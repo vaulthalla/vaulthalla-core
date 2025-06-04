@@ -6,13 +6,14 @@ BUILD_DIR = "server/build"
 class VaulthallaConan(ConanFile):
     name = "vaulthalla"
     version = "0.0.1"
-    settings = "os", "compiler", "arch", "build_type"
+    url = 'https://vaulthalla.io'
     description = ("A next-gen self-hosted file platform forged for the modern age. "
                    "Blazing-fast C++ backend. Beautiful Next.js frontend. Norse-tier performance.")
+    settings = "os", "compiler", "arch", "build_type"
     requires = [
-        "boost/1.85.0",
-        "nlohmann_json/3.11.3",
-        "libpqxx/7.9.1",
+        "boost/1.88.0",
+        "nlohmann_json/3.12.0",
+        "libpqxx/7.10.1",
         "gtest/1.14.0",
     ]
     generators = "PkgConfigDeps", "MesonToolchain"

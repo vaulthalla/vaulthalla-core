@@ -1,0 +1,8 @@
+# Dev
+.idea
+
+# Client
+client/node_modules
+
+# Server
+server/buildDir

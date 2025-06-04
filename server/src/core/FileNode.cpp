@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace vaulthalla {
+namespace core {
 
     FileNode::FileNode(std::string  path, FileType type)
             : path_(std::move(path)), type_(type), metadata_(std::make_shared<FileMetadata>()) {}
@@ -23,4 +23,4 @@ namespace vaulthalla {
         *metadata_ = metadata;
     }
 
-} // namespace vaulthalla
+} // namespace core

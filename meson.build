@@ -6,19 +6,29 @@ boost_dep = dependency('boost', modules: ['filesystem', 'system', 'serialization
 nlohmann_json_dep = dependency('nlohmann_json', required: true)
 libpqxx_dep = dependency('libpqxx', required: true)
 thread_dep = dependency('threads', required: true)
-gtest_dep = dependency('gtest', required: true, main: false)
+gtest_dep = dependency('gtest', required: true, main: true)
+
+source_root = 'server'
+project_root = source_root + '/src'
+tests_source_root = source_root + '/tests'
+main = files(source_root + '/main.cpp')
 
 global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, thread_dep]
 test_deps = global_deps + gtest_dep
 
-inc = include_directories('server/include')
+inc = include_directories(source_root + '/include')
 
-src_files = files(
-        'server/src/core/FileNode.cpp',
-        'server/main.cpp',
-)
+src_files = []
+foreach cpp_file : run_command('find', project_root, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    src_files += files(cpp_file)
+endforeach
 
-test_sources = []
+core_test_sources = src_files
+foreach cpp_file : run_command('find', tests_source_root + '/core', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    core_test_sources += files(cpp_file)
+endforeach
+
+src_files += main
 
 vaulthalla = executable('vaulthalla',
                         src_files,
@@ -26,8 +36,8 @@ vaulthalla = executable('vaulthalla',
                         include_directories: inc,
                         install : true)
 
-test('test_vaulthalla', executable('test_vaulthalla',
-                        test_sources,
+test('test_core', executable('test_core',
+                        core_test_sources,
                         dependencies: test_deps,
                         include_directories: inc,
                         install : true))

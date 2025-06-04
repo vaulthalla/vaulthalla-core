@@ -4,7 +4,7 @@
 #include <memory>
 #include "FileMetadata.hpp"
 
-namespace vh::core {
+namespace core {
 
     enum class FileType {
         File,
@@ -28,4 +28,4 @@ namespace vh::core {
         std::shared_ptr<FileMetadata> metadata_;
     };
 
-} // namespace vh::core
+} // namespace core

@@ -5,4 +5,4 @@
 client/node_modules
 
 # Server
-server/build
+build

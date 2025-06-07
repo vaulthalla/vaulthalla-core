@@ -8,7 +8,7 @@ libpqxx_dep = dependency('libpqxx', required: true)
 thread_dep = dependency('threads', required: true)
 gtest_dep = dependency('gtest', required: true, main: true)
 
-source_root = 'server'
+source_root = '.'
 project_root = source_root + '/src'
 tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')

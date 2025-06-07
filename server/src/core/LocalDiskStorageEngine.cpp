@@ -2,9 +2,9 @@
 
 #include <utility>
 
-namespace core {
+namespace vh::core {
 
-    LocalDiskStorageEngine::LocalDiskStorageEngine(std::filesystem::path  root_dir)
+    LocalDiskStorageEngine::LocalDiskStorageEngine(std::filesystem::path root_dir)
             : root(std::move(root_dir)) {
         std::filesystem::create_directories(root);
     }
@@ -39,4 +39,16 @@ namespace core {
         return std::filesystem::remove(full_path);
     }
 
-}
+    bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
+        return std::filesystem::exists(root / rel_path);
+    }
+
+    std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
+        return root / rel_path;
+    }
+
+    std::filesystem::path LocalDiskStorageEngine::getRootPath() const {
+        return root;
+    }
+
+} // namespace vh::core

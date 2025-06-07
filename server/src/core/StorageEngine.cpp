@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iostream>
 
-namespace core {
+namespace vh::core {
 
     StorageEngine::StorageEngine(const fs::path& root_directory)
             : root(fs::absolute(root_directory)) {
@@ -73,4 +73,6 @@ namespace core {
         return fs::absolute(root / relative_path);
     }
 
-} // namespace core
+    fs::path StorageEngine::getRootPath() const { return root; }
+
+} // namespace vh::core

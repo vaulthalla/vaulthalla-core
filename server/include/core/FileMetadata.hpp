@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-namespace core {
+namespace vh::core {
 
     struct FileMetadata {
         std::string path;
@@ -26,4 +26,4 @@ namespace core {
         static FileMetadata from_json(const nlohmann::json& j);
     };
 
-} // namespace core
+} // namespace vh::core

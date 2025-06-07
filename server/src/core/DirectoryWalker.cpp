@@ -7,7 +7,7 @@ using DirectoryIteratorVariant = std::variant<
         std::filesystem::recursive_directory_iterator
 >;
 
-namespace core {
+namespace vh::core {
 
     DirectoryWalker::DirectoryWalker(bool recursive)
             : recursive(recursive) {}
@@ -49,4 +49,4 @@ namespace core {
         return entries;
     }
 
-} // namespace core
+} // namespace vh::core

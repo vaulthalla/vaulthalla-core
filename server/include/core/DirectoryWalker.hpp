@@ -7,7 +7,7 @@
 
 namespace fs = std::filesystem;
 
-namespace core {
+namespace vh::core {
 
     class DirectoryWalker {
     public:
@@ -27,4 +27,4 @@ namespace core {
         bool recursive;
     };
 
-} // namespace core
+} // namespace vh::core

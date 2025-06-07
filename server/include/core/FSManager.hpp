@@ -1,35 +1,49 @@
 #pragma once
 
-#include <string>
-#include <unordered_map>
+#include "StorageEngine.hpp"
+#include "FileMetadata.hpp"
+#include "DirectoryWalker.hpp"
+#include "index/FileScanner.hpp"
+#include "index/SearchIndex.hpp"
+
 #include <filesystem>
-#include <optional>
 #include <memory>
-#include "core/StorageEngine.hpp"
-#include "core/FileMetadata.hpp"
+#include <optional>
+#include <unordered_map>
+#include <vector>
 
-namespace fs = std::filesystem;
-
-namespace core {
+namespace vh::core {
 
     class FSManager {
     public:
-        explicit FSManager(const fs::path& root_directory);
+        explicit FSManager(const std::filesystem::path& root_directory);
         explicit FSManager(const std::shared_ptr<StorageEngine>& storage_engine);
 
+        // Core file APIs
+        std::filesystem::path resolvePath(const std::string& id) const;
         bool saveFile(const std::string& id, const std::vector<uint8_t>& data);
-        [[nodiscard]] std::optional<std::vector<uint8_t>> loadFile(const std::string& id) const;
+        std::optional<std::vector<uint8_t>> loadFile(const std::string& id) const;
         bool deleteFile(const std::string& id);
-        [[nodiscard]] bool fileExists(const std::string& id) const;
-
+        bool fileExists(const std::string& id) const;
+        std::optional<FileMetadata> getMetadata(const std::string& id) const;
         std::unordered_map<std::string, FileMetadata> getIndex() const;
-        [[nodiscard]] std::optional<FileMetadata> getMetadata(const std::string& id) const;
+
+        // New APIs for full FS control
+        void rebuildIndex(bool recursive = true);
+        std::vector<std::filesystem::path> search(const std::string& term) const;
+        void scanFile(const std::filesystem::path& path);
+        std::vector<std::filesystem::path> listFilesInDir(const std::filesystem::path& dir, bool recursive = true) const;
+
+        std::shared_ptr<StorageEngine> getStorageEngine() const { return storage; }
 
     private:
         std::shared_ptr<StorageEngine> storage;
         std::unordered_map<std::string, FileMetadata> file_index;
 
-        [[nodiscard]] fs::path resolvePath(const std::string& id) const;
+        // Injected tools
+        core::DirectoryWalker directoryWalker{true};
+        index::FileScanner fileScanner;
+        index::SearchIndex searchIndex;
     };
 
-} // namespace core
+} // namespace vh::core

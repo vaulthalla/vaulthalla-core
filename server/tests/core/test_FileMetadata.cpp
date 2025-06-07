@@ -3,7 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <thread>
 
-using namespace core;
+using namespace vh::core;
 using namespace std::chrono;
 
 TEST(FileMetadataTest, ConstructorSetsFieldsCorrectly) {

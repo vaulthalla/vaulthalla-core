@@ -1,7 +1,7 @@
 from conan import ConanFile
 from conan.tools.meson import Meson
 
-BUILD_DIR = "server/build"
+BUILD_DIR = "build"
 
 class VaulthallaConan(ConanFile):
     name = "vaulthalla"
@@ -20,7 +20,7 @@ class VaulthallaConan(ConanFile):
     exports_sources = "meson.build", "src/*", "main.cpp", "tests/*", "meson/*"
 
     def layout(self):
-        self.folders.source = 'server'
+        self.folders.source = '.'
         self.folders.build = f'{BUILD_DIR}'
         self.folders.generators = f'{BUILD_DIR}/generators'
         self.folders.package = f'{BUILD_DIR}/package'

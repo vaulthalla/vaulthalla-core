@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-namespace core {
+namespace vh::core {
 
     class StorageEngine {
     public:
@@ -23,10 +23,11 @@ namespace core {
         virtual bool deleteFile(const fs::path& relative_path);
         [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const;
 
-        [[nodiscard]] fs::path getAbsolutePath(const fs::path& relative_path) const;
+        [[nodiscard]] virtual fs::path getAbsolutePath(const fs::path& relative_path) const;
+        [[nodiscard]] virtual fs::path getRootPath() const;
 
     private:
         fs::path root;
     };
 
-} // namespace core
+} // namespace vh::core

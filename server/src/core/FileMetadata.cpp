@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-namespace core {
+namespace vh::core {
 
     FileMetadata::FileMetadata(const fs::directory_entry& entry) {
         path = entry.path().string();
@@ -72,4 +72,4 @@ namespace core {
         return meta;
     }
 
-} // namespace core
+} // namespace vh::core

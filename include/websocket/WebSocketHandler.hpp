@@ -1,59 +1,26 @@
 #pragma once
 
+#include "websocket/handlers/AuthHandler.hpp"
+#include "websocket/handlers/FileSystemHandler.hpp"
+#include "websocket/handlers/StorageHandler.hpp"
+#include "websocket/handlers/ShareHandler.hpp"
+#include "websocket/handlers/SearchHandler.hpp"
+#include "websocket/handlers/NotificationHandler.hpp"
+#include "services/ServiceManager.hpp"
+
 #include <memory>
 
-namespace vh::auth {
-    class SessionManager;
-    class AuthManager;
-    class TokenValidator;
-}
-
-namespace vh::core {
-    class FSManager;
-}
-
-namespace vh::index {
-    class SearchIndex;
-}
-
-namespace vh::security {
-    class PermissionManager;
-}
-
-namespace vh::share {
-    class LinkResolver;
-}
-
-namespace vh::storage {
-    class StorageManager;
-}
-
 namespace vh::websocket {
-    class WebSocketRouter;
-    class AuthHandler;
-    class FileSystemHandler;
-    class StorageHandler;
-    class ShareHandler;
-    class SearchHandler;
-    class NotificationHandler;
 
     class WebSocketHandler {
     public:
-        WebSocketHandler(WebSocketRouter& router,
-                         vh::auth::SessionManager& sessionManager,
-                         vh::auth::AuthManager& authManager,
-                         vh::auth::TokenValidator& tokenValidator,
-                         std::shared_ptr<vh::core::FSManager> fsManager,
-                         std::shared_ptr<vh::index::SearchIndex> searchIndex);
+        WebSocketHandler(WebSocketRouter& router, const std::shared_ptr<vh::services::ServiceManager>& serviceManager);
 
         void registerAllHandlers();
 
     private:
         WebSocketRouter& router_;
-        vh::auth::SessionManager& sessionManager_;
-        std::shared_ptr<vh::core::FSManager> fsManager_;
-        std::shared_ptr<vh::index::SearchIndex> searchIndex_;
-        std::shared_ptr<vh::storage::StorageManager> storageManager_;
+        std::shared_ptr<vh::services::ServiceManager> serviceManager_;
 
         std::shared_ptr<AuthHandler> authHandler_;
         std::shared_ptr<FileSystemHandler> fsHandler_;
@@ -61,10 +28,6 @@ namespace vh::websocket {
         std::shared_ptr<ShareHandler> shareHandler_;
         std::shared_ptr<SearchHandler> searchHandler_;
         std::shared_ptr<NotificationHandler> notificationHandler_;
-
-        std::shared_ptr<vh::security::PermissionManager> permissionManager_;
-        std::shared_ptr<vh::share::LinkResolver> linkResolver_;
-
     };
 
 } // namespace vh::websocket

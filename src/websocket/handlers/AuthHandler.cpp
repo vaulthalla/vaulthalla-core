@@ -7,20 +7,20 @@
 
 namespace vh::websocket {
 
-    AuthHandler::AuthHandler(vh::auth::SessionManager& sessionManager,
-                             vh::auth::AuthManager& authManager,
-                             vh::auth::TokenValidator& tokenValidator)
-            : sessionManager_(sessionManager),
-              authManager_(authManager),
-              tokenValidator_(tokenValidator) {}
+    AuthHandler::AuthHandler(const std::shared_ptr<vh::auth::AuthManager> &authManager)
+            : authManager_(authManager),
+              sessionManager_(authManager->sessionManager()),
+              tokenValidator_(authManager->tokenValidator()) {
+        if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
+    }
 
     void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) {
         try {
             std::string username = msg.at("username").get<std::string>();
             std::string password = msg.at("password").get<std::string>();
 
-            auto user = authManager_.loginUser(username, password);
-            std::string token = sessionManager_.createSession(user);
+            auto user = authManager_->loginUser(username, password);
+            std::string token = sessionManager_->createSession(user);
 
             // Bind user to WebSocketSession
             session.setAuthenticatedUser(user);
@@ -53,11 +53,11 @@ namespace vh::websocket {
         try {
             std::string token = msg.at("token").get<std::string>();
 
-            if (!tokenValidator_.validateToken(token)) {
+            if (!tokenValidator_->validateToken(token)) {
                 throw std::runtime_error("Invalid token");
             }
 
-            auto user = sessionManager_.getUserForSession(token);
+            auto user = sessionManager_->getUserForSession(token);
             if (!user) {
                 throw std::runtime_error("Session not found");
             }
@@ -93,7 +93,7 @@ namespace vh::websocket {
         try {
             std::string token = msg.at("token").get<std::string>();
 
-            sessionManager_.invalidateSession(token);
+            sessionManager_->invalidateSession(token);
 
             // Clear bound user in WebSocketSession
             session.setAuthenticatedUser(nullptr);

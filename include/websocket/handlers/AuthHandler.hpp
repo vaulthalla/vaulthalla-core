@@ -17,18 +17,16 @@ namespace vh::websocket {
 
     class AuthHandler {
     public:
-        AuthHandler(vh::auth::SessionManager& sessionManager,
-                    vh::auth::AuthManager& authManager,
-                    vh::auth::TokenValidator& tokenValidator);
+        explicit AuthHandler(const std::shared_ptr<vh::auth::AuthManager>& authManager);
 
         void handleLogin(const json& msg, WebSocketSession& session);
         void handleRefresh(const json& msg, WebSocketSession& session);
         void handleLogout(const json& msg, WebSocketSession& session);
 
     private:
-        vh::auth::SessionManager& sessionManager_;
-        vh::auth::AuthManager& authManager_;
-        vh::auth::TokenValidator& tokenValidator_;
+        std::shared_ptr<vh::auth::AuthManager> authManager_;
+        std::shared_ptr<vh::auth::SessionManager> sessionManager_;
+        std::shared_ptr<vh::auth::TokenValidator> tokenValidator_;
     };
 
 } // namespace vh::websocket

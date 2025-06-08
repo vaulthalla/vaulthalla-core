@@ -9,7 +9,7 @@ namespace vh::websocket {
     WebSocketServer::WebSocketServer(asio::io_context& ioc,
                                      const tcp::endpoint& endpoint,
                                      WebSocketRouter& router,
-                                     auth::SessionManager& sessionManager)
+                                     const std::shared_ptr<vh::auth::SessionManager>& sessionManager)
             : acceptor_(ioc), socket_(ioc), ioc_(ioc),
               router_(router), sessionManager_(sessionManager),
               broadcastManager_(std::make_shared<vh::websocket::NotificationBroadcastManager>()) {

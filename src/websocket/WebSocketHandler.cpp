@@ -1,37 +1,19 @@
 #include "websocket/WebSocketHandler.hpp"
 #include "websocket/WebSocketRouter.hpp"
 #include "auth/SessionManager.hpp"
-#include "websocket/handlers/AuthHandler.hpp"
-#include "websocket/handlers/FileSystemHandler.hpp"
-#include "websocket/handlers/StorageHandler.hpp"
-#include "websocket/handlers/ShareHandler.hpp"
-#include "websocket/handlers/SearchHandler.hpp"
-#include "websocket/handlers/NotificationHandler.hpp"
-#include "security/PermissionManager.hpp"
-#include "share/LinkResolver.hpp"
-#include "core/FSManager.hpp"
-#include "storage/StorageManager.hpp"
 
 #include <iostream>
 
 namespace vh::websocket {
 
-    WebSocketHandler::WebSocketHandler(WebSocketRouter &router, auth::SessionManager &sessionManager,
-                                       auth::AuthManager &authManager, auth::TokenValidator &tokenValidator,
-                                       std::shared_ptr<core::FSManager> fsManager,
-                                       std::shared_ptr<index::SearchIndex> searchIndex)
-                               : router_(router),
-                                 sessionManager_(sessionManager),
-                                 fsManager_(std::move(fsManager)),
-                                 searchIndex_(std::move(searchIndex)) {
-        authHandler_ = std::make_shared<AuthHandler>(sessionManager_, authManager, tokenValidator);
-        storageManager_ = std::make_shared<storage::StorageManager>();
-        storageHandler_ = std::make_shared<StorageHandler>(storageManager_);
-        permissionManager_ = std::make_shared<security::PermissionManager>();
-        fsHandler_ = std::make_shared<FileSystemHandler>(storageManager_, permissionManager_);
-        linkResolver_ = std::make_shared<share::LinkResolver>();
-        shareHandler_ = std::make_shared<ShareHandler>(linkResolver_);
-        searchHandler_ = std::make_shared<SearchHandler>(searchIndex_);
+    WebSocketHandler::WebSocketHandler(vh::websocket::WebSocketRouter &router,
+                                       const std::shared_ptr<vh::services::ServiceManager> &serviceManager)
+                   : router_(router), serviceManager_(serviceManager) {
+        authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());
+        storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager());
+        fsHandler_ = std::make_shared<FileSystemHandler>(serviceManager_);
+        shareHandler_ = std::make_shared<ShareHandler>(serviceManager_->linkResolver());
+        searchHandler_ = std::make_shared<SearchHandler>(serviceManager_->searchIndex());
         notificationHandler_ = std::make_shared<NotificationHandler>();
     }
 

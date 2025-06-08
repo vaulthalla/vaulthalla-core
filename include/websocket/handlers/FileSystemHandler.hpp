@@ -2,14 +2,10 @@
 
 #include <nlohmann/json.hpp>
 #include <memory>
-
-namespace vh::security {
-    class PermissionManager;
-}
-
-namespace vh::storage {
-    class StorageManager;
-}
+#include "security/AccessControl.hpp"
+#include "security/PermissionManager.hpp"
+#include "storage/StorageManager.hpp"
+#include "services/ServiceManager.hpp"
 
 namespace vh::websocket {
 
@@ -19,9 +15,7 @@ namespace vh::websocket {
 
     class FileSystemHandler {
     public:
-        explicit FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager);
-        FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager,
-                          std::shared_ptr<vh::security::PermissionManager> permissionManager);
+        explicit FileSystemHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager);
 
         void handleListDir(const json& msg, WebSocketSession& session);
         void handleReadFile(const json& msg, WebSocketSession& session);
@@ -30,6 +24,7 @@ namespace vh::websocket {
 
     private:
         std::shared_ptr<vh::storage::StorageManager> storageManager_;
+        std::shared_ptr<vh::security::AccessControl> accessControl_;
         std::shared_ptr<vh::security::PermissionManager> permissionManager_;
 
         static void validateAuth(WebSocketSession& session);

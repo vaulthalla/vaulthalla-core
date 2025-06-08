@@ -21,7 +21,7 @@ namespace vh::websocket {
         WebSocketServer(asio::io_context& ioc,
                         const tcp::endpoint& endpoint,
                         WebSocketRouter& router,
-                        auth::SessionManager& sessionManager);
+                        const std::shared_ptr<vh::auth::SessionManager>& sessionManager);
 
         void run();
 
@@ -31,7 +31,7 @@ namespace vh::websocket {
         asio::io_context& ioc_;
 
         WebSocketRouter& router_;
-        auth::SessionManager& sessionManager_;
+        std::shared_ptr<vh::auth::SessionManager> sessionManager_;
         std::shared_ptr<vh::websocket::NotificationBroadcastManager> broadcastManager_;
 
         void doAccept();

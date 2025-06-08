@@ -5,16 +5,18 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
-#include <iomanip>
 
 namespace vh::auth {
 
-    AuthManager::AuthManager(SessionManager& sessionManager, TokenValidator& tokenValidator)
-            : sessionManager_(sessionManager), tokenValidator_(tokenValidator) {
-        if (sodium_init() < 0) {
-            throw std::runtime_error("libsodium initialization failed in AuthManager");
-        }
+    AuthManager::AuthManager(const std::shared_ptr<SessionManager> &sessionManager,
+                             const std::shared_ptr<TokenValidator> &tokenValidator)
+                     : sessionManager_(sessionManager), tokenValidator_(tokenValidator) {
+        if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
     }
+
+    std::shared_ptr<SessionManager> AuthManager::sessionManager() const { return sessionManager_; }
+
+    std::shared_ptr<TokenValidator> AuthManager::tokenValidator() const { return tokenValidator_; }
 
     std::shared_ptr<User> AuthManager::registerUser(const std::string& username, const std::string& password) {
         if (users_.count(username) > 0) {

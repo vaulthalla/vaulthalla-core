@@ -12,7 +12,8 @@ namespace vh::auth {
 
     class AuthManager {
     public:
-        AuthManager(SessionManager& sessionManager, TokenValidator& tokenValidator);
+        AuthManager(const std::shared_ptr<SessionManager>& sessionManager,
+                    const std::shared_ptr<TokenValidator>& tokenValidator);
 
         std::shared_ptr<User> registerUser(const std::string& username, const std::string& password);
         std::shared_ptr<User> loginUser(const std::string& username, const std::string& password);
@@ -21,10 +22,13 @@ namespace vh::auth {
         // Simplified user storage for now (later: persist to DB)
         std::shared_ptr<User> findUser(const std::string& username);
 
+        [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;
+        [[nodiscard]] std::shared_ptr<TokenValidator> tokenValidator() const;
+
     private:
         std::unordered_map<std::string, std::shared_ptr<User>> users_;
-        SessionManager& sessionManager_;
-        TokenValidator& tokenValidator_;
+        std::shared_ptr<SessionManager> sessionManager_;
+        std::shared_ptr<TokenValidator> tokenValidator_;
 
         std::string hashPassword(const std::string& password);
         bool verifyPassword(const std::string& password, const std::string& hash);

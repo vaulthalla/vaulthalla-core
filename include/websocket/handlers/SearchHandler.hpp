@@ -12,7 +12,7 @@ namespace vh::websocket {
 
     class SearchHandler {
     public:
-        explicit SearchHandler(std::shared_ptr<vh::index::SearchIndex> searchIndex);
+        explicit SearchHandler(const std::shared_ptr<vh::index::SearchIndex>& searchIndex);
 
         void handleSearch(const json& msg, WebSocketSession& session);
 

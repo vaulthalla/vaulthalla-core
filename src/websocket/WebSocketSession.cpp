@@ -9,13 +9,13 @@ namespace vh::websocket {
 
     WebSocketSession::WebSocketSession(tcp::socket socket,
                                        WebSocketRouter& router,
-                                       auth::SessionManager& sessionManager,
-                                       std::shared_ptr<NotificationBroadcastManager> broadcastManager)
+                                       const std::shared_ptr<vh::auth::SessionManager>& sessionManager,
+                                       const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
             : ws_(std::move(socket)),
               strand_(boost::asio::make_strand(ws_.get_executor())),
               router_(router),
               sessionManager_(sessionManager),
-              broadcastManager_(std::move(broadcastManager)) {}
+              broadcastManager_(broadcastManager) {}
 
     WebSocketSession::~WebSocketSession() {
         if (broadcastManager_ && isRegistered_) {

@@ -17,6 +17,8 @@ namespace vh::security {
                                const std::string& path,
                                const std::string& requiredPermission);
 
+        [[nodiscard]] std::shared_ptr<PermissionManager> permissionManager() const;
+
     private:
         std::shared_ptr<PermissionManager> permissionManager_;
     };

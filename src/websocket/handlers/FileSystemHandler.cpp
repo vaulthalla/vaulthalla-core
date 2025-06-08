@@ -1,19 +1,18 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "security/PermissionManager.hpp"
-#include "storage/StorageManager.hpp"
 #include "auth/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
 
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager)
-            : storageManager_(std::move(storageManager)) {}
-
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager,
-                                         std::shared_ptr<vh::security::PermissionManager> permissionManager)
-            : storageManager_(std::move(storageManager)),
-              permissionManager_(std::move(permissionManager)) {}
+    FileSystemHandler::FileSystemHandler(const std::shared_ptr<vh::services::ServiceManager> &serviceManager)
+            : storageManager_(serviceManager->storageManager()),
+              accessControl_(serviceManager->accessControl()),
+              permissionManager_(accessControl_->permissionManager()) {
+        if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
+        if (!accessControl_) throw std::invalid_argument("AccessControl cannot be null");
+        if (!permissionManager_) throw std::invalid_argument("PermissionManager cannot be null");
+    }
 
     void FileSystemHandler::validateAuth(WebSocketSession& session) {
         if (!session.getAuthenticatedUser()) {

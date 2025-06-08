@@ -31,8 +31,8 @@ namespace vh::websocket {
         ~WebSocketSession();
         WebSocketSession(tcp::socket socket,
                          WebSocketRouter& router,
-                         auth::SessionManager& sessionManager,
-                         std::shared_ptr<NotificationBroadcastManager> broadcastManager);
+                         const std::shared_ptr<vh::auth::SessionManager>& sessionManager,
+                         const std::shared_ptr<NotificationBroadcastManager>& broadcastManager);
 
         void run();
 
@@ -53,7 +53,7 @@ namespace vh::websocket {
         asio::any_io_executor strand_;
 
         WebSocketRouter& router_;
-        auth::SessionManager& sessionManager_;
+        std::shared_ptr<auth::SessionManager> sessionManager_;
         std::shared_ptr<auth::User> authenticatedUser_;
 
         std::mutex writeQueueMutex_;

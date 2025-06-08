@@ -15,7 +15,7 @@ namespace vh::websocket {
 
     class ShareHandler {
     public:
-        explicit ShareHandler(std::shared_ptr<vh::share::LinkResolver> linkResolver);
+        explicit ShareHandler(const std::shared_ptr<vh::share::LinkResolver>& linkResolver);
 
         void handleCreateLink(const json& msg, WebSocketSession& session);
         void handleResolveLink(const json& msg, WebSocketSession& session);

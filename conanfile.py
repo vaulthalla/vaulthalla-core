@@ -15,6 +15,8 @@ class VaulthallaConan(ConanFile):
         "nlohmann_json/3.12.0",
         "libpqxx/7.10.1",
         "gtest/1.14.0",
+        "libsodium/1.0.20",
+        "jwt-cpp/0.7.1"
     ]
     generators = "PkgConfigDeps", "MesonToolchain"
     exports_sources = "meson.build", "src/*", "main.cpp", "tests/*", "meson/*"

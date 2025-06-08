@@ -1,13 +1,34 @@
 #include "security/AccessControl.hpp"
 
-namespace Security {
+#include <stdexcept>
+#include <iostream>
 
-AccessControl::AccessControl() {
-    // TODO: Constructor
-}
+namespace vh::security {
 
-AccessControl::~AccessControl() {
-    // TODO: Destructor
-}
+    AccessControl::AccessControl(std::shared_ptr<PermissionManager> permissionManager)
+            : permissionManager_(std::move(permissionManager)) {}
 
-}
+    void AccessControl::enforcePermission(std::shared_ptr<vh::auth::User> user,
+                                          const std::string& mountName,
+                                          const std::string& path,
+                                          const std::string& requiredPermission) {
+        if (!user) {
+            throw std::runtime_error("Unauthorized: no user bound to session");
+        }
+
+        const std::string& username = user->getUsername();
+
+        if (!permissionManager_->hasPermission(username, mountName, path, requiredPermission)) {
+            std::cerr << "[AccessControl] Permission denied: user " << username
+                      << " lacks " << requiredPermission << " on "
+                      << mountName << ":" << path << "\n";
+
+            throw std::runtime_error("Permission denied: " + requiredPermission + " on " + path);
+        }
+
+        std::cout << "[AccessControl] Permission granted: user " << username
+                  << " " << requiredPermission << " on "
+                  << mountName << ":" << path << "\n";
+    }
+
+} // namespace vh::security

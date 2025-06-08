@@ -1,4 +1,13 @@
 #include "websocket/WebSocketHandler.hpp"
+#include "websocket/WebSocketRouter.hpp"
+#include "auth/SessionManager.hpp"
+#include "websocket/handlers/AuthHandler.hpp"
+#include "websocket/handlers/FileSystemHandler.hpp"
+#include "websocket/handlers/StorageHandler.hpp"
+// Future:
+#include "websocket/handlers/ShareHandler.hpp"
+#include "websocket/handlers/SearchHandler.hpp"
+#include "websocket/handlers/NotificationHandler.hpp"
 
 namespace vh::websocket {
 

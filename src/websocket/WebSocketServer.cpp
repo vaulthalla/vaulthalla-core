@@ -1,16 +1,18 @@
 #include "websocket/WebSocketServer.hpp"
 #include "websocket/WebSocketSession.hpp"
+#include "websocket/handlers/NotificationBroadcastManager.hpp"
 
 #include <iostream>
 
 namespace vh::websocket {
 
     WebSocketServer::WebSocketServer(asio::io_context& ioc,
-                                     tcp::endpoint endpoint,
+                                     const tcp::endpoint& endpoint,
                                      WebSocketRouter& router,
                                      auth::SessionManager& sessionManager)
             : acceptor_(ioc), socket_(ioc), ioc_(ioc),
-              router_(router), sessionManager_(sessionManager) {
+              router_(router), sessionManager_(sessionManager),
+              broadcastManager_(std::make_shared<vh::websocket::NotificationBroadcastManager>()) {
         beast::error_code ec;
 
         acceptor_.open(endpoint.protocol(), ec);
@@ -51,7 +53,7 @@ namespace vh::websocket {
             std::cout << "[WebSocketServer] Accepted new connection.\n";
 
             // Launch WebSocketSession
-            std::make_shared<WebSocketSession>(std::move(socket_), router_, sessionManager_)->run();
+            std::make_shared<WebSocketSession>(std::move(socket_), router_, sessionManager_, broadcastManager_)->run();
         }
 
         // Accept next connection

@@ -1,10 +1,5 @@
 #pragma once
 
-#include "websocket/WebSocketRouter.hpp"
-#include "auth/User.hpp"
-#include "auth/SessionManager.hpp"
-#include "websocket/handlers/NotificationBroadcastManager.hpp"
-
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/strand.hpp>
@@ -17,6 +12,13 @@
 #include <unordered_set>
 
 namespace vh::websocket {
+    namespace auth {
+        class User;
+        class SessionManager;
+    }
+
+    class WebSocketRouter;
+    class NotificationBroadcastManager;
 
     namespace beast = boost::beast;
     namespace websocket = beast::websocket;
@@ -48,7 +50,7 @@ namespace vh::websocket {
     private:
         websocket::stream<tcp::socket> ws_;
         beast::flat_buffer buffer_;
-        asio::strand<asio::io_context::executor_type> strand_;
+        asio::strand<boost::asio::any_io_executor> strand_;
 
         WebSocketRouter& router_;
         auth::SessionManager& sessionManager_;

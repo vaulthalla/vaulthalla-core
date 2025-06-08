@@ -1,4 +1,5 @@
 #include "websocket/WebSocketRouter.hpp"
+#include "websocket/WebSocketSession.hpp"
 #include <iostream>
 
 namespace vh::websocket {

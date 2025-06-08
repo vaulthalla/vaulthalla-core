@@ -1,12 +1,12 @@
 #pragma once
 
-#include "WebSocketSession.hpp"
 #include <functional>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <string>
 
 namespace vh::websocket {
+    class WebSocketSession;
 
     using json = nlohmann::json;
 

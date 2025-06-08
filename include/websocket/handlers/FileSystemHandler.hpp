@@ -1,15 +1,17 @@
 #pragma once
 
-#include "websocket/WebSocketSession.hpp"
-#include "websocket/handlers/StorageHandler.hpp"
-#include "security/PermissionManager.hpp"
-
 #include <nlohmann/json.hpp>
 #include <memory>
 
 namespace vh::websocket {
 
     using json = nlohmann::json;
+
+    class WebSocketSession;
+    class StorageHandler;
+    namespace vh::security {
+        class PermissionManager;
+    }
 
     class FileSystemHandler {
     public:

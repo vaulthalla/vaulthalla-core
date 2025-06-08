@@ -1,4 +1,10 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
+#include "websocket/WebSocketSession.hpp"
+#include "websocket/handlers/StorageHandler.hpp"
+#include "security/PermissionManager.hpp"
+#include "websocket/WebSocketSession.hpp"
+#include "websocket/handlers/StorageHandler.hpp"
+#include "security/PermissionManager.hpp"
 #include <iostream>
 
 namespace vh::websocket {

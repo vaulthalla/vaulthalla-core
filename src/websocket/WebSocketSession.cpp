@@ -1,4 +1,8 @@
 #include "websocket/WebSocketSession.hpp"
+#include "websocket/WebSocketRouter.hpp"
+#include "auth/User.hpp"
+#include "auth/SessionManager.hpp"
+#include "websocket/handlers/NotificationBroadcastManager.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -8,14 +12,14 @@ namespace vh::websocket {
                                        auth::SessionManager& sessionManager,
                                        std::shared_ptr<NotificationBroadcastManager> broadcastManager)
             : ws_(std::move(socket)),
-              strand_(ws_.get_executor()),
+              strand_(boost::asio::make_strand(ws_.get_executor())),
               router_(router),
               sessionManager_(sessionManager),
               broadcastManager_(std::move(broadcastManager)) {}
 
     WebSocketSession::~WebSocketSession() {
         if (broadcastManager_ && isRegistered_) {
-            broadcastManager_->unregisterSession(this);
+            broadcastManager_->unregisterSession(shared_from_this());
             std::cout << "[WebSocketSession] Destructor called, session unregistered.\n";
         }
     }
@@ -41,7 +45,7 @@ namespace vh::websocket {
 
     void WebSocketSession::onRead(beast::error_code ec, std::size_t bytesTransferred) {
         if (!isRegistered_) {
-            broadcastManager_->registerSession(this);
+            broadcastManager_->registerSession(shared_from_this());
             isRegistered_ = true;
         }
 
@@ -51,10 +55,7 @@ namespace vh::websocket {
             std::cout << "[WebSocketSession] Connection closed.\n";
             return;
 
-            WebSocketSession::~WebSocketSession() {
-                broadcastManager_->unregisterSession(shared_from_this());
-                std::cout << "[WebSocketSession] Destructor called, session unregistered.\n";
-            }
+            WebSocketSession::~WebSocketSession();
         }
 
         if (ec) {

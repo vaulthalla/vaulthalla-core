@@ -1,4 +1,8 @@
 #include "websocket/handlers/AuthHandler.hpp"
+#include "websocket/WebSocketSession.hpp"
+#include "auth/AuthManager.hpp"
+#include "auth/SessionManager.hpp"
+#include "auth/TokenValidator.hpp"
 #include <iostream>
 
 namespace vh::websocket {

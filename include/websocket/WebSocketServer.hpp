@@ -10,6 +10,7 @@
 #include <memory>
 
 namespace vh::websocket {
+    class NotificationBroadcastManager;
 
     namespace asio = boost::asio;
     namespace beast = boost::beast;
@@ -18,7 +19,7 @@ namespace vh::websocket {
     class WebSocketServer : public std::enable_shared_from_this<WebSocketServer> {
     public:
         WebSocketServer(asio::io_context& ioc,
-                        tcp::endpoint endpoint,
+                        const tcp::endpoint& endpoint,
                         WebSocketRouter& router,
                         auth::SessionManager& sessionManager);
 
@@ -31,6 +32,7 @@ namespace vh::websocket {
 
         WebSocketRouter& router_;
         auth::SessionManager& sessionManager_;
+        std::shared_ptr<vh::websocket::NotificationBroadcastManager> broadcastManager_;
 
         void doAccept();
         void onAccept(boost::system::error_code ec);

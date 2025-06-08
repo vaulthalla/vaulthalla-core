@@ -1,23 +1,32 @@
 #pragma once
 
-#include "websocket/WebSocketRouter.hpp"
-#include "auth/SessionManager.hpp"
-#include "websocket/handlers/AuthHandler.hpp"
-#include "websocket/handlers/FileSystemHandler.hpp"
-#include "websocket/handlers/StorageHandler.hpp"
-// Future:
-#include "websocket/handlers/ShareHandler.hpp"
-#include "websocket/handlers/SearchHandler.hpp"
-#include "websocket/handlers/NotificationHandler.hpp"
-
 #include <memory>
 
 namespace vh::websocket {
+    namespace vh::auth {
+        class SessionManager;
+    }
+
+    namespace vh::core {
+        class FSManager;
+    }
+
+    namespace vh::index {
+        class SearchIndex;
+    }
+
+    class WebSocketRouter;
+    class AuthHandler;
+    class FileSystemHandler;
+    class StorageHandler;
+    class ShareHandler;
+    class SearchHandler;
+    class NotificationHandler;
 
     class WebSocketHandler {
     public:
         WebSocketHandler(WebSocketRouter& router,
-                         auth::SessionManager& sessionManager,
+                         vh::auth::SessionManager& sessionManager,
                          std::shared_ptr<vh::core::FSManager> fsManager,
                          std::shared_ptr<vh::index::SearchIndex> searchIndex);
 
@@ -25,7 +34,7 @@ namespace vh::websocket {
 
     private:
         WebSocketRouter& router_;
-        auth::SessionManager& sessionManager_;
+        vh::auth::SessionManager& sessionManager_;
         std::shared_ptr<vh::core::FSManager> fsManager_;
         std::shared_ptr<vh::index::SearchIndex> searchIndex_;
 

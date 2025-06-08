@@ -1,16 +1,19 @@
 #pragma once
 
-#include "websocket/WebSocketSession.hpp"
-#include "auth/AuthManager.hpp"
-#include "auth/SessionManager.hpp"
-#include "auth/TokenValidator.hpp"
-
 #include <nlohmann/json.hpp>
 #include <memory>
 
 namespace vh::websocket {
 
     using json = nlohmann::json;
+
+    namespace vh::auth {
+        class SessionManager;
+        class AuthManager;
+        class TokenValidator;
+    }
+
+    class WebSocketSession;
 
     class AuthHandler {
     public:

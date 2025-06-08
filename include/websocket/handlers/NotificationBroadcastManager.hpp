@@ -1,13 +1,13 @@
 #pragma once
 
-#include "websocket/WebSocketSession.hpp"
-
 #include <memory>
 #include <unordered_set>
 #include <mutex>
 #include <string>
+#include <nlohmann/json.hpp>
 
 namespace vh::websocket {
+    class WebSocketSession;
 
     class NotificationBroadcastManager {
     public:
@@ -20,7 +20,7 @@ namespace vh::websocket {
                                    const nlohmann::json& payload);
 
     private:
-        std::unordered_set<std::shared_ptr<WebSocketSession>> sessions_;
+        std::unordered_set<std::shared_ptr<WebSocketSession>> sessions_{};
         std::mutex sessionsMutex_;
     };
 

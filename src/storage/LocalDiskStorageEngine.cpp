@@ -1,8 +1,8 @@
-#include "core/LocalDiskStorageEngine.hpp"
+#include "include/storage/LocalDiskStorageEngine.hpp"
 
 #include <utility>
 
-namespace vh::core {
+namespace vh::storage {
 
     LocalDiskStorageEngine::LocalDiskStorageEngine(std::filesystem::path root_dir)
             : root(std::move(root_dir)) {
@@ -13,11 +13,17 @@ namespace vh::core {
         auto full_path = root / rel_path;
         std::filesystem::create_directories(full_path.parent_path());
 
+        if (!overwrite && std::filesystem::exists(full_path)) return false;
+
         std::ofstream out(full_path, std::ios::binary);
         if (!out) return false;
 
         out.write(reinterpret_cast<const char*>(data.data()), data.size());
         return out.good();
+    }
+
+    bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data) {
+        return writeFile(rel_path, data, true);
     }
 
     std::optional<std::vector<uint8_t>> LocalDiskStorageEngine::readFile(const std::filesystem::path& rel_path) const {
@@ -43,6 +49,23 @@ namespace vh::core {
         return std::filesystem::exists(root / rel_path);
     }
 
+    std::vector<std::filesystem::path> LocalDiskStorageEngine::listFilesInDir(const std::filesystem::path& rel_path, bool recursive) const {
+        std::vector<std::filesystem::path> files;
+        auto full_path = root / rel_path;
+
+        if (!std::filesystem::exists(full_path) || !std::filesystem::is_directory(full_path)) return files;
+
+        for (const auto& entry : std::filesystem::directory_iterator(full_path)) {
+            if (entry.is_regular_file()) files.push_back(entry.path());
+            else if (recursive && entry.is_directory()) {
+                auto sub_files = listFilesInDir(entry.path(), true);
+                files.insert(files.end(), sub_files.begin(), sub_files.end());
+            }
+        }
+
+        return files;
+    }
+
     std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
         return root / rel_path;
     }
@@ -51,4 +74,4 @@ namespace vh::core {
         return root;
     }
 
-} // namespace vh::core
+} // namespace vh::storage

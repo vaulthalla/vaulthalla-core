@@ -8,10 +8,10 @@ namespace vh::auth {
 
     class User {
     public:
-        User(const std::string& username,
-             const std::string& passwordHash,
-             const std::string& encryptedPrivateKey,
-             const std::string& publicKey);
+        User(std::string  username,
+             std::string  passwordHash,
+             std::string  encryptedPrivateKey,
+             std::string  publicKey);
 
         [[nodiscard]] const std::string& getUsername() const;
         [[nodiscard]] const std::string& getPasswordHash() const;

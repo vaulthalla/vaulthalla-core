@@ -1,16 +1,19 @@
 #pragma once
 
-#include "websocket/WebSocketSession.hpp"
-#include "storage/StorageBackend.hpp"
-
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <memory>
 #include <mutex>
 
+namespace vh::storage {
+    class StorageEngine;
+}
+
 namespace vh::websocket {
 
     using json = nlohmann::json;
+
+    class WebSocketSession;
 
     class StorageHandler {
     public:
@@ -26,10 +29,10 @@ namespace vh::websocket {
         void handleUnmount(const json& msg, WebSocketSession& session);
 
         // Access active mounts
-        std::shared_ptr<vh::storage::StorageBackend> getMount(const std::string& mountName);
+        std::shared_ptr<vh::storage::StorageEngine> getMount(const std::string& mountName);
 
     private:
-        std::unordered_map<std::string, std::shared_ptr<vh::storage::StorageBackend>> mounts_;
+        std::unordered_map<std::string, std::shared_ptr<vh::storage::StorageEngine>> mounts_;
         std::mutex mountsMutex_;
     };
 

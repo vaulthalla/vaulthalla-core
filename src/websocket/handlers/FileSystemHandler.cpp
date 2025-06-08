@@ -1,20 +1,18 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "websocket/handlers/StorageHandler.hpp"
 #include "security/PermissionManager.hpp"
-#include "websocket/WebSocketSession.hpp"
-#include "websocket/handlers/StorageHandler.hpp"
-#include "security/PermissionManager.hpp"
+#include "storage/StorageManager.hpp"
+#include "auth/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
 
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<StorageHandler> storageHandler)
-            : storageHandler_(std::move(storageHandler)) {}
+    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageHandler)
+            : storageManager_(std::move(storageHandler)) {}
 
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<StorageHandler> storageHandler,
+    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageHandler,
                                          std::shared_ptr<vh::security::PermissionManager> permissionManager)
-            : storageHandler_(std::move(storageHandler)),
+            : storageManager_(std::move(storageHandler)),
               permissionManager_(std::move(permissionManager)) {}
 
     void FileSystemHandler::validateAuth(WebSocketSession& session) {
@@ -51,8 +49,8 @@ namespace vh::websocket {
 
             // Try Local first
             try {
-                auto fsManager = storageHandler_->getLocalMount(mountName);
-                auto files = fsManager->listFilesInDir(path, false);
+                auto fsManager = storageManager_->getLocalEngine(mountName);
+                auto files = fsManager->listFilesInDir(path);
 
                 entries = json::array();
                 for (const auto& file : files) {
@@ -60,8 +58,8 @@ namespace vh::websocket {
                 }
             } catch (...) {
                 // Try Cloud
-                auto cloudProvider = storageHandler_->getCloudMount(mountName);
-                entries = cloudProvider->listDirectory(path);
+                auto cloudProvider = storageManager_->getCloudEngine(mountName);
+                entries = cloudProvider->storage::StorageEngine::listFilesInDir(path);
             }
 
             json response = {
@@ -99,17 +97,19 @@ namespace vh::websocket {
             std::string fileContent;
 
             try {
-                auto fsManager = storageHandler_->getLocalMount(mountName);
-                auto dataOpt = fsManager->loadFile(path);
-                if (!dataOpt.has_value()) {
-                    throw std::runtime_error("File not found");
-                }
+                auto fsManager = storageManager_->getLocalEngine(mountName);
+                auto dataOpt = fsManager->readFile(path);
+                if (!dataOpt.has_value()) throw std::runtime_error("File not found");
 
                 // Encode binary data as base64 string (TODO: implement your base64 encode)
                 fileContent = std::string(dataOpt->begin(), dataOpt->end());
             } catch (...) {
-                auto cloudProvider = storageHandler_->getCloudMount(mountName);
-                fileContent = cloudProvider->readFile(path);
+                auto cloudProvider = storageManager_->getCloudEngine(mountName);
+                auto dataOpt = cloudProvider->readFile(path);
+                if (!dataOpt.has_value()) throw std::runtime_error("File not found");
+
+                // Encode binary data as base64 string (TODO: implement your base64 encode)
+                fileContent = std::string(dataOpt->begin(), dataOpt->end());
             }
 
             json response = {
@@ -148,12 +148,13 @@ namespace vh::websocket {
             bool success = false;
 
             try {
-                auto fsManager = storageHandler_->getLocalMount(mountName);
+                auto fsManager = storageManager_->getLocalEngine(mountName);
                 std::vector<uint8_t> binaryData(data.begin(), data.end());
-                success = fsManager->saveFile(path, binaryData);
+                success = fsManager->writeFile(path, binaryData);
             } catch (...) {
-                auto cloudProvider = storageHandler_->getCloudMount(mountName);
-                cloudProvider->writeFile(path, data);
+                auto cloudProvider = storageManager_->getCloudEngine(mountName);
+                // TODO: Fix cloud write logic, make better use of polymorphic classes
+                // cloudProvider->writeFile(path, data);
                 success = true;
             }
 
@@ -191,10 +192,10 @@ namespace vh::websocket {
             bool success = false;
 
             try {
-                auto fsManager = storageHandler_->getLocalMount(mountName);
+                auto fsManager = storageManager_->getLocalEngine(mountName);
                 success = fsManager->deleteFile(path);
             } catch (...) {
-                auto cloudProvider = storageHandler_->getCloudMount(mountName);
+                auto cloudProvider = storageManager_->getCloudEngine(mountName);
                 cloudProvider->deleteFile(path);
                 success = true;
             }

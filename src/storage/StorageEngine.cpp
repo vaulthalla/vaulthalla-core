@@ -1,8 +1,8 @@
-#include "core/StorageEngine.hpp"
+#include "include/storage/StorageEngine.hpp"
 #include <fstream>
 #include <iostream>
 
-namespace vh::core {
+namespace vh::storage {
 
     StorageEngine::StorageEngine(const fs::path& root_directory)
             : root(fs::absolute(root_directory)) {
@@ -75,4 +75,4 @@ namespace vh::core {
 
     fs::path StorageEngine::getRootPath() const { return root; }
 
-} // namespace vh::core
+} // namespace vh::storage

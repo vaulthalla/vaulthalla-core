@@ -3,15 +3,15 @@
 #include <nlohmann/json.hpp>
 #include <memory>
 
+namespace vh::auth {
+    class SessionManager;
+    class AuthManager;
+    class TokenValidator;
+}
+
 namespace vh::websocket {
 
     using json = nlohmann::json;
-
-    namespace vh::auth {
-        class SessionManager;
-        class AuthManager;
-        class TokenValidator;
-    }
 
     class WebSocketSession;
 

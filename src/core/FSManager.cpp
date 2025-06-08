@@ -1,15 +1,16 @@
 #include "core/FSManager.hpp"
+#include "include/storage/StorageEngine.hpp"
 #include <iostream>
 
 namespace vh::core {
 
     FSManager::FSManager(const std::filesystem::path& root_directory)
-            : storage(std::make_shared<StorageEngine>(root_directory)),
+            : storage(std::make_shared<vh::storage::StorageEngine>(root_directory)),
               directoryWalker(true) {
         // TODO: Load index from disk (future enhancement)
     }
 
-    FSManager::FSManager(const std::shared_ptr<StorageEngine>& storage_engine)
+    FSManager::FSManager(const std::shared_ptr<vh::storage::StorageEngine>& storage_engine)
             : storage(storage_engine),
               directoryWalker(true) {}
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "StorageEngine.hpp"
 #include "FileMetadata.hpp"
 #include "DirectoryWalker.hpp"
 #include "index/FileScanner.hpp"
@@ -12,12 +11,16 @@
 #include <unordered_map>
 #include <vector>
 
+namespace vh::storage {
+    class StorageEngine;
+}
+
 namespace vh::core {
 
     class FSManager {
     public:
         explicit FSManager(const std::filesystem::path& root_directory);
-        explicit FSManager(const std::shared_ptr<StorageEngine>& storage_engine);
+        explicit FSManager(const std::shared_ptr<vh::storage::StorageEngine>& storage_engine);
 
         // Core file APIs
         std::filesystem::path resolvePath(const std::string& id) const;
@@ -34,10 +37,10 @@ namespace vh::core {
         void scanFile(const std::filesystem::path& path);
         std::vector<std::filesystem::path> listFilesInDir(const std::filesystem::path& dir, bool recursive = true) const;
 
-        std::shared_ptr<StorageEngine> getStorageEngine() const { return storage; }
+        std::shared_ptr<vh::storage::StorageEngine> getStorageEngine() const { return storage; }
 
     private:
-        std::shared_ptr<StorageEngine> storage;
+        std::shared_ptr<vh::storage::StorageEngine> storage;
         std::unordered_map<std::string, FileMetadata> file_index;
 
         // Injected tools

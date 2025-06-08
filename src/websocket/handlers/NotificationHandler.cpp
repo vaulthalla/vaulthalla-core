@@ -1,4 +1,5 @@
 #include "websocket/handlers/NotificationHandler.hpp"
+#include "auth/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {

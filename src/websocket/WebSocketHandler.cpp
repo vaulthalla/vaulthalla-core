@@ -4,26 +4,31 @@
 #include "websocket/handlers/AuthHandler.hpp"
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/handlers/StorageHandler.hpp"
-// Future:
 #include "websocket/handlers/ShareHandler.hpp"
 #include "websocket/handlers/SearchHandler.hpp"
 #include "websocket/handlers/NotificationHandler.hpp"
+#include "security/PermissionManager.hpp"
+#include "share/LinkResolver.hpp"
+#include "core/FSManager.hpp"
+
+#include <iostream>
 
 namespace vh::websocket {
 
-    WebSocketHandler::WebSocketHandler(WebSocketRouter& router,
-                                       auth::SessionManager& sessionManager,
-                                       std::shared_ptr<vh::core::FSManager> fsManager,
-                                       std::shared_ptr<vh::index::SearchIndex> searchIndex)
-            : router_(router),
-              sessionManager_(sessionManager),
-              fsManager_(std::move(fsManager)),
-              searchIndex_(std::move(searchIndex)) {
-        // Construct handlers with deps
-        authHandler_ = std::make_shared<AuthHandler>(sessionManager_);
-        fsHandler_ = std::make_shared<FileSystemHandler>(fsManager_);
+    WebSocketHandler::WebSocketHandler(WebSocketRouter &router, auth::SessionManager &sessionManager,
+                                       auth::AuthManager &authManager, auth::TokenValidator &tokenValidator,
+                                       std::shared_ptr<core::FSManager> fsManager,
+                                       std::shared_ptr<index::SearchIndex> searchIndex)
+                               : router_(router),
+                                 sessionManager_(sessionManager),
+                                 fsManager_(std::move(fsManager)),
+                                 searchIndex_(std::move(searchIndex)) {
+        authHandler_ = std::make_shared<AuthHandler>(sessionManager_, authManager, tokenValidator);
         storageHandler_ = std::make_shared<StorageHandler>();
-        shareHandler_ = std::make_shared<ShareHandler>();
+        permissionManager_ = std::make_shared<security::PermissionManager>();
+        fsHandler_ = std::make_shared<FileSystemHandler>(storageHandler_, permissionManager_);
+        linkResolver_ = std::make_shared<share::LinkResolver>();
+        shareHandler_ = std::make_shared<ShareHandler>(linkResolver_);
         searchHandler_ = std::make_shared<SearchHandler>(searchIndex_);
         notificationHandler_ = std::make_shared<NotificationHandler>();
     }

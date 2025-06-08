@@ -11,12 +11,12 @@
 #include <mutex>
 #include <unordered_set>
 
-namespace vh::websocket {
-    namespace auth {
-        class User;
-        class SessionManager;
-    }
+namespace vh::auth {
+    class User;
+    class SessionManager;
+}
 
+namespace vh::websocket {
     class WebSocketRouter;
     class NotificationBroadcastManager;
 
@@ -50,7 +50,7 @@ namespace vh::websocket {
     private:
         websocket::stream<tcp::socket> ws_;
         beast::flat_buffer buffer_;
-        asio::strand<boost::asio::any_io_executor> strand_;
+        asio::any_io_executor strand_;
 
         WebSocketRouter& router_;
         auth::SessionManager& sessionManager_;

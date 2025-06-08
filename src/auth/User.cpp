@@ -1,15 +1,17 @@
 #include "auth/User.hpp"
 
+#include <utility>
+
 namespace vh::auth {
 
-    User::User(const std::string& username,
-               const std::string& passwordHash,
-               const std::string& encryptedPrivateKey,
-               const std::string& publicKey)
-            : username_(username),
-              passwordHash_(passwordHash),
-              encryptedPrivateKey_(encryptedPrivateKey),
-              publicKey_(publicKey) {}
+    User::User(std::string  username,
+               std::string  passwordHash,
+               std::string  encryptedPrivateKey,
+               std::string  publicKey)
+            : username_(std::move(username)),
+              passwordHash_(std::move(passwordHash)),
+              encryptedPrivateKey_(std::move(encryptedPrivateKey)),
+              publicKey_(std::move(publicKey)) {}
 
     const std::string& User::getUsername() const {
         return username_;

@@ -1,5 +1,6 @@
 #include "websocket/handlers/StorageHandler.hpp"
-#include "storage/LocalDiskBackend.hpp"
+#include "storage/LocalDiskStorageEngine.hpp"
+#include "websocket/WebSocketSession.hpp"
 // #include "storage/S3Backend.hpp"
 // #include "storage/R2Backend.hpp"
 
@@ -7,14 +8,14 @@
 
 namespace vh::websocket {
 
-    StorageHandler::StorageHandler() {}
+    StorageHandler::StorageHandler() = default;
 
     void StorageHandler::handleInitLocal(const json& msg, WebSocketSession& session) {
         try {
             std::string mountName = msg.at("mountName").get<std::string>();
             std::string rootPath = msg.at("rootPath").get<std::string>();
 
-            auto backend = std::make_shared<vh::storage::LocalDiskBackend>(rootPath);
+            auto backend = std::make_shared<vh::storage::LocalDiskStorageEngine>(rootPath);
 
             {
                 std::lock_guard<std::mutex> lock(mountsMutex_);
@@ -91,7 +92,7 @@ namespace vh::websocket {
         }
     }
 
-    std::shared_ptr<vh::storage::StorageBackend> StorageHandler::getMount(const std::string& mountName) {
+    std::shared_ptr<vh::storage::StorageEngine> StorageHandler::getMount(const std::string& mountName) {
         std::lock_guard<std::mutex> lock(mountsMutex_);
         auto it = mounts_.find(mountName);
         if (it != mounts_.end()) {

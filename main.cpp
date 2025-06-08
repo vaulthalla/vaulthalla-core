@@ -1,45 +1,54 @@
-#include <iostream>
+#include "auth/SessionManager.hpp"
+#include "auth/AuthManager.hpp"
+#include "auth/TokenValidator.hpp"
+
+#include "core/FSManager.hpp"
+#include "index/SearchIndex.hpp"
+
 #include "websocket/WebSocketRouter.hpp"
+#include "websocket/WebSocketHandler.hpp"
+#include "websocket/WebSocketServer.hpp"
+
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <iostream>
 
 int main() {
-    auto router = std::make_shared<vh::websocket::WebSocketRouter>();
+    try {
+        // IO context
+        boost::asio::io_context ioc;
 
-    auto fsHandler = std::make_shared<vh::websocket::FileSystemHandler>();
-    auto storageHandler = std::make_shared<vh::websocket::StorageHandler>();
+        // Core services
+        vh::auth::SessionManager sessionManager;
+        vh::auth::TokenValidator tokenValidator;
+        vh::auth::AuthManager authManager(sessionManager, tokenValidator);
 
-// Register FS routes
-    router->registerHandler("fs.listDir", [fsHandler](const json& msg, WebSocketSession& session) {
-        fsHandler->handleListDir(msg, session);
-    });
+        auto fsManager = std::make_shared<vh::core::FSManager>(); // assuming you have this default constructible
+        auto searchIndex = std::make_shared<vh::index::SearchIndex>();
 
-    router->registerHandler("fs.readFile", [fsHandler](const json& msg, WebSocketSession& session) {
-        fsHandler->handleReadFile(msg, session);
-    });
+        // WebSocket router
+        vh::websocket::WebSocketRouter router;
 
-    router->registerHandler("fs.writeFile", [fsHandler](const json& msg, WebSocketSession& session) {
-        fsHandler->handleWriteFile(msg, session);
-    });
+        // WebSocket handler → registers all routes
+        vh::websocket::WebSocketHandler wsHandler(router, sessionManager, authManager, tokenValidator, fsManager, searchIndex);
+        wsHandler.registerAllHandlers();
 
-    router->registerHandler("fs.deleteFile", [fsHandler](const json& msg, WebSocketSession& session) {
-        fsHandler->handleDeleteFile(msg, session);
-    });
+        // WebSocket server
+        vh::websocket::WebSocketServer server(ioc,
+                                              boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 9001), // Port 9001 for testing
+                                              router,
+                                              sessionManager);
 
-// Register Storage routes
-    router->registerHandler("storage.local.init", [storageHandler](const json& msg, WebSocketSession& session) {
-        storageHandler->handleInitLocal(msg, session);
-    });
+        server.run();
 
-    router->registerHandler("storage.s3.init", [storageHandler](const json& msg, WebSocketSession& session) {
-        storageHandler->handleInitS3(msg, session);
-    });
+        std::cout << "[main] WebSocketServer running on port 9001.\n";
 
-    router->registerHandler("storage.r2.init", [storageHandler](const json& msg, WebSocketSession& session) {
-        storageHandler->handleInitR2(msg, session);
-    });
+        // Run IO loop
+        ioc.run();
 
-// ... and so on for mount/unmount commands
+    } catch (const std::exception& e) {
+        std::cerr << "[main] Exception: " << e.what() << "\n";
+    }
 
-// Now wire the WebSocketServer with this router
-    auto server = std::make_shared<vh::websocket::WebSocketServer>(ioc, tcp::endpoint(tcp::v4(), 9002), *router);
-    server->run();
+    return 0;
 }

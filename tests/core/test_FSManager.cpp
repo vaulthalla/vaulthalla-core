@@ -8,14 +8,14 @@ namespace fs = std::filesystem;
 
 class FSManagerIntegrationTest : public ::testing::Test {
 protected:
-    std::shared_ptr<vh::core::StorageEngine> storage;
+    std::shared_ptr<vh::storage::LocalDiskStorageEngine> storage;
     std::unique_ptr<vh::core::FSManager> manager;
     fs::path test_dir;
 
     void SetUp() override {
         test_dir = fs::temp_directory_path() / "vaulthalla_test_dir";
         fs::create_directory(test_dir);
-        storage = std::make_shared<vh::core::LocalDiskStorageEngine>(test_dir);
+        storage = std::make_shared<vh::storage::LocalDiskStorageEngine>(test_dir);
         manager = std::make_unique<vh::core::FSManager>(storage);
     }
 

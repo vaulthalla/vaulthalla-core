@@ -4,20 +4,10 @@
 
 namespace vh::storage {
 
-    CloudStorageEngine::CloudStorageEngine()
-            : StorageEngine() {}
-
     bool CloudStorageEngine::writeFile(const std::filesystem::path& rel_path,
                                        const std::vector<uint8_t>& data,
                                        bool overwrite) {
         std::cout << "[CloudStorageEngine] writeFile called: " << rel_path << "\n";
-        // TODO: Implement S3/R2 write logic
-        return true;
-    }
-
-    bool CloudStorageEngine::writeFile(const std::filesystem::path& rel_path,
-                                       const std::vector<uint8_t>& data) {
-        std::cout << "[CloudStorageEngine] writeFile called (no overwrite): " << rel_path << "\n";
         // TODO: Implement S3/R2 write logic
         return true;
     }
@@ -46,10 +36,22 @@ namespace vh::storage {
         return std::vector<std::filesystem::path>{};
     }
 
+    std::filesystem::path CloudStorageEngine::resolvePath(const std::string& id) const {
+        std::cout << "[CloudStorageEngine] resolvePath called: " << id << "\n";
+        // Cloud paths don't have a real "resolve path" → return id for now
+        return std::filesystem::path(id);
+    }
+
     std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
         std::cout << "[CloudStorageEngine] getAbsolutePath called: " << rel_path << "\n";
         // Cloud paths don't have a real "absolute path" → return rel_path for now
         return rel_path;
+    }
+
+    std::filesystem::path CloudStorageEngine::getRelativePath(const std::filesystem::path& absolute_path) const {
+        std::cout << "[CloudStorageEngine] getRelativePath called: " << absolute_path << "\n";
+        // Cloud paths don't have a real "relative path" → return absolute_path for now
+        return absolute_path;
     }
 
     std::filesystem::path CloudStorageEngine::getRootPath() const {

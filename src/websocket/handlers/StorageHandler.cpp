@@ -1,14 +1,14 @@
 #include "websocket/handlers/StorageHandler.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
+#include "storage/StorageManager.hpp"
 #include "websocket/WebSocketSession.hpp"
-// #include "storage/S3Backend.hpp"
-// #include "storage/R2Backend.hpp"
 
 #include <iostream>
 
 namespace vh::websocket {
 
-    StorageHandler::StorageHandler() = default;
+    StorageHandler::StorageHandler(const std::shared_ptr<vh::storage::StorageManager> &storageManager)
+            : storageManager_(storageManager) {}
 
     void StorageHandler::handleInitLocal(const json& msg, WebSocketSession& session) {
         try {
@@ -17,10 +17,7 @@ namespace vh::websocket {
 
             auto backend = std::make_shared<vh::storage::LocalDiskStorageEngine>(rootPath);
 
-            {
-                std::lock_guard<std::mutex> lock(mountsMutex_);
-                mounts_[mountName] = backend;
-            }
+            storageManager_->mountLocal(mountName, std::filesystem::path(rootPath));
 
             json response = {
                     {"command", "storage.local.init.response"},
@@ -50,12 +47,7 @@ namespace vh::websocket {
         try {
             std::string mountName = msg.at("mountName").get<std::string>();
 
-            {
-                std::lock_guard<std::mutex> lock(mountsMutex_);
-                if (mounts_.find(mountName) == mounts_.end()) {
-                    throw std::runtime_error("Mount not found: " + mountName);
-                }
-            }
+            storageManager_->mountLocal(mountName, std::filesystem::path(msg.at("rootPath").get<std::string>()));
 
             json response = {
                     {"command", "storage.mount.response"},
@@ -73,10 +65,7 @@ namespace vh::websocket {
         try {
             std::string mountName = msg.at("mountName").get<std::string>();
 
-            {
-                std::lock_guard<std::mutex> lock(mountsMutex_);
-                mounts_.erase(mountName);
-            }
+            // TODO: Implement unmount logic
 
             json response = {
                     {"command", "storage.unmount.response"},
@@ -90,15 +79,6 @@ namespace vh::websocket {
         } catch (const std::exception& e) {
             std::cerr << "[StorageHandler] handleUnmount error: " << e.what() << "\n";
         }
-    }
-
-    std::shared_ptr<vh::storage::StorageEngine> StorageHandler::getMount(const std::string& mountName) {
-        std::lock_guard<std::mutex> lock(mountsMutex_);
-        auto it = mounts_.find(mountName);
-        if (it != mounts_.end()) {
-            return it->second;
-        }
-        throw std::runtime_error("Mount not found: " + mountName);
     }
 
 } // namespace vh::websocket

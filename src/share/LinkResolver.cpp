@@ -3,17 +3,7 @@
 
 namespace vh::share {
 
-    void LinkResolver::addShareLink(const ShareLink& link) {
-        std::lock_guard<std::mutex> lock(linksMutex_);
-        links_[link.getLinkId()] = link;
-    }
-
-    void LinkResolver::removeShareLink(const std::string& linkId) {
-        std::lock_guard<std::mutex> lock(linksMutex_);
-        links_.erase(linkId);
-    }
-
-    std::string LinkResolver::createLink(ShareLink& link) {
+    std::string LinkResolver::createShareLink(ShareLink& link) {
         std::lock_guard<std::mutex> lock(linksMutex_);
 
         std::string linkId = generateRandomLinkId();
@@ -22,6 +12,11 @@ namespace vh::share {
         links_[linkId] = link;
 
         return linkId;
+    }
+
+    void LinkResolver::removeShareLink(const std::string& linkId) {
+        std::lock_guard<std::mutex> lock(linksMutex_);
+        links_.erase(linkId);
     }
 
     std::optional<ShareLink> LinkResolver::resolveLink(const std::string& linkId) {

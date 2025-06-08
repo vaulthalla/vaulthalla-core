@@ -6,7 +6,8 @@ namespace vh::auth {
 
     class TokenValidator {
     public:
-        explicit TokenValidator(const std::string& jwtSecret);
+        TokenValidator() = default;
+        explicit TokenValidator(std::string  jwtSecret);
 
         std::string generateToken(const std::string& username);
         bool validateToken(const std::string& token);

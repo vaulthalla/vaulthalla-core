@@ -10,6 +10,7 @@
 #include "security/PermissionManager.hpp"
 #include "share/LinkResolver.hpp"
 #include "core/FSManager.hpp"
+#include "storage/StorageManager.hpp"
 
 #include <iostream>
 
@@ -24,9 +25,10 @@ namespace vh::websocket {
                                  fsManager_(std::move(fsManager)),
                                  searchIndex_(std::move(searchIndex)) {
         authHandler_ = std::make_shared<AuthHandler>(sessionManager_, authManager, tokenValidator);
-        storageHandler_ = std::make_shared<StorageHandler>();
+        storageManager_ = std::make_shared<storage::StorageManager>();
+        storageHandler_ = std::make_shared<StorageHandler>(storageManager_);
         permissionManager_ = std::make_shared<security::PermissionManager>();
-        fsHandler_ = std::make_shared<FileSystemHandler>(storageHandler_, permissionManager_);
+        fsHandler_ = std::make_shared<FileSystemHandler>(storageManager_, permissionManager_);
         linkResolver_ = std::make_shared<share::LinkResolver>();
         shareHandler_ = std::make_shared<ShareHandler>(linkResolver_);
         searchHandler_ = std::make_shared<SearchHandler>(searchIndex_);

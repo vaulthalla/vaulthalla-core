@@ -7,12 +7,12 @@
 
 namespace vh::websocket {
 
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageHandler)
-            : storageManager_(std::move(storageHandler)) {}
+    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager)
+            : storageManager_(std::move(storageManager)) {}
 
-    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageHandler,
+    FileSystemHandler::FileSystemHandler(std::shared_ptr<vh::storage::StorageManager> storageManager,
                                          std::shared_ptr<vh::security::PermissionManager> permissionManager)
-            : storageManager_(std::move(storageHandler)),
+            : storageManager_(std::move(storageManager)),
               permissionManager_(std::move(permissionManager)) {}
 
     void FileSystemHandler::validateAuth(WebSocketSession& session) {
@@ -45,22 +45,13 @@ namespace vh::websocket {
             std::string mountName = msg.at("mountName").get<std::string>();
             std::string path = msg.at("path").get<std::string>();
 
-            json entries;
-
-            // Try Local first
-            try {
-                auto fsManager = storageManager_->getLocalEngine(mountName);
-                auto files = fsManager->listFilesInDir(path);
-
-                entries = json::array();
-                for (const auto& file : files) {
-                    entries.push_back(file.string());
-                }
-            } catch (...) {
-                // Try Cloud
-                auto cloudProvider = storageManager_->getCloudEngine(mountName);
-                entries = cloudProvider->storage::StorageEngine::listFilesInDir(path);
-            }
+            auto engine = storageManager_->getEngine(mountName);
+            if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
+            enforcePermission(session, mountName, path, "list");
+            auto files = engine->listFilesInDir(path);
+            json entries = json::array();
+            if (files.empty()) throw std::runtime_error("Directory not found or empty: " + path);
+            for (const auto& file : files) entries.push_back(file.string());
 
             json response = {
                     {"command", "fs.listDir.response"},
@@ -94,23 +85,12 @@ namespace vh::websocket {
             std::string mountName = msg.at("mountName").get<std::string>();
             std::string path = msg.at("path").get<std::string>();
 
-            std::string fileContent;
-
-            try {
-                auto fsManager = storageManager_->getLocalEngine(mountName);
-                auto dataOpt = fsManager->readFile(path);
-                if (!dataOpt.has_value()) throw std::runtime_error("File not found");
-
-                // Encode binary data as base64 string (TODO: implement your base64 encode)
-                fileContent = std::string(dataOpt->begin(), dataOpt->end());
-            } catch (...) {
-                auto cloudProvider = storageManager_->getCloudEngine(mountName);
-                auto dataOpt = cloudProvider->readFile(path);
-                if (!dataOpt.has_value()) throw std::runtime_error("File not found");
-
-                // Encode binary data as base64 string (TODO: implement your base64 encode)
-                fileContent = std::string(dataOpt->begin(), dataOpt->end());
-            }
+            auto engine = storageManager_->getEngine(mountName);
+            if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
+            enforcePermission(session, mountName, path, "read");
+            auto data = engine->readFile(path);
+            if (!data.has_value()) throw std::runtime_error("File not found: " + path);
+            auto fileContent = std::string(data->begin(), data->end());
 
             json response = {
                     {"command", "fs.readFile.response"},
@@ -145,18 +125,11 @@ namespace vh::websocket {
             std::string path = msg.at("path").get<std::string>();
             std::string data = msg.at("data").get<std::string>();
 
-            bool success = false;
-
-            try {
-                auto fsManager = storageManager_->getLocalEngine(mountName);
-                std::vector<uint8_t> binaryData(data.begin(), data.end());
-                success = fsManager->writeFile(path, binaryData);
-            } catch (...) {
-                auto cloudProvider = storageManager_->getCloudEngine(mountName);
-                // TODO: Fix cloud write logic, make better use of polymorphic classes
-                // cloudProvider->writeFile(path, data);
-                success = true;
-            }
+            auto engine = storageManager_->getEngine(mountName);
+            if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
+            std::vector<uint8_t> binaryData(data.begin(), data.end());
+            enforcePermission(session, mountName, path, "write");
+            bool success = engine->writeFile(path, binaryData);
 
             json response = {
                     {"command", "fs.writeFile.response"},

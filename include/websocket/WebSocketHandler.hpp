@@ -24,6 +24,10 @@ namespace vh::share {
     class LinkResolver;
 }
 
+namespace vh::storage {
+    class StorageManager;
+}
+
 namespace vh::websocket {
     class WebSocketRouter;
     class AuthHandler;
@@ -49,6 +53,7 @@ namespace vh::websocket {
         vh::auth::SessionManager& sessionManager_;
         std::shared_ptr<vh::core::FSManager> fsManager_;
         std::shared_ptr<vh::index::SearchIndex> searchIndex_;
+        std::shared_ptr<vh::storage::StorageManager> storageManager_;
 
         std::shared_ptr<AuthHandler> authHandler_;
         std::shared_ptr<FileSystemHandler> fsHandler_;

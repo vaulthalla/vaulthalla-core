@@ -16,10 +16,11 @@ namespace vh::storage {
         StorageManager();
 
         void mountLocal(const std::string& mountName, const std::filesystem::path& rootPath);
-        void mountCloud(const std::string& mountName /* , cloud params */);
+        void mountCloud(const std::string& mountName);
 
         std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(const std::string& mountName) const;
         std::shared_ptr<CloudStorageEngine> getCloudEngine(const std::string& mountName) const;
+        std::shared_ptr<StorageEngine> getEngine(const std::string& mountName) const;
 
     private:
         mutable std::mutex mountsMutex_;

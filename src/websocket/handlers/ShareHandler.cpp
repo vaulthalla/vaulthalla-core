@@ -13,9 +13,7 @@ namespace vh::websocket {
     void ShareHandler::handleCreateLink(const json& msg, WebSocketSession& session) {
         try {
             auto user = session.getAuthenticatedUser();
-            if (!user) {
-                throw std::runtime_error("Unauthorized");
-            }
+            if (!user) throw std::runtime_error("Unauthorized");
 
             std::string mountName = msg.at("mountName").get<std::string>();
             std::string path = msg.at("path").get<std::string>();
@@ -24,7 +22,7 @@ namespace vh::websocket {
             const auto& expiresAt = std::chrono::system_clock::now() + std::chrono::seconds(expiresIn);
 
             share::ShareLink shareLink(user->getUsername(), mountName, path, permissions.get<std::string>(), expiresAt);
-            std::string shareLinkUrl = linkResolver_->createLink(shareLink);
+            auto shareLinkUrl = linkResolver_->createShareLink(shareLink);
 
             json response = {
                     {"command", "share.createLink.response"},

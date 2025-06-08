@@ -36,9 +36,7 @@ namespace vh::storage {
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
         auto it = localEngines_.find(mountName);
-        if (it == localEngines_.end()) {
-            throw std::runtime_error("Unknown local mount: " + mountName);
-        }
+        if (it == localEngines_.end()) throw std::runtime_error("Unknown local mount: " + mountName);
 
         return it->second;
     }
@@ -47,11 +45,16 @@ namespace vh::storage {
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
         auto it = cloudEngines_.find(mountName);
-        if (it == cloudEngines_.end()) {
-            throw std::runtime_error("Unknown cloud mount: " + mountName);
-        }
+        if (it == cloudEngines_.end()) throw std::runtime_error("Unknown cloud mount: " + mountName);
 
         return it->second;
+    }
+
+    std::shared_ptr<StorageEngine> StorageManager::getEngine(const std::string& mountName) const {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+        if (localEngines_.count(mountName)) return localEngines_.at(mountName);
+        else if (cloudEngines_.count(mountName)) return cloudEngines_.at(mountName);
+        throw std::runtime_error("Unknown storage engine: " + mountName);
     }
 
 } // namespace vh::storage

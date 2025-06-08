@@ -32,7 +32,7 @@ namespace vh::websocket {
         std::shared_ptr<vh::storage::StorageManager> storageManager_;
         std::shared_ptr<vh::security::PermissionManager> permissionManager_;
 
-        void validateAuth(WebSocketSession& session);
+        static void validateAuth(WebSocketSession& session);
         void enforcePermission(WebSocketSession& session,
                                const std::string& mountName,
                                const std::string& path,

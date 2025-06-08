@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 namespace vh::security {
 
@@ -10,14 +11,14 @@ namespace vh::security {
         std::string path;           // Path prefix this permission applies to
         std::string permissionType; // e.g. "READ", "WRITE"
 
-        Permission(const std::string& username_,
-                   const std::string& mountName_,
-                   const std::string& path_,
-                   const std::string& permissionType_)
-                : username(username_),
-                  mountName(mountName_),
-                  path(path_),
-                  permissionType(permissionType_) {}
+        Permission(std::string  username_,
+                   std::string  mountName_,
+                   std::string  path_,
+                   std::string  permissionType_)
+                : username(std::move(username_)),
+                  mountName(std::move(mountName_)),
+                  path(std::move(path_)),
+                  permissionType(std::move(permissionType_)) {}
     };
 
 } // namespace vh::security

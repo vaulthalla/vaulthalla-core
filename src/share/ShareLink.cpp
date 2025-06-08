@@ -1,17 +1,32 @@
 #include "share/ShareLink.hpp"
 
+#include <utility>
+
 namespace vh::share {
 
-    ShareLink::ShareLink(const std::string& ownerUsername,
-                         const std::string& mountName,
-                         const std::string& path,
-                         const std::string& permissionType,
+    ShareLink::ShareLink(std::string ownerUsername,
+                         std::string mountName,
+                         std::string path,
+                         std::string permissionType,
                          std::optional<std::chrono::system_clock::time_point> expiresAt)
-            : ownerUsername_(ownerUsername),
-              mountName_(mountName),
-              path_(path),
-              permissionType_(permissionType),
+            : ownerUsername_(std::move(ownerUsername)),
+              mountName_(std::move(mountName)),
+              path_(std::move(path)),
+              permissionType_(std::move(permissionType)),
               expiresAt_(expiresAt) {}
+
+    ShareLink::ShareLink(std::string linkId,
+                         std::string ownerUsername,
+                         std::string mountName,
+                         std::string path,
+                         std::string permissionType,
+                         std::optional<std::chrono::system_clock::time_point> expiresAt)
+             : linkId_(std::move(linkId)),
+              ownerUsername_(std::move(ownerUsername)),
+              mountName_(std::move(mountName)),
+              path_(std::move(path)),
+              permissionType_(std::move(permissionType)),
+              expiresAt_(expiresAt) {};
 
     void ShareLink::setLinkId(const std::string& linkId) {
         linkId_ = linkId;

@@ -9,10 +9,18 @@ namespace vh::share {
 
     class ShareLink {
     public:
-        ShareLink(const std::string& ownerUsername,
-                  const std::string& mountName,
-                  const std::string& path,
-                  const std::string& permissionType,
+        ShareLink() = default;
+        ShareLink(std::string ownerUsername,
+                  std::string mountName,
+                  std::string path,
+                  std::string permissionType,
+                  std::optional<std::chrono::system_clock::time_point> expiresAt = std::nullopt);
+
+        ShareLink(std::string linkId,
+                  std::string ownerUsername,
+                  std::string mountName,
+                  std::string path,
+                  std::string permissionType,
                   std::optional<std::chrono::system_clock::time_point> expiresAt = std::nullopt);
 
         void setLinkId(const std::string& linkId);

@@ -1,84 +1,84 @@
 #include "core/FSManager.hpp"
-#include "include/storage/StorageEngine.hpp"
+#include "include/storage/LocalDiskStorageEngine.hpp"
 #include <iostream>
 
 namespace vh::core {
 
     FSManager::FSManager(const std::filesystem::path& root_directory)
-            : storage(std::make_shared<vh::storage::StorageEngine>(root_directory)),
-              directoryWalker(true) {
+            : storageEngine_(std::make_shared<vh::storage::LocalDiskStorageEngine>(root_directory)),
+              directoryWalker_(true) {
         // TODO: Load index from disk (future enhancement)
     }
 
-    FSManager::FSManager(const std::shared_ptr<vh::storage::StorageEngine>& storage_engine)
-            : storage(storage_engine),
-              directoryWalker(true) {}
+    FSManager::FSManager(const std::shared_ptr<vh::storage::LocalDiskStorageEngine>& storage_engine)
+            : storageEngine_(storage_engine),
+              directoryWalker_(true) {}
 
-    fs::path FSManager::resolvePath(const std::string& id) const {
+    fs::path FSManager::resolvePath(const std::string& id) {
         return fs::path("data") / (id + ".bin");  // can expand to hashed buckets later
     }
 
     bool FSManager::saveFile(const std::string& id, const std::vector<uint8_t>& data) {
         fs::path rel_path = resolvePath(id);
         fs::create_directories(rel_path.parent_path());
-        if (!storage->writeFile(rel_path, data, false)) return false;
+        if (!storageEngine_->writeFile(rel_path, data, false)) return false;
 
         FileMetadata meta(id, rel_path, data.size());
-        file_index[id] = meta;
+        fileIndex_[id] = meta;
         return true;
     }
 
     std::optional<std::vector<uint8_t>> FSManager::loadFile(const std::string& id) const {
         fs::path rel_path = resolvePath(id);
-        return storage->readFile(rel_path);
+        return storageEngine_->readFile(rel_path);
     }
 
     bool FSManager::deleteFile(const std::string& id) {
         fs::path rel_path = resolvePath(id);
-        if (!storage->deleteFile(rel_path)) return false;
+        if (!storageEngine_->deleteFile(rel_path)) return false;
 
-        file_index.erase(id);
+        fileIndex_.erase(id);
         return true;
     }
 
     bool FSManager::fileExists(const std::string& id) const {
-        return storage->fileExists(resolvePath(id));
+        return storageEngine_->fileExists(resolvePath(id));
     }
 
     std::optional<FileMetadata> FSManager::getMetadata(const std::string& id) const {
-        auto it = file_index.find(id);
-        if (it != file_index.end()) return it->second;
+        auto it = fileIndex_.find(id);
+        if (it != fileIndex_.end()) return it->second;
         return std::nullopt;
     }
 
     std::unordered_map<std::string, FileMetadata> FSManager::getIndex() const {
-        return file_index;
+        return fileIndex_;
     }
 
     void FSManager::rebuildIndex(bool recursive) {
-        directoryWalker = core::DirectoryWalker(recursive);
-        searchIndex = index::SearchIndex(); // Reset search index
+        directoryWalker_ = core::DirectoryWalker(recursive);
+        searchIndex_ = index::SearchIndex(); // Reset search index
 
-        auto entries = directoryWalker.walk(storage->getRootPath(), [](const auto& entry) {
+        auto entries = directoryWalker_.walk(storageEngine_->getRootPath(), [](const auto& entry) {
             return entry.is_regular_file();
         });
 
         for (const auto& entry : entries) {
-            auto metadata = fileScanner.scan(entry.path);
+            auto metadata = fileScanner_.scan(entry.path);
             std::cout << "Scanning: " << entry.path << " | isText: " << metadata.isTextFile << "\n";
-            searchIndex.addToIndex(entry.path, metadata.contentPreview.value_or(""));
+            searchIndex_.addToIndex(entry.path, metadata.contentPreview.value_or(""));
         }
 
         std::cout << "Rebuilt search index with " << entries.size() << " files.\n";
     }
 
     std::vector<std::filesystem::path> FSManager::search(const std::string& term) const {
-        return searchIndex.search(term);
+        return searchIndex_.search(term);
     }
 
     void FSManager::scanFile(const std::filesystem::path& path) {
-        auto metadata = fileScanner.scan(path);
-        searchIndex.addToIndex(path, metadata.contentPreview.value_or(""));
+        auto metadata = fileScanner_.scan(path);
+        searchIndex_.addToIndex(path, metadata.contentPreview.value_or(""));
         std::cout << "Scanned & indexed: " << path << "\n";
     }
 

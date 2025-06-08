@@ -10,12 +10,12 @@
 
 namespace vh::share {
 
+    class ShareLink;
+
     class LinkResolver {
     public:
-        void addShareLink(const ShareLink& link);
+        [[nodiscard]]std::string createShareLink(ShareLink& link);
         void removeShareLink(const std::string& linkId);
-        std::string createLink(ShareLink& link);
-
 
         std::optional<ShareLink> resolveLink(const std::string& linkId);
 
@@ -24,8 +24,8 @@ namespace vh::share {
         static std::string generateRandomLinkId();
 
     private:
-        std::unordered_map<std::string, ShareLink> links_;
-        std::mutex linksMutex_;
+        std::unordered_map<std::string, ShareLink> links_{};
+        std::mutex linksMutex_{};
     };
 
 } // namespace vh::share

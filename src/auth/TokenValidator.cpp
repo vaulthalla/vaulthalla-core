@@ -1,16 +1,17 @@
 #include "auth/TokenValidator.hpp"
 
 #include <jwt-cpp/jwt.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 
 namespace vh::auth {
 
-    TokenValidator::TokenValidator(const std::string& jwtSecret)
-            : jwtSecret_(jwtSecret) {}
+    TokenValidator::TokenValidator(std::string  jwtSecret) : jwtSecret_(std::move(jwtSecret)) {}
 
     std::string TokenValidator::generateToken(const std::string& username) {
-        auto token = jwt::create()
+        auto token = jwt::create<jwt::traits::nlohmann_json>()
                 .set_issuer("vaulthalla")
                 .set_type("JWS")
                 .set_subject(username)
@@ -23,9 +24,9 @@ namespace vh::auth {
 
     bool TokenValidator::validateToken(const std::string& token) {
         try {
-            auto decoded = jwt::decode(token);
+            auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
 
-            auto verifier = jwt::verify()
+            auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
                     .allow_algorithm(jwt::algorithm::hs256{jwtSecret_})
                     .with_issuer("vaulthalla");
 
@@ -40,7 +41,7 @@ namespace vh::auth {
 
     std::string TokenValidator::extractUsername(const std::string& token) {
         try {
-            auto decoded = jwt::decode(token);
+            auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
             return decoded.get_subject(); // subject = username
         } catch (const std::exception& e) {
             std::cerr << "[TokenValidator] Failed to extract username: " << e.what() << "\n";

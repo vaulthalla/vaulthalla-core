@@ -7,6 +7,7 @@
 
 namespace vh::storage {
     class StorageEngine;
+    class StorageManager;
 }
 
 namespace vh::websocket {
@@ -17,7 +18,7 @@ namespace vh::websocket {
 
     class StorageHandler {
     public:
-        StorageHandler();
+        StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager);
 
         // Init commands
         void handleInitLocal(const json& msg, WebSocketSession& session);
@@ -28,12 +29,8 @@ namespace vh::websocket {
         void handleMount(const json& msg, WebSocketSession& session);
         void handleUnmount(const json& msg, WebSocketSession& session);
 
-        // Access active mounts
-        std::shared_ptr<vh::storage::StorageEngine> getMount(const std::string& mountName);
-
     private:
-        std::unordered_map<std::string, std::shared_ptr<vh::storage::StorageEngine>> mounts_;
-        std::mutex mountsMutex_;
+        std::shared_ptr<vh::storage::StorageManager> storageManager_;
     };
 
 } // namespace vh::websocket

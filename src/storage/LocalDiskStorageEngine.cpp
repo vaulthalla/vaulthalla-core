@@ -22,10 +22,6 @@ namespace vh::storage {
         return out.good();
     }
 
-    bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data) {
-        return writeFile(rel_path, data, true);
-    }
-
     std::optional<std::vector<uint8_t>> LocalDiskStorageEngine::readFile(const std::filesystem::path& rel_path) const {
         auto full_path = root / rel_path;
         std::ifstream in(full_path, std::ios::binary | std::ios::ate);
@@ -66,8 +62,17 @@ namespace vh::storage {
         return files;
     }
 
+    std::filesystem::path LocalDiskStorageEngine::resolvePath(const std::string& id) const {
+        return root / id;
+    }
+
     std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
         return root / rel_path;
+    }
+
+    fs::path LocalDiskStorageEngine::getRelativePath(const fs::path &absolute_path) const {
+        if (absolute_path.is_absolute()) return std::filesystem::relative(absolute_path, root);
+        return absolute_path;
     }
 
     std::filesystem::path LocalDiskStorageEngine::getRootPath() const {

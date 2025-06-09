@@ -1,6 +1,6 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "auth/User.hpp"
+#include "include/auth/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {

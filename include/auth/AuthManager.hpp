@@ -1,6 +1,6 @@
 #pragma once
 
-#include "auth/User.hpp"
+#include "User.hpp"
 #include "auth/SessionManager.hpp"
 #include "auth/TokenValidator.hpp"
 

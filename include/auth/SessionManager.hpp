@@ -1,6 +1,6 @@
 #pragma once
 
-#include "auth/User.hpp"
+#include "User.hpp"
 
 #include <string>
 #include <unordered_map>

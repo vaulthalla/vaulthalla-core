@@ -2,7 +2,7 @@
 #include "websocket/WebSocketSession.hpp"
 #include "share/LinkResolver.hpp"
 #include "share/ShareLink.hpp"
-#include "auth/User.hpp"
+#include "include/auth/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {

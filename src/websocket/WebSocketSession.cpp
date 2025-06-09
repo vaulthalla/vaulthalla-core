@@ -1,6 +1,6 @@
 #include "websocket/WebSocketSession.hpp"
 #include "websocket/WebSocketRouter.hpp"
-#include "auth/User.hpp"
+#include "include/auth/User.hpp"
 #include "auth/SessionManager.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
 #include <iostream>

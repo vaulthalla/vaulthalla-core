@@ -1,5 +1,5 @@
 #pragma once
-#include <pqxx/pqxx>
+#include <pqxx/connection>
 #include "DBConfig.hpp"
 
 namespace vh::database {

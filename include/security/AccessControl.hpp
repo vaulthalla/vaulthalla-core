@@ -1,7 +1,7 @@
 #pragma once
 
 #include "security/PermissionManager.hpp"
-#include "auth/User.hpp"
+#include "include/auth/User.hpp"
 
 #include <memory>
 #include <string>

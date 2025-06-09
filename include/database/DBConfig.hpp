@@ -9,7 +9,7 @@ namespace vh::database {
         std::string password = std::getenv("DB_PASSWORD");
         std::string dbname = std::getenv("DB_NAME") ? std::getenv("DB_NAME") : "vaulthalla";
 
-        std::string connectionString() const {
+        [[nodiscard]] std::string connectionString() const {
             return "host=" + host +
                    " port=" + port +
                    " user=" + user +

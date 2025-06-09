@@ -10,7 +10,7 @@ namespace vh::security {
 
     class AccessControl {
     public:
-        explicit AccessControl(std::shared_ptr<PermissionManager> permissionManager);
+        AccessControl();
 
         void enforcePermission(std::shared_ptr<vh::auth::User> user,
                                const std::string& mountName,

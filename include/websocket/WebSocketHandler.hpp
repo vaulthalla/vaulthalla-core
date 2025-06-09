@@ -1,5 +1,6 @@
 #pragma once
 
+#include "websocket/WebSocketRouter.hpp"
 #include "websocket/handlers/AuthHandler.hpp"
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/handlers/StorageHandler.hpp"
@@ -14,12 +15,12 @@ namespace vh::websocket {
 
     class WebSocketHandler {
     public:
-        WebSocketHandler(WebSocketRouter& router, const std::shared_ptr<vh::services::ServiceManager>& serviceManager);
+        explicit WebSocketHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager);
 
         void registerAllHandlers();
 
     private:
-        WebSocketRouter& router_;
+        WebSocketRouter router_;
         std::shared_ptr<vh::services::ServiceManager> serviceManager_;
 
         std::shared_ptr<AuthHandler> authHandler_;

@@ -8,9 +8,9 @@
 
 namespace vh::auth {
 
-    AuthManager::AuthManager(const std::shared_ptr<SessionManager> &sessionManager,
-                             const std::shared_ptr<TokenValidator> &tokenValidator)
-                     : sessionManager_(sessionManager), tokenValidator_(tokenValidator) {
+    AuthManager::AuthManager()
+                     : sessionManager_(std::make_shared<SessionManager>()),
+                       tokenValidator_(std::make_shared<TokenValidator>()) {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
     }
 

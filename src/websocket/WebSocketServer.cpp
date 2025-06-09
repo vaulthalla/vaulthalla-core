@@ -37,6 +37,7 @@ namespace vh::websocket {
     }
 
     void WebSocketServer::run() {
+        std::cout << "[WebSocketServer] Starting to accept connections on " << acceptor_.local_endpoint() << "\n";
         doAccept();
     }
 

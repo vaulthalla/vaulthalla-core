@@ -6,11 +6,11 @@ namespace vh::services {
         try {
             ioContext_ = std::make_shared<boost::asio::io_context>();
 
-            serviceManager_ = std::make_shared<vh::services::ServiceManager>("config/vaulthalla.json");
+            serviceManager_ = std::make_shared<vh::services::ServiceManager>();
 
             wsRouter_ = std::make_shared<vh::websocket::WebSocketRouter>();
 
-            wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(*wsRouter_, serviceManager_);
+            wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(serviceManager_);
             wsHandler_->registerAllHandlers();
 
             wsServer_ = std::make_shared<vh::websocket::WebSocketServer>(

@@ -14,7 +14,7 @@
 namespace vh::services {
     class ServiceManager {
     public:
-        ServiceManager(const std::filesystem::path& configPath);
+        ServiceManager();
 
         [[nodiscard]] std::shared_ptr<vh::auth::AuthManager> authManager() const;
         [[nodiscard]] std::shared_ptr<vh::core::FSManager> fsManager() const;
@@ -23,11 +23,7 @@ namespace vh::services {
         [[nodiscard]] std::shared_ptr<vh::security::AccessControl> accessControl() const;
         [[nodiscard]] std::shared_ptr<vh::share::LinkResolver> linkResolver() const;
 
-        void loadConfig();
-
     private:
-        std::filesystem::path configPath_;
-
         std::shared_ptr<vh::auth::AuthManager> authManager_;
         std::shared_ptr<vh::core::FSManager> fsManager_;
         std::shared_ptr<vh::index::SearchIndex> searchIndex_;

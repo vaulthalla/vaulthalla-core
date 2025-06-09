@@ -5,8 +5,8 @@
 
 namespace vh::security {
 
-    AccessControl::AccessControl(std::shared_ptr<PermissionManager> permissionManager)
-            : permissionManager_(std::move(permissionManager)) {}
+    AccessControl::AccessControl()
+            : permissionManager_(std::make_shared<PermissionManager>()) {}
 
     std::shared_ptr<PermissionManager> AccessControl::permissionManager() const { return permissionManager_; }
 

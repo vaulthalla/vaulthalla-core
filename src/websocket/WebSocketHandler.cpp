@@ -1,14 +1,12 @@
 #include "websocket/WebSocketHandler.hpp"
-#include "websocket/WebSocketRouter.hpp"
 #include "auth/SessionManager.hpp"
 
 #include <iostream>
 
 namespace vh::websocket {
 
-    WebSocketHandler::WebSocketHandler(vh::websocket::WebSocketRouter &router,
-                                       const std::shared_ptr<vh::services::ServiceManager> &serviceManager)
-                   : router_(router), serviceManager_(serviceManager) {
+    WebSocketHandler::WebSocketHandler(const std::shared_ptr<vh::services::ServiceManager> &serviceManager)
+                   : router_({}), serviceManager_(serviceManager) {
         authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());
         storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager());
         fsHandler_ = std::make_shared<FileSystemHandler>(serviceManager_);

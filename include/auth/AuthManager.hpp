@@ -12,8 +12,7 @@ namespace vh::auth {
 
     class AuthManager {
     public:
-        AuthManager(const std::shared_ptr<SessionManager>& sessionManager,
-                    const std::shared_ptr<TokenValidator>& tokenValidator);
+        AuthManager();
 
         std::shared_ptr<User> registerUser(const std::string& username, const std::string& password);
         std::shared_ptr<User> loginUser(const std::string& username, const std::string& password);

@@ -1,6 +1,7 @@
 # Dev
 .idea
 ~/*
+.env
 
 # Server
 build

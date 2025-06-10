@@ -5,6 +5,7 @@
 #include <boost/describe.hpp>
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
+#include <optional>
 
 namespace vh::types {
     struct User {
@@ -13,7 +14,7 @@ namespace vh::types {
         std::string email;
         std::string password_hash;
         std::time_t created_at;
-        std::time_t last_login;
+        std::optional<std::time_t> last_login;
         bool is_active;
 
         explicit User(const pqxx::row& row)

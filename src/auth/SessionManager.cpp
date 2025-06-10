@@ -51,12 +51,8 @@ namespace vh::auth {
     std::string SessionManager::generateRandomToken() {
         unsigned char buf[16]; // 128-bit token → plenty
         randombytes_buf(buf, sizeof buf);
-
         std::ostringstream oss;
-        for (size_t i = 0; i < sizeof buf; ++i) {
-            oss << std::hex << std::setw(2) << std::setfill('0') << (int)buf[i];
-        }
-
+        for (unsigned char i : buf) oss << std::hex << std::setw(2) << std::setfill('0') << (int)i;
         return oss.str();
     }
 

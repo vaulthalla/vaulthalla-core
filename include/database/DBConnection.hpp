@@ -1,6 +1,5 @@
 #pragma once
 #include <pqxx/connection>
-#include "DBConfig.hpp"
 
 namespace vh::database {
     class DBConnection {
@@ -12,5 +11,7 @@ namespace vh::database {
 
     private:
         std::unique_ptr<pqxx::connection> conn_;
+
+        const std::string DB_CONNECTION_STR = std::getenv("VAULTHALLA_DB_CONNECTION_STR");
     };
 }

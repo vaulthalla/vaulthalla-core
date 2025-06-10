@@ -87,9 +87,7 @@ namespace vh::websocket {
         try {
             std::string token = msg.at("token").get<std::string>();
 
-            if (!tokenValidator_->validateToken(token)) {
-                throw std::runtime_error("Invalid token");
-            }
+            if (!tokenValidator_->validateToken(token)) throw std::runtime_error("Invalid token");
 
             auto user = sessionManager_->getUserForSession(token);
             if (!user) {

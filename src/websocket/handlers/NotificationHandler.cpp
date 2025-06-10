@@ -12,9 +12,7 @@ namespace vh::websocket {
             }
 
             auto channels = msg.at("channels");
-            for (const auto& channel : channels) {
-                session.subscribeChannel(channel.get<std::string>());
-            }
+            for (const auto& channel : channels) session.subscribeChannel(channel.get<std::string>());
 
             json response = {
                     {"command", "notification.subscribe.response"},
@@ -43,14 +41,10 @@ namespace vh::websocket {
     void NotificationHandler::handleUnsubscribe(const json& msg, WebSocketSession& session) {
         try {
             auto user = session.getAuthenticatedUser();
-            if (!user) {
-                throw std::runtime_error("Unauthorized");
-            }
+            if (!user) throw std::runtime_error("Unauthorized");
 
             auto channels = msg.at("channels");
-            for (const auto& channel : channels) {
-                session.unsubscribeChannel(channel.get<std::string>());
-            }
+            for (const auto& channel : channels) session.unsubscribeChannel(channel.get<std::string>());
 
             json response = {
                     {"command", "notification.unsubscribe.response"},
@@ -79,9 +73,7 @@ namespace vh::websocket {
     void NotificationHandler::pushNotification(WebSocketSession& session,
                                                const std::string& channel,
                                                const json& payload) {
-        if (!session.isSubscribedTo(channel)) {
-            return; // Session not subscribed → no push
-        }
+        if (!session.isSubscribedTo(channel)) return; // Session not subscribed → no push
 
         json message = {
                 {"command", "notification.push"},

@@ -21,9 +21,7 @@ namespace vh::auth {
     std::shared_ptr<TokenValidator> AuthManager::tokenValidator() const { return tokenValidator_; }
 
     std::shared_ptr<vh::types::User> AuthManager::registerUser(const std::string& username, const std::string& email, const std::string& password) {
-        if (users_.count(username) > 0) {
-            throw std::runtime_error("User already exists: " + username);
-        }
+        if (users_.count(username) > 0) throw std::runtime_error("User already exists: " + username);
 
         std::string hashedPassword = hashPassword(password);
         vh::database::UserQueries::createUser(username, email, hashedPassword);

@@ -2,8 +2,7 @@
 
 namespace vh::database {
     DBConnection::DBConnection() {
-        auto config = DBConfig();
-        conn_ = std::make_unique<pqxx::connection>(config.connectionString());
+        conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
     }
 
     DBConnection::~DBConnection() {

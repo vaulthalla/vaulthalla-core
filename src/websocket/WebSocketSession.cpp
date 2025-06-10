@@ -1,6 +1,6 @@
 #include "websocket/WebSocketSession.hpp"
 #include "websocket/WebSocketRouter.hpp"
-#include "include/auth/User.hpp"
+#include "types/User.hpp"
 #include "auth/SessionManager.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
 #include <iostream>
@@ -8,7 +8,7 @@
 namespace vh::websocket {
 
     WebSocketSession::WebSocketSession(tcp::socket socket,
-                                       WebSocketRouter& router,
+                                       const std::shared_ptr<WebSocketRouter>& router,
                                        const std::shared_ptr<vh::auth::SessionManager>& sessionManager,
                                        const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
             : ws_(std::move(socket)),
@@ -24,16 +24,28 @@ namespace vh::websocket {
         }
     }
 
-    void WebSocketSession::run() {
+    void WebSocketSession::run()
+    {
         ws_.set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
-        ws_.set_option(websocket::stream_base::decorator([](websocket::response_type& res) {
-            res.set(boost::beast::http::field::server, "Vaulthalla-WebSocket-Server");
-        }));
+        ws_.set_option(websocket::stream_base::decorator(
+                [](websocket::response_type& res) {
+                    res.set(boost::beast::http::field::server, "Vaulthalla-WebSocket-Server");
+                }));
 
-        ws_.async_accept(asio::bind_executor(strand_,
-                                             std::bind(&WebSocketSession::doRead, shared_from_this())));
-
-        broadcastManager_->registerSession(shared_from_this());
+        // handshake THEN lambda fires
+        ws_.async_accept(asio::bind_executor(
+                strand_,
+                [self = shared_from_this()](beast::error_code ec)
+                {
+                    if (ec) {
+                        std::cerr << "[Session] Handshake failed: " << ec.message() << '\n';
+                        return;
+                    }
+                    // safe to broadcast now
+                    self->broadcastManager_->registerSession(self);
+                    self->isRegistered_ = true;
+                    self->doRead();
+                }));
     }
 
     void WebSocketSession::doRead() {
@@ -43,34 +55,22 @@ namespace vh::websocket {
                                                      std::placeholders::_1, std::placeholders::_2)));
     }
 
-    void WebSocketSession::onRead(beast::error_code ec, std::size_t bytesTransferred) {
-        if (!isRegistered_) {
-            broadcastManager_->registerSession(shared_from_this());
-            isRegistered_ = true;
-        }
-
-        boost::ignore_unused(bytesTransferred);
-
+    void WebSocketSession::onRead(beast::error_code ec, std::size_t)
+    {
         if (ec == websocket::error::closed) {
-            std::cout << "[WebSocketSession] Connection closed.\n";
-            return;
-
-            WebSocketSession::~WebSocketSession();
+            std::cout << "[Session] Connection closed.\n";
+            return;               // shared_ptr ref-count hits zero ⇒ auto-destruct
         }
-
         if (ec) {
-            std::cerr << "[WebSocketSession] Read error: " << ec.message() << "\n";
+            std::cerr << "[Session] Read error: " << ec.message() << '\n';
             return;
         }
 
         try {
-            std::string msgStr = beast::buffers_to_string(buffer_.data());
-            json msg = json::parse(msgStr);
-
-            // Route the message
-            router_.routeMessage(msg, *this);
+            auto msg = json::parse(beast::buffers_to_string(buffer_.data()));
+            router_->routeMessage(msg, *this);
         } catch (const std::exception& e) {
-            std::cerr << "[WebSocketSession] JSON parse or routing error: " << e.what() << "\n";
+            std::cerr << "[Session] JSON error: " << e.what() << '\n';
         }
 
         buffer_.consume(buffer_.size());
@@ -133,11 +133,11 @@ namespace vh::websocket {
         }
     }
 
-    std::shared_ptr<auth::User> WebSocketSession::getAuthenticatedUser() const {
+    std::shared_ptr<vh::types::User> WebSocketSession::getAuthenticatedUser() const {
         return authenticatedUser_;
     }
 
-    void WebSocketSession::setAuthenticatedUser(std::shared_ptr<auth::User> user) {
+    void WebSocketSession::setAuthenticatedUser(std::shared_ptr<vh::types::User> user) {
         authenticatedUser_ = std::move(user);
     }
 

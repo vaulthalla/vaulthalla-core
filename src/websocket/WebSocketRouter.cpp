@@ -13,11 +13,10 @@ namespace vh::websocket {
             std::string command = msg.at("command").get<std::string>();
 
             auto it = handlers_.find(command);
-            if (it != handlers_.end()) {
-                it->second(msg, session);
-            } else {
+            if (it != handlers_.end()) it->second(msg, session);
+            else {
                 std::cerr << "[Router] Unknown command: " << command << "\n";
-                // You could send an error back here too
+                // send an error back here too
             }
         } catch (const std::exception& e) {
             std::cerr << "[Router] Error routing message: " << e.what() << "\n";

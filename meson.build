@@ -4,6 +4,7 @@ project('vaulthalla', 'cpp',
 
 boost_dep = dependency('boost', modules: ['filesystem', 'system'], required: true)
 nlohmann_json_dep = dependency('nlohmann_json', required: true)
+libenvpp_dep = dependency('libenvpp', required: true)
 libpqxx_dep = dependency('libpqxx', required: true)
 libsodium_dep = dependency('libsodium', required: true)
 jwt_cpp_dep = dependency('jwt-cpp', required: true)
@@ -15,7 +16,7 @@ project_root = source_root + '/src'
 tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')
 
-global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, libsodium_dep, jwt_cpp_dep, thread_dep]
+global_deps = [boost_dep, nlohmann_json_dep, libenvpp_dep, libpqxx_dep, libsodium_dep, jwt_cpp_dep, thread_dep]
 test_deps = global_deps + gtest_dep
 
 inc = include_directories(source_root + '/include')

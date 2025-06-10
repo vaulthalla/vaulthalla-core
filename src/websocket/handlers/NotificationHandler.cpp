@@ -1,5 +1,5 @@
 #include "websocket/handlers/NotificationHandler.hpp"
-#include "include/auth/User.hpp"
+#include "types/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -24,7 +24,7 @@ namespace vh::websocket {
 
             session.send(response);
 
-            std::cout << "[NotificationHandler] User '" << user->getUsername()
+            std::cout << "[NotificationHandler] User '" << user->email
                       << "' subscribed to channels.\n";
 
         } catch (const std::exception& e) {
@@ -60,7 +60,7 @@ namespace vh::websocket {
 
             session.send(response);
 
-            std::cout << "[NotificationHandler] User '" << user->getUsername()
+            std::cout << "[NotificationHandler] User '" << user->email
                       << "' unsubscribed from channels.\n";
 
         } catch (const std::exception& e) {

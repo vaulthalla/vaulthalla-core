@@ -1,7 +1,7 @@
 #pragma once
 
 #include "security/PermissionManager.hpp"
-#include "include/auth/User.hpp"
+#include "types/User.hpp"
 
 #include <memory>
 #include <string>
@@ -12,7 +12,7 @@ namespace vh::security {
     public:
         AccessControl();
 
-        void enforcePermission(std::shared_ptr<vh::auth::User> user,
+        void enforcePermission(const std::shared_ptr<vh::types::User>& user,
                                const std::string& mountName,
                                const std::string& path,
                                const std::string& requiredPermission);

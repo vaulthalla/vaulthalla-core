@@ -1,6 +1,6 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "include/auth/User.hpp"
+#include "types/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -29,9 +29,7 @@ namespace vh::websocket {
             throw std::runtime_error("Unauthorized");
         }
 
-        const std::string& username = user->getUsername();
-
-        bool allowed = permissionManager_->hasPermission(username, mountName, path, requiredPermission);
+        bool allowed = permissionManager_->hasPermission(user->email, mountName, path, requiredPermission);
         if (!allowed) {
             throw std::runtime_error("Permission denied: " + requiredPermission + " for " + path);
         }

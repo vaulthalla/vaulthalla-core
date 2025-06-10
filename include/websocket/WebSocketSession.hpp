@@ -12,8 +12,11 @@
 #include <unordered_set>
 
 namespace vh::auth {
-    class User;
     class SessionManager;
+}
+
+namespace vh::types {
+    class User;
 }
 
 namespace vh::websocket {
@@ -30,7 +33,7 @@ namespace vh::websocket {
     public:
         ~WebSocketSession();
         WebSocketSession(tcp::socket socket,
-                         WebSocketRouter& router,
+                         const std::shared_ptr<WebSocketRouter>& router,
                          const std::shared_ptr<vh::auth::SessionManager>& sessionManager,
                          const std::shared_ptr<NotificationBroadcastManager>& broadcastManager);
 
@@ -39,8 +42,8 @@ namespace vh::websocket {
         void send(const json& message);
 
         // Accessors for session state
-        std::shared_ptr<auth::User> getAuthenticatedUser() const;
-        void setAuthenticatedUser(std::shared_ptr<auth::User> user);
+        std::shared_ptr<vh::types::User> getAuthenticatedUser() const;
+        void setAuthenticatedUser(std::shared_ptr<vh::types::User> user);
 
         void subscribeChannel(const std::string& channel);
         void unsubscribeChannel(const std::string& channel);
@@ -52,9 +55,9 @@ namespace vh::websocket {
         beast::flat_buffer buffer_;
         asio::any_io_executor strand_;
 
-        WebSocketRouter& router_;
+        std::shared_ptr<WebSocketRouter> router_;
         std::shared_ptr<auth::SessionManager> sessionManager_;
-        std::shared_ptr<auth::User> authenticatedUser_;
+        std::shared_ptr<vh::types::User> authenticatedUser_;
 
         std::mutex writeQueueMutex_;
         std::queue<std::string> writeQueue_;

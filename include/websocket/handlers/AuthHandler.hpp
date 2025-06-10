@@ -20,8 +20,10 @@ namespace vh::websocket {
         explicit AuthHandler(const std::shared_ptr<vh::auth::AuthManager>& authManager);
 
         void handleLogin(const json& msg, WebSocketSession& session);
+        void handleRegister(const json& msg, WebSocketSession& session);
         void handleRefresh(const json& msg, WebSocketSession& session);
         void handleLogout(const json& msg, WebSocketSession& session);
+        void handleUnauthenticatedHello(WebSocketSession& session);
 
     private:
         std::shared_ptr<vh::auth::AuthManager> authManager_;

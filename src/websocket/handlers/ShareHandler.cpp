@@ -2,7 +2,7 @@
 #include "websocket/WebSocketSession.hpp"
 #include "share/LinkResolver.hpp"
 #include "share/ShareLink.hpp"
-#include "include/auth/User.hpp"
+#include "types/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -23,7 +23,7 @@ namespace vh::websocket {
             int expiresIn = msg.value("expiresIn", 0); // optional expiration in seconds
             const auto& expiresAt = std::chrono::system_clock::now() + std::chrono::seconds(expiresIn);
 
-            share::ShareLink shareLink(user->getUsername(), mountName, path, permissions.get<std::string>(), expiresAt);
+            share::ShareLink shareLink(user->email, mountName, path, permissions.get<std::string>(), expiresAt);
             auto shareLinkUrl = linkResolver_->createShareLink(shareLink);
 
             json response = {
@@ -34,7 +34,7 @@ namespace vh::websocket {
 
             session.send(response);
 
-            std::cout << "[ShareHandler] User '" << user->getUsername() << "' created share link for " << path << "\n";
+            std::cout << "[ShareHandler] User '" << user->email << "' created share link for " << path << "\n";
 
         } catch (const std::exception& e) {
             std::cerr << "[ShareHandler] handleCreateLink error: " << e.what() << "\n";

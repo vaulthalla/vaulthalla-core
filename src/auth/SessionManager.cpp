@@ -7,25 +7,23 @@
 
 namespace vh::auth {
 
-    std::string SessionManager::createSession(std::shared_ptr<User> user) {
+    std::string SessionManager::createSession(const std::shared_ptr<vh::types::User>& user) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
         std::string token = generateRandomToken();
         activeSessions_[token] = user;
 
         std::cout << "[SessionManager] Created session for user: "
-                  << user->getUsername() << " token: " << token << "\n";
+                  << user->email << " token: " << token << "\n";
 
         return token;
     }
 
-    std::shared_ptr<User> SessionManager::getUserForSession(const std::string& token) {
+    std::shared_ptr<vh::types::User> SessionManager::getUserForSession(const std::string& token) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
         auto it = activeSessions_.find(token);
-        if (it != activeSessions_.end()) {
-            return it->second;
-        }
+        if (it != activeSessions_.end()) return it->second;
 
         return nullptr;
     }
@@ -36,7 +34,7 @@ namespace vh::auth {
         auto it = activeSessions_.find(token);
         if (it != activeSessions_.end()) {
             std::cout << "[SessionManager] Invalidated session for user: "
-                      << it->second->getUsername() << "\n";
+                      << it->second->email << "\n";
             activeSessions_.erase(it);
         }
     }
@@ -45,9 +43,7 @@ namespace vh::auth {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
         std::unordered_map<std::string, std::string> result;
-        for (const auto& pair : activeSessions_) {
-            result[pair.first] = pair.second->getUsername();
-        }
+        for (const auto& pair : activeSessions_) result[pair.first] = pair.second->email;
 
         return result;
     }

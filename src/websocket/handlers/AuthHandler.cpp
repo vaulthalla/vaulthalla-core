@@ -1,7 +1,6 @@
 #include "websocket/handlers/AuthHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "auth/AuthManager.hpp"
-#include "auth/SessionManager.hpp"
 #include "auth/TokenValidator.hpp"
 #include <iostream>
 
@@ -29,8 +28,7 @@ namespace vh::websocket {
                     {"command", "auth.login.response"},
                     {"status", "ok"},
                     {"token", token},
-                    {"username", user->getUsername()},
-                    {"publicKey", user->getPublicKey()}
+                    {"user", *user}
             };
 
             session.send(response);
@@ -41,6 +39,42 @@ namespace vh::websocket {
 
             json response = {
                     {"command", "auth.login.response"},
+                    {"status", "error"},
+                    {"error", e.what()}
+            };
+
+            session.send(response);
+        }
+    }
+
+    void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) {
+        try {
+            json data = msg.at("payload");
+            std::string name = data.at("name").get<std::string>();
+            std::string email = data.at("email").get<std::string>();
+            std::string password = data.at("password").get<std::string>();
+
+            auto user = authManager_->registerUser(name, email, password);
+            std::string token = sessionManager_->createSession(user);
+
+            // Bind user to WebSocketSession
+            session.setAuthenticatedUser(user);
+
+            json response = {
+                    {"command", "auth.register.response"},
+                    {"status", "ok"},
+                    {"token", token},
+                    {"user", *user}
+            };
+
+            session.send(response);
+
+            std::cout << "[AuthHandler] User '" << name << "' registered.\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[AuthHandler] handleRegister error: " << e.what() << "\n";
+
+            json response = {
+                    {"command", "auth.register.response"},
                     {"status", "error"},
                     {"error", e.what()}
             };
@@ -69,13 +103,12 @@ namespace vh::websocket {
                     {"command", "auth.refresh.response"},
                     {"status", "ok"},
                     {"token", token},
-                    {"username", user->getUsername()},
-                    {"publicKey", user->getPublicKey()}
+                    {"user", *user}
             };
 
             session.send(response);
 
-            std::cout << "[AuthHandler] User '" << user->getUsername() << "' refreshed session.\n";
+            std::cout << "[AuthHandler] User '" << user->email << "' refreshed session.\n";
         } catch (const std::exception& e) {
             std::cerr << "[AuthHandler] handleRefresh error: " << e.what() << "\n";
 
@@ -116,6 +149,24 @@ namespace vh::websocket {
             };
 
             session.send(response);
+        }
+    }
+
+    void AuthHandler::handleUnauthenticatedHello(WebSocketSession& session) {
+        try {
+            std::string greeting = "Shield Brother";
+
+            json response = {
+                    {"command", "auth.hello.response"},
+                    {"status", "ok"},
+                    {"message", "Hello, " + greeting + "!"}
+            };
+
+            session.send(response);
+
+            std::cout << "[AuthHandler] Unauthenticated hello: " << greeting << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[AuthHandler] handleUnauthenticatedHello error: " << e.what() << "\n";
         }
     }
 

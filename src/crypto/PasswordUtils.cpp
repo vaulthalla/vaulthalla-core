@@ -87,9 +87,7 @@ namespace vh::auth {
             size_t delimPos = line.find(':');
             if (delimPos != std::string::npos) {
                 std::string hashSuffix = line.substr(0, delimPos);
-                if (hashSuffix == suffix) {
-                    return true;
-                }
+                if (hashSuffix == suffix) return true;
             }
         }
 

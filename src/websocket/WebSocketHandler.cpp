@@ -19,10 +19,6 @@ namespace vh::websocket {
 
     void WebSocketHandler::registerAllHandlers() {
         // Auth
-        router_->registerHandler("auth.hello", [this](const json& msg, WebSocketSession& session) {
-            authHandler_->handleUnauthenticatedHello(session);
-        });
-
         router_->registerHandler("auth.login", [this](const json& msg, WebSocketSession& session) {
             authHandler_->handleLogin(msg, session);
         });

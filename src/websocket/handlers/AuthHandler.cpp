@@ -189,22 +189,4 @@ namespace vh::websocket {
         }
     }
 
-    void AuthHandler::handleUnauthenticatedHello(WebSocketSession& session) {
-        try {
-            std::string greeting = "Shield Brother";
-
-            json response = {
-                    {"command", "auth.hello.response"},
-                    {"status", "ok"},
-                    {"message", "Hello, " + greeting + "!"}
-            };
-
-            session.send(response);
-
-            std::cout << "[AuthHandler] Unauthenticated hello: " << greeting << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "[AuthHandler] handleUnauthenticatedHello error: " << e.what() << "\n";
-        }
-    }
-
 } // namespace vh::websocket

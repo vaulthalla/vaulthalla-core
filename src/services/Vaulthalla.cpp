@@ -1,4 +1,6 @@
 #include "services/Vaulthalla.hpp"
+#include "database/Transactions.hpp"
+#include "crypto/PasswordUtils.hpp"
 #include <libenvpp/env.hpp>
 
 namespace vh::services {
@@ -38,9 +40,20 @@ namespace vh::services {
                     serviceManager_->authManager()->sessionManager()
             );
 
+            vh::database::Transactions::init();
+
             wsServer_->run();
 
             ioContext_->run();
+
+            vh::auth::PasswordUtils::loadCommonWeakPasswordsFromURLs({
+                "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt",
+                "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/probable-v2_top-12000.txt"
+            });
+
+            vh::auth::PasswordUtils::loadDictionaryFromURL(
+                    "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt"
+            );
         } catch (const std::exception& e) {
             std::cerr << "[Vaulthalla] Exception: " << e.what() << "\n";
         }

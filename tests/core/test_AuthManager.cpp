@@ -1,27 +1,33 @@
 #include <gtest/gtest.h>
 #include "auth/AuthManager.hpp"
-#include "database//DBConnection.hpp"
 #include "database/queries/UserQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/User.hpp"
+#include "crypto/PasswordUtils.hpp"
 #include <memory>
 
 class AuthManagerTest : public ::testing::Test {
 protected:
-    std::shared_ptr<vh::database::DBConnection> db_;
     std::unique_ptr<vh::auth::AuthManager> authManager_;
 
     void SetUp() override {
-        db_ = std::make_shared<vh::database::DBConnection>();
         authManager_ = std::make_unique<vh::auth::AuthManager>();
+        vh::database::Transactions::init();
+        vh::auth::PasswordUtils::loadCommonWeakPasswordsFromURLs({
+            "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt",
+            "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/probable-v2_top-12000.txt"
+        });
 
-        vh::database::runTransaction("AuthManagerTest::SetUp", [&](pqxx::work& txn) {
+        vh::auth::PasswordUtils::loadDictionaryFromURL(
+                "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt"
+        );
+
+        vh::database::Transactions::exec("AuthManagerTest::SetUp", [&](pqxx::work& txn) {
             txn.exec("DELETE FROM users;");
         });
     }
 
     void TearDown() override {
-        vh::database::runTransaction("AuthManagerTest::TearDown", [&](pqxx::work& txn) {
+        vh::database::Transactions::exec("AuthManagerTest::TearDown", [&](pqxx::work& txn) {
             // Ensure the users table is empty after each test
             txn.exec("DELETE FROM users;");
         });
@@ -29,26 +35,26 @@ protected:
 };
 
 TEST_F(AuthManagerTest, RegisterUser_Success) {
-    auto user = authManager_->registerUser("Cooper Test", "cooper.test@example.com", "password123");
+    auto user = authManager_->registerUser("Cooper Test", "cooper.test@example.com", "fjeljws@1884");
 
     ASSERT_NE(user, nullptr);
     EXPECT_EQ(user->name, "Cooper Test");
     EXPECT_EQ(user->email, "cooper.test@example.com");
     // NOTE: Do not test raw password — assume it's hashed in DB
 
-    auto fetched = std::make_unique<vh::types::User>(vh::database::UserQueries::getUserByEmail("cooper.test@example.com"));
+    auto fetched = vh::database::UserQueries::getUserByEmail("cooper.test@example.com");
     ASSERT_NE(fetched, nullptr);
     EXPECT_EQ(fetched->name, "Cooper Test");
     EXPECT_EQ(fetched->email, "cooper.test@example.com");
 }
 
 TEST_F(AuthManagerTest, RegisterUser_DuplicateEmail_Fails) {
-    authManager_->registerUser("First User", "duplicate@example.com", "password123");
-    EXPECT_THROW({ authManager_->registerUser("Second User", "duplicate@example.com", "diffpassword"); }, std::exception);
+    authManager_->registerUser("First User", "duplicate@example.com", "fjeljws@1884");
+    EXPECT_THROW({ authManager_->registerUser("Second User", "duplicate@example.com", "dwfe23$3212"); }, std::exception);
 }
 
 TEST_F(AuthManagerTest, RegisterUser_InvalidEmail_Fails) {
-    EXPECT_THROW({ authManager_->registerUser("Bad User", "", "password123"); }, std::exception);
+    EXPECT_THROW({ authManager_->registerUser("Bad User", "", "fjeljws@1884"); }, std::exception);
 }
 
 TEST_F(AuthManagerTest, RegisterUser_InvalidPassword_Fails) {

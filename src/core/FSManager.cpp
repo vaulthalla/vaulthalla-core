@@ -4,9 +4,14 @@
 
 namespace vh::core {
 
-    FSManager::FSManager(const std::filesystem::path& root_directory)
-            : storageEngine_(std::make_shared<vh::storage::LocalDiskStorageEngine>(root_directory)),
+    FSManager::FSManager()
+            : storageEngine_(std::make_shared<vh::storage::LocalDiskStorageEngine>(rootDirectory_)),
               directoryWalker_(true) {
+        if (!std::filesystem::exists(rootDirectory_)) {
+            std::cout << "[FSManager] Root directory does not exist, creating: " << rootDirectory_ << "\n";
+            std::filesystem::create_directories(rootDirectory_);
+        }
+
         // TODO: Load index from disk (future enhancement)
     }
 

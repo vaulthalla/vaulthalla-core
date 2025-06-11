@@ -19,8 +19,7 @@ namespace vh::core {
 
     class FSManager {
     public:
-        FSManager() : storageEngine_(nullptr), searchIndex_() {}
-        explicit FSManager(const std::filesystem::path& root_directory);
+        FSManager();
         explicit FSManager(const std::shared_ptr<vh::storage::LocalDiskStorageEngine>& storage_engine);
 
         // Core file APIs
@@ -41,6 +40,10 @@ namespace vh::core {
         std::shared_ptr<vh::storage::LocalDiskStorageEngine> getStorageEngine() const { return storageEngine_; }
 
     private:
+        const std::filesystem::path rootDirectory_ = std::getenv("VAULTHALLA_ROOT_DIR") ?
+                                                     std::filesystem::path(std::getenv("VAULTHALLA_ROOT_DIR")) :
+                                                     std::filesystem::current_path() / "data";
+
         std::shared_ptr<vh::storage::LocalDiskStorageEngine> storageEngine_;
         std::unordered_map<std::string, FileMetadata> fileIndex_;
 

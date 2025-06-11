@@ -23,7 +23,7 @@ namespace vh::core {
         explicit FSManager(const std::shared_ptr<vh::storage::LocalDiskStorageEngine>& storage_engine);
 
         // Core file APIs
-        static std::filesystem::path resolvePath(const std::string& id) ;
+        std::filesystem::path resolvePath(const std::string& id) const;
         bool saveFile(const std::string& id, const std::vector<uint8_t>& data);
         std::optional<std::vector<uint8_t>> loadFile(const std::string& id) const;
         bool deleteFile(const std::string& id);

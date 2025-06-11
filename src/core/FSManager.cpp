@@ -19,8 +19,14 @@ namespace vh::core {
             : storageEngine_(storage_engine),
               directoryWalker_(true) {}
 
-    fs::path FSManager::resolvePath(const std::string& id) {
-        return fs::path("data") / (id + ".bin");  // can expand to hashed buckets later
+    fs::path FSManager::resolvePath(const std::string& id) const {
+        if (id.empty()) throw std::invalid_argument("File ID cannot be empty");
+
+        fs::path rel_path = fs::path(id);
+        if (rel_path.is_absolute() || rel_path.has_root_name())
+            throw std::invalid_argument("File ID must be a relative path");
+
+        return rootDirectory_ / rel_path;
     }
 
     bool FSManager::saveFile(const std::string& id, const std::vector<uint8_t>& data) {

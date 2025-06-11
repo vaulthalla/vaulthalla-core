@@ -48,13 +48,8 @@ namespace vh::auth {
         std::string lowerPw = password;
         std::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
 
-        for (const auto& word : dictionaryWords_) {
-            if (lowerPw.find(word) != std::string::npos) {
-                return true;
-            }
-        }
-
-        return false;
+        return std::ranges::any_of(dictionaryWords_,
+                                   [&](const auto& word) { return lowerPw.contains(word); });
     }
 
     bool PasswordUtils::isCommonWeakPassword(const std::string& password) {

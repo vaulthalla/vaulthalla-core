@@ -1,6 +1,8 @@
 #include "database/DBConnection.hpp"
+#include <iostream>
 
 namespace vh::database {
+
     DBConnection::DBConnection() {
         conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
     }

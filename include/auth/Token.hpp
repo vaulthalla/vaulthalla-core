@@ -17,7 +17,6 @@ namespace vh::auth {
         std::chrono::system_clock::time_point expiryTs;
         bool revoked = false;
 
-        // Helper methods
         [[nodiscard]] bool isExpired() const { return std::chrono::system_clock::now() >= expiryTs; }
         [[nodiscard]] bool isValid() const { return !isExpired() && !revoked; }
 

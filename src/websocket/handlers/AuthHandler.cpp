@@ -22,11 +22,16 @@ namespace vh::websocket {
             // Bind user to WebSocketSession
             session.setAuthenticatedUser(user);
 
+            json data = {
+                    {"token", token},
+                    {"user", *user}
+            };
+
             json response = {
                     {"command", "auth.login.response"},
                     {"status", "ok"},
-                    {"token", token},
-                    {"user", *user}
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"data", data}
             };
 
             session.send(response);
@@ -47,10 +52,10 @@ namespace vh::websocket {
 
     void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) {
         try {
-            json data = msg.at("payload");
-            std::string name = data.at("name").get<std::string>();
-            std::string email = data.at("email").get<std::string>();
-            std::string password = data.at("password").get<std::string>();
+            json payload = msg.at("payload");
+            std::string name = payload.at("name").get<std::string>();
+            std::string email = payload.at("email").get<std::string>();
+            std::string password = payload.at("password").get<std::string>();
 
             auto user = authManager_->registerUser(name, email, password);
             std::string token = sessionManager_->createSession(session.shared_from_this(), user);
@@ -58,11 +63,16 @@ namespace vh::websocket {
             // Bind user to WebSocketSession
             session.setAuthenticatedUser(user);
 
+            json data = {
+                    {"token", token},
+                    {"user", *user}
+            };
+
             json response = {
                     {"command", "auth.register.response"},
                     {"status", "ok"},
-                    {"token", token},
-                    {"user", *user}
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"data", data}
             };
 
             session.send(response);
@@ -74,6 +84,7 @@ namespace vh::websocket {
             json response = {
                     {"command", "auth.register.response"},
                     {"status", "error"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
                     {"error", e.what()}
             };
 
@@ -91,11 +102,16 @@ namespace vh::websocket {
 
             client->refreshToken();
 
+            json data = {
+                    {"token", client->getRawToken()},
+                    {"user", *client->getUser()}
+            };
+
             json response = {
                     {"command", "auth.refresh.response"},
                     {"status", "ok"},
-                    {"token", token},
-                    {"user", *client->getUser()}
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"data", data}
             };
 
             session.send(response);
@@ -107,6 +123,7 @@ namespace vh::websocket {
             json response = {
                     {"command", "auth.refresh.response"},
                     {"status", "error"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
                     {"error", e.what()}
             };
 
@@ -125,7 +142,8 @@ namespace vh::websocket {
 
             json response = {
                     {"command", "auth.logout.response"},
-                    {"status", "ok"}
+                    {"status", "ok"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
             };
 
             session.send(response);
@@ -137,10 +155,37 @@ namespace vh::websocket {
             json response = {
                     {"command", "auth.logout.response"},
                     {"status", "error"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
                     {"error", e.what()}
             };
 
             session.send(response);
+        }
+    }
+
+    void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session) {
+        try {
+            auto token = msg.at("token").get<std::string>();
+            auto client = sessionManager_->getClientSession(token);
+
+            json data = {
+                    {"isAuthenticated", client && client->isAuthenticated()},
+                    {"user", client ? *client->getUser() : json::object()}
+            };
+
+            json response = {
+                    {"command", "auth.isAuthenticated.response"},
+                    {"status", "ok"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"data", data}
+            };
+
+            session.send(response);
+
+            std::cout << "[AuthHandler] User authentication check: "
+                      << (client->isAuthenticated() ? "Authenticated" : "Unauthenticated") << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[AuthHandler] isUserAuthenticated error: " << e.what() << "\n";
         }
     }
 

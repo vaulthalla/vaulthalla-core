@@ -25,5 +25,13 @@ namespace vh::services {
         std::shared_ptr<vh::websocket::WebSocketHandler> wsHandler_;
         std::shared_ptr<vh::websocket::WebSocketServer> wsServer_;
         std::shared_ptr<vh::services::ConnectionLifecycleManager> lifecycleManager_;
+
+        const boost::asio::ip::address address_ = std::getenv("VAULTHALLA_WEBSOCKET_ADDRESS") ?
+            boost::asio::ip::make_address(std::getenv("VAULTHALLA_WEBSOCKET_ADDRESS")) :
+            boost::asio::ip::make_address("127.0.0.1");
+
+        const unsigned short port_ = std::getenv("VAULTHALLA_WEBSOCKET_PORT") ?
+            static_cast<unsigned short>(std::stoi(std::getenv("VAULTHALLA_WEBSOCKET_PORT"))) :
+            9001;
     };
 } // namespace vh::services

@@ -35,6 +35,10 @@ namespace vh::websocket {
             authHandler_->handleLogout(msg, session);
         });
 
+        router_->registerHandler("auth.isAuthenticated", [this](const json& msg, WebSocketSession& session) {
+            authHandler_->isUserAuthenticated(msg, session);
+        });
+
         router_->registerHandler("auth.register", [this](const json& msg, WebSocketSession& session) {
             authHandler_->handleRegister(msg, session);
         });

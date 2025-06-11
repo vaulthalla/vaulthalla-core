@@ -22,6 +22,7 @@ namespace vh::websocket {
         void handleRegister(const json& msg, WebSocketSession& session);
         void handleRefresh(const json& msg, WebSocketSession& session);
         void handleLogout(const json& msg, WebSocketSession& session);
+        void isUserAuthenticated(const json& msg, WebSocketSession& session);
         void handleUnauthenticatedHello(WebSocketSession& session);
 
     private:

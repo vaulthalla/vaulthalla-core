@@ -9,7 +9,7 @@
 
 namespace vh::types {
     struct User {
-        unsigned int id;
+        unsigned short id;
         std::string name;
         std::string email;
         std::string password_hash;
@@ -18,7 +18,7 @@ namespace vh::types {
         bool is_active;
 
         explicit User(const pqxx::row& row)
-            : id(row["id"].as<unsigned int>()),
+            : id(row["id"].as<unsigned short>()),
               name(row["name"].as<std::string>()),
               email(row["email"].as<std::string>()),
               password_hash(row["password_hash"].as<std::string>()),

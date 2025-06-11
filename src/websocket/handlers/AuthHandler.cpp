@@ -1,15 +1,13 @@
 #include "websocket/handlers/AuthHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "auth/AuthManager.hpp"
-#include "auth/TokenValidator.hpp"
 #include <iostream>
 
 namespace vh::websocket {
 
     AuthHandler::AuthHandler(const std::shared_ptr<vh::auth::AuthManager> &authManager)
             : authManager_(authManager),
-              sessionManager_(authManager->sessionManager()),
-              tokenValidator_(authManager->tokenValidator()) {
+              sessionManager_(authManager->sessionManager()) {
         if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
     }
 
@@ -19,7 +17,7 @@ namespace vh::websocket {
             std::string password = msg.at("password").get<std::string>();
 
             auto user = authManager_->loginUser(username, password);
-            std::string token = sessionManager_->createSession(user);
+            std::string token = sessionManager_->createSession(session.shared_from_this(), user);
 
             // Bind user to WebSocketSession
             session.setAuthenticatedUser(user);
@@ -55,7 +53,7 @@ namespace vh::websocket {
             std::string password = data.at("password").get<std::string>();
 
             auto user = authManager_->registerUser(name, email, password);
-            std::string token = sessionManager_->createSession(user);
+            std::string token = sessionManager_->createSession(session.shared_from_this(), user);
 
             // Bind user to WebSocketSession
             session.setAuthenticatedUser(user);
@@ -87,26 +85,22 @@ namespace vh::websocket {
         try {
             std::string token = msg.at("token").get<std::string>();
 
-            if (!tokenValidator_->validateToken(token)) throw std::runtime_error("Invalid token");
+            auto client = sessionManager_->getClientSession(token);
 
-            auto user = sessionManager_->getUserForSession(token);
-            if (!user) {
-                throw std::runtime_error("Session not found");
-            }
+            if (!client) throw std::runtime_error("Session not found");
 
-            // Re-bind user to session
-            session.setAuthenticatedUser(user);
+            client->refreshToken();
 
             json response = {
                     {"command", "auth.refresh.response"},
                     {"status", "ok"},
                     {"token", token},
-                    {"user", *user}
+                    {"user", *client->getUser()}
             };
 
             session.send(response);
 
-            std::cout << "[AuthHandler] User '" << user->email << "' refreshed session.\n";
+            std::cout << "[AuthHandler] User '" << client->getUser()->email << "' refreshed session.\n";
         } catch (const std::exception& e) {
             std::cerr << "[AuthHandler] handleRefresh error: " << e.what() << "\n";
 

@@ -6,7 +6,6 @@
 namespace vh::auth {
     class SessionManager;
     class AuthManager;
-    class TokenValidator;
 }
 
 namespace vh::websocket {
@@ -28,7 +27,6 @@ namespace vh::websocket {
     private:
         std::shared_ptr<vh::auth::AuthManager> authManager_;
         std::shared_ptr<vh::auth::SessionManager> sessionManager_;
-        std::shared_ptr<vh::auth::TokenValidator> tokenValidator_;
     };
 
 } // namespace vh::websocket

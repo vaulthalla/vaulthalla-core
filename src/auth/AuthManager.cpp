@@ -11,15 +11,33 @@
 namespace vh::auth {
 
     AuthManager::AuthManager()
-            : sessionManager_(std::make_shared<SessionManager>()),
-              tokenValidator_(std::make_shared<TokenValidator>()) {
+            : sessionManager_(std::make_shared<SessionManager>()) {
         if (sodium_init() < 0)
             throw std::runtime_error("libsodium initialization failed in AuthManager");
     }
 
-    std::shared_ptr<SessionManager> AuthManager::sessionManager() const { return sessionManager_; }
+    bool AuthManager::validateToken(const std::string& token) {
+        try {
+            auto session = sessionManager_->getClientSession(token);
 
-    std::shared_ptr<TokenValidator> AuthManager::tokenValidator() const { return tokenValidator_; }
+            if (!session) {
+                std::cerr << "[AuthManager] Invalid token: session not found for token " << token << "\n";
+                return false;
+            }
+
+            if (!session->isAuthenticated()) {
+                std::cerr << "[AuthManager] Invalid token: session is not authenticated for token " << token << "\n";
+                return false;
+            }
+
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "[AuthManager] Token validation failed: " << e.what() << "\n";
+            return false;
+        }
+    }
+
+    std::shared_ptr<SessionManager> AuthManager::sessionManager() const { return sessionManager_; }
 
     std::shared_ptr<vh::types::User> AuthManager::registerUser(const std::string& username, const std::string& email, const std::string& password) {
         if (users_.count(username) > 0) throw std::runtime_error("User already exists: " + username);

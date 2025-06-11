@@ -1,7 +1,6 @@
 #include "websocket/WebSocketSession.hpp"
 #include "websocket/WebSocketRouter.hpp"
 #include "types/User.hpp"
-#include "auth/SessionManager.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
 #include <iostream>
 
@@ -9,12 +8,10 @@ namespace vh::websocket {
 
     WebSocketSession::WebSocketSession(tcp::socket socket,
                                        const std::shared_ptr<WebSocketRouter>& router,
-                                       const std::shared_ptr<vh::auth::SessionManager>& sessionManager,
                                        const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
             : ws_(std::move(socket)),
               strand_(boost::asio::make_strand(ws_.get_executor())),
               router_(router),
-              sessionManager_(sessionManager),
               broadcastManager_(broadcastManager) {}
 
     WebSocketSession::~WebSocketSession() {
@@ -131,6 +128,13 @@ namespace vh::websocket {
         if (writeMore) {
             doWrite();
         }
+    }
+
+    void WebSocketSession::close() {
+        beast::error_code ec;
+        ws_.close(websocket::close_code::normal, ec);
+        if (ec) std::cerr << "[WebSocketSession] Close error: " << ec.message() << "\n";
+        else std::cout << "[WebSocketSession] Connection closed gracefully.\n";
     }
 
     std::shared_ptr<vh::types::User> WebSocketSession::getAuthenticatedUser() const {

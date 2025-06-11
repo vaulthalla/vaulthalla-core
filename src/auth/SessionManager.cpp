@@ -1,25 +1,26 @@
 #include "auth/SessionManager.hpp"
+#include "websocket/WebSocketSession.hpp"
 
-#include <sodium.h>
 #include <iostream>
-#include <sstream>
-#include <iomanip>
 
 namespace vh::auth {
 
-    std::string SessionManager::createSession(const std::shared_ptr<vh::types::User>& user) {
+    std::string SessionManager::createSession(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
+                                            const std::shared_ptr<vh::types::User>& user) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
-        std::string token = generateRandomToken();
-        activeSessions_[token] = user;
+        if (!session || !user) throw std::invalid_argument("Session and user must not be null");
 
-        std::cout << "[SessionManager] Created session for user: "
-                  << user->email << " token: " << token << "\n";
+        auto client = std::make_shared<Client>(user, session);
+        activeSessions_[client->getRawToken()] = client;
 
-        return token;
+        session->setAuthenticatedUser(user);
+        std::cout << "[SessionManager] Authenticated session for user: " << user->email << "\n";
+
+        return client->getRawToken();
     }
 
-    std::shared_ptr<vh::types::User> SessionManager::getUserForSession(const std::string& token) {
+    std::shared_ptr<Client> SessionManager::getClientSession(const std::string& token) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
         auto it = activeSessions_.find(token);
@@ -33,27 +34,16 @@ namespace vh::auth {
 
         auto it = activeSessions_.find(token);
         if (it != activeSessions_.end()) {
+            it->second->invalidateToken();
             std::cout << "[SessionManager] Invalidated session for user: "
-                      << it->second->email << "\n";
+                      << it->second->getEmail() << "\n";
             activeSessions_.erase(it);
         }
     }
 
-    std::unordered_map<std::string, std::string> SessionManager::listActiveSessions() {
+    std::unordered_map<std::string, std::shared_ptr<Client>> SessionManager::getActiveSessions() {
         std::lock_guard<std::mutex> lock(sessionMutex_);
-
-        std::unordered_map<std::string, std::string> result;
-        for (const auto& pair : activeSessions_) result[pair.first] = pair.second->email;
-
-        return result;
-    }
-
-    std::string SessionManager::generateRandomToken() {
-        unsigned char buf[16]; // 128-bit token → plenty
-        randombytes_buf(buf, sizeof buf);
-        std::ostringstream oss;
-        for (unsigned char i : buf) oss << std::hex << std::setw(2) << std::setfill('0') << (int)i;
-        return oss.str();
+        return activeSessions_;
     }
 
 } // namespace vh::auth

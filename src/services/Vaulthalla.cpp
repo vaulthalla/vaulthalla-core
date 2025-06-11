@@ -29,6 +29,10 @@ namespace vh::services {
 
             serviceManager_ = std::make_shared<vh::services::ServiceManager>();
 
+            lifecycleManager_ = std::make_shared<vh::services::ConnectionLifecycleManager>(
+                    serviceManager_->authManager()->sessionManager()
+            );
+
             wsRouter_ = std::make_shared<vh::websocket::WebSocketRouter>();
 
             wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(serviceManager_, wsRouter_);
@@ -61,7 +65,7 @@ namespace vh::services {
 
     void Vaulthalla::stop() {
         std::cout << "Vaulthalla service stopped." << std::endl;
-        // Clean up resources, stop servers, etc.
+
     }
 
     void Vaulthalla::restart() {

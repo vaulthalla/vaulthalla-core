@@ -3,6 +3,7 @@
 #include "websocket/WebSocketRouter.hpp"
 #include "websocket/WebSocketHandler.hpp"
 #include "websocket/WebSocketServer.hpp"
+#include "services/ConnectionLifecycleManager.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -23,5 +24,6 @@ namespace vh::services {
         std::shared_ptr<vh::websocket::WebSocketRouter> wsRouter_;
         std::shared_ptr<vh::websocket::WebSocketHandler> wsHandler_;
         std::shared_ptr<vh::websocket::WebSocketServer> wsServer_;
+        std::shared_ptr<vh::services::ConnectionLifecycleManager> lifecycleManager_;
     };
 } // namespace vh::services

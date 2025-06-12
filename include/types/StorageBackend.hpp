@@ -35,24 +35,24 @@ namespace vh::types {
               created_at(row["created_at"].as<std::time_t>()) {}
     };
 
-    struct LocalDiskConfig {
+    struct LocalDiskConfig : public StorageBackend {
         unsigned int storage_backend_id;
         std::string mount_point;
 
         explicit LocalDiskConfig(const pqxx::row& row)
-            : storage_backend_id(row["storage_backend_id"].as<unsigned int>()),
+            : StorageBackend(row),
+              storage_backend_id(row["storage_backend_id"].as<unsigned int>()),
               mount_point(row["mount_point"].as<std::string>()) {}
     };
 
-    struct S3Config {
-        unsigned short id;
+    struct S3Config : public StorageBackend {
         unsigned short storage_backend_id;
         unsigned short api_key_id;
         std::string bucket;
 
 
         explicit S3Config(const pqxx::row& row)
-            : id(row["id"].as<unsigned short>()),
+            : StorageBackend(row),
               storage_backend_id(row["storage_backend_id"].as<unsigned short>()),
               api_key_id(row["api_key_id"].as<unsigned short>()),
               bucket(row["bucket"].as<std::string>()) {}

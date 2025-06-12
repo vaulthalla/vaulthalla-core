@@ -36,6 +36,7 @@ CREATE TABLE user_roles (
 CREATE TABLE api_keys (
                           id SERIAL PRIMARY KEY,
                           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                          name VARCHAR(100) NOT NULL,
                           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -53,8 +54,8 @@ CREATE TYPE storage_backend_type AS ENUM ('local', 's3');
 
 CREATE TABLE storage_backends (
                                   id SERIAL PRIMARY KEY,
-                                  name VARCHAR(150) UNIQUE NOT NULL,
                                   type storage_backend_type NOT NULL,
+                                  name VARCHAR(150) UNIQUE NOT NULL,
                                   is_active BOOLEAN DEFAULT TRUE,
                                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -67,7 +68,6 @@ CREATE TABLE local_disk_configs (
 
 -- S3 config
 CREATE TABLE s3_configs (
-                           id SERIAL PRIMARY KEY,
                            storage_backend_id INTEGER REFERENCES storage_backends(id) ON DELETE CASCADE,
                            api_key_id INTEGER REFERENCES s3_api_keys(api_key_id) ON DELETE CASCADE,
                            bucket TEXT NOT NULL

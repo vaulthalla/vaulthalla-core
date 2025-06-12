@@ -4,9 +4,10 @@
 namespace vh::database {
     void APIKeyQueries::addS3APIKey(const vh::types::S3APIKey &key) {
         Transactions::exec("APIKeyQueries::addS3APIKey", [&](pqxx::work& txn) {
-            txn.exec("INSERT INTO api_keys (id, user_id, created_at) VALUES ("
+            txn.exec("INSERT INTO api_keys (id, user_id, name, created_at) VALUES ("
                      + txn.quote(key.id) + ", "
                      + txn.quote(key.user_id) + ", "
+                     + txn.quote(key.name) + ", "
                      + txn.quote(key.created_at) + ")");
 
             txn.exec("INSERT INTO s3_api_keys (api_key_id, access_key, secret_access_key, region, endpoint) VALUES ("

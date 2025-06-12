@@ -18,8 +18,15 @@ namespace vh::database {
     void MountQueries::addS3Mount(const vh::types::StorageBackend& backend,
                                   const vh::types::S3Config& config) {
         vh::database::Transactions::exec("MountQueries::addS3Mount", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("INSERT INTO storage_backends (name, type, is_active, created_at) VALUES ("
+                     + txn.quote(backend.name) + ", "
+                     + txn.quote(static_cast<int>(backend.type)) + ", "
+                     + txn.quote(backend.is_active) + ", "
+                     + txn.quote(backend.created_at) + ") "
+                     "RETURNING id");
+
             txn.exec("INSERT INTO s3_configs (storage_backend_id, api_key_id, bucket) VALUES ("
-                     + txn.quote(config.storage_backend_id) + ", "
+                     + txn.quote(res[0][0].get<unsigned short>()) + ", "
                      + txn.quote(config.api_key_id) + ", "
                      + txn.quote(config.bucket) + ")");
 

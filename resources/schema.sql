@@ -31,6 +31,67 @@ CREATE TABLE user_roles (
                             PRIMARY KEY (user_id, role_id)
 );
 
+-- API KEYS
+
+CREATE TABLE api_keys (
+                          id SERIAL PRIMARY KEY,
+                          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE s3_api_keys (
+                             api_key_id INTEGER PRIMARY KEY REFERENCES api_keys(id) ON DELETE CASCADE,
+                             access_key TEXT NOT NULL,
+                             secret_access_key TEXT NOT NULL,
+                             region VARCHAR(20) NOT NULL,
+                             endpoint TEXT DEFAULT NULL
+);
+
+-- STORAGE BACKENDS AND VOLUMES
+
+CREATE TYPE storage_backend_type AS ENUM ('local', 's3');
+
+CREATE TABLE storage_backends (
+                                  id SERIAL PRIMARY KEY,
+                                  name VARCHAR(150) UNIQUE NOT NULL,
+                                  type storage_backend_type NOT NULL,
+                                  is_active BOOLEAN DEFAULT TRUE,
+                                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Local Disk config
+CREATE TABLE local_disk_configs (
+                                   storage_backend_id INTEGER PRIMARY KEY REFERENCES storage_backends(id) ON DELETE CASCADE,
+                                   mount_point TEXT NOT NULL
+);
+
+-- S3 config
+CREATE TABLE s3_configs (
+                           id SERIAL PRIMARY KEY,
+                           storage_backend_id INTEGER REFERENCES storage_backends(id) ON DELETE CASCADE,
+                           api_key_id INTEGER REFERENCES s3_api_keys(api_key_id) ON DELETE CASCADE,
+                           bucket TEXT NOT NULL
+);
+
+CREATE TABLE storage_volumes (
+                                 id SERIAL PRIMARY KEY,
+                                 config_id INTEGER NOT NULL,
+                                 type storage_backend_type NOT NULL,
+                                 name VARCHAR(150) NOT NULL,
+                                 path_prefix VARCHAR(255),
+                                 quota_bytes BIGINT DEFAULT NULL,
+                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE user_storage_volumes (
+                                      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                                      storage_volume_id INTEGER REFERENCES storage_volumes(id) ON DELETE CASCADE,
+                                      PRIMARY KEY (user_id, storage_volume_id)
+);
+
+-- PERMISSIONS AND ROLES
+
 CREATE TYPE permission_name AS ENUM (
     'ManageUsers',
     'ManageRoles',
@@ -55,50 +116,6 @@ CREATE TABLE role_permissions (
                                   permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
                                   storage_volume_id INTEGER REFERENCES storage_volumes(id) ON DELETE CASCADE DEFAULT NULL,
                                   PRIMARY KEY (role_id, permission_id, storage_volume_id)
-);
-
--- STORAGE BACKENDS AND VOLUMES
-
-CREATE TYPE storage_backend_type AS ENUM ('local_disk', 's3');
-
-CREATE TABLE storage_backends (
-                                  id SERIAL PRIMARY KEY,
-                                  name VARCHAR(150) UNIQUE NOT NULL,
-                                  type storage_backend_type NOT NULL,
-                                  is_active BOOLEAN DEFAULT TRUE,
-                                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Local Disk config
-CREATE TABLE local_disk_config (
-                                   storage_backend_id INTEGER PRIMARY KEY REFERENCES storage_backends(id) ON DELETE CASCADE,
-                                   mount_point TEXT NOT NULL
-);
-
--- S3 config
-CREATE TABLE s3_config (
-                           storage_backend_id INTEGER PRIMARY KEY REFERENCES storage_backends(id) ON DELETE CASCADE,
-                           bucket_name TEXT NOT NULL,
-                           access_key_id TEXT NOT NULL,
-                           secret_access_key TEXT NOT NULL,
-                           region TEXT NOT NULL,
-                           prefix TEXT,
-                           endpoint TEXT DEFAULT NULL
-);
-
-CREATE TABLE storage_volumes (
-                                 id SERIAL PRIMARY KEY,
-                                 storage_backend_id INTEGER REFERENCES storage_backends(id) ON DELETE CASCADE,
-                                 name VARCHAR(150) NOT NULL,
-                                 path_prefix TEXT,
-                                 quota_bytes BIGINT DEFAULT NULL,
-                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE user_storage_volumes (
-                                      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                                      storage_volume_id INTEGER REFERENCES storage_volumes(id) ON DELETE CASCADE,
-                                      PRIMARY KEY (user_id, storage_volume_id)
 );
 
 -- FILES AND METADATA

@@ -13,10 +13,11 @@ namespace vh::websocket {
 
     void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) {
         try {
-            std::string username = msg.at("username").get<std::string>();
-            std::string password = msg.at("password").get<std::string>();
+            json payload = msg.at("payload");
+            std::string email = payload.at("email").get<std::string>();
+            std::string password = payload.at("password").get<std::string>();
 
-            auto user = authManager_->loginUser(username, password);
+            auto user = authManager_->loginUser(email, password);
             std::string token = sessionManager_->createSession(session.shared_from_this(), user);
 
             // Bind user to WebSocketSession
@@ -36,7 +37,7 @@ namespace vh::websocket {
 
             session.send(response);
 
-            std::cout << "[AuthHandler] User '" << username << "' logged in.\n";
+            std::cout << "[AuthHandler] User '" << email << "' logged in.\n";
         } catch (const std::exception& e) {
             std::cerr << "[AuthHandler] handleLogin error: " << e.what() << "\n";
 

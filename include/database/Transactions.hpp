@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DBPool.hpp"
-#include <pqxx/transaction>
+#include <pqxx/pqxx>
 #include <functional>
 #include <iostream>
 #include <memory>

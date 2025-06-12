@@ -16,7 +16,8 @@ namespace vh::core {
     }
 
     FSManager::FSManager(const std::shared_ptr<vh::storage::LocalDiskStorageEngine>& storage_engine)
-            : storageEngine_(storage_engine),
+            : rootDirectory_(storage_engine->getRootPath()),
+              storageEngine_(storage_engine),
               directoryWalker_(true) {}
 
     fs::path FSManager::resolvePath(const std::string& id) const {

@@ -6,7 +6,6 @@
 #include <mutex>
 
 namespace vh::storage {
-    class StorageEngine;
     class StorageManager;
 }
 
@@ -18,16 +17,31 @@ namespace vh::websocket {
 
     class StorageHandler {
     public:
-        StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager);
+        explicit StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager);
 
-        // Init commands
-        void handleInitLocal(const json& msg, WebSocketSession& session);
+        // API commands
+        void handleAddS3APIKey(const json& msg, WebSocketSession& session);
+        void handleRemoveAPIKey(const json& msg, WebSocketSession& session);
+        void handleListS3APIKeys(const json& msg, WebSocketSession& session);
+        void handleGetS3APIKey(const json& msg, WebSocketSession& session);
+
+        // Local Disk Vault commands
+        void handleInitLocalDisk(const json& msg, WebSocketSession& session);
+        void handleRemoveLocalDiskVault(const json& msg, WebSocketSession& session);
+        void handleGetLocalDiskVault(const json& msg, WebSocketSession& session);
+
+        // S3 Vault commands
         void handleInitS3(const json& msg, WebSocketSession& session);
-        void handleInitR2(const json& msg, WebSocketSession& session);
+        void handleRemoveS3Vault(const json& msg, WebSocketSession& session);
+        void handleListS3Vaults(const json& msg, WebSocketSession& session);
+        void handleGetS3Vault(const json& msg, WebSocketSession& session);
 
-        // Mount commands
-        void handleMount(const json& msg, WebSocketSession& session);
-        void handleUnmount(const json& msg, WebSocketSession& session);
+        // Volume management
+        void handleAddVolume(const json& msg, WebSocketSession& session);
+        void handleRemoveVolume(const json& msg, WebSocketSession& session);
+        void handleListVolumes(const json& msg, WebSocketSession& session);
+        void handleGetVolume(const json& msg, WebSocketSession& session);
+
 
     private:
         std::shared_ptr<vh::storage::StorageManager> storageManager_;

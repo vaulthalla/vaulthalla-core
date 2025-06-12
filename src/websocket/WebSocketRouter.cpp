@@ -1,8 +1,14 @@
 #include "websocket/WebSocketRouter.hpp"
 #include "websocket/WebSocketSession.hpp"
+#include "auth/SessionManager.hpp"
 #include <iostream>
 
 namespace vh::websocket {
+
+    WebSocketRouter::WebSocketRouter(const std::shared_ptr<vh::auth::SessionManager>& sessionManager)
+        : sessionManager_(sessionManager) {
+        if (!sessionManager_) throw std::invalid_argument("SessionManager cannot be null");
+    }
 
     void WebSocketRouter::registerHandler(const std::string& command, HandlerFunc handler) {
         handlers_[command] = std::move(handler);
@@ -11,6 +17,21 @@ namespace vh::websocket {
     void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         try {
             std::string command = msg.at("command").get<std::string>();
+
+            if (!command.starts_with("auth")) {
+                auto token = msg.value("token", "");
+                auto client = sessionManager_->getClientSession(token);
+                if (!client || !client->isAuthenticated()) {
+                    std::cerr << "[Router] Unauthorized access attempt with command: " << command << "\n";
+                    json errorResponse = {
+                        {"command", "error"},
+                        {"status", "unauthorized"},
+                        {"message", "You must be authenticated to perform this action."}
+                    };
+                    session.send(errorResponse);
+                    return;
+                }
+            }
 
             auto it = handlers_.find(command);
             if (it != handlers_.end()) it->second(msg, session);

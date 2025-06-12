@@ -4,6 +4,8 @@
 #include <boost/describe.hpp>
 #include <ctime>
 #include <pqxx/row>
+#include <utility>
+#include <nlohmann/json.hpp>
 
 namespace vh::types {
 
@@ -12,6 +14,11 @@ namespace vh::types {
         unsigned int user_id;
         std::string name;
         std::time_t created_at;
+
+        APIKey() = default;
+
+        APIKey(unsigned int id, unsigned int userId, std::string name, std::time_t createdAt)
+            : id(id), user_id(userId), name(std::move(name)), created_at(createdAt) {}
     };
 
     struct S3APIKey : public APIKey {
@@ -19,6 +26,20 @@ namespace vh::types {
         std::string secret_access_key;
         std::string region;
         std::string endpoint;
+
+        S3APIKey() = default;
+
+        S3APIKey(const std::string& name,
+                 unsigned int userId,
+                 std::string  accessKey,
+                 std::string  secretAccessKey,
+                 std::string  region,
+                 std::string  endpoint)
+            : APIKey{0, 0, name, std::time(nullptr)}, // ID and user_id will be set by the database
+              access_key(std::move(accessKey)),
+              secret_access_key(std::move(secretAccessKey)),
+              region(std::move(region)),
+              endpoint(std::move(endpoint)) {}
 
         S3APIKey(const pqxx::row& row)
             : APIKey{row["id"].as<unsigned int>(),
@@ -29,6 +50,16 @@ namespace vh::types {
               secret_access_key(row["secret_access_key"].as<std::string>()),
               region(row["region"].as<std::string>()),
               endpoint(row["endpoint"].as<std::string>()) {}
+
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(vh::types::S3APIKey,
+                                       id,
+                                       user_id,
+                                       name,
+                                       created_at,
+                                       access_key,
+                                       secret_access_key,
+                                       region,
+                                       endpoint)
     };
 
 }

@@ -50,24 +50,24 @@ CREATE TABLE s3_api_keys (
 
 -- STORAGE BACKENDS AND VOLUMES
 
-CREATE TYPE storage_backend_type AS ENUM ('local', 's3');
+CREATE TYPE vault_type AS ENUM ('local', 's3');
 
 CREATE TABLE storage_backends (
                                   id SERIAL PRIMARY KEY,
-                                  type storage_backend_type NOT NULL,
+                                  type vault_type NOT NULL,
                                   name VARCHAR(150) UNIQUE NOT NULL,
                                   is_active BOOLEAN DEFAULT TRUE,
                                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Local Disk config
-CREATE TABLE local_disk_configs (
+CREATE TABLE local_disk_vaults (
                                    storage_backend_id INTEGER PRIMARY KEY REFERENCES storage_backends(id) ON DELETE CASCADE,
                                    mount_point TEXT NOT NULL
 );
 
 -- S3 config
-CREATE TABLE s3_configs (
+CREATE TABLE s3_vaults (
                            storage_backend_id INTEGER REFERENCES storage_backends(id) ON DELETE CASCADE,
                            api_key_id INTEGER REFERENCES s3_api_keys(api_key_id) ON DELETE CASCADE,
                            bucket TEXT NOT NULL
@@ -75,10 +75,9 @@ CREATE TABLE s3_configs (
 
 CREATE TABLE storage_volumes (
                                  id SERIAL PRIMARY KEY,
-                                 config_id INTEGER NOT NULL,
-                                 type storage_backend_type NOT NULL,
+                                 vault_id INTEGER NOT NULL,
                                  name VARCHAR(150) NOT NULL,
-                                 path_prefix VARCHAR(255),
+                                 path_prefix VARCHAR(255) DEFAULT '/',
                                  quota_bytes BIGINT DEFAULT NULL,
                                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -15,7 +15,7 @@ namespace vh::services {
                     serviceManager_->authManager()->sessionManager()
             );
 
-            wsRouter_ = std::make_shared<vh::websocket::WebSocketRouter>();
+            wsRouter_ = std::make_shared<vh::websocket::WebSocketRouter>(serviceManager_->authManager()->sessionManager());
 
             wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(serviceManager_, wsRouter_);
 

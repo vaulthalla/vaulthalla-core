@@ -38,7 +38,7 @@ namespace vh::websocket {
             apiKeyManager_->addAPIKey(key);
 
             json response = {
-                    {"command", "storage.addApiKey.response"},
+                    {"command", "storage.apiKey.add.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"}
             };
@@ -50,7 +50,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.addApiKey.response"},
+                    {"command", "storage.apiKey.add.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -96,7 +96,7 @@ namespace vh::websocket {
             auto keys = apiKeyManager_->listAPIKeys(userId);
 
             json response = {
-                    {"command", "storage.listApiKeys.response"},
+                    {"command", "storage.apiKey.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
                     {"data", vh::types::to_json(keys).dump(4)}
@@ -109,7 +109,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.listApiKeys.response"},
+                    {"command", "storage.apiKey.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -126,7 +126,7 @@ namespace vh::websocket {
             auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
             json response = {
-                    {"command", "storage.getApiKey.response"},
+                    {"command", "storage.apiKey.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
                     {"data", vh::types::to_json(key)}
@@ -139,7 +139,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.getApiKey.response"},
+                    {"command", "storage.apiKey.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -181,7 +181,7 @@ namespace vh::websocket {
             };
 
             json response = {
-                    {"command", "storage.addVault.response"},
+                    {"command", "storage.vault.add.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
                     {"data", data}
@@ -194,7 +194,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.addVault.response"},
+                    {"command", "storage.vault.add.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -210,7 +210,7 @@ namespace vh::websocket {
             storageManager_->removeVault(vaultId);
 
             json response = {
-                    {"command", "storage.removeVault.response"},
+                    {"command", "storage.vault.remove.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"}
             };
@@ -222,7 +222,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.removeVault.response"},
+                    {"command", "storage.vault.remove.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -238,7 +238,7 @@ namespace vh::websocket {
             auto vault = storageManager_->getVault(vaultId);
 
             json response = {
-                    {"command", "storage.getVault.response"},
+                    {"command", "storage.vault.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
                     {"data", json(*vault)}
@@ -251,7 +251,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.getVault.response"},
+                    {"command", "storage.vault.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -266,7 +266,7 @@ namespace vh::websocket {
             const auto vaults = storageManager_->listVaults();
 
             json response = {
-                    {"command", "storage.listVaults.response"},
+                    {"command", "storage.vault.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
                     {"data", vh::types::to_json(vaults).dump(4)}
@@ -279,7 +279,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.listVaults.response"},
+                    {"command", "storage.vault.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}

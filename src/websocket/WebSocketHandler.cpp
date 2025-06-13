@@ -57,37 +57,53 @@ namespace vh::websocket {
         });
 
         // Storage
-        router_->registerHandler("storage.listVaults", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.vault.list", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleListVaults(msg, session);
         });
 
-        router_->registerHandler("storage.addVault", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.vault.add", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleAddVault(msg, session);
         });
 
-        router_->registerHandler("storage.removeVault", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.vault.remove", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleRemoveVault(msg, session);
         });
 
-        router_->registerHandler("storage.local.getVault", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.vault.get", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleGetVault(msg, session);
+        });
+
+        router_->registerHandler("storage.volume.add", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleAddVolume(msg, session);
+        });
+
+        router_->registerHandler("storage.volume.remove", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleRemoveVolume(msg, session);
+        });
+
+        router_->registerHandler("storage.volume.list", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListVolumes(msg, session);
+        });
+
+        router_->registerHandler("storage.volume.get", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleGetVolume(msg, session);
         });
 
         // API Keys
 
-        router_->registerHandler("storage.addAPIKey", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.apiKey.add", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleAddAPIKey(msg, session);
         });
 
-        router_->registerHandler("storage.s3.removeAPIKey", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.apiKye.remove", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleRemoveAPIKey(msg, session);
         });
 
-        router_->registerHandler("storage.listAPIKeys", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.apiKey.list", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleListAPIKeys(msg, session);
         });
 
-        router_->registerHandler("storage.getAPIKey", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.apiKey.get", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleGetAPIKey(msg, session);
         });
 

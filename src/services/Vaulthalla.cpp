@@ -7,6 +7,8 @@ namespace vh::services {
         std::cout << "Vaulthalla service started." << std::endl;
 
         try {
+            vh::database::Transactions::init();
+
             ioContext_ = std::make_shared<boost::asio::io_context>();
 
             serviceManager_ = std::make_shared<vh::services::ServiceManager>();
@@ -25,8 +27,6 @@ namespace vh::services {
                     wsRouter_,
                     serviceManager_->authManager()->sessionManager()
             );
-
-            vh::database::Transactions::init();
 
             wsServer_->run();
 

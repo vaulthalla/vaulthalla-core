@@ -52,7 +52,7 @@ CREATE TABLE s3_api_keys (
 
 CREATE TYPE vault_type AS ENUM ('local', 's3');
 
-CREATE TABLE storage_backends (
+CREATE TABLE vaults (
                                   id SERIAL PRIMARY KEY,
                                   type vault_type NOT NULL,
                                   name VARCHAR(150) UNIQUE NOT NULL,
@@ -62,13 +62,13 @@ CREATE TABLE storage_backends (
 
 -- Local Disk config
 CREATE TABLE local_disk_vaults (
-                                   storage_backend_id INTEGER PRIMARY KEY REFERENCES storage_backends(id) ON DELETE CASCADE,
+                                   storage_backend_id INTEGER PRIMARY KEY REFERENCES vaults(id) ON DELETE CASCADE,
                                    mount_point TEXT NOT NULL
 );
 
 -- S3 config
 CREATE TABLE s3_vaults (
-                           storage_backend_id INTEGER REFERENCES storage_backends(id) ON DELETE CASCADE,
+                           storage_backend_id INTEGER REFERENCES vaults(id) ON DELETE CASCADE,
                            api_key_id INTEGER REFERENCES s3_api_keys(api_key_id) ON DELETE CASCADE,
                            bucket TEXT NOT NULL
 );

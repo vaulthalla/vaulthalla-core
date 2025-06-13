@@ -9,6 +9,10 @@ namespace vh::storage {
     class StorageManager;
 }
 
+namespace vh::keys {
+    class APIKeyManager;
+}
+
 namespace vh::websocket {
 
     using json = nlohmann::json;
@@ -20,21 +24,16 @@ namespace vh::websocket {
         explicit StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager);
 
         // API commands
-        void handleAddS3APIKey(const json& msg, WebSocketSession& session);
+        void handleAddAPIKey(const json& msg, WebSocketSession& session);
         void handleRemoveAPIKey(const json& msg, WebSocketSession& session);
-        void handleListS3APIKeys(const json& msg, WebSocketSession& session);
-        void handleGetS3APIKey(const json& msg, WebSocketSession& session);
+        void handleListAPIKeys(const json& msg, WebSocketSession& session);
+        void handleGetAPIKey(const json& msg, WebSocketSession& session);
 
-        // Local Disk Vault commands
-        void handleInitLocalDisk(const json& msg, WebSocketSession& session);
-        void handleRemoveLocalDiskVault(const json& msg, WebSocketSession& session);
-        void handleGetLocalDiskVault(const json& msg, WebSocketSession& session);
-
-        // S3 Vault commands
-        void handleInitS3(const json& msg, WebSocketSession& session);
-        void handleRemoveS3Vault(const json& msg, WebSocketSession& session);
-        void handleListS3Vaults(const json& msg, WebSocketSession& session);
-        void handleGetS3Vault(const json& msg, WebSocketSession& session);
+        // All Vault commands
+        void handleListVaults(const json& msg, WebSocketSession& session);
+        void handleAddVault(const json& msg, WebSocketSession& session);
+        void handleRemoveVault(const json& msg, WebSocketSession& session);
+        void handleGetVault(const json& msg, WebSocketSession& session);
 
         // Volume management
         void handleAddVolume(const json& msg, WebSocketSession& session);
@@ -45,6 +44,7 @@ namespace vh::websocket {
 
     private:
         std::shared_ptr<vh::storage::StorageManager> storageManager_;
+        std::shared_ptr<vh::keys::APIKeyManager> apiKeyManager_;
     };
 
 } // namespace vh::websocket

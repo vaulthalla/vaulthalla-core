@@ -1,60 +1,79 @@
 #include "storage/StorageManager.hpp"
+#include "database/Queries/VaultQueries.hpp"
 
 #include <stdexcept>
 #include <iostream>
 
 namespace vh::storage {
 
-    StorageManager::StorageManager() = default;
+    StorageManager::StorageManager() { initStorageEngines(); }
 
-    void StorageManager::mountLocal(const std::string& mountName, const std::filesystem::path& rootPath) {
+    void StorageManager::initStorageEngines() {
         std::lock_guard<std::mutex> lock(mountsMutex_);
+        for (auto& vault : vh::database::VaultQueries::listVaults()) mount(std::move(vault));
+    }
 
-        if (localEngines_.count(mountName)) {
-            throw std::runtime_error("Local mount already exists: " + mountName);
+    void StorageManager::mount(std::unique_ptr<vh::types::Vault> &&vault) {
+        if (auto* diskVault = dynamic_cast<vh::types::LocalDiskVault*>(vault.get())) {
+            auto localEngine = std::make_shared<LocalDiskStorageEngine>(diskVault->mount_point);
+            localEngines_[diskVault->id] = localEngine;
+            std::cout << "[StorageManager] Mounted local disk vault: " << diskVault->name << "\n";
+        } else if (auto* cloudVault = dynamic_cast<vh::types::S3Vault*>(vault.get())) {
+            // TODO: Initialize cloud storage engine with S3 credentials
+            auto cloudEngine = std::make_shared<CloudStorageEngine>();
+            cloudEngines_[cloudVault->id] = cloudEngine;
+            std::cout << "[StorageManager] Mounted cloud vault: " << cloudVault->name << "\n";
+        } else {
+            throw std::runtime_error("Unsupported vault type: " + std::to_string(static_cast<int>(vault->type)));
         }
-
-        localEngines_[mountName] = std::make_shared<LocalDiskStorageEngine>(rootPath);
-
-        std::cout << "[StorageManager] Mounted local: " << mountName << " → " << rootPath << "\n";
     }
 
-    void StorageManager::mountCloud(const std::string& mountName /* , cloud params */) {
+    void StorageManager::addVault(std::unique_ptr<vh::types::Vault>&& vault) {
+        if (!vault) throw std::invalid_argument("Vault cannot be null");
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
-        if (cloudEngines_.count(mountName)) {
-            throw std::runtime_error("Cloud mount already exists: " + mountName);
-        }
-
-        // For now stub → no cloud params yet
-        cloudEngines_[mountName] = std::make_shared<CloudStorageEngine>();
-
-        std::cout << "[StorageManager] Mounted cloud: " << mountName << "\n";
+        vh::database::VaultQueries::addVault(*vault);
+        vault = vh::database::VaultQueries::getVault(vault->id);
+        mount(std::move(vault));
     }
 
-    std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const std::string& mountName) const {
+    void StorageManager::removeVault(unsigned int vaultId) {
         std::lock_guard<std::mutex> lock(mountsMutex_);
+        vh::database::VaultQueries::removeVault(vaultId);
 
-        auto it = localEngines_.find(mountName);
-        if (it == localEngines_.end()) throw std::runtime_error("Unknown local mount: " + mountName);
-
-        return it->second;
+        localEngines_.erase(vaultId);
+        cloudEngines_.erase(vaultId);
+        std::cout << "[StorageManager] Removed vault with ID: " << vaultId << "\n";
     }
 
-    std::shared_ptr<CloudStorageEngine> StorageManager::getCloudEngine(const std::string& mountName) const {
+    std::vector<std::unique_ptr<vh::types::Vault>> StorageManager::listVaults() const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-
-        auto it = cloudEngines_.find(mountName);
-        if (it == cloudEngines_.end()) throw std::runtime_error("Unknown cloud mount: " + mountName);
-
-        return it->second;
+        return vh::database::VaultQueries::listVaults();
     }
 
-    std::shared_ptr<StorageEngine> StorageManager::getEngine(const std::string& mountName) const {
+    std::unique_ptr<vh::types::Vault> StorageManager::getVault(unsigned int vaultId) const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        if (localEngines_.count(mountName)) return localEngines_.at(mountName);
-        else if (cloudEngines_.count(mountName)) return cloudEngines_.at(mountName);
-        throw std::runtime_error("Unknown storage engine: " + mountName);
+        return vh::database::VaultQueries::getVault(vaultId);
+    }
+
+    std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(unsigned short id) const {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+        auto it = localEngines_.find(id);
+        if (it != localEngines_.end()) return it->second;
+        return nullptr;
+    }
+
+    std::shared_ptr<CloudStorageEngine> StorageManager::getCloudEngine(unsigned short id) const {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+        auto it = cloudEngines_.find(id);
+        if (it != cloudEngines_.end()) return it->second;
+        return nullptr;
+    }
+
+    std::shared_ptr<StorageEngine> StorageManager::getEngine(unsigned short id) const {
+        if (auto localEngine = getLocalEngine(id)) return localEngine;
+        if (auto cloudEngine = getCloudEngine(id)) return cloudEngine;
+        return nullptr; // No engine found for the given ID
     }
 
 } // namespace vh::storage

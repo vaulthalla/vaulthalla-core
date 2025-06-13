@@ -1,5 +1,4 @@
 #include "database/Queries/VaultQueries.hpp"
-#include "database/Transactions.hpp"
 #include "types/Vault.hpp"
 
 namespace vh::database {
@@ -11,7 +10,7 @@ namespace vh::database {
                      + txn.quote(vault.is_active) + ", "
                      + txn.quote(vault.created_at) + ") RETURNING id");
 
-            unsigned int vaultId = res[0][0].as<unsigned int>();
+            auto vaultId = res[0][0].as<unsigned int>();
 
             if (vault.type == vh::types::VaultType::Local) {
                 txn.exec("INSERT INTO local_disk_vaults (vault_id, storage_backend_id, mount_point) VALUES ("
@@ -37,20 +36,33 @@ namespace vh::database {
         });
     }
 
-    std::vector<types::Vault> VaultQueries::listVaults() {
+    std::vector<std::unique_ptr<types::Vault>> VaultQueries::listVaults() {
         return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec("SELECT * FROM vaults");
-            std::vector<types::Vault> vaults;
-            for (const auto& row : res) vaults.emplace_back(row);
-            return vaults;
-        });
-    }
+            std::vector<std::unique_ptr<types::Vault>> vaults;
 
-    types::Vault VaultQueries::getVault(unsigned int vaultID) {
-        return Transactions::exec("VaultQueries::getVault", [&](pqxx::work& txn) {
-            pqxx::result res = txn.exec("SELECT * FROM vaults WHERE id = " + txn.quote(vaultID));
-            if (res.empty()) throw std::runtime_error("No vault found with ID: " + std::to_string(vaultID));
-            return types::Vault(res[0]);
+            for (const auto& row : res) {
+                types::Vault baseVault(row);
+
+                switch (baseVault.type) {
+                    case types::VaultType::Local: {
+                        pqxx::result localRes = txn.exec("SELECT * FROM local_disk_vaults WHERE vault_id = " + txn.quote(baseVault.id));
+                        if (localRes.empty()) throw std::runtime_error("No LocalDiskVault data for vault ID: " + std::to_string(baseVault.id));
+                        vaults.push_back(std::make_unique<types::LocalDiskVault>(localRes[0]));
+                        break;
+                    }
+                    case types::VaultType::S3: {
+                        pqxx::result s3Res = txn.exec("SELECT * FROM s3_vaults WHERE vault_id = " + txn.quote(baseVault.id));
+                        if (s3Res.empty()) throw std::runtime_error("No S3Vault data for vault ID: " + std::to_string(baseVault.id));
+                        vaults.push_back(std::make_unique<types::S3Vault>(s3Res[0]));
+                        break;
+                    }
+                    default:
+                        throw std::runtime_error("Unsupported VaultType in listVaults()");
+                }
+            }
+
+            return vaults;
         });
     }
 

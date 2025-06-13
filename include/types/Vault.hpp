@@ -28,6 +28,8 @@ namespace vh::types {
         bool is_active;
         std::time_t created_at;
 
+        virtual ~Vault() = default;
+
         explicit Vault(const pqxx::row& row)
             : id(row["id"].as<unsigned int>()),
               name(row["name"].as<std::string>()),
@@ -88,6 +90,37 @@ namespace vh::types {
 
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(S3Vault, id, name, type, is_active, created_at, storage_backend_id, api_key_id, bucket)
     };
+
+    inline nlohmann::json to_json(const std::vector<std::unique_ptr<Vault>>& vaults) {
+        nlohmann::json j = nlohmann::json::array();
+
+        for (const auto& vault : vaults) {
+            nlohmann::json vault_json = {
+                    {"id", vault->id},
+                    {"name", vault->name},
+                    {"type", to_string(vault->type)},
+                    {"is_active", vault->is_active},
+                    {"created_at", vault->created_at}
+            };
+
+            // Check for LocalDiskVault fields
+            if (const auto* diskVault = dynamic_cast<const LocalDiskVault*>(vault.get())) {
+                vault_json["storage_backend_id"] = diskVault->storage_backend_id;
+                vault_json["mount_point"] = diskVault->mount_point;
+            }
+
+                // Check for S3Vault fields
+            else if (const auto* s3Vault = dynamic_cast<const S3Vault*>(vault.get())) {
+                vault_json["storage_backend_id"] = s3Vault->storage_backend_id;
+                vault_json["api_key_id"] = s3Vault->api_key_id;
+                vault_json["bucket"] = s3Vault->bucket;
+            }
+
+            j.push_back(vault_json);
+        }
+
+        return j;
+    }
 }
 
 BOOST_DESCRIBE_ENUM(vh::types::VaultType, Local, S3)

@@ -2,6 +2,7 @@
 
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
+#include "types/Vault.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -15,17 +16,23 @@ namespace vh::storage {
     public:
         StorageManager();
 
-        void mountLocal(const std::string& mountName, const std::filesystem::path& rootPath);
-        void mountCloud(const std::string& mountName);
+        void initStorageEngines();
 
-        std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(const std::string& mountName) const;
-        std::shared_ptr<CloudStorageEngine> getCloudEngine(const std::string& mountName) const;
-        std::shared_ptr<StorageEngine> getEngine(const std::string& mountName) const;
+        void mount(std::unique_ptr<vh::types::Vault>&& vault);
+
+        void addVault(std::unique_ptr<vh::types::Vault>&& vault);
+        void removeVault(unsigned int vaultId);
+        std::vector<std::unique_ptr<vh::types::Vault>> listVaults() const;
+        std::unique_ptr<vh::types::Vault> getVault(unsigned int vaultId) const;
+
+        std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(unsigned short id) const;
+        std::shared_ptr<CloudStorageEngine> getCloudEngine(unsigned short id) const;
+        std::shared_ptr<StorageEngine> getEngine(unsigned short id) const;
 
     private:
         mutable std::mutex mountsMutex_;
-        std::unordered_map<std::string, std::shared_ptr<LocalDiskStorageEngine>> localEngines_;
-        std::unordered_map<std::string, std::shared_ptr<CloudStorageEngine>> cloudEngines_;
+        std::unordered_map<unsigned short, std::shared_ptr<LocalDiskStorageEngine>> localEngines_;
+        std::unordered_map<unsigned short, std::shared_ptr<CloudStorageEngine>> cloudEngines_;
     };
 
 } // namespace vh::storage

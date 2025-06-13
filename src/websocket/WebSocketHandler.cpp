@@ -57,50 +57,38 @@ namespace vh::websocket {
         });
 
         // Storage
-        router_->registerHandler("storage.local.init", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleInitLocalDisk(msg, session);
+        router_->registerHandler("storage.listVaults", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListVaults(msg, session);
         });
 
-        router_->registerHandler("storage.local.removeVault", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleRemoveLocalDiskVault(msg, session);
+        router_->registerHandler("storage.addVault", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleAddVault(msg, session);
+        });
+
+        router_->registerHandler("storage.removeVault", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleRemoveVault(msg, session);
         });
 
         router_->registerHandler("storage.local.getVault", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleGetLocalDiskVault(msg, session);
+            storageHandler_->handleGetVault(msg, session);
         });
 
-        // S3 Storage
+        // API Keys
 
-        router_->registerHandler("storage.s3.init", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleInitS3(msg, session);
-        });
-
-        router_->registerHandler("storage.s3.listVaults", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleListS3Vaults(msg, session);
-        });
-
-        router_->registerHandler("storage.s3.getVault", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleGetS3Vault(msg, session);
-        });
-
-        router_->registerHandler("storage.s3.removeVault", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleRemoveS3Vault(msg, session);
-        });
-
-        router_->registerHandler("storage.s3.addAPIKey", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleAddS3APIKey(msg, session);
+        router_->registerHandler("storage.addAPIKey", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleAddAPIKey(msg, session);
         });
 
         router_->registerHandler("storage.s3.removeAPIKey", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleRemoveAPIKey(msg, session);
         });
 
-        router_->registerHandler("storage.s3.getAPIKey", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleGetS3APIKey(msg, session);
+        router_->registerHandler("storage.listAPIKeys", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListAPIKeys(msg, session);
         });
 
-        router_->registerHandler("storage.s3.listAPIKeys", [this](const json& msg, WebSocketSession& session) {
-            storageHandler_->handleListS3APIKeys(msg, session);
+        router_->registerHandler("storage.getAPIKey", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleGetAPIKey(msg, session);
         });
 
         // Share

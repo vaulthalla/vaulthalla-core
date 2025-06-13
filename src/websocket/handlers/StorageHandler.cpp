@@ -2,43 +2,55 @@
 #include "storage/StorageManager.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
 #include "types/Vault.hpp"
+#include "keys/APIKeyManager.hpp"
+#include "types/User.hpp"
+#include "types/APIKey.hpp"
+
+#include <boost/algorithm/string.hpp>
 
 #include <iostream>
 
 namespace vh::websocket {
 
     StorageHandler::StorageHandler(const std::shared_ptr<vh::storage::StorageManager> &storageManager)
-            : storageManager_(storageManager) {}
+            : storageManager_(storageManager), apiKeyManager_() {}
 
-    void StorageHandler::handleAddS3APIKey(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session) {
         try {
             json payload = msg.at("payload");
             unsigned short userID = payload.at("userID").get<unsigned short>();
             std::string name = payload.at("name").get<std::string>();
-            std::string accessKey = payload.at("accessKey").get<std::string>();
-            std::string secretKey = payload.at("secretKey").get<std::string>();
-            std::string region = payload.at("region").get<std::string>();
-            std::string endpoint = payload.value("endpoint", "");
+            std::string type = payload.at("type").get<std::string>();
+            std::string typeLower = boost::algorithm::to_lower_copy(type);
 
-            auto apiKey = vh::types::S3APIKey(name, userID, accessKey, secretKey, region, endpoint);
-            vh::database::APIKeyQueries::addS3APIKey(apiKey);
+            std::shared_ptr<vh::types::APIKey> key;
+
+            if (typeLower == "s3") {
+                std::string accessKey = payload.at("accessKey").get<std::string>();
+                std::string secretKey = payload.at("secretKey").get<std::string>();
+                std::string region = payload.at("region").get<std::string>();
+                std::string endpoint = payload.at("endpoint").get<std::string>();
+
+                key = std::make_shared<vh::types::S3APIKey>(name, userID, accessKey, secretKey, region, endpoint);
+            } else throw std::runtime_error("Unsupported API key type: " + type);
+
+            apiKeyManager_->addAPIKey(key);
 
             json response = {
-                    {"command", "storage.s3.addApiKey.response"},
+                    {"command", "storage.addApiKey.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"}
             };
 
             session.send(response);
 
-            std::cout << "[StorageHandler] Added S3 API key: " << name << "\n";
+            std::cout << "[StorageHandler] Added API key: " << name << "\n";
         } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleAddS3APIKey error: " << e.what() << "\n";
+            std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.s3.addApiKey.response"},
+                    {"command", "storage.addApiKey.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -51,8 +63,8 @@ namespace vh::websocket {
     void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& session) {
         try {
             unsigned int keyId = msg.at("payload").at("keyId").get<unsigned int>();
-
-            vh::database::APIKeyQueries::removeAPIKey(keyId);
+            const auto user = session.getAuthenticatedUser();
+            apiKeyManager_->removeAPIKey(keyId, user->id);
 
             json response = {
                     {"command", "storage.apiKey.remove.response"},
@@ -78,26 +90,26 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleListS3APIKeys(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& session) {
         try {
             unsigned int userId = msg.at("payload").at("userId").get<unsigned int>();
-            auto keys = vh::database::APIKeyQueries::listS3APIKeys(userId);
+            auto keys = apiKeyManager_->listAPIKeys(userId);
 
             json response = {
-                    {"command", "storage.s3.listApiKeys.response"},
+                    {"command", "storage.listApiKeys.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(keys).dump(4)}
+                    {"data", vh::types::to_json(keys).dump(4)}
             };
 
             session.send(response);
 
-            std::cout << "[StorageHandler] Listed S3 API keys for user ID: " << userId << "\n";
+            std::cout << "[StorageHandler] Listed API keys for user ID: " << userId << "\n";
         } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleListS3APIKeys error: " << e.what() << "\n";
+            std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.s3.listApiKeys.response"},
+                    {"command", "storage.listApiKeys.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -107,26 +119,27 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleGetS3APIKey(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session) {
         try {
             unsigned int keyId = msg.at("payload").at("keyId").get<unsigned int>();
-            auto key = vh::database::APIKeyQueries::getS3APIKey(keyId);
+            const auto user = session.getAuthenticatedUser();
+            auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
             json response = {
-                    {"command", "storage.s3.getApiKey.response"},
+                    {"command", "storage.getApiKey.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(key)}
+                    {"data", vh::types::to_json(key)}
             };
 
             session.send(response);
 
-            std::cout << "[StorageHandler] Fetched S3 API key with ID: " << keyId << "\n";
+            std::cout << "[StorageHandler] Fetched API key with ID: " << keyId << "\n";
         } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleGetS3APIKey error: " << e.what() << "\n";
+            std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.s3.getApiKey.response"},
+                    {"command", "storage.getApiKey.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -136,32 +149,52 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleInitLocalDisk(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) {
         try {
             if (vh::database::VaultQueries::localDiskVaultExists())
                 throw std::runtime_error("Local disk vault already exists. Only one local disk vault is allowed.");
 
-            json payload = msg.at("payload");
-            std::string name = payload.at("name").get<std::string>();
-            std::string mountPoint = payload.at("mountPoint").get<std::string>();
+            const json& payload = msg.at("payload");
+            const std::string name = payload.at("name").get<std::string>();
+            const std::string type = payload.at("type").get<std::string>();
+            const std::string typeLower = boost::algorithm::to_lower_copy(type);
 
-            vh::types::LocalDiskVault vault(name, mountPoint);
-            vh::database::VaultQueries::addVault(vault);
+            std::unique_ptr<vh::types::Vault> vault;
+
+            if (typeLower == "local") {
+                const std::string mountPoint = payload.at("mountPoint").get<std::string>();
+                vault = std::make_unique<vh::types::LocalDiskVault>(name, mountPoint);
+            } else if (typeLower == "s3") {
+                unsigned short apiKeyID = payload.at("apiKeyID").get<unsigned short>();
+                const std::string bucket = payload.at("bucket").get<std::string>();
+                vault = std::make_unique<vh::types::S3Vault>(name, apiKeyID, bucket);
+            } else throw std::runtime_error("Unsupported vault type: " + typeLower);
+
+            storageManager_->addVault(std::move(vault));
+
+            json data = {
+                    {"id", vault->id},
+                    {"name", vault->name},
+                    {"type", to_string(vault->type)},
+                    {"isActive", vault->is_active},
+                    {"createdAt", vault->created_at}
+            };
 
             json response = {
-                    {"command", "storage.local.init.response"},
+                    {"command", "storage.addVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "ok"}
+                    {"status", "ok"},
+                    {"data", data}
             };
 
             session.send(response);
 
-            std::cout << "[StorageHandler] Mounted local disk storage: " << name << " -> " << mountPoint << "\n";
+            std::cout << "[StorageHandler] Mounted vault: " << name << " -> " << type << "\n";
         } catch (const std::exception& e) {
             std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.local.init.response"},
+                    {"command", "storage.addVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -171,14 +204,13 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleRemoveLocalDiskVault(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
-
-            vh::database::VaultQueries::removeVault(vaultId);
+            unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
+            storageManager_->removeVault(vaultId);
 
             json response = {
-                    {"command", "storage.local.removeVault.response"},
+                    {"command", "storage.removeVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"}
             };
@@ -190,7 +222,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.local.removeVault.response"},
+                    {"command", "storage.removeVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -200,16 +232,16 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleGetLocalDiskVault(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
-            auto vault = vh::database::VaultQueries::getVault(vaultId);
+            unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
+            auto vault = storageManager_->getVault(vaultId);
 
             json response = {
-                    {"command", "storage.local.getVault.response"},
+                    {"command", "storage.getVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(vault)}
+                    {"data", json(*vault)}
             };
 
             session.send(response);
@@ -219,7 +251,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.local.getVault.response"},
+                    {"command", "storage.getVault.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -229,76 +261,15 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleInitS3(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session) {
         try {
-            json payload = msg.at("payload");
-            std::string name = payload.at("name").get<std::string>();
-            unsigned short apiKeyID = payload.at("apiKeyID").get<unsigned short>();
-            std::string bucket = payload.at("bucket").get<std::string>();
-
-            vh::database::VaultQueries::addVault(vh::types::S3Vault(name, apiKeyID, bucket));
+            const auto vaults = storageManager_->listVaults();
 
             json response = {
-                    {"command", "storage.s3.init.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "ok"}
-            };
-
-            session.send(response);
-
-            std::cout << "[StorageHandler] Mounted S3 storage: " << name << " -> " << bucket << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleInitS3 error: " << e.what() << "\n";
-
-            json response = {
-                    {"command", "storage.s3.init.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "error"},
-                    {"error", e.what()}
-            };
-
-            session.send(response);
-        }
-    }
-
-    void StorageHandler::handleRemoveS3Vault(const json& msg, WebSocketSession& session) {
-        try {
-            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
-
-            vh::database::VaultQueries::removeVault(vaultId);
-
-            json response = {
-                    {"command", "storage.s3.removeVault.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "ok"}
-            };
-
-            session.send(response);
-
-            std::cout << "[StorageHandler] Removed S3 vault with ID: " << vaultId << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleRemoveS3Vault error: " << e.what() << "\n";
-
-            json response = {
-                    {"command", "storage.s3.removeVault.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "error"},
-                    {"error", e.what()}
-            };
-
-            session.send(response);
-        }
-    }
-
-    void StorageHandler::handleListS3Vaults(const json& msg, WebSocketSession& session) {
-        try {
-            auto vaults = vh::database::VaultQueries::listVaults();
-
-            json response = {
-                    {"command", "storage.s3.listVaults.response"},
+                    {"command", "storage.listVaults.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(vaults).dump(4)}
+                    {"data", vh::types::to_json(vaults).dump(4)}
             };
 
             session.send(response);
@@ -308,36 +279,7 @@ namespace vh::websocket {
             std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << "\n";
 
             json response = {
-                    {"command", "storage.s3.listVaults.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "error"},
-                    {"error", e.what()}
-            };
-
-            session.send(response);
-        }
-    }
-
-    void StorageHandler::handleGetS3Vault(const json& msg, WebSocketSession& session) {
-        try {
-            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
-            auto vault = vh::database::VaultQueries::getVault(vaultId);
-
-            json response = {
-                    {"command", "storage.s3.getVault.response"},
-                    {"requestId", msg.at("requestId").get<std::string>()},
-                    {"status", "ok"},
-                    {"data", json(vault)}
-            };
-
-            session.send(response);
-
-            std::cout << "[StorageHandler] Fetched S3 vault with ID: " << vaultId << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "[StorageHandler] handleGetS3Vault error: " << e.what() << "\n";
-
-            json response = {
-                    {"command", "storage.s3.getVault.response"},
+                    {"command", "storage.listVaults.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}

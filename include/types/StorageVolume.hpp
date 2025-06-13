@@ -8,26 +8,27 @@
 #include <optional>
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
+#include <utility>
 
 namespace vh::types {
 
     struct StorageVolume {
-        unsigned int id;
-        unsigned int vault_id;
+        unsigned int id{0};
+        unsigned int vault_id{0};
         std::string name;
-        std::optional<std::string> path_prefix;
+        std::filesystem::path path_prefix;
         std::optional<unsigned long long> quota_bytes;
-        std::time_t created_at;
+        std::time_t created_at{std::time(nullptr)};
 
         StorageVolume() = default;
 
-        StorageVolume(unsigned int vaultId, const std::string& name,
-                      std::optional<std::string> pathPrefix = std::nullopt,
+        StorageVolume(unsigned int vaultId, std::string name,
+                      std::filesystem::path pathPrefix,
                       std::optional<unsigned long long> quotaBytes = std::nullopt)
             : id(0), // ID will be set by the database
               vault_id(vaultId),
-              name(name),
-              path_prefix(pathPrefix),
+              name(std::move(name)),
+              path_prefix(std::move(pathPrefix)),
               quota_bytes(quotaBytes),
               created_at(std::time(nullptr)) {} // Set current time
 
@@ -35,7 +36,7 @@ namespace vh::types {
             : id(row["id"].as<unsigned int>()),
               vault_id(row["vault_id"].as<unsigned int>()),
               name(row["name"].as<std::string>()),
-              path_prefix(row["path_prefix"].is_null() ? std::nullopt : std::make_optional(row["path_prefix"].as<std::string>())),
+              path_prefix(row["path_prefix"].as<std::string>()),
               quota_bytes(row["quota_bytes"].is_null() ? std::nullopt : std::make_optional(row["quota_bytes"].as<unsigned long long>())),
               created_at(row["created_at"].as<std::time_t>()) {}
 
@@ -47,6 +48,12 @@ namespace vh::types {
                                        quota_bytes,
                                        created_at)
     };
+
+    inline nlohmann::json to_json(const std::vector<std::shared_ptr<StorageVolume>>& volumes) {
+        nlohmann::json j;
+        for (const auto& volume : volumes) if (volume) j.push_back(*volume);
+        return j;
+    }
 
 } // namespace vh::types
 

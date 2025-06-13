@@ -42,11 +42,11 @@ namespace vh::types {
 
     struct LocalDiskVault : public Vault {
         unsigned int storage_backend_id{0};
-        std::string mount_point;
+        std::filesystem::path mount_point;
 
         LocalDiskVault() = default;
 
-        LocalDiskVault(const std::string& name, const std::string& mountPoint)
+        LocalDiskVault(const std::string& name, const std::filesystem::path& mountPoint)
             : Vault({}),
               storage_backend_id(0), // This will be set by the database
               mount_point(mountPoint) {

@@ -292,14 +292,14 @@ namespace vh::websocket {
     void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session) {
         try {
             json payload = msg.at("payload");
-            unsigned short userID = payload.at("userID").get<unsigned short>();
-            unsigned short vaultID = payload.at("vaultID").get<unsigned short>();
+            unsigned int userID = payload.at("userID").get<unsigned int>();
+            unsigned int vaultID = payload.at("vaultID").get<unsigned int>();
             std::string name = payload.at("name").get<std::string>();
             std::string pathPrefix = payload.contains("pathPrefix") ? payload.at("pathPrefix").get<std::string>() : "/";
             unsigned long long quotaBytes = payload.contains("quotaBytes") ? payload.at("quotaBytes").get<unsigned long long>() : 0;
 
-            vh::types::StorageVolume storageVolume(vaultID, name, pathPrefix, quotaBytes);
-            vh::database::VaultQueries::addVolume(userID, storageVolume);
+            auto storageVolume = std::make_shared<vh::types::StorageVolume>(vaultID, name, pathPrefix, quotaBytes);
+            storageManager_->addVolume(storageVolume, userID);
 
             json response = {
                     {"command", "storage.volume.add.response"},
@@ -327,8 +327,9 @@ namespace vh::websocket {
     void StorageHandler::handleRemoveVolume(const json& msg, WebSocketSession& session) {
         try {
             unsigned int volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
+            const auto user = session.getAuthenticatedUser();
 
-            vh::database::VaultQueries::removeVolume(volumeId);
+            storageManager_->removeVolume(volumeId, user->id);
 
             json response = {
                     {"command", "storage.volume.remove.response"},
@@ -356,13 +357,13 @@ namespace vh::websocket {
     void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& session) {
         try {
             unsigned int userId = msg.at("payload").at("userId").get<unsigned int>();
-            auto volumes = vh::database::VaultQueries::listVolumes(userId);
+            auto volumes = storageManager_->listVolumes(userId);
 
             json response = {
                     {"command", "storage.volume.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(volumes).dump(4)}
+                    {"data", vh::types::to_json(volumes).dump(4)}
             };
 
             session.send(response);
@@ -385,13 +386,14 @@ namespace vh::websocket {
     void StorageHandler::handleGetVolume(const json& msg, WebSocketSession& session) {
         try {
             unsigned int volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
-            auto volume = vh::database::VaultQueries::getVolume(volumeId);
+            const auto user = session.getAuthenticatedUser();
+            auto volume = storageManager_->getVolume(volumeId, user->id);
 
             json response = {
                     {"command", "storage.volume.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(volume)}
+                    {"data", *volume}
             };
 
             session.send(response);

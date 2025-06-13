@@ -12,17 +12,17 @@ namespace vh::database {
 
             auto vaultId = res[0][0].as<unsigned int>();
 
-            if (vault.type == vh::types::VaultType::Local) {
+            // dynamic cast
+            if (auto* localVault = dynamic_cast<const vh::types::LocalDiskVault*>(&vault)) {
                 txn.exec("INSERT INTO local_disk_vaults (vault_id, storage_backend_id, mount_point) VALUES ("
                          + txn.quote(vaultId) + ", "
-                         + txn.quote(static_cast<const vh::types::LocalDiskVault&>(vault).storage_backend_id) + ", "
-                         + txn.quote(static_cast<const vh::types::LocalDiskVault&>(vault).mount_point) + ")");
-            } else if (vault.type == vh::types::VaultType::S3) {
-                const auto& s3Vault = static_cast<const types::S3Vault&>(vault);
+                         + txn.quote(localVault->storage_backend_id) + ", "
+                         + txn.quote(localVault->mount_point.string()) + ")");
+            } else if (auto* s3Vault = dynamic_cast<const vh::types::S3Vault*>(&vault)) {
                 txn.exec("INSERT INTO s3_vaults (vault_id, api_key_id, bucket) VALUES ("
                          + txn.quote(vaultId) + ", "
-                         + txn.quote(s3Vault.api_key_id) + ", "
-                         + txn.quote(s3Vault.bucket) + ")");
+                         + txn.quote(s3Vault->api_key_id) + ", "
+                         + txn.quote(s3Vault->bucket) + ")");
             }
 
             txn.commit();
@@ -73,16 +73,16 @@ namespace vh::database {
         });
     }
 
-    void VaultQueries::addVolume(unsigned short userID, const types::StorageVolume& volume) {
+    void VaultQueries::addVolume(unsigned short userID, const std::shared_ptr<vh::types::StorageVolume>& volume) {
         Transactions::exec("VaultQueries::addVolume", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec(
                 "INSERT INTO storage_volumes (vault_id, name, path_prefix, quota_bytes, created_at) "
                 "VALUES ("
-                + txn.quote(volume.vault_id) + ", "
-                + txn.quote(volume.name) + ", "
-                + txn.quote(volume.path_prefix.value_or("")) + ", "
-                + txn.quote(volume.quota_bytes.value_or(0ULL)) + ", "
-                + txn.quote(volume.created_at) + ") "
+                + txn.quote(volume->vault_id) + ", "
+                + txn.quote(volume->name) + ", "
+                + txn.quote(volume->path_prefix.string()) + ", "
+                + txn.quote(volume->quota_bytes.value_or(0ULL)) + ", "
+                + txn.quote(volume->created_at) + ") "
                 "RETURNING id"
             );
 
@@ -102,22 +102,43 @@ namespace vh::database {
         });
     }
 
-    std::vector<types::StorageVolume> VaultQueries::listVolumes(unsigned int userId) {
+    std::vector<std::shared_ptr<vh::types::StorageVolume>> VaultQueries::listVolumes(unsigned int userId) {
         return Transactions::exec("VaultQueries::listVolumes", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec("SELECT sv.* FROM storage_volumes sv "
                                         "JOIN user_storage_volumes usv ON sv.id = usv.storage_volume_id "
                                         "WHERE usv.user_id = " + txn.quote(userId));
-            std::vector<types::StorageVolume> volumes;
-            for (const auto& row : res) volumes.emplace_back(row);
+            std::vector<std::shared_ptr<vh::types::StorageVolume>> volumes;
+            for (const auto& row : res) volumes.push_back(std::make_shared<vh::types::StorageVolume>(row));
             return volumes;
         });
     }
 
-    types::StorageVolume VaultQueries::getVolume(unsigned int volumeId) {
+    std::shared_ptr<vh::types::StorageVolume> VaultQueries::getVolume(unsigned int volumeId) {
         return Transactions::exec("VaultQueries::getVolume", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec("SELECT * FROM storage_volumes WHERE id = " + txn.quote(volumeId));
             if (res.empty()) throw std::runtime_error("No storage volume found with ID: " + std::to_string(volumeId));
-            return types::StorageVolume(res[0]);
+            return std::make_shared<vh::types::StorageVolume>(res[0]);
+        });
+    }
+
+    std::shared_ptr<vh::types::UserStorageVolume> VaultQueries::getUserVolume(unsigned int volumeId, unsigned int userId) {
+        return Transactions::exec("VaultQueries::getUserVolume", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("SELECT * FROM user_storage_volumes WHERE storage_volume_id = " + txn.quote(volumeId) +
+                                        " AND user_id = " + txn.quote(userId));
+            if (res.empty()) throw std::runtime_error("No user storage volume found for user ID: " + std::to_string(userId) +
+                                                   " and volume ID: " + std::to_string(volumeId));
+            return std::make_shared<vh::types::UserStorageVolume>(res[0]);
+        });
+    }
+
+    std::vector<std::shared_ptr<vh::types::UserStorageVolume>> VaultQueries::listUserVolumes(unsigned int userId) {
+        return Transactions::exec("VaultQueries::listUserVolumes", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("SELECT usv.* FROM user_storage_volumes usv "
+                                        "JOIN storage_volumes sv ON usv.storage_volume_id = sv.id "
+                                        "WHERE usv.user_id = " + txn.quote(userId));
+            std::vector<std::shared_ptr<vh::types::UserStorageVolume>> userVolumes;
+            for (const auto& row : res) userVolumes.push_back(std::make_shared<vh::types::UserStorageVolume>(row));
+            return userVolumes;
         });
     }
 }

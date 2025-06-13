@@ -10,22 +10,8 @@ namespace vh::storage {
 
     void StorageManager::initStorageEngines() {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        for (auto& vault : vh::database::VaultQueries::listVaults()) mount(std::move(vault));
-    }
-
-    void StorageManager::mount(std::unique_ptr<vh::types::Vault> &&vault) {
-        if (auto* diskVault = dynamic_cast<vh::types::LocalDiskVault*>(vault.get())) {
-            auto localEngine = std::make_shared<LocalDiskStorageEngine>(diskVault->mount_point);
-            localEngines_[diskVault->id] = localEngine;
-            std::cout << "[StorageManager] Mounted local disk vault: " << diskVault->name << "\n";
-        } else if (auto* cloudVault = dynamic_cast<vh::types::S3Vault*>(vault.get())) {
-            // TODO: Initialize cloud storage engine with S3 credentials
-            auto cloudEngine = std::make_shared<CloudStorageEngine>();
-            cloudEngines_[cloudVault->id] = cloudEngine;
-            std::cout << "[StorageManager] Mounted cloud vault: " << cloudVault->name << "\n";
-        } else {
-            throw std::runtime_error("Unsupported vault type: " + std::to_string(static_cast<int>(vault->type)));
-        }
+        for (auto& vault : vh::database::VaultQueries::listVaults())
+            vaults_[vault->id] = std::move(vault);
     }
 
     void StorageManager::addVault(std::unique_ptr<vh::types::Vault>&& vault) {
@@ -34,7 +20,7 @@ namespace vh::storage {
 
         vh::database::VaultQueries::addVault(*vault);
         vault = vh::database::VaultQueries::getVault(vault->id);
-        mount(std::move(vault));
+        vaults_[vault->id] = std::move(vault);
     }
 
     void StorageManager::removeVault(unsigned int vaultId) {
@@ -53,7 +39,77 @@ namespace vh::storage {
 
     std::unique_ptr<vh::types::Vault> StorageManager::getVault(unsigned int vaultId) const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
+        if (vaults_.find(vaultId) != vaults_.end()) return std::make_unique<vh::types::Vault>(*vaults_.at(vaultId));
         return vh::database::VaultQueries::getVault(vaultId);
+    }
+
+    void StorageManager::mountVolume(const std::shared_ptr<vh::types::StorageVolume> &volume) {
+        if (!volume) throw std::invalid_argument("Volume cannot be null");
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+
+        auto vault = getVault(volume->vault_id);
+        if (!vault) throw std::runtime_error("Vault not found for volume ID: " + std::to_string(volume->vault_id));
+
+        auto volumesOnVault = vh::database::VaultQueries::listVolumes(vault->id);
+
+        if (auto* vaultDisk = dynamic_cast<vh::types::LocalDiskVault*>(vault.get())) {
+            auto newVolPath = vaultDisk->mount_point / volume->path_prefix;
+            for (const auto& existingVolume : volumesOnVault) {
+                if (existingVolume->id == volume->id) continue;
+                if (pathsAreConflicting(vaultDisk->mount_point / existingVolume->path_prefix, newVolPath)) {
+                    throw std::runtime_error("Volume path conflicts with existing volume: " + existingVolume->path_prefix.string());
+                }
+            }
+            localEngines_[volume->id] = std::make_shared<LocalDiskStorageEngine>(newVolPath);
+        } else if (auto* vaultS3 = dynamic_cast<vh::types::S3Vault*>(vault.get())) {
+            // TODO: Handle S3 volume path conflicts
+        }
+    }
+
+    void StorageManager::addVolume(const std::shared_ptr<vh::types::StorageVolume>& volume, unsigned int userId) {
+        if (!volume) throw std::invalid_argument("Volume cannot be null");
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+
+        mountVolume(volume);
+        vh::database::VaultQueries::addVolume(userId, volume);
+        std::cout << "[StorageManager] Added volume: " << volume->name << " with ID: " << volume->id << "\n";
+    }
+
+    void StorageManager::removeVolume(unsigned int volumeId, unsigned int userId) {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+
+        auto volume = vh::database::VaultQueries::getVolume(volumeId);
+        if (!volume) throw std::runtime_error("Volume not found with ID: " + std::to_string(volumeId));
+
+        try { vh::database::VaultQueries::getUserVolume(volumeId, userId); }
+        catch (const std::runtime_error& e) {
+            throw std::runtime_error("User does not have access to volume ID: " + std::to_string(volumeId));
+        }
+
+        vh::database::VaultQueries::removeVolume(volumeId);
+
+        localEngines_.erase(volumeId);
+        cloudEngines_.erase(volumeId);
+        std::cout << "[StorageManager] Removed volume with ID: " << volumeId << "\n";
+    }
+
+    std::shared_ptr<vh::types::StorageVolume> StorageManager::getVolume(unsigned int volumeId, unsigned int userId) const {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+        auto volume = vh::database::VaultQueries::getVolume(volumeId);
+        if (!volume) throw std::runtime_error("Volume not found with ID: " + std::to_string(volumeId));
+
+        try {
+            vh::database::VaultQueries::getUserVolume(volumeId, userId);
+        } catch (const std::runtime_error& e) {
+            throw std::runtime_error("User does not have access to volume ID: " + std::to_string(volumeId));
+        }
+
+        return volume;
+    }
+
+    std::vector<std::shared_ptr<vh::types::StorageVolume>> StorageManager::listVolumes(unsigned int userId) const {
+        std::lock_guard<std::mutex> lock(mountsMutex_);
+        return vh::database::VaultQueries::listVolumes(userId);
     }
 
     std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(unsigned short id) const {
@@ -74,6 +130,18 @@ namespace vh::storage {
         if (auto localEngine = getLocalEngine(id)) return localEngine;
         if (auto cloudEngine = getCloudEngine(id)) return cloudEngine;
         return nullptr; // No engine found for the given ID
+    }
+
+    bool StorageManager::pathsAreConflicting(const std::filesystem::path &path1, const std::filesystem::path &path2) {
+        try {
+            auto canonical1 = std::filesystem::canonical(path1);
+            auto canonical2 = std::filesystem::canonical(path2);
+
+            return canonical1 == canonical2;
+        } catch (const std::filesystem::filesystem_error& e) {
+            // If canonicalization fails (non-existent path), fall back to weak comparison
+            return std::filesystem::equivalent(path1, path2);
+        }
     }
 
 } // namespace vh::storage

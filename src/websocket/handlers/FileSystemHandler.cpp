@@ -40,9 +40,10 @@ namespace vh::websocket {
             validateAuth(session);
 
             std::string mountName = msg.at("mountName").get<std::string>();
+            unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
             std::string path = msg.at("path").get<std::string>();
 
-            auto engine = storageManager_->getEngine(mountName);
+            auto engine = storageManager_->getEngine(volumeId);
             if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
             enforcePermission(session, mountName, path, "list");
             auto files = engine->listFilesInDir(path);
@@ -80,9 +81,10 @@ namespace vh::websocket {
             validateAuth(session);
 
             std::string mountName = msg.at("mountName").get<std::string>();
+            unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
             std::string path = msg.at("path").get<std::string>();
 
-            auto engine = storageManager_->getEngine(mountName);
+            auto engine = storageManager_->getEngine(volumeId);
             if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
             enforcePermission(session, mountName, path, "read");
             auto data = engine->readFile(path);
@@ -119,10 +121,11 @@ namespace vh::websocket {
             validateAuth(session);
 
             std::string mountName = msg.at("mountName").get<std::string>();
+            unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
             std::string path = msg.at("path").get<std::string>();
             std::string data = msg.at("data").get<std::string>();
 
-            auto engine = storageManager_->getEngine(mountName);
+            auto engine = storageManager_->getEngine(volumeId);
             if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
             std::vector<uint8_t> binaryData(data.begin(), data.end());
             enforcePermission(session, mountName, path, "write");
@@ -157,15 +160,16 @@ namespace vh::websocket {
             validateAuth(session);
 
             std::string mountName = msg.at("mountName").get<std::string>();
+            unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
             std::string path = msg.at("path").get<std::string>();
 
             bool success = false;
 
             try {
-                auto fsManager = storageManager_->getLocalEngine(mountName);
+                auto fsManager = storageManager_->getLocalEngine(volumeId);
                 success = fsManager->deleteFile(path);
             } catch (...) {
-                auto cloudProvider = storageManager_->getCloudEngine(mountName);
+                auto cloudProvider = storageManager_->getCloudEngine(volumeId);
                 cloudProvider->deleteFile(path);
                 success = true;
             }

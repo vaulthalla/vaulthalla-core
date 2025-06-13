@@ -1,6 +1,7 @@
 #pragma once
 
 #include "include/storage/StorageEngine.hpp"
+#include "types/StorageVolume.hpp"
 #include <filesystem>
 #include <fstream>
 
@@ -10,6 +11,9 @@ namespace vh::storage {
     public:
         explicit LocalDiskStorageEngine(std::filesystem::path root_dir);
         ~LocalDiskStorageEngine() override = default;
+
+        void mountVolume(const std::filesystem::path& mount_point);
+        void unmountVolume(const vh::types::StorageVolume& volume);
 
         bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
         [[nodiscard]] std::optional<std::vector<uint8_t>> readFile(const std::filesystem::path& rel_path) const override;

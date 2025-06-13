@@ -42,10 +42,13 @@ namespace vh::database {
 
         static bool localDiskVaultExists();
 
-        static void addVolume(unsigned short userID, const vh::types::StorageVolume& volume);
+        static void addVolume(unsigned short userID, const std::shared_ptr<vh::types::StorageVolume>& volume);
         static void removeVolume(unsigned int volumeId);
-        static std::vector<vh::types::StorageVolume> listVolumes(unsigned int userId);
-        static vh::types::StorageVolume getVolume(unsigned int volumeId);
+        static std::vector<std::shared_ptr<vh::types::StorageVolume>> listVolumes(unsigned int userId);
+        static std::shared_ptr<vh::types::StorageVolume> getVolume(unsigned int volumeId);
+
+        static std::shared_ptr<vh::types::UserStorageVolume> getUserVolume(unsigned int volumeId, unsigned int userId);
+        static std::vector<std::shared_ptr<vh::types::UserStorageVolume>> listUserVolumes(unsigned int userId);
     };
 
 }

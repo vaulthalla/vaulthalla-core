@@ -43,30 +43,26 @@ namespace vh::websocket {
                          const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
                          const std::shared_ptr<vh::auth::AuthManager>& authManager);
 
-        void run();
-
         void send(const json& message);
-
-        // Accessors for session state
-        std::shared_ptr<vh::types::User> getAuthenticatedUser() const;
-        void setAuthenticatedUser(std::shared_ptr<vh::types::User> user);
+        void accept(tcp::socket&& socket);
+        void close();
 
         void subscribeChannel(const std::string& channel);
         void unsubscribeChannel(const std::string& channel);
         bool isSubscribedTo(const std::string& channel);
         std::unordered_set<std::string> getSubscribedChannels();
 
-        void accept(tcp::socket&& socket);
+        const std::string& getUUID() const { return uuid; }
 
+        // Accessors for session state
+        std::shared_ptr<vh::types::User> getAuthenticatedUser() const;
+        void setAuthenticatedUser(std::shared_ptr<vh::types::User> user);
         void setRefreshTokenCookie(const std::string& token);
         void setHandshakeRequest(const RequestType& req);
         std::string getClientIp() const;
         std::string getUserAgent() const;
         std::string getRefreshToken() const;
         std::string getRefreshTokenFromCookie() const;
-
-        const std::string& getUUID() const { return uuid; }
-        void close();
 
     private:
         std::shared_ptr<vh::auth::AuthManager> authManager_;

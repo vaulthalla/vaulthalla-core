@@ -10,6 +10,10 @@ namespace vh::types {
     class User;
 }
 
+namespace vh::websocket {
+    class WebSocketSession;
+}
+
 namespace vh::auth {
 
     class Client;
@@ -26,9 +30,10 @@ namespace vh::auth {
         std::shared_ptr<vh::types::User> findUser(const std::string& email);
         [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;
         [[nodiscard]] bool validateToken(const std::string& token);
-        std::string createRefreshToken(const std::shared_ptr<Client>& client);
         std::shared_ptr<Client> validateRefreshToken(const std::string& refreshToken,
                                                      const std::shared_ptr<vh::websocket::WebSocketSession>& session);
+
+        static std::shared_ptr<RefreshToken> createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSession>& session);
 
     private:
         std::unordered_map<std::string, std::shared_ptr<vh::types::User>> users_;

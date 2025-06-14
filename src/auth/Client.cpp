@@ -1,4 +1,5 @@
 #include "auth/Client.hpp"
+#include "auth/AuthManager.hpp"
 
 namespace vh::auth {
 
@@ -6,7 +7,7 @@ namespace vh::auth {
 
     Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
                    const std::shared_ptr<vh::types::User>& user)
-            : user_(user), session_(session) {}
+            : user_(user), session_(session), refreshToken_(AuthManager::createRefreshToken(session_)) {}
 
     std::shared_ptr<vh::types::User> Client::getUser() const { return user_; }
     std::shared_ptr<Token> Client::getToken() const { return token_; }

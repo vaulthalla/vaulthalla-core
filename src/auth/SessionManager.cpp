@@ -10,7 +10,7 @@ namespace vh::auth {
     void SessionManager::createSession(const std::shared_ptr<Client>& client) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
-        if (!client || !client->getSession()) throw std::invalid_argument("Session and user must not be null");
+        if (!client || !client->getSession()) throw std::invalid_argument("Session must not be null");
 
         activeSessions_[client->getHashedRefreshToken()] = client;
         std::cout << "[SessionManager] Created new stateless session.\n";

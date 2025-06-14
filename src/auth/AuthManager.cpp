@@ -71,17 +71,13 @@ namespace vh::auth {
         try {
             auto user = findUser(email);
             if (!user) throw std::runtime_error("User not found: " + email);
+
             if (!vh::crypto::verifyPassword(password, user->password_hash))
                 throw std::runtime_error("Invalid password for user: " + email);
 
-            // Optional: Revoke all existing refresh tokens for this user
             vh::database::UserQueries::revokeAllRefreshTokens(user->id);
-
-            // Initialize client (WebSocketSession attached later)
             auto client = sessionManager_->getClientSession(refreshToken);
-
-            // Generate new refresh token (adds to DB + assigns to client)
-            createRefreshToken(client);
+            client->setUser(user);
 
             sessionManager_->promoteSession(client);
 
@@ -221,27 +217,25 @@ namespace vh::auth {
         return {uuidStr};
     }
 
-    std::string AuthManager::createRefreshToken(const std::shared_ptr<Client>& client) {
+    std::shared_ptr<RefreshToken> AuthManager::createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
         auto now = std::chrono::system_clock::now();
         auto exp = now + std::chrono::hours(24 * 7); // 7 days
         std::string jti = generateUUID();
 
         std::string token = jwt::create<jwt::traits::nlohmann_json>()
-                .set_subject(client->getSession()->getClientIp())
+                .set_subject(session->getClientIp() + ":" + session->getUserAgent())
                 .set_issued_at(now)
                 .set_expires_at(exp)
                 .set_id(jti)
                 .sign(jwt::algorithm::hs256{std::getenv("VAULTHALLA_JWT_REFRESH_SECRET")});
 
-        auto refreshToken = std::make_shared<RefreshToken>(
-            jti,
-            vh::crypto::hashPassword(token), // Store hashed token
-            0, // User ID will be set later
-            client->getSession()->getUserAgent(),
-            client->getSession()->getClientIp()
+        return std::make_shared<RefreshToken>(
+                jti,
+                vh::crypto::hashPassword(token), // Store hashed token
+                0, // User ID will be set later
+                session->getUserAgent(),
+                session->getClientIp()
         );
-
-        return token;
     }
 
 } // namespace vh::auth

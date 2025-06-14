@@ -2,6 +2,11 @@ project('vaulthalla', 'cpp',
         version : '0.0.1',
         default_options : ['warning_level=3', 'cpp_std=c++2a'])
 
+if get_option('buildtype') == 'debug'
+    add_project_arguments('-fsanitize=undefined', language: 'cpp')
+    add_project_link_arguments('-fsanitize=undefined', language: 'cpp')
+endif
+
 boost_dep = dependency('boost', modules: ['filesystem', 'system'], required: true)
 nlohmann_json_dep = dependency('nlohmann_json', required: true)
 libpqxx_dep = dependency('libpqxx', required: true)

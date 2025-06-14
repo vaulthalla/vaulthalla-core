@@ -19,9 +19,9 @@ namespace vh::auth {
         AuthManager();
 
         std::shared_ptr<Client> registerUser(const std::string& username, const std::string& email, const std::string& password,
-                                             const std::shared_ptr<vh::websocket::WebSocketSession>& session = nullptr);
+                                             const std::string& refreshToken);
         std::shared_ptr<Client> loginUser(const std::string& email, const std::string& password,
-                                          const std::shared_ptr<vh::websocket::WebSocketSession>& session = nullptr);
+                                          const std::string& refreshToken);
         void changePassword(const std::string& username, const std::string& oldPassword, const std::string& newPassword);
         std::shared_ptr<vh::types::User> findUser(const std::string& email);
         [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;

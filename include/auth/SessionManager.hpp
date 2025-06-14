@@ -16,7 +16,8 @@ namespace vh::auth {
 
     class SessionManager {
     public:
-        std::string createSession(const std::shared_ptr<Client>& client);
+        void createSession(const std::shared_ptr<Client>& client);
+        std::string promoteSession(const std::shared_ptr<Client>& client);
         std::shared_ptr<Client> getClientSession(const std::string& token);
         void invalidateSession(const std::string& token);
 

@@ -1,21 +1,35 @@
 #include "auth/SessionManager.hpp"
-#include "websocket/WebSocketSession.hpp"
 #include "crypto/PasswordHash.hpp"
+#include "database/Queries/UserQueries.hpp"
+#include "auth/RefreshToken.hpp"
 
 #include <iostream>
 
 namespace vh::auth {
 
-    std::string SessionManager::createSession(const std::shared_ptr<Client>& client) {
+    void SessionManager::createSession(const std::shared_ptr<Client>& client) {
         std::lock_guard<std::mutex> lock(sessionMutex_);
 
         if (!client || !client->getSession()) throw std::invalid_argument("Session and user must not be null");
 
         activeSessions_[client->getHashedRefreshToken()] = client;
+        std::cout << "[SessionManager] Created new stateless session.\n";
+    }
 
-        client->getSession()->setAuthenticatedUser(client->getUser());
-        std::cout << "[SessionManager] Authenticated session for user: " << client->getEmail() << "\n";
+    std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client) {
+        std::lock_guard<std::mutex> lock(sessionMutex_);
 
+        if (!client || !client->getSession()) throw std::invalid_argument("Client and session must not be null");
+
+        auto refreshToken = client->getRefreshToken();
+        refreshToken->setUserId(client->getUser()->id);
+        refreshToken->setUserAgent(client->getSession()->getUserAgent());
+        refreshToken->setIpAddress(client->getSession()->getClientIp());
+        vh::database::UserQueries::addRefreshToken(refreshToken);
+        client->setRefreshToken(vh::database::UserQueries::getRefreshToken(refreshToken->getJti()));
+        activeSessions_[refreshToken->getHashedToken()] = client;
+
+        std::cout << "[SessionManager] Promoted session for user: " << client->getEmail() << "\n";
         return client->getRawToken();
     }
 

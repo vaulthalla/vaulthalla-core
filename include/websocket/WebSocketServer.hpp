@@ -9,6 +9,10 @@
 
 #include <memory>
 
+namespace vh::auth {
+    class authManager;
+}
+
 namespace vh::websocket {
     class NotificationBroadcastManager;
 
@@ -21,7 +25,7 @@ namespace vh::websocket {
         WebSocketServer(asio::io_context& ioc,
                         const tcp::endpoint& endpoint,
                         const std::shared_ptr<WebSocketRouter>& router,
-                        const std::shared_ptr<vh::auth::SessionManager>& sessionManager);
+                        const std::shared_ptr<vh::auth::AuthManager>& authManager);
 
         void run();
 
@@ -31,6 +35,7 @@ namespace vh::websocket {
         asio::io_context& ioc_;
 
         std::shared_ptr<WebSocketRouter> router_;
+        std::shared_ptr<vh::auth::AuthManager> authManager_;
         std::shared_ptr<vh::auth::SessionManager> sessionManager_;
         std::shared_ptr<vh::websocket::NotificationBroadcastManager> broadcastManager_;
 

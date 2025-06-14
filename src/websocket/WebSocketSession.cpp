@@ -2,6 +2,8 @@
 #include "websocket/WebSocketRouter.hpp"
 #include "types/User.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
+#include "auth/Client.hpp"
+#include "auth/AuthManager.hpp"
 #include <iostream>
 #include <regex>
 #include <boost/beast/http.hpp>
@@ -15,8 +17,10 @@ using tcp        = asio::ip::tcp;
 namespace vh::websocket {
 
     WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                                       const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
-            : ws_(nullptr),
+                                       const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
+                                       const std::shared_ptr<vh::auth::AuthManager>& authManager)
+            : authManager_(authManager),
+              ws_(nullptr),
               router_(router),
               broadcastManager_(broadcastManager) {}
 
@@ -169,10 +173,18 @@ namespace vh::websocket {
     void WebSocketSession::accept(tcp::socket&& socket)
     {
         // Wrap the raw socket in a Beast WebSocket stream
-        ws_     = std::make_unique<websocket::stream<tcp::socket>>(std::move(socket));
+        ws_     = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
         strand_ = asio::make_strand(ws_->get_executor());
 
         auto self = shared_from_this();                               // keep session alive
+        std::cout << "[Session] Accepting new WebSocket connection...\n";
+        auto client = std::make_shared<vh::auth::Client>(self);
+        std::cout << "[Session] Creating refresh token....\n";
+        authManager_->createRefreshToken(client);
+        std::cout << "[Session] Creating session for client...\n";
+        authManager_->sessionManager()->createSession(client);
+        std::cout << "[Session] Setting refresh token cookie...\n";
+        setRefreshTokenCookie(client->getHashedRefreshToken());
         auto req  = std::make_shared<http::request<http::string_body>>(); // survives the async chain
 
         // 1) Read the incoming HTTP upgrade request ourselves
@@ -208,12 +220,12 @@ namespace vh::websocket {
                                         self->ws_->set_option(
                                                 websocket::stream_base::timeout::suggested(beast::role_type::server));
                                         self->ws_->set_option(websocket::stream_base::decorator(
-                                                [](websocket::response_type& res) {
+                                                [&refreshToken](websocket::response_type& res) {
                                                     res.set(http::field::server, "Vaulthalla");
 
                                                     // Send a blank refresh cookie
                                                     res.set(http::field::set_cookie,
-                                                            "refresh=; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800");
+                                                            "refresh=" + refreshToken + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800");
                                                 }));
 
                                         self->ws_->async_accept(

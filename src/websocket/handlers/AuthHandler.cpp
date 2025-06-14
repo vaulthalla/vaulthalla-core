@@ -18,7 +18,7 @@ namespace vh::websocket {
             std::string email = payload.at("email").get<std::string>();
             std::string password = payload.at("password").get<std::string>();
 
-            auto client = authManager_->loginUser(email, password, session.shared_from_this());
+            auto client = authManager_->loginUser(email, password, session.getRefreshToken());
             if (!client) throw std::runtime_error("Invalid email or password or user not found");
 
             auto user = client->getUser();
@@ -62,7 +62,7 @@ namespace vh::websocket {
             std::string email = payload.at("email").get<std::string>();
             std::string password = payload.at("password").get<std::string>();
 
-            auto client = authManager_->registerUser(name, email, password, session.shared_from_this());
+            auto client = authManager_->registerUser(name, email, password, session.getRefreshToken());
             auto user = client->getUser();
             std::string token = client->getRawToken();
 

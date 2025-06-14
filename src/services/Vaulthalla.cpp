@@ -25,7 +25,7 @@ namespace vh::services {
                     *ioContext_,
                     boost::asio::ip::tcp::endpoint(address_, port_),
                     wsRouter_,
-                    serviceManager_->authManager()->sessionManager()
+                    serviceManager_->authManager()
             );
 
             wsServer_->run();

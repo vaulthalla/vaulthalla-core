@@ -47,7 +47,7 @@ namespace vh::auth {
     std::shared_ptr<Client> AuthManager::registerUser(const std::string& username,
                                                       const std::string& email,
                                                       const std::string& password,
-                                                      const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+                                                      const std::string& refreshToken) {
         if (users_.count(username) > 0)
             throw std::runtime_error("User already exists: " + username);
 
@@ -57,18 +57,17 @@ namespace vh::auth {
         vh::database::UserQueries::createUser(username, email, hashedPassword);
 
         const auto user = findUser(email);
-        auto client = std::make_shared<Client>(user, session);
+        auto client = sessionManager_->getClientSession(refreshToken);
+        client->setUser(user);
 
-        createRefreshToken(client);
-
-        sessionManager_->createSession(client);
+        sessionManager_->promoteSession(client);
 
         std::cout << "[AuthManager] Registered new user: " << username << "\n";
         return client;
     }
 
     std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const std::string& password,
-                                                   const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+                                                   const std::string& refreshToken) {
         try {
             auto user = findUser(email);
             if (!user) throw std::runtime_error("User not found: " + email);
@@ -79,12 +78,12 @@ namespace vh::auth {
             vh::database::UserQueries::revokeAllRefreshTokens(user->id);
 
             // Initialize client (WebSocketSession attached later)
-            auto client = std::make_shared<Client>(user, session);
+            auto client = sessionManager_->getClientSession(refreshToken);
 
             // Generate new refresh token (adds to DB + assigns to client)
             createRefreshToken(client);
 
-            sessionManager_->createSession(client);
+            sessionManager_->promoteSession(client);
 
             std::cout << "[AuthManager] User logged in: " << email << "\n";
             return client;
@@ -132,7 +131,7 @@ namespace vh::auth {
                 throw std::runtime_error("Refresh token hash mismatch");
 
             auto user = vh::database::UserQueries::getUserByRefreshToken(tokenJti);
-            auto client = std::make_shared<Client>(user, session);
+            auto client = std::make_shared<Client>(session);
             sessionManager_->createSession(client);
             return client;
 
@@ -228,7 +227,7 @@ namespace vh::auth {
         std::string jti = generateUUID();
 
         std::string token = jwt::create<jwt::traits::nlohmann_json>()
-                .set_subject(client->getEmail())
+                .set_subject(client->getSession()->getClientIp())
                 .set_issued_at(now)
                 .set_expires_at(exp)
                 .set_id(jti)
@@ -237,13 +236,10 @@ namespace vh::auth {
         auto refreshToken = std::make_shared<RefreshToken>(
             jti,
             vh::crypto::hashPassword(token), // Store hashed token
-            client->getUser()->id,
+            0, // User ID will be set later
             client->getSession()->getUserAgent(),
             client->getSession()->getClientIp()
         );
-
-        vh::database::UserQueries::addRefreshToken(refreshToken);
-        client->setRefreshToken(vh::database::UserQueries::getRefreshToken(refreshToken->getJti()));
 
         return token;
     }

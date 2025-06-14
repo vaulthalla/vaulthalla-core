@@ -4,17 +4,19 @@ namespace vh::auth {
 
     Client::Client() = default;
 
-    Client::Client(const std::shared_ptr<vh::types::User>& user,
-                   const std::shared_ptr<vh::websocket::WebSocketSession>& session)
-            : user_(user),
-              token_(std::make_shared<Token>(generateToken(user->email), user_->id)),
-              session_(session) {}
+    Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
+                   const std::shared_ptr<vh::types::User>& user)
+            : user_(user), session_(session) {}
 
     std::shared_ptr<vh::types::User> Client::getUser() const { return user_; }
     std::shared_ptr<Token> Client::getToken() const { return token_; }
     std::shared_ptr<vh::websocket::WebSocketSession> Client::getSession() const { return session_; }
 
-    void Client::setUser(const std::shared_ptr<vh::types::User>& user) { user_ = user; }
+    void Client::setUser(const std::shared_ptr<vh::types::User>& user) {
+        user_ = user;
+        token_ = std::make_shared<Token>(generateToken(user->email), user->id);
+        session_->setAuthenticatedUser(user_);
+    }
     void Client::setToken(const std::shared_ptr<Token>& token) { token_ = token; }
 
     std::string Client::getUserName() const { return user_ ? user_->name : ""; }

@@ -19,6 +19,7 @@ using RequestType = boost::beast::http::request<boost::beast::http::string_body>
 
 namespace vh::auth {
     class SessionManager;
+    class AuthManager;
 }
 
 namespace vh::types {
@@ -39,7 +40,8 @@ namespace vh::websocket {
     public:
         ~WebSocketSession();
         WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                         const std::shared_ptr<NotificationBroadcastManager>& broadcastManager);
+                         const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
+                         const std::shared_ptr<vh::auth::AuthManager>& authManager);
 
         void run();
 
@@ -67,8 +69,9 @@ namespace vh::websocket {
         void close();
 
     private:
+        std::shared_ptr<vh::auth::AuthManager> authManager_;
         const std::string uuid = generateUUIDv4();
-        std::unique_ptr<websocket::stream<tcp::socket>> ws_;
+        std::shared_ptr<websocket::stream<tcp::socket>> ws_;
         beast::flat_buffer buffer_, tmpBuffer_;
         asio::any_io_executor strand_;
         RequestType handshakeRequest_;

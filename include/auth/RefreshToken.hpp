@@ -43,6 +43,11 @@ namespace vh::auth {
         [[nodiscard]] const std::string& getUserAgent() const { return userAgent_; }
         [[nodiscard]] const std::string& getIpAddress() const { return ipAddress_; }
 
+        void setRevoked(bool revoked) { revoked_ = revoked; }
+        void setUserId(unsigned int userId) { userId_ = userId; }
+        void setUserAgent(const std::string& userAgent) { userAgent_ = userAgent; }
+        void setIpAddress(const std::string& ipAddress) { ipAddress_ = ipAddress; }
+
     private:
         std::string jti_, hashedToken_, userAgent_, ipAddress_;
         unsigned int userId_;

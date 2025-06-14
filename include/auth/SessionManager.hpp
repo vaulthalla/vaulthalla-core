@@ -16,8 +16,7 @@ namespace vh::auth {
 
     class SessionManager {
     public:
-        std::string createSession(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
-                                const std::shared_ptr<vh::types::User>& user);
+        std::string createSession(const std::shared_ptr<Client>& client);
         std::shared_ptr<Client> getClientSession(const std::string& token);
         void invalidateSession(const std::string& token);
 

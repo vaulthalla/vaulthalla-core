@@ -1,6 +1,9 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/User.hpp"
+#include "auth/RefreshToken.hpp"
+#include <iomanip>
+#include <sstream>
 
 namespace vh::database {
     std::shared_ptr<vh::types::User> UserQueries::getUserByEmail(const std::string& email) {
@@ -49,6 +52,64 @@ namespace vh::database {
     void UserQueries::deleteUser(const std::string& email) {
         vh::database::Transactions::exec("UserQueries::deleteUser", [&](pqxx::work& txn) {
             txn.exec("DELETE FROM users WHERE email = " + txn.quote(email));
+        });
+    }
+
+    void UserQueries::addRefreshToken(const std::shared_ptr<vh::auth::RefreshToken>& token) {
+        vh::database::Transactions::exec("UserQueries::addRefreshToken", [&](pqxx::work& txn) {
+            txn.exec("INSERT INTO refresh_tokens (jti, user_id, token_hash, ip_address, user_agent) VALUES (" +
+                     txn.quote(token->getJti()) + ", " +
+                     txn.quote(token->getUserId()) + ", " +
+                     txn.quote(token->getHashedToken()) + ", " +
+                     txn.quote(token->getIpAddress()) + ", " +
+                     txn.quote(token->getUserAgent()) + ")");
+        });
+    }
+
+    void UserQueries::removeRefreshToken(const std::string& jti) {
+        vh::database::Transactions::exec("UserQueries::removeRefreshToken", [&](pqxx::work& txn) {
+            txn.exec("DELETE FROM refresh_tokens WHERE jti = " + txn.quote(jti));
+        });
+    }
+
+    std::shared_ptr<vh::auth::RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
+        return vh::database::Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<vh::auth::RefreshToken> {
+            pqxx::result res = txn.exec("SELECT "
+                                        "jti, user_id, token_hash, "
+                                        "extract(epoch from created_at)::bigint AS created_at, "
+                                        "extract(epoch from expires_at)::bigint AS expires_at, "
+                                        "extract(epoch from last_used)::bigint AS last_used, "
+                                        "ip_address, user_agent, revoked "
+                                        "FROM refresh_tokens WHERE jti = " + txn.quote(jti));
+            if (res.empty()) return nullptr; // No token found
+            return std::make_shared<vh::auth::RefreshToken>(res[0]);
+        });
+    }
+
+    std::vector<std::shared_ptr<vh::auth::RefreshToken>> UserQueries::listRefreshTokens(unsigned int userId) {
+        return vh::database::Transactions::exec("UserQueries::listRefreshTokens", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<vh::auth::RefreshToken>> {
+            pqxx::result res = txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " + txn.quote(userId));
+            std::vector<std::shared_ptr<vh::auth::RefreshToken>> tokens;
+            for (const auto& row : res) {
+                tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
+            }
+            return tokens;
+        });
+    }
+
+    void UserQueries::revokeAllRefreshTokens(unsigned int userId) {
+        vh::database::Transactions::exec("UserQueries::revokeAllRefreshTokens", [&](pqxx::work& txn) {
+            txn.exec("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = " + txn.quote(userId));
+        });
+    }
+
+    std::shared_ptr<vh::types::User> UserQueries::getUserByRefreshToken(const std::string& jti) {
+        return vh::database::Transactions::exec("UserQueries::getUserByRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
+            pqxx::result res = txn.exec("SELECT u.* FROM users u "
+                                         "JOIN refresh_tokens rt ON u.id = rt.user_id "
+                                         "WHERE rt.jti = " + txn.quote(jti));
+            if (res.empty()) return nullptr; // No user found
+            return std::make_shared<vh::types::User>(res[0]);
         });
     }
 }

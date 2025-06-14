@@ -35,7 +35,8 @@ protected:
 };
 
 TEST_F(AuthManagerTest, RegisterUser_Success) {
-    auto user = authManager_->registerUser("Cooper Test", "cooper.test@example.com", "fjeljws@1884");
+    auto client = authManager_->registerUser("Cooper Test", "cooper.test@example.com", "fjeljws@1884");
+    auto user = client->getUser();
 
     ASSERT_NE(user, nullptr);
     EXPECT_EQ(user->name, "Cooper Test");

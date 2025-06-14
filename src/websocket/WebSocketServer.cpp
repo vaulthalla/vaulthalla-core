@@ -45,7 +45,8 @@ namespace vh::websocket {
             std::cout << "[WebSocketServer] Accepted new connection.\n";
 
             // Launch WebSocketSession
-            std::make_shared<WebSocketSession>(std::move(socket_), router_, broadcastManager_)->run();
+            auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_);
+            session->accept(std::move(socket_));  // your new method to handle request parsing and upgrade
         }
 
         // Accept next connection

@@ -6,14 +6,19 @@ namespace vh::auth {
     Client::Client() = default;
 
     Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
+                   const std::shared_ptr<RefreshToken>& refreshToken,
                    const std::shared_ptr<vh::types::User>& user)
-            : user_(user), session_(session), refreshToken_(AuthManager::createRefreshToken(session_)) {}
+            : user_(user), session_(session), refreshToken_(refreshToken) {}
 
     std::shared_ptr<vh::types::User> Client::getUser() const { return user_; }
     std::shared_ptr<Token> Client::getToken() const { return token_; }
     std::shared_ptr<vh::websocket::WebSocketSession> Client::getSession() const { return session_; }
 
     void Client::setUser(const std::shared_ptr<vh::types::User>& user) {
+        if (!user) {
+            std::cerr << "[Client] Cannot set user: user is null.\n";
+            return;
+        }
         user_ = user;
         token_ = std::make_shared<Token>(generateToken(user->email), user->id);
         session_->setAuthenticatedUser(user_);

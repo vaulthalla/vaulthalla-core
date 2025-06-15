@@ -62,7 +62,6 @@ namespace vh::websocket {
         std::string getClientIp() const;
         std::string getUserAgent() const;
         std::string getRefreshToken() const;
-        std::string getRefreshTokenFromCookie() const;
 
     private:
         std::shared_ptr<vh::auth::AuthManager> authManager_;

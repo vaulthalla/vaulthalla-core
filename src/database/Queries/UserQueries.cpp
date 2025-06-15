@@ -8,17 +8,7 @@
 namespace vh::database {
     std::shared_ptr<vh::types::User> UserQueries::getUserByEmail(const std::string& email) {
         return vh::database::Transactions::exec("UserQueries::getUserByEmail", [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
-            pqxx::result res = txn.exec(R"(
-    SELECT
-        id,
-        name,
-        email,
-        password_hash,
-        extract(epoch from created_at)::bigint AS created_at,
-        extract(epoch from last_login)::bigint AS last_login,
-        is_active
-    FROM users
-    WHERE email = )" + txn.quote(email));
+            pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE email = )" + txn.quote(email));
 
             if (res.empty()) throw std::runtime_error("User not found: " + email);
             return std::make_shared<vh::types::User>(res[0]);
@@ -74,13 +64,7 @@ namespace vh::database {
 
     std::shared_ptr<vh::auth::RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
         return vh::database::Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<vh::auth::RefreshToken> {
-            pqxx::result res = txn.exec("SELECT "
-                                        "jti, user_id, token_hash, "
-                                        "extract(epoch from created_at)::bigint AS created_at, "
-                                        "extract(epoch from expires_at)::bigint AS expires_at, "
-                                        "extract(epoch from last_used)::bigint AS last_used, "
-                                        "ip_address, user_agent, revoked "
-                                        "FROM refresh_tokens WHERE jti = " + txn.quote(jti));
+            pqxx::result res = txn.exec("SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
             if (res.empty()) return nullptr; // No token found
             return std::make_shared<vh::auth::RefreshToken>(res[0]);
         });
@@ -100,6 +84,44 @@ namespace vh::database {
     void UserQueries::revokeAllRefreshTokens(unsigned int userId) {
         vh::database::Transactions::exec("UserQueries::revokeAllRefreshTokens", [&](pqxx::work& txn) {
             txn.exec("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = " + txn.quote(userId));
+        });
+    }
+
+    void UserQueries::revokeAndPurgeRefreshTokens(unsigned int userId) {
+        vh::database::Transactions::exec("UserQueries::revokeAndPurgeRefreshTokens", [&](pqxx::work& txn) {
+            // 1. Revoke the most recent unrevoked token
+            txn.exec(R"SQL(
+            UPDATE refresh_tokens
+            SET revoked = TRUE
+            WHERE jti = (
+                SELECT jti FROM refresh_tokens
+                WHERE user_id = )SQL" + txn.quote(userId) + R"SQL(
+                  AND revoked = FALSE
+                ORDER BY created_at DESC
+                LIMIT 1
+            )
+        )SQL");
+
+            // 2. Delete tokens older than 7 days (clean out true old shit)
+            txn.exec(R"SQL(
+            DELETE FROM refresh_tokens
+            WHERE user_id = )SQL" + txn.quote(userId) + R"SQL(
+              AND created_at < now() - INTERVAL '7 days'
+        )SQL");
+
+            // 3. Keep only the 5 most recent tokens < 7 days, delete the rest
+            txn.exec(R"SQL(
+            DELETE FROM refresh_tokens
+            WHERE user_id = )SQL" + txn.quote(userId) + R"SQL(
+              AND created_at >= now() - INTERVAL '7 days'
+              AND jti NOT IN (
+                  SELECT jti FROM refresh_tokens
+                  WHERE user_id = )SQL" + txn.quote(userId) + R"SQL(
+                    AND created_at >= now() - INTERVAL '7 days'
+                  ORDER BY created_at DESC
+                  LIMIT 5
+              )
+        )SQL");
         });
     }
 

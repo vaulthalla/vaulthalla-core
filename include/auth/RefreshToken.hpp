@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "util/timestamp.hpp"
+
 namespace vh::auth {
     class RefreshToken {
     public:
@@ -28,9 +30,9 @@ namespace vh::auth {
               userAgent_(row["user_agent"].as<std::string>()),
               ipAddress_(row["ip_address"].as<std::string>()),
               userId_(row["user_id"].as<unsigned int>()),
-              expiresAt_(row["expires_at"].as<std::time_t>()),
-              createdAt_(row["created_at"].as<std::time_t>()),
-              lastUsed_(row["last_used"].as<std::time_t>()),
+              expiresAt_(vh::util::parsePostgresTimestamp(row["expires_at"].as<std::string>())),
+              createdAt_(vh::util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+              lastUsed_(vh::util::parsePostgresTimestamp(row["last_used"].as<std::string>())),
               revoked_(row["revoked"].as<bool>()) {}
 
         [[nodiscard]] const std::string& getJti() const { return jti_; }
@@ -49,7 +51,8 @@ namespace vh::auth {
         void setIpAddress(const std::string& ipAddress) { ipAddress_ = ipAddress; }
 
     private:
-        std::string jti_, hashedToken_, userAgent_, ipAddress_;
+        const std::string jti_, hashedToken_;
+        std::string userAgent_, ipAddress_;
         unsigned int userId_;
         std::time_t expiresAt_, createdAt_, lastUsed_;
         bool revoked_;

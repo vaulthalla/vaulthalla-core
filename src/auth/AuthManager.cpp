@@ -3,6 +3,7 @@
 #include "types/User.hpp"
 #include "database/queries/UserQueries.hpp"
 #include "crypto/PasswordUtils.hpp"
+#include "storage/StorageManager.hpp"
 #include "auth/SessionManager.hpp"
 
 #include <sodium.h>
@@ -15,8 +16,9 @@
 
 namespace vh::auth {
 
-    AuthManager::AuthManager()
-            : sessionManager_(std::make_shared<SessionManager>()) {
+    AuthManager::AuthManager(const std::shared_ptr<vh::storage::StorageManager>& storageManager)
+            : sessionManager_(std::make_shared<SessionManager>()),
+              storageManager_(storageManager) {
         if (sodium_init() < 0)
             throw std::runtime_error("libsodium initialization failed in AuthManager");
     }
@@ -47,7 +49,7 @@ namespace vh::auth {
     std::shared_ptr<Client> AuthManager::registerUser(const std::string& username,
                                                       const std::string& email,
                                                       const std::string& password,
-                                                      const std::string& refreshToken) {
+                                                      const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
         if (users_.count(username) > 0)
             throw std::runtime_error("User already exists: " + username);
 
@@ -57,17 +59,21 @@ namespace vh::auth {
         vh::database::UserQueries::createUser(username, email, hashedPassword);
 
         const auto user = findUser(email);
-        auto client = sessionManager_->getClientSession(refreshToken);
+        auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
 
         sessionManager_->promoteSession(client);
+
+        storageManager_->initUserStorage(user);
+
+        if (!user) throw std::runtime_error("Failed to create user: " + username);
 
         std::cout << "[AuthManager] Registered new user: " << username << "\n";
         return client;
     }
 
     std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const std::string& password,
-                                                   const std::string& refreshToken) {
+                                                   const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
         try {
             auto user = findUser(email);
             if (!user) throw std::runtime_error("User not found: " + email);
@@ -76,7 +82,7 @@ namespace vh::auth {
                 throw std::runtime_error("Invalid password for user: " + email);
 
             vh::database::UserQueries::revokeAllRefreshTokens(user->id);
-            auto client = sessionManager_->getClientSession(refreshToken);
+            auto client = sessionManager_->getClientSession(session->getUUID());
             client->setUser(user);
 
             sessionManager_->promoteSession(client);
@@ -97,7 +103,7 @@ namespace vh::auth {
 
             const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
                     .allow_algorithm(jwt::algorithm::hs256{std::getenv("VAULTHALLA_JWT_REFRESH_SECRET")})
-                    .with_issuer("") // Optional if you're not setting `iss`
+                    .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
             ;
 
             verifier.verify(decoded);
@@ -113,12 +119,13 @@ namespace vh::auth {
             // 3. Lookup refresh token by jti
             auto storedToken = vh::database::UserQueries::getRefreshToken(tokenJti);
             if (!storedToken)
-                throw std::runtime_error("Refresh token not found");
+                throw std::runtime_error("Refresh token not found for JTI: " + tokenJti);
 
             if (storedToken->isRevoked())
                 throw std::runtime_error("Refresh token has been revoked");
 
             auto now = std::chrono::system_clock::now();
+
             if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now)
                 throw std::runtime_error("Refresh token has expired");
 
@@ -127,7 +134,7 @@ namespace vh::auth {
                 throw std::runtime_error("Refresh token hash mismatch");
 
             auto user = vh::database::UserQueries::getUserByRefreshToken(tokenJti);
-            auto client = std::make_shared<Client>(session);
+            auto client = std::make_shared<Client>(session, storedToken, user);
             sessionManager_->createSession(client);
             return client;
 
@@ -217,25 +224,28 @@ namespace vh::auth {
         return {uuidStr};
     }
 
-    std::shared_ptr<RefreshToken> AuthManager::createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+    std::pair<std::string, std::shared_ptr<RefreshToken>> AuthManager::createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
         auto now = std::chrono::system_clock::now();
         auto exp = now + std::chrono::hours(24 * 7); // 7 days
         std::string jti = generateUUID();
 
         std::string token = jwt::create<jwt::traits::nlohmann_json>()
+                .set_issuer("Vaulthalla")
                 .set_subject(session->getClientIp() + ":" + session->getUserAgent())
                 .set_issued_at(now)
                 .set_expires_at(exp)
                 .set_id(jti)
                 .sign(jwt::algorithm::hs256{std::getenv("VAULTHALLA_JWT_REFRESH_SECRET")});
 
-        return std::make_shared<RefreshToken>(
-                jti,
-                vh::crypto::hashPassword(token), // Store hashed token
-                0, // User ID will be set later
-                session->getUserAgent(),
-                session->getClientIp()
-        );
+        return std::pair<std::string, std::shared_ptr<RefreshToken>>(
+                token,
+                std::make_shared<RefreshToken>(
+                        jti,
+                        vh::crypto::hashPassword(token), // Store hashed token
+                        0, // User ID will be set later
+                        session->getUserAgent(),
+                        session->getClientIp()
+        ));
     }
 
 } // namespace vh::auth

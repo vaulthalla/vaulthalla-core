@@ -28,6 +28,7 @@ namespace vh::database {
         static std::shared_ptr<vh::auth::RefreshToken> getRefreshToken(const std::string& jti);
         static std::vector<std::shared_ptr<vh::auth::RefreshToken>> listRefreshTokens(unsigned int userId);
         static void revokeAllRefreshTokens(unsigned int userId);
+        static void revokeAndPurgeRefreshTokens(unsigned int userId);
         static std::shared_ptr<vh::types::User> getUserByRefreshToken(const std::string& jti);
     };
 }

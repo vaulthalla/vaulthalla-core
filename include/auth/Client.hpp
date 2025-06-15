@@ -19,8 +19,9 @@ namespace vh::auth {
     public:
         Client();
 
-        explicit Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
-                        const std::shared_ptr<vh::types::User>& user = nullptr);
+        Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
+               const std::shared_ptr<RefreshToken>& refreshToken,
+               const std::shared_ptr<vh::types::User>& user = nullptr);
 
         [[nodiscard]] std::shared_ptr<vh::types::User> getUser() const;
         [[nodiscard]] std::shared_ptr<Token> getToken() const;

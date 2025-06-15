@@ -10,13 +10,13 @@ namespace vh::database {
     struct VaultQueries {
         VaultQueries() = default;
 
-        static void addVault(const vh::types::Vault& vault);
-        static void removeVault(unsigned int backendId);
-        static std::vector<std::unique_ptr<types::Vault>> listVaults();
+        static unsigned int addVault(const std::shared_ptr<vh::types::Vault>& vault);
+        static void removeVault(unsigned int vaultId);
+        static std::vector<std::shared_ptr<types::Vault>> listVaults();
 
         template<class T = vh::types::Vault>
-        static std::unique_ptr<T> getVault(unsigned int vaultID) {
-            return Transactions::exec("VaultQueries::getVault", [&](pqxx::work& txn) -> std::unique_ptr<T> {
+        static std::shared_ptr<T> getVault(unsigned int vaultID) {
+            return Transactions::exec("VaultQueries::getVault", [&](pqxx::work& txn) -> std::shared_ptr<T> {
                 pqxx::result res = txn.exec("SELECT * FROM vaults WHERE id = " + txn.quote(vaultID));
                 if (res.empty()) throw std::runtime_error("No vault found with ID: " + std::to_string(vaultID));
 
@@ -27,12 +27,12 @@ namespace vh::database {
                     case vh::types::VaultType::Local: {
                         pqxx::result localRes = txn.exec("SELECT * FROM local_disk_vaults WHERE vault_id = " + txn.quote(vaultID));
                         if (localRes.empty()) throw std::runtime_error("No LocalDiskVault data found for vault ID: " + std::to_string(vaultID));
-                        return std::make_unique<vh::types::LocalDiskVault>(localRes[0]);
+                        return std::make_shared<vh::types::LocalDiskVault>(localRes[0]);
                     }
                     case vh::types::VaultType::S3: {
                         pqxx::result s3Res = txn.exec("SELECT * FROM s3_vaults WHERE vault_id = " + txn.quote(vaultID));
                         if (s3Res.empty()) throw std::runtime_error("No S3Vault data found for vault ID: " + std::to_string(vaultID));
-                        return std::make_unique<vh::types::S3Vault>(s3Res[0]);
+                        return std::make_shared<vh::types::S3Vault>(s3Res[0]);
                     }
                     default:
                         throw std::runtime_error("Unsupported VaultType in getVault()");

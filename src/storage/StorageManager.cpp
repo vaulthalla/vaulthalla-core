@@ -1,5 +1,9 @@
 #include "storage/StorageManager.hpp"
 #include "database/Queries/VaultQueries.hpp"
+#include "storage/LocalDiskStorageEngine.hpp"
+#include "types/Vault.hpp"
+#include "types/User.hpp"
+#include "types/StorageVolume.hpp"
 
 #include <stdexcept>
 #include <iostream>
@@ -10,15 +14,54 @@ namespace vh::storage {
 
     void StorageManager::initStorageEngines() {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        for (auto& vault : vh::database::VaultQueries::listVaults())
-            vaults_[vault->id] = std::move(vault);
+        try {
+            for (auto& vault : vh::database::VaultQueries::listVaults())
+                vaults_[vault->id] = std::move(vault);
+        } catch (const std::exception& e) {
+            std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << "\n";
+            throw;
+        }
     }
 
-    void StorageManager::addVault(std::unique_ptr<vh::types::Vault>&& vault) {
+    void StorageManager::initUserStorage(const std::shared_ptr<vh::types::User>& user) {
+        try {
+            std::lock_guard<std::mutex> lock(mountsMutex_);
+            std::cout << "[StorageManager] Initializing storage for user: " << user->email << "\n";
+
+            if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
+
+            std::shared_ptr<vh::types::Vault> vault = std::make_shared<vh::types::LocalDiskVault>(user->email,
+                                                                                                  std::filesystem::path(std::getenv("VAULTHALLA_ROOT_DIR")) / "users" / user->email);
+
+            vault->id = vh::database::VaultQueries::addVault(vault);
+            vault = vh::database::VaultQueries::getVault(vault->id);
+
+            if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->email);
+
+            vaults_[vault->id] = std::move(vault);
+
+            auto volume = std::make_shared<vh::types::StorageVolume>(vault->id,
+                                                                     user->name + " Default Volume",
+                                                                     std::filesystem::path(user->email + "_default_volume"));
+            vh::database::VaultQueries::addVolume(user->id, volume);
+            volume = getVolume(volume->id, user->id);
+
+            if (!volume) throw std::runtime_error("Failed to initialize user storage: Volume not found after creation");
+
+            mountVolume(volume);
+
+            std::cout << "[StorageManager] Initialized storage for user: " << user->email << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[StorageManager] Error initializing user storage: " << e.what() << "\n";
+            throw;
+        }
+    }
+
+    void StorageManager::addVault(std::shared_ptr<vh::types::Vault>&& vault) {
         if (!vault) throw std::invalid_argument("Vault cannot be null");
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
-        vh::database::VaultQueries::addVault(*vault);
+        vh::database::VaultQueries::addVault(vault);
         vault = vh::database::VaultQueries::getVault(vault->id);
         vaults_[vault->id] = std::move(vault);
     }
@@ -32,14 +75,14 @@ namespace vh::storage {
         std::cout << "[StorageManager] Removed vault with ID: " << vaultId << "\n";
     }
 
-    std::vector<std::unique_ptr<vh::types::Vault>> StorageManager::listVaults() const {
+    std::vector<std::shared_ptr<vh::types::Vault>> StorageManager::listVaults() const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
         return vh::database::VaultQueries::listVaults();
     }
 
-    std::unique_ptr<vh::types::Vault> StorageManager::getVault(unsigned int vaultId) const {
+    std::shared_ptr<vh::types::Vault> StorageManager::getVault(unsigned int vaultId) const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        if (vaults_.find(vaultId) != vaults_.end()) return std::make_unique<vh::types::Vault>(*vaults_.at(vaultId));
+        if (vaults_.find(vaultId) != vaults_.end()) return std::make_shared<vh::types::Vault>(*vaults_.at(vaultId));
         return vh::database::VaultQueries::getVault(vaultId);
     }
 

@@ -11,6 +11,10 @@
 #include <mutex>
 #include <string>
 
+namespace vh::types {
+    class User;
+}
+
 namespace vh::storage {
 
     class StorageManager {
@@ -19,11 +23,12 @@ namespace vh::storage {
 
         void initStorageEngines();
 
-        void mountVault(std::unique_ptr<vh::types::Vault>&& vault);
-        void addVault(std::unique_ptr<vh::types::Vault>&& vault);
+        void initUserStorage(const std::shared_ptr<vh::types::User>& user);
+        void mountVault(std::shared_ptr<vh::types::Vault>&& vault);
+        void addVault(std::shared_ptr<vh::types::Vault>&& vault);
         void removeVault(unsigned int vaultId);
-        std::vector<std::unique_ptr<vh::types::Vault>> listVaults() const;
-        std::unique_ptr<vh::types::Vault> getVault(unsigned int vaultId) const;
+        std::vector<std::shared_ptr<vh::types::Vault>> listVaults() const;
+        std::shared_ptr<vh::types::Vault> getVault(unsigned int vaultId) const;
 
         void mountVolume(const std::shared_ptr<vh::types::StorageVolume>& volume);
         void addVolume(const std::shared_ptr<vh::types::StorageVolume>& volume, unsigned int userId);
@@ -39,7 +44,7 @@ namespace vh::storage {
 
     private:
         mutable std::mutex mountsMutex_;
-        std::unordered_map<unsigned int, std::unique_ptr<vh::types::Vault>> vaults_;
+        std::unordered_map<unsigned int, std::shared_ptr<vh::types::Vault>> vaults_;
         std::unordered_map<unsigned int, std::shared_ptr<LocalDiskStorageEngine>> localEngines_;
         std::unordered_map<unsigned int, std::shared_ptr<CloudStorageEngine>> cloudEngines_;
     };

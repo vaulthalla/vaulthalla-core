@@ -2,23 +2,21 @@
 #include "types/Vault.hpp"
 
 namespace vh::database {
-    void VaultQueries::addVault(const types::Vault& vault) {
-        Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-            pqxx::result res = txn.exec("INSERT INTO vaults (name, type, is_active, created_at) VALUES ("
-                     + txn.quote(vault.name) + ", "
-                     + txn.quote(static_cast<int>(vault.type)) + ", "
-                     + txn.quote(vault.is_active) + ", "
-                     + txn.quote(vault.created_at) + ") RETURNING id");
+    unsigned int VaultQueries::addVault(const std::shared_ptr<vh::types::Vault>& vault) {
+        return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("INSERT INTO vaults (name, type) VALUES ("
+                     + txn.quote(vault->name) + ", "
+                     + txn.quote(vh::types::to_string(vault->type)) + ") RETURNING id");
 
+            if (res.empty()) throw std::runtime_error("Failed to insert vault into database");
             auto vaultId = res[0][0].as<unsigned int>();
 
             // dynamic cast
-            if (auto* localVault = dynamic_cast<const vh::types::LocalDiskVault*>(&vault)) {
-                txn.exec("INSERT INTO local_disk_vaults (vault_id, storage_backend_id, mount_point) VALUES ("
+            if (auto* localVault = dynamic_cast<const vh::types::LocalDiskVault*>(&*vault)) {
+                txn.exec("INSERT INTO local_disk_vaults (vault_id, mount_point) VALUES ("
                          + txn.quote(vaultId) + ", "
-                         + txn.quote(localVault->storage_backend_id) + ", "
                          + txn.quote(localVault->mount_point.string()) + ")");
-            } else if (auto* s3Vault = dynamic_cast<const vh::types::S3Vault*>(&vault)) {
+            } else if (auto* s3Vault = dynamic_cast<const vh::types::S3Vault*>(&*vault)) {
                 txn.exec("INSERT INTO s3_vaults (vault_id, api_key_id, bucket) VALUES ("
                          + txn.quote(vaultId) + ", "
                          + txn.quote(s3Vault->api_key_id) + ", "
@@ -26,6 +24,8 @@ namespace vh::database {
             }
 
             txn.commit();
+
+            return vaultId;
         });
     }
 
@@ -36,25 +36,28 @@ namespace vh::database {
         });
     }
 
-    std::vector<std::unique_ptr<types::Vault>> VaultQueries::listVaults() {
+    std::vector<std::shared_ptr<vh::types::Vault>> VaultQueries::listVaults() {
         return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
-            pqxx::result res = txn.exec("SELECT * FROM vaults");
-            std::vector<std::unique_ptr<types::Vault>> vaults;
+            pqxx::result res = txn.exec(R"SQL(
+            SELECT *
+            FROM vaults
+            LEFT JOIN local_disk_vaults ON local_disk_vaults.vault_id = vaults.id
+            LEFT JOIN s3_vaults         ON s3_vaults.vault_id = vaults.id
+        )SQL");
+
+            std::vector<std::shared_ptr<vh::types::Vault>> vaults;
 
             for (const auto& row : res) {
-                types::Vault baseVault(row);
+                auto typeStr = row["type"].as<std::string>();
+                auto type = vh::types::from_string(typeStr);
 
-                switch (baseVault.type) {
-                    case types::VaultType::Local: {
-                        pqxx::result localRes = txn.exec("SELECT * FROM local_disk_vaults WHERE vault_id = " + txn.quote(baseVault.id));
-                        if (localRes.empty()) throw std::runtime_error("No LocalDiskVault data for vault ID: " + std::to_string(baseVault.id));
-                        vaults.push_back(std::make_unique<types::LocalDiskVault>(localRes[0]));
+                switch (type) {
+                    case vh::types::VaultType::Local: {
+                        vaults.push_back(std::make_shared<vh::types::LocalDiskVault>(row));
                         break;
                     }
-                    case types::VaultType::S3: {
-                        pqxx::result s3Res = txn.exec("SELECT * FROM s3_vaults WHERE vault_id = " + txn.quote(baseVault.id));
-                        if (s3Res.empty()) throw std::runtime_error("No S3Vault data for vault ID: " + std::to_string(baseVault.id));
-                        vaults.push_back(std::make_unique<types::S3Vault>(s3Res[0]));
+                    case vh::types::VaultType::S3: {
+                        vaults.push_back(std::make_shared<vh::types::S3Vault>(row));
                         break;
                     }
                     default:
@@ -86,7 +89,7 @@ namespace vh::database {
                 "RETURNING id"
             );
 
-            unsigned int volumeId = res[0][0].as<unsigned int>();
+            auto volumeId = res[0][0].as<unsigned int>();
             txn.exec("INSERT INTO user_storage_volumes (user_id, storage_volume_id) VALUES ("
                      + txn.quote(userID) + ", "
                      + txn.quote(volumeId) + ")");

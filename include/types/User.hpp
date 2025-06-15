@@ -7,6 +7,8 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 
+#include "util/timestamp.hpp"
+
 namespace vh::types {
     struct User {
         unsigned short id;
@@ -22,8 +24,8 @@ namespace vh::types {
               name(row["name"].as<std::string>()),
               email(row["email"].as<std::string>()),
               password_hash(row["password_hash"].as<std::string>()),
-              created_at(row["created_at"].as<std::time_t>()),
-              last_login(row["last_login"].as<std::time_t>()),
+              created_at(vh::util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+              last_login(row["last_login"].is_null() ? std::nullopt : std::make_optional(vh::util::parsePostgresTimestamp(row["last_login"].as<std::string>()))),
               is_active(row["is_active"].as<bool>()) {}
 
         void setPasswordHash(const std::string& hash) { password_hash = hash; }

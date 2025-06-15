@@ -2,10 +2,10 @@
 
 namespace vh::services {
     ServiceManager::ServiceManager()
-        : authManager_(std::make_shared<vh::auth::AuthManager>()),
+        : storageManager_(std::make_shared<vh::storage::StorageManager>()),
+          authManager_(std::make_shared<vh::auth::AuthManager>(storageManager_)),
           fsManager_(std::make_shared<vh::core::FSManager>()),
           searchIndex_(std::make_shared<vh::index::SearchIndex>()),
-          storageManager_(std::make_shared<vh::storage::StorageManager>()),
           accessControl_(std::make_shared<vh::security::AccessControl>()),
           linkResolver_(std::make_shared<vh::share::LinkResolver>()) {}
 

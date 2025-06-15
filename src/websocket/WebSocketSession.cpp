@@ -26,7 +26,19 @@ namespace {
 
 namespace vh::websocket {
 
-// ──────────────────────────────────────────────────────────────────────────────
+    std::string extractCookie(const boost::beast::http::request<boost::beast::http::string_body>& req, const std::string& key) {
+        if (auto it = req.find(boost::beast::http::field::cookie); it != req.end()) {
+            const std::string cookieHeader = it->value();
+            std::regex cookieRegex(key + "=([^;]+)");
+            std::smatch match;
+            if (std::regex_search(cookieHeader, match, cookieRegex)) {
+                return match[1];
+            }
+        }
+        return "";
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────────
 // ‑‑ construction & destruction
 // ──────────────────────────────────────────────────────────────────────────────
     WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>&          router,
@@ -62,16 +74,6 @@ namespace vh::websocket {
 
     std::string WebSocketSession::getRefreshToken() const { return refreshToken_; }
 
-    std::string WebSocketSession::getRefreshTokenFromCookie() const {
-        const auto it = handshakeRequest_.find(http::field::cookie);
-        if (it == handshakeRequest_.end()) return {};
-
-        static const std::regex rgx{"refreshToken=([^;\s]+)"};
-        std::smatch        m;
-        const std::string header = it->value();
-        return std::regex_search(header, m, rgx) && m.size() > 1 ? m[1].str() : "";
-    }
-
 // ──────────────────────────────────────────────────────────────────────────────
 // ‑‑ session life‑cycle
 // ──────────────────────────────────────────────────────────────────────────────
@@ -80,51 +82,70 @@ namespace vh::websocket {
         strand_ = asio::make_strand(ws_->get_executor());
 
         auto self   = shared_from_this();
-        auto client = std::make_shared<auth::Client>(self);
-        authManager_->sessionManager()->createSession(client);
-        setRefreshTokenCookie(client->getHashedRefreshToken());
-
         auto req = std::make_shared<http::request<http::string_body>>();
+
         http::async_read(ws_->next_layer(), tmpBuffer_, *req,
-                         asio::bind_executor(strand_,
-                                             [self, req](beast::error_code ec, std::size_t) {
-                                                 if (ec) {
-                                                     std::cerr << "[Session] Handshake read error: " << ec.message() << '\n';
-                                                     return;
-                                                 }
+                         asio::bind_executor(strand_, [self, req](beast::error_code ec, std::size_t) {
+                             if (ec) {
+                                 std::cerr << "[Session] Handshake read error: " << ec.message() << '\n';
+                                 return;
+                             }
 
-                                                 // capture request metadata
-                                                 self->ipAddress_  = self->ws_->next_layer().remote_endpoint().address().to_string();
-                                                 self->userAgent_  = (*req)[http::field::user_agent];
-                                                 self->handshakeRequest_ = *req;
+                             // Extract headers
+                             self->ipAddress_ = self->ws_->next_layer().remote_endpoint().address().to_string();
+                             self->userAgent_ = (*req)[http::field::user_agent];
+                             self->handshakeRequest_ = *req;
 
-                                                 if (const auto authHeader = req->find(http::field::authorization); authHeader != req->end())
-                                                     self->refreshToken_ = (*req)[http::field::authorization];
+                             self->refreshToken_ = extractCookie(*req, "refresh");
 
-                                                 // decorate the handshake response (cookie etc.)
-                                                 const auto refreshTokenCopy = self->refreshToken_;
-                                                 self->ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
-                                                 self->ws_->set_option(websocket::stream_base::decorator(
-                                                         [refreshTokenCopy](websocket::response_type& res) {
-                                                             res.set(http::field::server, "Vaulthalla");
-                                                             res.set(http::field::set_cookie,
-                                                                     "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800");
-                                                         }));
+                             if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies\n";
+                             else std::cout << "[Session] No refresh token found in Cookie header\n";
 
-                                                 self->ws_->async_accept(*req, asio::bind_executor(self->strand_,
-                                                                                                   [self](beast::error_code ec) {
-                                                                                                       if (ec) {
-                                                                                                           std::cerr << "[Session] WebSocket accept error: " << ec.message() << '\n';
-                                                                                                           return;
-                                                                                                       }
+                             std::shared_ptr<auth::Client> client;
 
-                                                                                                       if (self->broadcastManager_) self->broadcastManager_->registerSession(self);
-                                                                                                       self->isRegistered_ = true;
+                             if (!self->refreshToken_.empty()) {
+                                 std::cout << "[Session] Attempting token rehydration...\n";
+                                 auto validatedClient = self->authManager_->validateRefreshToken(self->refreshToken_, self);
+                                 if (validatedClient) {
+                                     client = validatedClient;
+                                     std::cout << "[Session] Rehydrated session from provided token.\n";
+                                 } else {
+                                     std::cout << "[Session] Provided token was invalid or expired.\n";
+                                 }
+                             }
 
-                                                                                                       std::cout << "[Session] WS connected from " << self->ipAddress_ << " UA:" << self->userAgent_ << '\n';
-                                                                                                       self->doRead();
-                                                                                                   }));
-                                             }));
+                             if (!client) {
+                                 auto tokenPair = vh::auth::AuthManager::createRefreshToken(self);
+                                 client = std::make_shared<auth::Client>(self, tokenPair.second);
+                                 self->refreshToken_ = tokenPair.first;
+                             }
+
+                             self->authManager_->sessionManager()->createSession(client);
+
+                             // Set response headers
+                             const auto refreshTokenCopy = self->refreshToken_;
+                             self->ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
+                             self->ws_->set_option(websocket::stream_base::decorator(
+                                     [refreshTokenCopy](websocket::response_type& res) {
+                                         res.set(http::field::server, "Vaulthalla");
+                                         res.set(http::field::set_cookie,
+                                                 "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800");
+                                     }));
+
+                             self->ws_->async_accept(*req, asio::bind_executor(self->strand_,
+                                                                               [self](beast::error_code ec) {
+                                                                                   if (ec) {
+                                                                                       std::cerr << "[Session] WebSocket accept error: " << ec.message() << '\n';
+                                                                                       return;
+                                                                                   }
+
+                                                                                   if (self->broadcastManager_) self->broadcastManager_->registerSession(self);
+                                                                                   self->isRegistered_ = true;
+
+                                                                                   std::cout << "[Session] WS connected from " << self->ipAddress_ << " UA:" << self->userAgent_ << '\n';
+                                                                                   self->doRead();
+                                                                               }));
+                         }));
     }
 
     void WebSocketSession::close() {

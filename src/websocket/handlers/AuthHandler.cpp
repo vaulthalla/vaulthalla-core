@@ -2,6 +2,7 @@
 #include "websocket/WebSocketSession.hpp"
 #include "auth/AuthManager.hpp"
 #include "auth/Client.hpp"
+#include "database/Queries/UserQueries.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -18,7 +19,7 @@ namespace vh::websocket {
             std::string email = payload.at("email").get<std::string>();
             std::string password = payload.at("password").get<std::string>();
 
-            auto client = authManager_->loginUser(email, password, session.getRefreshToken());
+            auto client = authManager_->loginUser(email, password, session.shared_from_this());
             if (!client) throw std::runtime_error("Invalid email or password or user not found");
 
             auto user = client->getUser();
@@ -62,7 +63,7 @@ namespace vh::websocket {
             std::string email = payload.at("email").get<std::string>();
             std::string password = payload.at("password").get<std::string>();
 
-            auto client = authManager_->registerUser(name, email, password, session.getRefreshToken());
+            auto client = authManager_->registerUser(name, email, password, session.shared_from_this());
             auto user = client->getUser();
             std::string token = client->getRawToken();
 
@@ -100,9 +101,7 @@ namespace vh::websocket {
 
     void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) {
         try {
-            std::cout << "Refresh Token: " << session.getRefreshToken() << "\n";
-            std::cout << "Refresh Token from Cookie: " << session.getRefreshTokenFromCookie() << "\n";
-            auto client = authManager_->validateRefreshToken(session.getRefreshTokenFromCookie(),
+            auto client = authManager_->validateRefreshToken(session.getRefreshToken(),
                                                              session.shared_from_this());
 
             if (!client) throw std::runtime_error("Session not found");
@@ -140,9 +139,9 @@ namespace vh::websocket {
 
     void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) {
         try {
-            std::string token = msg.at("token").get<std::string>();
+            auto refreshToken = session.getRefreshToken();
 
-            sessionManager_->invalidateSession(token);
+            sessionManager_->invalidateSession(session.getUUID());
 
             // Clear bound user in WebSocketSession
             session.setAuthenticatedUser(nullptr);
@@ -155,7 +154,7 @@ namespace vh::websocket {
 
             session.send(response);
 
-            std::cout << "[AuthHandler] Session '" << token << "' logged out.\n";
+            std::cout << "[AuthHandler] Session '" << refreshToken << "' logged out.\n";
         } catch (const std::exception& e) {
             std::cerr << "[AuthHandler] handleLogout error: " << e.what() << "\n";
 

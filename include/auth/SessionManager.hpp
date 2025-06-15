@@ -29,4 +29,13 @@ namespace vh::auth {
         std::mutex sessionMutex_;
     };
 
+
+    inline std::string to_string(const std::unordered_map<std::string, std::shared_ptr<Client>>& sessions) {
+        std::string result;
+        for (const auto& [token, client] : sessions) {
+            result += "Token: " + token + "\n";
+        }
+        return result;
+    }
+
 } // namespace vh::auth

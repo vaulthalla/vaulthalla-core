@@ -26,10 +26,14 @@ namespace vh::auth {
     public:
         explicit AuthManager(const std::shared_ptr<vh::storage::StorageManager>& storageManager = nullptr);
 
+        void rehydrateOrCreateClient(const std::shared_ptr<vh::websocket::WebSocketSession>& session);
+
         std::shared_ptr<Client> registerUser(const std::string& username, const std::string& email, const std::string& password,
                                              const std::shared_ptr<vh::websocket::WebSocketSession>& session);
+
         std::shared_ptr<Client> loginUser(const std::string& email, const std::string& password,
                                           const std::shared_ptr<vh::websocket::WebSocketSession>& session);
+
         void changePassword(const std::string& username, const std::string& oldPassword, const std::string& newPassword);
         std::shared_ptr<vh::types::User> findUser(const std::string& email);
         [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;

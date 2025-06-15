@@ -5,6 +5,8 @@
 #include "crypto/PasswordUtils.hpp"
 #include "storage/StorageManager.hpp"
 #include "auth/SessionManager.hpp"
+#include "auth/Client.hpp"
+#include "websocket/WebSocketSession.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -22,6 +24,29 @@ namespace vh::auth {
         if (sodium_init() < 0)
             throw std::runtime_error("libsodium initialization failed in AuthManager");
     }
+
+    void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+        std::shared_ptr<auth::Client> client;
+
+        if (!session->getRefreshToken().empty()) {
+            std::cout << "[Session] Attempting token rehydration...\n";
+            auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
+            if (!validatedClient) std::cout << "[Session] Provided token was invalid or expired.\n";
+            else {
+                client = validatedClient;
+                std::cout << "[Session] Rehydrated session from provided token.\n";
+            }
+        }
+
+        if (!client) {
+            auto tokenPair = vh::auth::AuthManager::createRefreshToken(session);
+            client = std::make_shared<auth::Client>(session, tokenPair.second);
+            session->setRefreshTokenCookie(tokenPair.first);
+        }
+
+        sessionManager_->createSession(client);
+    }
+
 
     bool AuthManager::validateToken(const std::string& token) {
         try {

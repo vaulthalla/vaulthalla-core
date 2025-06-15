@@ -19,11 +19,11 @@ namespace vh::websocket {
             std::cout << "[Router] Routing message: " << msg.dump() << "\n";
 
             std::string command = msg.at("command").get<std::string>();
+            std::string accessToken = msg.value("token", "");
 
             if (!command.starts_with("auth")) {
-                auto token = msg.value("token", "");
-                auto client = sessionManager_->getClientSession(token);
-                if (!client || !client->isAuthenticated()) {
+                auto client = sessionManager_->getClientSession(session.getUUID());
+                if (!client || !client->validateToken(accessToken)) {
                     std::cerr << "[Router] Unauthorized access attempt with command: " << command << "\n";
                     json errorResponse = {
                         {"command", "error"},

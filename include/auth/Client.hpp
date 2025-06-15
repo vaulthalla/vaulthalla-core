@@ -45,7 +45,7 @@ namespace vh::auth {
         [[nodiscard]] const std::shared_ptr<RefreshToken>& getRefreshToken() const { return refreshToken_; }
         [[nodiscard]] std::string getHashedRefreshToken() const { return refreshToken_->getHashedToken(); }
 
-        bool validateToken(const std::string& token);
+        bool validateToken(const std::string& token) const;
 
         void sendControlMessage(const std::string& type, const nlohmann::json& payload);
 

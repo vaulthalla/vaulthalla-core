@@ -8,7 +8,15 @@ namespace vh::auth {
     Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
                    const std::shared_ptr<RefreshToken>& refreshToken,
                    const std::shared_ptr<vh::types::User>& user)
-            : user_(user), session_(session), refreshToken_(refreshToken) {}
+            : user_(user), session_(session), refreshToken_(refreshToken) {
+    if (user) {
+        token_ = std::make_shared<Token>(generateToken(user->email), user->id);
+        session_->setAuthenticatedUser(user_);
+    } else {
+        std::cerr << "[Client] User is null, cannot set token.\n";
+        token_ = nullptr;
+    }
+}
 
     std::shared_ptr<vh::types::User> Client::getUser() const { return user_; }
     std::shared_ptr<Token> Client::getToken() const { return token_; }
@@ -61,7 +69,7 @@ namespace vh::auth {
         }
     }
 
-    bool Client::validateToken(const std::string& token) {
+    bool Client::validateToken(const std::string& token) const {
         try {
             auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
 

@@ -34,9 +34,9 @@ namespace vh::types {
 
     inline void to_json(nlohmann::json& j, const User& u) {
         j = nlohmann::json{
+                {"id", u.id},
                 {"name", u.name},
                 {"email", u.email},
-                {"createdAt", u.created_at},
                 {"lastLogin", u.last_login},
         };
     }

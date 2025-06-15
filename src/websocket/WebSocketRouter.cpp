@@ -16,6 +16,8 @@ namespace vh::websocket {
 
     void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         try {
+            std::cout << "[Router] Routing message: " << msg.dump() << "\n";
+
             std::string command = msg.at("command").get<std::string>();
 
             if (!command.starts_with("auth")) {

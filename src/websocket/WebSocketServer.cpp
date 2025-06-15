@@ -1,6 +1,7 @@
 #include "websocket/WebSocketServer.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
+#include "auth/AuthManager.hpp"
 
 #include <iostream>
 
@@ -9,9 +10,9 @@ namespace vh::websocket {
     WebSocketServer::WebSocketServer(asio::io_context& ioc,
                                      const tcp::endpoint& endpoint,
                                      const std::shared_ptr<WebSocketRouter>& router,
-                                     const std::shared_ptr<vh::auth::SessionManager>& sessionManager)
+                                     const std::shared_ptr<vh::auth::AuthManager>& authManager)
             : acceptor_(ioc), socket_(ioc), ioc_(ioc),
-              router_(router), sessionManager_(sessionManager),
+              router_(router), authManager_(authManager), sessionManager_(authManager_->sessionManager()),
               broadcastManager_(std::make_shared<vh::websocket::NotificationBroadcastManager>()) {
         beast::error_code ec;
 
@@ -45,7 +46,8 @@ namespace vh::websocket {
             std::cout << "[WebSocketServer] Accepted new connection.\n";
 
             // Launch WebSocketSession
-            std::make_shared<WebSocketSession>(std::move(socket_), router_, broadcastManager_)->run();
+            auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
+            session->accept(std::move(socket_));  // your new method to handle request parsing and upgrade
         }
 
         // Accept next connection

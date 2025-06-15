@@ -31,6 +31,18 @@ CREATE TABLE user_roles (
                             PRIMARY KEY (user_id, role_id)
 );
 
+CREATE TABLE refresh_tokens (
+                                  jti UUID PRIMARY KEY,
+                                  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                                  token_hash TEXT NOT NULL,
+                                  created_at TIMESTAMP DEFAULT NOW(),
+                                  expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '7 days',
+                                  last_used TIMESTAMP DEFAULT NOW(),
+                                  ip_address TEXT,
+                                  user_agent TEXT,
+                                  revoked BOOLEAN DEFAULT FALSE
+);
+
 -- API KEYS
 
 CREATE TABLE api_keys (

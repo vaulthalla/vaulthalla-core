@@ -87,7 +87,7 @@ namespace vh::storage {
 
     std::shared_ptr<vh::types::Vault> StorageManager::getVault(unsigned int vaultId) const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        if (vaults_.find(vaultId) != vaults_.end()) return std::make_shared<vh::types::Vault>(*vaults_.at(vaultId));
+        if (vaults_.find(vaultId) != vaults_.end()) return vaults_.at(vaultId);
         return vh::database::VaultQueries::getVault(vaultId);
     }
 

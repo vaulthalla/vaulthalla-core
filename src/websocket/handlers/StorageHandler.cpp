@@ -237,11 +237,15 @@ namespace vh::websocket {
             unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
             auto vault = storageManager_->getVault(vaultId);
 
+            json data = {
+                    {"vault", json(*vault)}
+            };
+
             json response = {
                     {"command", "storage.vault.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", json(*vault)}
+                    {"data", data}
             };
 
             session.send(response);

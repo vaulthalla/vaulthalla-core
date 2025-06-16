@@ -25,30 +25,35 @@ namespace vh::storage {
 
     void StorageManager::initUserStorage(const std::shared_ptr<vh::types::User>& user) {
         try {
-            std::lock_guard<std::mutex> lock(mountsMutex_);
             std::cout << "[StorageManager] Initializing storage for user: " << user->email << "\n";
 
             if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
             std::shared_ptr<vh::types::Vault> vault = std::make_shared<vh::types::LocalDiskVault>(user->email,
                                                                                                   std::filesystem::path(std::getenv("VAULTHALLA_ROOT_DIR")) / "users" / user->email);
-
-            vault->id = vh::database::VaultQueries::addVault(vault);
-            vault = vh::database::VaultQueries::getVault(vault->id);
+            {
+                std::lock_guard<std::mutex> lock(mountsMutex_);
+                vault->id = vh::database::VaultQueries::addVault(vault);
+                vault = vh::database::VaultQueries::getVault(vault->id);
+            }
 
             if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->email);
 
-            vaults_[vault->id] = std::move(vault);
+            vaults_[vault->id] = std::static_pointer_cast<types::LocalDiskVault>(vault);
 
             auto volume = std::make_shared<vh::types::StorageVolume>(vault->id,
                                                                      user->name + " Default Volume",
                                                                      std::filesystem::path(user->email + "_default_volume"));
-            vh::database::VaultQueries::addVolume(user->id, volume);
-            volume = getVolume(volume->id, user->id);
+
+            {
+                std::lock_guard<std::mutex> lock(mountsMutex_);
+                volume->id = vh::database::VaultQueries::addVolume(user->id, volume);
+                volume = vh::database::VaultQueries::getVolume(volume->id);
+            }
 
             if (!volume) throw std::runtime_error("Failed to initialize user storage: Volume not found after creation");
 
-            mountVolume(volume);
+            mountVolume(volume, vault);
 
             std::cout << "[StorageManager] Initialized storage for user: " << user->email << "\n";
         } catch (const std::exception& e) {
@@ -86,16 +91,17 @@ namespace vh::storage {
         return vh::database::VaultQueries::getVault(vaultId);
     }
 
-    void StorageManager::mountVolume(const std::shared_ptr<vh::types::StorageVolume> &volume) {
+    void StorageManager::mountVolume(const std::shared_ptr<vh::types::StorageVolume> &volume,
+                                     const std::shared_ptr<vh::types::Vault> &vault) {
         if (!volume) throw std::invalid_argument("Volume cannot be null");
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
-        auto vault = getVault(volume->vault_id);
+        if (!vault) vh::database::VaultQueries::getVault(volume->vault_id);
         if (!vault) throw std::runtime_error("Vault not found for volume ID: " + std::to_string(volume->vault_id));
 
         auto volumesOnVault = vh::database::VaultQueries::listVolumes(vault->id);
 
-        if (auto* vaultDisk = dynamic_cast<vh::types::LocalDiskVault*>(vault.get())) {
+        if (auto* vaultDisk = dynamic_cast<vh::types::LocalDiskVault*>(&*vault)) {
             auto newVolPath = vaultDisk->mount_point / volume->path_prefix;
             for (const auto& existingVolume : volumesOnVault) {
                 if (existingVolume->id == volume->id) continue;

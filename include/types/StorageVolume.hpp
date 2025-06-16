@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types/Vault.hpp"
+#include "util/timestamp.hpp"
 
 #include <string>
 #include <boost/describe.hpp>
@@ -38,7 +39,7 @@ namespace vh::types {
               name(row["name"].as<std::string>()),
               path_prefix(row["path_prefix"].as<std::string>()),
               quota_bytes(row["quota_bytes"].is_null() ? std::nullopt : std::make_optional(row["quota_bytes"].as<unsigned long long>())),
-              created_at(row["created_at"].as<std::time_t>()) {}
+              created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())) {}
 
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(StorageVolume,
                                        id,

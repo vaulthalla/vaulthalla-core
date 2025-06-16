@@ -30,7 +30,8 @@ namespace vh::storage {
         std::vector<std::shared_ptr<vh::types::Vault>> listVaults() const;
         std::shared_ptr<vh::types::Vault> getVault(unsigned int vaultId) const;
 
-        void mountVolume(const std::shared_ptr<vh::types::StorageVolume>& volume);
+        void mountVolume(const std::shared_ptr<vh::types::StorageVolume>& volume,
+                         const std::shared_ptr<vh::types::Vault>& vault = nullptr);
         void addVolume(const std::shared_ptr<vh::types::StorageVolume>& volume, unsigned int userId);
         void removeVolume(unsigned int volumeId, unsigned int userId);
         std::shared_ptr<vh::types::StorageVolume> getVolume(unsigned int volumeId, unsigned int userId) const;

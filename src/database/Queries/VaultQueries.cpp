@@ -36,6 +36,39 @@ namespace vh::database {
         });
     }
 
+    std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
+        return Transactions::exec("VaultQueries::getVault", [vaultID](pqxx::work& txn) -> std::shared_ptr<vh::types::Vault> {
+            // First, get the vault type
+            pqxx::row typeRow = txn.exec1(
+                    "SELECT type FROM vaults WHERE id = " + txn.quote(vaultID)
+            );
+
+            auto typeStr = typeRow["type"].as<std::string>();
+            vh::types::VaultType vaultType = vh::types::from_string(typeStr);
+
+            switch (vaultType) {
+                case vh::types::VaultType::Local: {
+                    auto res = txn.exec1(
+                            "SELECT * FROM vaults "
+                            "INNER JOIN local_disk_vaults ON vaults.id = local_disk_vaults.vault_id "
+                            "WHERE vaults.id = " + txn.quote(vaultID)
+                    );
+                    return std::make_shared<vh::types::LocalDiskVault>(res);
+                }
+                case vh::types::VaultType::S3: {
+                    auto res = txn.exec1(
+                            "SELECT * FROM vaults "
+                            "INNER JOIN s3_vaults ON vaults.id = s3_vaults.vault_id "
+                            "WHERE vaults.id = " + txn.quote(vaultID)
+                    );
+                    return std::make_shared<vh::types::S3Vault>(res);
+                }
+                default:
+                    throw std::runtime_error("Unsupported VaultType: " + typeStr);
+            }
+        });
+    }
+
     std::vector<std::shared_ptr<vh::types::Vault>> VaultQueries::listVaults() {
         return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec(R"SQL(
@@ -76,24 +109,25 @@ namespace vh::database {
         });
     }
 
-    void VaultQueries::addVolume(unsigned short userID, const std::shared_ptr<vh::types::StorageVolume>& volume) {
-        Transactions::exec("VaultQueries::addVolume", [&](pqxx::work& txn) {
+    unsigned int VaultQueries::addVolume(unsigned int userID, const std::shared_ptr<vh::types::StorageVolume>& volume) {
+        return Transactions::exec("VaultQueries::addVolume", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec(
-                "INSERT INTO storage_volumes (vault_id, name, path_prefix, quota_bytes, created_at) "
+                "INSERT INTO storage_volumes (vault_id, name, path_prefix, quota_bytes) "
                 "VALUES ("
                 + txn.quote(volume->vault_id) + ", "
                 + txn.quote(volume->name) + ", "
                 + txn.quote(volume->path_prefix.string()) + ", "
-                + txn.quote(volume->quota_bytes.value_or(0ULL)) + ", "
-                + txn.quote(volume->created_at) + ") "
-                "RETURNING id"
+                + txn.quote(volume->quota_bytes.value_or(0ULL)) + ") RETURNING id"
             );
 
             auto volumeId = res[0][0].as<unsigned int>();
             txn.exec("INSERT INTO user_storage_volumes (user_id, storage_volume_id) VALUES ("
                      + txn.quote(userID) + ", "
                      + txn.quote(volumeId) + ")");
+
             txn.commit();
+
+            return volumeId;
         });
     }
 

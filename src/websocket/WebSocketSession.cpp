@@ -119,10 +119,8 @@ namespace vh::websocket {
             self->handshakeRequest_ = *req;
             self->refreshToken_ = extractCookie(*req, "refresh");
 
-            if (!self->refreshToken_.empty())
-                std::cout << "[Session] Found refresh token in cookies\n";
-            else
-                std::cout << "[Session] No refresh token found in Cookie header\n";
+            if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies\n";
+            else std::cout << "[Session] No refresh token found in Cookie header\n";
 
             // Attempt to rehydrate or generate a new session client
             self->authManager_->rehydrateOrCreateClient(self);

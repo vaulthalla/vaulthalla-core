@@ -29,7 +29,7 @@ namespace vh::storage {
 
             if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
-            std::shared_ptr<vh::types::Vault> vault = std::make_shared<vh::types::LocalDiskVault>(user->email,
+            std::shared_ptr<vh::types::Vault> vault = std::make_shared<vh::types::LocalDiskVault>(user->name + "'s Local Disk Vault",
                                                                                                   std::filesystem::path(std::getenv("VAULTHALLA_ROOT_DIR")) / "users" / user->email);
             {
                 std::lock_guard<std::mutex> lock(mountsMutex_);

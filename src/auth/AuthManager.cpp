@@ -47,7 +47,6 @@ namespace vh::auth {
         sessionManager_->createSession(client);
     }
 
-
     bool AuthManager::validateToken(const std::string& token) {
         try {
             auto session = sessionManager_->getClientSession(token);

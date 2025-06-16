@@ -1,16 +1,21 @@
 #pragma once
 
 #include <string>
-#include <boost/describe.hpp>
+#include <filesystem>
 #include <ctime>
 #include <optional>
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
+#include <memory>
+#include <vector>
 #include <utility>
+#include <sstream>
+#include <iomanip>
 
 #include "util/timestamp.hpp"
 
 namespace vh::types {
+
     enum class VaultType {
         Local,
         S3
@@ -19,15 +24,15 @@ namespace vh::types {
     inline std::string to_string(VaultType type) {
         switch (type) {
             case VaultType::Local: return "local";
-            case VaultType::S3: return "s3";
-            default: return "Unknown";
+            case VaultType::S3:    return "s3";
+            default:               return "unknown";
         }
     }
 
     inline VaultType from_string(const std::string& type) {
         if (type == "local") return VaultType::Local;
-        if (type == "s3") return VaultType::S3;
-        throw std::invalid_argument("Invalid VaultType string: " + type);
+        if (type == "s3")    return VaultType::S3;
+        throw std::invalid_argument("Invalid VaultType: " + type);
     }
 
     struct Vault {
@@ -41,102 +46,117 @@ namespace vh::types {
         virtual ~Vault() = default;
 
         explicit Vault(const pqxx::row& row)
-            : id(row["id"].as<unsigned int>()),
-              name(row["name"].as<std::string>()),
-              type(from_string(row["type"].as<std::string>())),
-              is_active(row["is_active"].as<bool>()),
-              created_at(vh::util::parsePostgresTimestamp(row["created_at"].c_str())) {}
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Vault, id, name, type, is_active, created_at)
+                : id(row["id"].as<unsigned int>()),
+                  name(row["name"].as<std::string>()),
+                  type(from_string(row["type"].as<std::string>())),
+                  is_active(row["is_active"].as<bool>()),
+                  created_at(util::parsePostgresTimestamp(row["created_at"].c_str())) {}
     };
 
     struct LocalDiskVault : public Vault {
-        unsigned int vault_id{0};
+        unsigned int vault_id{};
         std::filesystem::path mount_point;
 
         LocalDiskVault() = default;
 
         LocalDiskVault(const std::string& name, std::filesystem::path mountPoint)
-            : Vault(),
-              vault_id(0), // This will be set by the database
-              mount_point(std::move(mountPoint)) {
+                : Vault(), vault_id(0), mount_point(std::move(mountPoint)) {
             this->name = name;
             this->type = VaultType::Local;
             this->is_active = true;
-            this->created_at = std::time(nullptr); // Set current time
+            this->created_at = std::time(nullptr);
         }
 
         explicit LocalDiskVault(const pqxx::row& row)
-            : Vault(row),
-              vault_id(row["vault_id"].as<unsigned int>()),
-              mount_point(row["mount_point"].as<std::string>()) {}
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(LocalDiskVault, id, name, type, is_active, created_at, mount_point)
+                : Vault(row),
+                  vault_id(row["vault_id"].as<unsigned int>()),
+                  mount_point(row["mount_point"].as<std::string>()) {}
     };
 
     struct S3Vault : public Vault {
-        unsigned short vault_id{0};
-        unsigned short api_key_id{0};
+        unsigned short vault_id{};
+        unsigned short api_key_id{};
         std::string bucket;
 
         S3Vault() = default;
 
-        S3Vault(const std::string& name, unsigned short apiKeyID, std::string  bucketName)
-            : Vault(),
-              vault_id(0), // This will be set by the database
-              api_key_id(apiKeyID),
-              bucket(std::move(bucketName)) {
+        S3Vault(const std::string& name, unsigned short apiKeyID, std::string bucketName)
+                : Vault(), vault_id(0), api_key_id(apiKeyID), bucket(std::move(bucketName)) {
             this->name = name;
             this->type = VaultType::S3;
             this->is_active = true;
-            this->created_at = std::time(nullptr); // Set current time
+            this->created_at = std::time(nullptr);
         }
 
         explicit S3Vault(const pqxx::row& row)
-            : Vault(row),
-              vault_id(row["vault_id"].as<unsigned short>()),
-              api_key_id(row["api_key_id"].as<unsigned short>()),
-              bucket(row["bucket"].as<std::string>()) {}
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(S3Vault, id, name, type, is_active, created_at, api_key_id, bucket)
+                : Vault(row),
+                  vault_id(row["vault_id"].as<unsigned short>()),
+                  api_key_id(row["api_key_id"].as<unsigned short>()),
+                  bucket(row["bucket"].as<std::string>()) {}
     };
+
+    // ───── JSON SERIALIZATION ─────
+
+    inline void to_json(nlohmann::json& j, const Vault& v) {
+        j = {
+                {"id", v.id},
+                {"name", v.name},
+                {"type", to_string(v.type)},
+                {"is_active", v.is_active},
+                {"created_at", util::timestampToString(v.created_at)}
+        };
+    }
+
+    inline void from_json(const nlohmann::json& j, Vault& v) {
+        v.id = j.at("id").get<unsigned int>();
+        v.name = j.at("name").get<std::string>();
+        v.type = from_string(j.at("type").get<std::string>());
+        v.is_active = j.at("is_active").get<bool>();
+        v.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
+    }
+
+    inline void to_json(nlohmann::json& j, const LocalDiskVault& v) {
+        to_json(j, static_cast<const Vault&>(v));
+        j["vault_id"] = v.vault_id;
+        j["mount_point"] = v.mount_point.string();
+    }
+
+    inline void from_json(const nlohmann::json& j, LocalDiskVault& v) {
+        from_json(j, static_cast<Vault&>(v));
+        v.vault_id = j.at("vault_id").get<unsigned int>();
+        v.mount_point = j.at("mount_point").get<std::string>();
+    }
+
+    inline void to_json(nlohmann::json& j, const S3Vault& v) {
+        to_json(j, static_cast<const Vault&>(v));
+        j["vault_id"] = v.vault_id;
+        j["api_key_id"] = v.api_key_id;
+        j["bucket"] = v.bucket;
+    }
+
+    inline void from_json(const nlohmann::json& j, S3Vault& v) {
+        from_json(j, static_cast<Vault&>(v));
+        v.vault_id = j.at("vault_id").get<unsigned short>();
+        v.api_key_id = j.at("api_key_id").get<unsigned short>();
+        v.bucket = j.at("bucket").get<std::string>();
+    }
+
+    // ───── Polymorphic List Serializer ─────
 
     inline nlohmann::json to_json(const std::vector<std::shared_ptr<Vault>>& vaults) {
         nlohmann::json j = nlohmann::json::array();
 
         for (const auto& vault : vaults) {
-            nlohmann::json vault_json = {
-                    {"id", vault->id},
-                    {"name", vault->name},
-                    {"type", to_string(vault->type)},
-                    {"is_active", vault->is_active},
-                    {"created_at", vault->created_at}
-            };
-
-            // Check for LocalDiskVault fields
-            if (const auto* diskVault = dynamic_cast<const LocalDiskVault*>(&*vault)) {
-                vault_json["vault_id"] = diskVault->vault_id;
-                vault_json["mount_point"] = diskVault->mount_point;
+            if (const auto* local = dynamic_cast<const LocalDiskVault*>(vault.get())) {
+                j.push_back(*local);
+            } else if (const auto* s3 = dynamic_cast<const S3Vault*>(vault.get())) {
+                j.push_back(*s3);
+            } else {
+                j.push_back(*vault);  // fallback: base Vault
             }
-
-                // Check for S3Vault fields
-            else if (const auto* s3Vault = dynamic_cast<const S3Vault*>(&*vault)) {
-                vault_json["vault_id"] = s3Vault->vault_id;
-                vault_json["api_key_id"] = s3Vault->api_key_id;
-                vault_json["bucket"] = s3Vault->bucket;
-            }
-
-            j.push_back(vault_json);
         }
 
         return j;
     }
-}
 
-BOOST_DESCRIBE_ENUM(vh::types::VaultType, Local, S3)
-
-BOOST_DESCRIBE_STRUCT(vh::types::Vault, (), (id, name, type, is_active, created_at))
-
-BOOST_DESCRIBE_STRUCT(vh::types::LocalDiskVault, (), (mount_point))
-
-BOOST_DESCRIBE_STRUCT(vh::types::S3Vault, (), (id, api_key_id, bucket))
+} // namespace vh::types

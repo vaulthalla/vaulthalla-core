@@ -265,11 +265,15 @@ namespace vh::websocket {
         try {
             const auto vaults = storageManager_->listVaults();
 
+            json data = {
+                    {"vaults", vh::types::to_json(vaults).dump(4)}
+            };
+
             json response = {
                     {"command", "storage.vault.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", vh::types::to_json(vaults).dump(4)}
+                    {"data", data}
             };
 
             session.send(response);

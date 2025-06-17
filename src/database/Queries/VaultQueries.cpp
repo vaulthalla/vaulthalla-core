@@ -39,29 +39,29 @@ namespace vh::database {
     std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
         return Transactions::exec("VaultQueries::getVault", [vaultID](pqxx::work& txn) -> std::shared_ptr<vh::types::Vault> {
             // First, get the vault type
-            pqxx::row typeRow = txn.exec1(
+            pqxx::row typeRow = txn.exec(
                     "SELECT type FROM vaults WHERE id = " + txn.quote(vaultID)
-            );
+            ).one_row();
 
             auto typeStr = typeRow["type"].as<std::string>();
             vh::types::VaultType vaultType = vh::types::from_string(typeStr);
 
             switch (vaultType) {
                 case vh::types::VaultType::Local: {
-                    auto res = txn.exec1(
+                    auto res = txn.exec(
                             "SELECT * FROM vaults "
                             "INNER JOIN local_disk_vaults ON vaults.id = local_disk_vaults.vault_id "
                             "WHERE vaults.id = " + txn.quote(vaultID)
                     );
-                    return std::make_shared<vh::types::LocalDiskVault>(res);
+                    return std::make_shared<vh::types::LocalDiskVault>(res.one_row());
                 }
                 case vh::types::VaultType::S3: {
-                    auto res = txn.exec1(
+                    auto res = txn.exec(
                             "SELECT * FROM vaults "
                             "INNER JOIN s3_vaults ON vaults.id = s3_vaults.vault_id "
                             "WHERE vaults.id = " + txn.quote(vaultID)
                     );
-                    return std::make_shared<vh::types::S3Vault>(res);
+                    return std::make_shared<vh::types::S3Vault>(res.one_row());
                 }
                 default:
                     throw std::runtime_error("Unsupported VaultType: " + typeStr);
@@ -139,11 +139,30 @@ namespace vh::database {
         });
     }
 
-    std::vector<std::shared_ptr<vh::types::StorageVolume>> VaultQueries::listVolumes(unsigned int userId) {
+    std::vector<std::shared_ptr<vh::types::StorageVolume>> VaultQueries::listUserVolumes(unsigned int userId) {
         return Transactions::exec("VaultQueries::listVolumes", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec("SELECT sv.* FROM storage_volumes sv "
                                         "JOIN user_storage_volumes usv ON sv.id = usv.storage_volume_id "
                                         "WHERE usv.user_id = " + txn.quote(userId));
+            std::vector<std::shared_ptr<vh::types::StorageVolume>> volumes;
+            for (const auto& row : res) volumes.push_back(std::make_shared<vh::types::StorageVolume>(row));
+            return volumes;
+        });
+    }
+
+    std::vector<std::shared_ptr<vh::types::StorageVolume>> VaultQueries::listVolumes() {
+        return Transactions::exec("VaultQueries::listVolumes", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("SELECT sv.* FROM storage_volumes sv "
+                                        "JOIN user_storage_volumes usv ON sv.id = usv.storage_volume_id ");
+            std::vector<std::shared_ptr<vh::types::StorageVolume>> volumes;
+            for (const auto& row : res) volumes.push_back(std::make_shared<vh::types::StorageVolume>(row));
+            return volumes;
+        });
+    }
+
+    std::vector<std::shared_ptr<vh::types::StorageVolume>> VaultQueries::listVaultVolumes(unsigned int vaultId) {
+        return Transactions::exec("VaultQueries::listVaultVolumes", [&](pqxx::work& txn) {
+            pqxx::result res = txn.exec("SELECT * FROM storage_volumes WHERE vault_id = " + txn.quote(vaultId));
             std::vector<std::shared_ptr<vh::types::StorageVolume>> volumes;
             for (const auto& row : res) volumes.push_back(std::make_shared<vh::types::StorageVolume>(row));
             return volumes;
@@ -168,7 +187,7 @@ namespace vh::database {
         });
     }
 
-    std::vector<std::shared_ptr<vh::types::UserStorageVolume>> VaultQueries::listUserVolumes(unsigned int userId) {
+    std::vector<std::shared_ptr<vh::types::UserStorageVolume>> VaultQueries::listUserAssignedVolumes(unsigned int userId) {
         return Transactions::exec("VaultQueries::listUserVolumes", [&](pqxx::work& txn) {
             pqxx::result res = txn.exec("SELECT usv.* FROM user_storage_volumes usv "
                                         "JOIN storage_volumes sv ON usv.storage_volume_id = sv.id "

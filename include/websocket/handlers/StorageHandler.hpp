@@ -27,6 +27,7 @@ namespace vh::websocket {
         void handleAddAPIKey(const json& msg, WebSocketSession& session);
         void handleRemoveAPIKey(const json& msg, WebSocketSession& session);
         void handleListAPIKeys(const json& msg, WebSocketSession& session);
+        void handleListUserAPIKeys(const json& msg, WebSocketSession& session);
         void handleGetAPIKey(const json& msg, WebSocketSession& session);
 
         // All Vault commands
@@ -38,6 +39,8 @@ namespace vh::websocket {
         // Volume management
         void handleAddVolume(const json& msg, WebSocketSession& session);
         void handleRemoveVolume(const json& msg, WebSocketSession& session);
+        void handleListUserVolumes(const json& msg, WebSocketSession& session);
+        void handleListVaultVolumes(const json& msg, WebSocketSession& session);
         void handleListVolumes(const json& msg, WebSocketSession& session);
         void handleGetVolume(const json& msg, WebSocketSession& session);
 

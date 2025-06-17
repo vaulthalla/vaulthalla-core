@@ -52,6 +52,7 @@ CREATE TABLE api_keys
 (
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    type       VARCHAR(50) NOT NULL, -- 'S3', etc.
     name       VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,6 +60,7 @@ CREATE TABLE api_keys
 CREATE TABLE s3_api_keys
 (
     api_key_id        INTEGER PRIMARY KEY REFERENCES api_keys (id) ON DELETE CASCADE,
+    provider          VARCHAR(50) NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
     access_key        TEXT        NOT NULL,
     secret_access_key TEXT        NOT NULL,
     region            VARCHAR(20) NOT NULL,
@@ -67,12 +69,10 @@ CREATE TABLE s3_api_keys
 
 -- STORAGE BACKENDS AND VOLUMES
 
-CREATE TYPE vault_type AS ENUM ('local', 's3');
-
 CREATE TABLE vaults
 (
     id         SERIAL PRIMARY KEY,
-    type       vault_type          NOT NULL,
+    type       VARCHAR(50) NOT NULL,
     name       VARCHAR(150) UNIQUE NOT NULL,
     is_active  BOOLEAN   DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

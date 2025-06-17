@@ -51,7 +51,7 @@ namespace vh::auth {
 
         auto it = activeSessions_.find(sessionUUID);
         if (it != activeSessions_.end()) {
-            if (it->second) {
+            if (it->second->getUser()) {
                 it->second->invalidateToken();
                 vh::database::UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
                 std::cout << "[SessionManager] Invalidated session for user: "

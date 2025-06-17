@@ -14,25 +14,26 @@
 namespace vh::websocket {
 
     StorageHandler::StorageHandler(const std::shared_ptr<vh::storage::StorageManager> &storageManager)
-            : storageManager_(storageManager), apiKeyManager_() {}
+            : storageManager_(storageManager), apiKeyManager_(std::make_shared<keys::APIKeyManager>()) {}
 
     void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session) {
         try {
             json payload = msg.at("payload");
-            unsigned short userID = payload.at("userID").get<unsigned short>();
+            unsigned short userID = payload.at("user_id").get<unsigned short>();
             std::string name = payload.at("name").get<std::string>();
             std::string type = payload.at("type").get<std::string>();
             std::string typeLower = boost::algorithm::to_lower_copy(type);
 
-            std::shared_ptr<vh::types::APIKey> key;
+            std::shared_ptr<vh::types::api::APIKey> key;
 
             if (typeLower == "s3") {
-                std::string accessKey = payload.at("accessKey").get<std::string>();
-                std::string secretKey = payload.at("secretKey").get<std::string>();
+                std::string provider = payload.at("provider").get<std::string>();
+                std::string accessKey = payload.at("access_key").get<std::string>();
+                std::string secretKey = payload.at("secret_access_key").get<std::string>();
                 std::string region = payload.at("region").get<std::string>();
                 std::string endpoint = payload.at("endpoint").get<std::string>();
 
-                key = std::make_shared<vh::types::S3APIKey>(name, userID, accessKey, secretKey, region, endpoint);
+                key = std::make_shared<vh::types::api::S3APIKey>(name, userID, provider, accessKey, secretKey, region, endpoint);
             } else throw std::runtime_error("Unsupported API key type: " + type);
 
             apiKeyManager_->addAPIKey(key);
@@ -92,24 +93,62 @@ namespace vh::websocket {
 
     void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int userId = msg.at("payload").at("userId").get<unsigned int>();
-            auto keys = apiKeyManager_->listAPIKeys(userId);
+            auto keys = apiKeyManager_->listAPIKeys();
+
+            json data = {
+                    {"keys", vh::types::api::to_json(keys).dump(4)}
+            };
 
             json response = {
                     {"command", "storage.apiKey.list.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", vh::types::to_json(keys).dump(4)}
+                    {"data", data}
             };
 
             session.send(response);
 
-            std::cout << "[StorageHandler] Listed API keys for user ID: " << userId << "\n";
+            std::cout << "[StorageHandler] Listed API keys for all users." << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << "\n";
 
             json response = {
                     {"command", "storage.apiKey.list.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "error"},
+                    {"error", e.what()}
+            };
+
+            session.send(response);
+        }
+    }
+
+    void
+    StorageHandler::handleListUserAPIKeys(const vh::websocket::json &msg, vh::websocket::WebSocketSession &session) {
+        try {
+            const auto user = session.getAuthenticatedUser();
+            if (!user) throw std::runtime_error("User not authenticated");
+            auto keys = apiKeyManager_->listUserAPIKeys(user->id);
+
+            json data {
+                    {"keys", vh::types::api::to_json(keys).dump(4)}
+            };
+
+            json response = {
+                    {"command", "storage.apiKey.list.user.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "ok"},
+                    {"data", data}
+            };
+
+            session.send(response);
+
+            std::cout << "[StorageHandler] Listed API keys for user ID: " << user->id << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << "\n";
+
+            json response = {
+                    {"command", "storage.apiKey.list.user.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "error"},
                     {"error", e.what()}
@@ -125,11 +164,15 @@ namespace vh::websocket {
             const auto user = session.getAuthenticatedUser();
             auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
+            json data = {
+                    {"key", vh::types::api::to_json(key)}
+            };
+
             json response = {
                     {"command", "storage.apiKey.get.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", vh::types::to_json(key)}
+                    {"data", data}
             };
 
             session.send(response);
@@ -300,11 +343,11 @@ namespace vh::websocket {
     void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session) {
         try {
             json payload = msg.at("payload");
-            unsigned int userID = payload.at("userID").get<unsigned int>();
-            unsigned int vaultID = payload.at("vaultID").get<unsigned int>();
+            unsigned int userID = payload.at("user_id").get<unsigned int>();
+            unsigned int vaultID = payload.at("vault_id").get<unsigned int>();
             std::string name = payload.at("name").get<std::string>();
-            std::string pathPrefix = payload.contains("pathPrefix") ? payload.at("pathPrefix").get<std::string>() : "/";
-            unsigned long long quotaBytes = payload.contains("quotaBytes") ? payload.at("quotaBytes").get<unsigned long long>() : 0;
+            std::string pathPrefix = payload.contains("path_prefix") ? payload.at("path_prefix").get<std::string>() : "/";
+            unsigned long long quotaBytes = payload.contains("quota_bytes") ? payload.at("quota_bytes").get<unsigned long long>() : 0;
 
             auto storageVolume = std::make_shared<vh::types::StorageVolume>(vaultID, name, pathPrefix, quotaBytes);
             storageManager_->addVolume(storageVolume, userID);
@@ -362,21 +405,90 @@ namespace vh::websocket {
         }
     }
 
-    void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& session) {
+    void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& session) {
         try {
             unsigned int userId = msg.at("payload").at("userId").get<unsigned int>();
-            auto volumes = storageManager_->listVolumes(userId);
+            auto volumes = database::VaultQueries::listUserVolumes(userId);
+
+            json data = {
+                    {"volumes", vh::types::to_json(volumes).dump(4)}
+            };
 
             json response = {
-                    {"command", "storage.volume.list.response"},
+                    {"command", "storage.volume.list.user.response"},
                     {"requestId", msg.at("requestId").get<std::string>()},
                     {"status", "ok"},
-                    {"data", vh::types::to_json(volumes).dump(4)}
+                    {"data", data}
             };
 
             session.send(response);
 
             std::cout << "[StorageHandler] Listed volumes for user ID: " << userId << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
+
+            json response = {
+                    {"command", "storage.volume.list.user.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "error"},
+                    {"error", e.what()}
+            };
+
+            session.send(response);
+        }
+    }
+
+    void StorageHandler::handleListVaultVolumes(const json& msg, WebSocketSession& session) {
+        try {
+            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
+            auto volumes = database::VaultQueries::listVaultVolumes(vaultId);
+
+            json data = {
+                    {"volumes", vh::types::to_json(volumes).dump(4)}
+            };
+
+            json response = {
+                    {"command", "storage.volume.list.vault.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "ok"},
+                    {"data", data}
+            };
+
+            session.send(response);
+
+            std::cout << "[StorageHandler] Listed volumes for vault ID: " << vaultId << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
+
+            json response = {
+                    {"command", "storage.volume.list.vault.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "error"},
+                    {"error", e.what()}
+            };
+
+            session.send(response);
+        }
+    }
+
+    void StorageHandler::handleListVolumes(const vh::websocket::json &msg, vh::websocket::WebSocketSession &session) {
+        try {
+            auto volumes = database::VaultQueries::listVolumes();
+
+            json data = {
+                    {"volumes", vh::types::to_json(volumes).dump(4)}
+            };
+
+            json response = {
+                    {"command", "storage.volume.list.response"},
+                    {"requestId", msg.at("requestId").get<std::string>()},
+                    {"status", "ok"},
+                    {"data", data}
+            };
+
+            session.send(response);
+
+            std::cout << "[StorageHandler] Listed all storage volumes.\n";
         } catch (const std::exception& e) {
             std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
 

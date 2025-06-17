@@ -85,6 +85,14 @@ namespace vh::websocket {
             storageHandler_->handleListVolumes(msg, session);
         });
 
+        router_->registerHandler("storage.volume.list.vault", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListVaultVolumes(msg, session);
+        });
+
+        router_->registerHandler("storage.volume.list.user", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListUserVolumes(msg, session);
+        });
+
         router_->registerHandler("storage.volume.get", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleGetVolume(msg, session);
         });
@@ -95,12 +103,16 @@ namespace vh::websocket {
             storageHandler_->handleAddAPIKey(msg, session);
         });
 
-        router_->registerHandler("storage.apiKye.remove", [this](const json& msg, WebSocketSession& session) {
+        router_->registerHandler("storage.apiKey.remove", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleRemoveAPIKey(msg, session);
         });
 
         router_->registerHandler("storage.apiKey.list", [this](const json& msg, WebSocketSession& session) {
             storageHandler_->handleListAPIKeys(msg, session);
+        });
+
+        router_->registerHandler("storage.apiKey.list.user", [this](const json& msg, WebSocketSession& session) {
+            storageHandler_->handleListUserAPIKeys(msg, session);
         });
 
         router_->registerHandler("storage.apiKey.get", [this](const json& msg, WebSocketSession& session) {

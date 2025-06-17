@@ -92,14 +92,14 @@ namespace vh::storage {
     }
 
     void StorageManager::mountVolume(const std::shared_ptr<vh::types::StorageVolume> &volume,
-                                     const std::shared_ptr<vh::types::Vault> &vault) {
+                                     std::shared_ptr<vh::types::Vault> vault) {
         if (!volume) throw std::invalid_argument("Volume cannot be null");
         std::lock_guard<std::mutex> lock(mountsMutex_);
 
-        if (!vault) vh::database::VaultQueries::getVault(volume->vault_id);
+        if (!vault) vault = vh::database::VaultQueries::getVault(volume->vault_id);
         if (!vault) throw std::runtime_error("Vault not found for volume ID: " + std::to_string(volume->vault_id));
 
-        auto volumesOnVault = vh::database::VaultQueries::listVolumes(vault->id);
+        auto volumesOnVault = vh::database::VaultQueries::listVaultVolumes(vault->id);
 
         if (auto* vaultDisk = dynamic_cast<vh::types::LocalDiskVault*>(&*vault)) {
             auto newVolPath = vaultDisk->mount_point / volume->path_prefix;
@@ -115,12 +115,16 @@ namespace vh::storage {
         }
     }
 
-    void StorageManager::addVolume(const std::shared_ptr<vh::types::StorageVolume>& volume, unsigned int userId) {
+    void StorageManager::addVolume(std::shared_ptr<vh::types::StorageVolume> volume, unsigned int userId) {
         if (!volume) throw std::invalid_argument("Volume cannot be null");
-        std::lock_guard<std::mutex> lock(mountsMutex_);
+
+        {
+            std::lock_guard<std::mutex> lock(mountsMutex_);
+            volume->id = vh::database::VaultQueries::addVolume(userId, volume);
+            volume = vh::database::VaultQueries::getVolume(volume->id);
+        }
 
         mountVolume(volume);
-        vh::database::VaultQueries::addVolume(userId, volume);
         std::cout << "[StorageManager] Added volume: " << volume->name << " with ID: " << volume->id << "\n";
     }
 
@@ -158,7 +162,7 @@ namespace vh::storage {
 
     std::vector<std::shared_ptr<vh::types::StorageVolume>> StorageManager::listVolumes(unsigned int userId) const {
         std::lock_guard<std::mutex> lock(mountsMutex_);
-        return vh::database::VaultQueries::listVolumes(userId);
+        return vh::database::VaultQueries::listUserVolumes(userId);
     }
 
     std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(unsigned short id) const {
@@ -181,16 +185,17 @@ namespace vh::storage {
         return nullptr; // No engine found for the given ID
     }
 
-    bool StorageManager::pathsAreConflicting(const std::filesystem::path &path1, const std::filesystem::path &path2) {
-        try {
-            auto canonical1 = std::filesystem::canonical(path1);
-            auto canonical2 = std::filesystem::canonical(path2);
+    bool StorageManager::pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2) {
+        std::error_code ec;
 
-            return canonical1 == canonical2;
-        } catch (const std::filesystem::filesystem_error& e) {
-            // If canonicalization fails (non-existent path), fall back to weak comparison
-            return std::filesystem::equivalent(path1, path2);
-        }
+        auto weak1 = std::filesystem::weakly_canonical(path1, ec);
+        if (ec) weak1 = std::filesystem::absolute(path1);  // fallback if partial canonical fails
+
+        ec.clear();
+        auto weak2 = std::filesystem::weakly_canonical(path2, ec);
+        if (ec) weak2 = std::filesystem::absolute(path2);
+
+        return weak1 == weak2;
     }
 
 } // namespace vh::storage

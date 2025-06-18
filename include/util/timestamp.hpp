@@ -28,4 +28,22 @@ namespace vh::util {
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
         return timegm(&tm);  // or use vh::util::parsePostgresTimestamp if preferred
     }
+
+    inline std::string getCurrentTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        std::tm tm = *gmtime(&now_c);
+        char buffer[17];
+        strftime(buffer, sizeof(buffer), "%Y%m%dT%H%M%SZ", &tm);
+        return {buffer};
+    }
+
+    inline std::string getDate() {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        std::tm tm = *gmtime(&now_c);
+        char buffer[9];
+        strftime(buffer, sizeof(buffer), "%Y%m%d", &tm);
+        return {buffer};
+    }
 }

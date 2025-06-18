@@ -122,13 +122,13 @@ namespace vh::types::api {
 
         S3APIKey(const std::string& name,
                  unsigned int userId,
-                 const std::string&  provider,
+                 const S3Provider& provider,
                  std::string  accessKey,
                  std::string  secretAccessKey,
                  std::string  region,
                  std::string  endpoint)
             : APIKey{userId, APIKeyType::S3, name },
-              provider(s3_provider_from_string(provider)),
+              provider(provider),
               access_key(std::move(accessKey)),
               secret_access_key(std::move(secretAccessKey)),
               region(std::move(region)),

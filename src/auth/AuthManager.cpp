@@ -255,7 +255,7 @@ namespace vh::auth {
 
         std::string token = jwt::create<jwt::traits::nlohmann_json>()
                 .set_issuer("Vaulthalla")
-                .set_subject(session->getClientIp() + ":" + session->getUserAgent())
+                .set_subject(session->getClientIp() + ":" + session->getUserAgent() + ":" + session->getUUID())
                 .set_issued_at(now)
                 .set_expires_at(exp)
                 .set_id(jti)

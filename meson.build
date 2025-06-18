@@ -36,6 +36,11 @@ foreach cpp_file : run_command('find', tests_source_root + '/core', '-type', 'f'
     core_test_sources += files(cpp_file)
 endforeach
 
+cloud_test_sources = src_files
+foreach cpp_file : run_command('find', tests_source_root + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    cloud_test_sources += files(cpp_file)
+endforeach
+
 src_files += main
 
 vaulthalla = executable('vaulthalla',
@@ -46,6 +51,12 @@ vaulthalla = executable('vaulthalla',
 
 test('test_core', executable('test_core',
                         core_test_sources,
+                        dependencies: test_deps,
+                        include_directories: inc,
+                        install : true))
+
+test('test_cloud', executable('test_cloud',
+                        cloud_test_sources,
                         dependencies: test_deps,
                         include_directories: inc,
                         install : true))

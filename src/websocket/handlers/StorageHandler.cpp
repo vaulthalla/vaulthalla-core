@@ -27,7 +27,7 @@ namespace vh::websocket {
             std::shared_ptr<vh::types::api::APIKey> key;
 
             if (typeLower == "s3") {
-                std::string provider = payload.at("provider").get<std::string>();
+                vh::types::api::S3Provider provider = vh::types::api::s3_provider_from_string(payload.at("provider").get<std::string>());
                 std::string accessKey = payload.at("access_key").get<std::string>();
                 std::string secretKey = payload.at("secret_access_key").get<std::string>();
                 std::string region = payload.at("region").get<std::string>();
@@ -63,7 +63,7 @@ namespace vh::websocket {
 
     void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int keyId = msg.at("payload").at("keyId").get<unsigned int>();
+            unsigned int keyId = msg.at("payload").at("id").get<unsigned int>();
             const auto user = session.getAuthenticatedUser();
             apiKeyManager_->removeAPIKey(keyId, user->id);
 
@@ -160,13 +160,31 @@ namespace vh::websocket {
 
     void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int keyId = msg.at("payload").at("keyId").get<unsigned int>();
+            unsigned int keyId = msg.at("payload").at("id").get<unsigned int>();
             const auto user = session.getAuthenticatedUser();
             auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
-            json data = {
-                    {"key", vh::types::api::to_json(key)}
-            };
+            json data;
+
+            if (key->type == vh::types::api::APIKeyType::S3) {
+                auto s3Key = std::dynamic_pointer_cast<vh::types::api::S3APIKey>(key);
+                data = {
+                        {"key", {
+                                {"id", s3Key->id},
+                                {"user_id", s3Key->user_id},
+                                {"type", to_string(s3Key->type)},
+                                {"name", s3Key->name},
+                                {"created_at", util::timestampToString(s3Key->created_at)},
+                                {"provider", to_string(s3Key->provider)},
+                                {"access_key", s3Key->access_key},
+                                {"secret_access_key", s3Key->secret_access_key},
+                                {"region", s3Key->region},
+                                {"endpoint", s3Key->endpoint}
+                        }}
+                };
+            } else {
+                throw std::runtime_error("Unsupported API key type: " + to_string(key->type));
+            }
 
             json response = {
                     {"command", "storage.apiKey.get.response"},
@@ -205,10 +223,10 @@ namespace vh::websocket {
             std::unique_ptr<vh::types::Vault> vault;
 
             if (typeLower == "local") {
-                const std::string mountPoint = payload.at("mountPoint").get<std::string>();
+                const std::string mountPoint = payload.at("mount_point").get<std::string>();
                 vault = std::make_unique<vh::types::LocalDiskVault>(name, mountPoint);
             } else if (typeLower == "s3") {
-                unsigned short apiKeyID = payload.at("apiKeyID").get<unsigned short>();
+                unsigned short apiKeyID = payload.at("api_key_id").get<unsigned short>();
                 const std::string bucket = payload.at("bucket").get<std::string>();
                 vault = std::make_unique<vh::types::S3Vault>(name, apiKeyID, bucket);
             } else throw std::runtime_error("Unsupported vault type: " + typeLower);
@@ -377,7 +395,7 @@ namespace vh::websocket {
 
     void StorageHandler::handleRemoveVolume(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
+            unsigned int volumeId = msg.at("payload").at("volume_id").get<unsigned int>();
             const auto user = session.getAuthenticatedUser();
 
             storageManager_->removeVolume(volumeId, user->id);
@@ -407,7 +425,7 @@ namespace vh::websocket {
 
     void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int userId = msg.at("payload").at("userId").get<unsigned int>();
+            unsigned int userId = msg.at("payload").at("user_id").get<unsigned int>();
             auto volumes = database::VaultQueries::listUserVolumes(userId);
 
             json data = {
@@ -440,7 +458,7 @@ namespace vh::websocket {
 
     void StorageHandler::handleListVaultVolumes(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int vaultId = msg.at("payload").at("vaultId").get<unsigned int>();
+            unsigned int vaultId = msg.at("payload").at("vault_id").get<unsigned int>();
             auto volumes = database::VaultQueries::listVaultVolumes(vaultId);
 
             json data = {
@@ -505,7 +523,7 @@ namespace vh::websocket {
 
     void StorageHandler::handleGetVolume(const json& msg, WebSocketSession& session) {
         try {
-            unsigned int volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
+            unsigned int volumeId = msg.at("payload").at("volume_id").get<unsigned int>();
             const auto user = session.getAuthenticatedUser();
             auto volume = storageManager_->getVolume(volumeId, user->id);
 

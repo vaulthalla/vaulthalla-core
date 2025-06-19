@@ -6,7 +6,7 @@
 #include <cstddef>
 
 namespace vh::types {
-    class FileMetadata;
+    class File;
 }
 
 namespace vh::shared::bridge {
@@ -17,9 +17,9 @@ namespace vh::shared::bridge {
     public:
         explicit RemoteFSProxy(std::shared_ptr<UnifiedStorage> backend);
 
-        bool fileExists(const std::string& path) const;
-        types::FileMetadata stat(const std::string& path) const;
-        std::vector<types::FileMetadata> listDirectory(const std::string& path) const;
+        [[nodiscard]] bool fileExists(const std::string& path) const;
+        [[nodiscard]] types::File stat(const std::string& path) const;
+        [[nodiscard]] std::vector<types::File> listDirectory(const std::string& path) const;
 
         ssize_t readFile(const std::string& path, char* buf, size_t size, off_t offset);
         ssize_t writeFile(const std::string& path, const char* buf, size_t size, off_t offset);

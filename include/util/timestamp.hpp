@@ -4,6 +4,7 @@
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 
 namespace vh::util {
     inline std::time_t parsePostgresTimestamp(const std::string& timestampStr) {

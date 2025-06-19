@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Shared:Cache {
+namespace vh::shared::cache {
 class PreviewCache {
 public:
     PreviewCache();

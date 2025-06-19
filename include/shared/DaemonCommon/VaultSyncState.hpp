@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Shared:DaemonCommon {
+namespace vh::shared::common {
 class VaultSyncState {
 public:
     VaultSyncState();

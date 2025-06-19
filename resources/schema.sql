@@ -150,6 +150,7 @@ CREATE TABLE files
     parent_id                  INTEGER REFERENCES files (id) ON DELETE CASCADE,
     name                       VARCHAR(500) NOT NULL,
     is_directory               BOOLEAN   DEFAULT FALSE,
+    mode                       INTEGER DEFAULT 33188,
     owner_id                   INTEGER REFERENCES users (id),
     created_by                 INTEGER REFERENCES users (id),
     created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -161,6 +162,23 @@ CREATE TABLE files
     full_path                  TEXT,
     UNIQUE (storage_volume_id, parent_id, name)
 );
+
+CREATE INDEX idx_files_full_path ON files(full_path);
+
+CREATE TABLE file_xattrs (
+                             id          SERIAL PRIMARY KEY,
+                             file_id     INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+                             namespace   VARCHAR(64) NOT NULL DEFAULT 'user',
+                             key         VARCHAR(255) NOT NULL,
+                             value       BYTEA NOT NULL, -- Store as raw bytes (can be stringified at API layer)
+                             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                             UNIQUE (file_id, namespace, key)
+);
+
+CREATE INDEX idx_file_xattrs_file_id ON file_xattrs(file_id);
+CREATE INDEX idx_file_xattrs_key ON file_xattrs(key);
 
 CREATE TABLE file_versions
 (

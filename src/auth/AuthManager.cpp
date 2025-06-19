@@ -1,7 +1,7 @@
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "types/User.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "database/Queries/UserQueries.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "storage/StorageManager.hpp"
 #include "auth/SessionManager.hpp"
@@ -13,7 +13,6 @@
 #include <iostream>
 #include <jwt-cpp/jwt.h>
 #include <chrono>
-#include <random>
 #include <uuid/uuid.h>
 
 namespace vh::auth {

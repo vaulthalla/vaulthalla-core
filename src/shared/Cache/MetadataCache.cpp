@@ -1,6 +1,6 @@
 #include "shared/Cache/MetadataCache.hpp"
 
-namespace Shared:Cache {
+namespace vh::shared::cache {
 
 MetadataCache::MetadataCache() {
     // TODO: Constructor

@@ -1,6 +1,6 @@
 #include "shared/DaemonCommon/VaultSyncState.hpp"
 
-namespace Shared:DaemonCommon {
+namespace vh::shared::common {
 
 VaultSyncState::VaultSyncState() {
     // TODO: Constructor

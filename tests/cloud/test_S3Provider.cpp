@@ -35,7 +35,6 @@ protected:
 
     void TearDown() override {
         fs::remove_all(test_dir);
-        curl_global_cleanup();
     }
 
     static void writeTextFile(const fs::path& path, const std::string& content) {

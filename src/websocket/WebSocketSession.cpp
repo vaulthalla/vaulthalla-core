@@ -87,7 +87,7 @@ namespace vh::websocket {
                         res.set(http::field::server, "Vaulthalla");
                         res.set(http::field::set_cookie,
                                 "refresh=" + refreshTokenCopy +
-                                "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800");
+                                "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
                     }));
         };
 

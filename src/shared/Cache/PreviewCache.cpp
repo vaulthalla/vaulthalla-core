@@ -1,6 +1,6 @@
 #include "shared/Cache/PreviewCache.hpp"
 
-namespace Shared:Cache {
+namespace vh::shared::cache {
 
 PreviewCache::PreviewCache() {
     // TODO: Constructor

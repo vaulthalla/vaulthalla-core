@@ -1,6 +1,6 @@
 #include "shared/StorageBridge/RemoteFSProxy.hpp"
 #include "shared/StorageBridge/UnifiedStorage.hpp"
-#include "types/FileMetadata.hpp"
+#include "types/File.hpp"
 
 #include <stdexcept>
 #include <cstring>
@@ -14,11 +14,11 @@ bool RemoteFSProxy::fileExists(const std::string& path) const {
     return backend_->exists(path);
 }
 
-vh::types::FileMetadata RemoteFSProxy::stat(const std::string& path) const {
+vh::types::File RemoteFSProxy::stat(const std::string& path) const {
     return backend_->getMetadata(path);
 }
 
-std::vector<vh::types::FileMetadata> RemoteFSProxy::listDirectory(const std::string& path) const {
+std::vector<vh::types::File> RemoteFSProxy::listDirectory(const std::string& path) const {
     return backend_->listDirectory(path);
 }
 

@@ -1,6 +1,6 @@
 #include "shared/DaemonCommon/PathResolver.hpp"
 
-namespace Shared:DaemonCommon {
+namespace vh::shared::common {
 
 PathResolver::PathResolver() {
     // TODO: Constructor

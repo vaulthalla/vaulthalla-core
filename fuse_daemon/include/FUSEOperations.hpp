@@ -3,11 +3,14 @@
 #define FUSE_USE_VERSION 35
 
 #include <fuse3/fuse.h>
-#include "shared/StorageBridge/RemoteFSProxy.hpp"
+
+namespace vh::shared::bridge {
+    class RemoteFSProxy;
+}
 
 namespace vh::fuse {
 
-    void bind(RemoteFSProxy* proxy);
+    void bind(shared::bridge::RemoteFSProxy* proxy);
 
     // FUSE callbacks
     int getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi);

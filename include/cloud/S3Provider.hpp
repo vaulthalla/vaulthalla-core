@@ -2,8 +2,8 @@
 
 #include <string>
 #include <map>
-#include <curl/curl.h>
 #include <memory>
+#include <vector>
 
 namespace vh::types::api {
     class S3APIKey;

@@ -1,6 +1,6 @@
 project('vaulthalla', 'cpp',
         version : '0.0.1',
-        default_options : ['warning_level=3', 'cpp_std=c++2a'])
+        default_options : ['warning_level=3', 'cpp_std=c++2b'])
 
 if get_option('buildtype') == 'debug'
     add_project_arguments('-fsanitize=undefined', language: 'cpp')
@@ -13,7 +13,8 @@ libpqxx_dep = dependency('libpqxx', required: true)
 libsodium_dep = dependency('libsodium', required: true)
 jwt_cpp_dep = dependency('jwt-cpp', required: true)
 libcurl_dep = dependency('libcurl', required: true)
-libfuse_dep = dependency('libfuse', required: true)
+libfuse_dep = dependency('fuse3', required: true)
+uuid_dep = dependency('uuid', required: true)
 thread_dep = dependency('threads', required: true)
 gtest_dep = dependency('gtest', required: true, main: true)
 
@@ -22,7 +23,7 @@ project_root = source_root + '/src'
 tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')
 
-global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, libsodium_dep, jwt_cpp_dep, libfuse_dep, libcurl_dep, thread_dep]
+global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, libsodium_dep, jwt_cpp_dep, libfuse_dep, libcurl_dep, uuid_dep, thread_dep]
 test_deps = global_deps + gtest_dep
 
 inc = include_directories(source_root + '/include')

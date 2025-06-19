@@ -25,9 +25,10 @@ fuse_root = source_root + '/fuse_daemon/src'
 tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')
 
-global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, libsodium_dep, jwt_cpp_dep, libcurl_dep, uuid_dep, thread_dep]
-fuse_deps = [libfuse_dep, thread_dep, uuid_dep]
-test_deps = global_deps + gtest_dep
+global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, uuid_dep, thread_dep]
+vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep]
+fuse_deps = global_deps + libfuse_dep
+test_deps = vaulthalla_deps + gtest_dep
 
 inc = include_directories(source_root + '/include', source_root + '/shared/include')
 fuse_inc = include_directories(source_root + '/fuse_daemon/include', source_root + '/shared/include')
@@ -61,11 +62,11 @@ src_files += main
 
 vaulthalla = executable('vaulthalla',
                         src_files,
-                        dependencies: global_deps,
+                        dependencies: vaulthalla_deps,
                         include_directories: inc,
                         install : true)
 
-vaulthalla_fuse = executable('vaulthalla_fuse',
+vaulthalla_fuse = executable('vaulthalla_fuse_daemon',
                         fuse_src_files,
                         dependencies: fuse_deps,
                         include_directories: fuse_inc,

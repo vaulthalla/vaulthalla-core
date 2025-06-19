@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types/Vault.hpp"
-#include "types/StorageVolume.hpp"
+#include "../../../shared/include/types/StorageVolume.hpp"
 #include "types/UserStorageVolume.hpp"
 #include "database/Transactions.hpp"
 

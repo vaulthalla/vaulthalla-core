@@ -3,7 +3,7 @@
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "types/Vault.hpp"
 #include "types/User.hpp"
-#include "types/StorageVolume.hpp"
+#include "../../shared/include/types/StorageVolume.hpp"
 
 #include <stdexcept>
 #include <iostream>

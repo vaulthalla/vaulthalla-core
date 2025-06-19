@@ -2,7 +2,7 @@
 
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
-#include "types/StorageVolume.hpp"
+#include "../../shared/include/types/StorageVolume.hpp"
 #include "types/Vault.hpp"
 
 #include <memory>

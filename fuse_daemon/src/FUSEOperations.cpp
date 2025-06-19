@@ -1,6 +1,6 @@
 #include "../include/FUSEOperations.hpp"
-#include "shared/StorageBridge/RemoteFSProxy.hpp"
-#include "types/FileMetadata.hpp"
+#include "StorageBridge/RemoteFSProxy.hpp"
+#include "../../shared/include/types/FileMetadata.hpp"
 #include "types/File.hpp"
 
 #include <cstring>

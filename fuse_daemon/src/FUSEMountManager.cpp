@@ -1,4 +1,4 @@
-#include "../include/FUSEMountManager.hpp"
+#include "FUSEMountManager.hpp"
 #include <cstdlib>
 #include <iostream>
 

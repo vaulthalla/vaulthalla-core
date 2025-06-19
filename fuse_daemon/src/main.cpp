@@ -1,6 +1,6 @@
 #include "../include/FUSEOperations.hpp"
-#include "shared/StorageBridge/RemoteFSProxy.hpp"
-#include "shared/StorageBridge/UnifiedStorage.hpp"
+#include "StorageBridge/RemoteFSProxy.hpp"
+#include "StorageBridge/UnifiedStorage.hpp"
 
 int main(int argc, char* argv[]) {
     auto storage = std::make_shared<vh::shared::bridge::UnifiedStorage>(/* vault config */);

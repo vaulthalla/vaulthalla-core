@@ -1,5 +1,5 @@
-#include "shared/StorageBridge/RemoteFSProxy.hpp"
-#include "shared/StorageBridge/UnifiedStorage.hpp"
+#include "StorageBridge/RemoteFSProxy.hpp"
+#include "StorageBridge/UnifiedStorage.hpp"
 #include "types/File.hpp"
 
 #include <stdexcept>

@@ -1,9 +1,9 @@
 #include "storage/StorageManager.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
-#include "types/Vault.hpp"
-#include "types/User.hpp"
-#include "../../shared/include/types/StorageVolume.hpp"
+#include "../../shared/include/types/db/Vault.hpp"
+#include "../../shared/include/types/db/User.hpp"
+#include "../../shared/include/types/db/StorageVolume.hpp"
 
 #include <stdexcept>
 #include <iostream>

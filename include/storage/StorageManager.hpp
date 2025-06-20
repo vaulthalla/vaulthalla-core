@@ -2,8 +2,8 @@
 
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
-#include "../../shared/include/types/StorageVolume.hpp"
-#include "types/Vault.hpp"
+#include "../../shared/include/types/db/StorageVolume.hpp"
+#include "../../shared/include/types/db/Vault.hpp"
 
 #include <memory>
 #include <unordered_map>

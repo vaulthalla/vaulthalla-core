@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/FilePermission.hpp"
+#include "FilePermission.hpp"
 
 #include <string>
 #include <boost/describe.hpp>

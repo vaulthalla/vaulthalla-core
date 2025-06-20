@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/Vault.hpp"
+#include "Vault.hpp"
 #include "util/timestamp.hpp"
 
 #include <string>

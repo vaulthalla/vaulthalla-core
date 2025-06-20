@@ -1,17 +1,12 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "types/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
 
     FileSystemHandler::FileSystemHandler(const std::shared_ptr<vh::services::ServiceManager> &serviceManager)
-            : storageManager_(serviceManager->storageManager()),
-              accessControl_(serviceManager->accessControl()),
-              permissionManager_(accessControl_->permissionManager()) {
+            : storageManager_(serviceManager->storageManager()) {
         if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
-        if (!accessControl_) throw std::invalid_argument("AccessControl cannot be null");
-        if (!permissionManager_) throw std::invalid_argument("PermissionManager cannot be null");
     }
 
     void FileSystemHandler::validateAuth(WebSocketSession& session) {
@@ -25,14 +20,7 @@ namespace vh::websocket {
                                               const std::string& path,
                                               const std::string& requiredPermission) {
         auto user = session.getAuthenticatedUser();
-        if (!user) {
-            throw std::runtime_error("Unauthorized");
-        }
-
-        bool allowed = permissionManager_->hasPermission(user->email, mountName, path, requiredPermission);
-        if (!allowed) {
-            throw std::runtime_error("Permission denied: " + requiredPermission + " for " + path);
-        }
+        if (!user) throw std::runtime_error("Unauthorized");
     }
 
     void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {

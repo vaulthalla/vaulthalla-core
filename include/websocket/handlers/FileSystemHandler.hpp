@@ -2,8 +2,6 @@
 
 #include <nlohmann/json.hpp>
 #include <memory>
-#include "security/AccessControl.hpp"
-#include "security/PermissionManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "services/ServiceManager.hpp"
 
@@ -24,8 +22,6 @@ namespace vh::websocket {
 
     private:
         std::shared_ptr<vh::storage::StorageManager> storageManager_;
-        std::shared_ptr<vh::security::AccessControl> accessControl_;
-        std::shared_ptr<vh::security::PermissionManager> permissionManager_;
 
         static void validateAuth(WebSocketSession& session);
         void enforcePermission(WebSocketSession& session,

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <memory>
 
 namespace vh::fuse {
 
@@ -9,9 +8,13 @@ namespace vh::fuse {
     public:
         explicit FUSEMountManager(std::string mountPoint);
 
+        // Prepare mountpoint (mkdir, check not already mounted)
         bool mount();
+
+        // Unmount the FUSE FS from the mountpoint
         bool unmount();
 
+        // Return the current mountpoint string
         const std::string& getMountPoint() const;
 
     private:

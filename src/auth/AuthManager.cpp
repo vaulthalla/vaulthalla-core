@@ -1,6 +1,6 @@
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
-#include "types/User.hpp"
+#include "../../shared/include/types/db/User.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "storage/StorageManager.hpp"

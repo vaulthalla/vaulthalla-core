@@ -1,14 +1,16 @@
 #include "StorageBridge/RemoteFSProxy.hpp"
 #include "StorageBridge/UnifiedStorage.hpp"
-#include "types/File.hpp"
+#include "../../include/types/db/File.hpp"
 
 #include <stdexcept>
 #include <cstring>
+#include <sys/statvfs.h>
+#include <unistd.h>
 
 using namespace vh::shared::bridge;
 
 RemoteFSProxy::RemoteFSProxy(std::shared_ptr<UnifiedStorage> backend)
-        : backend_(std::move(backend)) {}
+    : backend_(std::move(backend)) {}
 
 bool RemoteFSProxy::fileExists(const std::string& path) const {
     return backend_->exists(path);
@@ -32,15 +34,46 @@ ssize_t RemoteFSProxy::writeFile(const std::string& path, const char* buf, size_
     return backend_->writeFile(path, buf, size, offset);
 }
 
-bool RemoteFSProxy::mkdir(const std::string& path) {
-    return backend_->makeDirectory(path);
+bool RemoteFSProxy::createFile(const std::string& path, mode_t mode) {
+    return backend_->createFile(path, mode);
 }
 
-bool RemoteFSProxy::unlink(const std::string& path) {
+bool RemoteFSProxy::resizeFile(const std::string& path, size_t newSize) {
+    return backend_->resizeFile(path, newSize);
+}
+
+bool RemoteFSProxy::deleteFile(const std::string& path) {
     return backend_->removeFile(path);
+}
+
+bool RemoteFSProxy::mkdir(const std::string& path, mode_t mode) {
+    return backend_->makeDirectory(path, mode);
+}
+
+bool RemoteFSProxy::deleteDirectory(const std::string& path) {
+    return backend_->removeDirectory(path);
 }
 
 bool RemoteFSProxy::rename(const std::string& oldPath, const std::string& newPath) {
     return backend_->moveFile(oldPath, newPath);
 }
 
+bool RemoteFSProxy::updateTimestamps(const std::string& path, time_t atime, time_t mtime) {
+    return backend_->updateTimestamps(path, atime, mtime);
+}
+
+bool RemoteFSProxy::setPermissions(const std::string& path, mode_t mode) {
+    return backend_->chmod(path, mode);
+}
+
+bool RemoteFSProxy::setOwnership(const std::string& path, uid_t uid, gid_t gid) {
+    return backend_->chown(path, uid, gid);
+}
+
+size_t RemoteFSProxy::getTotalBlocks() const {
+    return backend_->getTotalBlocks();
+}
+
+size_t RemoteFSProxy::getFreeBlocks() const {
+    return backend_->getFreeBlocks();
+}

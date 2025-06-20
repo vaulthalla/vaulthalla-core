@@ -1,5 +1,5 @@
 #include "database/Queries/VaultQueries.hpp"
-#include "types/Vault.hpp"
+#include "../../../shared/include/types/db/Vault.hpp"
 
 namespace vh::database {
     unsigned int VaultQueries::addVault(const std::shared_ptr<vh::types::Vault>& vault) {

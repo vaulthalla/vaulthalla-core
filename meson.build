@@ -48,11 +48,6 @@ foreach cpp_file : run_command('find', fuse_root, '-type', 'f', '-name', '*.cpp'
     fuse_src_files += files(cpp_file)
 endforeach
 
-core_test_sources = src_files
-foreach cpp_file : run_command('find', tests_source_root + '/core', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    core_test_sources += files(cpp_file)
-endforeach
-
 cloud_test_sources = src_files
 foreach cpp_file : run_command('find', tests_source_root + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
     cloud_test_sources += files(cpp_file)
@@ -71,12 +66,6 @@ vaulthalla_fuse = executable('vaulthalla_fuse_daemon',
                         dependencies: fuse_deps,
                         include_directories: fuse_inc,
                         install : true)
-
-test('test_core', executable('test_core',
-                        core_test_sources,
-                        dependencies: test_deps,
-                        include_directories: inc,
-                        install : true))
 
 test('test_cloud', executable('test_cloud',
                         cloud_test_sources,

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "include/storage/StorageEngine.hpp"
-#include "../../shared/include/types/StorageVolume.hpp"
+#include "../../shared/include/types/db/StorageVolume.hpp"
 #include <filesystem>
 #include <fstream>
 

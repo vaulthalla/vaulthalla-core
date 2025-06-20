@@ -1,6 +1,6 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/User.hpp"
+#include "../../../shared/include/types/db/User.hpp"
 #include "auth/RefreshToken.hpp"
 #include <iomanip>
 #include <sstream>

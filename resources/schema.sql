@@ -141,6 +141,33 @@ CREATE TABLE role_permissions
     PRIMARY KEY (role_id, permission_id, storage_volume_id)
 );
 
+-- GROUPS (TEAM SHARING)
+
+CREATE TABLE groups
+(
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE group_members
+(
+    gid  INTEGER REFERENCES groups (id) ON DELETE CASCADE,
+    uid   INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (gid, uid)
+);
+
+CREATE TABLE group_storage_volumes
+(
+    gid          INTEGER REFERENCES groups (id) ON DELETE CASCADE,
+    storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
+    assigned_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (gid, storage_volume_id)
+);
+
 -- FILES AND METADATA
 
 CREATE TABLE files
@@ -151,7 +178,8 @@ CREATE TABLE files
     name                       VARCHAR(500) NOT NULL,
     is_directory               BOOLEAN   DEFAULT FALSE,
     mode                       INTEGER DEFAULT 33188,
-    owner_id                   INTEGER REFERENCES users (id),
+    uid                        INTEGER REFERENCES users (id),
+    gid                        INTEGER REFERENCES groups(id),
     created_by                 INTEGER REFERENCES users (id),
     created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -318,33 +346,6 @@ CREATE TABLE user_storage_usage
     total_bytes       BIGINT    DEFAULT 0,
     used_bytes        BIGINT    DEFAULT 0,
     updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- GROUPS (TEAM SHARING)
-
-CREATE TABLE groups
-(
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(150) UNIQUE NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE group_memberships
-(
-    group_id  INTEGER REFERENCES groups (id) ON DELETE CASCADE,
-    user_id   INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (group_id, user_id)
-);
-
-CREATE TABLE group_storage_volumes
-(
-    group_id          INTEGER REFERENCES groups (id) ON DELETE CASCADE,
-    storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
-    assigned_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (group_id, storage_volume_id)
 );
 
 -- FILE TAGGING

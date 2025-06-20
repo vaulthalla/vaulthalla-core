@@ -1,4 +1,4 @@
-#include "types/APIKey.hpp"
+#include "../../shared/include/types/db/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
 
 #include <gtest/gtest.h>

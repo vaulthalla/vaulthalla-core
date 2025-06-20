@@ -2,10 +2,10 @@
 #include "storage/StorageManager.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/Vault.hpp"
+#include "../../../shared/include/types/db/Vault.hpp"
 #include "keys/APIKeyManager.hpp"
-#include "types/User.hpp"
-#include "types/APIKey.hpp"
+#include "../../../shared/include/types/db/User.hpp"
+#include "../../../shared/include/types/db/APIKey.hpp"
 
 #include <boost/algorithm/string.hpp>
 

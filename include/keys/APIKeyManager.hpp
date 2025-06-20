@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <mutex>
-#include "types/APIKey.hpp"
+#include "../../shared/include/types/db/APIKey.hpp"
 
 namespace vh::keys {
 

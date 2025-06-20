@@ -14,7 +14,8 @@ namespace vh::types {
         std::string name;
         bool is_directory = false;
         unsigned long long mode;
-        unsigned int owner_id;
+        unsigned int uid;
+        unsigned int gid;
         unsigned int created_by;
         std::time_t created_at;
         std::time_t updated_at;
@@ -28,6 +29,6 @@ namespace vh::types {
 } // namespace vh::types
 
 BOOST_DESCRIBE_STRUCT(vh::types::File, (),
-                      (id, storage_volume_id, parent_id, name, is_directory, mode, owner_id,
+                      (id, storage_volume_id, parent_id, name, is_directory, mode, uid, gid,
                        created_by, created_at, updated_at, current_version_size_bytes,
                        is_trashed, trashed_at, trashed_by, full_path))

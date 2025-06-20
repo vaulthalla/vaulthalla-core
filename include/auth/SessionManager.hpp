@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/User.hpp"
+#include "../../shared/include/types/db/User.hpp"
 #include "auth/Client.hpp"
 
 #include <string>

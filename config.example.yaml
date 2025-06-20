@@ -1,78 +1,70 @@
-# ========================
-# VAULTHALLA CONFIGURATION
-# ========================
+# ═══════════════════════════════════════════════════════
+#                  VAULTHALLA CONFIGURATION
+#                ⚔️  FINAL FORGED EDITION ⚔️
+#     A self-hosted empire demands no less than glory
+# ═══════════════════════════════════════════════════════
 
-# === CORE SERVER SETTINGS ===
+# === 🧠 CORE SERVER SETTINGS ===
 server:
-  host: "0.0.0.0"             # Bind address for API/WebSocket daemon
-  port: 8080                  # Main API listener port
-  uds_socket: "/tmp/vaulthalla.sock"  # Unix domain socket for internal IPC
-  log_level: "info"           # debug | info | warn | error
-  max_connections: 1024
+  host: 0.0.0.0                     # Bind address for API/WebSocket daemon
+  port: 8080                        # Main API listener port
+  uds_socket: /tmp/vaulthalla.sock  # Unix domain socket for internal IPC
+  log_level: info                   # debug | info | warn | error
+  max_connections: 1024             # Max concurrent API connections
 
-# === FUSE MOUNT SETTINGS ===
+# === 🪓 FUSE MOUNT SETTINGS ===
 fuse:
-  enabled: true
-  root_mount_path: "/mnt/vaulthalla"  # Root directory to mount user volumes under
-  mount_per_user: true                # Whether to spawn per-user submounts
-  fuse_timeout_seconds: 60            # Idle timeout before FUSE unmounts
-  allow_other: true                   # Allow access from non-calling user (like Nextcloud)
+  enabled: true                     # Mounting enabled
+  root_mount_path: /mnt/vaulthalla  # Base mountpoint for all volumes
+  mount_per_user: true              # Isolate each user's mount
+  fuse_timeout_seconds: 60          # Idle timeout for auto-unmount
+  allow_other: true                 # Allow access by non-calling users (e.g. Nextcloud)
 
-# === DATABASE SETTINGS ===
+# === 🐘 DATABASE SETTINGS ===
 database:
-  host: "localhost"
-  port: 5432
-  name: "vaulthalla"
-  user: "vaulthalla"
-  password: "changeme"               # 🔐 override with VAULTHALLA_DB_PASSWORD env var
-  pool_size: 10
+  host: localhost              # PostgreSQL host
+  port: 5432                   # PostgreSQL port
+  name: vaulthalla             # Database name
+  user: vaulthalla             # Database user
+  password: changeme           # 🔐 Override with VAULTHALLA_DB_PASSWORD env var
+  pool_size: 10                # Max DB connection pool size
 
-# === STORAGE ENGINE SETTINGS ===
-storage:
-  default_backend: "local"           # local | s3 | r2 | custom
-  local:
-    mount_point: "/data/vaulthalla"  # Where physical storage is rooted
-  s3:
-    endpoint: "https://s3.example.com"
-    region: "us-east-1"
-    access_key: "REPLACE_ME"
-    secret_key: "REPLACE_ME"
-    bucket: "vaulthalla-bucket"
-
-# === AUTHENTICATION ===
+# === 🔐 AUTHENTICATION SETTINGS ===
 auth:
-  token_expiry_minutes: 60
-  refresh_token_expiry_days: 7
-  jwt_secret: "changeme-very-secret" # 🔐 override with VAULTHALLA_JWT_SECRET env var
-  allow_signup: false
+  token_expiry_minutes: 60          # JWT access token TTL
+  refresh_token_expiry_days: 7      # Refresh token TTL
+  jwt_secret: changeme-very-secret  # 🔐 Override with VAULTHALLA_JWT_SECRET
+  allow_signup: false               # Enable/disable open registration
 
-# === TLS / HTTPS ===
+# === 📜 TLS / HTTPS SETTINGS ===
 tls:
-  enabled: false
-  cert_file: "/etc/vaulthalla/certs/fullchain.pem"
-  key_file: "/etc/vaulthalla/certs/privkey.pem"
+  enabled: false                                  # Set true to enable HTTPS
+  cert_file: /etc/vaulthalla/certs/fullchain.pem  # Full chain cert
+  key_file: /etc/vaulthalla/certs/privkey.pem     # Private key
 
-# === METRICS / MONITORING ===
+# === 📊 METRICS / MONITORING ===
 metrics:
-  enabled: true
-  port: 9100
+  enabled: true                # Enable Prometheus metrics
+  port: 9100                   # Metrics endpoint port
 
-# === ADMIN UI / DASHBOARD ===
+# === 🛡️ ADMIN UI / DASHBOARD ===
 admin_ui:
-  enabled: true
-  bind_port: 9090
-  allowed_ips: ["127.0.0.1", "::1"]
+  enabled: true                # Enable embedded UI
+  bind_port: 9090              # Port to serve UI
+  allowed_ips:                 # Whitelisted IPs for access
+    - 127.0.0.1
+    - "::1"
 
-# === BACKGROUND TASKS ===
+# === 🧼 BACKGROUND TASKS ===
 scheduler:
-  cleanup_interval_hours: 24
-  audit_prune_days: 90
-  usage_refresh_minutes: 10
+  cleanup_interval_hours: 24   # Cleanup cycle frequency
+  audit_prune_days: 90         # Audit log TTL
+  usage_refresh_minutes: 10    # How often to refresh user usage stats
 
-# === ADVANCED ===
+# === ⚙️ ADVANCED FEATURES ===
 advanced:
-  enable_file_versioning: true
-  max_upload_size_mb: 2048
-  enable_sharing: true
-  enable_public_links: true
-  rate_limit_per_ip_per_minute: 60
+  enable_file_versioning: true      # Keep past versions
+  max_upload_size_mb: 2048          # Upload limit per file
+  enable_sharing: true              # Allow internal file sharing
+  enable_public_links: true         # Allow external share links
+  rate_limit_per_ip_per_minute: 60  # API request limiter

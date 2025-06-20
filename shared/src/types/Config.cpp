@@ -41,20 +41,6 @@ Config loadConfig(const std::string& path) {
         cfg.database.pool_size = getOrDefault(node, "pool_size", cfg.database.pool_size);
     }
 
-    if (auto node = root["storage"]) {
-        cfg.storage.default_backend = getOrDefault(node, "default_backend", cfg.storage.default_backend);
-        if (auto local = node["local"]) {
-            cfg.storage.local.mount_point = getOrDefault(local, "mount_point", cfg.storage.local.mount_point);
-        }
-        if (auto s3 = node["s3"]) {
-            cfg.storage.s3.endpoint = getOrDefault(s3, "endpoint", cfg.storage.s3.endpoint);
-            cfg.storage.s3.region = getOrDefault(s3, "region", cfg.storage.s3.region);
-            cfg.storage.s3.access_key = getOrDefault(s3, "access_key", cfg.storage.s3.access_key);
-            cfg.storage.s3.secret_key = getOrDefault(s3, "secret_key", cfg.storage.s3.secret_key);
-            cfg.storage.s3.bucket = getOrDefault(s3, "bucket", cfg.storage.s3.bucket);
-        }
-    }
-
     if (auto node = root["auth"]) {
         cfg.auth.token_expiry_minutes = getOrDefault(node, "token_expiry_minutes", cfg.auth.token_expiry_minutes);
         cfg.auth.refresh_token_expiry_days = getOrDefault(node, "refresh_token_expiry_days", cfg.auth.refresh_token_expiry_days);

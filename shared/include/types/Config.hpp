@@ -44,12 +44,6 @@ struct S3StorageConfig {
     std::string bucket = "vaulthalla-bucket";
 };
 
-struct StorageConfig {
-    std::string default_backend = "local"; // local | s3 | ...
-    LocalStorageConfig local;
-    S3StorageConfig s3;
-};
-
 struct AuthConfig {
     int token_expiry_minutes = 60;
     int refresh_token_expiry_days = 7;
@@ -92,7 +86,6 @@ struct Config {
     ServerConfig server;
     FuseConfig fuse;
     DatabaseConfig database;
-    StorageConfig storage;
     AuthConfig auth;
     TLSConfig tls;
     MetricsConfig metrics;

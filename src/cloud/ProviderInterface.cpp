@@ -10,4 +10,4 @@ ProviderInterface::~ProviderInterface() {
     // TODO: Destructor
 }
 
-}
+} // namespace Cloud

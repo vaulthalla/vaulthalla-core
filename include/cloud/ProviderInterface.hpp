@@ -2,8 +2,8 @@
 
 namespace Cloud {
 class ProviderInterface {
-public:
+  public:
     ProviderInterface();
     ~ProviderInterface();
 };
-}
+} // namespace Cloud

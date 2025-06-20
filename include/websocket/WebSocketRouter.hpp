@@ -1,33 +1,33 @@
 #pragma once
 
 #include <functional>
-#include <nlohmann/json.hpp>
-#include <unordered_map>
-#include <string>
 #include <memory>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <unordered_map>
 
 namespace vh::auth {
-    class SessionManager;
+class SessionManager;
 }
 
 namespace vh::websocket {
-    class WebSocketSession;
+class WebSocketSession;
 
-    using json = nlohmann::json;
+using json = nlohmann::json;
 
-    class WebSocketRouter {
-    public:
-        using HandlerFunc = std::function<void(const json& msg, WebSocketSession& session)>;
+class WebSocketRouter {
+  public:
+    using HandlerFunc = std::function<void(const json& msg, WebSocketSession& session)>;
 
-        explicit WebSocketRouter(const std::shared_ptr<vh::auth::SessionManager>& sessionManager);
+    explicit WebSocketRouter(const std::shared_ptr<vh::auth::SessionManager>& sessionManager);
 
-        void registerHandler(const std::string& command, HandlerFunc handler);
+    void registerHandler(const std::string& command, HandlerFunc handler);
 
-        void routeMessage(const json& msg, WebSocketSession& session);
+    void routeMessage(const json& msg, WebSocketSession& session);
 
-    private:
-        std::unordered_map<std::string, HandlerFunc> handlers_;
-        std::shared_ptr<vh::auth::SessionManager> sessionManager_;
-    };
+  private:
+    std::unordered_map<std::string, HandlerFunc> handlers_;
+    std::shared_ptr<vh::auth::SessionManager> sessionManager_;
+};
 
 } // namespace vh::websocket

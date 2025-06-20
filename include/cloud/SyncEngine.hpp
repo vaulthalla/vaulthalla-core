@@ -2,8 +2,8 @@
 
 namespace Cloud {
 class SyncEngine {
-public:
+  public:
     SyncEngine();
     ~SyncEngine();
 };
-}
+} // namespace Cloud

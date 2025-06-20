@@ -1,49 +1,43 @@
 #pragma once
 
-#include <string>
 #include <boost/describe.hpp>
 #include <ctime>
+#include <string>
 
 namespace vh::types {
-    enum class FileMetadataType {
-        String,
-        Integer,
-        Boolean,
-        Timestamp,
-        Float
-    };
+enum class FileMetadataType { String, Integer, Boolean, Timestamp, Float };
 
-    struct FileMetadata {
-        unsigned int id;
-        unsigned int file_id;
-        std::string key;
-        FileMetadataType type;
-    };
+struct FileMetadata {
+    unsigned int id;
+    unsigned int file_id;
+    std::string key;
+    FileMetadataType type;
+};
 
-    struct FileMetadataString {
-        unsigned int file_metadata_id;
-        std::string value;
-    };
+struct FileMetadataString {
+    unsigned int file_metadata_id;
+    std::string value;
+};
 
-    struct FileMetadataInteger {
-        unsigned int file_metadata_id;
-        unsigned long value;
-    };
+struct FileMetadataInteger {
+    unsigned int file_metadata_id;
+    unsigned long value;
+};
 
-    struct FileMetadataBoolean {
-        unsigned int file_metadata_id;
-        bool value;
-    };
+struct FileMetadataBoolean {
+    unsigned int file_metadata_id;
+    bool value;
+};
 
-    struct FileMetadataTimestamp {
-        unsigned int file_metadata_id;
-        std::time_t value;
-    };
+struct FileMetadataTimestamp {
+    unsigned int file_metadata_id;
+    std::time_t value;
+};
 
-    struct FileMetadataFloat {
-        unsigned int file_metadata_id;
-        double value;
-    };
+struct FileMetadataFloat {
+    unsigned int file_metadata_id;
+    double value;
+};
 
 } // namespace vh::types
 

@@ -10,4 +10,4 @@ MinioProvider::~MinioProvider() {
     // TODO: Destructor
 }
 
-}
+} // namespace Cloud

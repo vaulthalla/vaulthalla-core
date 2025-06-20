@@ -1,14 +1,13 @@
 #include "../../shared/include/types/db/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
-
-#include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 
 namespace fs = std::filesystem;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
-protected:
+  protected:
     std::shared_ptr<vh::types::api::S3APIKey> apiKey_;
     std::string bucket_;
     std::shared_ptr<vh::cloud::s3::S3Provider> s3Provider_;
@@ -18,24 +17,20 @@ protected:
         test_dir = fs::temp_directory_path() / "vaulthalla_test_dir";
         fs::create_directory(test_dir);
 
-        apiKey_ = std::make_shared<vh::types::api::S3APIKey>(
-            "Test S3 Key",
-            1, // user_id
-            vh::types::api::S3Provider::CloudflareR2,
-            std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY"),
-            std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY"),
-            std::getenv("VAULTHALLA_TEST_R2_REGION"),
-            std::getenv("VAULTHALLA_TEST_R2_ENDPOINT")
-            );
+        apiKey_ = std::make_shared<vh::types::api::S3APIKey>("Test S3 Key",
+                                                             1, // user_id
+                                                             vh::types::api::S3Provider::CloudflareR2,
+                                                             std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY"),
+                                                             std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY"),
+                                                             std::getenv("VAULTHALLA_TEST_R2_REGION"),
+                                                             std::getenv("VAULTHALLA_TEST_R2_ENDPOINT"));
 
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
         s3Provider_ = std::make_shared<vh::cloud::s3::S3Provider>(apiKey_);
     }
 
-    void TearDown() override {
-        fs::remove_all(test_dir);
-    }
+    void TearDown() override { fs::remove_all(test_dir); }
 
     static void writeTextFile(const fs::path& path, const std::string& content) {
         std::ofstream out(path);

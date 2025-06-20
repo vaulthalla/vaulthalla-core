@@ -2,8 +2,8 @@
 
 namespace vh::shared::common {
 class PathResolver {
-public:
+  public:
     PathResolver();
     ~PathResolver();
 };
-}
+} // namespace vh::shared::common

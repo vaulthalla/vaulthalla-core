@@ -10,4 +10,4 @@ VaultSyncState::~VaultSyncState() {
     // TODO: Destructor
 }
 
-}
+} // namespace vh::shared::common

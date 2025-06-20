@@ -6,12 +6,12 @@
 
 namespace vh::types {
 
-    struct FileLock {
-        unsigned int file_id;
-        unsigned int locked_by;
-        std::time_t locked_at;
-        std::optional<std::time_t> expires_at;
-    };
+struct FileLock {
+    unsigned int file_id;
+    unsigned int locked_by;
+    std::time_t locked_at;
+    std::optional<std::time_t> expires_at;
+};
 
 } // namespace vh::types
 

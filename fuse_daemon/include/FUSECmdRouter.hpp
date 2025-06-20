@@ -1,10 +1,10 @@
 #pragma once
 
+#include <functional>
+#include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <thread>
-#include <functional>
-#include <optional>
-#include <nlohmann/json.hpp>
 
 namespace vh::types::fuse {
 struct Command;
@@ -13,7 +13,7 @@ struct Command;
 namespace vh::fuse::ipc {
 
 class CommandRouter {
-public:
+  public:
     explicit CommandRouter(const std::string& socketPath);
 
     ~CommandRouter();
@@ -24,7 +24,7 @@ public:
 
     void setCommandHandler(std::function<void(const types::fuse::Command&)> handler);
 
-private:
+  private:
     std::string socketPath_;
     int serverFd_ = -1;
     bool running_ = false;

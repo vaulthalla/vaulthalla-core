@@ -10,4 +10,4 @@ MetadataCache::~MetadataCache() {
     // TODO: Destructor
 }
 
-}
+} // namespace vh::shared::cache

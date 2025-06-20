@@ -1,19 +1,16 @@
 #include "FUSECmdRouter.hpp"
 #include "types/fuse/Command.hpp"
-
+#include <fcntl.h>
+#include <iostream>
+#include <nlohmann/json.hpp>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <iostream>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <nlohmann/json.hpp>
 
 using namespace vh::fuse::ipc;
 
-CommandRouter::CommandRouter(const std::string& socketPath)
-    : socketPath_(socketPath) {
-}
+CommandRouter::CommandRouter(const std::string& socketPath) : socketPath_(socketPath) {}
 
 CommandRouter::~CommandRouter() {
     stop();

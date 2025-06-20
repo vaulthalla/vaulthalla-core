@@ -2,8 +2,8 @@
 
 namespace vh::shared::cache {
 class MetadataCache {
-public:
+  public:
     MetadataCache();
     ~MetadataCache();
 };
-}
+} // namespace vh::shared::cache

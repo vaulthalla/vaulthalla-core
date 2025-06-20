@@ -1,12 +1,11 @@
 #include "types/Config.hpp"
-#include <yaml-cpp/yaml.h>
 #include <cstdlib>
 #include <iostream>
+#include <yaml-cpp/yaml.h>
 
 namespace vh::types::config {
 
-template<typename T>
-T getOrDefault(const YAML::Node& node, const std::string& key, const T& def) {
+template <typename T> T getOrDefault(const YAML::Node& node, const std::string& key, const T& def) {
     return node[key] ? node[key].as<T>() : def;
 }
 
@@ -36,17 +35,18 @@ Config loadConfig(const std::string& path) {
         cfg.database.name = getOrDefault(node, "name", cfg.database.name);
         cfg.database.user = getOrDefault(node, "user", cfg.database.user);
         cfg.database.password = std::getenv("VAULTHALLA_DB_PASSWORD")
-            ? std::getenv("VAULTHALLA_DB_PASSWORD")
-            : getOrDefault(node, "password", cfg.database.password);
+                                    ? std::getenv("VAULTHALLA_DB_PASSWORD")
+                                    : getOrDefault(node, "password", cfg.database.password);
         cfg.database.pool_size = getOrDefault(node, "pool_size", cfg.database.pool_size);
     }
 
     if (auto node = root["auth"]) {
         cfg.auth.token_expiry_minutes = getOrDefault(node, "token_expiry_minutes", cfg.auth.token_expiry_minutes);
-        cfg.auth.refresh_token_expiry_days = getOrDefault(node, "refresh_token_expiry_days", cfg.auth.refresh_token_expiry_days);
+        cfg.auth.refresh_token_expiry_days =
+            getOrDefault(node, "refresh_token_expiry_days", cfg.auth.refresh_token_expiry_days);
         cfg.auth.jwt_secret = std::getenv("VAULTHALLA_JWT_SECRET")
-            ? std::getenv("VAULTHALLA_JWT_SECRET")
-            : getOrDefault(node, "jwt_secret", cfg.auth.jwt_secret);
+                                  ? std::getenv("VAULTHALLA_JWT_SECRET")
+                                  : getOrDefault(node, "jwt_secret", cfg.auth.jwt_secret);
         cfg.auth.allow_signup = getOrDefault(node, "allow_signup", cfg.auth.allow_signup);
     }
 
@@ -72,17 +72,21 @@ Config loadConfig(const std::string& path) {
     }
 
     if (auto node = root["scheduler"]) {
-        cfg.scheduler.cleanup_interval_hours = getOrDefault(node, "cleanup_interval_hours", cfg.scheduler.cleanup_interval_hours);
+        cfg.scheduler.cleanup_interval_hours =
+            getOrDefault(node, "cleanup_interval_hours", cfg.scheduler.cleanup_interval_hours);
         cfg.scheduler.audit_prune_days = getOrDefault(node, "audit_prune_days", cfg.scheduler.audit_prune_days);
-        cfg.scheduler.usage_refresh_minutes = getOrDefault(node, "usage_refresh_minutes", cfg.scheduler.usage_refresh_minutes);
+        cfg.scheduler.usage_refresh_minutes =
+            getOrDefault(node, "usage_refresh_minutes", cfg.scheduler.usage_refresh_minutes);
     }
 
     if (auto node = root["advanced"]) {
-        cfg.advanced.enable_file_versioning = getOrDefault(node, "enable_file_versioning", cfg.advanced.enable_file_versioning);
+        cfg.advanced.enable_file_versioning =
+            getOrDefault(node, "enable_file_versioning", cfg.advanced.enable_file_versioning);
         cfg.advanced.max_upload_size_mb = getOrDefault(node, "max_upload_size_mb", cfg.advanced.max_upload_size_mb);
         cfg.advanced.enable_sharing = getOrDefault(node, "enable_sharing", cfg.advanced.enable_sharing);
         cfg.advanced.enable_public_links = getOrDefault(node, "enable_public_links", cfg.advanced.enable_public_links);
-        cfg.advanced.rate_limit_per_ip_per_minute = getOrDefault(node, "rate_limit_per_ip_per_minute", cfg.advanced.rate_limit_per_ip_per_minute);
+        cfg.advanced.rate_limit_per_ip_per_minute =
+            getOrDefault(node, "rate_limit_per_ip_per_minute", cfg.advanced.rate_limit_per_ip_per_minute);
     }
 
     return cfg;

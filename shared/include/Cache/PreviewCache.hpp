@@ -2,8 +2,8 @@
 
 namespace vh::shared::cache {
 class PreviewCache {
-public:
+  public:
     PreviewCache();
     ~PreviewCache();
 };
-}
+} // namespace vh::shared::cache

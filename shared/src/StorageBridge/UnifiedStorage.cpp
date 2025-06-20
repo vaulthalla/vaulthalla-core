@@ -1,14 +1,13 @@
 #include "StorageBridge/UnifiedStorage.hpp"
 #include "../../include/types/db/File.hpp"
-
-#include <unordered_map>
-#include <vector>
-#include <string>
 #include <cstring>
 #include <ctime>
-#include <sys/stat.h>
 #include <stdexcept>
+#include <string>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <unordered_map>
+#include <vector>
 
 using namespace vh::shared::bridge;
 
@@ -37,7 +36,7 @@ FileNode makeFileNode(mode_t mode) {
     return FileNode{false, {}, mode | S_IFREG, std::time(nullptr), std::time(nullptr), getuid(), getgid()};
 }
 
-}
+} // namespace
 
 UnifiedStorage::UnifiedStorage() {
     mock_fs["/"] = makeDirNode(0755);

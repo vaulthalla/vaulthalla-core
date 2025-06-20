@@ -26,8 +26,8 @@ fuse_root = source_root + '/fuse_daemon/src'
 tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')
 
-global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, uuid_dep, thread_dep]
-vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep, yaml_cpp_dep]
+global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, yaml_cpp_dep, uuid_dep, thread_dep]
+vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep]
 fuse_deps = global_deps + libfuse_dep
 test_deps = vaulthalla_deps + gtest_dep
 

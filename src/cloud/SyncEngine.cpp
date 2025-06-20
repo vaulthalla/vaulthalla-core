@@ -10,4 +10,4 @@ SyncEngine::~SyncEngine() {
     // TODO: Destructor
 }
 
-}
+} // namespace Cloud

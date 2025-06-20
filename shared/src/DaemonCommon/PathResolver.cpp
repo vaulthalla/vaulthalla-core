@@ -10,4 +10,4 @@ PathResolver::~PathResolver() {
     // TODO: Destructor
 }
 
-}
+} // namespace vh::shared::common

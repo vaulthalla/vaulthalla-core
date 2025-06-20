@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include <cstdint>
 
 namespace vh::types::config {
 
@@ -65,7 +65,7 @@ struct MetricsConfig {
 struct AdminUIConfig {
     bool enabled = true;
     uint16_t bind_port = 9090;
-    std::vector<std::string> allowed_ips = { "127.0.0.1", "::1" };
+    std::vector<std::string> allowed_ips = {"127.0.0.1", "::1"};
 };
 
 struct SchedulerConfig {

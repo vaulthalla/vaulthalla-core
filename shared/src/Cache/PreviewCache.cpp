@@ -10,4 +10,4 @@ PreviewCache::~PreviewCache() {
     // TODO: Destructor
 }
 
-}
+} // namespace vh::shared::cache

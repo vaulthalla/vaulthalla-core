@@ -2,8 +2,8 @@
 
 namespace Cloud {
 class MinioProvider {
-public:
+  public:
     MinioProvider();
     ~MinioProvider();
 };
-}
+} // namespace Cloud

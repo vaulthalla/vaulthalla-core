@@ -1,32 +1,34 @@
 #pragma once
 
-#include "auth/SessionManager.hpp"
 #include "auth/Client.hpp"
-
-#include <thread>
+#include "auth/SessionManager.hpp"
 #include <atomic>
-#include <mutex>
 #include <chrono>
+#include <mutex>
+#include <thread>
 
 namespace vh::services {
 
-    class ConnectionLifecycleManager {
-    public:
-        explicit ConnectionLifecycleManager(std::shared_ptr<vh::auth::SessionManager> sessionManager);
-        ~ConnectionLifecycleManager();
+class ConnectionLifecycleManager {
+  public:
+    explicit ConnectionLifecycleManager(std::shared_ptr<vh::auth::SessionManager> sessionManager);
 
-        void start();
-        void stop();
+    ~ConnectionLifecycleManager();
 
-    private:
-        void run();
-        void sweepActiveSessions();
+    void start();
 
-        std::shared_ptr<vh::auth::SessionManager> sessionManager_;
-        std::thread lifecycleThread_;
-        std::atomic<bool> running_{false};
+    void stop();
 
-        constexpr static std::chrono::milliseconds SweepInterval{1000}; // 1 second sweep interval
-    };
+  private:
+    void run();
+
+    void sweepActiveSessions();
+
+    std::shared_ptr<vh::auth::SessionManager> sessionManager_;
+    std::thread lifecycleThread_;
+    std::atomic<bool> running_{false};
+
+    constexpr static std::chrono::milliseconds SweepInterval{1000}; // 1 second sweep interval
+};
 
 } // namespace vh::services

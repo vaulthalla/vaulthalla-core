@@ -2,8 +2,8 @@
 
 namespace vh::shared::common {
 class VaultSyncState {
-public:
+  public:
     VaultSyncState();
     ~VaultSyncState();
 };
-}
+} // namespace vh::shared::common

@@ -1,5 +1,4 @@
 #include "FUSEPermissions.hpp"
-
 #include <memory>
 #include <sys/stat.h>
 

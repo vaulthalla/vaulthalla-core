@@ -1,13 +1,12 @@
 #include "FUSEMountManager.hpp"
-#include <filesystem>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 
 using namespace vh::fuse;
 namespace fs = std::filesystem;
 
-FUSEMountManager::FUSEMountManager(std::string mountPoint)
-    : mountPoint_(std::move(mountPoint)) {}
+FUSEMountManager::FUSEMountManager(std::string mountPoint) : mountPoint_(std::move(mountPoint)) {}
 
 bool FUSEMountManager::mount() {
     // Ensure directory exists

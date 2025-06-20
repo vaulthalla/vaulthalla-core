@@ -1,16 +1,14 @@
 #include "StorageBridge/RemoteFSProxy.hpp"
-#include "StorageBridge/UnifiedStorage.hpp"
 #include "../../include/types/db/File.hpp"
-
-#include <stdexcept>
+#include "StorageBridge/UnifiedStorage.hpp"
 #include <cstring>
+#include <stdexcept>
 #include <sys/statvfs.h>
 #include <unistd.h>
 
 using namespace vh::shared::bridge;
 
-RemoteFSProxy::RemoteFSProxy(std::shared_ptr<UnifiedStorage> backend)
-    : backend_(std::move(backend)) {}
+RemoteFSProxy::RemoteFSProxy(std::shared_ptr<UnifiedStorage> backend) : backend_(std::move(backend)) {}
 
 bool RemoteFSProxy::fileExists(const std::string& path) const {
     return backend_->exists(path);

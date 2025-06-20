@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════
+#           ⚔️ CLANG-FORMAT: FINAL FORGED EDITION ⚔️
+#       Minimalist. Tight. Efficient. Ruthless beauty.
+# ═══════════════════════════════════════════════════════
+
+BasedOnStyle: LLVM
+
+# === Formatting Core ===
+IndentWidth:             4
+TabWidth:                4
+UseTab:                  Never
+ColumnLimit:             120
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Always
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+
+# === Braces & Structure ===
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterFunction:         false
+  AfterClass:            false
+  AfterControlStatement: false
+  AfterEnum:             false
+  AfterStruct:           false
+  BeforeElse:            false
+  IndentBraces:          false
+  SplitEmptyFunction:    false
+  SplitEmptyRecord:      false
+  SplitEmptyNamespace:   false
+
+# === Includes ===
+SortIncludes: true
+IncludeBlocks: Merge
+
+# === Alignment ===
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+
+# === Style Tightening ===
+SpaceAfterCStyleCast: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeParens: ControlStatements
+Cpp11BracedListStyle: true
+AlwaysBreakTemplateDeclarations: No
+BinPackArguments: true
+BinPackParameters: true
+PenaltyBreakBeforeFirstCallParameter: 1000
+PenaltyBreakString: 1000
+
+# === Naming & Advanced ===
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# === Experimental Tightness ===
+ReflowComments: false
+IndentCaseLabels: false
+CompactNamespaces: true

@@ -12,7 +12,8 @@
 using namespace vh::fuse::ipc;
 
 CommandRouter::CommandRouter(const std::string& socketPath)
-    : socketPath_(socketPath) {}
+    : socketPath_(socketPath) {
+}
 
 CommandRouter::~CommandRouter() {
     stop();

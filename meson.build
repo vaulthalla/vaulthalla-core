@@ -14,6 +14,7 @@ libsodium_dep = dependency('libsodium', required: true)
 jwt_cpp_dep = dependency('jwt-cpp', required: true)
 libcurl_dep = dependency('libcurl', required: true)
 libfuse_dep = dependency('fuse3', required: true)
+yaml_cpp_dep = dependency('yaml-cpp', required: true)
 uuid_dep = dependency('uuid', required: true)
 thread_dep = dependency('threads', required: true)
 gtest_dep = dependency('gtest', required: true, main: true)
@@ -26,7 +27,7 @@ tests_source_root = source_root + '/tests'
 main = files(source_root + '/main.cpp')
 
 global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, uuid_dep, thread_dep]
-vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep]
+vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep, yaml_cpp_dep]
 fuse_deps = global_deps + libfuse_dep
 test_deps = vaulthalla_deps + gtest_dep
 

@@ -1,0 +1,78 @@
+# ========================
+# VAULTHALLA CONFIGURATION
+# ========================
+
+# === CORE SERVER SETTINGS ===
+server:
+  host: "0.0.0.0"             # Bind address for API/WebSocket daemon
+  port: 8080                  # Main API listener port
+  uds_socket: "/tmp/vaulthalla.sock"  # Unix domain socket for internal IPC
+  log_level: "info"           # debug | info | warn | error
+  max_connections: 1024
+
+# === FUSE MOUNT SETTINGS ===
+fuse:
+  enabled: true
+  root_mount_path: "/mnt/vaulthalla"  # Root directory to mount user volumes under
+  mount_per_user: true                # Whether to spawn per-user submounts
+  fuse_timeout_seconds: 60            # Idle timeout before FUSE unmounts
+  allow_other: true                   # Allow access from non-calling user (like Nextcloud)
+
+# === DATABASE SETTINGS ===
+database:
+  host: "localhost"
+  port: 5432
+  name: "vaulthalla"
+  user: "vaulthalla"
+  password: "changeme"               # 🔐 override with VAULTHALLA_DB_PASSWORD env var
+  pool_size: 10
+
+# === STORAGE ENGINE SETTINGS ===
+storage:
+  default_backend: "local"           # local | s3 | r2 | custom
+  local:
+    mount_point: "/data/vaulthalla"  # Where physical storage is rooted
+  s3:
+    endpoint: "https://s3.example.com"
+    region: "us-east-1"
+    access_key: "REPLACE_ME"
+    secret_key: "REPLACE_ME"
+    bucket: "vaulthalla-bucket"
+
+# === AUTHENTICATION ===
+auth:
+  token_expiry_minutes: 60
+  refresh_token_expiry_days: 7
+  jwt_secret: "changeme-very-secret" # 🔐 override with VAULTHALLA_JWT_SECRET env var
+  allow_signup: false
+
+# === TLS / HTTPS ===
+tls:
+  enabled: false
+  cert_file: "/etc/vaulthalla/certs/fullchain.pem"
+  key_file: "/etc/vaulthalla/certs/privkey.pem"
+
+# === METRICS / MONITORING ===
+metrics:
+  enabled: true
+  port: 9100
+
+# === ADMIN UI / DASHBOARD ===
+admin_ui:
+  enabled: true
+  bind_port: 9090
+  allowed_ips: ["127.0.0.1", "::1"]
+
+# === BACKGROUND TASKS ===
+scheduler:
+  cleanup_interval_hours: 24
+  audit_prune_days: 90
+  usage_refresh_minutes: 10
+
+# === ADVANCED ===
+advanced:
+  enable_file_versioning: true
+  max_upload_size_mb: 2048
+  enable_sharing: true
+  enable_public_links: true
+  rate_limit_per_ip_per_minute: 60

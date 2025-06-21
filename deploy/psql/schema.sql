@@ -135,10 +135,12 @@ CREATE TABLE permissions
 
 CREATE TABLE role_permissions
 (
-    role_id           INTEGER REFERENCES roles (id) ON DELETE CASCADE,
-    permission_id     INTEGER REFERENCES permissions (id) ON DELETE CASCADE,
-    storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE DEFAULT NULL,
-    PRIMARY KEY (role_id, permission_id, storage_volume_id)
+    id                SERIAL PRIMARY KEY,
+    role_id           INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
+    permission_id     INTEGER NOT NULL REFERENCES permissions (id) ON DELETE CASCADE,
+    storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
+
+    CONSTRAINT unique_role_permission_scope UNIQUE (role_id, permission_id, storage_volume_id)
 );
 
 -- GROUPS (TEAM SHARING)

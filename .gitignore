@@ -6,3 +6,4 @@ config.yaml
 
 # Server
 build
+deploy/psql/hash_password

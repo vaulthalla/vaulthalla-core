@@ -7,7 +7,7 @@
 # === 🧠 CORE SERVER SETTINGS ===
 server:
   host: 0.0.0.0                     # Bind address for API/WebSocket daemon
-  port: 8080                        # Main API listener port
+  port: 36969                       # Main API listener port
   uds_socket: /tmp/vaulthalla.sock  # Unix domain socket for internal IPC
   log_level: info                   # debug | info | warn | error
   max_connections: 1024             # Max concurrent API connections

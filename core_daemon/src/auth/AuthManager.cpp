@@ -7,12 +7,14 @@
 #include "database/Queries/UserQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "websocket/WebSocketSession.hpp"
+#include "types/config/ConfigRegistry.hpp"
 #include <chrono>
 #include <iostream>
 #include <jwt-cpp/jwt.h>
 #include <sodium.h>
 #include <stdexcept>
 #include <uuid/uuid.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
 
 namespace vh::auth {
 
@@ -123,7 +125,7 @@ AuthManager::validateRefreshToken(const std::string& refreshToken,
         auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-                                  .allow_algorithm(jwt::algorithm::hs256{std::getenv("VAULTHALLA_JWT_REFRESH_SECRET")})
+                                  .allow_algorithm(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret})
                                   .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
             ;
 
@@ -254,7 +256,7 @@ AuthManager::createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSe
             .set_issued_at(now)
             .set_expires_at(exp)
             .set_id(jti)
-            .sign(jwt::algorithm::hs256{std::getenv("VAULTHALLA_JWT_REFRESH_SECRET")});
+            .sign(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret});
 
     return std::pair<std::string,
                      std::shared_ptr<RefreshToken>>(token,

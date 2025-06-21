@@ -1,6 +1,11 @@
 #include "auth/Client.hpp"
 #include "auth/AuthManager.hpp"
 
+#include <chrono>
+#include <iostream>
+#include <jwt-cpp/jwt.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
+
 namespace vh::auth {
 
 Client::Client() = default;

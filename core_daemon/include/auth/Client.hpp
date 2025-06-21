@@ -1,15 +1,11 @@
 #pragma once
 
-#include "../../shared/include/types/db/User.hpp"
+#include "types/db/User.hpp"
 #include "Token.hpp"
 #include "auth/RefreshToken.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include <chrono>
-#include <iostream>
-#include <jwt-cpp/jwt.h>
-#include <jwt-cpp/traits/nlohmann-json/traits.h>
+#include "types/config/ConfigRegistry.hpp"
 #include <memory>
-#include <sodium.h>
 #include <string>
 
 namespace vh::auth {
@@ -52,7 +48,7 @@ class Client {
     std::shared_ptr<Token> token_;
     std::shared_ptr<vh::websocket::WebSocketSession> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
-    const std::string jwt_secret_ = std::getenv("VAULTHALLA_JWT_SECRET");
+    const std::string jwt_secret_ = types::config::ConfigRegistry::get().auth.jwt_secret;
 
     std::string generateToken(const std::string& email);
 };

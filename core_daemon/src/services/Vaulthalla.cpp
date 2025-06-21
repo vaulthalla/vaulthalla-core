@@ -6,7 +6,7 @@
 
 namespace vh::services {
 void Vaulthalla::start() {
-    std::cout << "Vaulthalla service started." << std::endl;
+    std::cout << "Starting Vaulthalla service..." << std::endl;
 
     try {
         const auto config = types::config::loadConfig("/etc/vaulthalla/config.yaml");
@@ -32,18 +32,22 @@ void Vaulthalla::start() {
                                                                      boost::asio::ip::tcp::endpoint(addr, port),
                                                                      wsRouter_, serviceManager_->authManager());
 
+        std::cout << "Websocket listening on: " << addr << ":" << port << std::endl;
+
         wsServer_->run();
 
         ioContext_->run();
 
-        vh::auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
+        auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
             {"https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
              "100k-most-used-passwords-NCSC.txt",
              "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
              "probable-v2_top-12000.txt"});
 
-        vh::auth::PasswordUtils::loadDictionaryFromURL(
+        auth::PasswordUtils::loadDictionaryFromURL(
             "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt");
+
+        std::cout << "Vaulthalla service started." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[Vaulthalla] Exception: " << e.what() << "\n";
     }

@@ -1,66 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTALL_DEPS=false
+# ═══════════════════════════════════════════════════════
+#             ⚔️  VAULTHALLA INSTALLATION ⚔️
+#       This script sets up the entire environment
+# ═══════════════════════════════════════════════════════
 
-# Check for --install-deps flag
-for arg in "$@"; do
-    if [[ "$arg" == "--install-deps" ]]; then
-        INSTALL_DEPS=true
-    fi
-done
-
-if $INSTALL_DEPS; then
-    echo "📦 Installing required dependencies..."
-
-    # Install PostgreSQL if not present
-    if ! command -v psql &>/dev/null; then
-        echo "🔌 Installing PostgreSQL..."
-        sudo apt update
-        sudo apt install -y postgresql
-    else
-        echo "✅ PostgreSQL already installed."
-    fi
-
-    # Install Conan if missing
-    if ! command -v conan &>/dev/null; then
-        echo "🧱 Installing Conan..."
-        pip install --user conan || sudo pip install conan
-    else
-        echo "✅ Conan already installed."
-    fi
-
-    # Install Meson if missing
-    if ! command -v meson &>/dev/null; then
-        echo "🧰 Installing Meson build system..."
-        sudo apt install -y meson ninja-build
-    else
-        echo "✅ Meson already installed."
-    fi
-fi
-
-echo "🏗️  Starting Vaulthalla installation..."
-
-# === 0) Conan Remote Setup ===
-if ! conan remote list | grep -q "vaulthalla"; then
-    echo "📦 Adding Conan remote for Vaulthalla packages..."
-    conan remote add vaulthalla https://repo.cooperhlarson.com/artifactory/api/conan/vh-conan-virtual
-else
-    echo "📦 Conan remote 'vaulthalla' already exists."
-fi
-
-# === 1) Install dependencies & build ===
-echo "🔧 Installing Conan dependencies..."
-conan install . -r vaulthalla --build=missing
-
-echo "🔨 Building binaries..."
-conan build .
-
-# === 2) Move helper binary ===
-echo "📁 Deploying hash_password helper..."
-sudo mv build/hash_password deploy/psql/
-
-# === 3) Create system user + group ===
+# === 1) Create system user ===
 if ! id vaulthalla &>/dev/null; then
     echo "👤 Creating system user 'vaulthalla'..."
     sudo useradd -r -s /usr/sbin/nologin vaulthalla
@@ -68,95 +14,179 @@ else
     echo "👤 System user 'vaulthalla' already exists."
 fi
 
-# === 4) Layout essential directories ===
-echo "📁 Creating runtime directories..."
-sudo install -d -o vaulthalla -g vaulthalla -m 755 /mnt/vaulthalla
-sudo install -d -o vaulthalla -g vaulthalla -m 755 /var/lib/vaulthalla
-sudo install -d -o vaulthalla -g vaulthalla -m 750 /var/log/vaulthalla
-sudo install -d -o vaulthalla -g vaulthalla -m 755 /run/vaulthalla
+# === 2) Ensure Build Dependencies ===
+echo "🔍 Checking for required build dependencies..."
 
-# === 5) Install binaries ===
+# -- PostgreSQL --
+if ! command -v psql &>/dev/null; then
+    echo "🔌 Installing PostgreSQL client tools..."
+    sudo apt update
+    sudo apt install -y postgresql
+else
+    echo "✅ PostgreSQL already installed."
+fi
+
+# === Conan ===
+if ! command -v conan &>/dev/null; then
+    echo "🧱 Conan not found. Attempting installation..."
+
+    if command -v pip &>/dev/null; then
+        echo "➡️ Trying pip --user install..."
+        if pip install --user conan; then
+            export PATH="$PATH:$HOME/.local/bin"
+        else
+            echo "⚠️ pip --user failed. Trying sudo pip..."
+
+            if sudo pip install conan; then
+                echo "✅ Installed Conan globally via pip."
+            else
+                echo "❌ pip failed. Trying pipx fallback..."
+
+                if ! command -v pipx &>/dev/null; then
+                    echo "📦 Installing pipx..."
+                    sudo apt install -y pipx
+                fi
+
+                echo "📦 Installing Conan globally via pipx..."
+                sudo pipx install conan || true
+                sudo pipx ensurepath
+
+                # This is the pipx install path for root. Export early for next checks.
+                ROOT_PIPX_BIN="/root/.local/bin"
+                if [[ -x "$ROOT_PIPX_BIN/conan" ]]; then
+                    echo "📍 Conan binary found in pipx fallback path. Injecting into PATH..."
+                    export PATH="$PATH:$ROOT_PIPX_BIN"
+                fi
+            fi
+        fi
+    else
+        echo "❌ pip is missing. Cannot install Conan."
+        exit 1
+    fi
+
+    # Final sanity check (brute force path check fallback)
+    if ! command -v conan &>/dev/null; then
+        if [[ -x "/root/.local/bin/conan" ]]; then
+            echo "⚠️ Conan manually found at /root/.local/bin/conan"
+        else
+            echo "💥 Conan install failed after all fallback attempts."
+            exit 1
+        fi
+    fi
+
+    echo "✅ Conan installed successfully."
+else
+    echo "✅ Conan already installed."
+fi
+
+# -- Meson/Ninja --
+if ! command -v meson &>/dev/null || ! command -v ninja &>/dev/null; then
+    echo "🛠️ Installing Meson and Ninja build system..."
+    sudo apt install -y meson ninja-build
+else
+    echo "✅ Meson and Ninja already installed."
+fi
+
+# === 3) Build Project ===
+echo "🏗️  Starting Vaulthalla build..."
+
+echo "🔧 Installing Conan dependencies..."
+
+# === Ensure default Conan profile exists ===
+if [[ ! -f "/root/.conan2/profiles/default" ]]; then
+    echo "📄 Conan profile missing. Running 'conan profile detect'..."
+    conan profile detect --force
+else
+    echo "✅ Conan profile already exists."
+fi
+
+# === Patch default Conan profile for modernity ===
+echo "🔧 Patching Conan profile: set C++ standard to gnu23 and build_type to Release..."
+sudo sed -i 's/compiler\.cppstd=.*/compiler.cppstd=gnu23/' /root/.conan2/profiles/default
+sudo sed -i 's/build_type=.*/build_type=Release/' /root/.conan2/profiles/default
+
+# Install dependencies
+conan install . --build=missing
+
+
+echo "🔨 Building binaries..."
+conan build .
+
+# === 4) Deploy helper binary ===
+echo "📁 Deploying hash_password helper..."
+sudo mv build/hash_password deploy/psql/
+
+# === 5) Setup Runtime Directories ===
+echo "📁 Creating runtime directories..."
+for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthalla; do
+    sudo install -d -o vaulthalla -g vaulthalla -m 755 "$dir"
+done
+sudo chmod 750 /var/log/vaulthalla
+
+# === 6) Install Binaries ===
 echo "🚀 Installing core executables..."
 sudo install -d -o vaulthalla -g vaulthalla -m 755 /usr/local/bin/vaulthalla
 sudo install -m 755 build/fuse_daemon /usr/local/bin/vaulthalla/
 sudo install -m 755 build/core_daemon /usr/local/bin/vaulthalla/
 
-# === 6) Copy default config ===
+# === 7) Deploy Config ===
 echo "⚙️  Deploying default config..."
 sudo install -d -m 755 /etc/vaulthalla
-
 if [[ -f ./config.yaml ]]; then
     echo "📄 Using local ./config.yaml"
     sudo cp ./config.yaml /etc/vaulthalla/config.yaml
 else
-    echo "📄 No local config found. Using example config from deploy/"
+    echo "📄 Using example config"
     sudo cp deploy/config.example.yaml /etc/vaulthalla/config.yaml
 fi
 
-# === 7) Create DB user and database ===
+# === 8) Setup Database ===
 VAUL_PG_PASS=$(uuidgen)
 echo "🔐 Creating PostgreSQL user and database..."
 
-# Create user if not exists
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='vaulthalla'" | grep -q 1; then
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='vaulthalla'" | grep -q 1 ||
     sudo -u postgres psql -c "CREATE USER vaulthalla WITH PASSWORD '${VAUL_PG_PASS}';"
-else
-    echo "👤 PostgreSQL user 'vaulthalla' already exists."
-fi
 
-# Create database if not exists
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'" | grep -q 1; then
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'" | grep -q 1 ||
     sudo -u postgres psql -c "CREATE DATABASE vaulthalla OWNER vaulthalla;"
-else
-    echo "🗃️  Database 'vaulthalla' already exists."
-fi
 
-# Grant privileges
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaulthalla;"
 
-# === 8) Inject DB password into config ===
+# === 9) Inject DB Password into Config ===
 echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
-# === 9) Apply DB schema ===
+# === 10) Apply Schema + Seed DB ===
 echo "📄 Applying schema.sql..."
 sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/schema.sql
 
-# === 10) Seed the database ===
-echo "🌱 Seeding the database with default roles and admin..."
-
-# ✅ Run the reduced, pure-SQL seed.sql (roles, permissions, etc.)
+echo "🌱 Seeding database..."
 sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/seed.sql
 
-# 🔐 Prompt for admin password
-echo "🔐 Set admin password (press Enter to use default: vh!adm1n):"
+echo "🔐 Set admin password (Enter = vh!adm1n):"
 read -rs ADMIN_PLAIN
 ADMIN_PLAIN="${ADMIN_PLAIN:-vh!adm1n}"
 
-# 🔒 Hash the password with the helper binary
 echo "🔒 Hashing admin password..."
 HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
 
-# 🚀 Inject the dynamic admin user and linkage SQL
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
 -- Insert Admin User
 INSERT INTO users (name, email, password_hash, created_at, is_active)
 VALUES ('Admin', 'admin@vaulthalla.lan', '${HASHED_PASS}', NOW(), TRUE);
 
--- Assign admin role
+-- Link Role
 INSERT INTO user_roles (user_id, role_id)
 SELECT users.id, roles.id FROM users, roles
 WHERE users.email = 'admin@vaulthalla.lan' AND roles.name = 'Admin';
 
--- Create admin group
+-- Create Admin Group & Link
 INSERT INTO groups (name, description) VALUES ('admin', 'Core admin group');
-
--- Add admin to admin group
 INSERT INTO group_members (gid, uid)
 SELECT groups.id, users.id FROM users, groups
 WHERE users.email = 'admin@vaulthalla.lan' AND groups.name = 'admin';
 
--- Create and link vault
+-- Create Vault
 INSERT INTO vaults (type, name, is_active, created_at)
 VALUES ('local', 'Admin Local Disk Vault', TRUE, NOW());
 
@@ -171,7 +201,7 @@ SELECT users.id, storage_volumes.id
 FROM users, storage_volumes
 WHERE users.email = 'admin@vaulthalla.lan' AND storage_volumes.name = 'Admin Local Disk Vault';
 
--- Assign all permissions to Admin role
+-- Full Permissions
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT roles.id, permissions.id FROM roles, permissions
 WHERE roles.name = 'Admin';
@@ -179,19 +209,12 @@ EOF
 
 # === 11) Install systemd services ===
 echo "🛠️  Installing systemd services..."
-
-SERVICE_DIR="./deploy/systemd"
-SYSTEMD_DIR="/etc/systemd/system"
-
-sudo install -m 644 "$SERVICE_DIR/vaulthalla-core.service" "$SYSTEMD_DIR/"
-sudo install -m 644 "$SERVICE_DIR/vaulthalla-fuse.service" "$SYSTEMD_DIR/"
+sudo install -m 644 deploy/systemd/vaulthalla-core.service /etc/systemd/system/
+sudo install -m 644 deploy/systemd/vaulthalla-fuse.service /etc/systemd/system/
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now vaulthalla-core.service
 sudo systemctl enable --now vaulthalla-fuse.service
 
-echo "✅ Systemd services installed and enabled."
-
-# === 🎉 DONE ===
 echo ""
 echo "🏁 Vaulthalla installed successfully!"

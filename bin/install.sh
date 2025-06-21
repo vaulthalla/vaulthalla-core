@@ -173,18 +173,18 @@ HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
 -- Insert Admin User
 INSERT INTO users (name, email, password_hash, created_at, is_active)
-VALUES ('Admin', 'admin@vaulthalla.lan', '${HASHED_PASS}', NOW(), TRUE);
+VALUES ('Admin', 'admin@vaulthalla.dev', '${HASHED_PASS}', NOW(), TRUE);
 
 -- Link Role
 INSERT INTO user_roles (user_id, role_id)
 SELECT users.id, roles.id FROM users, roles
-WHERE users.email = 'admin@vaulthalla.lan' AND roles.name = 'Admin';
+WHERE users.email = 'admin@vaulthalla.dev' AND roles.name = 'Admin';
 
 -- Create Admin Group & Link
 INSERT INTO groups (name, description) VALUES ('admin', 'Core admin group');
 INSERT INTO group_members (gid, uid)
 SELECT groups.id, users.id FROM users, groups
-WHERE users.email = 'admin@vaulthalla.lan' AND groups.name = 'admin';
+WHERE users.email = 'admin@vaulthalla.dev' AND groups.name = 'admin';
 
 -- Create Vault
 INSERT INTO vaults (type, name, is_active, created_at)
@@ -199,7 +199,7 @@ SELECT id, 'Admin Local Disk Vault', '/users/admin', NULL, NOW() FROM vaults WHE
 INSERT INTO user_storage_volumes (user_id, storage_volume_id)
 SELECT users.id, storage_volumes.id
 FROM users, storage_volumes
-WHERE users.email = 'admin@vaulthalla.lan' AND storage_volumes.name = 'Admin Local Disk Vault';
+WHERE users.email = 'admin@vaulthalla.dev' AND storage_volumes.name = 'Admin Local Disk Vault';
 
 -- Full Permissions
 INSERT INTO role_permissions (role_id, permission_id)

@@ -5,7 +5,7 @@
 
 namespace vh::websocket {
 
-WebSocketRouter::WebSocketRouter(const std::shared_ptr<vh::auth::SessionManager>& sessionManager)
+WebSocketRouter::WebSocketRouter(const std::shared_ptr<auth::SessionManager>& sessionManager)
     : sessionManager_(sessionManager) {
     if (!sessionManager_) throw std::invalid_argument("SessionManager cannot be null");
 }

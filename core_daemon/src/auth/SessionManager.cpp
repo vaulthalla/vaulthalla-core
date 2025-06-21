@@ -1,13 +1,12 @@
 #include "auth/SessionManager.hpp"
 #include "auth/RefreshToken.hpp"
-#include "crypto/PasswordHash.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include <iostream>
 
 namespace vh::auth {
 
 void SessionManager::createSession(const std::shared_ptr<Client>& client) {
-    std::lock_guard<std::mutex> lock(sessionMutex_);
+    std::lock_guard lock(sessionMutex_);
 
     if (!client || !client->getSession()) throw std::invalid_argument("Session must not be null");
 
@@ -17,7 +16,7 @@ void SessionManager::createSession(const std::shared_ptr<Client>& client) {
 
 std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client) {
     try {
-        std::lock_guard<std::mutex> lock(sessionMutex_);
+        std::lock_guard lock(sessionMutex_);
 
         if (!client || !client->getSession()) throw std::invalid_argument("Client and session must not be null");
 
@@ -25,8 +24,8 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
         refreshToken->setUserId(client->getUser()->id);
         refreshToken->setUserAgent(client->getSession()->getUserAgent());
         refreshToken->setIpAddress(client->getSession()->getClientIp());
-        vh::database::UserQueries::addRefreshToken(refreshToken);
-        client->setRefreshToken(vh::database::UserQueries::getRefreshToken(refreshToken->getJti()));
+        database::UserQueries::addRefreshToken(refreshToken);
+        client->setRefreshToken(database::UserQueries::getRefreshToken(refreshToken->getJti()));
         activeSessions_[client->getSession()->getUUID()] = client;
 
         std::cout << "[SessionManager] Promoted session for user: " << client->getEmail() << "\n";
@@ -38,7 +37,7 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
 }
 
 std::shared_ptr<Client> SessionManager::getClientSession(const std::string& UUID) {
-    std::lock_guard<std::mutex> lock(sessionMutex_);
+    std::lock_guard lock(sessionMutex_);
     auto it = activeSessions_.find(UUID);
     if (it != activeSessions_.end()) return it->second;
 
@@ -46,21 +45,21 @@ std::shared_ptr<Client> SessionManager::getClientSession(const std::string& UUID
 }
 
 void SessionManager::invalidateSession(const std::string& sessionUUID) {
-    std::lock_guard<std::mutex> lock(sessionMutex_);
+    std::lock_guard lock(sessionMutex_);
 
     auto it = activeSessions_.find(sessionUUID);
     if (it != activeSessions_.end()) {
         if (it->second->getUser()) {
             it->second->invalidateToken();
-            vh::database::UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
+            database::UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
             std::cout << "[SessionManager] Invalidated session for user: " << it->second->getEmail() << "\n";
         }
         activeSessions_.erase(it);
     }
 }
 
-std::unordered_map<std::string, std::shared_ptr<Client>> SessionManager::getActiveSessions() {
-    std::lock_guard<std::mutex> lock(sessionMutex_);
+std::unordered_map<std::string, std::shared_ptr<Client> > SessionManager::getActiveSessions() {
+    std::lock_guard lock(sessionMutex_);
     return activeSessions_;
 }
 

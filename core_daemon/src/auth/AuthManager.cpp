@@ -1,5 +1,5 @@
 #include "auth/AuthManager.hpp"
-#include "../../shared/include/types/db/User.hpp"
+#include "types/db/User.hpp"
 #include "auth/Client.hpp"
 #include "auth/SessionManager.hpp"
 #include "crypto/PasswordHash.hpp"
@@ -18,13 +18,13 @@
 
 namespace vh::auth {
 
-AuthManager::AuthManager(const std::shared_ptr<vh::storage::StorageManager>& storageManager)
+AuthManager::AuthManager(const std::shared_ptr<storage::StorageManager>& storageManager)
     : sessionManager_(std::make_shared<SessionManager>()), storageManager_(storageManager) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
 
-void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
-    std::shared_ptr<auth::Client> client;
+void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) {
+    std::shared_ptr<Client> client;
 
     if (!session->getRefreshToken().empty()) {
         std::cout << "[Session] Attempting token rehydration...\n";
@@ -37,8 +37,8 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<vh::websocket::W
     }
 
     if (!client) {
-        auto tokenPair = vh::auth::AuthManager::createRefreshToken(session);
-        client = std::make_shared<auth::Client>(session, tokenPair.second);
+        auto tokenPair = createRefreshToken(session);
+        client = std::make_shared<Client>(session, tokenPair.second);
         session->setRefreshTokenCookie(tokenPair.first);
     }
 
@@ -72,13 +72,13 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
 
 std::shared_ptr<Client> AuthManager::registerUser(const std::string& username, const std::string& email,
                                                   const std::string& password,
-                                                  const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+                                                  const std::shared_ptr<websocket::WebSocketSession>& session) {
     if (users_.count(username) > 0) throw std::runtime_error("User already exists: " + username);
 
     isValidRegistration(username, email, password);
 
-    const std::string hashedPassword = vh::crypto::hashPassword(password);
-    vh::database::UserQueries::createUser(username, email, hashedPassword);
+    const std::string hashedPassword = crypto::hashPassword(password);
+    database::UserQueries::createUser(username, email, hashedPassword);
 
     const auto user = findUser(email);
     auto client = sessionManager_->getClientSession(session->getUUID());
@@ -95,15 +95,15 @@ std::shared_ptr<Client> AuthManager::registerUser(const std::string& username, c
 }
 
 std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const std::string& password,
-                                               const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+                                               const std::shared_ptr<websocket::WebSocketSession>& session) {
     try {
         auto user = findUser(email);
         if (!user) throw std::runtime_error("User not found: " + email);
 
-        if (!vh::crypto::verifyPassword(password, user->password_hash))
-            throw std::runtime_error("Invalid password for user: " + email);
+        if (!crypto::verifyPassword(password, user->password_hash)) throw std::runtime_error(
+            "Invalid password for user: " + email);
 
-        vh::database::UserQueries::revokeAllRefreshTokens(user->id);
+        database::UserQueries::revokeAllRefreshTokens(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
 
@@ -119,14 +119,14 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const s
 
 std::shared_ptr<Client>
 AuthManager::validateRefreshToken(const std::string& refreshToken,
-                                  const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+                                  const std::shared_ptr<websocket::WebSocketSession>& session) {
     try {
         // 1. Decode and verify JWT
         auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-                                  .allow_algorithm(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret})
-                                  .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
+                .allow_algorithm(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret})
+                .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
             ;
 
         verifier.verify(decoded);
@@ -139,21 +139,21 @@ AuthManager::validateRefreshToken(const std::string& refreshToken,
         if (tokenJti.empty()) throw std::runtime_error("Missing JTI in refresh token");
 
         // 3. Lookup refresh token by jti
-        auto storedToken = vh::database::UserQueries::getRefreshToken(tokenJti);
+        auto storedToken = database::UserQueries::getRefreshToken(tokenJti);
         if (!storedToken) throw std::runtime_error("Refresh token not found for JTI: " + tokenJti);
 
         if (storedToken->isRevoked()) throw std::runtime_error("Refresh token has been revoked");
 
         auto now = std::chrono::system_clock::now();
 
-        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now)
-            throw std::runtime_error("Refresh token has expired");
+        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now) throw std::runtime_error(
+            "Refresh token has expired");
 
         // 4. Secure compare stored hash to hashed input token
-        if (!vh::crypto::verifyPassword(refreshToken, storedToken->getHashedToken()))
-            throw std::runtime_error("Refresh token hash mismatch");
+        if (!crypto::verifyPassword(refreshToken, storedToken->getHashedToken())) throw std::runtime_error(
+            "Refresh token hash mismatch");
 
-        auto user = vh::database::UserQueries::getUserByRefreshToken(tokenJti);
+        auto user = database::UserQueries::getUserByRefreshToken(tokenJti);
         auto client = std::make_shared<Client>(session, storedToken, user);
         sessionManager_->createSession(client);
         return client;
@@ -169,10 +169,10 @@ void AuthManager::changePassword(const std::string& email, const std::string& ol
     auto user = findUser(email);
     if (!user) throw std::runtime_error("User not found: " + email);
 
-    if (!vh::crypto::verifyPassword(oldPassword, user->password_hash))
-        throw std::runtime_error("Invalid old password for user: " + email);
+    if (!crypto::verifyPassword(oldPassword, user->password_hash)) throw std::runtime_error(
+        "Invalid old password for user: " + email);
 
-    std::string newHashed = vh::crypto::hashPassword(newPassword);
+    std::string newHashed = crypto::hashPassword(newPassword);
     user->setPasswordHash(newHashed);
 
     std::cout << "[AuthManager] Changed password for user: " << email << "\n";
@@ -190,14 +190,14 @@ bool AuthManager::isValidRegistration(const std::string& name, const std::string
         errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
                             "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
 
-    if (PasswordUtils::containsDictionaryWord(password))
-        errors.emplace_back("Password contains dictionary word — this is forbidden.");
+    if (PasswordUtils::containsDictionaryWord(password)) errors.emplace_back(
+        "Password contains dictionary word — this is forbidden.");
 
-    if (PasswordUtils::isCommonWeakPassword(password))
-        errors.emplace_back("Password matches known weak pattern — this is forbidden.");
+    if (PasswordUtils::isCommonWeakPassword(password)) errors.emplace_back(
+        "Password matches known weak pattern — this is forbidden.");
 
-    if (PasswordUtils::isPwnedPassword(password))
-        errors.emplace_back("Password has been found in public breaches — choose a different one.");
+    if (PasswordUtils::isPwnedPassword(password)) errors.emplace_back(
+        "Password has been found in public breaches — choose a different one.");
 
     if (!errors.empty()) {
         std::ostringstream oss;
@@ -223,11 +223,11 @@ bool AuthManager::isValidPassword(const std::string& password) {
            std::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
 }
 
-std::shared_ptr<vh::types::User> AuthManager::findUser(const std::string& email) {
+std::shared_ptr<types::User> AuthManager::findUser(const std::string& email) {
     auto it = users_.find(email);
     if (it != users_.end()) return it->second;
 
-    auto user = vh::database::UserQueries::getUserByEmail(email);
+    auto user = database::UserQueries::getUserByEmail(email);
     if (user) {
         users_[email] = user;
         return user;
@@ -243,29 +243,28 @@ std::string generateUUID() {
     return {uuidStr};
 }
 
-std::pair<std::string, std::shared_ptr<RefreshToken>>
-AuthManager::createRefreshToken(const std::shared_ptr<vh::websocket::WebSocketSession>& session) {
+std::pair<std::string, std::shared_ptr<RefreshToken> >
+AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) {
     auto now = std::chrono::system_clock::now();
     auto exp = now + std::chrono::hours(24 * 7); // 7 days
     std::string jti = generateUUID();
 
     std::string token =
         jwt::create<jwt::traits::nlohmann_json>()
-            .set_issuer("Vaulthalla")
-            .set_subject(session->getClientIp() + ":" + session->getUserAgent() + ":" + session->getUUID())
-            .set_issued_at(now)
-            .set_expires_at(exp)
-            .set_id(jti)
-            .sign(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret});
+        .set_issuer("Vaulthalla")
+        .set_subject(session->getClientIp() + ":" + session->getUserAgent() + ":" + session->getUUID())
+        .set_issued_at(now)
+        .set_expires_at(exp)
+        .set_id(jti)
+        .sign(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret});
 
-    return std::pair<std::string,
-                     std::shared_ptr<RefreshToken>>(token,
-                                                    std::make_shared<RefreshToken>(jti,
-                                                                                   vh::crypto::hashPassword(
-                                                                                       token), // Store hashed token
-                                                                                   0, // User ID will be set later
-                                                                                   session->getUserAgent(),
-                                                                                   session->getClientIp()));
+    return {token,
+            std::make_shared<RefreshToken>(jti,
+                                           crypto::hashPassword(
+                                               token), // Store hashed token
+                                           0,          // User ID will be set later
+                                           session->getUserAgent(),
+                                           session->getClientIp())};
 }
 
 } // namespace vh::auth

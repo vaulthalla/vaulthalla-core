@@ -11,12 +11,12 @@ using json = nlohmann::json;
 
 class SearchHandler {
   public:
-    explicit SearchHandler(const std::shared_ptr<vh::index::SearchIndex>& searchIndex);
+    explicit SearchHandler(const std::shared_ptr<index::SearchIndex>& searchIndex);
 
     void handleSearch(const json& msg, WebSocketSession& session);
 
   private:
-    std::shared_ptr<vh::index::SearchIndex> searchIndex_;
+    std::shared_ptr<index::SearchIndex> searchIndex_;
 };
 
 } // namespace vh::websocket

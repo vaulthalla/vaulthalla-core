@@ -4,7 +4,7 @@
 
 namespace vh::websocket {
 
-SearchHandler::SearchHandler(const std::shared_ptr<vh::index::SearchIndex>& searchIndex) : searchIndex_(searchIndex) {
+SearchHandler::SearchHandler(const std::shared_ptr<index::SearchIndex>& searchIndex) : searchIndex_(searchIndex) {
     if (!searchIndex_) throw std::invalid_argument("SearchIndex cannot be null");
 }
 

@@ -5,21 +5,21 @@
 namespace vh::websocket {
 
 void NotificationBroadcastManager::registerSession(std::shared_ptr<WebSocketSession> session) {
-    std::lock_guard<std::mutex> lock(sessionsMutex_);
+    std::lock_guard lock(sessionsMutex_);
     sessions_.insert(session);
 
     std::cout << "[NotificationBroadcastManager] Registered new session.\n";
 }
 
 void NotificationBroadcastManager::unregisterSession(std::shared_ptr<WebSocketSession> session) {
-    std::lock_guard<std::mutex> lock(sessionsMutex_);
+    std::lock_guard lock(sessionsMutex_);
     sessions_.erase(session);
 
     std::cout << "[NotificationBroadcastManager] Unregistered session.\n";
 }
 
 void NotificationBroadcastManager::broadcastNotification(const std::string& channel, const nlohmann::json& payload) {
-    std::lock_guard<std::mutex> lock(sessionsMutex_);
+    std::lock_guard lock(sessionsMutex_);
 
     std::cout << "[NotificationBroadcastManager] Broadcasting to channel '" << channel << "' to " << sessions_.size()
               << " session(s).\n";

@@ -7,7 +7,7 @@
 
 namespace vh::websocket {
 
-ShareHandler::ShareHandler(const std::shared_ptr<vh::share::LinkResolver>& linkResolver) : linkResolver_(linkResolver) {
+ShareHandler::ShareHandler(const std::shared_ptr<share::LinkResolver>& linkResolver) : linkResolver_(linkResolver) {
     if (!linkResolver_) throw std::invalid_argument("LinkResolver cannot be null");
 }
 

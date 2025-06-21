@@ -19,7 +19,7 @@ class WebSocketSession;
 
 class StorageHandler {
   public:
-    explicit StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager);
+    explicit StorageHandler(const std::shared_ptr<storage::StorageManager>& storageManager);
 
     // API commands
     void handleAddAPIKey(const json& msg, WebSocketSession& session);
@@ -43,8 +43,8 @@ class StorageHandler {
     void handleGetVolume(const json& msg, WebSocketSession& session);
 
   private:
-    std::shared_ptr<vh::storage::StorageManager> storageManager_;
-    std::shared_ptr<vh::keys::APIKeyManager> apiKeyManager_;
+    std::shared_ptr<storage::StorageManager> storageManager_;
+    std::shared_ptr<keys::APIKeyManager> apiKeyManager_;
 };
 
 } // namespace vh::websocket

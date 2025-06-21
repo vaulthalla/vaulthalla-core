@@ -11,8 +11,9 @@
 
 namespace vh::websocket {
 
-StorageHandler::StorageHandler(const std::shared_ptr<vh::storage::StorageManager>& storageManager)
-    : storageManager_(storageManager), apiKeyManager_(std::make_shared<keys::APIKeyManager>()) {}
+StorageHandler::StorageHandler(const std::shared_ptr<storage::StorageManager>& storageManager)
+    : storageManager_(storageManager), apiKeyManager_(std::make_shared<keys::APIKeyManager>()) {
+}
 
 void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session) {
     try {
@@ -22,20 +23,19 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
         std::string type = payload.at("type").get<std::string>();
         std::string typeLower = boost::algorithm::to_lower_copy(type);
 
-        std::shared_ptr<vh::types::api::APIKey> key;
+        std::shared_ptr<types::api::APIKey> key;
 
         if (typeLower == "s3") {
-            vh::types::api::S3Provider provider =
-                vh::types::api::s3_provider_from_string(payload.at("provider").get<std::string>());
+            types::api::S3Provider provider =
+                types::api::s3_provider_from_string(payload.at("provider").get<std::string>());
             std::string accessKey = payload.at("access_key").get<std::string>();
             std::string secretKey = payload.at("secret_access_key").get<std::string>();
             std::string region = payload.at("region").get<std::string>();
             std::string endpoint = payload.at("endpoint").get<std::string>();
 
-            key = std::make_shared<vh::types::api::S3APIKey>(name, userID, provider, accessKey, secretKey, region,
-                                                             endpoint);
-        } else
-            throw std::runtime_error("Unsupported API key type: " + type);
+            key = std::make_shared<types::api::S3APIKey>(name, userID, provider, accessKey, secretKey, region,
+                                                         endpoint);
+        } else throw std::runtime_error("Unsupported API key type: " + type);
 
         apiKeyManager_->addAPIKey(key);
 
@@ -88,7 +88,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     try {
         auto keys = apiKeyManager_->listAPIKeys();
 
-        json data = {{"keys", vh::types::api::to_json(keys).dump(4)}};
+        json data = {{"keys", types::api::to_json(keys).dump(4)}};
 
         json response = {{"command", "storage.apiKey.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -110,13 +110,13 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     }
 }
 
-void StorageHandler::handleListUserAPIKeys(const vh::websocket::json& msg, vh::websocket::WebSocketSession& session) {
+void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
         if (!user) throw std::runtime_error("User not authenticated");
         auto keys = apiKeyManager_->listUserAPIKeys(user->id);
 
-        json data{{"keys", vh::types::api::to_json(keys).dump(4)}};
+        json data{{"keys", types::api::to_json(keys).dump(4)}};
 
         json response = {{"command", "storage.apiKey.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -146,8 +146,8 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
 
         json data;
 
-        if (key->type == vh::types::api::APIKeyType::S3) {
-            auto s3Key = std::dynamic_pointer_cast<vh::types::api::S3APIKey>(key);
+        if (key->type == types::api::APIKeyType::S3) {
+            auto s3Key = std::dynamic_pointer_cast<types::api::S3APIKey>(key);
             data = {{"key",
                      {{"id", s3Key->id},
                       {"user_id", s3Key->user_id},
@@ -185,25 +185,24 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
 
 void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) {
     try {
-        if (vh::database::VaultQueries::localDiskVaultExists())
-            throw std::runtime_error("Local disk vault already exists. Only one local disk vault is allowed.");
+        if (database::VaultQueries::localDiskVaultExists()) throw std::runtime_error(
+            "Local disk vault already exists. Only one local disk vault is allowed.");
 
         const json& payload = msg.at("payload");
         const std::string name = payload.at("name").get<std::string>();
         const std::string type = payload.at("type").get<std::string>();
         const std::string typeLower = boost::algorithm::to_lower_copy(type);
 
-        std::unique_ptr<vh::types::Vault> vault;
+        std::unique_ptr<types::Vault> vault;
 
         if (typeLower == "local") {
             const std::string mountPoint = payload.at("mount_point").get<std::string>();
-            vault = std::make_unique<vh::types::LocalDiskVault>(name, mountPoint);
+            vault = std::make_unique<types::LocalDiskVault>(name, mountPoint);
         } else if (typeLower == "s3") {
             unsigned short apiKeyID = payload.at("api_key_id").get<unsigned short>();
             const std::string bucket = payload.at("bucket").get<std::string>();
-            vault = std::make_unique<vh::types::S3Vault>(name, apiKeyID, bucket);
-        } else
-            throw std::runtime_error("Unsupported vault type: " + typeLower);
+            vault = std::make_unique<types::S3Vault>(name, apiKeyID, bucket);
+        } else throw std::runtime_error("Unsupported vault type: " + typeLower);
 
         storageManager_->addVault(std::move(vault));
 
@@ -288,7 +287,7 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
     try {
         const auto vaults = storageManager_->listVaults();
 
-        json data = {{"vaults", vh::types::to_json(vaults).dump(4)}};
+        json data = {{"vaults", types::to_json(vaults).dump(4)}};
 
         json response = {{"command", "storage.vault.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -320,7 +319,7 @@ void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session)
         unsigned long long quotaBytes =
             payload.contains("quota_bytes") ? payload.at("quota_bytes").get<unsigned long long>() : 0;
 
-        auto storageVolume = std::make_shared<vh::types::StorageVolume>(vaultID, name, pathPrefix, quotaBytes);
+        auto storageVolume = std::make_shared<types::StorageVolume>(vaultID, name, pathPrefix, quotaBytes);
         storageManager_->addVolume(storageVolume, userID);
 
         json response = {{"command", "storage.volume.add.response"},
@@ -373,7 +372,7 @@ void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& se
         unsigned int userId = msg.at("payload").at("user_id").get<unsigned int>();
         auto volumes = database::VaultQueries::listUserVolumes(userId);
 
-        json data = {{"volumes", vh::types::to_json(volumes).dump(4)}};
+        json data = {{"volumes", types::to_json(volumes).dump(4)}};
 
         json response = {{"command", "storage.volume.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -400,7 +399,7 @@ void StorageHandler::handleListVaultVolumes(const json& msg, WebSocketSession& s
         unsigned int vaultId = msg.at("payload").at("vault_id").get<unsigned int>();
         auto volumes = database::VaultQueries::listVaultVolumes(vaultId);
 
-        json data = {{"volumes", vh::types::to_json(volumes).dump(4)}};
+        json data = {{"volumes", types::to_json(volumes).dump(4)}};
 
         json response = {{"command", "storage.volume.list.vault.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -422,11 +421,11 @@ void StorageHandler::handleListVaultVolumes(const json& msg, WebSocketSession& s
     }
 }
 
-void StorageHandler::handleListVolumes(const vh::websocket::json& msg, vh::websocket::WebSocketSession& session) {
+void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& session) {
     try {
         auto volumes = database::VaultQueries::listVolumes();
 
-        json data = {{"volumes", vh::types::to_json(volumes).dump(4)}};
+        json data = {{"volumes", types::to_json(volumes).dump(4)}};
 
         json response = {{"command", "storage.volume.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},

@@ -7,50 +7,50 @@ APIKeyManager::APIKeyManager() {
 }
 
 void APIKeyManager::initAPIKeys() {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
-    auto keys = vh::database::APIKeyQueries::listAPIKeys();
+    std::lock_guard lock(apiKeysMutex_);
+    auto keys = database::APIKeyQueries::listAPIKeys();
     for (const auto& key : keys) apiKeys_[key->id] = key;
 }
 
-void APIKeyManager::addAPIKey(std::shared_ptr<vh::types::api::APIKey>& key) {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
-    key->id = vh::database::APIKeyQueries::addAPIKey(key);
-    key = vh::database::APIKeyQueries::getAPIKey(key->id);
+void APIKeyManager::addAPIKey(std::shared_ptr<types::api::APIKey>& key) {
+    std::lock_guard lock(apiKeysMutex_);
+    key->id = database::APIKeyQueries::addAPIKey(key);
+    key = database::APIKeyQueries::getAPIKey(key->id);
     apiKeys_[key->id] = key; // Store in local cache
 }
 
 void APIKeyManager::removeAPIKey(unsigned short keyId, unsigned short userId) {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
+    std::lock_guard lock(apiKeysMutex_);
     if (apiKeys_.find(keyId) != apiKeys_.end()) {
         auto key = apiKeys_.at(keyId);
         if (key->user_id != userId) throw std::runtime_error("API key does not belong to the user");
         else
             apiKeys_.erase(keyId);
     } else {
-        auto key = vh::database::APIKeyQueries::getAPIKey(keyId);
+        auto key = database::APIKeyQueries::getAPIKey(keyId);
         if (key && key->user_id != userId) throw std::runtime_error("API key does not belong to the user");
         else if (!key)
             throw std::runtime_error("API key not found");
     }
-    vh::database::APIKeyQueries::removeAPIKey(keyId);
+    database::APIKeyQueries::removeAPIKey(keyId);
 }
 
-std::vector<std::shared_ptr<vh::types::api::APIKey>> APIKeyManager::listUserAPIKeys(unsigned short userId) const {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
-    return vh::database::APIKeyQueries::listAPIKeys(userId);
+std::vector<std::shared_ptr<types::api::APIKey>> APIKeyManager::listUserAPIKeys(unsigned short userId) const {
+    std::lock_guard lock(apiKeysMutex_);
+    return database::APIKeyQueries::listAPIKeys(userId);
 }
 
-std::vector<std::shared_ptr<vh::types::api::APIKey>> APIKeyManager::listAPIKeys() const {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
-    return vh::database::APIKeyQueries::listAPIKeys();
+std::vector<std::shared_ptr<types::api::APIKey>> APIKeyManager::listAPIKeys() const {
+    std::lock_guard lock(apiKeysMutex_);
+    return database::APIKeyQueries::listAPIKeys();
 }
 
-std::shared_ptr<vh::types::api::APIKey> APIKeyManager::getAPIKey(unsigned short keyId, unsigned short userId) const {
-    std::lock_guard<std::mutex> lock(apiKeysMutex_);
+std::shared_ptr<types::api::APIKey> APIKeyManager::getAPIKey(unsigned short keyId, unsigned short userId) const {
+    std::lock_guard lock(apiKeysMutex_);
     if (apiKeys_.find(keyId) != apiKeys_.end()) {
         auto key = apiKeys_.at(keyId);
         if (key->user_id != userId) throw std::runtime_error("API key does not belong to the user");
     }
-    return vh::database::APIKeyQueries::getAPIKey(keyId);
+    return database::APIKeyQueries::getAPIKey(keyId);
 }
 } // namespace vh::keys

@@ -8,10 +8,10 @@ namespace vh::websocket {
 
 WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
                                  const std::shared_ptr<WebSocketRouter>& router,
-                                 const std::shared_ptr<vh::auth::AuthManager>& authManager)
+                                 const std::shared_ptr<auth::AuthManager>& authManager)
     : acceptor_(ioc), socket_(ioc), ioc_(ioc), router_(router), authManager_(authManager),
       sessionManager_(authManager_->sessionManager()),
-      broadcastManager_(std::make_shared<vh::websocket::NotificationBroadcastManager>()) {
+      broadcastManager_(std::make_shared<NotificationBroadcastManager>()) {
     beast::error_code ec;
 
     acceptor_.open(endpoint.protocol(), ec);

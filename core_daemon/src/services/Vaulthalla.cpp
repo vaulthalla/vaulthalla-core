@@ -15,20 +15,20 @@ void Vaulthalla::start() {
 
         ioContext_ = std::make_shared<boost::asio::io_context>();
 
-        serviceManager_ = std::make_shared<vh::services::ServiceManager>();
+        serviceManager_ = std::make_shared<ServiceManager>();
 
-        lifecycleManager_ = std::make_shared<vh::services::ConnectionLifecycleManager>(
+        lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(
             serviceManager_->authManager()->sessionManager());
 
-        wsRouter_ = std::make_shared<vh::websocket::WebSocketRouter>(serviceManager_->authManager()->sessionManager());
+        wsRouter_ = std::make_shared<websocket::WebSocketRouter>(serviceManager_->authManager()->sessionManager());
 
-        wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(serviceManager_, wsRouter_);
+        wsHandler_ = std::make_shared<websocket::WebSocketHandler>(serviceManager_, wsRouter_);
 
         const auto ws_config = config.server;
         const auto addr = boost::asio::ip::make_address(ws_config.host);
         const auto port = ws_config.port;
 
-        wsServer_ = std::make_shared<vh::websocket::WebSocketServer>(*ioContext_,
+        wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_,
                                                                      boost::asio::ip::tcp::endpoint(addr, port),
                                                                      wsRouter_, serviceManager_->authManager());
 

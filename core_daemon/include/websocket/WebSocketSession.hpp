@@ -36,42 +36,54 @@ using tcp = asio::ip::tcp;
 using json = nlohmann::json;
 
 class WebSocketSession : public std::enable_shared_from_this<WebSocketSession> {
-  public:
+public:
     ~WebSocketSession();
+
     WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
                      const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
-                     const std::shared_ptr<vh::auth::AuthManager>& authManager);
+                     const std::shared_ptr<auth::AuthManager>& authManager);
 
     void send(const json& message);
+
     void accept(tcp::socket&& socket);
+
     void close();
 
     void subscribeChannel(const std::string& channel);
+
     void unsubscribeChannel(const std::string& channel);
+
     bool isSubscribedTo(const std::string& channel);
+
     std::unordered_set<std::string> getSubscribedChannels();
 
     const std::string& getUUID() const { return uuid; }
 
     // Accessors for session state
-    std::shared_ptr<vh::types::User> getAuthenticatedUser() const;
-    void setAuthenticatedUser(std::shared_ptr<vh::types::User> user);
+    std::shared_ptr<types::User> getAuthenticatedUser() const;
+
+    void setAuthenticatedUser(std::shared_ptr<types::User> user);
+
     void setRefreshTokenCookie(const std::string& token);
+
     void setHandshakeRequest(const RequestType& req);
+
     std::string getClientIp() const;
+
     std::string getUserAgent() const;
+
     std::string getRefreshToken() const;
 
-  private:
-    std::shared_ptr<vh::auth::AuthManager> authManager_;
+private:
+    std::shared_ptr<auth::AuthManager> authManager_;
     const std::string uuid = generateUUIDv4();
-    std::shared_ptr<websocket::stream<tcp::socket>> ws_;
+    std::shared_ptr<websocket::stream<tcp::socket> > ws_;
     beast::flat_buffer buffer_, tmpBuffer_;
     asio::any_io_executor strand_;
     RequestType handshakeRequest_;
 
     std::shared_ptr<WebSocketRouter> router_;
-    std::shared_ptr<vh::types::User> authenticatedUser_;
+    std::shared_ptr<types::User> authenticatedUser_;
     std::string refreshToken_;
     std::string userAgent_;
     std::string ipAddress_;
@@ -86,9 +98,11 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession> {
     bool isRegistered_ = false;
 
     void doRead();
+
     void onRead(beast::error_code ec, std::size_t bytesTransferred);
 
     void doWrite();
+
     void onWrite(beast::error_code ec, std::size_t bytesTransferred);
 
     static std::string generateUUIDv4() {

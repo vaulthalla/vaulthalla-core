@@ -6,7 +6,7 @@
 
 namespace vh::websocket {
 
-AuthHandler::AuthHandler(const std::shared_ptr<vh::auth::AuthManager>& authManager)
+AuthHandler::AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager)
     : authManager_(authManager), sessionManager_(authManager->sessionManager()) {
     if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
 }

@@ -16,7 +16,7 @@ class WebSocketSession;
 
 class AuthHandler {
   public:
-    explicit AuthHandler(const std::shared_ptr<vh::auth::AuthManager>& authManager);
+    explicit AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager);
 
     void handleLogin(const json& msg, WebSocketSession& session);
     void handleRegister(const json& msg, WebSocketSession& session);
@@ -25,8 +25,8 @@ class AuthHandler {
     void isUserAuthenticated(const json& msg, WebSocketSession& session);
 
   private:
-    std::shared_ptr<vh::auth::AuthManager> authManager_;
-    std::shared_ptr<vh::auth::SessionManager> sessionManager_;
+    std::shared_ptr<auth::AuthManager> authManager_;
+    std::shared_ptr<auth::SessionManager> sessionManager_;
 };
 
 } // namespace vh::websocket

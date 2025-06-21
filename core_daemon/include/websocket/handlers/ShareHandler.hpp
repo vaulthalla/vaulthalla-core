@@ -15,13 +15,13 @@ class WebSocketSession;
 
 class ShareHandler {
   public:
-    explicit ShareHandler(const std::shared_ptr<vh::share::LinkResolver>& linkResolver);
+    explicit ShareHandler(const std::shared_ptr<share::LinkResolver>& linkResolver);
 
     void handleCreateLink(const json& msg, WebSocketSession& session);
     void handleResolveLink(const json& msg, WebSocketSession& session);
 
   private:
-    std::shared_ptr<vh::share::LinkResolver> linkResolver_;
+    std::shared_ptr<share::LinkResolver> linkResolver_;
 };
 
 } // namespace vh::websocket

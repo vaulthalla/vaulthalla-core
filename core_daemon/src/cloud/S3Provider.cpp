@@ -1,6 +1,6 @@
 // S3Provider.cpp — safe header lifetime + explicit payload sizes
 #include "cloud/S3Provider.hpp"
-#include "../../shared/include/types/db/APIKey.hpp"
+#include "types/db/APIKey.hpp"
 #include "util/timestamp.hpp"
 #include <ctime>
 #include <curl/curl.h>
@@ -29,6 +29,7 @@ struct HeaderList {
     std::vector<std::string> store; // owns the memory
     curl_slist* list = nullptr;     // raw list pointer
     ~HeaderList() { curl_slist_free_all(list); }
+
     void add(const std::string& h) {
         store.push_back(h);
         list = curl_slist_append(list, store.back().c_str());
@@ -68,7 +69,7 @@ bool S3Provider::uploadObject(const std::string& bucket, const std::string& key,
 
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
 
     const std::string authHeader = buildAuthorizationHeader("PUT", "/" + bucket + "/" + key, hdrMap, payloadHash);
 
@@ -112,7 +113,7 @@ bool S3Provider::downloadObject(const std::string& bucket, const std::string& ke
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
     const std::string authHeader = buildAuthorizationHeader("GET", uriPath, hdrMap, payloadHash);
 
     HeaderList headers;
@@ -145,7 +146,7 @@ bool S3Provider::deleteObject(const std::string& bucket, const std::string& key)
 
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
 
     const std::string authHeader = buildAuthorizationHeader("DELETE", "/" + bucket + "/" + key, hdrMap, payloadHash);
 
@@ -174,7 +175,8 @@ std::string S3Provider::hmacSha256Hex(const std::string& key, const std::string&
     unsigned char* digest;
     digest = HMAC(EVP_sha256(), key.c_str(), key.length(), (unsigned char*)data.c_str(), data.length(), NULL, NULL);
     std::ostringstream oss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i
+         ++)
         oss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
     return oss.str();
 }
@@ -197,7 +199,7 @@ std::string S3Provider::buildAuthorizationHeader(const std::string& method,
     const std::string service = "s3";
     const std::string algorithm = "AWS4-HMAC-SHA256";
     const std::string amzDate = headers.at("x-amz-date");
-    const std::string dateStamp = vh::util::getDate();
+    const std::string dateStamp = util::getDate();
 
     // 1. Canonical headers
     std::string canonicalHeaders;
@@ -211,11 +213,11 @@ std::string S3Provider::buildAuthorizationHeader(const std::string& method,
     // 2. Canonical request
     std::ostringstream canonicalRequestStream;
     canonicalRequestStream << method << "\n"
-                           << canonicalPath << "\n"
-                           << canonicalQuery << "\n"
-                           << canonicalHeaders << "\n"
-                           << signedHeaders << "\n"
-                           << payloadHash;
+        << canonicalPath << "\n"
+        << canonicalQuery << "\n"
+        << canonicalHeaders << "\n"
+        << signedHeaders << "\n"
+        << payloadHash;
 
     const std::string canonicalRequest = canonicalRequestStream.str();
     const std::string hashedCanonicalRequest = sha256Hex(canonicalRequest);
@@ -244,13 +246,14 @@ std::string S3Provider::buildAuthorizationHeader(const std::string& method,
          stringToSign.size(), sigRaw, nullptr);
 
     std::ostringstream sigHex;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++
+         i)
         sigHex << std::hex << std::setw(2) << std::setfill('0') << (int)sigRaw[i];
 
     // 5. Final header
     std::ostringstream authHeader;
     authHeader << algorithm << " " << "Credential=" << apiKey_->access_key << "/" << credentialScope << ", "
-               << "SignedHeaders=" << signedHeaders << ", " << "Signature=" << sigHex.str();
+        << "SignedHeaders=" << signedHeaders << ", " << "Signature=" << sigHex.str();
 
     return authHeader.str();
 }
@@ -269,14 +272,13 @@ std::string S3Provider::initiateMultipartUpload(const std::string& bucket, const
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
     const std::string authHeader = buildAuthorizationHeader("POST", uri, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
     headers.add("x-amz-content-sha256: " + payloadHash);
-    for (const auto& [k, v] : hdrMap)
-        if (k != "x-amz-content-sha256") headers.add(k + ": " + v);
+    for (const auto& [k, v] : hdrMap) if (k != "x-amz-content-sha256") headers.add(k + ": " + v);
 
     std::string response;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -286,8 +288,8 @@ std::string S3Provider::initiateMultipartUpload(const std::string& bucket, const
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)0);
     curl_easy_setopt(
         curl, CURLOPT_WRITEFUNCTION, +[](char* p, size_t s, size_t n, std::string* d) {
-            d->append(p, s * n);
-            return s * n;
+        d->append(p, s * n);
+        return s * n;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
@@ -298,7 +300,7 @@ std::string S3Provider::initiateMultipartUpload(const std::string& bucket, const
 
     if (res != CURLE_OK || httpCode != 200) {
         std::cerr << "initiateMultipartUpload failed: CURL=" << res << " HTTP=" << httpCode << "Resp: " << response
-                  << std::endl;
+            << std::endl;
         return "";
     }
 
@@ -324,7 +326,7 @@ bool S3Provider::uploadPart(const std::string& bucket, const std::string& key, c
     const std::string payloadHash = sha256Hex(partData);
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
     const std::string authHeader = buildAuthorizationHeader("PUT", uri, hdrMap, payloadHash);
 
     HeaderList headers;
@@ -340,8 +342,8 @@ bool S3Provider::uploadPart(const std::string& bucket, const std::string& key, c
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)partData.size());
     curl_easy_setopt(
         curl, CURLOPT_HEADERFUNCTION, +[](char* b, size_t s, size_t n, std::string* out) {
-            out->append(b, s * n);
-            return s * n;
+        out->append(b, s * n);
+        return s * n;
         });
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &respHdr);
 
@@ -374,14 +376,15 @@ bool S3Provider::completeMultipartUpload(const std::string& bucket, const std::s
     std::ostringstream xml;
     xml << "<CompleteMultipartUpload>";
     for (size_t i = 0; i < etags.size(); ++i)
-        xml << "<Part><PartNumber>" << (i + 1) << "</PartNumber><ETag>" << etags[i] << "</ETag></Part>";
+        xml << "<Part><PartNumber>" << (i + 1) << "</PartNumber><ETag>" << etags[
+            i] << "</ETag></Part>";
     xml << "</CompleteMultipartUpload>";
     const std::string body = xml.str();
 
     const std::string payloadHash = sha256Hex(body);
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
     const std::string authHeader = buildAuthorizationHeader("POST", uri, hdrMap, payloadHash);
 
     HeaderList headers;
@@ -397,8 +400,8 @@ bool S3Provider::completeMultipartUpload(const std::string& bucket, const std::s
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)body.size());
     curl_easy_setopt(
         curl, CURLOPT_WRITEFUNCTION, +[](char* p, size_t s, size_t n, std::string* d) {
-            d->append(p, s * n);
-            return s * n;
+        d->append(p, s * n);
+        return s * n;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
@@ -428,7 +431,7 @@ bool S3Provider::abortMultipartUpload(const std::string& bucket, const std::stri
     const std::string payloadHash = sha256Hex("");
     std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
                                               {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", vh::util::getCurrentTimestamp()}};
+                                              {"x-amz-date", util::getCurrentTimestamp()}};
     const std::string authHeader = buildAuthorizationHeader("DELETE", uri, hdrMap, payloadHash);
 
     HeaderList headers;

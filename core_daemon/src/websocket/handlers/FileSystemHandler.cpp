@@ -4,7 +4,7 @@
 
 namespace vh::websocket {
 
-FileSystemHandler::FileSystemHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager)
+FileSystemHandler::FileSystemHandler(const std::shared_ptr<services::ServiceManager>& serviceManager)
     : storageManager_(serviceManager->storageManager()) {
     if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
 }

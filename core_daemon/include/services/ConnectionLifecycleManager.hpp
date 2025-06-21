@@ -4,14 +4,13 @@
 #include "auth/SessionManager.hpp"
 #include <atomic>
 #include <chrono>
-#include <mutex>
 #include <thread>
 
 namespace vh::services {
 
 class ConnectionLifecycleManager {
   public:
-    explicit ConnectionLifecycleManager(std::shared_ptr<vh::auth::SessionManager> sessionManager);
+    explicit ConnectionLifecycleManager(std::shared_ptr<auth::SessionManager> sessionManager);
 
     ~ConnectionLifecycleManager();
 
@@ -24,7 +23,7 @@ class ConnectionLifecycleManager {
 
     void sweepActiveSessions();
 
-    std::shared_ptr<vh::auth::SessionManager> sessionManager_;
+    std::shared_ptr<auth::SessionManager> sessionManager_;
     std::thread lifecycleThread_;
     std::atomic<bool> running_{false};
 

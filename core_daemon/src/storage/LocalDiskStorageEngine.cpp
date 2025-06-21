@@ -1,5 +1,6 @@
 #include "storage/LocalDiskStorageEngine.hpp"
 #include <utility>
+#include <fstream>
 
 namespace vh::storage {
 
@@ -21,7 +22,7 @@ bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path, co
     return out.good();
 }
 
-std::optional<std::vector<uint8_t>> LocalDiskStorageEngine::readFile(const std::filesystem::path& rel_path) const {
+std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std::filesystem::path& rel_path) const {
     auto full_path = root / rel_path;
     std::ifstream in(full_path, std::ios::binary | std::ios::ate);
     if (!in) return std::nullopt;

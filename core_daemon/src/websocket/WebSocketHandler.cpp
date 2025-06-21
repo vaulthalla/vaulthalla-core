@@ -3,7 +3,7 @@
 
 namespace vh::websocket {
 
-WebSocketHandler::WebSocketHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager,
+WebSocketHandler::WebSocketHandler(const std::shared_ptr<services::ServiceManager>& serviceManager,
                                    const std::shared_ptr<WebSocketRouter>& router)
     : router_(router), serviceManager_(serviceManager) {
     authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());

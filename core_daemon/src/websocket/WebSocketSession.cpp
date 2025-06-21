@@ -19,9 +19,9 @@ using json = nlohmann::json;
 
 namespace vh::websocket {
 
-std::string extractCookie(const boost::beast::http::request<boost::beast::http::string_body>& req,
+std::string extractCookie(const http::request<http::string_body>& req,
                           const std::string& key) {
-    if (auto it = req.find(boost::beast::http::field::cookie); it != req.end()) {
+    if (auto it = req.find(http::field::cookie); it != req.end()) {
         const std::string cookieHeader = it->value();
         std::regex cookieRegex(key + "=([^;]+)");
         std::smatch match;

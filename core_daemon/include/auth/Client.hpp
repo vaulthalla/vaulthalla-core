@@ -14,14 +14,14 @@ class Client {
   public:
     Client();
 
-    Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
-           const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<vh::types::User>& user = nullptr);
+    Client(const std::shared_ptr<websocket::WebSocketSession>& session,
+           const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<types::User>& user = nullptr);
 
-    [[nodiscard]] std::shared_ptr<vh::types::User> getUser() const;
+    [[nodiscard]] std::shared_ptr<types::User> getUser() const;
     [[nodiscard]] std::shared_ptr<Token> getToken() const;
-    [[nodiscard]] std::shared_ptr<vh::websocket::WebSocketSession> getSession() const;
+    [[nodiscard]] std::shared_ptr<websocket::WebSocketSession> getSession() const;
 
-    void setUser(const std::shared_ptr<vh::types::User>& user);
+    void setUser(const std::shared_ptr<types::User>& user);
     void setToken(const std::shared_ptr<Token>& token);
 
     [[nodiscard]] std::string getUserName() const;
@@ -39,14 +39,14 @@ class Client {
     [[nodiscard]] const std::shared_ptr<RefreshToken>& getRefreshToken() const { return refreshToken_; }
     [[nodiscard]] std::string getHashedRefreshToken() const { return refreshToken_->getHashedToken(); }
 
-    bool validateToken(const std::string& token) const;
+    [[nodiscard]] bool validateToken(const std::string& token) const;
 
     void sendControlMessage(const std::string& type, const nlohmann::json& payload);
 
   private:
-    std::shared_ptr<vh::types::User> user_;
+    std::shared_ptr<types::User> user_;
     std::shared_ptr<Token> token_;
-    std::shared_ptr<vh::websocket::WebSocketSession> session_;
+    std::shared_ptr<websocket::WebSocketSession> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
     const std::string jwt_secret_ = types::config::ConfigRegistry::get().auth.jwt_secret;
 

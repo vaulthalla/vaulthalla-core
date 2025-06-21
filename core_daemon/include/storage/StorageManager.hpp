@@ -21,19 +21,19 @@ class StorageManager {
 
     void initStorageEngines();
 
-    void initUserStorage(const std::shared_ptr<vh::types::User>& user);
-    void mountVault(std::shared_ptr<vh::types::Vault>&& vault);
-    void addVault(std::shared_ptr<vh::types::Vault>&& vault);
+    void initUserStorage(const std::shared_ptr<types::User>& user);
+    void mountVault(std::shared_ptr<types::Vault>&& vault);
+    void addVault(std::shared_ptr<types::Vault>&& vault);
     void removeVault(unsigned int vaultId);
-    std::vector<std::shared_ptr<vh::types::Vault>> listVaults() const;
-    std::shared_ptr<vh::types::Vault> getVault(unsigned int vaultId) const;
+    std::vector<std::shared_ptr<types::Vault>> listVaults() const;
+    std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
 
-    void mountVolume(const std::shared_ptr<vh::types::StorageVolume>& volume,
-                     std::shared_ptr<vh::types::Vault> vault = nullptr);
-    void addVolume(std::shared_ptr<vh::types::StorageVolume> volume, unsigned int userId);
+    void mountVolume(const std::shared_ptr<types::StorageVolume>& volume,
+                     std::shared_ptr<types::Vault> vault = nullptr);
+    void addVolume(std::shared_ptr<types::StorageVolume> volume, unsigned int userId);
     void removeVolume(unsigned int volumeId, unsigned int userId);
-    std::shared_ptr<vh::types::StorageVolume> getVolume(unsigned int volumeId, unsigned int userId) const;
-    std::vector<std::shared_ptr<vh::types::StorageVolume>> listVolumes(unsigned int userId) const;
+    std::shared_ptr<types::StorageVolume> getVolume(unsigned int volumeId, unsigned int userId) const;
+    std::vector<std::shared_ptr<types::StorageVolume>> listVolumes(unsigned int userId) const;
 
     std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(unsigned short id) const;
     std::shared_ptr<CloudStorageEngine> getCloudEngine(unsigned short id) const;
@@ -43,7 +43,7 @@ class StorageManager {
 
   private:
     mutable std::mutex mountsMutex_;
-    std::unordered_map<unsigned int, std::shared_ptr<vh::types::Vault>> vaults_;
+    std::unordered_map<unsigned int, std::shared_ptr<types::Vault>> vaults_;
     std::unordered_map<unsigned int, std::shared_ptr<LocalDiskStorageEngine>> localEngines_;
     std::unordered_map<unsigned int, std::shared_ptr<CloudStorageEngine>> cloudEngines_;
 };

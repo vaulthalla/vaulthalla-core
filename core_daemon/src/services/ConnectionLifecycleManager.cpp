@@ -3,7 +3,7 @@
 
 namespace vh::services {
 
-ConnectionLifecycleManager::ConnectionLifecycleManager(std::shared_ptr<vh::auth::SessionManager> sessionManager)
+ConnectionLifecycleManager::ConnectionLifecycleManager(std::shared_ptr<auth::SessionManager> sessionManager)
     : sessionManager_(std::move(sessionManager)) {}
 
 ConnectionLifecycleManager::~ConnectionLifecycleManager() {

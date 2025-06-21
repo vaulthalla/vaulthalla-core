@@ -3,7 +3,6 @@
 #include "types/db/StorageVolume.hpp"
 #include "storage/StorageEngine.hpp"
 #include <filesystem>
-#include <fstream>
 
 namespace vh::storage {
 
@@ -13,7 +12,7 @@ class LocalDiskStorageEngine : public StorageEngine {
     ~LocalDiskStorageEngine() override = default;
 
     void mountVolume(const std::filesystem::path& mount_point);
-    void unmountVolume(const vh::types::StorageVolume& volume);
+    void unmountVolume(const types::StorageVolume& volume);
 
     bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
     [[nodiscard]] std::optional<std::vector<uint8_t>> readFile(const std::filesystem::path& rel_path) const override;

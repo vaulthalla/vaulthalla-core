@@ -5,25 +5,25 @@
 
 namespace vh::database {
 std::shared_ptr<vh::types::User> UserQueries::getUserByEmail(const std::string& email) {
-    return vh::database::Transactions::exec("UserQueries::getUserByEmail",
-                                            [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
-                                                pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE email = )" +
-                                                                            txn.quote(email));
+    return Transactions::exec("UserQueries::getUserByEmail",
+                              [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
+                                  pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE email = )" +
+                                                              txn.quote(email));
 
-                                                if (res.empty()) throw std::runtime_error("User not found: " + email);
-                                                return std::make_shared<vh::types::User>(res[0]);
-                                            });
+                                  if (res.empty()) throw std::runtime_error("User not found: " + email);
+                                  return std::make_shared<vh::types::User>(res[0]);
+                              });
 }
 
 void UserQueries::createUser(const std::string& name, const std::string& email, const std::string& password_hash) {
-    vh::database::Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         txn.exec("INSERT INTO users (name, email, password_hash, last_login) VALUES (" + txn.quote(name) + ", " +
                  txn.quote(email) + ", " + txn.quote(password_hash) + ", NOW())");
     });
 }
 
 bool UserQueries::authenticateUser(const std::string& email, const std::string& password) {
-    return vh::database::Transactions::exec("UserQueries::authenticateUser", [&](pqxx::work& txn) -> bool {
+    return Transactions::exec("UserQueries::authenticateUser", [&](pqxx::work& txn) -> bool {
         pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE email = " + txn.quote(email));
         if (res.empty()) return false; // User not found
         const std::string& storedHash = res[0][0].as<std::string>();
@@ -32,19 +32,19 @@ bool UserQueries::authenticateUser(const std::string& email, const std::string& 
 }
 
 void UserQueries::updateUserPassword(const std::string& email, const std::string& newPassword) {
-    vh::database::Transactions::exec("UserQueries::updateUserPassword", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::updateUserPassword", [&](pqxx::work& txn) {
         txn.exec("UPDATE users SET password_hash = " + txn.quote(newPassword) + " WHERE email = " + txn.quote(email));
     });
 }
 
 void UserQueries::deleteUser(const std::string& email) {
-    vh::database::Transactions::exec("UserQueries::deleteUser", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::deleteUser", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM users WHERE email = " + txn.quote(email));
     });
 }
 
 void UserQueries::addRefreshToken(const std::shared_ptr<vh::auth::RefreshToken>& token) {
-    vh::database::Transactions::exec("UserQueries::addRefreshToken", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::addRefreshToken", [&](pqxx::work& txn) {
         txn.exec("INSERT INTO refresh_tokens (jti, user_id, token_hash, ip_address, user_agent) VALUES (" +
                  txn.quote(token->getJti()) + ", " + txn.quote(token->getUserId()) + ", " +
                  txn.quote(token->getHashedToken()) + ", " + txn.quote(token->getIpAddress()) + ", " +
@@ -53,44 +53,44 @@ void UserQueries::addRefreshToken(const std::shared_ptr<vh::auth::RefreshToken>&
 }
 
 void UserQueries::removeRefreshToken(const std::string& jti) {
-    vh::database::Transactions::exec("UserQueries::removeRefreshToken", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::removeRefreshToken", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM refresh_tokens WHERE jti = " + txn.quote(jti));
     });
 }
 
 std::shared_ptr<vh::auth::RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
-    return vh::database::Transactions::exec("UserQueries::getRefreshToken",
-                                            [&](pqxx::work& txn) -> std::shared_ptr<vh::auth::RefreshToken> {
-                                                pqxx::result res = txn.exec(
-                                                    "SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
-                                                if (res.empty()) return nullptr; // No token found
-                                                return std::make_shared<vh::auth::RefreshToken>(res[0]);
-                                            });
+    return Transactions::exec("UserQueries::getRefreshToken",
+                              [&](pqxx::work& txn) -> std::shared_ptr<vh::auth::RefreshToken> {
+                                  pqxx::result res = txn.exec(
+                                      "SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
+                                  if (res.empty()) return nullptr; // No token found
+                                  return std::make_shared<vh::auth::RefreshToken>(res[0]);
+                              });
 }
 
-std::vector<std::shared_ptr<vh::auth::RefreshToken>> UserQueries::listRefreshTokens(unsigned int userId) {
-    return vh::database::Transactions::exec("UserQueries::listRefreshTokens",
-                                            [&](pqxx::work& txn)
-                                                -> std::vector<std::shared_ptr<vh::auth::RefreshToken>> {
-                                                pqxx::result res =
-                                                    txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " +
-                                                             txn.quote(userId));
-                                                std::vector<std::shared_ptr<vh::auth::RefreshToken>> tokens;
-                                                for (const auto& row : res) {
-                                                    tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
-                                                }
-                                                return tokens;
-                                            });
+std::vector<std::shared_ptr<vh::auth::RefreshToken> > UserQueries::listRefreshTokens(unsigned int userId) {
+    return Transactions::exec("UserQueries::listRefreshTokens",
+                              [&](pqxx::work& txn)
+                              -> std::vector<std::shared_ptr<vh::auth::RefreshToken> > {
+                                  pqxx::result res =
+                                      txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " +
+                                               txn.quote(userId));
+                                  std::vector<std::shared_ptr<vh::auth::RefreshToken> > tokens;
+                                  for (const auto& row : res) {
+                                      tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
+                                  }
+                                  return tokens;
+                              });
 }
 
 void UserQueries::revokeAllRefreshTokens(unsigned int userId) {
-    vh::database::Transactions::exec("UserQueries::revokeAllRefreshTokens", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::revokeAllRefreshTokens", [&](pqxx::work& txn) {
         txn.exec("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = " + txn.quote(userId));
     });
 }
 
 void UserQueries::revokeAndPurgeRefreshTokens(unsigned int userId) {
-    vh::database::Transactions::exec("UserQueries::revokeAndPurgeRefreshTokens", [&](pqxx::work& txn) {
+    Transactions::exec("UserQueries::revokeAndPurgeRefreshTokens", [&](pqxx::work& txn) {
         // 1. Revoke the most recent unrevoked token
         txn.exec(R"SQL(
             UPDATE refresh_tokens
@@ -132,15 +132,15 @@ void UserQueries::revokeAndPurgeRefreshTokens(unsigned int userId) {
 }
 
 std::shared_ptr<vh::types::User> UserQueries::getUserByRefreshToken(const std::string& jti) {
-    return vh::database::Transactions::exec("UserQueries::getUserByRefreshToken",
-                                            [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
-                                                pqxx::result res =
-                                                    txn.exec("SELECT u.* FROM users u "
-                                                             "JOIN refresh_tokens rt ON u.id = rt.user_id "
-                                                             "WHERE rt.jti = " +
-                                                             txn.quote(jti));
-                                                if (res.empty()) return nullptr; // No user found
-                                                return std::make_shared<vh::types::User>(res[0]);
-                                            });
+    return Transactions::exec("UserQueries::getUserByRefreshToken",
+                              [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
+                                  pqxx::result res =
+                                      txn.exec("SELECT u.* FROM users u "
+                                               "JOIN refresh_tokens rt ON u.id = rt.user_id "
+                                               "WHERE rt.jti = " +
+                                               txn.quote(jti));
+                                  if (res.empty()) return nullptr; // No user found
+                                  return std::make_shared<vh::types::User>(res[0]);
+                              });
 }
 } // namespace vh::database

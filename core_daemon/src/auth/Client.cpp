@@ -10,8 +10,8 @@ namespace vh::auth {
 
 Client::Client() = default;
 
-Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
-               const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<vh::types::User>& user)
+Client::Client(const std::shared_ptr<websocket::WebSocketSession>& session,
+               const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<types::User>& user)
     : user_(user), session_(session), refreshToken_(refreshToken) {
     if (user) {
         token_ = std::make_shared<Token>(generateToken(user->email), user->id);
@@ -22,17 +22,19 @@ Client::Client(const std::shared_ptr<vh::websocket::WebSocketSession>& session,
     }
 }
 
-std::shared_ptr<vh::types::User> Client::getUser() const {
+std::shared_ptr<types::User> Client::getUser() const {
     return user_;
 }
+
 std::shared_ptr<Token> Client::getToken() const {
     return token_;
 }
-std::shared_ptr<vh::websocket::WebSocketSession> Client::getSession() const {
+
+std::shared_ptr<websocket::WebSocketSession> Client::getSession() const {
     return session_;
 }
 
-void Client::setUser(const std::shared_ptr<vh::types::User>& user) {
+void Client::setUser(const std::shared_ptr<types::User>& user) {
     if (!user) {
         std::cerr << "[Client] Cannot set user: user is null.\n";
         return;
@@ -41,6 +43,7 @@ void Client::setUser(const std::shared_ptr<vh::types::User>& user) {
     token_ = std::make_shared<Token>(generateToken(user->email), user->id);
     session_->setAuthenticatedUser(user_);
 }
+
 void Client::setToken(const std::shared_ptr<Token>& token) {
     token_ = token;
 }
@@ -48,9 +51,11 @@ void Client::setToken(const std::shared_ptr<Token>& token) {
 std::string Client::getUserName() const {
     return user_ ? user_->name : "";
 }
+
 std::string Client::getEmail() const {
     return user_ ? user_->email : "";
 }
+
 std::string Client::getRawToken() const {
     return token_ ? token_->rawToken : "";
 }
@@ -65,8 +70,7 @@ bool Client::isAuthenticated() const {
 
 void Client::refreshToken() {
     if (user_) token_ = std::make_shared<Token>(generateToken(user_->email), user_->id);
-    else
-        std::cerr << "[Client] Cannot refresh token: user is not set.\n";
+    else std::cerr << "[Client] Cannot refresh token: user is not set.\n";
 }
 
 void Client::invalidateToken() {
@@ -93,8 +97,8 @@ bool Client::validateToken(const std::string& token) const {
         auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
 
         auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-                            .allow_algorithm(jwt::algorithm::hs256{jwt_secret_})
-                            .with_issuer("vaulthalla");
+            .allow_algorithm(jwt::algorithm::hs256{jwt_secret_})
+            .with_issuer("vaulthalla");
 
         verifier.verify(decoded);
 
@@ -114,18 +118,17 @@ void Client::sendControlMessage(const std::string& type, const nlohmann::json& p
     nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
 
     if (session_) session_->send(msg);
-    else
-        std::cerr << "[Client] Cannot send control message: session is not set.\n";
+    else std::cerr << "[Client] Cannot send control message: session is not set.\n";
 }
 
 std::string Client::generateToken(const std::string& email) {
     auto token = jwt::create<jwt::traits::nlohmann_json>()
-                     .set_issuer("vaulthalla")
-                     .set_type("JWS")
-                     .set_subject(email)
-                     .set_issued_at(std::chrono::system_clock::now())
-                     .set_expires_at(std::chrono::system_clock::now() + std::chrono::minutes(60))
-                     .sign(jwt::algorithm::hs256{jwt_secret_});
+        .set_issuer("vaulthalla")
+        .set_type("JWS")
+        .set_subject(email)
+        .set_issued_at(std::chrono::system_clock::now())
+        .set_expires_at(std::chrono::system_clock::now() + std::chrono::minutes(60))
+        .sign(jwt::algorithm::hs256{jwt_secret_});
 
     return token;
 }

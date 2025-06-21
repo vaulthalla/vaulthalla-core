@@ -17,7 +17,7 @@ class DBPool {
     }
 
     std::unique_ptr<DBConnection> acquire() {
-        std::unique_lock<std::mutex> lock(mtx_);
+        std::unique_lock lock(mtx_);
         cv_.wait(lock, [&]() { return !pool_.empty(); });
         auto conn = std::move(pool_.front());
         pool_.pop();
@@ -25,7 +25,7 @@ class DBPool {
     }
 
     void release(std::unique_ptr<DBConnection> conn) {
-        std::lock_guard<std::mutex> lock(mtx_);
+        std::lock_guard lock(mtx_);
         pool_.push(std::move(conn));
         cv_.notify_one();
     }

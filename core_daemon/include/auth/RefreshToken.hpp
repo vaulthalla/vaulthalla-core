@@ -24,9 +24,9 @@ class RefreshToken {
         : jti_(row["jti"].as<std::string>()), hashedToken_(row["token_hash"].as<std::string>()),
           userAgent_(row["user_agent"].as<std::string>()), ipAddress_(row["ip_address"].as<std::string>()),
           userId_(row["user_id"].as<unsigned int>()),
-          expiresAt_(vh::util::parsePostgresTimestamp(row["expires_at"].as<std::string>())),
-          createdAt_(vh::util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-          lastUsed_(vh::util::parsePostgresTimestamp(row["last_used"].as<std::string>())),
+          expiresAt_(util::parsePostgresTimestamp(row["expires_at"].as<std::string>())),
+          createdAt_(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+          lastUsed_(util::parsePostgresTimestamp(row["last_used"].as<std::string>())),
           revoked_(row["revoked"].as<bool>()) {}
 
     [[nodiscard]] const std::string& getJti() const { return jti_; }

@@ -1,6 +1,5 @@
 #include "storage/StorageEngine.hpp"
 #include <fstream>
-#include <iostream>
 
 namespace vh::storage {
 

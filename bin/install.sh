@@ -116,7 +116,7 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaultha
 
 # === 8) Inject DB password into config ===
 echo "✍️  Updating config with DB password..."
-sudo sed -i "s/^\(password:\s*\).*\(#.*\)/\1${VAUL_PG_PASS} \2/" /etc/vaulthalla/config.yaml
+sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
 # === 9) Apply DB schema ===
 echo "📄 Applying schema.sql..."
@@ -158,7 +158,7 @@ WHERE users.email = 'admin@vaulthalla.lan' AND groups.name = 'admin';
 
 -- Create and link vault
 INSERT INTO vaults (type, name, is_active, created_at)
-VALUES ('LocalDisk', 'Admin Local Disk Vault', TRUE, NOW());
+VALUES ('local', 'Admin Local Disk Vault', TRUE, NOW());
 
 INSERT INTO local_disk_vaults (vault_id, mount_point)
 SELECT id, '/mnt/vaulthalla/users/admin' FROM vaults WHERE name = 'Admin Local Disk Vault';

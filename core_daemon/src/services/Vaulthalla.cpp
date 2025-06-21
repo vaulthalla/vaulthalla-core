@@ -1,13 +1,17 @@
 #include "services/Vaulthalla.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "database/Transactions.hpp"
+#include "types/config/ConfigRegistry.hpp"
+#include "types/config/Config.hpp"
 
 namespace vh::services {
 void Vaulthalla::start() {
     std::cout << "Vaulthalla service started." << std::endl;
 
     try {
-        vh::database::Transactions::init();
+        const auto config = types::config::loadConfig("/etc/vaulthalla/config.yaml");
+        types::config::ConfigRegistry::init(config);
+        database::Transactions::init();
 
         ioContext_ = std::make_shared<boost::asio::io_context>();
 
@@ -20,8 +24,12 @@ void Vaulthalla::start() {
 
         wsHandler_ = std::make_shared<vh::websocket::WebSocketHandler>(serviceManager_, wsRouter_);
 
+        const auto ws_config = config.server;
+        const auto addr = boost::asio::ip::make_address(ws_config.host);
+        const auto port = ws_config.port;
+
         wsServer_ = std::make_shared<vh::websocket::WebSocketServer>(*ioContext_,
-                                                                     boost::asio::ip::tcp::endpoint(address_, port_),
+                                                                     boost::asio::ip::tcp::endpoint(addr, port),
                                                                      wsRouter_, serviceManager_->authManager());
 
         wsServer_->run();

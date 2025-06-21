@@ -1,4 +1,4 @@
-#include "types/Config.hpp"
+#include "../../../include/types/config/Config.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <yaml-cpp/yaml.h>

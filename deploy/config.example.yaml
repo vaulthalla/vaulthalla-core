@@ -26,7 +26,8 @@ database:
   port: 5432                   # PostgreSQL port
   name: vaulthalla             # Database name
   user: vaulthalla             # Database user
-  password: changeme           # 🔐 Override with VAULTHALLA_DB_PASSWORD env var
+  # 🔐 Override the password field with VAULTHALLA_DB_PASSWORD env var
+  password: changeme
   pool_size: 10                # Max DB connection pool size
 
 # === 🔐 AUTHENTICATION SETTINGS ===

@@ -1,75 +1,88 @@
 project('vaulthalla', 'cpp',
-        version : '0.0.1',
-        default_options : ['warning_level=3', 'cpp_std=c++2b'])
+        version: '0.5.0',
+        default_options: ['warning_level=3', 'cpp_std=c++2b'])
 
+# ╭──────────────────── DEBUG FLAGS ─────────────────────╮
 if get_option('buildtype') == 'debug'
     add_project_arguments('-fsanitize=undefined', language: 'cpp')
     add_project_link_arguments('-fsanitize=undefined', language: 'cpp')
 endif
 
-boost_dep = dependency('boost', modules: ['filesystem', 'system'], required: true)
-nlohmann_json_dep = dependency('nlohmann_json', required: true)
-libpqxx_dep = dependency('libpqxx', required: true)
-libsodium_dep = dependency('libsodium', required: true)
-jwt_cpp_dep = dependency('jwt-cpp', required: true)
-libcurl_dep = dependency('libcurl', required: true)
-libfuse_dep = dependency('fuse3', required: true)
-yaml_cpp_dep = dependency('yaml-cpp', required: true)
-uuid_dep = dependency('uuid', required: true)
-thread_dep = dependency('threads', required: true)
-gtest_dep = dependency('gtest', required: true, main: true)
+# ╭──────────────────── DEPENDENCIES ────────────────────╮
+boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
+nlohmann_json   = dependency('nlohmann_json', required: true)
+libpqxx         = dependency('libpqxx', required: true)
+libsodium       = dependency('libsodium', required: true)
+jwt_cpp         = dependency('jwt-cpp', required: true)
+libcurl         = dependency('libcurl', required: true)
+libfuse         = dependency('fuse3', required: true)
+yaml_cpp        = dependency('yaml-cpp', required: true)
+uuid            = dependency('uuid', required: true)
+thread_dep      = dependency('threads', required: true)
+gtest           = dependency('gtest', required: true, main: true)
 
-source_root = '.'
-shared_root = source_root + '/shared/src'
-project_root = source_root + '/src'
-fuse_root = source_root + '/fuse_daemon/src'
-tests_source_root = source_root + '/tests'
-main = files(source_root + '/main.cpp')
+global_deps     = [boost_dep, nlohmann_json, libpqxx, yaml_cpp, uuid, thread_dep]
+core_deps       = global_deps + [libsodium, jwt_cpp, libcurl]
+fuse_deps       = global_deps + [libfuse]
+test_deps       = core_deps + [gtest]
 
-global_deps = [boost_dep, nlohmann_json_dep, libpqxx_dep, yaml_cpp_dep, uuid_dep, thread_dep]
-vaulthalla_deps = global_deps + [libsodium_dep, jwt_cpp_dep, libcurl_dep]
-fuse_deps = global_deps + libfuse_dep
-test_deps = vaulthalla_deps + gtest_dep
+# ╭──────────────────── SOURCE DIRS ─────────────────────╮
+source_root         = '.'
+core_src_dir        = source_root + '/core_daemon/src'
+fuse_src_dir        = source_root + '/fuse_daemon/src'
+shared_src_dir      = source_root + '/shared/src'
+tests_src_dir       = source_root + '/tests'
+core_main           = files(source_root + '/main.cpp')
 
-inc = include_directories(source_root + '/include', source_root + '/shared/include')
-fuse_inc = include_directories(source_root + '/fuse_daemon/include', source_root + '/shared/include')
+core_inc            = include_directories('core_daemon/include', 'shared/include')
+fuse_inc            = include_directories('fuse_daemon/include', 'shared/include')
 
-shared_src_files = []
-foreach cpp_file : run_command('find', shared_root, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    shared_src_files += files(cpp_file)
+# ╭──────────────────── SOURCE COLLECTION ───────────────╮
+shared_sources = []
+foreach f : run_command('find', shared_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    shared_sources += files(f)
 endforeach
 
-src_files = shared_src_files
-foreach cpp_file : run_command('find', project_root, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    src_files += files(cpp_file)
+core_sources = shared_sources
+foreach f : run_command('find', core_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    core_sources += files(f)
 endforeach
 
-fuse_src_files = shared_src_files
-foreach cpp_file : run_command('find', fuse_root, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    fuse_src_files += files(cpp_file)
+fuse_sources = shared_sources
+foreach f : run_command('find', fuse_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    fuse_sources += files(f)
 endforeach
 
-cloud_test_sources = src_files
-foreach cpp_file : run_command('find', tests_source_root + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    cloud_test_sources += files(cpp_file)
+# Core Daemon: add the entrypoint
+core_sources += core_main
+
+# ╭──────────────────── EXECUTABLES ─────────────────────╮
+
+# === ⚙️ Core Daemon ===
+executable('core-daemon',
+           core_sources,
+           dependencies: core_deps,
+           include_directories: core_inc,
+           install: true
+)
+
+# === 🧷 FUSE Daemon ===
+executable('fuse-daemon',
+           fuse_sources,
+           dependencies: fuse_deps,
+           include_directories: fuse_inc,
+           install: true
+)
+
+# === 🧪 Cloud-Side Tests ===
+cloud_test_sources = core_sources
+foreach f : run_command('find', tests_src_dir + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    cloud_test_sources += files(f)
 endforeach
-
-src_files += main
-
-vaulthalla = executable('vaulthalla',
-                        src_files,
-                        dependencies: vaulthalla_deps,
-                        include_directories: inc,
-                        install : true)
-
-vaulthalla_fuse = executable('vaulthalla_fuse_daemon',
-                        fuse_src_files,
-                        dependencies: fuse_deps,
-                        include_directories: fuse_inc,
-                        install : true)
 
 test('test_cloud', executable('test_cloud',
-                        cloud_test_sources,
-                        dependencies: test_deps,
-                        include_directories: inc,
-                        install : true))
+                              cloud_test_sources,
+                              dependencies: test_deps,
+                              include_directories: core_inc,
+                              install: true
+     ))

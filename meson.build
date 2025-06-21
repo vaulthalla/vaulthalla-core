@@ -33,9 +33,12 @@ fuse_src_dir        = source_root + '/fuse_daemon/src'
 shared_src_dir      = source_root + '/shared/src'
 tests_src_dir       = source_root + '/tests'
 core_main           = files(source_root + '/main.cpp')
+hash_pass_src       = files(core_src_dir + '/crypto/PasswordHash.cpp')
+hash_pass_main      = files(source_root + '/deploy/psql/hash_password.cpp')
 
 core_inc            = include_directories('core_daemon/include', 'shared/include')
 fuse_inc            = include_directories('fuse_daemon/include', 'shared/include')
+hash_pass_inc       = include_directories('core_daemon/include')
 
 # ╭──────────────────── SOURCE COLLECTION ───────────────╮
 shared_sources = []
@@ -59,7 +62,7 @@ core_sources += core_main
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
 # === ⚙️ Core Daemon ===
-executable('core-daemon',
+executable('core_daemon',
            core_sources,
            dependencies: core_deps,
            include_directories: core_inc,
@@ -67,10 +70,17 @@ executable('core-daemon',
 )
 
 # === 🧷 FUSE Daemon ===
-executable('fuse-daemon',
+executable('fuse_daemon',
            fuse_sources,
            dependencies: fuse_deps,
            include_directories: fuse_inc,
+           install: true
+)
+
+executable('hash_password',
+           [hash_pass_src, hash_pass_main],
+           dependencies: libsodium,
+           include_directories: hash_pass_inc,
            install: true
 )
 

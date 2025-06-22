@@ -2,12 +2,13 @@
 #include "types/db/User.hpp"
 #include "auth/RefreshToken.hpp"
 #include "database/Transactions.hpp"
+#include "types/db/Role.hpp"
 
 namespace vh::database {
-std::shared_ptr<vh::types::User> UserQueries::getUserByEmail(const std::string& email) {
+std::shared_ptr<types::User> UserQueries::getUserByEmail(const std::string& email) {
     return Transactions::exec("UserQueries::getUserByEmail",
                               [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
-                                  pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE email = )" +
+                                  const pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE email = )" +
                                                               txn.quote(email));
 
                                   if (res.empty()) throw std::runtime_error("User not found: " + email);
@@ -15,16 +16,33 @@ std::shared_ptr<vh::types::User> UserQueries::getUserByEmail(const std::string& 
                               });
 }
 
-void UserQueries::createUser(const std::string& name, const std::string& email, const std::string& password_hash) {
+std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
+    return Transactions::exec("UserQueries::getUserById",
+                              [&](pqxx::work& txn) -> std::shared_ptr<vh::types::User> {
+                                  const pqxx::result res = txn.exec(R"(SELECT * FROM users WHERE id = )" + txn.quote(id));
+
+                                  if (res.empty()) throw std::runtime_error("User not found with ID: " + std::to_string(id));
+                                  return std::make_shared<vh::types::User>(res[0]);
+                              });
+}
+
+void UserQueries::createUser(const std::shared_ptr<types::User>& user, const std::string& role) {
     Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
-        txn.exec("INSERT INTO users (name, email, password_hash, last_login) VALUES (" + txn.quote(name) + ", " +
-                 txn.quote(email) + ", " + txn.quote(password_hash) + ", NOW())");
+        const auto userId = txn.exec("INSERT INTO users (name, email, password_hash, is_active) VALUES (" +
+                 txn.quote(user->name) + ", " + txn.quote(user->email) + ", " + txn.quote(user->password_hash)
+                 + ", " + txn.quote(user->is_active) + ") RETURNING id").one_row()[0].as<unsigned int>();
+
+        const auto role_id = txn.exec("SELECT id FROM roles WHERE name = "
+            + txn.quote(role)).one_row()[0].as<unsigned int>();
+
+        txn.exec("INSERT INTO user_roles (user_id, role_id) VALUES (" + txn.quote(userId) + ", " +
+                 txn.quote(role_id) + ")");
     });
 }
 
 bool UserQueries::authenticateUser(const std::string& email, const std::string& password) {
     return Transactions::exec("UserQueries::authenticateUser", [&](pqxx::work& txn) -> bool {
-        pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE email = " + txn.quote(email));
+        const pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE email = " + txn.quote(email));
         if (res.empty()) return false; // User not found
         const std::string& storedHash = res[0][0].as<std::string>();
         return storedHash == password;
@@ -40,6 +58,64 @@ void UserQueries::updateUserPassword(const std::string& email, const std::string
 void UserQueries::deleteUser(const std::string& email) {
     Transactions::exec("UserQueries::deleteUser", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM users WHERE email = " + txn.quote(email));
+    });
+}
+
+std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
+    return Transactions::exec("UserQueries::listUsers",
+                              [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::User> > {
+                                  const pqxx::result res = txn.exec("SELECT * FROM users");
+                                  std::vector<std::shared_ptr<types::User> > users;
+                                  for (const auto& row : res) users.push_back(std::make_shared<types::User>(row));
+                                  return users;
+                              });
+}
+
+std::vector<std::pair<std::shared_ptr<types::User>, std::string>> UserQueries::listUsersWithRoles() {
+    return Transactions::exec("UserQueries::listUsersWithRoles",
+                              [&](pqxx::work& txn) -> std::vector<std::pair<std::shared_ptr<types::User>, std::string> > {
+                                  const pqxx::result res = txn.exec(R"(SELECT u.*, r.name as role_name
+                                                                FROM users u
+                                                                JOIN user_roles ur ON u.id = ur.user_id
+                                                                JOIN roles r ON ur.role_id = r.id)");
+                                  std::vector<std::pair<std::shared_ptr<types::User>, std::string>> usersWithRoles;
+                                  for (const auto& row : res) {
+                                      usersWithRoles.emplace_back(std::make_shared<types::User>(row),
+                                          types::db_role_str_to_cli_str(row["role_name"].as<std::string>()));
+                                  }
+                                  return usersWithRoles;
+                              });
+}
+
+std::pair<std::shared_ptr<types::User>, std::string> UserQueries::getUserWithRole(unsigned int userId) {
+    return Transactions::exec("UserQueries::getUserWithRole",
+                              [&](pqxx::work& txn) -> std::pair<std::shared_ptr<types::User>, std::string> {
+                                  const pqxx::result res = txn.exec(R"(SELECT u.*, r.*
+                                                                FROM users u
+                                                                JOIN user_roles ur ON u.id = ur.user_id
+                                                                JOIN roles r ON ur.role_id = r.id
+                                                                WHERE u.id = )" + txn.quote(userId));
+                                  if (res.empty()) throw std::runtime_error("User not found with ID: " + std::to_string(userId));
+                                  const types::User user(res[0]);
+                                  const types::Role role(res[0]);
+                                  return {std::make_shared<types::User>(user), types::to_string(role.name)};
+                              });
+}
+
+types::Role UserQueries::getUserRole(const unsigned int userId) {
+    return Transactions::exec("UserQueries::getUserRole", [&](pqxx::work& txn) -> types::Role {
+        const pqxx::result res = txn.exec("SELECT r.* FROM roles r "
+                                    "JOIN user_roles ur ON r.id = ur.role_id "
+                                    "WHERE ur.user_id = " +
+                                    txn.quote(userId));
+        if (res.empty()) throw std::runtime_error("Role not found for user ID: " + std::to_string(userId));
+        return types::Role(res[0]);
+    });
+}
+
+void UserQueries::updateLastLoggedInUser(const unsigned int userId) {
+    Transactions::exec("UserQueries::updateLastLoggedInUser", [&](pqxx::work& txn) {
+        txn.exec("UPDATE users SET last_login = NOW() WHERE id = " + txn.quote(userId));
     });
 }
 

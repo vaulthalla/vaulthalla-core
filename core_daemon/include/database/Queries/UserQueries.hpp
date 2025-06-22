@@ -1,15 +1,16 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace vh::auth {
 class RefreshToken;
 }
 
 namespace vh::types {
-class User;
+struct User;
+struct Role;
 }
 
 namespace vh::database {
@@ -18,10 +19,16 @@ class UserQueries {
     UserQueries() = default;
 
     [[nodiscard]] static std::shared_ptr<types::User> getUserByEmail(const std::string& email);
-    static void createUser(const std::string& name, const std::string& email, const std::string& password_hash);
+    [[nodiscard]] static std::shared_ptr<types::User> getUserById(unsigned int id);
+    static void createUser(const std::shared_ptr<types::User>& user, const std::string& role);
     static bool authenticateUser(const std::string& email, const std::string& password);
     static void updateUserPassword(const std::string& email, const std::string& newPassword);
     static void deleteUser(const std::string& email);
+    static std::vector<std::shared_ptr<types::User>> listUsers();
+    static std::vector<std::pair<std::shared_ptr<types::User>, std::string>> listUsersWithRoles();
+    static std::pair<std::shared_ptr<types::User>, std::string> getUserWithRole(unsigned int userId);
+    [[nodiscard]] static types::Role getUserRole(unsigned int userId);
+    static void updateLastLoggedInUser(unsigned int userId);
 
     static void addRefreshToken(const std::shared_ptr<auth::RefreshToken>& token);
     static void removeRefreshToken(const std::string& jti);

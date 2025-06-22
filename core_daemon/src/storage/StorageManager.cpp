@@ -4,6 +4,7 @@
 #include "types/db/Vault.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
+#include "types/config/ConfigRegistry.hpp"
 #include <iostream>
 #include <stdexcept>
 
@@ -31,7 +32,7 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
 
         std::shared_ptr<types::Vault> vault =
             std::make_shared<types::LocalDiskVault>(user->name + "'s Local Disk Vault",
-                                                        std::filesystem::path(std::getenv("VAULTHALLA_ROOT_DIR")) /
+                                                        std::filesystem::path(types::config::ConfigRegistry::get().fuse.root_mount_path) /
                                                             "users" / user->email);
         {
             std::lock_guard lock(mountsMutex_);

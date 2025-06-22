@@ -18,11 +18,13 @@ class AuthHandler {
   public:
     explicit AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager);
 
-    void handleLogin(const json& msg, WebSocketSession& session);
-    void handleRegister(const json& msg, WebSocketSession& session);
-    void handleRefresh(const json& msg, WebSocketSession& session);
-    void handleLogout(const json& msg, WebSocketSession& session);
-    void isUserAuthenticated(const json& msg, WebSocketSession& session);
+    void handleLogin(const json& msg, WebSocketSession& session) const;
+    void handleRegister(const json& msg, WebSocketSession& session) const;
+    void handleRefresh(const json& msg, WebSocketSession& session) const;
+    void handleLogout(const json& msg, WebSocketSession& session) const;
+    void handleGetUser(const json& msg, WebSocketSession& session) const;
+    void handleListUsers(const json& msg, WebSocketSession& session);
+    void isUserAuthenticated(const json& msg, WebSocketSession& session) const;
 
   private:
     std::shared_ptr<auth::AuthManager> authManager_;

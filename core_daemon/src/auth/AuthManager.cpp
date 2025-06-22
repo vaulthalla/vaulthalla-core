@@ -70,17 +70,16 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
     return sessionManager_;
 }
 
-std::shared_ptr<Client> AuthManager::registerUser(const std::string& username, const std::string& email,
+std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> user,
                                                   const std::string& password,
+                                                  const std::string& role,
                                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
-    if (users_.count(username) > 0) throw std::runtime_error("User already exists: " + username);
+    isValidRegistration(user, password);
 
-    isValidRegistration(username, email, password);
+    user->setPasswordHash(crypto::hashPassword(password));
+    database::UserQueries::createUser(user, role);
 
-    const std::string hashedPassword = crypto::hashPassword(password);
-    database::UserQueries::createUser(username, email, hashedPassword);
-
-    const auto user = findUser(email);
+    user = findUser(user->email);
     auto client = sessionManager_->getClientSession(session->getUUID());
     client->setUser(user);
 
@@ -88,9 +87,9 @@ std::shared_ptr<Client> AuthManager::registerUser(const std::string& username, c
 
     storageManager_->initUserStorage(user);
 
-    if (!user) throw std::runtime_error("Failed to create user: " + username);
+    if (!user) throw std::runtime_error("Failed to create user: " + user->email);
 
-    std::cout << "[AuthManager] Registered new user: " << username << "\n";
+    std::cout << "[AuthManager] Registered new user: " << user->email << "\n";
     return client;
 }
 
@@ -100,10 +99,13 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const s
         auto user = findUser(email);
         if (!user) throw std::runtime_error("User not found: " + email);
 
-        if (!crypto::verifyPassword(password, user->password_hash)) throw std::runtime_error(
-            "Invalid password for user: " + email);
+        if (!crypto::verifyPassword(password, user->password_hash))
+            throw std::runtime_error(
+                "Invalid password for user: " + email);
 
         database::UserQueries::revokeAllRefreshTokens(user->id);
+        database::UserQueries::updateLastLoggedInUser(user->id);
+        user = database::UserQueries::getUserById(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
 
@@ -146,12 +148,14 @@ AuthManager::validateRefreshToken(const std::string& refreshToken,
 
         auto now = std::chrono::system_clock::now();
 
-        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now) throw std::runtime_error(
-            "Refresh token has expired");
+        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now)
+            throw std::runtime_error(
+                "Refresh token has expired");
 
         // 4. Secure compare stored hash to hashed input token
-        if (!crypto::verifyPassword(refreshToken, storedToken->getHashedToken())) throw std::runtime_error(
-            "Refresh token hash mismatch");
+        if (!crypto::verifyPassword(refreshToken, storedToken->getHashedToken()))
+            throw std::runtime_error(
+                "Refresh token hash mismatch");
 
         auto user = database::UserQueries::getUserByRefreshToken(tokenJti);
         auto client = std::make_shared<Client>(session, storedToken, user);
@@ -169,8 +173,9 @@ void AuthManager::changePassword(const std::string& email, const std::string& ol
     auto user = findUser(email);
     if (!user) throw std::runtime_error("User not found: " + email);
 
-    if (!crypto::verifyPassword(oldPassword, user->password_hash)) throw std::runtime_error(
-        "Invalid old password for user: " + email);
+    if (!crypto::verifyPassword(oldPassword, user->password_hash))
+        throw std::runtime_error(
+            "Invalid old password for user: " + email);
 
     std::string newHashed = crypto::hashPassword(newPassword);
     user->setPasswordHash(newHashed);
@@ -178,8 +183,11 @@ void AuthManager::changePassword(const std::string& email, const std::string& ol
     std::cout << "[AuthManager] Changed password for user: " << email << "\n";
 }
 
-bool AuthManager::isValidRegistration(const std::string& name, const std::string& email, const std::string& password) {
+bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, const std::string& password) {
     std::vector<std::string> errors;
+
+    const std::string& name = user->name;
+    const std::string& email = user->email;
 
     if (!isValidName(name)) errors.emplace_back("Name must be between 3 and 50 characters.");
 
@@ -190,14 +198,17 @@ bool AuthManager::isValidRegistration(const std::string& name, const std::string
         errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
                             "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
 
-    if (PasswordUtils::containsDictionaryWord(password)) errors.emplace_back(
-        "Password contains dictionary word — this is forbidden.");
+    if (PasswordUtils::containsDictionaryWord(password))
+        errors.emplace_back(
+            "Password contains dictionary word — this is forbidden.");
 
-    if (PasswordUtils::isCommonWeakPassword(password)) errors.emplace_back(
-        "Password matches known weak pattern — this is forbidden.");
+    if (PasswordUtils::isCommonWeakPassword(password))
+        errors.emplace_back(
+            "Password matches known weak pattern — this is forbidden.");
 
-    if (PasswordUtils::isPwnedPassword(password)) errors.emplace_back(
-        "Password has been found in public breaches — choose a different one.");
+    if (PasswordUtils::isPwnedPassword(password))
+        errors.emplace_back(
+            "Password has been found in public breaches — choose a different one.");
 
     if (!errors.empty()) {
         std::ostringstream oss;

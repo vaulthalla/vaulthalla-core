@@ -37,6 +37,14 @@ void WebSocketHandler::registerAllHandlers() {
         authHandler_->handleRegister(msg, session);
     });
 
+    router_->registerHandler("auth.user.get", [this](const json& msg, WebSocketSession& session) {
+        authHandler_->handleGetUser(msg, session);
+    });
+
+    router_->registerHandler("auth.users.list", [this](const json& msg, WebSocketSession& session) {
+        authHandler_->handleListUsers(msg, session);
+    });
+
     // FileSystem
     router_->registerHandler("fs.listDir", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleListDir(msg, session);

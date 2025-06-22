@@ -132,12 +132,22 @@ void WebSocketSession::accept(tcp::socket&& socket) {
 }
 
 void WebSocketSession::close() {
-    beast::error_code ec;
-    ws_->close(websocket::close_code::normal, ec);
-    if (ec) std::cerr << "[WebSocketSession] Close error: " << ec.message() << "\n";
-    else
-        std::cout << "[WebSocketSession] Connection closed gracefully.\n";
+    if (broadcastManager_ && isRegistered_) {      // drop pub/sub ref
+        broadcastManager_->unregisterSession(shared_from_this());
+        isRegistered_ = false;
+    }
+
+    if (ws_ && ws_->is_open()) {                   // close websocket
+        beast::error_code ec;
+        ws_->close(websocket::close_code::normal, ec);
+        if (ec) std::cerr << "[Session] Close error: " << ec.message() << '\n';
+    }
+
+    ws_.reset();                                   // release FD
+    buffer_.consume(buffer_.size());
+    std::cout << "[WebSocketSession] Session cleaned up\n";
 }
+
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ‑‑ messaging I/O
@@ -161,9 +171,14 @@ void WebSocketSession::send(const json& message) {
 void WebSocketSession::doWrite() {
     std::lock_guard lock(writeQueueMutex_);
     const std::string& front = writeQueue_.front();
-    ws_->async_write(asio::buffer(front),
-                     asio::bind_executor(strand_, std::bind(&WebSocketSession::onWrite, shared_from_this(),
-                                                            std::placeholders::_1, std::placeholders::_2)));
+    auto self = shared_from_this();
+
+    ws_->async_write(
+        asio::buffer(front),
+        asio::bind_executor(strand_,
+            [self](beast::error_code ec, std::size_t bytesWritten) {
+                self->onWrite(ec, bytesWritten);
+            }));
 }
 
 void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
@@ -184,17 +199,32 @@ void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
 }
 
 void WebSocketSession::doRead() {
-    ws_->async_read(buffer_, asio::bind_executor(strand_, std::bind(&WebSocketSession::onRead, shared_from_this(),
-                                                                    std::placeholders::_1, std::placeholders::_2)));
+    auto self = shared_from_this();
+
+    ws_->async_read(
+        buffer_,
+        asio::bind_executor(strand_,
+            [self](beast::error_code ec, std::size_t bytesRead) {
+                self->onRead(ec, bytesRead);
+            }));
 }
 
 void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
-    if (ec == websocket::error::closed) {
-        std::cout << "[Session] Connection closed.\n";
+    if (ec == websocket::error::closed) {          // graceful close
+        std::cout << "[Session] Peer sent CLOSE frame\n";
+        close();
         return;
     }
-    if (ec) {
+
+    if (ec == asio::error::eof) {                  // ungraceful close
+        std::cout << "[Session] Peer vanished (EOF)\n";
+        close();                                   // <- **must** clean up
+        return;
+    }
+
+    if (ec) {                                     // any other read error
         std::cerr << "[Session] Read error: " << ec.message() << '\n';
+        close();                                   // defensive cleanup
         return;
     }
 

@@ -19,9 +19,9 @@ class ConnectionLifecycleManager {
     void stop();
 
   private:
-    void run();
+    void run() const;
 
-    void sweepActiveSessions();
+    void sweepActiveSessions() const;
 
     std::shared_ptr<auth::SessionManager> sessionManager_;
     std::thread lifecycleThread_;

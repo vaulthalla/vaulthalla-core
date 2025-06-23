@@ -4,6 +4,7 @@
 #include <cctype>
 #include <curl/curl.h>
 #include <sstream>
+#include <ranges>
 
 namespace vh::auth {
 std::unordered_set<std::string> PasswordUtils::dictionaryWords_;
@@ -20,10 +21,10 @@ unsigned short PasswordUtils::passwordStrengthCheck(const std::string& password)
     if (len >= 16) score += 10;
     if (len >= 20) score += 10;
 
-    bool hasUpper = std::any_of(password.begin(), password.end(), ::isupper);
-    bool hasLower = std::any_of(password.begin(), password.end(), ::islower);
-    bool hasDigit = std::any_of(password.begin(), password.end(), ::isdigit);
-    bool hasSymbol = std::any_of(password.begin(), password.end(), [](unsigned char c) { return std::ispunct(c); });
+    const bool hasUpper = std::ranges::any_of(password.begin(), password.end(), ::isupper);
+    const bool hasLower = std::ranges::any_of(password.begin(), password.end(), ::islower);
+    const bool hasDigit = std::ranges::any_of(password.begin(), password.end(), ::isdigit);
+    const bool hasSymbol = std::ranges::any_of(password.begin(), password.end(), [](unsigned char c) { return std::ispunct(c); });
 
     if (hasLower) score += 15;
     if (hasUpper) score += 15;
@@ -43,14 +44,14 @@ bool PasswordUtils::containsDictionaryWord(const std::string& password) {
     if (dictionaryWords_.empty()) return false; // fallback if not loaded
 
     std::string lowerPw = password;
-    std::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
+    std::ranges::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
 
     return std::ranges::any_of(dictionaryWords_, [&](const auto& word) { return lowerPw.contains(word); });
 }
 
 bool PasswordUtils::isCommonWeakPassword(const std::string& password) {
     std::string lowerPw = password;
-    std::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
+    std::ranges::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
     return commonWeakPasswords_.count(lowerPw) > 0;
 }
 
@@ -61,16 +62,16 @@ size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* s) 
 }
 
 bool PasswordUtils::isPwnedPassword(const std::string& password) {
-    std::string sha1Hex = SHA1Hex(password); // Needs to be uppercase hex
-    std::string prefix = sha1Hex.substr(0, 5);
-    std::string suffix = sha1Hex.substr(5);
+    const std::string sha1Hex = SHA1Hex(password); // Needs to be uppercase hex
+    const std::string prefix = sha1Hex.substr(0, 5);
+    const std::string suffix = sha1Hex.substr(5);
 
-    std::string url = "https://api.pwnedpasswords.com/range/" + prefix;
+    const std::string url = "https://api.pwnedpasswords.com/range/" + prefix;
 
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    auto response = downloadURL(url);
+    const auto response = downloadURL(url);
 
     std::istringstream stream(response);
     std::string line;

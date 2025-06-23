@@ -24,23 +24,21 @@ void ConnectionLifecycleManager::stop() {
     std::cout << "[LifecycleManager] Stopped." << std::endl;
 }
 
-void ConnectionLifecycleManager::run() {
+void ConnectionLifecycleManager::run() const {
     while (running_) {
         sweepActiveSessions();
         std::this_thread::sleep_for(SweepInterval);
     }
 }
 
-void ConnectionLifecycleManager::sweepActiveSessions() {
+void ConnectionLifecycleManager::sweepActiveSessions() const {
     auto sessions = sessionManager_->getActiveSessions(); // Expose activeSessions_ snapshot in SessionManager
-
-    auto now = std::chrono::system_clock::now();
 
     for (const auto& [tokenStr, client] : sessions) {
         if (!client) continue;
 
-        auto token = client->getToken();
-        auto secondsLeft = client->getToken()->getTimeLeft();
+        const auto token = client->getToken();
+        const auto secondsLeft = client->getToken()->getTimeLeft();
 
         if (token->revoked) {
             std::cout << "[LifecycleManager] Token revoked. Closing session for user " << client->getUser()->id

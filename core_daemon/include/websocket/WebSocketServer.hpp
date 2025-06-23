@@ -7,7 +7,7 @@
 #include <memory>
 
 namespace vh::auth {
-class authManager;
+class AuthManager;
 }
 
 namespace vh::websocket {
@@ -18,16 +18,15 @@ namespace beast = boost::beast;
 using tcp = asio::ip::tcp;
 
 class WebSocketServer : public std::enable_shared_from_this<WebSocketServer> {
-  public:
+public:
     WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
                     const std::shared_ptr<WebSocketRouter>& router,
                     const std::shared_ptr<auth::AuthManager>& authManager);
 
     void run();
 
-  private:
+private:
     tcp::acceptor acceptor_;
-    tcp::socket socket_;
     asio::io_context& ioc_;
 
     std::shared_ptr<WebSocketRouter> router_;
@@ -36,7 +35,7 @@ class WebSocketServer : public std::enable_shared_from_this<WebSocketServer> {
     std::shared_ptr<NotificationBroadcastManager> broadcastManager_;
 
     void doAccept();
-    void onAccept(boost::system::error_code ec);
+    void onAccept(tcp::socket socket);
 };
 
 } // namespace vh::websocket

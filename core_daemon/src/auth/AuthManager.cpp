@@ -50,18 +50,18 @@ bool AuthManager::validateToken(const std::string& token) {
         auto session = sessionManager_->getClientSession(token);
 
         if (!session) {
-            std::cerr << "[AuthManager] Invalid token: session not found for token " << token << "\n";
+            std::cerr << "[AuthManager] Invalid token: session not found for token " << token << std::endl;
             return false;
         }
 
         if (!session->isAuthenticated()) {
-            std::cerr << "[AuthManager] Invalid token: session is not authenticated for token " << token << "\n";
+            std::cerr << "[AuthManager] Invalid token: session is not authenticated for token " << token << std::endl;
             return false;
         }
 
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] Token validation failed: " << e.what() << "\n";
+        std::cerr << "[AuthManager] Token validation failed: " << e.what() << std::endl;
         return false;
     }
 }
@@ -88,7 +88,7 @@ std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> u
 
     if (!user) throw std::runtime_error("Failed to create user: " + user->email);
 
-    std::cout << "[AuthManager] Registered new user: " << user->email << "\n";
+    std::cout << "[AuthManager] Registered new user: " << user->email << std::endl;
     return client;
 }
 
@@ -111,10 +111,10 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const s
 
         sessionManager_->promoteSession(client);
 
-        std::cout << "[AuthManager] User logged in: " << email << "\n";
+        std::cout << "[AuthManager] User logged in: " << email << std::endl;
         return client;
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] loginUser failed: " << e.what() << "\n";
+        std::cerr << "[AuthManager] loginUser failed: " << e.what() << std::endl;
         return nullptr;
     }
 }
@@ -133,9 +133,9 @@ void AuthManager::updateUser(const std::shared_ptr<types::User>& user) {
 
         database::UserQueries::updateUser(existingUser);
 
-        std::cout << "[AuthManager] Updated user: " << user->email << "\n";
+        std::cout << "[AuthManager] Updated user: " << user->email << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] updateUser failed: " << e.what() << "\n";
+        std::cerr << "[AuthManager] updateUser failed: " << e.what() << std::endl;
     }
 }
 
@@ -144,17 +144,24 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
     try {
         // 1. Decode and verify JWT
         const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
+        const std::string tokenJti = decoded.get_id();
+
+        auto priorSession = sessionManager_->getClientSession(tokenJti);
+        if (priorSession && priorSession->isAuthenticated()) {
+            std::cout << "[AuthManager] Rehydrating existing session for JTI: " << tokenJti << std::endl;
+            priorSession->setSession(session);
+            return priorSession; // Session already exists, rehydrate it
+        }
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
                 .allow_algorithm(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret})
                 .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
-            ;
+        ;
 
         verifier.verify(decoded);
 
         // 2. Extract and validate claims
         const std::string tokenSub = decoded.get_subject();
-        const std::string tokenJti = decoded.get_id();
         const auto tokenExp = decoded.get_expires_at();
 
         if (tokenJti.empty()) throw std::runtime_error("Missing JTI in refresh token");
@@ -181,7 +188,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
         return client;
 
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] validateRefreshToken failed: " << e.what() << "\n";
+        std::cerr << "[AuthManager] validateRefreshToken failed: " << e.what() << std::endl;
         return nullptr;
     }
 }
@@ -198,7 +205,7 @@ void AuthManager::changePassword(const std::string& email, const std::string& ol
     std::string newHashed = crypto::hashPassword(newPassword);
     user->setPasswordHash(newHashed);
 
-    std::cout << "[AuthManager] Changed password for user: " << email << "\n";
+    std::cout << "[AuthManager] Changed password for user: " << email << std::endl;
 }
 
 bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, const std::string& password) {
@@ -231,7 +238,7 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, 
     if (!errors.empty()) {
         std::ostringstream oss;
         oss << "Registration failed due to the following issues:\n";
-        for (const auto& err : errors) oss << "- " << err << "\n";
+        for (const auto& err : errors) oss << "- " << err << std::endl;
         throw std::runtime_error(oss.str());
     }
 

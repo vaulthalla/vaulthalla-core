@@ -16,7 +16,7 @@ void WebSocketRouter::registerHandler(const std::string& command, HandlerFunc ha
 
 void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
     try {
-        std::cout << "[Router] Routing message: " << msg.dump() << "\n";
+        std::cout << "[Router] Routing message: " << msg.dump() << std::endl;
 
         std::string command = msg.at("command").get<std::string>();
         std::string accessToken = msg.value("token", "");
@@ -24,7 +24,7 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         if (!command.starts_with("auth")) {
             auto client = sessionManager_->getClientSession(session.getUUID());
             if (!client || !client->validateToken(accessToken)) {
-                std::cerr << "[Router] Unauthorized access attempt with command: " << command << "\n";
+                std::cerr << "[Router] Unauthorized access attempt with command: " << command << std::endl;
                 json errorResponse = {{"command", "error"},
                                       {"status", "unauthorized"},
                                       {"message", "You must be authenticated to perform this action."}};
@@ -36,11 +36,11 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         auto it = handlers_.find(command);
         if (it != handlers_.end()) it->second(msg, session);
         else {
-            std::cerr << "[Router] Unknown command: " << command << "\n";
+            std::cerr << "[Router] Unknown command: " << command << std::endl;
             // send an error back here too
         }
     } catch (const std::exception& e) {
-        std::cerr << "[Router] Error routing message: " << e.what() << "\n";
+        std::cerr << "[Router] Error routing message: " << e.what() << std::endl;
     }
 }
 

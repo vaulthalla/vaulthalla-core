@@ -49,7 +49,7 @@ void Vaulthalla::start() {
 
         std::cout << "Vaulthalla service started." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[Vaulthalla] Exception: " << e.what() << "\n";
+        std::cerr << "[Vaulthalla] Exception: " << e.what() << std::endl;
     }
 }
 

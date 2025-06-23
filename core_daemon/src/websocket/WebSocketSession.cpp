@@ -1,4 +1,5 @@
 #include "websocket/WebSocketSession.hpp"
+
 #include "types/db/User.hpp"
 #include "auth/AuthManager.hpp"
 #include "websocket/WebSocketRouter.hpp"
@@ -21,9 +22,9 @@ namespace vh::websocket {
 
 std::string extractCookie(const http::request<http::string_body>& req,
                           const std::string& key) {
-    if (auto it = req.find(http::field::cookie); it != req.end()) {
+    if (const auto it = req.find(http::field::cookie); it != req.end()) {
         const std::string cookieHeader = it->value();
-        std::regex cookieRegex(key + "=([^;]+)");
+        const std::regex cookieRegex(key + "=([^;]+)");
         std::smatch match;
         if (std::regex_search(cookieHeader, match, cookieRegex)) return match[1];
     }
@@ -41,7 +42,7 @@ WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& route
 WebSocketSession::~WebSocketSession() {
     if (broadcastManager_ && isRegistered_) {
         broadcastManager_->unregisterSession(shared_from_this());
-        std::cout << "[WebSocketSession] Destructor — session unregistered.\n";
+        std::cout << "[WebSocketSession] Destructor — session unregistered." << std::endl;
     }
 }
 
@@ -89,14 +90,14 @@ void WebSocketSession::accept(tcp::socket&& socket) {
     // ── Lambda: what happens once the WebSocket handshake is accepted ──
     auto onHandshakeAccepted = [self](beast::error_code ec) {
         if (ec) {
-            std::cerr << "[Session] WebSocket accept error: " << ec.message() << '\n';
+            std::cerr << "[Session] WebSocket accept error: " << ec.message() << std::endl;
             return;
         }
 
         if (self->broadcastManager_) self->broadcastManager_->registerSession(self);
 
         self->isRegistered_ = true;
-        std::cout << "[Session] WS connected from " << self->ipAddress_ << " UA:" << self->userAgent_ << '\n';
+        std::cout << "[Session] WS connected from " << self->ipAddress_ << " UA:" << self->userAgent_ << std::endl;
 
         self->doRead();
     };
@@ -105,7 +106,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
     auto onHeadersRead = [self, req, setHandshakeResponseHeaders, onHandshakeAccepted](beast::error_code ec,
                                                                                        std::size_t) {
         if (ec) {
-            std::cerr << "[Session] Handshake read error: " << ec.message() << '\n';
+            std::cerr << "[Session] Handshake read error: " << ec.message() << std::endl;
             return;
         }
 
@@ -115,9 +116,9 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         self->handshakeRequest_ = *req;
         self->refreshToken_ = extractCookie(*req, "refresh");
 
-        if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies\n";
+        if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies" << std::endl;
         else
-            std::cout << "[Session] No refresh token found in Cookie header\n";
+            std::cout << "[Session] No refresh token found in Cookie header" << std::endl;
 
         self->authManager_->rehydrateOrCreateClient(self);
 
@@ -140,12 +141,12 @@ void WebSocketSession::close() {
     if (ws_ && ws_->is_open()) {                   // close websocket
         beast::error_code ec;
         ws_->close(websocket::close_code::normal, ec);
-        if (ec) std::cerr << "[Session] Close error: " << ec.message() << '\n';
+        if (ec) std::cerr << "[Session] Close error: " << ec.message() << std::endl;
     }
 
     ws_.reset();                                   // release FD
     buffer_.consume(buffer_.size());
-    std::cout << "[WebSocketSession] Session cleaned up\n";
+    std::cout << "[WebSocketSession] Session cleaned up" << std::endl;
 }
 
 
@@ -156,20 +157,16 @@ void WebSocketSession::send(const json& message) {
     const std::string msg = message.dump();
     asio::post(strand_, [self = shared_from_this(), msg]() {
         bool startWrite = false;
-        {
-            std::lock_guard lock(self->writeQueueMutex_);
-            self->writeQueue_.push(msg);
-            if (!self->writingInProgress_) {
-                self->writingInProgress_ = true;
-                startWrite = true;
-            }
+        self->writeQueue_.push(msg);
+        if (!self->writingInProgress_) {
+            self->writingInProgress_ = true;
+            startWrite = true;
         }
         if (startWrite) self->doWrite();
     });
 }
 
 void WebSocketSession::doWrite() {
-    std::lock_guard lock(writeQueueMutex_);
     const std::string& front = writeQueue_.front();
     auto self = shared_from_this();
 
@@ -184,18 +181,13 @@ void WebSocketSession::doWrite() {
 void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
     boost::ignore_unused(bytesWritten);
     if (ec) {
-        std::cerr << "[WebSocketSession] Write error: " << ec.message() << '\n';
+        std::cerr << "[WebSocketSession] Write error: " << ec.message() << std::endl;
         return;
     }
 
-    bool more;
-    {
-        std::lock_guard lock(writeQueueMutex_);
-        writeQueue_.pop();
-        more = !writeQueue_.empty();
-        if (!more) writingInProgress_ = false;
-    }
-    if (more) doWrite();
+    writeQueue_.pop();
+    if (writeQueue_.empty()) writingInProgress_ = false;
+    else doWrite();
 }
 
 void WebSocketSession::doRead() {
@@ -211,19 +203,19 @@ void WebSocketSession::doRead() {
 
 void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
     if (ec == websocket::error::closed) {          // graceful close
-        std::cout << "[Session] Peer sent CLOSE frame\n";
+        std::cout << "[Session] Peer sent CLOSE frame" << std::endl;
         close();
         return;
     }
 
     if (ec == asio::error::eof) {                  // ungraceful close
-        std::cout << "[Session] Peer vanished (EOF)\n";
+        std::cout << "[Session] Peer vanished (EOF)" << std::endl;
         close();                                   // <- **must** clean up
         return;
     }
 
     if (ec) {                                     // any other read error
-        std::cerr << "[Session] Read error: " << ec.message() << '\n';
+        std::cerr << "[Session] Read error: " << ec.message() << std::endl;
         close();                                   // defensive cleanup
         return;
     }
@@ -231,7 +223,7 @@ void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
     try {
         router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
     } catch (const std::exception& ex) {
-        std::cerr << "[Session] JSON error: " << ex.what() << '\n';
+        std::cerr << "[Session] JSON error: " << ex.what() << std::endl;
     }
 
     buffer_.consume(buffer_.size());
@@ -261,22 +253,18 @@ void WebSocketSession::setHandshakeRequest(const RequestType& req) {
 // ‑‑ pub/sub channels
 // ──────────────────────────────────────────────────────────────────────────────
 void WebSocketSession::subscribeChannel(const std::string& channel) {
-    std::lock_guard lock(subscriptionMutex_);
     subscribedChannels_.insert(channel);
 }
 
 void WebSocketSession::unsubscribeChannel(const std::string& channel) {
-    std::lock_guard lock(subscriptionMutex_);
     subscribedChannels_.erase(channel);
 }
 
 bool WebSocketSession::isSubscribedTo(const std::string& channel) {
-    std::lock_guard lock(subscriptionMutex_);
     return subscribedChannels_.contains(channel);
 }
 
 std::unordered_set<std::string> WebSocketSession::getSubscribedChannels() {
-    std::lock_guard lock(subscriptionMutex_);
     return subscribedChannels_;
 }
 

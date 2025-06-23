@@ -29,10 +29,10 @@ void ShareHandler::handleCreateLink(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[ShareHandler] User '" << user->email << "' created share link for " << path << "\n";
+        std::cout << "[ShareHandler] User '" << user->email << "' created share link for " << path << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[ShareHandler] handleCreateLink error: " << e.what() << "\n";
+        std::cerr << "[ShareHandler] handleCreateLink error: " << e.what() << std::endl;
 
         json response = {{"command", "share.createLink.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -57,10 +57,10 @@ void ShareHandler::handleResolveLink(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[ShareHandler] Resolved share link for path " << shareLink->getPath() << "\n";
+        std::cout << "[ShareHandler] Resolved share link for path " << shareLink->getPath() << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[ShareHandler] handleResolveLink error: " << e.what() << "\n";
+        std::cerr << "[ShareHandler] handleResolveLink error: " << e.what() << std::endl;
 
         json response = {{"command", "share.resolveLink.response"}, {"status", "error"}, {"error", e.what()}};
 

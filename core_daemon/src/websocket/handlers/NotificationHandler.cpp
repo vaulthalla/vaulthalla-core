@@ -18,10 +18,10 @@ void NotificationHandler::handleSubscribe(const json& msg, WebSocketSession& ses
 
         session.send(response);
 
-        std::cout << "[NotificationHandler] User '" << user->email << "' subscribed to channels.\n";
+        std::cout << "[NotificationHandler] User '" << user->email << "' subscribed to channels." << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[NotificationHandler] handleSubscribe error: " << e.what() << "\n";
+        std::cerr << "[NotificationHandler] handleSubscribe error: " << e.what() << std::endl;
 
         json response = {{"command", "notification.subscribe.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -41,10 +41,10 @@ void NotificationHandler::handleUnsubscribe(const json& msg, WebSocketSession& s
 
         session.send(response);
 
-        std::cout << "[NotificationHandler] User '" << user->email << "' unsubscribed from channels.\n";
+        std::cout << "[NotificationHandler] User '" << user->email << "' unsubscribed from channels." << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[NotificationHandler] handleUnsubscribe error: " << e.what() << "\n";
+        std::cerr << "[NotificationHandler] handleUnsubscribe error: " << e.what() << std::endl;
 
         json response = {{"command", "notification.unsubscribe.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -59,7 +59,7 @@ void NotificationHandler::pushNotification(WebSocketSession& session, const std:
 
     session.send(message);
 
-    std::cout << "[NotificationHandler] Pushed notification on channel '" << channel << "'\n";
+    std::cout << "[NotificationHandler] Pushed notification on channel '" << channel << "'" << std::endl;
 }
 
 } // namespace vh::websocket

@@ -45,10 +45,10 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] ListDir on mount '" << mountName << "' path '" << path << "'\n";
+        std::cout << "[FileSystemHandler] ListDir on mount '" << mountName << "' path '" << path << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << "\n";
+        std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << std::endl;
 
         json response = {{"command", "fs.listDir.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -79,10 +79,10 @@ void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] ReadFile on mount '" << mountName << "' path '" << path << "'\n";
+        std::cout << "[FileSystemHandler] ReadFile on mount '" << mountName << "' path '" << path << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleReadFile error: " << e.what() << "\n";
+        std::cerr << "[FileSystemHandler] handleReadFile error: " << e.what() << std::endl;
 
         json response = {{"command", "fs.readFile.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -112,10 +112,10 @@ void FileSystemHandler::handleWriteFile(const json& msg, WebSocketSession& sessi
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] WriteFile on mount '" << mountName << "' path '" << path << "'\n";
+        std::cout << "[FileSystemHandler] WriteFile on mount '" << mountName << "' path '" << path << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleWriteFile error: " << e.what() << "\n";
+        std::cerr << "[FileSystemHandler] handleWriteFile error: " << e.what() << std::endl;
 
         json response = {{"command", "fs.writeFile.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -149,10 +149,10 @@ void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& sess
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] DeleteFile on mount '" << mountName << "' path '" << path << "'\n";
+        std::cout << "[FileSystemHandler] DeleteFile on mount '" << mountName << "' path '" << path << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleDeleteFile error: " << e.what() << "\n";
+        std::cerr << "[FileSystemHandler] handleDeleteFile error: " << e.what() << std::endl;
 
         json response = {{"command", "fs.deleteFile.response"}, {"status", "error"}, {"error", e.what()}};
 

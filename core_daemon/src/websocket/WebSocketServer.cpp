@@ -3,13 +3,14 @@
 #include "websocket/WebSocketSession.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
 #include <iostream>
+#include <thread>
 
 namespace vh::websocket {
 
 WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
                                  const std::shared_ptr<WebSocketRouter>& router,
                                  const std::shared_ptr<auth::AuthManager>& authManager)
-    : acceptor_(ioc), socket_(ioc), ioc_(ioc), router_(router), authManager_(authManager),
+    : acceptor_(ioc), ioc_(ioc), router_(router), authManager_(authManager),
       sessionManager_(authManager_->sessionManager()),
       broadcastManager_(std::make_shared<NotificationBroadcastManager>()) {
     beast::error_code ec;
@@ -28,26 +29,24 @@ WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& end
 }
 
 void WebSocketServer::run() {
-    std::cout << "[WebSocketServer] Starting to accept connections on " << acceptor_.local_endpoint() << "\n";
+    std::cout << "[WebSocketServer] Starting to accept connections on " << acceptor_.local_endpoint() << std::endl;
     doAccept();
 }
 
 void WebSocketServer::doAccept() {
-    acceptor_.async_accept(socket_, [self = shared_from_this()](boost::system::error_code ec) { self->onAccept(ec); });
+    auto sock = std::make_shared<tcp::socket>(acceptor_.get_executor());
+    acceptor_.async_accept(*sock, [self = shared_from_this(), sock](boost::system::error_code ec) {
+        if (!ec) self->onAccept(std::move(*sock));
+        self->doAccept();
+    });
 }
 
-void WebSocketServer::onAccept(boost::system::error_code ec) {
-    if (ec) std::cerr << "[WebSocketServer] Accept error: " << ec.message() << "\n";
-    else {
-        std::cout << "[WebSocketServer] Accepted new connection.\n";
+void WebSocketServer::onAccept(tcp::socket socket) {
+    socket.set_option(tcp::no_delay(true));
+    socket.set_option(asio::socket_base::keep_alive(true));
 
-        // Launch WebSocketSession
-        auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
-        session->accept(std::move(socket_)); // your new method to handle request parsing and upgrade
-    }
-
-    // Accept next connection
-    doAccept();
+    auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
+    session->accept(std::move(socket));
 }
 
 } // namespace vh::websocket

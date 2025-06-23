@@ -45,9 +45,9 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Added API key: " << name << "\n";
+        std::cout << "[StorageHandler] Added API key: " << name << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.apiKey.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -70,10 +70,10 @@ void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& sessi
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Removed API key with ID: " << keyId << "\n";
+        std::cout << "[StorageHandler] Removed API key with ID: " << keyId << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleRemoveAPIKey error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleRemoveAPIKey error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.apiKey.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -99,7 +99,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
 
         std::cout << "[StorageHandler] Listed API keys for all users." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.apiKey.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -125,9 +125,9 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed API keys for user ID: " << user->id << "\n";
+        std::cout << "[StorageHandler] Listed API keys for user ID: " << user->id << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.apiKey.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -170,9 +170,9 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Fetched API key with ID: " << keyId << "\n";
+        std::cout << "[StorageHandler] Fetched API key with ID: " << keyId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.apiKey.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -219,9 +219,9 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Mounted vault: " << name << " -> " << type << "\n";
+        std::cout << "[StorageHandler] Mounted vault: " << name << " -> " << type << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.vault.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -243,9 +243,9 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Removed local disk vault with ID: " << vaultId << "\n";
+        std::cout << "[StorageHandler] Removed local disk vault with ID: " << vaultId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.vault.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -270,9 +270,9 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Fetched local disk vault with ID: " << vaultId << "\n";
+        std::cout << "[StorageHandler] Fetched local disk vault with ID: " << vaultId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.vault.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -296,9 +296,9 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed S3 vaults.\n";
+        std::cout << "[StorageHandler] Listed S3 vaults." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.vault.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -328,9 +328,9 @@ void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Added volume: " << name << "\n";
+        std::cout << "[StorageHandler] Added volume: " << name << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleAddVolume error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleAddVolume error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -354,9 +354,9 @@ void StorageHandler::handleRemoveVolume(const json& msg, WebSocketSession& sessi
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Removed volume with ID: " << volumeId << "\n";
+        std::cout << "[StorageHandler] Removed volume with ID: " << volumeId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleRemoveVolume error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleRemoveVolume error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -381,9 +381,9 @@ void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& se
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed volumes for user ID: " << userId << "\n";
+        std::cout << "[StorageHandler] Listed volumes for user ID: " << userId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -408,9 +408,9 @@ void StorageHandler::handleListVaultVolumes(const json& msg, WebSocketSession& s
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed volumes for vault ID: " << vaultId << "\n";
+        std::cout << "[StorageHandler] Listed volumes for vault ID: " << vaultId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.list.vault.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -434,9 +434,9 @@ void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed all storage volumes.\n";
+        std::cout << "[StorageHandler] Listed all storage volumes." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
@@ -460,9 +460,9 @@ void StorageHandler::handleGetVolume(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Fetched volume with ID: " << volumeId << "\n";
+        std::cout << "[StorageHandler] Fetched volume with ID: " << volumeId << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleGetVolume error: " << e.what() << "\n";
+        std::cerr << "[StorageHandler] handleGetVolume error: " << e.what() << std::endl;
 
         json response = {{"command", "storage.volume.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},

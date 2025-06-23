@@ -11,7 +11,7 @@ void SessionManager::createSession(const std::shared_ptr<Client>& client) {
     if (!client || !client->getSession()) throw std::invalid_argument("Session must not be null");
 
     activeSessions_[client->getSession()->getUUID()] = client;
-    std::cout << "[SessionManager] Created new stateless session.\n";
+    std::cout << "[SessionManager] Created new stateless session." << std::endl;
 }
 
 std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client) {
@@ -28,10 +28,10 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
         client->setRefreshToken(database::UserQueries::getRefreshToken(refreshToken->getJti()));
         activeSessions_[client->getSession()->getUUID()] = client;
 
-        std::cout << "[SessionManager] Promoted session for user: " << client->getEmail() << "\n";
+        std::cout << "[SessionManager] Promoted session for user: " << client->getEmail() << std::endl;
         return client->getRawToken();
     } catch (const std::exception& e) {
-        std::cerr << "[SessionManager] promoteSession failed: " << e.what() << "\n";
+        std::cerr << "[SessionManager] promoteSession failed: " << e.what() << std::endl;
         return "";
     }
 }
@@ -52,7 +52,7 @@ void SessionManager::invalidateSession(const std::string& sessionUUID) {
         if (it->second->getUser()) {
             it->second->invalidateToken();
             database::UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
-            std::cout << "[SessionManager] Invalidated session for user: " << it->second->getEmail() << "\n";
+            std::cout << "[SessionManager] Invalidated session for user: " << it->second->getEmail() << std::endl;
         }
         activeSessions_.erase(it);
     }

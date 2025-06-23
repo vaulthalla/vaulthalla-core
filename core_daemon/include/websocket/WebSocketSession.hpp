@@ -78,7 +78,7 @@ private:
     std::shared_ptr<auth::AuthManager> authManager_;
     const std::string uuid = generateUUIDv4();
     std::shared_ptr<websocket::stream<tcp::socket> > ws_;
-    beast::flat_buffer buffer_, tmpBuffer_;
+    beast::flat_buffer buffer_{8192}, tmpBuffer_{4096};
     asio::any_io_executor strand_;
     RequestType handshakeRequest_;
 
@@ -88,12 +88,10 @@ private:
     std::string userAgent_;
     std::string ipAddress_;
 
-    std::mutex writeQueueMutex_;
     std::queue<std::string> writeQueue_;
     bool writingInProgress_ = false;
 
     std::unordered_set<std::string> subscribedChannels_;
-    std::mutex subscriptionMutex_;
     std::shared_ptr<NotificationBroadcastManager> broadcastManager_;
     bool isRegistered_ = false;
 

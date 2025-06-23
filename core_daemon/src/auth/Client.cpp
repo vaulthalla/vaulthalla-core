@@ -16,9 +16,6 @@ Client::Client(const std::shared_ptr<websocket::WebSocketSession>& session,
     if (user) {
         token_ = std::make_shared<Token>(generateToken(user->email), user->id);
         session_->setAuthenticatedUser(user_);
-    } else {
-        std::cerr << "[Client] User is null, cannot set token.\n";
-        token_ = nullptr;
     }
 }
 
@@ -34,9 +31,19 @@ std::shared_ptr<websocket::WebSocketSession> Client::getSession() const {
     return session_;
 }
 
+void Client::setSession(const std::shared_ptr<websocket::WebSocketSession>& session) {
+    if (!session) {
+        std::cerr << "[Client] Cannot set session: session is null." << std::endl;
+        return;
+    }
+    session_ = session;
+    if (user_) session_->setAuthenticatedUser(user_);
+    else std::cerr << "[Client] User is not set, cannot bind to session." << std::endl;
+}
+
 void Client::setUser(const std::shared_ptr<types::User>& user) {
     if (!user) {
-        std::cerr << "[Client] Cannot set user: user is null.\n";
+        std::cerr << "[Client] Cannot set user: user is null." << std::endl;
         return;
     }
     user_ = user;
@@ -70,15 +77,15 @@ bool Client::isAuthenticated() const {
 
 void Client::refreshToken() {
     if (user_) token_ = std::make_shared<Token>(generateToken(user_->email), user_->id);
-    else std::cerr << "[Client] Cannot refresh token: user is not set.\n";
+    else std::cerr << "[Client] Cannot refresh token: user is not set." << std::endl;
 }
 
 void Client::invalidateToken() {
     if (token_) {
         token_->revoke();
-        std::cout << "[Client] Token invalidated for user: " << user_->email << "\n";
+        std::cout << "[Client] Token invalidated for user: " << user_->email << std::endl;
     } else {
-        std::cerr << "[Client] Cannot invalidate token: token is not set.\n";
+        std::cerr << "[Client] Cannot invalidate token: token is not set." << std::endl;
     }
 }
 
@@ -86,9 +93,9 @@ void Client::closeConnection() {
     if (session_) {
         invalidateToken();
         session_->close();
-        std::cout << "[Client] Connection closed for user: " << user_->email << "\n";
+        std::cout << "[Client] Connection closed for user: " << user_->email << std::endl;
     } else {
-        std::cerr << "[Client] Cannot close connection: session is not set.\n";
+        std::cerr << "[Client] Cannot close connection: session is not set." << std::endl;
     }
 }
 
@@ -104,21 +111,21 @@ bool Client::validateToken(const std::string& token) const {
 
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "[TokenValidator] Token validation failed: " << e.what() << "\n";
+        std::cerr << "[TokenValidator] Token validation failed: " << e.what() << std::endl;
         return false;
     }
 }
 
 void Client::sendControlMessage(const std::string& type, const nlohmann::json& payload) {
     if (!isAuthenticated()) {
-        std::cerr << "[Client] Cannot send control message: user is not authenticated.\n";
+        std::cerr << "[Client] Cannot send control message: user is not authenticated." << std::endl;
         return;
     }
 
     nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
 
     if (session_) session_->send(msg);
-    else std::cerr << "[Client] Cannot send control message: session is not set.\n";
+    else std::cerr << "[Client] Cannot send control message: session is not set." << std::endl;
 }
 
 std::string Client::generateToken(const std::string& email) {

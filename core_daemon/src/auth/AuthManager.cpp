@@ -72,12 +72,11 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
 
 std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> user,
                                                   const std::string& password,
-                                                  const std::string& role,
                                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
     isValidRegistration(user, password);
 
     user->setPasswordHash(crypto::hashPassword(password));
-    database::UserQueries::createUser(user, role);
+    database::UserQueries::createUser(user);
 
     user = findUser(user->email);
     auto client = sessionManager_->getClientSession(session->getUUID());
@@ -108,6 +107,7 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const s
         user = database::UserQueries::getUserById(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
+        client->getSession()->setAuthenticatedUser(user);
 
         sessionManager_->promoteSession(client);
 
@@ -119,12 +119,31 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& email, const s
     }
 }
 
-std::shared_ptr<Client>
-AuthManager::validateRefreshToken(const std::string& refreshToken,
+void AuthManager::updateUser(const std::shared_ptr<types::User>& user) {
+    try {
+        if (!user) throw std::runtime_error("Cannot update null user");
+
+        auto existingUser = findUser(user->email);
+        if (!existingUser) throw std::runtime_error("User not found: " + user->email);
+
+        existingUser->name = user->name;
+        existingUser->email = user->email;
+        existingUser->is_active = user->is_active;
+        existingUser->role = user->role;
+
+        database::UserQueries::updateUser(existingUser);
+
+        std::cout << "[AuthManager] Updated user: " << user->email << "\n";
+    } catch (const std::exception& e) {
+        std::cerr << "[AuthManager] updateUser failed: " << e.what() << "\n";
+    }
+}
+
+std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& refreshToken,
                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
     try {
         // 1. Decode and verify JWT
-        auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
+        const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
                 .allow_algorithm(jwt::algorithm::hs256{types::config::ConfigRegistry::get().auth.jwt_secret})
@@ -146,7 +165,7 @@ AuthManager::validateRefreshToken(const std::string& refreshToken,
 
         if (storedToken->isRevoked()) throw std::runtime_error("Refresh token has been revoked");
 
-        auto now = std::chrono::system_clock::now();
+        const auto now = std::chrono::system_clock::now();
 
         if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now)
             throw std::runtime_error(
@@ -154,8 +173,7 @@ AuthManager::validateRefreshToken(const std::string& refreshToken,
 
         // 4. Secure compare stored hash to hashed input token
         if (!crypto::verifyPassword(refreshToken, storedToken->getHashedToken()))
-            throw std::runtime_error(
-                "Refresh token hash mismatch");
+            throw std::runtime_error("Refresh token hash mismatch");
 
         auto user = database::UserQueries::getUserByRefreshToken(tokenJti);
         auto client = std::make_shared<Client>(session, storedToken, user);
@@ -256,8 +274,8 @@ std::string generateUUID() {
 
 std::pair<std::string, std::shared_ptr<RefreshToken> >
 AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) {
-    auto now = std::chrono::system_clock::now();
-    auto exp = now + std::chrono::hours(24 * 7); // 7 days
+    const auto now = std::chrono::system_clock::now();
+    const auto exp = now + std::chrono::hours(24 * 7); // 7 days
     std::string jti = generateUUID();
 
     std::string token =

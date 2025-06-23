@@ -29,11 +29,12 @@ public:
 
     std::shared_ptr<Client> registerUser(std::shared_ptr<types::User> user,
                                          const std::string& password,
-                                         const std::string& role,
                                          const std::shared_ptr<websocket::WebSocketSession>& session);
 
     std::shared_ptr<Client> loginUser(const std::string& email, const std::string& password,
                                       const std::shared_ptr<websocket::WebSocketSession>& session);
+
+    void updateUser(const std::shared_ptr<types::User>& user);
 
     void changePassword(const std::string& username, const std::string& oldPassword, const std::string& newPassword);
 

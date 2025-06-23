@@ -7,7 +7,7 @@
 namespace vh::types {
 enum class RoleName { Admin, User, Guest, Moderator, SuperAdmin };
 
-inline std::string to_string(const RoleName& role) {
+inline std::string to_cli_string(const RoleName& role) {
     switch (role) {
         case RoleName::Admin: return "Administrator";
         case RoleName::User: return "User";
@@ -15,6 +15,17 @@ inline std::string to_string(const RoleName& role) {
         case RoleName::Moderator: return "Moderator";
         case RoleName::SuperAdmin: return "Super Administrator";
         default: return "Unknown";
+    }
+}
+
+inline std::string to_db_string(const RoleName& role) {
+    switch (role) {
+        case RoleName::Admin: return "Admin";
+        case RoleName::User: return "User";
+        case RoleName::Guest: return "Guest";
+        case RoleName::Moderator: return "Moderator";
+        case RoleName::SuperAdmin: return "SuperAdmin";
+        default: throw std::invalid_argument("Unknown role name");
     }
 }
 
@@ -39,6 +50,15 @@ inline std::string cli_role_str_to_db_string(const std::string& str) {
     return str;
 }
 
+inline RoleName role_from_cli_string(const std::string& str) {
+    if (str == "Administrator") return RoleName::Admin;
+    if (str == "User") return RoleName::User;
+    if (str == "Guest") return RoleName::Guest;
+    if (str == "Moderator") return RoleName::Moderator;
+    if (str == "Super Administrator") return RoleName::SuperAdmin;
+    throw std::invalid_argument("Unknown role name: " + str);
+}
+
 struct Role {
     unsigned int id;
     RoleName name;
@@ -50,14 +70,6 @@ struct Role {
         : id(row["id"].as<unsigned int>()),
           name(role_from_db_string(row["name"].as<std::string>())),
           description(row["description"].as<std::string>()) {}
-
-    [[nodiscard]] bool isAdmin() const { return name == RoleName::Admin || name == RoleName::SuperAdmin; }
-
-    [[nodiscard]] bool isUser() const { return name == RoleName::User || isAdmin(); }
-
-    [[nodiscard]] bool isGuest() const { return name == RoleName::Guest; }
-
-    [[nodiscard]] bool isModerator() const { return name == RoleName::Moderator || isAdmin(); }
 };
 } // namespace vh::types
 

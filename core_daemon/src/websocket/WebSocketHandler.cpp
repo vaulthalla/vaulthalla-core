@@ -29,6 +29,14 @@ void WebSocketHandler::registerAllHandlers() {
         authHandler_->handleLogout(msg, session);
     });
 
+    router_->registerHandler("auth.user.update", [this](const json& msg, WebSocketSession& session) {
+        authHandler_->handleUpdateUser(msg, session);
+    });
+
+    router_->registerHandler("auth.user.change_password", [this](const json& msg, WebSocketSession& session) {
+        authHandler_->handleChangePassword(msg, session);
+    });
+
     router_->registerHandler("auth.isAuthenticated", [this](const json& msg, WebSocketSession& session) {
         authHandler_->isUserAuthenticated(msg, session);
     });

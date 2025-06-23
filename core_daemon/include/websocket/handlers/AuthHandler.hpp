@@ -20,6 +20,8 @@ class AuthHandler {
 
     void handleLogin(const json& msg, WebSocketSession& session) const;
     void handleRegister(const json& msg, WebSocketSession& session) const;
+    void handleUpdateUser(const json& msg, WebSocketSession& session) const;
+    void handleChangePassword(const json& msg, WebSocketSession& session) const;
     void handleRefresh(const json& msg, WebSocketSession& session) const;
     void handleLogout(const json& msg, WebSocketSession& session) const;
     void handleGetUser(const json& msg, WebSocketSession& session) const;

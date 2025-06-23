@@ -100,17 +100,65 @@ else
     echo "✅ Conan profile already exists."
 fi
 
-# === Patch default Conan profile for modernity ===
-echo "🔧 Patching Conan profile: set C++ standard to gnu23 and build_type to Release..."
-sudo sed -i 's/compiler\.cppstd=.*/compiler.cppstd=gnu23/' /root/.conan2/profiles/default
-sudo sed -i 's/build_type=.*/build_type=Release/' /root/.conan2/profiles/default
+# === Conan Profile Detection & Injection ===
+echo "🧠 Generating custom Vaulthalla Conan profile..."
+
+# Get base profile dir (no matter pipx, sudo, root, user, etc)
+CONAN_PROFILE_DIR=$(conan profile path default | sed 's|/default$||')
+VAULTHALLA_PROFILE_PATH="$CONAN_PROFILE_DIR/vaulthalla"
+
+# Detect compiler
+if command -v g++ &> /dev/null; then
+  COMPILER="gcc"
+  COMPILER_VERSION=$(g++ -dumpversion | cut -d. -f1)
+elif command -v clang++ &> /dev/null; then
+  COMPILER="clang"
+  COMPILER_VERSION=$(clang++ --version | grep -oP 'version\s+\K[0-9]+' | head -n1)
+else
+  echo "❌ No supported compiler found (gcc or clang required)."
+  exit 1
+fi
+
+# Detect arch
+ARCH=$(uname -m)
+[[ "$ARCH" == "x86_64" ]] || {
+  echo "❌ Unsupported architecture: $ARCH"
+  exit 1
+}
+
+# Detect OS
+OS=$(uname)
+[[ "$OS" == "Linux" ]] || {
+  echo "❌ Unsupported OS: $OS. Vaulthalla is Linux-only."
+  exit 1
+}
+
+# Write profile
+mkdir -p "$(dirname "$VAULTHALLA_PROFILE_PATH")"
+
+cat > "$VAULTHALLA_PROFILE_PATH" <<EOF
+[settings]
+arch=$ARCH
+build_type=Release
+compiler=$COMPILER
+compiler.version=$COMPILER_VERSION
+compiler.cppstd=gnu23
+compiler.libcxx=libstdc++11
+os=Linux
+
+[conf]
+tools.system.package_manager:mode = install
+tools.system.package_manager:sudo = True
+EOF
+
+echo "✅ Custom Conan profile written to $VAULTHALLA_PROFILE_PATH"
 
 # Install dependencies
-conan install . --build=missing
+conan install . --build=missing -pr:a vaulthalla
 
 
 echo "🔨 Building binaries..."
-conan build .
+conan build . -pr:a vaulthalla
 
 # === 4) Deploy helper binary ===
 echo "📁 Deploying hash_password helper..."

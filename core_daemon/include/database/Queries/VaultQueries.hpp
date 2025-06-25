@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types/db/StorageVolume.hpp"
-#include "types/db/UserStorageVolume.hpp"
+#include "types/db/UserStorageUsage.hpp"
 #include "types/db/Vault.hpp"
 #include "database/Transactions.hpp"
 
@@ -23,9 +23,6 @@ struct VaultQueries {
     static std::vector<std::shared_ptr<types::StorageVolume>> listVaultVolumes(unsigned int vaultId);
     static std::vector<std::shared_ptr<types::StorageVolume>> listVolumes();
     static std::shared_ptr<types::StorageVolume> getVolume(unsigned int volumeId);
-
-    static std::shared_ptr<types::UserStorageVolume> getUserVolume(unsigned int volumeId, unsigned int userId);
-    static std::vector<std::shared_ptr<types::UserStorageVolume>> listUserAssignedVolumes(unsigned int userId);
 };
 
 } // namespace vh::database

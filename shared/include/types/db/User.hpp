@@ -7,15 +7,15 @@
 #include <ctime>
 
 #include <nlohmann/json_fwd.hpp> // Forward-decl only
-#include <boost/describe.hpp>
 
 namespace pqxx {
 class row;
+class result;
 }
 
 namespace vh::types {
 
-enum class RoleName;
+struct Role;
 
 struct User {
     unsigned short id;
@@ -25,23 +25,30 @@ struct User {
     std::time_t created_at;
     std::optional<std::time_t> last_login;
     bool is_active;
-    RoleName role;
+    std::shared_ptr<Role> global_role; // Global role
+    std::optional<std::vector<std::shared_ptr<Role>>> scoped_roles;  // Scoped roles, if any
 
     User();
-    User(std::string name, std::string email, bool isActive, const RoleName& role);
+    User(std::string name, std::string email, const bool isActive, const std::shared_ptr<Role>& global_role);
     explicit User(const pqxx::row& row);
+    User(const pqxx::row& user, const pqxx::result& roles);
 
+    void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);
 
-    [[nodiscard]] bool isAdmin() const;
-    [[nodiscard]] bool isUser() const;
-    [[nodiscard]] bool isGuest() const;
-    [[nodiscard]] bool isModerator() const;
+    [[nodiscard]] bool canManageUsers() const;
+    [[nodiscard]] bool canManageRoles() const;
+    [[nodiscard]] bool canManageStorage() const;
+    [[nodiscard]] bool canManageFiles() const;
+    [[nodiscard]] bool canViewAuditLog() const;
+    [[nodiscard]] bool canUploadFile() const;
+    [[nodiscard]] bool canDownloadFile() const;
+    [[nodiscard]] bool canDeleteFile() const;
+    [[nodiscard]] bool canShareFile() const;
+    [[nodiscard]] bool canLockFile() const;
 };
 
 } // namespace vh::types
-
-BOOST_DESCRIBE_STRUCT(vh::types::User, (), (id, name, email, password_hash, created_at, last_login, is_active))
 
 namespace vh::types {
 

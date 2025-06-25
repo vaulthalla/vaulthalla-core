@@ -6,6 +6,14 @@ set -euo pipefail
 #       This script sets up the entire environment
 # ═══════════════════════════════════════════════════════
 
+# Clean build environment
+#if [[ -d build ]]; then
+#    echo "🧹 Cleaning previous build artifacts..."
+#    rm -rf build
+#else
+#    mkdir -p build
+#fi
+
 # === 1) Create system user ===
 if ! id vaulthalla &>/dev/null; then
     echo "👤 Creating system user 'vaulthalla'..."

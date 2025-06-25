@@ -56,7 +56,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const auto email = payload.at("email").get<std::string>();
         const auto password = payload.at("password").get<std::string>();
         const auto isActive = payload.at("is_active").get<bool>();
-        const auto role = types::role_from_cli_string(payload.at("role").get<std::string>());
+        const auto role_id = payload.at("role_id").get<unsigned int>();
+
+        const auto role = database::UserQueries::getRole(role_id);
 
         auto user = std::make_shared<types::User>(name, email, isActive, role);
         const auto client = authManager_->registerUser(user, password, session.shared_from_this());
@@ -93,12 +95,8 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
         const auto user = session.getAuthenticatedUser();
         if (!user) throw std::runtime_error("User not authenticated");
 
-        json payload = msg.at("payload");
-        user->name = payload.at("name").get<std::string>();
-        user->email = payload.at("email").get<std::string>();
-        user->is_active = payload.at("is_active").get<bool>();
-        user->role = types::role_from_cli_string(payload.at("role").get<std::string>());
-
+        const auto payload = msg.at("payload");
+        user->updateUser(payload);
         authManager_->updateUser(user);
 
         const json data = {{"user", *user}};
@@ -160,7 +158,7 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
 
         const auto requestId = msg.at("payload").at("id").get<unsigned int>();
 
-        if (user->id != requestId && !user->isAdmin())
+        if (user->id != requestId && !user->canManageUsers())
             throw std::runtime_error("Permission denied: Only admins can fetch user data");
 
         const auto requestedUser = database::UserQueries::getUserById(requestId);
@@ -251,7 +249,7 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
 void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user->isAdmin()) throw std::runtime_error("Permission denied: Only admins can list users");
+        if (!user->canManageUsers()) throw std::runtime_error("Permission denied: Only admins can list users");
         const auto users = database::UserQueries::listUsers();
 
         const json data = {

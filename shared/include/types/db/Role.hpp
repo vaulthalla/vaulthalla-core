@@ -1,77 +1,47 @@
 #pragma once
 
-#include <boost/describe.hpp>
 #include <string>
 #include <pqxx/row>
+#include <cstdint>
+#include <ctime>
+#include <nlohmann/json_fwd.hpp>
 
 namespace vh::types {
-enum class RoleName { Admin, User, Guest, Moderator, SuperAdmin };
 
-inline std::string to_cli_string(const RoleName& role) {
-    switch (role) {
-        case RoleName::Admin: return "Administrator";
-        case RoleName::User: return "User";
-        case RoleName::Guest: return "Guest";
-        case RoleName::Moderator: return "Moderator";
-        case RoleName::SuperAdmin: return "Super Administrator";
-        default: return "Unknown";
-    }
-}
-
-inline std::string to_db_string(const RoleName& role) {
-    switch (role) {
-        case RoleName::Admin: return "Admin";
-        case RoleName::User: return "User";
-        case RoleName::Guest: return "Guest";
-        case RoleName::Moderator: return "Moderator";
-        case RoleName::SuperAdmin: return "SuperAdmin";
-        default: throw std::invalid_argument("Unknown role name");
-    }
-}
-
-inline RoleName role_from_db_string(const std::string& str) {
-    if (str == "Admin") return RoleName::Admin;
-    if (str == "User") return RoleName::User;
-    if (str == "Guest") return RoleName::Guest;
-    if (str == "Moderator") return RoleName::Moderator;
-    if (str == "SuperAdmin") return RoleName::SuperAdmin;
-    throw std::invalid_argument("Unknown role name: " + str);
-}
-
-inline std::string db_role_str_to_cli_str(const std::string& str) {
-    if (str == "Admin") return "Administrator";
-    if (str == "SuperAdmin") return "Super Administrator";
-    return str;
-}
-
-inline std::string cli_role_str_to_db_string(const std::string& str) {
-    if (str == "Administrator") return "Admin";
-    if (str == "Super Administrator") return "SuperAdmin";
-    return str;
-}
-
-inline RoleName role_from_cli_string(const std::string& str) {
-    if (str == "Administrator") return RoleName::Admin;
-    if (str == "User") return RoleName::User;
-    if (str == "Guest") return RoleName::Guest;
-    if (str == "Moderator") return RoleName::Moderator;
-    if (str == "Super Administrator") return RoleName::SuperAdmin;
-    throw std::invalid_argument("Unknown role name: " + str);
-}
+enum class PermissionName : uint16_t;
 
 struct Role {
+    // roles
     unsigned int id;
-    RoleName name;
+    std::string name;
     std::string description;
+    uint16_t permissions;
+    std::time_t created_at;
+
+    // user_roles
+    std::string scope;
+    unsigned int scope_id;
+    std::time_t assigned_at;
 
     Role() = default;
 
-    explicit Role(const pqxx::row& row)
-        : id(row["id"].as<unsigned int>()),
-          name(role_from_db_string(row["name"].as<std::string>())),
-          description(row["description"].as<std::string>()) {}
-};
-} // namespace vh::types
+    explicit Role(const pqxx::row& row);
 
-BOOST_DESCRIBE_ENUM(vh::types::RoleName, Admin, User, Guest, Moderator, SuperAdmin)
-BOOST_DESCRIBE_STRUCT(vh::types::Role, (), (id, name, description))
+    [[nodiscard]] bool canManageUsers() const;
+    [[nodiscard]] bool canManageRoles() const;
+    [[nodiscard]] bool canManageStorage() const;
+    [[nodiscard]] bool canManageFiles() const;
+    [[nodiscard]] bool canViewAuditLog() const;
+    [[nodiscard]] bool canUploadFile() const;
+    [[nodiscard]] bool canDownloadFile() const;
+    [[nodiscard]] bool canDeleteFile() const;
+    [[nodiscard]] bool canShareFile() const;
+    [[nodiscard]] bool canLockFile() const;
+};
+
+void to_json(nlohmann::json& j, const Role& r);
+void from_json(const nlohmann::json& j, Role& r);
+nlohmann::json to_json(const std::vector<std::shared_ptr<Role>>& roles);
+std::vector<std::shared_ptr<Role>> roles_from_json(const nlohmann::json& j);
+
+} // namespace vh::types

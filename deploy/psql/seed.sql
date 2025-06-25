@@ -5,18 +5,17 @@ INSERT INTO roles (name, description) VALUES
                                           ('Admin', 'Full system administrator with all permissions'),
                                           ('User', 'Standard user with access to personal files'),
                                           ('Guest', 'Limited access for shared files'),
-                                          ('Moderator', 'Can manage public shares and audit logs'),
                                           ('SuperAdmin', 'Root-level internal use only');
 
 -- Insert permissions
-INSERT INTO permissions (name, description) VALUES
-                                                ('ManageUsers', 'Can manage users and assign roles'),
-                                                ('ManageRoles', 'Can manage role definitions and assignments'),
-                                                ('ManageStorage', 'Can create and configure storage backends'),
-                                                ('ManageFiles', 'Can manage files and folders'),
-                                                ('ViewAuditLog', 'Can view system audit logs'),
-                                                ('UploadFile', 'Can upload files'),
-                                                ('DownloadFile', 'Can download files'),
-                                                ('DeleteFile', 'Can delete files'),
-                                                ('ShareFile', 'Can create file shares'),
-                                                ('LockFile', 'Can apply locks to files');
+INSERT INTO permissions (bit_position, name, description) VALUES
+                                                (1, 'ManageUsers', 'Can manage users and assign roles'),
+                                                (2, 'ManageRoles', 'Can manage role definitions and assignments'),
+                                                (3, 'ManageStorage', 'Can create and configure storage backends'),
+                                                (4, 'ManageFiles', 'Can manage files and folders'),
+                                                (5, 'ViewAuditLog', 'Can view system audit logs'),
+                                                (6, 'UploadFile', 'Can upload files'),
+                                                (7, 'DownloadFile', 'Can download files'),
+                                                (8, 'DeleteFile', 'Can delete files'),
+                                                (9, 'ShareFile', 'Can create file shares'),
+                                                (10, 'LockFile', 'Can apply locks to files');

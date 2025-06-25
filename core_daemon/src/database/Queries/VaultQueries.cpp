@@ -168,27 +168,4 @@ std::shared_ptr<types::StorageVolume> VaultQueries::getVolume(unsigned int volum
     });
 }
 
-std::shared_ptr<types::UserStorageVolume> VaultQueries::getUserVolume(unsigned int volumeId, unsigned int userId) {
-    return Transactions::exec("VaultQueries::getUserVolume", [&](pqxx::work& txn) {
-        pqxx::result res =
-            txn.exec("SELECT * FROM user_storage_volumes WHERE storage_volume_id = " + txn.quote(volumeId) +
-                     " AND user_id = " + txn.quote(userId));
-        if (res.empty())
-            throw std::runtime_error("No user storage volume found for user ID: " + std::to_string(userId) +
-                                     " and volume ID: " + std::to_string(volumeId));
-        return std::make_shared<types::UserStorageVolume>(res[0]);
-    });
-}
-
-std::vector<std::shared_ptr<types::UserStorageVolume> > VaultQueries::listUserAssignedVolumes(unsigned int userId) {
-    return Transactions::exec("VaultQueries::listUserVolumes", [&](pqxx::work& txn) {
-        pqxx::result res = txn.exec("SELECT usv.* FROM user_storage_volumes usv "
-                                    "JOIN storage_volumes sv ON usv.storage_volume_id = sv.id "
-                                    "WHERE usv.user_id = " +
-                                    txn.quote(userId));
-        std::vector<std::shared_ptr<types::UserStorageVolume> > userVolumes;
-        for (const auto& row : res) userVolumes.push_back(std::make_shared<types::UserStorageVolume>(row));
-        return userVolumes;
-    });
-}
 } // namespace vh::database

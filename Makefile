@@ -15,6 +15,7 @@ build:
 
 ## 🛠️ Install system-wide
 install:
+	./bin/install_guard.sh
 	@echo "🛡️  Running install script..."
 	./bin/install.sh
 

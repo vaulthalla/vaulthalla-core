@@ -18,33 +18,109 @@ CREATE TABLE users
     is_active     BOOLEAN   DEFAULT TRUE
 );
 
-CREATE TYPE role_name AS ENUM ('Admin', 'User', 'Guest', 'Moderator', 'SuperAdmin');
+CREATE TABLE refresh_tokens
+(
+    jti        UUID PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token_hash TEXT    NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '7 days',
+    last_used  TIMESTAMP DEFAULT NOW(),
+    ip_address TEXT,
+    user_agent TEXT,
+    revoked    BOOLEAN   DEFAULT FALSE
+);
+
+-- PERMISSIONS AND ROLES
 
 CREATE TABLE roles
 (
     id          SERIAL PRIMARY KEY,
-    name        role_name UNIQUE NOT NULL,
-    description TEXT
+    name        VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    permissions BIT(16), -- Bitmask for role permissions
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE permissions
+(
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(50) UNIQUE NOT NULL,
+    description  TEXT,
+    bit_position INTEGER UNIQUE     NOT NULL CHECK (bit_position >= 0 AND bit_position < 16),
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE user_roles
 (
-    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    role_id INTEGER REFERENCES roles (id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER     NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    role_id     INTEGER     NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
+    scope       VARCHAR(10) NOT NULL CHECK (scope IN ('global', 'group', 'vault', 'volume')),
+    scope_id   INTEGER,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE refresh_tokens (
-                                  jti UUID PRIMARY KEY,
-                                  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                                  token_hash TEXT NOT NULL,
-                                  created_at TIMESTAMP DEFAULT NOW(),
-                                  expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '7 days',
-                                  last_used TIMESTAMP DEFAULT NOW(),
-                                  ip_address TEXT,
-                                  user_agent TEXT,
-                                  revoked BOOLEAN DEFAULT FALSE
-);
+-- This ensures a user can have only ONE role where scope = 'global'
+CREATE UNIQUE INDEX uniq_user_global_role
+    ON user_roles (user_id) WHERE scope = 'global';
+
+-- This ensures a user can have only ONE role per group, vault, or volume
+CREATE FUNCTION enforce_one_global_role() RETURNS TRIGGER AS $$
+BEGIN
+    IF
+TG_OP = 'DELETE' OR (TG_OP = 'UPDATE' AND OLD.scope = 'global') THEN
+        -- Is this the user's only global role?
+        IF NOT EXISTS (
+            SELECT 1 FROM user_roles
+            WHERE user_id = OLD.user_id
+            AND scope = 'global'
+            AND id != OLD.id
+        ) THEN
+            RAISE EXCEPTION 'User must always have exactly one global role.';
+END IF;
+END IF;
+
+RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_enforce_one_global_role
+    BEFORE DELETE OR
+UPDATE ON user_roles
+    FOR EACH ROW EXECUTE FUNCTION enforce_one_global_role();
+
+-- This function validates the scoped_id based on the scope
+CREATE FUNCTION validate_user_role_scope() RETURNS trigger AS $$
+BEGIN
+    IF
+NEW.scope = 'group' THEN
+        IF NOT EXISTS (SELECT 1 FROM groups WHERE id = NEW.scoped_id) THEN
+            RAISE EXCEPTION 'Invalid group ID';
+END IF;
+    ELSIF
+NEW.scope = 'vault' THEN
+        IF NOT EXISTS (SELECT 1 FROM vaults WHERE id = NEW.scoped_id) THEN
+            RAISE EXCEPTION 'Invalid vault ID';
+END IF;
+    ELSIF
+NEW.scope = 'volume' THEN
+        IF NOT EXISTS (SELECT 1 FROM storage_volumes WHERE id = NEW.scoped_id) THEN
+            RAISE EXCEPTION 'Invalid volume ID';
+END IF;
+    ELSIF
+NEW.scope = 'global' THEN
+        IF NEW.scoped_id IS NOT NULL THEN
+            RAISE EXCEPTION 'Global scope must not have scoped_id';
+END IF;
+END IF;
+
+RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
 
 -- API KEYS
 
@@ -52,7 +128,7 @@ CREATE TABLE api_keys
 (
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    type       VARCHAR(50) NOT NULL, -- 'S3', etc.
+    type       VARCHAR(50)  NOT NULL, -- 'S3', etc.
     name       VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -72,10 +148,11 @@ CREATE TABLE s3_api_keys
 CREATE TABLE vaults
 (
     id         SERIAL PRIMARY KEY,
-    type       VARCHAR(50) NOT NULL,
+    type       VARCHAR(50)         NOT NULL,
     name       VARCHAR(150) UNIQUE NOT NULL,
     is_active  BOOLEAN   DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Local Disk config
@@ -100,7 +177,8 @@ CREATE TABLE storage_volumes
     name        VARCHAR(150) NOT NULL,
     path_prefix VARCHAR(255) DEFAULT '/',
     quota_bytes BIGINT       DEFAULT NULL,
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -108,39 +186,8 @@ CREATE TABLE user_storage_volumes
 (
     user_id           INTEGER REFERENCES users (id) ON DELETE CASCADE,
     storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
+    assigned_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, storage_volume_id)
-);
-
--- PERMISSIONS AND ROLES
-
-CREATE TYPE permission_name AS ENUM (
-    'ManageUsers',
-    'ManageRoles',
-    'ManageStorage',
-    'ManageFiles',
-    'ViewAuditLog',
-    'UploadFile',
-    'DownloadFile',
-    'DeleteFile',
-    'ShareFile',
-    'LockFile'
-    );
-
-CREATE TABLE permissions
-(
-    id          SERIAL PRIMARY KEY,
-    name        permission_name UNIQUE NOT NULL,
-    description TEXT
-);
-
-CREATE TABLE role_permissions
-(
-    id                SERIAL PRIMARY KEY,
-    role_id           INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
-    permission_id     INTEGER NOT NULL REFERENCES permissions (id) ON DELETE CASCADE,
-    storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
-
-    CONSTRAINT unique_role_permission_scope UNIQUE (role_id, permission_id, storage_volume_id)
 );
 
 -- GROUPS (TEAM SHARING)
@@ -156,15 +203,15 @@ CREATE TABLE groups
 
 CREATE TABLE group_members
 (
-    gid  INTEGER REFERENCES groups (id) ON DELETE CASCADE,
-    uid   INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    gid       INTEGER REFERENCES groups (id) ON DELETE CASCADE,
+    uid       INTEGER REFERENCES users (id) ON DELETE CASCADE,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (gid, uid)
 );
 
 CREATE TABLE group_storage_volumes
 (
-    gid          INTEGER REFERENCES groups (id) ON DELETE CASCADE,
+    gid               INTEGER REFERENCES groups (id) ON DELETE CASCADE,
     storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
     assigned_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (gid, storage_volume_id)
@@ -179,12 +226,13 @@ CREATE TABLE files
     parent_id                  INTEGER REFERENCES files (id) ON DELETE CASCADE,
     name                       VARCHAR(500) NOT NULL,
     is_directory               BOOLEAN   DEFAULT FALSE,
-    mode                       INTEGER DEFAULT 33188,
+    mode                       INTEGER   DEFAULT 33188,
     uid                        INTEGER REFERENCES users (id),
-    gid                        INTEGER REFERENCES groups(id),
+    gid                        INTEGER REFERENCES groups (id),
     created_by                 INTEGER REFERENCES users (id),
     created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_modified_by           INTEGER REFERENCES users (id),
     current_version_size_bytes BIGINT    DEFAULT 0,
     is_trashed                 BOOLEAN   DEFAULT FALSE,
     trashed_at                 TIMESTAMP,
@@ -193,22 +241,23 @@ CREATE TABLE files
     UNIQUE (storage_volume_id, parent_id, name)
 );
 
-CREATE INDEX idx_files_full_path ON files(full_path);
+CREATE INDEX idx_files_full_path ON files (full_path);
 
-CREATE TABLE file_xattrs (
-                             id          SERIAL PRIMARY KEY,
-                             file_id     INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
-                             namespace   VARCHAR(64) NOT NULL DEFAULT 'user',
-                             key         VARCHAR(255) NOT NULL,
-                             value       BYTEA NOT NULL, -- Store as raw bytes (can be stringified at API layer)
-                             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE file_xattrs
+(
+    id         SERIAL PRIMARY KEY,
+    file_id    INTEGER      NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+    namespace  VARCHAR(64)  NOT NULL DEFAULT 'user',
+    key        VARCHAR(255) NOT NULL,
+    value      BYTEA        NOT NULL, -- Store as raw bytes (can be stringified at API layer)
+    created_at TIMESTAMP             DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP             DEFAULT CURRENT_TIMESTAMP,
 
-                             UNIQUE (file_id, namespace, key)
+    UNIQUE (file_id, namespace, key)
 );
 
-CREATE INDEX idx_file_xattrs_file_id ON file_xattrs(file_id);
-CREATE INDEX idx_file_xattrs_key ON file_xattrs(key);
+CREATE INDEX idx_file_xattrs_file_id ON file_xattrs (file_id);
+CREATE INDEX idx_file_xattrs_key ON file_xattrs (key);
 
 CREATE TABLE file_versions
 (
@@ -228,10 +277,12 @@ CREATE TYPE file_metadata_type AS ENUM ('string', 'integer', 'boolean', 'timesta
 
 CREATE TABLE file_metadata
 (
-    id      SERIAL PRIMARY KEY,
-    file_id INTEGER REFERENCES files (id) ON DELETE CASCADE,
-    key     VARCHAR(255)       NOT NULL UNIQUE,
-    type    file_metadata_type NOT NULL,
+    id         SERIAL PRIMARY KEY,
+    file_id    INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    key        VARCHAR(255)       NOT NULL,
+    type       file_metadata_type NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (file_id, key)
 );
 
@@ -265,33 +316,50 @@ CREATE TABLE file_metadata_float
     value            DOUBLE PRECISION NOT NULL
 );
 
+-- FILE ACL
+
+CREATE TABLE file_acl
+(
+    id           SERIAL PRIMARY KEY,           -- <-- NEW surrogate PK
+    file_id      INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    subject_type TEXT CHECK (subject_type IN ('user', 'group', 'role', 'public')),
+    subject_id   INTEGER,                      -- can be NULL if public (enforced via check later)
+    permissions  BIT(16) NOT NULL,             -- Match bitset layout
+    inherited    BOOLEAN DEFAULT FALSE,
+    UNIQUE (file_id, subject_type, subject_id) -- <-- still enforce uniqueness
+);
+
+CREATE TABLE file_acl_index
+(
+    file_id           INTEGER PRIMARY KEY REFERENCES files (id) ON DELETE CASCADE,
+    has_override_acl  BOOLEAN   DEFAULT FALSE,
+    subtree_acl_count INTEGER   DEFAULT 0,
+    inherited_from_id INTEGER,
+    full_path         TEXT,
+    last_updated      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_acl_index_path ON file_acl_index (full_path);
+
+-- FILE SHARING
+
+CREATE TYPE share_type AS ENUM ('user', 'public');
+
 CREATE TABLE file_shares
 (
-    id         SERIAL PRIMARY KEY,
-    file_id    INTEGER REFERENCES files (id) ON DELETE CASCADE,
-    shared_by  INTEGER REFERENCES users (id),
-    expires_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE file_shares_users
-(
-    id                  SERIAL PRIMARY KEY,
-    file_share_id       INTEGER REFERENCES file_shares (id) ON DELETE CASCADE,
-    shared_with_user_id INTEGER REFERENCES users (id),
-    permissions         INTEGER NOT NULL DEFAULT 0, -- bitmask
-    UNIQUE (file_share_id, shared_with_user_id)
-);
-
-CREATE TABLE public_file_shares
-(
     id          SERIAL PRIMARY KEY,
-    file_id     INTEGER REFERENCES files (id) ON DELETE CASCADE,
-    shared_by   INTEGER REFERENCES users (id),
-    share_token VARCHAR(100) UNIQUE NOT NULL,
-    permissions INTEGER             NOT NULL DEFAULT 0, -- bitmask
+    file_acl_id INTEGER NOT NULL REFERENCES file_acl (id) ON DELETE CASCADE,
+    shared_by   INTEGER NOT NULL REFERENCES users (id),
+    share_token VARCHAR(100), -- nullable for user shares
     expires_at  TIMESTAMP,
-    created_at  TIMESTAMP                    DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CHECK (
+        (share_token IS NULL AND file_acl_id IS NOT NULL) OR
+        (share_token IS NOT NULL AND file_acl_id IS NOT NULL)
+        ),
+
+    UNIQUE (share_token)
 );
 
 -- FILE LOCKS
@@ -347,6 +415,7 @@ CREATE TABLE user_storage_usage
     storage_volume_id INTEGER REFERENCES storage_volumes (id) ON DELETE CASCADE,
     total_bytes       BIGINT    DEFAULT 0,
     used_bytes        BIGINT    DEFAULT 0,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -354,8 +423,10 @@ CREATE TABLE user_storage_usage
 
 CREATE TABLE file_tags
 (
-    id   SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL
+    id         SERIAL PRIMARY KEY,
+    name       VARCHAR(100) UNIQUE NOT NULL,
+    color      VARCHAR(20) DEFAULT '#FFFFFF', -- Hex color code
+    created_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE file_tag_assignments

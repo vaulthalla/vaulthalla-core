@@ -123,15 +123,7 @@ void AuthManager::updateUser(const std::shared_ptr<types::User>& user) {
     try {
         if (!user) throw std::runtime_error("Cannot update null user");
 
-        auto existingUser = findUser(user->email);
-        if (!existingUser) throw std::runtime_error("User not found: " + user->email);
-
-        existingUser->name = user->name;
-        existingUser->email = user->email;
-        existingUser->is_active = user->is_active;
-        existingUser->role = user->role;
-
-        database::UserQueries::updateUser(existingUser);
+        database::UserQueries::updateUser(user);
 
         std::cout << "[AuthManager] Updated user: " << user->email << std::endl;
     } catch (const std::exception& e) {

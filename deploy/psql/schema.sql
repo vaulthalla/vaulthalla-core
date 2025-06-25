@@ -37,6 +37,9 @@ CREATE TABLE roles
 (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(50) UNIQUE NOT NULL,
+    display_name  VARCHAR(50) GENERATED ALWAYS AS (
+        initcap(replace(name, '_', ' '))
+        ) STORED,
     description TEXT,
     permissions BIT(16), -- Bitmask for role permissions
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -46,6 +49,9 @@ CREATE TABLE permissions
 (
     id           SERIAL PRIMARY KEY,
     name         VARCHAR(50) UNIQUE NOT NULL,
+    display_name  VARCHAR(50) GENERATED ALWAYS AS (
+        initcap(replace(name, '_', ' '))
+        ) STORED,
     description  TEXT,
     bit_position INTEGER UNIQUE     NOT NULL CHECK (bit_position >= 0 AND bit_position < 16),
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -57,8 +63,8 @@ CREATE TABLE user_roles
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER     NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     role_id     INTEGER     NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
-    scope       VARCHAR(10) NOT NULL CHECK (scope IN ('global', 'group', 'vault', 'volume')),
-    scope_id   INTEGER,
+    scope       VARCHAR(10) NOT NULL DEFAULT 'global' CHECK (scope IN ('global', 'group', 'vault', 'volume')),
+    scope_id   INTEGER DEFAULT NULL,
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

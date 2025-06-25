@@ -15,7 +15,7 @@ class result;
 
 namespace vh::types {
 
-struct Role;
+struct UserRole;
 
 struct User {
     unsigned short id;
@@ -25,11 +25,11 @@ struct User {
     std::time_t created_at;
     std::optional<std::time_t> last_login;
     bool is_active;
-    std::shared_ptr<Role> global_role; // Global role
-    std::optional<std::vector<std::shared_ptr<Role>>> scoped_roles;  // Scoped roles, if any
+    std::shared_ptr<UserRole> global_role; // Global role
+    std::optional<std::vector<std::shared_ptr<UserRole>>> scoped_roles;  // Scoped roles, if any
 
     User();
-    User(std::string name, std::string email, const bool isActive, const std::shared_ptr<Role>& global_role);
+    User(std::string name, std::string email, const bool isActive);
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::result& roles);
 

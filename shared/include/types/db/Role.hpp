@@ -13,19 +13,14 @@ enum class PermissionName : uint16_t;
 struct Role {
     // roles
     unsigned int id;
-    std::string name;
-    std::string description;
+    std::string name, display_name, description;
     uint16_t permissions;
     std::time_t created_at;
-
-    // user_roles
-    std::string scope;
-    unsigned int scope_id;
-    std::time_t assigned_at;
 
     Role() = default;
 
     explicit Role(const pqxx::row& row);
+    explicit Role(const nlohmann::json& j);
 
     [[nodiscard]] bool canManageUsers() const;
     [[nodiscard]] bool canManageRoles() const;
@@ -41,7 +36,7 @@ struct Role {
 
 void to_json(nlohmann::json& j, const Role& r);
 void from_json(const nlohmann::json& j, Role& r);
-nlohmann::json to_json(const std::vector<std::shared_ptr<Role>>& roles);
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles);
 std::vector<std::shared_ptr<Role>> roles_from_json(const nlohmann::json& j);
 
 } // namespace vh::types

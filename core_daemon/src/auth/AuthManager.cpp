@@ -72,11 +72,12 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
 
 std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> user,
                                                   const std::string& password,
+                                                  const unsigned int roleId,
                                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
     isValidRegistration(user, password);
 
     user->setPasswordHash(crypto::hashPassword(password));
-    database::UserQueries::createUser(user);
+    database::UserQueries::createUser(user, roleId);
 
     user = findUser(user->email);
     auto client = sessionManager_->getClientSession(session->getUUID());

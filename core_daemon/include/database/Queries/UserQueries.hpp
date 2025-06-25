@@ -20,7 +20,7 @@ class UserQueries {
 
     [[nodiscard]] static std::shared_ptr<types::User> getUserByEmail(const std::string& email);
     [[nodiscard]] static std::shared_ptr<types::User> getUserById(unsigned int id);
-    static void createUser(const std::shared_ptr<types::User>& user);
+    static void createUser(const std::shared_ptr<types::User>& user, unsigned int roleId);
     static void updateUser(const std::shared_ptr<types::User>& user);
     static bool authenticateUser(const std::string& email, const std::string& password);
     static void updateUserPassword(const std::string& email, const std::string& newPassword);

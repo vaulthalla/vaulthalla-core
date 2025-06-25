@@ -6,7 +6,7 @@
 
 #include "types/db/User.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "types/db/Role.hpp"
+#include "database/Queries/PermsQueries.hpp"
 
 namespace vh::websocket {
 
@@ -58,10 +58,8 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const auto isActive = payload.at("is_active").get<bool>();
         const auto role_id = payload.at("role_id").get<unsigned int>();
 
-        const auto role = database::UserQueries::getRole(role_id);
-
-        auto user = std::make_shared<types::User>(name, email, isActive, role);
-        const auto client = authManager_->registerUser(user, password, session.shared_from_this());
+        auto user = std::make_shared<types::User>(name, email, isActive);
+        const auto client = authManager_->registerUser(user, password, role_id, session.shared_from_this());
         user = client->getUser();
         std::string token = client->getRawToken();
 

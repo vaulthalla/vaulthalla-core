@@ -9,26 +9,26 @@ using namespace vh::types;
 Role::Role(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
+      display_name(row["display_name"].as<std::string>()),
       description(row["description"].as<std::string>()),
       permissions(row["permissions"].as<uint16_t>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      scope(row["scope"].as<std::string>()),
-      scope_id(row["scope_id"].as<unsigned int>()),
-      assigned_at(row["assigned_at"].is_null()
-                      ? static_cast<std::time_t>(0)
-                      : util::parsePostgresTimestamp(row["assigned_at"].as<std::string>())) {
-}
+      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())) {}
+
+Role::Role(const nlohmann::json& j)
+    : id(j.at("id").get<unsigned int>()),
+      name(j.at("name").get<std::string>()),
+      description(j.at("description").get<std::string>()),
+      permissions(toBitmask(j.at("permissions").get<std::vector<PermissionName> >())),
+      created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())) {}
 
 void vh::types::to_json(nlohmann::json& j, const Role& r) {
     j = {
         {"id", r.id},
         {"name", r.name},
+        {"display_name", r.display_name},
         {"description", r.description},
-        {"permissions", permsFromBitmask(r.permissions)},
+        {"permissions", permsFromBitmaskAsString(r.permissions)},
         {"created_at", util::timestampToString(r.created_at)},
-        {"scope", r.scope},
-        {"scope_id", r.scope_id},
-        {"assigned_at", util::timestampToString(r.assigned_at)},
     };
 }
 
@@ -38,9 +38,6 @@ void vh::types::from_json(const nlohmann::json& j, Role& r) {
     r.description = j.at("description").get<std::string>();
     r.permissions = toBitmask(j.at("permissions").get<std::vector<PermissionName> >());
     r.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
-    r.scope = j.value("scope", "");
-    r.scope_id = j.value("scope_id", 0);
-    r.assigned_at = util::parsePostgresTimestamp(j.value("assigned_at", ""));
 }
 
 std::vector<std::shared_ptr<Role>> vh::types::roles_from_json(const nlohmann::json& j) {
@@ -49,10 +46,9 @@ std::vector<std::shared_ptr<Role>> vh::types::roles_from_json(const nlohmann::js
     return roles;
 }
 
-nlohmann::json vh::types::to_json(const std::vector<std::shared_ptr<Role>>& roles) {
-    nlohmann::json j = nlohmann::json::array();
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles) {
+    j = nlohmann::json::array();
     for (const auto& role : roles) j.push_back(*role);
-    return j;
 }
 
 nlohmann::json from_json(const std::vector<std::shared_ptr<Role>>& roles) {

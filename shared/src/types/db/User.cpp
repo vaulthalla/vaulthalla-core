@@ -1,5 +1,7 @@
 #include "types/db/User.hpp"
-#include "types/db/Role.hpp"
+#include <iostream>
+
+#include "types/db/UserRole.hpp"
 
 #include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
@@ -10,8 +12,8 @@ namespace vh::types {
 
 User::User() = default;
 
-User::User(std::string name, std::string email, const bool isActive, const std::shared_ptr<Role>& global_role)
-    : id(0), name(std::move(name)), email(std::move(email)), is_active(isActive), global_role(global_role) {
+User::User(std::string name, std::string email, const bool isActive)
+    : id(0), name(std::move(name)), email(std::move(email)), is_active(isActive), global_role(nullptr) {
     created_at = std::time(nullptr);
     last_login = std::nullopt;
 }
@@ -42,13 +44,15 @@ User::User(const pqxx::row& user, const pqxx::result& roles)
       global_role(nullptr),
       scoped_roles(std::nullopt) {
     if (!roles.empty()) {
-        scoped_roles = std::vector<std::shared_ptr<Role>>();
+        scoped_roles = std::vector<std::shared_ptr<UserRole>>();
         for (const auto& role_row : roles) {
-            const auto role = std::make_shared<Role>(role_row);
+            const auto role = std::make_shared<UserRole>(role_row);
             if (role->scope == "global") global_role = role;
             else scoped_roles->push_back(role);
         }
     }
+
+    if (!global_role) std::cerr << "User does not have a global role." << std::endl;
 }
 
 void User::setPasswordHash(const std::string& hash) {
@@ -62,12 +66,12 @@ void User::updateUser(const nlohmann::json& j) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) global_role = nullptr;
-        else global_role = std::make_shared<Role>(j["global_role"]);
+        else global_role = std::make_shared<UserRole>(j["global_role"]);
     }
 
     if (j.contains("scoped_roles")) {
         if (j["scoped_roles"].is_null()) scoped_roles = std::nullopt;
-        else scoped_roles = roles_from_json(j["scoped_roles"]);
+        else scoped_roles = user_roles_from_json(j["scoped_roles"]);
     }
 }
 
@@ -91,7 +95,7 @@ void to_json(nlohmann::json& j, const User& u) {
         {"created_at", util::timestampToString(u.created_at)},
         {"is_active", u.is_active},
         {"global_role", u.global_role ? nlohmann::json(*u.global_role) : nlohmann::json(nullptr)},
-        {"scoped_roles", u.scoped_roles.has_value() ? to_json(*u.scoped_roles) : nlohmann::json(nullptr)},
+        {"scoped_roles", u.scoped_roles.has_value() ? *u.scoped_roles : nlohmann::json(nullptr)},
     };
 }
 
@@ -103,12 +107,12 @@ void from_json(const nlohmann::json& j, User& u) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) u.global_role = nullptr;
-        else u.global_role = std::make_shared<Role>(j["global_role"]);
+        else u.global_role = std::make_shared<UserRole>(j["global_role"]);
     } else u.global_role = nullptr;
 
     if (j.contains("scoped_roles")) {
         if (j["scoped_roles"].is_null()) u.scoped_roles = std::nullopt;
-        else u.scoped_roles = roles_from_json(j["scoped_roles"]);
+        else u.scoped_roles = user_roles_from_json(j["scoped_roles"]);
     } else {
         u.scoped_roles = std::nullopt;
     }

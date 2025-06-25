@@ -2,43 +2,75 @@
 #include "types/db/User.hpp"
 #include "auth/RefreshToken.hpp"
 #include "database/Transactions.hpp"
-#include "types/db/Role.hpp"
+#include "types/db/UserRole.hpp"
 #include "database/utils.hpp"
 #include <pqxx/pqxx>
 
 #include <set>
 
 namespace vh::database {
+
 std::shared_ptr<types::User> UserQueries::getUserByEmail(const std::string& email) {
     return Transactions::exec("UserQueries::getUserWithRole",
-                              [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
-                                  const auto userRow = txn.exec(R"(SELECT * FROM users WHERE u.email = )" + txn.quote(email)).one_row();
-                                  const auto roles = txn.exec(R"(SELECT r.* FROM roles r)
-                                                                JOIN user_roles ur ON r.id = ur.role_id
-                                                                WHERE ur.user_id = )" + txn.quote(userRow["id"].get<std::string>()));
-                                  return std::make_shared<types::User>(userRow, roles);
-                              });
+        [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
+            const auto userRow = txn.exec(
+                "SELECT * FROM users WHERE email = " + txn.quote(email)).one_row();
+
+            const auto roles = txn.exec(
+                "SELECT r.id, r.name, r.display_name, r.description, r.permissions::int AS permissions, r.created_at, "
+                "       ur.* "
+                "FROM roles r "
+                "JOIN user_roles ur ON r.id = ur.role_id "
+                "WHERE ur.user_id = " + txn.quote(userRow["id"].get<unsigned int>()));
+
+            return std::make_shared<types::User>(userRow, roles);
+        });
 }
 
 std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
     return Transactions::exec("UserQueries::getUserByIdWithRoles",
-                              [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
-                                  const auto userRow = txn.exec(R"(SELECT * FROM users WHERE id = )" + txn.quote(id)).one_row();
-                                  const auto roles = txn.exec(R"(SELECT r.* FROM roles r
-                                                                JOIN user_roles ur ON r.id = ur.role_id
-                                                                WHERE ur.user_id = )" + txn.quote(id));
-                                  return std::make_shared<types::User>(userRow, roles);
-                              });
+        [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
+            const auto userRow = txn.exec(
+                "SELECT * FROM users WHERE id = " + txn.quote(id)).one_row();
+
+            const auto roles = txn.exec(
+                "SELECT r.id, r.name, r.display_name, r.description, r.permissions::int AS permissions, r.created_at, "
+                "       ur.* "
+                "FROM roles r "
+                "JOIN user_roles ur ON r.id = ur.role_id "
+                "WHERE ur.user_id = " + txn.quote(id));
+
+            return std::make_shared<types::User>(userRow, roles);
+        });
 }
 
-void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
+std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::string& jti) {
+    return Transactions::exec("UserQueries::getUserByRefreshToken",
+        [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
+            const auto userRow = txn.exec(
+                "SELECT u.* FROM users u "
+                "JOIN refresh_tokens rt ON u.id = rt.user_id "
+                "WHERE rt.jti = " + txn.quote(jti)).one_row();
+
+            const auto roles = txn.exec(
+                "SELECT r.id, r.name, r.display_name, r.description, r.permissions::int AS permissions, r.created_at, "
+                "       ur.* "
+                "FROM roles r "
+                "JOIN user_roles ur ON r.id = ur.role_id "
+                "WHERE ur.user_id = " + txn.quote(userRow["id"].get<unsigned int>()));
+
+            return std::make_shared<types::User>(userRow, roles);
+        });
+}
+
+void UserQueries::createUser(const std::shared_ptr<types::User>& user, const unsigned int roleId) {
     Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         const auto userId = txn.exec("INSERT INTO users (name, email, password_hash, is_active) VALUES (" +
                  txn.quote(user->name) + ", " + txn.quote(user->email) + ", " + txn.quote(user->password_hash)
                  + ", " + txn.quote(user->is_active) + ") RETURNING id").one_row()[0].as<unsigned int>();
 
         txn.exec("INSERT INTO user_roles (user_id, role_id) VALUES (" + txn.quote(userId) + ", " +
-                 txn.quote(user->global_role->id) + ")");
+                 txn.quote(roleId) + ")");
 
         if (user->scoped_roles.has_value()) {
             for (const auto& role : *user->scoped_roles) {
@@ -179,7 +211,7 @@ std::vector<std::shared_ptr<vh::auth::RefreshToken> > UserQueries::listRefreshTo
                               });
 }
 
-void UserQueries::revokeAllRefreshTokens(unsigned int userId) {
+void UserQueries::revokeAllRefreshTokens(const unsigned int userId) {
     Transactions::exec("UserQueries::revokeAllRefreshTokens", [&](pqxx::work& txn) {
         txn.exec("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = " + txn.quote(userId));
     });
@@ -226,19 +258,5 @@ void UserQueries::revokeAndPurgeRefreshTokens(unsigned int userId) {
         )SQL");
     });
 }
-
-std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::string& jti) {
-    return Transactions::exec("UserQueries::getUserByRefreshToken",
-                              [&](pqxx::work& txn) -> std::shared_ptr<types::User> {
-                                  const auto row = txn.exec(
-                                      "SELECT u.*, r.name as role FROM users u "
-                                      "JOIN user_roles ur ON u.id = ur.user_id "
-                                      "JOIN roles r ON ur.role_id = r.id "
-                                      "JOIN refresh_tokens rt ON u.id = rt.user_id "
-                                      "WHERE rt.jti = " + txn.quote(jti)).one_row();
-                                  return std::make_shared<types::User>(row);
-                              });
-}
-
 
 } // namespace vh::database

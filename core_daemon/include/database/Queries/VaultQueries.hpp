@@ -1,7 +1,6 @@
 #pragma once
 
 #include "types/db/StorageVolume.hpp"
-#include "types/db/UserStorageUsage.hpp"
 #include "types/db/Vault.hpp"
 #include "database/Transactions.hpp"
 

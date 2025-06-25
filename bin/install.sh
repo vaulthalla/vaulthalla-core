@@ -234,7 +234,7 @@ VALUES ('Admin', 'admin@vaulthalla.dev', '${HASHED_PASS}', NOW(), TRUE);
 -- Link Role
 INSERT INTO user_roles (user_id, role_id)
 SELECT users.id, roles.id FROM users, roles
-WHERE users.email = 'admin@vaulthalla.dev' AND roles.name = 'Admin';
+WHERE users.email = 'admin@vaulthalla.dev' AND roles.name = 'super_admin';
 
 -- Create Admin Group & Link
 INSERT INTO groups (name, description) VALUES ('admin', 'Core admin group');
@@ -244,23 +244,18 @@ WHERE users.email = 'admin@vaulthalla.dev' AND groups.name = 'admin';
 
 -- Create Vault
 INSERT INTO vaults (type, name, is_active, created_at)
-VALUES ('local', 'Admin Local Disk Vault', TRUE, NOW());
+VALUES ('local', 'Admin Default Vault', TRUE, NOW());
 
 INSERT INTO local_disk_vaults (vault_id, mount_point)
-SELECT id, '/mnt/vaulthalla/users/admin' FROM vaults WHERE name = 'Admin Local Disk Vault';
+SELECT id, '/mnt/vaulthalla/users/admin' FROM vaults WHERE name = 'Admin Default Vault';
 
 INSERT INTO storage_volumes (vault_id, name, path_prefix, quota_bytes, created_at)
-SELECT id, 'Admin Local Disk Vault', '/users/admin', NULL, NOW() FROM vaults WHERE name = 'Admin Local Disk Vault';
+SELECT id, 'Admin Default Volume', '/users/admin', NULL, NOW() FROM vaults WHERE name = 'Admin Default Vault';
 
 INSERT INTO user_storage_volumes (user_id, storage_volume_id)
 SELECT users.id, storage_volumes.id
 FROM users, storage_volumes
-WHERE users.email = 'admin@vaulthalla.dev' AND storage_volumes.name = 'Admin Local Disk Vault';
-
--- Full Permissions
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id FROM roles, permissions
-WHERE roles.name = 'Admin';
+WHERE users.email = 'admin@vaulthalla.dev' AND storage_volumes.name = 'Admin Default Volume';
 EOF
 
 # === 11) Install systemd services ===

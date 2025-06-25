@@ -23,9 +23,11 @@ enum class PermissionName : uint16_t {
 };
 
 struct Permission {
+    static constexpr unsigned short BITMAP_SIZE = 10;
+
     unsigned int id;
     PermissionName name;
-    std::string description;
+    std::string display_name, description;
     unsigned short bit_position;
     std::time_t created_at;
     std::time_t updated_at;
@@ -36,8 +38,14 @@ struct Permission {
 std::string to_string(const PermissionName& permission);
 nlohmann::json to_json(const std::vector<PermissionName>& permissions);
 
+void to_json(nlohmann::json& j, const Permission& p);
+void from_json(const nlohmann::json& j, Permission& p);
+
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions);
+
 uint16_t toBitmask(const std::vector<PermissionName>& permissions);
 std::vector<PermissionName> permsFromBitmask(uint16_t bitmask);
+std::vector<std::string> permsFromBitmaskAsString(uint16_t bitmask);
 bool hasPermission(uint16_t bitmask, PermissionName permission);
 
 } // namespace vh::types

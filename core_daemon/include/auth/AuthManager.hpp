@@ -29,6 +29,7 @@ public:
 
     std::shared_ptr<Client> registerUser(std::shared_ptr<types::User> user,
                                          const std::string& password,
+                                         unsigned int roleId,
                                          const std::shared_ptr<websocket::WebSocketSession>& session);
 
     std::shared_ptr<Client> loginUser(const std::string& email, const std::string& password,

@@ -11,7 +11,7 @@
 
 INSERT INTO roles (name, description, permissions)
 VALUES
-    ('admin', 'Full system administrator with all permissions', B'0000001111111111'),
+    ('admin', 'Full system administrator with all permissions', B'0000011111111111'),
     ('user', 'Standard user with access to personal files',     B'0000001011000000'),
     ('guest', 'Limited access for shared files',                B'0000000001000000'),
     ('super_admin', 'Root-level internal use only',             B'1111111111111111');
@@ -28,5 +28,6 @@ VALUES
     (7, 'download_file',    'Can download files'),
     (8, 'delete_file',      'Can delete files'),
     (9, 'share_file',       'Can create file shares'),
-    (10, 'lock_file',       'Can apply locks to files');
+    (10, 'lock_file',       'Can apply locks to files'),
+    (11, 'manage_settings', 'Can change system settings');
 

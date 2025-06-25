@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
+#include <nlohmann/json_fwd.hpp>
 
 namespace vh::types::config {
 
@@ -50,12 +52,6 @@ struct AuthConfig {
     bool allow_signup = false;
 };
 
-struct TLSConfig {
-    bool enabled = false;
-    std::string cert_file = "/etc/vaulthalla/certs/fullchain.pem";
-    std::string key_file = "/etc/vaulthalla/certs/privkey.pem";
-};
-
 struct MetricsConfig {
     bool enabled = true;
     uint16_t port = 9100;
@@ -82,17 +78,22 @@ struct AdvancedConfig {
 };
 
 struct Config {
+    inline static const std::filesystem::path CONFIG_FILE_PATH = "/etc/vaulthalla";
+
     ServerConfig server;
     FuseConfig fuse;
     DatabaseConfig database;
     AuthConfig auth;
-    TLSConfig tls;
     MetricsConfig metrics;
     AdminUIConfig admin_ui;
     SchedulerConfig scheduler;
     AdvancedConfig advanced;
+
+    void save() const;
 };
 
 Config loadConfig(const std::string& path);
+void to_json(nlohmann::json& j, const Config& c);
+void from_json(const nlohmann::json& j, Config& c);
 
 } // namespace vh::types::config

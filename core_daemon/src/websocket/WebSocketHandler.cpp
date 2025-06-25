@@ -1,4 +1,6 @@
 #include "websocket/WebSocketHandler.hpp"
+#include "websocket/handlers/PermissionsHandler.hpp"
+#include "websocket/handlers/SettingsHandler.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -9,7 +11,6 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<services::ServiceManage
     authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());
     storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager());
     fsHandler_ = std::make_shared<FileSystemHandler>(serviceManager_);
-    permissionsHandler_ = std::make_shared<PermissionsHandler>();
     shareHandler_ = std::make_shared<ShareHandler>(serviceManager_->linkResolver());
     searchHandler_ = std::make_shared<SearchHandler>(serviceManager_->searchIndex());
     notificationHandler_ = std::make_shared<NotificationHandler>();
@@ -137,39 +138,48 @@ void WebSocketHandler::registerAllHandlers() {
     // Roles & Permissions
 
     router_->registerHandler("role.add", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleAddRole(msg, session);
+        PermissionsHandler::handleAddRole(msg, session);
     });
 
     router_->registerHandler("role.delete", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleDeleteRole(msg, session);
+        PermissionsHandler::handleDeleteRole(msg, session);
     });
 
     router_->registerHandler("role.update", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleUpdateRole(msg, session);
+        PermissionsHandler::handleUpdateRole(msg, session);
     });
 
     router_->registerHandler("role.get", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleGetRole(msg, session);
+        PermissionsHandler::handleGetRole(msg, session);
     });
 
     router_->registerHandler("role.get.byName", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleGetRoleByName(msg, session);
+        PermissionsHandler::handleGetRoleByName(msg, session);
     });
 
     router_->registerHandler("roles.list", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleListRoles(msg, session);
+        PermissionsHandler::handleListRoles(msg, session);
     });
 
     router_->registerHandler("permission.get", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleGetPermission(msg, session);
+        PermissionsHandler::handleGetPermission(msg, session);
     });
 
     router_->registerHandler("permission.get.byName", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleGetPermissionByName(msg, session);
+        PermissionsHandler::handleGetPermissionByName(msg, session);
     });
 
     router_->registerHandler("permissions.list", [this](const json& msg, WebSocketSession& session) {
-        permissionsHandler_->handleListPermissions(msg, session);
+        PermissionsHandler::handleListPermissions(msg, session);
+    });
+
+    // Settings
+    router_->registerHandler("settings.get", [this](const json& msg, WebSocketSession& session) {
+        SettingsHandler::handleGetSettings(msg, session);
+    });
+
+    router_->registerHandler("settings.update", [this](const json& msg, WebSocketSession& session) {
+        SettingsHandler::handleUpdateSettings(msg, session);
     });
 
     // Share

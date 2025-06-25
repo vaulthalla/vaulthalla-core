@@ -85,6 +85,7 @@ bool User::canDownloadFile() const { return global_role && global_role->canDownl
 bool User::canDeleteFile() const { return global_role && global_role->canDeleteFile(); }
 bool User::canShareFile() const { return global_role && global_role->canShareFile(); }
 bool User::canLockFile() const { return global_role && global_role->canLockFile(); }
+bool User::canManageSettings() const { return global_role && global_role->canManageSettings(); }
 
 void to_json(nlohmann::json& j, const User& u) {
     j = {

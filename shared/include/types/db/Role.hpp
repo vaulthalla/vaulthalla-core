@@ -32,6 +32,7 @@ struct Role {
     [[nodiscard]] bool canDeleteFile() const;
     [[nodiscard]] bool canShareFile() const;
     [[nodiscard]] bool canLockFile() const;
+    [[nodiscard]] bool canManageSettings() const;
 };
 
 void to_json(nlohmann::json& j, const Role& r);

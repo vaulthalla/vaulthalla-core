@@ -188,12 +188,13 @@ sudo install -m 755 build/core_daemon /usr/local/bin/vaulthalla/
 # === 7) Deploy Config ===
 echo "⚙️  Deploying default config..."
 sudo install -d -m 755 /etc/vaulthalla
+sudo cp deploy/config/config_template.yaml.in /etc/vaulthalla/
 if [[ -f ./config.yaml ]]; then
     echo "📄 Using local ./config.yaml"
     sudo cp ./config.yaml /etc/vaulthalla/config.yaml
 else
     echo "📄 Using example config"
-    sudo cp deploy/config.example.yaml /etc/vaulthalla/config.yaml
+    sudo cp deploy/config/config.example.yaml /etc/vaulthalla/config.yaml
 fi
 
 # === 8) Setup Database ===

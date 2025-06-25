@@ -67,3 +67,4 @@ bool Role::canDownloadFile() const { return hasPermission(permissions, Permissio
 bool Role::canDeleteFile() const { return hasPermission(permissions, PermissionName::DeleteFile); }
 bool Role::canShareFile() const { return hasPermission(permissions, PermissionName::ShareFile); }
 bool Role::canLockFile() const { return hasPermission(permissions, PermissionName::LockFile); }
+bool Role::canManageSettings() const { return hasPermission(permissions, PermissionName::ManageSettings); }

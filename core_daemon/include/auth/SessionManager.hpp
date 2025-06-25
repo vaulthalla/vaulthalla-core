@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../../shared/include/types/db/User.hpp"
 #include "auth/Client.hpp"
 #include <memory>
 #include <mutex>

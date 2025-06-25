@@ -19,11 +19,12 @@ enum class PermissionName : uint16_t {
     DownloadFile = 1 << 6,
     DeleteFile = 1 << 7,
     ShareFile = 1 << 8,
-    LockFile = 1 << 9
+    LockFile = 1 << 9,
+    ManageSettings = 1 << 10,
 };
 
 struct Permission {
-    static constexpr unsigned short BITMAP_SIZE = 10;
+    static constexpr unsigned short BITMAP_SIZE = 11;
 
     unsigned int id;
     PermissionName name;

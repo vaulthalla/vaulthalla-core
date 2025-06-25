@@ -27,6 +27,7 @@ std::string vh::types::to_string(const PermissionName& permission) {
         case PermissionName::DeleteFile: return "Delete File";
         case PermissionName::ShareFile: return "Share File";
         case PermissionName::LockFile: return "Lock File";
+        case PermissionName::ManageSettings: return "Manage Settings";
         default: return "Unknown Permission";
     }
 }

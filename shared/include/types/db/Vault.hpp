@@ -47,7 +47,7 @@ struct Vault {
           created_at(util::parsePostgresTimestamp(row["created_at"].c_str())) {}
 };
 
-struct LocalDiskVault : public Vault {
+struct LocalDiskVault : Vault {
     unsigned int vault_id{};
     std::filesystem::path mount_point;
 

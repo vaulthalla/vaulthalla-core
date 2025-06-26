@@ -11,10 +11,10 @@
 
 INSERT INTO role (name, description, permissions)
 VALUES
+    ('super_admin', 'Root-level internal use only',             B'1111111111111111'),
     ('admin', 'Full system administrator with all permissions', B'0000011111111111'),
     ('user', 'Standard user with access to personal files',     B'0000001011000000'),
-    ('guest', 'Limited access for shared files',                B'0000000001000000'),
-    ('super_admin', 'Root-level internal use only',             B'1111111111111111');
+    ('guest', 'Limited access for shared files',                B'0000000001000000');
 
 -- Insert permissions with snake_case identifiers
 INSERT INTO permissions (bit_position, name, description)

@@ -59,10 +59,10 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups() {
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
                 const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
                 groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
             }
@@ -82,10 +82,10 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroup(const unsigned int grou
                 "WHERE gm.group_id = " + txn.quote(groupId));
 
             const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
             return std::make_shared<types::Group>(groupRow, members, storageVolumes);
         });
@@ -106,10 +106,10 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroupByName(const std::string
                 "WHERE gm.group_id = " + txn.quote(groupRow["id"].as<unsigned int>()));
 
             const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
             return std::make_shared<types::Group>(groupRow, members, storageVolumes);
         });
@@ -119,7 +119,7 @@ void GroupQueries::addStorageVolumeToGroup(const unsigned int groupId, const uns
     Transactions::exec("GroupQueries::addStorageVolumeToGroup",
         [&](pqxx::work& txn) {
             txn.exec(
-                "INSERT INTO group_storage_volumes (group_id, volume_id, assigned_at) "
+                "INSERT INTO volumes (group_id, volume_id, assigned_at) "
                 "VALUES (" + txn.quote(groupId) + ", " + txn.quote(volumeId) + ", NOW())");
         });
 }
@@ -127,7 +127,7 @@ void GroupQueries::addStorageVolumeToGroup(const unsigned int groupId, const uns
 void GroupQueries::removeStorageVolumeFromGroup(const unsigned int groupId, const unsigned int volumeId) {
     Transactions::exec("GroupQueries::removeStorageVolumeFromGroup",
         [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM group_storage_volumes WHERE group_id = " + txn.quote(groupId) +
+            txn.exec("DELETE FROM volumes WHERE group_id = " + txn.quote(groupId) +
                      " AND volume_id = " + txn.quote(volumeId));
         });
 }
@@ -151,10 +151,10 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByUser(co
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
                 const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
                 groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
             }
@@ -167,8 +167,8 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByStorage
         [&](pqxx::work& txn) -> std::vector<std::shared_ptr<vh::types::Group>> {
             const auto res = txn.exec(
                 "SELECT g.* FROM groups g "
-                "JOIN group_storage_volumes gsv ON g.id = gsv.group_id "
-                "WHERE gsv.volume_id = " + txn.quote(volumeId));
+                "JOIN volumes vs ON g.id = vs.subject_id "
+                "WHERE vs.volume_id = " + txn.quote(volumeId));
 
             std::vector<std::shared_ptr<types::Group>> groups;
             for (const auto& group : res) {
@@ -181,10 +181,10 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByStorage
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
                 const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
                 groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
             }
@@ -197,8 +197,8 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroupByStorageVolume(const un
         [&](pqxx::work& txn) -> std::shared_ptr<vh::types::Group> {
             const auto group = txn.exec(
                 "SELECT g.* FROM groups g "
-                "JOIN group_storage_volumes gsv ON g.id = gsv.group_id "
-                "WHERE gsv.volume_id = " + txn.quote(volumeId)).one_row();
+                "JOIN volumes vs ON g.id = vs.subject_id "
+                "WHERE vs.volume_id = " + txn.quote(volumeId)).one_row();
 
             const auto groupId = group["id"].as<unsigned int>();
 
@@ -209,10 +209,10 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroupByStorageVolume(const un
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
             const auto storageVolumes = txn.exec(
-                "SELECT v.*, gsv.assigned_at "
-                "FROM storage_volumes v "
-                "JOIN group_storage_volumes gsv ON v.id = gsv.volume_id "
-                "WHERE gsv.group_id = " + txn.quote(groupId));
+                "SELECT v.*, vs.assigned_at "
+                "FROM volume v "
+                "JOIN volumes vs ON v.id = vs.volume_id "
+                "WHERE vs.subject_id = " + txn.quote(groupId));
 
             return std::make_shared<types::Group>(group, members, storageVolumes);
         });

@@ -214,7 +214,6 @@ echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
 # === 10) Apply Schema + Seed DB ===
-sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/schema.sql
 for sql_file in auth vaults files acl; do
     echo "📄 Applying $sql_file.sql..."
     sudo -u vaulthalla psql -d vaulthalla -f "deploy/psql/$sql_file.sql"

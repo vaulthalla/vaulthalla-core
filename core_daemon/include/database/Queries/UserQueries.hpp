@@ -10,7 +10,7 @@ class RefreshToken;
 
 namespace vh::types {
 struct User;
-struct Role;
+struct BaseRole;
 }
 
 namespace vh::database {
@@ -28,7 +28,7 @@ class UserQueries {
     static std::vector<std::shared_ptr<types::User>> listUsers();
     static void updateLastLoggedInUser(unsigned int userId);
 
-    static std::shared_ptr<types::Role> getRole(unsigned int id);
+    static std::shared_ptr<types::BaseRole> getRole(unsigned int id);
 
     static void addRefreshToken(const std::shared_ptr<auth::RefreshToken>& token);
     static void removeRefreshToken(const std::string& jti);

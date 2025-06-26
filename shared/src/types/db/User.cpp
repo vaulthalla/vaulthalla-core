@@ -1,7 +1,7 @@
 #include "types/db/User.hpp"
 #include <iostream>
 
-#include "types/db/UserRole.hpp"
+#include "types/db/Role.hpp"
 
 #include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
@@ -44,9 +44,9 @@ User::User(const pqxx::row& user, const pqxx::result& roles)
       global_role(nullptr),
       scoped_roles(std::nullopt) {
     if (!roles.empty()) {
-        scoped_roles = std::vector<std::shared_ptr<UserRole>>();
+        scoped_roles = std::vector<std::shared_ptr<Role>>();
         for (const auto& role_row : roles) {
-            const auto role = std::make_shared<UserRole>(role_row);
+            const auto role = std::make_shared<Role>(role_row);
             if (role->scope == "global") global_role = role;
             else scoped_roles->push_back(role);
         }
@@ -66,7 +66,7 @@ void User::updateUser(const nlohmann::json& j) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) global_role = nullptr;
-        else global_role = std::make_shared<UserRole>(j["global_role"]);
+        else global_role = std::make_shared<Role>(j["global_role"]);
     }
 
     if (j.contains("scoped_roles")) {
@@ -94,10 +94,11 @@ void to_json(nlohmann::json& j, const User& u) {
         {"email", u.email},
         {"last_login", u.last_login.has_value() ? util::timestampToString(u.last_login.value()) : ""},
         {"created_at", util::timestampToString(u.created_at)},
-        {"is_active", u.is_active},
-        {"global_role", u.global_role ? nlohmann::json(*u.global_role) : nlohmann::json(nullptr)},
-        {"scoped_roles", u.scoped_roles.has_value() ? *u.scoped_roles : nlohmann::json(nullptr)},
+        {"is_active", u.is_active}
     };
+
+    if (u.global_role) j["global_role"] = *u.global_role;
+    if (u.scoped_roles) j["scoped_roles"] = u.scoped_roles;
 }
 
 void from_json(const nlohmann::json& j, User& u) {
@@ -108,7 +109,7 @@ void from_json(const nlohmann::json& j, User& u) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) u.global_role = nullptr;
-        else u.global_role = std::make_shared<UserRole>(j["global_role"]);
+        else u.global_role = std::make_shared<Role>(j["global_role"]);
     } else u.global_role = nullptr;
 
     if (j.contains("scoped_roles")) {

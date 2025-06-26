@@ -4,7 +4,7 @@
 namespace vh::database {
 unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) {
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-        pqxx::result res = txn.exec("INSERT INTO vaults (name, type) VALUES (" + txn.quote(vault->name) + ", " +
+        pqxx::result res = txn.exec("INSERT INTO vault (name, type) VALUES (" + txn.quote(vault->name) + ", " +
                                     txn.quote(types::to_string(vault->type)) + ") RETURNING id");
 
         if (res.empty()) throw std::runtime_error("Failed to insert vault into database");
@@ -12,10 +12,10 @@ unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) 
 
         // dynamic cast
         if (auto* localVault = dynamic_cast<const types::LocalDiskVault*>(&*vault)) {
-            txn.exec("INSERT INTO local_disk_vaults (vault_id, mount_point) VALUES (" + txn.quote(vaultId) + ", " +
+            txn.exec("INSERT INTO local (vault_id, mount_point) VALUES (" + txn.quote(vaultId) + ", " +
                      txn.quote(localVault->mount_point.string()) + ")");
         } else if (auto* s3Vault = dynamic_cast<const types::S3Vault*>(&*vault)) {
-            txn.exec("INSERT INTO s3_vaults (vault_id, api_key_id, bucket) VALUES (" + txn.quote(vaultId) + ", " +
+            txn.exec("INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES (" + txn.quote(vaultId) + ", " +
                      txn.quote(s3Vault->api_key_id) + ", " + txn.quote(s3Vault->bucket) + ")");
         }
 
@@ -27,7 +27,7 @@ unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) 
 
 void VaultQueries::removeVault(unsigned int vaultId) {
     Transactions::exec("VaultQueries::removeVault", [&](pqxx::work& txn) {
-        txn.exec("DELETE FROM vaults WHERE id = " + txn.quote(vaultId));
+        txn.exec("DELETE FROM vault WHERE id = " + txn.quote(vaultId));
         txn.commit();
     });
 }
@@ -37,7 +37,7 @@ std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
                               [vaultID](pqxx::work& txn) -> std::shared_ptr<types::Vault> {
                                   // First, get the vault type
                                   pqxx::row typeRow =
-                                      txn.exec("SELECT type FROM vaults WHERE id = " + txn.quote(vaultID)).one_row();
+                                      txn.exec("SELECT type FROM vault WHERE id = " + txn.quote(vaultID)).one_row();
 
                                   auto typeStr = typeRow["type"].as<std::string>();
                                   types::VaultType vaultType = types::from_string(typeStr);
@@ -45,16 +45,16 @@ std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
                                   switch (vaultType) {
                                   case types::VaultType::Local: {
                                       auto res = txn.exec(
-                                          "SELECT * FROM vaults "
-                                          "INNER JOIN local_disk_vaults ON vaults.id = local_disk_vaults.vault_id "
-                                          "WHERE vaults.id = " +
+                                          "SELECT * FROM vault "
+                                          "INNER JOIN local ON vault.id = local.vault_id "
+                                          "WHERE vault.id = " +
                                           txn.quote(vaultID));
                                       return std::make_shared<types::LocalDiskVault>(res.one_row());
                                   }
                                   case types::VaultType::S3: {
-                                      auto res = txn.exec("SELECT * FROM vaults "
-                                                          "INNER JOIN s3_vaults ON vaults.id = s3_vaults.vault_id "
-                                                          "WHERE vaults.id = " +
+                                      auto res = txn.exec("SELECT * FROM vault "
+                                                          "INNER JOIN s3 ON vault.id = s3.vault_id "
+                                                          "WHERE vault.id = " +
                                                           txn.quote(vaultID));
                                       return std::make_shared<types::S3Vault>(res.one_row());
                                   }
@@ -67,9 +67,9 @@ std::vector<std::shared_ptr<types::Vault> > VaultQueries::listVaults() {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
         pqxx::result res = txn.exec(R"SQL(
             SELECT *
-            FROM vaults
-            LEFT JOIN local_disk_vaults ON local_disk_vaults.vault_id = vaults.id
-            LEFT JOIN s3_vaults         ON s3_vaults.vault_id = vaults.id
+            FROM vault
+            LEFT JOIN local ON local.vault_id = vault.id
+            LEFT JOIN s3         ON s3.vault_id = vault.id
         )SQL");
 
         std::vector<std::shared_ptr<types::Vault> > vaults;

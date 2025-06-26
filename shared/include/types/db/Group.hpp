@@ -34,7 +34,7 @@ struct GroupStorageVolume {
 };
 
 struct Group {
-    unsigned int id;
+    unsigned int id, gid{};
     std::string name;
     std::optional<std::string> description;
     std::time_t created_at;

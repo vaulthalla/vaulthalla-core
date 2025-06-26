@@ -60,7 +60,7 @@ CREATE TABLE volumes
     PRIMARY KEY (subject_id, subject_type, volume_id)
 );
 
-CREATE TABLE storage_usage
+CREATE TABLE usage
 (
     volume_id   INTEGER PRIMARY KEY REFERENCES volume (id) ON DELETE CASCADE,
     total_bytes BIGINT    DEFAULT 0 NOT NULL, -- actual usage
@@ -68,7 +68,7 @@ CREATE TABLE storage_usage
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE storage_usage_log
+CREATE TABLE usage_log
 (
     id          SERIAL PRIMARY KEY,
     volume_id   INTEGER NOT NULL REFERENCES volume (id),

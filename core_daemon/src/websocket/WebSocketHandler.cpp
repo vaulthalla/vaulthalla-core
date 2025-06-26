@@ -1,6 +1,7 @@
 #include "websocket/WebSocketHandler.hpp"
 #include "websocket/handlers/PermissionsHandler.hpp"
 #include "websocket/handlers/SettingsHandler.hpp"
+#include "websocket/handlers/GroupHandler.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -17,8 +18,19 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<services::ServiceManage
     registerAllHandlers();
 }
 
-void WebSocketHandler::registerAllHandlers() {
-    // Auth
+void WebSocketHandler::registerAllHandlers() const {
+    registerAuthHandlers();
+    registerFileSystemHandlers();
+    registerStorageHandlers();
+    registerAPIKeyHandlers();
+    registerPermissionsHandlers();
+    registerSettingsHandlers();
+    registerGroupHandlers();
+
+    std::cout << "[WebSocketHandler] All handlers registered.\n";
+}
+
+void WebSocketHandler::registerAuthHandlers() const {
     router_->registerHandler("auth.login", [this](const json& msg, WebSocketSession& session) {
         authHandler_->handleLogin(msg, session);
     });
@@ -54,8 +66,9 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("auth.users.list", [this](const json& msg, WebSocketSession& session) {
         authHandler_->handleListUsers(msg, session);
     });
+}
 
-    // FileSystem
+void WebSocketHandler::registerFileSystemHandlers() const {
     router_->registerHandler("fs.listDir", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleListDir(msg, session);
     });
@@ -71,8 +84,9 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("fs.deleteFile", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleDeleteFile(msg, session);
     });
+}
 
-    // Storage
+void WebSocketHandler::registerStorageHandlers() const {
     router_->registerHandler("storage.vault.list", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleListVaults(msg, session);
     });
@@ -112,12 +126,12 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("storage.volume.get", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleGetVolume(msg, session);
     });
+}
 
-    // API Keys
-
+void WebSocketHandler::registerAPIKeyHandlers() const {
     router_->registerHandler("storage.apiKey.add", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleAddAPIKey(msg, session);
-    });
+       storageHandler_->handleAddAPIKey(msg, session);
+   });
 
     router_->registerHandler("storage.apiKey.remove", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleRemoveAPIKey(msg, session);
@@ -134,9 +148,9 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("storage.apiKey.get", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleGetAPIKey(msg, session);
     });
+}
 
-    // Roles & Permissions
-
+void WebSocketHandler::registerPermissionsHandlers() const {
     router_->registerHandler("role.add", [this](const json& msg, WebSocketSession& session) {
         PermissionsHandler::handleAddRole(msg, session);
     });
@@ -172,8 +186,9 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("permissions.list", [this](const json& msg, WebSocketSession& session) {
         PermissionsHandler::handleListPermissions(msg, session);
     });
+}
 
-    // Settings
+void WebSocketHandler::registerSettingsHandlers() const {
     router_->registerHandler("settings.get", [this](const json& msg, WebSocketSession& session) {
         SettingsHandler::handleGetSettings(msg, session);
     });
@@ -181,31 +196,49 @@ void WebSocketHandler::registerAllHandlers() {
     router_->registerHandler("settings.update", [this](const json& msg, WebSocketSession& session) {
         SettingsHandler::handleUpdateSettings(msg, session);
     });
-
-    // Share
-    router_->registerHandler("share.createLink", [this](const json& msg, WebSocketSession& session) {
-        shareHandler_->handleCreateLink(msg, session);
-    });
-
-    router_->registerHandler("share.resolveLink", [this](const json& msg, WebSocketSession& session) {
-        shareHandler_->handleResolveLink(msg, session);
-    });
-
-    // Search
-    router_->registerHandler("index.search", [this](const json& msg, WebSocketSession& session) {
-        searchHandler_->handleSearch(msg, session);
-    });
-
-    // Notifications
-    router_->registerHandler("notification.subscribe", [this](const json& msg, WebSocketSession& session) {
-        notificationHandler_->handleSubscribe(msg, session);
-    });
-
-    router_->registerHandler("notification.unsubscribe", [this](const json& msg, WebSocketSession& session) {
-        notificationHandler_->handleUnsubscribe(msg, session);
-    });
-
-    std::cout << "[WebSocketHandler] All handlers registered.\n";
 }
+
+void WebSocketHandler::registerGroupHandlers() const {
+    router_->registerHandler("group.add", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleCreateGroup(msg, session);
+    });
+    router_->registerHandler("group.remove", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleDeleteGroup(msg, session);
+    });
+    router_->registerHandler("group.member.add", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleAddMemberToGroup(msg, session);
+    });
+    router_->registerHandler("group.member.remove", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleRemoveMemberFromGroup(msg, session);
+    });
+    router_->registerHandler("group.update", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleUpdateGroup(msg, session);
+    });
+    router_->registerHandler("groups.list", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleListGroups(msg, session);
+    });
+    router_->registerHandler("group.get", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleGetGroup(msg, session);
+    });
+    router_->registerHandler("group.get.byName", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleGetGroupByName(msg, session);
+    });
+    router_->registerHandler("group.volume.add", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleAddStorageVolumeToGroup(msg, session);
+    });
+    router_->registerHandler("group.volume.remove", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleRemoveStorageVolumeFromGroup(msg, session);
+    });
+    router_->registerHandler("groups.list.byUser", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleListGroupsByUser(msg, session);
+    });
+    router_->registerHandler("groups.list.byVolume", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleListGroupsByStorageVolume(msg, session);
+    });
+    router_->registerHandler("group.get.byVolume", [this](const json& msg, WebSocketSession& session) {
+        GroupHandler::handleGetGroupByStorageVolume(msg, session);
+    });
+}
+
 
 } // namespace vh::websocket

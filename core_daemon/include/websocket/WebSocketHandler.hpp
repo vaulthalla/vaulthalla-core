@@ -17,7 +17,7 @@ class WebSocketHandler {
     explicit WebSocketHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager,
                               const std::shared_ptr<WebSocketRouter>& router);
 
-    void registerAllHandlers();
+    void registerAllHandlers() const;
 
   private:
     std::shared_ptr<WebSocketRouter> router_;
@@ -29,6 +29,17 @@ class WebSocketHandler {
     std::shared_ptr<ShareHandler> shareHandler_;
     std::shared_ptr<SearchHandler> searchHandler_;
     std::shared_ptr<NotificationHandler> notificationHandler_;
+
+    void registerAuthHandlers() const;
+    void registerFileSystemHandlers() const;
+    void registerStorageHandlers() const;
+    void registerAPIKeyHandlers() const;
+    void registerPermissionsHandlers() const;
+    void registerSettingsHandlers() const;
+    void registerGroupHandlers() const;
+    void registerShareHandlers() const;
+    void registerSearchHandlers() const;
+    void registerNotificationHandlers() const;
 };
 
 } // namespace vh::websocket

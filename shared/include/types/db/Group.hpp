@@ -1,11 +1,37 @@
 #pragma once
 
-#include <boost/describe.hpp>
 #include <ctime>
+#include <memory>
 #include <optional>
 #include <string>
+#include <vector>
+#include <nlohmann/json_fwd.hpp>
+
+namespace pqxx {
+class row;
+class result;
+}
 
 namespace vh::types {
+
+struct User;
+struct StorageVolume;
+
+struct GroupMember {
+    std::shared_ptr<User> user;
+    std::time_t joined_at;
+
+    GroupMember() = default;
+    explicit GroupMember(const pqxx::row& row);
+};
+
+struct GroupStorageVolume {
+    std::shared_ptr<StorageVolume> volume;
+    std::time_t assigned_at;
+
+    GroupStorageVolume() = default;
+    explicit GroupStorageVolume(const pqxx::row& row);
+};
 
 struct Group {
     unsigned int id;
@@ -13,24 +39,21 @@ struct Group {
     std::optional<std::string> description;
     std::time_t created_at;
     std::optional<std::time_t> updated_at;
+    std::vector<std::shared_ptr<GroupMember>> members;
+    std::vector<std::shared_ptr<GroupStorageVolume>> volumes;
+
+    Group() = default;
+    explicit Group(const pqxx::row& gr, const pqxx::result& members, const pqxx::result& storageVolumes);
+    explicit Group(const nlohmann::json& j);
 };
 
-struct GroupMember {
-    unsigned int gid;
-    unsigned int uid;
-    std::time_t joined_at;
-};
+void to_json(nlohmann::json& j, const Group& g);
+void from_json(const nlohmann::json& j, Group& g);
 
-struct GroupStorageVolume {
-    unsigned int gid;
-    unsigned int storage_volume_id;
-    std::time_t assigned_at;
-};
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group>>& groups);
+std::vector<std::shared_ptr<Group>> groups_from_json(const nlohmann::json& j);
+
+void to_json(nlohmann::json& j, const GroupMember& gm);
+void to_json(nlohmann::json& j, const GroupStorageVolume& gsv);
 
 } // namespace vh::types
-
-BOOST_DESCRIBE_STRUCT(vh::types::Group, (), (id, name, description, created_at, updated_at))
-
-BOOST_DESCRIBE_STRUCT(vh::types::GroupMember, (), (gid, uid, joined_at))
-
-BOOST_DESCRIBE_STRUCT(vh::types::GroupStorageVolume, (), (gid, storage_volume_id, assigned_at))

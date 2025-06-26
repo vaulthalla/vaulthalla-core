@@ -214,8 +214,11 @@ echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
 # === 10) Apply Schema + Seed DB ===
-echo "📄 Applying schema.sql..."
 sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/schema.sql
+for sql_file in auth vaults files acl; do
+    echo "📄 Applying $sql_file.sql..."
+    sudo -u vaulthalla psql -d vaulthalla -f "deploy/psql/$sql_file.sql"
+done
 
 echo "🌱 Seeding database..."
 sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/seed.sql
@@ -233,30 +236,30 @@ INSERT INTO users (name, email, password_hash, created_at, is_active)
 VALUES ('Admin', 'admin@vaulthalla.dev', '${HASHED_PASS}', NOW(), TRUE);
 
 -- Link Role
-INSERT INTO user_roles (user_id, role_id)
-SELECT users.id, roles.id FROM users, roles
-WHERE users.email = 'admin@vaulthalla.dev' AND roles.name = 'super_admin';
+INSERT INTO roles (subject_id, subject_type, scope, role_id)
+SELECT users.id, 'user', 'global', role.id FROM users, role
+WHERE users.email = 'admin@vaulthalla.dev' AND role.name = 'super_admin';
 
 -- Create Admin Group & Link
 INSERT INTO groups (name, description) VALUES ('admin', 'Core admin group');
-INSERT INTO group_members (gid, uid)
+INSERT INTO group_members (group_id, user_id)
 SELECT groups.id, users.id FROM users, groups
 WHERE users.email = 'admin@vaulthalla.dev' AND groups.name = 'admin';
 
 -- Create Vault
-INSERT INTO vaults (type, name, is_active, created_at)
+INSERT INTO vault (type, name, is_active, created_at)
 VALUES ('local', 'Admin Default Vault', TRUE, NOW());
 
-INSERT INTO local_disk_vaults (vault_id, mount_point)
-SELECT id, '/mnt/vaulthalla/users/admin' FROM vaults WHERE name = 'Admin Default Vault';
+INSERT INTO local (vault_id, mount_point)
+SELECT id, '/mnt/vaulthalla/users/admin' FROM vault WHERE name = 'Admin Default Vault';
 
-INSERT INTO storage_volumes (vault_id, name, path_prefix, quota_bytes, created_at)
-SELECT id, 'Admin Default Volume', '/users/admin', NULL, NOW() FROM vaults WHERE name = 'Admin Default Vault';
+INSERT INTO volume (vault_id, name, path_prefix, quota_bytes, created_at)
+SELECT id, 'Admin Default Volume', '/users/admin', NULL, NOW() FROM vault WHERE name = 'Admin Default Vault';
 
-INSERT INTO user_storage_volumes (user_id, storage_volume_id)
-SELECT users.id, storage_volumes.id
-FROM users, storage_volumes
-WHERE users.email = 'admin@vaulthalla.dev' AND storage_volumes.name = 'Admin Default Volume';
+INSERT INTO volumes (subject_id, subject_type, volume_id)
+SELECT users.id, 'user', volume.id
+FROM users, volume
+WHERE users.email = 'admin@vaulthalla.dev' AND volume.name = 'Admin Default Volume';
 EOF
 
 # === 11) Install systemd services ===

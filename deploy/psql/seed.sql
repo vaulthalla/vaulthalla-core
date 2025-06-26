@@ -9,7 +9,7 @@
 -- User: Upload, Download, Share (bits 6, 7, 9 = 0b0000001011000000 = 0x02C0)
 -- Guest: Download only (bit 7 = 0b0000000001000000 = 0x0040)
 
-INSERT INTO roles (name, description, permissions)
+INSERT INTO role (name, description, permissions)
 VALUES
     ('admin', 'Full system administrator with all permissions', B'0000011111111111'),
     ('user', 'Standard user with access to personal files',     B'0000001011000000'),

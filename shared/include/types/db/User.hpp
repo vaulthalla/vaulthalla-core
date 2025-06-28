@@ -36,6 +36,9 @@ struct User {
     void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);
 
+    [[nodiscard]] bool isAdmin() const;
+    [[nodiscard]] bool isSuperAdmin() const;
+
     // Admin checks
     [[nodiscard]] bool canCreateUser() const;
     [[nodiscard]] bool canCreateAdminUser() const;

@@ -11,6 +11,8 @@ class row;
 namespace vh::types {
 
 struct Role {
+    static constexpr uint16_t ADMIN_MASK = 0x00FD;
+
     unsigned int id;
     std::string name;
     std::string display_name;
@@ -24,6 +26,9 @@ struct Role {
     Role() = default;
     explicit Role(const pqxx::row& row);
     explicit Role(const nlohmann::json& j);
+
+    [[nodiscard]] bool isAdmin() const;
+    [[nodiscard]] bool isSuperAdmin() const;
 
     // Admin checks
     bool canCreateUser() const;

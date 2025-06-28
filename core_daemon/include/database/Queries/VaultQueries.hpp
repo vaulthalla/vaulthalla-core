@@ -13,6 +13,7 @@ struct VaultQueries {
     static void removeVault(unsigned int vaultId);
     static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
     static std::vector<std::shared_ptr<types::Vault>> listVaults();
+    static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId);
 
     static bool localDiskVaultExists();
 

@@ -90,6 +90,36 @@ std::vector<std::shared_ptr<types::Vault> > VaultQueries::listVaults() {
     });
 }
 
+std::vector<std::shared_ptr<types::Vault> > VaultQueries::listUserVaults(const unsigned int userId) {
+    return Transactions::exec("VaultQueries::listUserVaults", [&](pqxx::work& txn) {
+        const auto res = txn.exec(R"SQL(
+            SELECT DISTINCT v.*
+            FROM vault v
+            JOIN roles r ON (
+                (r.scope = 'vault' AND r.scope_id = v.id)
+                OR
+                (r.scope = 'volume' AND r.scope_id IN (
+                    SELECT id FROM volume WHERE vault_id = v.id
+                ))
+            )
+            WHERE r.subject_type = 'user'
+              AND r.subject_id = )SQL" + txn.quote(userId));
+
+        std::vector<std::shared_ptr<types::Vault> > vaults;
+        for (const auto& row : res) {
+            const auto typeStr = row["type"].as<std::string>();
+            switch (types::from_string(typeStr)) {
+            case types::VaultType::Local: vaults.push_back(std::make_shared<types::LocalDiskVault>(row));
+                break;
+            case types::VaultType::S3: vaults.push_back(std::make_shared<types::S3Vault>(row));
+                break;
+            default: throw std::runtime_error("Unsupported VaultType in listUserVaults(): " + typeStr);
+            }
+        }
+        return vaults;
+    });
+}
+
 bool VaultQueries::localDiskVaultExists() {
     return Transactions::exec("VaultQueries::localDiskVaultExists", [&](pqxx::work& txn) {
         const auto res = txn.exec("SELECT COUNT(*) FROM vaults WHERE type = " +

@@ -24,7 +24,7 @@ class StorageManager {
     void initUserStorage(const std::shared_ptr<types::User>& user);
     void addVault(std::shared_ptr<types::Vault>&& vault);
     void removeVault(unsigned int vaultId);
-    std::vector<std::shared_ptr<types::Vault>> listVaults() const;
+    std::vector<std::shared_ptr<types::Vault>> listVaults(const std::shared_ptr<types::User>& user) const;
     std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
 
     void mountVolume(const std::shared_ptr<types::Volume>& volume);

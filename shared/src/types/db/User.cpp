@@ -76,6 +76,9 @@ void User::updateUser(const nlohmann::json& j) {
     // }
 }
 
+bool User::isAdmin() const { return global_role && global_role->isAdmin(); }
+bool User::isSuperAdmin() const { return global_role &&  global_role->isSuperAdmin(); }
+
 // --- Admin checks ---
 bool User::canCreateUser() const { return hasPermission(global_role->admin_permissions, AdminPermission::CreateUser); }
 bool User::canCreateAdminUser() const { return hasPermission(global_role->admin_permissions, AdminPermission::CreateAdminUser); }

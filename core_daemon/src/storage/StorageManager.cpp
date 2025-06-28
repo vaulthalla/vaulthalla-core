@@ -101,9 +101,10 @@ void StorageManager::removeVault(const unsigned int vaultId) {
     std::cout << "[StorageManager] Removed vault with ID: " << vaultId << "\n";
 }
 
-std::vector<std::shared_ptr<types::Vault>> StorageManager::listVaults() const {
+std::vector<std::shared_ptr<types::Vault>> StorageManager::listVaults(const std::shared_ptr<types::User>& user) const {
     std::lock_guard lock(mountsMutex_);
-    return database::VaultQueries::listVaults();
+    if (user->isAdmin()) return database::VaultQueries::listVaults();
+    return database::VaultQueries::listUserVaults(user->id);
 }
 
 std::shared_ptr<types::Vault> StorageManager::getVault(unsigned int vaultId) const {

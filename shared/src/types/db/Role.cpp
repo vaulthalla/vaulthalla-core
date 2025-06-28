@@ -61,6 +61,17 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Rol
     for (const auto& role : roles) j.push_back(*role);
 }
 
+bool Role::isAdmin() const {
+    return hasPermission(admin_permissions, AdminPermission::CreateUser) ||
+           hasPermission(admin_permissions, AdminPermission::CreateAdminUser) ||
+           hasPermission(admin_permissions, AdminPermission::ManageRoles) ||
+           hasPermission(admin_permissions, AdminPermission::ManageSettings);
+}
+
+bool Role::isSuperAdmin() const {
+    return hasPermission(admin_permissions, AdminPermission::CreateAdminUser);
+}
+
 // --- Admin checks ---
 bool Role::canCreateUser() const { return hasPermission(admin_permissions, AdminPermission::CreateUser); }
 bool Role::canCreateAdminUser() const { return hasPermission(admin_permissions, AdminPermission::CreateAdminUser); }

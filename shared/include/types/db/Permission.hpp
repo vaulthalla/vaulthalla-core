@@ -92,9 +92,7 @@ inline std::string bitStringFromMask(const uint16_t mask) {
 template <typename T>
 uint16_t toBitmask(const std::vector<T>& perms) {
     uint16_t mask = 0;
-    for (auto p : perms) {
-        mask |= static_cast<uint16_t>(p);
-    }
+    for (auto p : perms) mask |= static_cast<uint16_t>(p);
     return mask;
 }
 

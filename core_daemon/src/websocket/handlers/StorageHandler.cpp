@@ -17,7 +17,7 @@ StorageHandler::StorageHandler(const std::shared_ptr<storage::StorageManager>& s
 
 void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session) const {
     try {
-        json payload = msg.at("payload");
+        const json payload = msg.at("payload");
         unsigned short userID = payload.at("user_id").get<unsigned short>();
         std::string name = payload.at("name").get<std::string>();
         std::string type = payload.at("type").get<std::string>();
@@ -39,7 +39,7 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         apiKeyManager_->addAPIKey(key);
 
-        json response = {{"command", "storage.apiKey.add.response"},
+        const json response = {{"command", "storage.apiKey.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"}};
 
@@ -49,7 +49,7 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.apiKey.add.response"},
+        const json response = {{"command", "storage.apiKey.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -88,9 +88,9 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     try {
         auto keys = apiKeyManager_->listAPIKeys();
 
-        json data = {{"keys", types::api::to_json(keys).dump(4)}};
+        const json data = {{"keys", types::api::to_json(keys).dump(4)}};
 
-        json response = {{"command", "storage.apiKey.list.response"},
+        const json response = {{"command", "storage.apiKey.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -101,7 +101,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.apiKey.list.response"},
+        const json response = {{"command", "storage.apiKey.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -116,9 +116,9 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
         if (!user) throw std::runtime_error("User not authenticated");
         auto keys = apiKeyManager_->listUserAPIKeys(user->id);
 
-        json data{{"keys", types::api::to_json(keys).dump(4)}};
+        const json data{{"keys", types::api::to_json(keys).dump(4)}};
 
-        json response = {{"command", "storage.apiKey.list.user.response"},
+        const json response = {{"command", "storage.apiKey.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -129,7 +129,7 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.apiKey.list.user.response"},
+        const json response = {{"command", "storage.apiKey.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -163,7 +163,7 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
             throw std::runtime_error("Unsupported API key type: " + to_string(key->type));
         }
 
-        json response = {{"command", "storage.apiKey.get.response"},
+        const json response = {{"command", "storage.apiKey.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -174,7 +174,7 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.apiKey.get.response"},
+        const json response = {{"command", "storage.apiKey.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -206,13 +206,13 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
         storageManager_->addVault(std::move(vault));
 
-        json data = {{"id", vault->id},
+        const json data = {{"id", vault->id},
                      {"name", vault->name},
                      {"type", to_string(vault->type)},
                      {"isActive", vault->is_active},
                      {"createdAt", vault->created_at}};
 
-        json response = {{"command", "storage.vault.add.response"},
+        const json response = {{"command", "storage.vault.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -223,7 +223,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.vault.add.response"},
+        const json response = {{"command", "storage.vault.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -237,7 +237,7 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
         unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
         storageManager_->removeVault(vaultId);
 
-        json response = {{"command", "storage.vault.remove.response"},
+        const json response = {{"command", "storage.vault.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"}};
 
@@ -247,7 +247,7 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.vault.remove.response"},
+        const json response = {{"command", "storage.vault.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -261,9 +261,9 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
         unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
         auto vault = storageManager_->getVault(vaultId);
 
-        json data = {{"vault", json(*vault)}};
+        const json data = {{"vault", json(*vault)}};
 
-        json response = {{"command", "storage.vault.get.response"},
+        const json response = {{"command", "storage.vault.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -274,7 +274,7 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.vault.get.response"},
+        const json response = {{"command", "storage.vault.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -285,11 +285,11 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
 void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session) const {
     try {
-        const auto vaults = storageManager_->listVaults();
+        const auto vaults = storageManager_->listVaults(session.getAuthenticatedUser());
 
-        json data = {{"vaults", types::to_json(vaults).dump(4)}};
+        const json data = {{"vaults", types::to_json(vaults).dump(4)}};
 
-        json response = {{"command", "storage.vault.list.response"},
+        const json response = {{"command", "storage.vault.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -300,7 +300,7 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.vault.list.response"},
+        const json response = {{"command", "storage.vault.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -311,18 +311,18 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
 
 void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session) const {
     try {
-        json payload = msg.at("payload");
-        unsigned int userID = payload.at("user_id").get<unsigned int>();
-        unsigned int vaultID = payload.at("vault_id").get<unsigned int>();
-        std::string name = payload.at("name").get<std::string>();
-        std::string pathPrefix = payload.contains("path_prefix") ? payload.at("path_prefix").get<std::string>() : "/";
+        const json payload = msg.at("payload");
+        const auto userID = payload.at("user_id").get<unsigned int>();
+        const auto vaultID = payload.at("vault_id").get<unsigned int>();
+        const std::string name = payload.at("name").get<std::string>();
+        const std::string pathPrefix = payload.contains("path_prefix") ? payload.at("path_prefix").get<std::string>() : "/";
         unsigned long long quotaBytes =
             payload.contains("quota_bytes") ? payload.at("quota_bytes").get<unsigned long long>() : 0;
 
         auto storageVolume = std::make_shared<types::Volume>(vaultID, name, pathPrefix, quotaBytes);
         storageManager_->addVolume(storageVolume, userID);
 
-        json response = {{"command", "storage.volume.add.response"},
+        const json response = {{"command", "storage.volume.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"}};
 
@@ -332,7 +332,7 @@ void StorageHandler::handleAddVolume(const json& msg, WebSocketSession& session)
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleAddVolume error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.volume.add.response"},
+        const json response = {{"command", "storage.volume.add.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -348,7 +348,7 @@ void StorageHandler::handleRemoveVolume(const json& msg, WebSocketSession& sessi
 
         storageManager_->removeVolume(volumeId, user->id);
 
-        json response = {{"command", "storage.volume.remove.response"},
+        const json response = {{"command", "storage.volume.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"}};
 
@@ -358,7 +358,7 @@ void StorageHandler::handleRemoveVolume(const json& msg, WebSocketSession& sessi
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleRemoveVolume error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.volume.remove.response"},
+        const json response = {{"command", "storage.volume.remove.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -372,9 +372,9 @@ void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& se
         unsigned int userId = msg.at("payload").at("user_id").get<unsigned int>();
         auto volumes = database::VaultQueries::listUserVolumes(userId);
 
-        json data = {{"volumes", json(volumes).dump(4)}};
+        const json data = {{"volumes", json(volumes).dump(4)}};
 
-        json response = {{"command", "storage.volume.list.user.response"},
+        const json response = {{"command", "storage.volume.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -385,7 +385,7 @@ void StorageHandler::handleListUserVolumes(const json& msg, WebSocketSession& se
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.volume.list.user.response"},
+        const json response = {{"command", "storage.volume.list.user.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -425,9 +425,9 @@ void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& sessio
     try {
         auto volumes = database::VaultQueries::listVolumes();
 
-        json data = {{"volumes", json(volumes).dump(4)}};
+        const json data = {{"volumes", json(volumes).dump(4)}};
 
-        json response = {{"command", "storage.volume.list.response"},
+        const json response = {{"command", "storage.volume.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", data}};
@@ -438,7 +438,7 @@ void StorageHandler::handleListVolumes(const json& msg, WebSocketSession& sessio
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListVolumes error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.volume.list.response"},
+        const json response = {{"command", "storage.volume.list.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};
@@ -453,7 +453,7 @@ void StorageHandler::handleGetVolume(const json& msg, WebSocketSession& session)
         const auto user = session.getAuthenticatedUser();
         auto volume = storageManager_->getVolume(volumeId, user->id);
 
-        json response = {{"command", "storage.volume.get.response"},
+        const json response = {{"command", "storage.volume.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "ok"},
                          {"data", *volume}};
@@ -464,7 +464,7 @@ void StorageHandler::handleGetVolume(const json& msg, WebSocketSession& session)
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleGetVolume error: " << e.what() << std::endl;
 
-        json response = {{"command", "storage.volume.get.response"},
+        const json response = {{"command", "storage.volume.get.response"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"status", "error"},
                          {"error", e.what()}};

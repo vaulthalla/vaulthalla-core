@@ -33,6 +33,8 @@ struct User {
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::result& roles);
 
+    std::shared_ptr<AssignedRole> getBestFitRole(unsigned int vaultId, unsigned int volumeId) const;
+
     void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);
 

@@ -1,6 +1,9 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "types/db/File.hpp"
+#include "types/db/AssignedRole.hpp"
+#include "websocket/handlers/UploadHandler.hpp"
+#include "storage/LocalDiskStorageEngine.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -10,26 +13,94 @@ FileSystemHandler::FileSystemHandler(const std::shared_ptr<services::ServiceMana
     if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
 }
 
-void FileSystemHandler::validateAuth(WebSocketSession& session) {
-    if (!session.getAuthenticatedUser()) {
-        throw std::runtime_error("Unauthorized");
+void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& session) {
+    try {
+        const auto payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto volumeId = payload.at("volume_id").get<unsigned int>();
+        const auto path = payload.at("path").get<std::string>();
+
+        enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canUploadFile);
+
+        const auto uploadId = WebSocketSession::generateUUIDv4();
+        const auto engine = storageManager_->getEngine(volumeId);
+        if (!engine) throw std::runtime_error("Unknown storage engine");
+
+        if (engine->type() != storage::StorageType::Local) {
+            // TODO: Handle other storage types (e.g., S3, Azure, etc.)
+            throw std::runtime_error("Unsupported storage engine type for upload, requires Local");
+        }
+
+        const auto localEngine = std::static_pointer_cast<storage::LocalDiskStorageEngine>(engine);
+
+        const auto absPath = localEngine->getAbsolutePath(path, volumeId);
+        const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
+
+        // Create temp file
+        std::ofstream tmpFile(tmpPath, std::ios::binary | std::ios::trunc);
+        if (!tmpFile.is_open()) throw std::runtime_error("Failed to open temp file for upload");
+
+        session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
+
+        const json response = {{"command", "fs.upload.start.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", {"upload_id", uploadId}}};
+
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] UploadStart on vault '" << vaultId << "' path '" << path << "'"
+            << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleUploadStart error: " << e.what() << std::endl;
+        const json response = {{"command", "fs.upload.start.response"}, {"status", "error"}, {"error", e.what()}};
+        session.send(response);
     }
 }
 
-void FileSystemHandler::enforcePermission(WebSocketSession& session, const std::string& mountName,
-                                          const std::string& path, const std::string& requiredPermission) {
-    auto user = session.getAuthenticatedUser();
-    if (!user) throw std::runtime_error("Unauthorized");
+void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& session) {
+    try {
+        const auto payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto volumeId = payload.at("volume_id").get<unsigned int>();
+        const auto path = payload.at("path").get<std::string>();
+
+        enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canUploadFile);
+
+        session.getUploadHandler()->finishUpload();
+
+        const json response = {
+            {"command", "fs.upload.finish.response"},
+            {"status", "ok"},
+            {"requestId", msg.at("requestId").get<std::string>()},
+            {"data", {"path", path}}
+        };
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] UploadFinish on vault '" << vaultId << "' path '" << path << "'"
+            << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleUploadFinish error: " << e.what() << std::endl;
+
+        const json response = {
+            {"command", "fs.upload.finish.response"},
+            {"status", "error"},
+            {"error", e.what()}
+        };
+        session.send(response);
+    }
 }
 
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
-        validateAuth(session);
-
         const auto payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto volumeId = payload.at("volume_id").get<unsigned int>();
         const auto path = payload.value("path", "/");
+
+        // TODO: Validate auth and permissions
 
         const auto engine = storageManager_->getEngine(volumeId);
         if (!engine) throw std::runtime_error("Unknown storage engine: " + vaultId);
@@ -50,7 +121,8 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] ListDir on mount '" << engine->getVault()->name << "' path '" << path << std::endl;
+        std::cout << "[FileSystemHandler] ListDir on mount '" << engine->getVault()->name << "' path '" << path <<
+            std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << std::endl;
@@ -63,15 +135,14 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
 void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& session) {
     try {
-        validateAuth(session);
-
         std::string mountName = msg.at("mountName").get<std::string>();
         unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
         std::string path = msg.at("path").get<std::string>();
 
+        // TODO: Validate auth and permissions
+
         auto engine = storageManager_->getEngine(volumeId);
         if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
-        enforcePermission(session, mountName, path, "read");
         auto data = engine->readFile(path);
         if (!data.has_value()) throw std::runtime_error("File not found: " + path);
         auto fileContent = std::string(data->begin(), data->end());
@@ -95,46 +166,13 @@ void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& sessio
     }
 }
 
-void FileSystemHandler::handleWriteFile(const json& msg, WebSocketSession& session) {
-    try {
-        validateAuth(session);
-
-        std::string mountName = msg.at("mountName").get<std::string>();
-        unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
-        std::string path = msg.at("path").get<std::string>();
-        std::string data = msg.at("data").get<std::string>();
-
-        auto engine = storageManager_->getEngine(volumeId);
-        if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
-        std::vector<uint8_t> binaryData(data.begin(), data.end());
-        enforcePermission(session, mountName, path, "write");
-        bool success = engine->writeFile(path, binaryData, false);
-
-        json response = {{"command", "fs.writeFile.response"},
-                         {"status", success ? "ok" : "error"},
-                         {"mountName", mountName},
-                         {"path", path}};
-
-        session.send(response);
-
-        std::cout << "[FileSystemHandler] WriteFile on mount '" << mountName << "' path '" << path << std::endl;
-
-    } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleWriteFile error: " << e.what() << std::endl;
-
-        json response = {{"command", "fs.writeFile.response"}, {"status", "error"}, {"error", e.what()}};
-
-        session.send(response);
-    }
-}
-
 void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& session) {
     try {
-        validateAuth(session);
-
         std::string mountName = msg.at("mountName").get<std::string>();
         unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
         std::string path = msg.at("path").get<std::string>();
+
+        // TODO: Validate auth and permissions
 
         bool success = false;
 

@@ -31,7 +31,7 @@ class LocalDiskStorageEngine : public StorageEngine {
     std::vector<std::shared_ptr<types::File>> listFilesInDir(const std::filesystem::path& rel_path,
                                                                     bool recursive) const override;
 
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
+    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path, unsigned int volumeId) const;
     [[nodiscard]] std::filesystem::path getRootPath() const;
     [[nodiscard]] fs::path resolvePath(const std::string& id) const;
     [[nodiscard]] fs::path getRelativePath(const fs::path& absolute_path) const;

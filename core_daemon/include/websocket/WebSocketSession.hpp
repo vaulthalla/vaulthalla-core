@@ -13,6 +13,15 @@
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <unordered_set>
+#include <fstream>
+#include <optional>
+
+struct UploadContext {
+    std::string path;
+    uint64_t expectedSize = 0;
+    uint64_t bytesReceived = 0;
+    std::ofstream file;
+};
 
 using RequestType = boost::beast::http::request<boost::beast::http::string_body>;
 
@@ -28,6 +37,7 @@ class User;
 namespace vh::websocket {
 class WebSocketRouter;
 class NotificationBroadcastManager;
+class UploadHandler;
 
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
@@ -69,10 +79,15 @@ public:
     void setHandshakeRequest(const RequestType& req);
 
     std::string getClientIp() const;
-
     std::string getUserAgent() const;
-
     std::string getRefreshToken() const;
+    std::shared_ptr<UploadHandler> getUploadHandler() const { return uploadHandler_; }
+
+    static std::string generateUUIDv4() {
+        static boost::uuids::random_generator generator;
+        const boost::uuids::uuid uuid = generator();
+        return boost::uuids::to_string(uuid);
+    }
 
 private:
     std::shared_ptr<auth::AuthManager> authManager_;
@@ -81,6 +96,7 @@ private:
     beast::flat_buffer buffer_{8192}, tmpBuffer_{4096};
     asio::any_io_executor strand_;
     RequestType handshakeRequest_;
+    std::shared_ptr<UploadHandler> uploadHandler_;
 
     std::shared_ptr<WebSocketRouter> router_;
     std::shared_ptr<types::User> authenticatedUser_;
@@ -102,12 +118,6 @@ private:
     void doWrite();
 
     void onWrite(beast::error_code ec, std::size_t bytesTransferred);
-
-    static std::string generateUUIDv4() {
-        static boost::uuids::random_generator generator;
-        boost::uuids::uuid uuid = generator();
-        return boost::uuids::to_string(uuid);
-    }
 };
 
 } // namespace vh::websocket

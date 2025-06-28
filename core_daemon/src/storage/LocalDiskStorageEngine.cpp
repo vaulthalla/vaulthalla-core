@@ -8,7 +8,7 @@
 namespace vh::storage {
 
 LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault,
-                                                 const std::vector<std::shared_ptr<types::Volume>>& volumes)
+                                               const std::vector<std::shared_ptr<types::Volume> >& volumes)
     : vault_(vault), volumes_(volumes), root(vault->mount_point) {
     if (!std::filesystem::exists(root)) std::filesystem::create_directories(root);
 }
@@ -17,7 +17,8 @@ void LocalDiskStorageEngine::mountVolume(const std::shared_ptr<types::Volume>& v
     if (!volume) return;
 
     if (!std::filesystem::exists(root / volume->path_prefix))
-        std::filesystem::create_directories(root / volume->path_prefix);
+        std::filesystem::create_directories(
+            root / volume->path_prefix);
 
     volumes_.push_back(volume);
 }
@@ -65,9 +66,9 @@ bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) c
     return std::filesystem::exists(root / rel_path);
 }
 
-std::vector<std::shared_ptr<types::File>> LocalDiskStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
-                                                                    const bool recursive) const {
-    std::vector<std::shared_ptr<types::File>> files;
+std::vector<std::shared_ptr<types::File> > LocalDiskStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
+    const bool recursive) const {
+    std::vector<std::shared_ptr<types::File> > files;
     const auto full_path = root / rel_path;
 
     if (!std::filesystem::exists(full_path) || !std::filesystem::is_directory(full_path)) return files;
@@ -76,21 +77,21 @@ std::vector<std::shared_ptr<types::File>> LocalDiskStorageEngine::listFilesInDir
         std::shared_ptr<types::File> f{};
         const auto status = entry.symlink_status(); // safer for symlinks
 
-        f->id = 0; // If you don't have DB IDs in this context, leave as 0 or assign some sentinel
-        f->storage_volume_id = 0; // Same here, fill if meaningful
+        f->id = 0;                   // If you don't have DB IDs in this context, leave as 0 or assign some sentinel
+        f->storage_volume_id = 0;    // Same here, fill if meaningful
         f->parent_id = std::nullopt; // You can compute if needed
 
         f->name = entry.path().filename().string();
         f->is_directory = entry.is_directory();
         f->mode = static_cast<unsigned long long>(status.permissions());
-        f->uid = 0; // Could use stat() to fill real UID
-        f->gid = 0; // Could use stat() to fill real GID
+        f->uid = 0;        // Could use stat() to fill real UID
+        f->gid = 0;        // Could use stat() to fill real GID
         f->created_by = 0; // Application-specific
 
         auto ftime = std::filesystem::last_write_time(entry);
         f->updated_at = decltype(f->updated_at)(std::chrono::duration_cast<std::chrono::seconds>(
-                           ftime.time_since_epoch())
-                           .count());
+                ftime.time_since_epoch())
+            .count());
         f->created_at = f->updated_at; // No portable created time; use updated_at as placeholder
 
         f->current_version_size_bytes = entry.is_regular_file() ? entry.file_size() : 0;
@@ -114,8 +115,13 @@ std::filesystem::path LocalDiskStorageEngine::resolvePath(const std::string& id)
     return root / id;
 }
 
-std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
-    return root / rel_path;
+std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path,
+                                                              const unsigned int volumeId) const {
+    const auto it = std::find_if(volumes_.begin(), volumes_.end(),
+                               [volumeId](const auto& v) { return v->id == volumeId; });
+    if (it == volumes_.end()) throw std::runtime_error("Volume not found with ID: " + std::to_string(volumeId));
+    const auto& volume = *it;
+    return root / volume->path_prefix / rel_path;
 }
 
 fs::path LocalDiskStorageEngine::getRelativePath(const fs::path& absolute_path) const {

@@ -55,6 +55,21 @@ User::User(const pqxx::row& user, const pqxx::result& roles)
     if (!global_role) std::cerr << "User does not have a global role." << std::endl;
 }
 
+std::shared_ptr<AssignedRole> User::getBestFitRole(const unsigned int vaultId, const unsigned int volumeId) const {
+    if (global_role) return global_role;
+
+    if (scoped_roles.has_value()) {
+        std::shared_ptr<AssignedRole> best_fit_role = nullptr;
+        for (const auto& role : *scoped_roles) {
+            if (role->scope == "volume" && role->scope_id == volumeId) return role;
+            if (role->scope == "vault" && role->scope_id == vaultId) best_fit_role = role;
+        }
+        return best_fit_role;
+    }
+
+    return nullptr; // No suitable role found
+}
+
 void User::setPasswordHash(const std::string& hash) {
     password_hash = hash;
 }

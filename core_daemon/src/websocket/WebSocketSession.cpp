@@ -7,6 +7,7 @@
 #include <boost/beast/http.hpp>
 #include <iostream>
 #include <regex>
+#include "websocket/handlers/UploadHandler.hpp"
 
 namespace {
 namespace beast = boost::beast;
@@ -35,9 +36,10 @@ std::string extractCookie(const http::request<http::string_body>& req,
 // ‑‑ construction & destruction
 // ──────────────────────────────────────────────────────────────────────────────
 WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                                   const std::shared_ptr<NotificationBroadcastManager>& broadcaster,
+                                   const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
                                    const std::shared_ptr<auth::AuthManager>& authManager)
-    : authManager_{authManager}, ws_{nullptr}, router_{router}, broadcastManager_{broadcaster} {}
+    : authManager_{authManager}, ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)),
+      broadcastManager_{broadcastManager} {}
 
 WebSocketSession::~WebSocketSession() {
     if (broadcastManager_ && isRegistered_) {
@@ -70,11 +72,11 @@ std::string WebSocketSession::getRefreshToken() const {
 // ‑‑ session life‑cycle
 // ──────────────────────────────────────────────────────────────────────────────
 void WebSocketSession::accept(tcp::socket&& socket) {
-    ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
+    ws_ = std::make_shared<websocket::stream<tcp::socket> >(std::move(socket));
     strand_ = asio::make_strand(ws_->get_executor());
 
     auto self = shared_from_this();
-    auto req = std::make_shared<http::request<http::string_body>>();
+    auto req = std::make_shared<http::request<http::string_body> >();
 
     // ── Lambda: decorate handshake response with refresh token cookie ──
     auto setHandshakeResponseHeaders = [self]() {
@@ -104,7 +106,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
 
     // ── Lambda: after HTTP headers are read, prepare session & auth ──
     auto onHeadersRead = [self, req, setHandshakeResponseHeaders, onHandshakeAccepted](beast::error_code ec,
-                                                                                       std::size_t) {
+        std::size_t) {
         if (ec) {
             std::cerr << "[Session] Handshake read error: " << ec.message() << std::endl;
             return;
@@ -117,8 +119,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         self->refreshToken_ = extractCookie(*req, "refresh");
 
         if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies" << std::endl;
-        else
-            std::cout << "[Session] No refresh token found in Cookie header" << std::endl;
+        else std::cout << "[Session] No refresh token found in Cookie header" << std::endl;
 
         self->authManager_->rehydrateOrCreateClient(self);
 
@@ -133,18 +134,20 @@ void WebSocketSession::accept(tcp::socket&& socket) {
 }
 
 void WebSocketSession::close() {
-    if (broadcastManager_ && isRegistered_) {      // drop pub/sub ref
+    if (broadcastManager_ && isRegistered_) {
+        // drop pub/sub ref
         broadcastManager_->unregisterSession(shared_from_this());
         isRegistered_ = false;
     }
 
-    if (ws_ && ws_->is_open()) {                   // close websocket
+    if (ws_ && ws_->is_open()) {
+        // close websocket
         beast::error_code ec;
         ws_->close(websocket::close_code::normal, ec);
         if (ec) std::cerr << "[Session] Close error: " << ec.message() << std::endl;
     }
 
-    ws_.reset();                                   // release FD
+    ws_.reset(); // release FD
     buffer_.consume(buffer_.size());
     std::cout << "[WebSocketSession] Session cleaned up" << std::endl;
 }
@@ -173,9 +176,9 @@ void WebSocketSession::doWrite() {
     ws_->async_write(
         asio::buffer(front),
         asio::bind_executor(strand_,
-            [self](beast::error_code ec, std::size_t bytesWritten) {
-                self->onWrite(ec, bytesWritten);
-            }));
+                            [self](beast::error_code ec, std::size_t bytesWritten) {
+                                self->onWrite(ec, bytesWritten);
+                            }));
 }
 
 void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
@@ -196,34 +199,43 @@ void WebSocketSession::doRead() {
     ws_->async_read(
         buffer_,
         asio::bind_executor(strand_,
-            [self](beast::error_code ec, std::size_t bytesRead) {
-                self->onRead(ec, bytesRead);
-            }));
+                            [self](beast::error_code ec, std::size_t bytesRead) {
+                                self->onRead(ec, bytesRead);
+                            }));
 }
 
 void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
-    if (ec == websocket::error::closed) {          // graceful close
+    if (ec == websocket::error::closed) {
+        // graceful close
         std::cout << "[Session] Peer sent CLOSE frame" << std::endl;
         close();
         return;
     }
 
-    if (ec == asio::error::eof) {                  // ungraceful close
+    if (ec == asio::error::eof) {
+        // ungraceful close
         std::cout << "[Session] Peer vanished (EOF)" << std::endl;
-        close();                                   // <- **must** clean up
+        close(); // <- **must** clean up
         return;
     }
 
-    if (ec) {                                     // any other read error
+    if (ec) {
+        // any other read error
         std::cerr << "[Session] Read error: " << ec.message() << std::endl;
-        close();                                   // defensive cleanup
+        close(); // defensive cleanup
         return;
     }
 
-    try {
-        router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
-    } catch (const std::exception& ex) {
-        std::cerr << "[Session] JSON error: " << ex.what() << std::endl;
+    if (ws_->got_binary()) {
+        uploadHandler_->handleBinaryFrame(buffer_);
+        buffer_.consume(buffer_.size());
+    } else {
+        try {
+            router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
+        } catch (const std::exception& ex) {
+            std::cerr << "[Session] JSON error: " << ex.what() << std::endl;
+        }
+        buffer_.consume(buffer_.size());
     }
 
     buffer_.consume(buffer_.size());

@@ -177,11 +177,9 @@ void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& sess
         bool success = false;
 
         try {
-            auto fsManager = storageManager_->getLocalEngine(volumeId);
-            success = fsManager->deleteFile(path);
+            success = storageManager_->getLocalEngine(volumeId)->deleteFile(path);
         } catch (...) {
-            auto cloudProvider = storageManager_->getCloudEngine(volumeId);
-            cloudProvider->deleteFile(path);
+            storageManager_->getCloudEngine(volumeId)->deleteFile(path);
             success = true;
         }
 

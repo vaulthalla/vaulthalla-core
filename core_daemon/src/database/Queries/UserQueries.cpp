@@ -151,12 +151,7 @@ std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
                                   std::vector<std::shared_ptr<types::User> > usersWithRoles;
                                   for (const auto& row : res) {
 
-                                      const auto roles = txn.exec(
-                                          "SELECT r.id, r.name, r.display_name, r.description, "
-                                          "r.permissions::int AS permissions, r.created_at, "
-                                          "r.*, rs.* "
-                                          "FROM role r "
-                                          "JOIN roles rs ON r.id = rs.role_id "
+                                      const auto roles = txn.exec(std::string(ROLE_SELECT) +
                                           "WHERE rs.subject_type = 'user' and rs.subject_id = " + txn.quote(
                                               row["id"].get<unsigned int>()));
 

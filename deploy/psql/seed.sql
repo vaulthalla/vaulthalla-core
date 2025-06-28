@@ -15,38 +15,38 @@ INSERT INTO role
 VALUES
 -- ────────────────────────────────────────────────────────────────────────────────
 ('super_admin', 'Root-level system owner with unrestricted access',
- X'00000000000000FF'::bit(64), -- 8 bits (all admin perms)
- X'000000000003FF'::bit(64),   -- 10 bits (all vault perms)
- X'00000000000000FF'::bit(64), -- 8 bits (all file perms)
- X'000000000000001F'::bit(64), -- 5 bits (all dir perms)
+ X'00FF'::bit(16),  -- 8 bits (all admin perms)
+ X'03FF'::bit(16),  -- 10 bits (all vault perms)
+ X'00FF'::bit(16),  -- 8 bits (all file perms)
+ X'001F'::bit(16),  -- 5 bits (all dir perms)
  NOW()),
 
 ('admin', 'System administrator with all non-root administrative powers',
- X'00000000000000FD'::bit(64), -- all admin perms except CreateAdminUser (bit 1 off)
- X'000000000003FF'::bit(64),
- X'00000000000000FF'::bit(64),
- X'000000000000001F'::bit(64),
+ X'00FD'::bit(16),  -- all admin perms except CreateAdminUser (bit 1 off)
+ X'03FF'::bit(16),
+ X'00FF'::bit(16),
+ X'001F'::bit(16),
  NOW()),
 
 ('power_user', 'Advanced user with full file/vault control but no admin authority',
- X'0000000000000000'::bit(64),
- X'000000000003FF'::bit(64),
- X'00000000000000FF'::bit(64),
- X'000000000000001F'::bit(64),
+ X'0000'::bit(16),
+ X'03FF'::bit(16),
+ X'00FF'::bit(16),
+ X'001F'::bit(16),
  NOW()),
 
 ('user', 'Standard user with basic file operations',
- X'0000000000000000'::bit(64),
- X'0000000000000000'::bit(64),
- X'00000000000000C3'::bit(64), -- upload, download, share public/group
- X'000000000000001F'::bit(64),
+ X'0000'::bit(16),
+ X'0000'::bit(16),
+ X'00C3'::bit(16),  -- upload, download, share public/group
+ X'001F'::bit(16),
  NOW()),
 
 ('guest', 'Minimal access: can download files and list directories',
- X'0000000000000000'::bit(64),
- X'0000000000000000'::bit(64),
- X'0000000000000002'::bit(64), -- download only
- X'0000000000000010'::bit(64),
+ X'0000'::bit(16),
+ X'0000'::bit(16),
+ X'0002'::bit(16),  -- download only
+ X'0010'::bit(16),
  NOW());
 
 -- PERMISSION DEFINITIONS

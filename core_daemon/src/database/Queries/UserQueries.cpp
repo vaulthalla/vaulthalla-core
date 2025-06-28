@@ -2,7 +2,7 @@
 #include "types/db/User.hpp"
 #include "auth/RefreshToken.hpp"
 #include "database/Transactions.hpp"
-#include "types/db/Role.hpp"
+#include "types/db/AssignedRole.hpp"
 #include "database/utils.hpp"
 #include <pqxx/pqxx>
 
@@ -10,12 +10,20 @@
 
 namespace vh::database {
 
-static constexpr const char* ROLE_SELECT =
+static constexpr const auto* ROLE_SELECT =
     "SELECT "
-    "   rs.id                         AS id, "          // assignment PK (becomes Role.id)
+    "   rs.id                         AS id, "
     "   rs.role_id, "
-    "   rs.subject_id, rs.scope, rs.scope_id, rs.assigned_at, rs.inherited, "
-    "   r.name, r.display_name, r.description, r.created_at, "
+    "   rs.subject_type, "  // <-- YOU NEED THIS!
+    "   rs.subject_id, "
+    "   rs.scope, "
+    "   rs.scope_id, "
+    "   rs.assigned_at, "
+    "   rs.inherited, "
+    "   r.name, "
+    "   r.display_name, "
+    "   r.description, "
+    "   r.created_at, "
     "   r.admin_permissions::int      AS admin_permissions, "
     "   r.vault_permissions::int      AS vault_permissions, "
     "   r.file_permissions::int       AS file_permissions, "
@@ -27,16 +35,16 @@ std::shared_ptr<types::User> UserQueries::getUserByEmail(const std::string& emai
         auto userRow = txn.exec("SELECT * FROM users WHERE email = " + txn.quote(email)).one_row();
         auto rolesRes = txn.exec(std::string(ROLE_SELECT) +
                                  "WHERE rs.subject_type = 'user' AND rs.subject_id = " + txn.quote(userRow["id"].as<unsigned int>()));
-        return std::make_shared<vh::types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes);
     });
 }
 
-std::shared_ptr<types::User> UserQueries::getUserById(unsigned int id) {
+std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
     return Transactions::exec("UserQueries::getUserById", [&](pqxx::work& txn) {
         auto userRow = txn.exec("SELECT * FROM users WHERE id = " + txn.quote(id)).one_row();
         auto rolesRes = txn.exec(std::string(ROLE_SELECT) +
                                  "WHERE rs.subject_type = 'user' AND rs.subject_id = " + txn.quote(id));
-        return std::make_shared<vh::types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes);
     });
 }
 
@@ -47,7 +55,7 @@ std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::strin
             "WHERE rt.jti = " + txn.quote(jti)).one_row();
         auto rolesRes = txn.exec(std::string(ROLE_SELECT) +
                                  "WHERE rs.subject_type = 'user' AND rs.subject_id = " + txn.quote(userRow["id"].as<unsigned int>()));
-        return std::make_shared<vh::types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes);
     });
 }
 

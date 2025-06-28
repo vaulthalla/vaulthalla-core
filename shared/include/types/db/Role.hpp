@@ -3,28 +3,23 @@
 #include <string>
 #include <ctime>
 #include <nlohmann/json_fwd.hpp>
-#include <optional>
 
 namespace pqxx {
-    class row;
+class row;
 }
 
 namespace vh::types {
 
 struct Role {
-    unsigned int id;                  // Role ID
-    unsigned int role_id;              // Original role template (if you're doing templated roles)
-    unsigned int subject_id;           // Who this role is assigned to (user/group)
-    std::string name, display_name, description;
-    std::string scope;                 // e.g. "global", "vault", "volume"
-    std::optional<unsigned int> scope_id;
+    unsigned int id;
+    std::string name;
+    std::string display_name;
+    std::string description;
     uint16_t admin_permissions = 0;
     uint16_t vault_permissions = 0;
     uint16_t file_permissions = 0;
     uint16_t directory_permissions = 0;
     std::time_t created_at;
-    std::time_t assigned_at;
-    bool inherited = false;
 
     Role() = default;
     explicit Role(const pqxx::row& row);
@@ -74,6 +69,5 @@ struct Role {
 void to_json(nlohmann::json& j, const Role& r);
 void from_json(const nlohmann::json& j, Role& r);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles);
-std::vector<std::shared_ptr<Role>> roles_from_json(const nlohmann::json& j);
 
-}
+} // namespace vh::types

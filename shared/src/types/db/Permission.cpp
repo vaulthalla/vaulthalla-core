@@ -93,4 +93,106 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& 
     for (const auto& perm : permissions) j.push_back(*perm);
 }
 
+nlohmann::json jsonFromAdminMask(const uint16_t mask) {
+    return {
+        { "create_user",            (mask & (1 << 0)) != 0 },
+        { "create_admin_user",      (mask & (1 << 1)) != 0 },
+        { "deactivate_user",        (mask & (1 << 2)) != 0 },
+        { "reset_user_password",    (mask & (1 << 3)) != 0 },
+        { "manage_roles",           (mask & (1 << 4)) != 0 },
+        { "manage_settings",        (mask & (1 << 5)) != 0 },
+        { "view_audit_log",         (mask & (1 << 6)) != 0 },
+        { "manage_api_keys",        (mask & (1 << 7)) != 0 }
+    };
+}
+
+nlohmann::json jsonFromVaultMask(const uint16_t mask) {
+    return {
+        { "create_local_vault",     (mask & (1 << 0)) != 0 },
+        { "create_cloud_vault",     (mask & (1 << 1)) != 0 },
+        { "delete_vault",           (mask & (1 << 2)) != 0 },
+        { "adjust_vault_settings",  (mask & (1 << 3)) != 0 },
+        { "migrate_vault_data",     (mask & (1 << 4)) != 0 },
+        { "create_volume",          (mask & (1 << 5)) != 0 },
+        { "delete_volume",          (mask & (1 << 6)) != 0 },
+        { "resize_volume",          (mask & (1 << 7)) != 0 },
+        { "move_volume",            (mask & (1 << 8)) != 0 },
+        { "assign_volume_to_group", (mask & (1 << 9)) != 0 }
+    };
+}
+
+nlohmann::json jsonFromFileMask(const uint16_t mask) {
+    return {
+        { "upload_file",            (mask & (1 << 0)) != 0 },
+        { "download_file",          (mask & (1 << 1)) != 0 },
+        { "delete_file",            (mask & (1 << 2)) != 0 },
+        { "share_file_publicly",    (mask & (1 << 3)) != 0 },
+        { "share_file_with_group",  (mask & (1 << 4)) != 0 },
+        { "lock_file",              (mask & (1 << 5)) != 0 },
+        { "rename_file",            (mask & (1 << 6)) != 0 },
+        { "move_file",              (mask & (1 << 7)) != 0 }
+    };
+}
+
+nlohmann::json jsonFromDirectoryMask(const uint16_t mask) {
+    return {
+        { "create_directory",       (mask & (1 << 0)) != 0 },
+        { "delete_directory",       (mask & (1 << 1)) != 0 },
+        { "rename_directory",       (mask & (1 << 2)) != 0 },
+        { "move_directory",         (mask & (1 << 3)) != 0 },
+        { "list_directory",         (mask & (1 << 4)) != 0 }
+    };
+}
+
+uint16_t adminMaskFromJson(const nlohmann::json& j) {
+    uint16_t mask = 0;
+    if (j.at("create_user").get<bool>()) mask |= (1 << 0);
+    if (j.at("create_admin_user").get<bool>()) mask |= (1 << 1);
+    if (j.at("deactivate_user").get<bool>()) mask |= (1 << 2);
+    if (j.at("reset_user_password").get<bool>()) mask |= (1 << 3);
+    if (j.at("manage_roles").get<bool>()) mask |= (1 << 4);
+    if (j.at("manage_settings").get<bool>()) mask |= (1 << 5);
+    if (j.at("view_audit_log").get<bool>()) mask |= (1 << 6);
+    if (j.at("manage_api_keys").get<bool>()) mask |= (1 << 7);
+    return mask;
+}
+
+uint16_t vaultMaskFromJson(const nlohmann::json& j) {
+    uint16_t mask = 0;
+    if (j.at("create_local_vault").get<bool>()) mask |= (1 << 0);
+    if (j.at("create_cloud_vault").get<bool>()) mask |= (1 << 1);
+    if (j.at("delete_vault").get<bool>()) mask |= (1 << 2);
+    if (j.at("adjust_vault_settings").get<bool>()) mask |= (1 << 3);
+    if (j.at("migrate_vault_data").get<bool>()) mask |= (1 << 4);
+    if (j.at("create_volume").get<bool>()) mask |= (1 << 5);
+    if (j.at("delete_volume").get<bool>()) mask |= (1 << 6);
+    if (j.at("resize_volume").get<bool>()) mask |= (1 << 7);
+    if (j.at("move_volume").get<bool>()) mask |= (1 << 8);
+    if (j.at("assign_volume_to_group").get<bool>()) mask |= (1 << 9);
+    return mask;
+}
+
+uint16_t fileMaskFromJson(const nlohmann::json& j) {
+    uint16_t mask = 0;
+    if (j.at("upload_file").get<bool>()) mask |= (1 << 0);
+    if (j.at("download_file").get<bool>()) mask |= (1 << 1);
+    if (j.at("delete_file").get<bool>()) mask |= (1 << 2);
+    if (j.at("share_file_publicly").get<bool>()) mask |= (1 << 3);
+    if (j.at("share_file_with_group").get<bool>()) mask |= (1 << 4);
+    if (j.at("lock_file").get<bool>()) mask |= (1 << 5);
+    if (j.at("rename_file").get<bool>()) mask |= (1 << 6);
+    if (j.at("move_file").get<bool>()) mask |= (1 << 7);
+    return mask;
+}
+
+uint16_t directoryMaskFromJson(const nlohmann::json& j) {
+    uint16_t mask = 0;
+    if (j.at("create_directory").get<bool>()) mask |= (1 << 0);
+    if (j.at("delete_directory").get<bool>()) mask |= (1 << 1);
+    if (j.at("rename_directory").get<bool>()) mask |= (1 << 2);
+    if (j.at("move_directory").get<bool>()) mask |= (1 << 3);
+    if (j.at("list_directory").get<bool>()) mask |= (1 << 4);
+    return mask;
+}
+
 }

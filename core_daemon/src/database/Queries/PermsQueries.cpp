@@ -1,6 +1,8 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Transactions.hpp"
+#include "database/utils.hpp"
 #include "types/db/Role.hpp"
+#include "types/db/AssignedRole.hpp"
 #include "types/db/Permission.hpp"
 #include "util/timestamp.hpp"
 
@@ -13,16 +15,14 @@ using namespace vh::types;
 void PermsQueries::addRole(const std::shared_ptr<Role>& role) {
     Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
         txn.exec(
-            "INSERT INTO role (name, display_name, description, "
-            "admin_permissions, vault_permissions, file_permissions, directory_permissions, created_at) VALUES (" +
-            txn.quote(role->name) + ", " +
-            txn.quote(role->display_name) + ", " +
+            "INSERT INTO role (name, description, "
+            "admin_permissions, vault_permissions, file_permissions, directory_permissions) VALUES (" +
+            txn.quote(toSnakeCase(role->name)) + ", " +
             txn.quote(role->description) + ", " +
-            txn.quote(role->admin_permissions) + ", " +
-            txn.quote(role->vault_permissions) + ", " +
-            txn.quote(role->file_permissions) + ", " +
-            txn.quote(role->directory_permissions) + ", " +
-            txn.quote(util::timestampToString(role->created_at)) + ")");
+            bitStringFromMask(role->admin_permissions) + ", " +
+            bitStringFromMask(role->vault_permissions) + ", " +
+            bitStringFromMask(role->file_permissions) + ", " +
+            bitStringFromMask(role->directory_permissions) + ")");
     });
 }
 
@@ -37,12 +37,11 @@ void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
         txn.exec(
             "UPDATE role SET "
             "name = " + txn.quote(role->name) + ", " +
-            "display_name = " + txn.quote(role->display_name) + ", " +
             "description = " + txn.quote(role->description) + ", " +
-            "admin_permissions = " + txn.quote(role->admin_permissions) + ", " +
-            "vault_permissions = " + txn.quote(role->vault_permissions) + ", " +
-            "file_permissions = " + txn.quote(role->file_permissions) + ", " +
-            "directory_permissions = " + txn.quote(role->directory_permissions) +
+            "admin_permissions = " + bitStringFromMask(role->admin_permissions) + ", " +
+            "vault_permissions = " + bitStringFromMask(role->vault_permissions) + ", " +
+            "file_permissions = " + bitStringFromMask(role->file_permissions) + ", " +
+            "directory_permissions = " + bitStringFromMask(role->directory_permissions) +
             " WHERE id = " + txn.quote(role->id));
     });
 }
@@ -65,16 +64,25 @@ std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
     });
 }
 
+static const auto* SELECT_ALL_ROLE =
+    "SELECT id, name, display_name, description, created_at, "
+    "       admin_permissions::int      AS admin_permissions, "
+    "       vault_permissions::int      AS vault_permissions, "
+    "       file_permissions::int       AS file_permissions, "
+    "       directory_permissions::int  AS directory_permissions "
+    "FROM role";
+
+
 std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
     return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT r.*, rs.* FROM role r, roles rs WHERE r.id = rs.role_id");
+        const auto res = txn.exec(SELECT_ALL_ROLE);
         std::vector<std::shared_ptr<Role>> out;
         for (const auto& row : res) out.push_back(makeRoleFromRow(row));
         return out;
     });
 }
 
-void PermsQueries::assignUserRole(const std::shared_ptr<Role>& r) {
+void PermsQueries::assignUserRole(const std::shared_ptr<AssignedRole>& r) {
     Transactions::exec("PermsQueries::assignUserRole", [&](pqxx::work& txn) {
         txn.exec(
             std::string("INSERT INTO roles (subject_type, subject_id, role_id, scope, scope_id, assigned_at, inherited) VALUES (") +

@@ -3,6 +3,7 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "types/db/User.hpp"
 #include "types/db/Role.hpp"
+#include "types/db/AssignedRole.hpp"
 #include "types/db/Permission.hpp"
 
 #include <nlohmann/json.hpp>

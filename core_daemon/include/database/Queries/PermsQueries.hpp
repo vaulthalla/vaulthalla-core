@@ -6,6 +6,7 @@
 
 namespace vh::types {
 struct Role;
+struct AssignedRole;
 struct Permission;
 }
 
@@ -21,7 +22,7 @@ struct PermsQueries {
     static std::vector<std::shared_ptr<types::Role>> listRoles();
 
     // Role assignments (user/group)
-    static void assignUserRole(const std::shared_ptr<types::Role>& roleAssignment);
+    static void assignUserRole(const std::shared_ptr<types::AssignedRole>& roleAssignment);
     static void removeUserRole(unsigned int userId, unsigned int roleId);
     static std::shared_ptr<types::Role> getUserRole(unsigned int userId, unsigned int roleId);
     static std::vector<std::shared_ptr<types::Role>> listUserRoles(unsigned int userId);

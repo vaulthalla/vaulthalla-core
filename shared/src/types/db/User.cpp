@@ -1,5 +1,5 @@
 #include "types/db/User.hpp"
-#include "types/db/Role.hpp"
+#include "types/db/AssignedRole.hpp"
 #include "types/db/Permission.hpp"
 
 #include "util/timestamp.hpp"
@@ -44,9 +44,9 @@ User::User(const pqxx::row& user, const pqxx::result& roles)
       global_role(nullptr),
       scoped_roles(std::nullopt) {
     if (!roles.empty()) {
-        scoped_roles = std::vector<std::shared_ptr<Role>>();
+        scoped_roles = std::vector<std::shared_ptr<AssignedRole>>();
         for (const auto& role_row : roles) {
-            const auto role = std::make_shared<Role>(role_row);
+            const auto role = std::make_shared<AssignedRole>(role_row);
             if (role->scope == "global") global_role = role;
             else scoped_roles->push_back(role);
         }
@@ -66,7 +66,7 @@ void User::updateUser(const nlohmann::json& j) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) global_role = nullptr;
-        else global_role = std::make_shared<Role>(j["global_role"]);
+        else global_role = std::make_shared<AssignedRole>(j["global_role"]);
     }
 
     // TODO: Handle scoped roles properly
@@ -137,7 +137,7 @@ void from_json(const nlohmann::json& j, User& u) {
 
     if (j.contains("global_role")) {
         if (j["global_role"].is_null()) u.global_role = nullptr;
-        else u.global_role = std::make_shared<Role>(j["global_role"]);
+        else u.global_role = std::make_shared<AssignedRole>(j["global_role"]);
     } else u.global_role = nullptr;
 
     // TODO: Handle scoped roles properly

@@ -15,7 +15,7 @@ class result;
 
 namespace vh::types {
 
-struct Role;
+struct AssignedRole;
 
 struct User {
     unsigned short id, uid{};
@@ -25,11 +25,11 @@ struct User {
     std::time_t created_at;
     std::optional<std::time_t> last_login;
     bool is_active;
-    std::shared_ptr<Role> global_role; // Global role
-    std::optional<std::vector<std::shared_ptr<Role>>> scoped_roles;  // Scoped roles, if any
+    std::shared_ptr<AssignedRole> global_role; // Global role
+    std::optional<std::vector<std::shared_ptr<AssignedRole>>> scoped_roles;  // Scoped roles, if any
 
     User();
-    User(std::string name, std::string email, const bool isActive);
+    User(std::string name, std::string email, bool isActive);
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::result& roles);
 
@@ -37,43 +37,43 @@ struct User {
     void setPasswordHash(const std::string& hash);
 
     // Admin checks
-    bool canCreateUser() const;
-    bool canCreateAdminUser() const;
-    bool canDeactivateUser() const;
-    bool canResetUserPassword() const;
-    bool canManageRoles() const;
-    bool canManageSettings() const;
-    bool canViewAuditLog() const;
-    bool canManageAPIKeys() const;
+    [[nodiscard]] bool canCreateUser() const;
+    [[nodiscard]] bool canCreateAdminUser() const;
+    [[nodiscard]] bool canDeactivateUser() const;
+    [[nodiscard]] bool canResetUserPassword() const;
+    [[nodiscard]] bool canManageRoles() const;
+    [[nodiscard]] bool canManageSettings() const;
+    [[nodiscard]] bool canViewAuditLog() const;
+    [[nodiscard]] bool canManageAPIKeys() const;
 
     // Vault checks
-    bool canCreateLocalVault() const;
-    bool canCreateCloudVault() const;
-    bool canDeleteVault() const;
-    bool canAdjustVaultSettings() const;
-    bool canMigrateVaultData() const;
-    bool canCreateVolume() const;
-    bool canDeleteVolume() const;
-    bool canResizeVolume() const;
-    bool canMoveVolume() const;
-    bool canAssignVolumeToGroup() const;
+    [[nodiscard]] bool canCreateLocalVault() const;
+    [[nodiscard]] bool canCreateCloudVault() const;
+    [[nodiscard]] bool canDeleteVault() const;
+    [[nodiscard]] bool canAdjustVaultSettings() const;
+    [[nodiscard]] bool canMigrateVaultData() const;
+    [[nodiscard]] bool canCreateVolume() const;
+    [[nodiscard]] bool canDeleteVolume() const;
+    [[nodiscard]] bool canResizeVolume() const;
+    [[nodiscard]] bool canMoveVolume() const;
+    [[nodiscard]] bool canAssignVolumeToGroup() const;
 
     // File checks
-    bool canUploadFile() const;
-    bool canDownloadFile() const;
-    bool canDeleteFile() const;
-    bool canShareFilePublicly() const;
-    bool canShareFileWithGroup() const;
-    bool canLockFile() const;
-    bool canRenameFile() const;
-    bool canMoveFile() const;
+    [[nodiscard]] bool canUploadFile() const;
+    [[nodiscard]] bool canDownloadFile() const;
+    [[nodiscard]] bool canDeleteFile() const;
+    [[nodiscard]] bool canShareFilePublicly() const;
+    [[nodiscard]] bool canShareFileWithGroup() const;
+    [[nodiscard]] bool canLockFile() const;
+    [[nodiscard]] bool canRenameFile() const;
+    [[nodiscard]] bool canMoveFile() const;
 
     // Directory checks
-    bool canCreateDirectory() const;
-    bool canDeleteDirectory() const;
-    bool canRenameDirectory() const;
-    bool canMoveDirectory() const;
-    bool canListDirectory() const;
+    [[nodiscard]] bool canCreateDirectory() const;
+    [[nodiscard]] bool canDeleteDirectory() const;
+    [[nodiscard]] bool canRenameDirectory() const;
+    [[nodiscard]] bool canMoveDirectory() const;
+    [[nodiscard]] bool canListDirectory() const;
 };
 
 } // namespace vh::types

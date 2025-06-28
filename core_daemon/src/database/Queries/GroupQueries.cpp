@@ -1,7 +1,7 @@
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/db/Group.hpp"
-#include "types/db/StorageVolume.hpp"
+#include "types/db/Volume.hpp"
 
 using namespace vh::database;
 

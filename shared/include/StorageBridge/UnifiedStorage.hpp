@@ -38,6 +38,9 @@ class UnifiedStorage {
     bool chmod(const std::string& path, mode_t mode);
     bool chown(const std::string& path, uid_t uid, gid_t gid);
 
+    bool sync(const std::string& path);   // ensure data durability / flush to remote
+    bool flush(const std::string& path);  // close handles, flush kernel buffers (if needed)
+
     // Filesystem stats
     [[nodiscard]] size_t getTotalBlocks() const;
     [[nodiscard]] size_t getFreeBlocks() const;

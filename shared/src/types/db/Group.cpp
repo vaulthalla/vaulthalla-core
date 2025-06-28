@@ -1,6 +1,6 @@
 #include "types/db/Group.hpp"
 #include "util/timestamp.hpp"
-#include "types/db/StorageVolume.hpp"
+#include "types/db/Volume.hpp"
 #include "types/db/User.hpp"
 
 #include <pqxx/row>
@@ -14,7 +14,7 @@ GroupMember::GroupMember(const pqxx::row& row)
       joined_at(util::parsePostgresTimestamp(row["joined_at"].as<std::string>())) {}
 
 GroupStorageVolume::GroupStorageVolume(const pqxx::row& row)
-    : volume(std::make_shared<StorageVolume>(row)),
+    : volume(std::make_shared<Volume>(row)),
       assigned_at(util::parsePostgresTimestamp(row["assigned_at"].as<std::string>())) {}
 
 Group::Group(const pqxx::row& gr, const pqxx::result& members, const pqxx::result& storageVolumes)
@@ -46,7 +46,7 @@ Group::Group(const nlohmann::json& j)
 
     for (const auto& volumeJson : j.at("storage_volumes")) {
         auto volume = std::make_shared<GroupStorageVolume>();
-        volume->volume = std::make_shared<StorageVolume>();
+        volume->volume = std::make_shared<Volume>();
         volume->volume->id = volumeJson.at("volume_id").get<unsigned int>();
         volume->assigned_at = util::parsePostgresTimestamp(volumeJson.at("assigned_at").get<std::string>());
         volumes.push_back(volume);
@@ -91,7 +91,7 @@ void vh::types::from_json(const nlohmann::json& j, Group& g) {
 
     for (const auto& volumeJson : j.at("storage_volumes")) {
         auto volume = std::make_shared<GroupStorageVolume>();
-        volume->volume = std::make_shared<StorageVolume>();
+        volume->volume = std::make_shared<Volume>();
         volume->volume->id = volumeJson.at("volume_id").get<unsigned int>();
         volume->assigned_at = util::parsePostgresTimestamp(volumeJson.at("assigned_at").get<std::string>());
         g.volumes.push_back(volume);

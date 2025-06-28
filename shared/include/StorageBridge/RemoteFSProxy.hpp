@@ -13,13 +13,13 @@ namespace vh::shared::bridge {
 class UnifiedStorage;
 
 class RemoteFSProxy {
-  public:
+public:
     explicit RemoteFSProxy(std::shared_ptr<UnifiedStorage> backend);
 
     // File and Directory Queries
     [[nodiscard]] bool fileExists(const std::string& path) const;
     [[nodiscard]] types::File stat(const std::string& path) const;
-    [[nodiscard]] std::vector<types::File> listDirectory(const std::string& path) const;
+    [[nodiscard]] std::vector<types::File> listDir(const std::string& path) const;
 
     // File I/O
     ssize_t readFile(const std::string& path, char* buf, size_t size, off_t offset);
@@ -44,7 +44,11 @@ class RemoteFSProxy {
     [[nodiscard]] size_t getTotalBlocks() const;
     [[nodiscard]] size_t getFreeBlocks() const;
 
-  private:
+    // NEW: sync + flush
+    bool sync(const std::string& path);
+    bool flush(const std::string& path);
+
+private:
     std::shared_ptr<UnifiedStorage> backend_;
 };
 

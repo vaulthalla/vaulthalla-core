@@ -10,7 +10,7 @@ SearchHandler::SearchHandler(const std::shared_ptr<index::SearchIndex>& searchIn
 
 void SearchHandler::handleSearch(const json& msg, WebSocketSession& session) {
     try {
-        auto user = session.getAuthenticatedUser();
+        const auto user = session.getAuthenticatedUser();
         if (!user) {
             throw std::runtime_error("Unauthorized");
         }
@@ -18,14 +18,14 @@ void SearchHandler::handleSearch(const json& msg, WebSocketSession& session) {
         std::string query = msg.at("query").get<std::string>();
 
         // Future: multi-mount search, filter by mountName
-        std::vector<std::filesystem::path> results = searchIndex_->search(query);
+        const auto results = searchIndex_->search(query);
 
         json resultPaths = json::array();
         for (const auto& path : results) {
             resultPaths.push_back(path.string());
         }
 
-        json response = {{"command", "index.search.response"},
+        const json response = {{"command", "index.search.response"},
                          {"status", "ok"},
                          {"query", query},
                          {"results", resultPaths}};
@@ -37,7 +37,7 @@ void SearchHandler::handleSearch(const json& msg, WebSocketSession& session) {
     } catch (const std::exception& e) {
         std::cerr << "[SearchHandler] handleSearch error: " << e.what() << std::endl;
 
-        json response = {{"command", "index.search.response"}, {"status", "error"}, {"error", e.what()}};
+        const json response = {{"command", "index.search.response"}, {"status", "error"}, {"error", e.what()}};
 
         session.send(response);
     }

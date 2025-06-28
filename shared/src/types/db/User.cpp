@@ -1,12 +1,12 @@
 #include "types/db/User.hpp"
-#include <iostream>
-
 #include "types/db/Role.hpp"
+#include "types/db/Permission.hpp"
 
 #include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
+#include <iostream>
 
 namespace vh::types {
 
@@ -69,23 +69,51 @@ void User::updateUser(const nlohmann::json& j) {
         else global_role = std::make_shared<Role>(j["global_role"]);
     }
 
-    if (j.contains("scoped_roles")) {
-        if (j["scoped_roles"].is_null()) scoped_roles = std::nullopt;
-        else scoped_roles = user_roles_from_json(j["scoped_roles"]);
-    }
+    // TODO: Handle scoped roles properly
+    // if (j.contains("scoped_roles")) {
+    //     if (j["scoped_roles"].is_null()) scoped_roles = std::nullopt;
+    //     else scoped_roles = user_roles_from_json(j["scoped_roles"]);
+    // }
 }
 
-bool User::canManageUsers() const { return global_role && global_role->canManageUsers(); }
-bool User::canManageRoles() const { return global_role && global_role->canManageRoles(); }
-bool User::canManageStorage() const { return global_role && global_role->canManageStorage(); }
-bool User::canManageFiles() const { return global_role && global_role->canManageFiles(); }
-bool User::canViewAuditLog() const { return global_role && global_role->canViewAuditLog(); }
-bool User::canUploadFile() const { return global_role && global_role->canUploadFile(); }
-bool User::canDownloadFile() const { return global_role && global_role->canDownloadFile(); }
-bool User::canDeleteFile() const { return global_role && global_role->canDeleteFile(); }
-bool User::canShareFile() const { return global_role && global_role->canShareFile(); }
-bool User::canLockFile() const { return global_role && global_role->canLockFile(); }
-bool User::canManageSettings() const { return global_role && global_role->canManageSettings(); }
+// --- Admin checks ---
+bool User::canCreateUser() const { return hasPermission(global_role->admin_permissions, AdminPermission::CreateUser); }
+bool User::canCreateAdminUser() const { return hasPermission(global_role->admin_permissions, AdminPermission::CreateAdminUser); }
+bool User::canDeactivateUser() const { return hasPermission(global_role->admin_permissions, AdminPermission::DeactivateUser); }
+bool User::canResetUserPassword() const { return hasPermission(global_role->admin_permissions, AdminPermission::ResetUserPassword); }
+bool User::canManageRoles() const { return hasPermission(global_role->admin_permissions, AdminPermission::ManageRoles); }
+bool User::canManageSettings() const { return hasPermission(global_role->admin_permissions, AdminPermission::ManageSettings); }
+bool User::canViewAuditLog() const { return hasPermission(global_role->admin_permissions, AdminPermission::ViewAuditLog); }
+bool User::canManageAPIKeys() const { return hasPermission(global_role->admin_permissions, AdminPermission::ManageAPIKeys); }
+
+// --- Vault checks ---
+bool User::canCreateLocalVault() const { return hasPermission(global_role->vault_permissions, VaultPermission::CreateLocalVault); }
+bool User::canCreateCloudVault() const { return hasPermission(global_role->vault_permissions, VaultPermission::CreateCloudVault); }
+bool User::canDeleteVault() const { return hasPermission(global_role->vault_permissions, VaultPermission::DeleteVault); }
+bool User::canAdjustVaultSettings() const { return hasPermission(global_role->vault_permissions, VaultPermission::AdjustVaultSettings); }
+bool User::canMigrateVaultData() const { return hasPermission(global_role->vault_permissions, VaultPermission::MigrateVaultData); }
+bool User::canCreateVolume() const { return hasPermission(global_role->vault_permissions, VaultPermission::CreateVolume); }
+bool User::canDeleteVolume() const { return hasPermission(global_role->vault_permissions, VaultPermission::DeleteVolume); }
+bool User::canResizeVolume() const { return hasPermission(global_role->vault_permissions, VaultPermission::ResizeVolume); }
+bool User::canMoveVolume() const { return hasPermission(global_role->vault_permissions, VaultPermission::MoveVolume); }
+bool User::canAssignVolumeToGroup() const { return hasPermission(global_role->vault_permissions, VaultPermission::AssignVolumeToGroup); }
+
+// --- File checks ---
+bool User::canUploadFile() const { return hasPermission(global_role->file_permissions, FilePermission::UploadFile); }
+bool User::canDownloadFile() const { return hasPermission(global_role->file_permissions, FilePermission::DownloadFile); }
+bool User::canDeleteFile() const { return hasPermission(global_role->file_permissions, FilePermission::DeleteFile); }
+bool User::canShareFilePublicly() const { return hasPermission(global_role->file_permissions, FilePermission::ShareFilePublicly); }
+bool User::canShareFileWithGroup() const { return hasPermission(global_role->file_permissions, FilePermission::ShareFileWithGroup); }
+bool User::canLockFile() const { return hasPermission(global_role->file_permissions, FilePermission::LockFile); }
+bool User::canRenameFile() const { return hasPermission(global_role->file_permissions, FilePermission::RenameFile); }
+bool User::canMoveFile() const { return hasPermission(global_role->file_permissions, FilePermission::MoveFile); }
+
+// --- Directory checks ---
+bool User::canCreateDirectory() const { return hasPermission(global_role->directory_permissions, DirectoryPermission::CreateDirectory); }
+bool User::canDeleteDirectory() const { return hasPermission(global_role->directory_permissions, DirectoryPermission::DeleteDirectory); }
+bool User::canRenameDirectory() const { return hasPermission(global_role->directory_permissions, DirectoryPermission::RenameDirectory); }
+bool User::canMoveDirectory() const { return hasPermission(global_role->directory_permissions, DirectoryPermission::MoveDirectory); }
+bool User::canListDirectory() const { return hasPermission(global_role->directory_permissions, DirectoryPermission::ListDirectory); }
 
 void to_json(nlohmann::json& j, const User& u) {
     j = {
@@ -112,12 +140,13 @@ void from_json(const nlohmann::json& j, User& u) {
         else u.global_role = std::make_shared<Role>(j["global_role"]);
     } else u.global_role = nullptr;
 
-    if (j.contains("scoped_roles")) {
-        if (j["scoped_roles"].is_null()) u.scoped_roles = std::nullopt;
-        else u.scoped_roles = user_roles_from_json(j["scoped_roles"]);
-    } else {
-        u.scoped_roles = std::nullopt;
-    }
+    // TODO: Handle scoped roles properly
+    // if (j.contains("scoped_roles")) {
+    //     if (j["scoped_roles"].is_null()) u.scoped_roles = std::nullopt;
+    //     else u.scoped_roles = j["scoped_roles"];
+    // } else {
+    //     u.scoped_roles = std::nullopt;
+    // }
 }
 
 nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users) {

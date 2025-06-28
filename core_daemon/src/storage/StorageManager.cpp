@@ -1,9 +1,10 @@
 #include "storage/StorageManager.hpp"
-#include "types/db/StorageVolume.hpp"
+#include "types/db/Volume.hpp"
 #include "types/db/User.hpp"
 #include "types/db/Vault.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
+#include "storage/CloudStorageEngine.hpp"
 #include "types/config/ConfigRegistry.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -17,7 +18,18 @@ StorageManager::StorageManager() {
 void StorageManager::initStorageEngines() {
     std::lock_guard lock(mountsMutex_);
     try {
-        for (auto& vault : database::VaultQueries::listVaults()) vaults_[vault->id] = std::move(vault);
+        for (auto& vault : database::VaultQueries::listVaults()) {
+            const auto volumes = database::VaultQueries::listVaultVolumes(vault->id);
+            if (vault->type == types::VaultType::Local) {
+                auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+                if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
+                engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(localVault, volumes);
+            } else if (vault->type == types::VaultType::S3) {
+                auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
+                if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
+                engines_[vault->id] = std::make_shared<CloudStorageEngine>(vaultS3, volumes);
+            }
+        }
     } catch (const std::exception& e) {
         std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << "\n";
         throw;
@@ -42,10 +54,8 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
 
         if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->email);
 
-        vaults_[vault->id] = std::static_pointer_cast<types::LocalDiskVault>(vault);
-
         auto volume =
-            std::make_shared<types::StorageVolume>(vault->id, user->name + " Default Volume",
+            std::make_shared<types::Volume>(vault->id, user->name + " Default Volume",
                                                        std::filesystem::path(user->email + "_default_volume"));
 
         {
@@ -56,7 +66,8 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
 
         if (!volume) throw std::runtime_error("Failed to initialize user storage: Volume not found after creation");
 
-        mountVolume(volume, vault);
+        engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(
+            std::static_pointer_cast<types::LocalDiskVault>(vault), database::VaultQueries::listVaultVolumes(vault->id));
 
         std::cout << "[StorageManager] Initialized storage for user: " << user->email << "\n";
     } catch (const std::exception& e) {
@@ -71,15 +82,22 @@ void StorageManager::addVault(std::shared_ptr<types::Vault>&& vault) {
 
     database::VaultQueries::addVault(vault);
     vault = database::VaultQueries::getVault(vault->id);
-    vaults_[vault->id] = std::move(vault);
+    if (vault->type == types::VaultType::Local) {
+        auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+        if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
+        engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(localVault, database::VaultQueries::listVaultVolumes(vault->id));
+    } else if (vault->type == types::VaultType::S3) {
+        auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
+        if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
+        engines_[vault->id] = std::make_shared<CloudStorageEngine>(vaultS3, database::VaultQueries::listVaultVolumes(vault->id));
+    }
 }
 
-void StorageManager::removeVault(unsigned int vaultId) {
+void StorageManager::removeVault(const unsigned int vaultId) {
     std::lock_guard lock(mountsMutex_);
     database::VaultQueries::removeVault(vaultId);
 
-    localEngines_.erase(vaultId);
-    cloudEngines_.erase(vaultId);
+    engines_.erase(vaultId);
     std::cout << "[StorageManager] Removed vault with ID: " << vaultId << "\n";
 }
 
@@ -90,36 +108,20 @@ std::vector<std::shared_ptr<types::Vault>> StorageManager::listVaults() const {
 
 std::shared_ptr<types::Vault> StorageManager::getVault(unsigned int vaultId) const {
     std::lock_guard lock(mountsMutex_);
-    if (vaults_.find(vaultId) != vaults_.end()) return vaults_.at(vaultId);
+    if (engines_.find(vaultId) != engines_.end()) return engines_.at(vaultId)->getVault();
     return database::VaultQueries::getVault(vaultId);
 }
 
-void StorageManager::mountVolume(const std::shared_ptr<types::StorageVolume>& volume,
-                                 std::shared_ptr<types::Vault> vault) {
+void StorageManager::mountVolume(const std::shared_ptr<types::Volume>& volume) {
     if (!volume) throw std::invalid_argument("Volume cannot be null");
     std::lock_guard lock(mountsMutex_);
-
-    if (!vault) vault = database::VaultQueries::getVault(volume->vault_id);
-    if (!vault) throw std::runtime_error("Vault not found for volume ID: " + std::to_string(volume->vault_id));
-
-    auto volumesOnVault = database::VaultQueries::listVaultVolumes(vault->id);
-
-    if (auto* vaultDisk = dynamic_cast<types::LocalDiskVault*>(&*vault)) {
-        auto newVolPath = vaultDisk->mount_point / volume->path_prefix;
-        for (const auto& existingVolume : volumesOnVault) {
-            if (existingVolume->id == volume->id) continue;
-            if (pathsAreConflicting(vaultDisk->mount_point / existingVolume->path_prefix, newVolPath)) {
-                throw std::runtime_error("Volume path conflicts with existing volume: " +
-                                         existingVolume->path_prefix.string());
-            }
-        }
-        localEngines_[volume->id] = std::make_shared<LocalDiskStorageEngine>(newVolPath);
-    } else if (auto* vaultS3 = dynamic_cast<types::S3Vault*>(vault.get())) {
-        // TODO: Handle S3 volume path conflicts
-    }
+    const auto engine = getEngine(volume->vault_id);
+    if (!engine) throw std::runtime_error("No storage engine found for volume with ID: " + std::to_string(volume->vault_id));
+    engine->mountVolume(volume);
+    std::cout << "[StorageManager] Mounted volume: " << volume->name << " with ID: " << volume->id << "\n";
 }
 
-void StorageManager::addVolume(std::shared_ptr<types::StorageVolume> volume, unsigned int userId) {
+void StorageManager::addVolume(std::shared_ptr<types::Volume> volume, const unsigned int userId) {
     if (!volume) throw std::invalid_argument("Volume cannot be null");
 
     {
@@ -132,22 +134,23 @@ void StorageManager::addVolume(std::shared_ptr<types::StorageVolume> volume, uns
     std::cout << "[StorageManager] Added volume: " << volume->name << " with ID: " << volume->id << "\n";
 }
 
-void StorageManager::removeVolume(unsigned int volumeId, unsigned int userId) {
+void StorageManager::removeVolume(const unsigned int volumeId, unsigned int userId) {
     std::lock_guard lock(mountsMutex_);
 
-    auto volume = database::VaultQueries::getVolume(volumeId);
+    const auto volume = database::VaultQueries::getVolume(volumeId);
     if (!volume) throw std::runtime_error("Volume not found with ID: " + std::to_string(volumeId));
 
     // TODO: Check if user has access to this volume
 
     database::VaultQueries::removeVolume(volumeId);
 
-    localEngines_.erase(volumeId);
-    cloudEngines_.erase(volumeId);
+    const auto engine = getEngine(volume->vault_id);
+    engine->unmountVolume(volume);
+
     std::cout << "[StorageManager] Removed volume with ID: " << volumeId << "\n";
 }
 
-std::shared_ptr<types::StorageVolume> StorageManager::getVolume(unsigned int volumeId, unsigned int userId) const {
+std::shared_ptr<types::Volume> StorageManager::getVolume(const unsigned int volumeId, unsigned int userId) const {
     std::lock_guard lock(mountsMutex_);
     auto volume = database::VaultQueries::getVolume(volumeId);
     if (!volume) throw std::runtime_error("Volume not found with ID: " + std::to_string(volumeId));
@@ -157,26 +160,26 @@ std::shared_ptr<types::StorageVolume> StorageManager::getVolume(unsigned int vol
     return volume;
 }
 
-std::vector<std::shared_ptr<types::StorageVolume>> StorageManager::listVolumes(unsigned int userId) const {
+std::vector<std::shared_ptr<types::Volume>> StorageManager::listVolumes(const unsigned int userId) const {
     std::lock_guard lock(mountsMutex_);
     return database::VaultQueries::listUserVolumes(userId);
 }
 
-std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(unsigned short id) const {
+std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const unsigned int id) const {
     std::lock_guard lock(mountsMutex_);
-    auto it = localEngines_.find(id);
-    if (it != localEngines_.end()) return it->second;
+    auto it = engines_.find(id);
+    if (it != engines_.end()) return std::static_pointer_cast<LocalDiskStorageEngine>(it->second);
     return nullptr;
 }
 
-std::shared_ptr<CloudStorageEngine> StorageManager::getCloudEngine(unsigned short id) const {
+std::shared_ptr<CloudStorageEngine> StorageManager::getCloudEngine(const unsigned int id) const {
     std::lock_guard lock(mountsMutex_);
-    auto it = cloudEngines_.find(id);
-    if (it != cloudEngines_.end()) return it->second;
+    auto it = engines_.find(id);
+    if (it != engines_.end()) return std::static_pointer_cast<CloudStorageEngine>(it->second);
     return nullptr;
 }
 
-std::shared_ptr<StorageEngine> StorageManager::getEngine(unsigned short id) const {
+std::shared_ptr<StorageEngine> StorageManager::getEngine(const unsigned int id) const {
     if (auto localEngine = getLocalEngine(id)) return localEngine;
     if (auto cloudEngine = getCloudEngine(id)) return cloudEngine;
     return nullptr; // No engine found for the given ID

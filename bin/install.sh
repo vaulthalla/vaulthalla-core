@@ -230,35 +230,67 @@ echo "🔒 Hashing admin password..."
 HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
 
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
--- Insert Admin User
+-- Insert Admin User if not exists
 INSERT INTO users (name, email, password_hash, created_at, is_active)
-VALUES ('Admin', 'admin@vaulthalla.dev', '${HASHED_PASS}', NOW(), TRUE);
+VALUES ('Admin', 'admin@vaulthalla.dev', '${HASHED_PASS}', NOW(), TRUE)
+ON CONFLICT (email) DO NOTHING;
 
--- Link Role
+-- Link Super Admin Role
 INSERT INTO roles (subject_id, subject_type, scope, role_id)
-SELECT users.id, 'user', 'global', role.id FROM users, role
-WHERE users.email = 'admin@vaulthalla.dev' AND role.name = 'super_admin';
+SELECT u.id, 'user', 'global', r.id
+FROM users u, role r
+WHERE u.email = 'admin@vaulthalla.dev' AND r.name = 'super_admin'
+AND NOT EXISTS (
+  SELECT 1 FROM roles
+  WHERE subject_id = u.id AND subject_type = 'user' AND scope = 'global' AND role_id = r.id
+);
 
 -- Create Admin Group & Link
-INSERT INTO groups (name, description) VALUES ('admin', 'Core admin group');
+INSERT INTO groups (name, description)
+VALUES ('admin', 'Core admin group')
+ON CONFLICT (name) DO NOTHING;
+
 INSERT INTO group_members (group_id, user_id)
-SELECT groups.id, users.id FROM users, groups
-WHERE users.email = 'admin@vaulthalla.dev' AND groups.name = 'admin';
+SELECT g.id, u.id
+FROM groups g, users u
+WHERE g.name = 'admin' AND u.email = 'admin@vaulthalla.dev'
+AND NOT EXISTS (
+  SELECT 1 FROM group_members
+  WHERE group_id = g.id AND user_id = u.id
+);
 
--- Create Vault
+-- Create Admin Default Vault if not exists
 INSERT INTO vault (type, name, is_active, created_at)
-VALUES ('local', 'Admin Default Vault', TRUE, NOW());
+VALUES ('local', 'Admin Default Vault', TRUE, NOW())
+ON CONFLICT (name) DO NOTHING;
 
+-- Insert local mount point if not exists
 INSERT INTO local (vault_id, mount_point)
-SELECT id, '/mnt/vaulthalla/users/admin' FROM vault WHERE name = 'Admin Default Vault';
+SELECT v.id, '/mnt/vaulthalla/users/admin'
+FROM vault v
+WHERE v.name = 'Admin Default Vault'
+AND NOT EXISTS (
+  SELECT 1 FROM local WHERE vault_id = v.id
+);
 
+-- Create Admin Default Volume if not exists
 INSERT INTO volume (vault_id, name, path_prefix, quota_bytes, created_at)
-SELECT id, 'Admin Default Volume', '/users/admin', NULL, NOW() FROM vault WHERE name = 'Admin Default Vault';
+SELECT v.id, 'Admin Default Volume', '/users/admin', NULL, NOW()
+FROM vault v
+WHERE v.name = 'Admin Default Vault'
+AND NOT EXISTS (
+  SELECT 1 FROM volume WHERE vault_id = v.id AND name = 'Admin Default Volume'
+);
 
+-- Link volume to admin user if not exists
 INSERT INTO volumes (subject_id, subject_type, volume_id)
-SELECT users.id, 'user', volume.id
-FROM users, volume
-WHERE users.email = 'admin@vaulthalla.dev' AND volume.name = 'Admin Default Volume';
+SELECT u.id, 'user', vol.id
+FROM users u, volume vol
+WHERE u.email = 'admin@vaulthalla.dev' AND vol.name = 'Admin Default Volume'
+AND NOT EXISTS (
+  SELECT 1 FROM volumes
+  WHERE subject_id = u.id AND subject_type = 'user' AND volume_id = vol.id
+);
 EOF
 
 # === 11) Install systemd services ===

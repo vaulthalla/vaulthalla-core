@@ -38,7 +38,7 @@ void SettingsHandler::handleGetSettings(const json& msg, WebSocketSession& sessi
 void SettingsHandler::handleUpdateSettings(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageSettings())
             throw std::runtime_error("Permission denied: Only admins can update settings");
 
         const auto& payload = msg.at("payload");

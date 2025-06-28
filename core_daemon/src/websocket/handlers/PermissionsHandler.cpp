@@ -2,7 +2,7 @@
 #include "websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "types/db/User.hpp"
-#include "types/db/BaseRole.hpp"
+#include "types/db/Role.hpp"
 #include "types/db/Permission.hpp"
 
 #include <nlohmann/json.hpp>
@@ -16,7 +16,7 @@ void PermissionsHandler::handleAddRole(const json& msg, WebSocketSession& sessio
             throw std::runtime_error("Permission denied: Only admins can add roles");
 
         const auto& payload = msg.at("payload");
-        auto role = std::make_shared<types::BaseRole>(payload);
+        auto role = std::make_shared<types::Role>(payload);
 
         database::PermsQueries::addRole(role);
 
@@ -67,7 +67,7 @@ void PermissionsHandler::handleUpdateRole(const json& msg, WebSocketSession& ses
             throw std::runtime_error("Permission denied: Only admins can update roles");
 
         const auto& payload = msg.at("payload");
-        auto role = std::make_shared<types::BaseRole>(payload);
+        auto role = std::make_shared<types::Role>(payload);
 
         database::PermsQueries::updateRole(role);
 

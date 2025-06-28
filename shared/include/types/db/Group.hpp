@@ -15,7 +15,7 @@ class result;
 namespace vh::types {
 
 struct User;
-struct StorageVolume;
+struct Volume;
 
 struct GroupMember {
     std::shared_ptr<User> user;
@@ -26,7 +26,7 @@ struct GroupMember {
 };
 
 struct GroupStorageVolume {
-    std::shared_ptr<StorageVolume> volume;
+    std::shared_ptr<Volume> volume;
     std::time_t assigned_at;
 
     GroupStorageVolume() = default;

@@ -1,91 +1,96 @@
 #include "types/db/Permission.hpp"
 #include "util/timestamp.hpp"
-
-#include <string>
 #include <nlohmann/json.hpp>
 
-using namespace vh::types;
+namespace vh::types {
 
 Permission::Permission(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
-      name(static_cast<PermissionName>(row["name"].as<uint16_t>())),
+      name(row["name"].as<std::string>()),
       display_name(row["display_name"].as<std::string>()),
       description(row["description"].as<std::string>()),
-      bit_position(row["bit_position"].as<unsigned short>()),
+      bit_position(row["bit_position"].as<uint16_t>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {}
 
-std::string vh::types::to_string(const PermissionName& permission) {
-    switch (permission) {
-        case PermissionName::ManageUsers: return "Manage Users";
-        case PermissionName::ManageRoles: return "Manage Roles";
-        case PermissionName::ManageStorage: return "Manage Storage";
-        case PermissionName::ManageFiles: return "Manage Files";
-        case PermissionName::ViewAuditLog: return "View Audit Log";
-        case PermissionName::UploadFile: return "Upload File";
-        case PermissionName::DownloadFile: return "Download File";
-        case PermissionName::DeleteFile: return "Delete File";
-        case PermissionName::ShareFile: return "Share File";
-        case PermissionName::LockFile: return "Lock File";
-        case PermissionName::ManageSettings: return "Manage Settings";
-        default: return "Unknown Permission";
+std::string to_string(const AdminPermission p) {
+    switch (p) {
+        case AdminPermission::CreateUser: return "Create User";
+        case AdminPermission::CreateAdminUser: return "Create Admin User";
+        case AdminPermission::DeactivateUser: return "Deactivate User";
+        case AdminPermission::ResetUserPassword: return "Reset User Password";
+        case AdminPermission::ManageRoles: return "Manage Roles";
+        case AdminPermission::ManageSettings: return "Manage Settings";
+        case AdminPermission::ViewAuditLog: return "View Audit Log";
+        case AdminPermission::ManageAPIKeys: return "Manage API Keys";
+        default: return "Unknown Admin Permission";
     }
 }
 
-nlohmann::json vh::types::to_json(const std::vector<PermissionName>& permissions) {
-    nlohmann::json j = nlohmann::json::array();
-    for (const auto& perm : permissions) {
-        j.push_back({
-            {"name", to_string(perm)},
-            {"bit_position", static_cast<unsigned short>(perm)},
-        });
+std::string to_string(const VaultPermission p) {
+    switch (p) {
+        case VaultPermission::CreateLocalVault: return "Create Local Vault";
+        case VaultPermission::CreateCloudVault: return "Create Cloud Vault";
+        case VaultPermission::DeleteVault: return "Delete Vault";
+        case VaultPermission::AdjustVaultSettings: return "Adjust Vault Settings";
+        case VaultPermission::MigrateVaultData: return "Migrate Vault Data";
+        case VaultPermission::CreateVolume: return "Create Volume";
+        case VaultPermission::DeleteVolume: return "Delete Volume";
+        case VaultPermission::ResizeVolume: return "Resize Volume";
+        case VaultPermission::MoveVolume: return "Move Volume";
+        case VaultPermission::AssignVolumeToGroup: return "Assign Volume to Group";
+        default: return "Unknown Vault Permission";
     }
-    return j;
 }
 
-void vh::types::to_json(nlohmann::json& j, const Permission& p) {
+std::string to_string(const FilePermission p) {
+    switch (p) {
+        case FilePermission::UploadFile: return "Upload File";
+        case FilePermission::DownloadFile: return "Download File";
+        case FilePermission::DeleteFile: return "Delete File";
+        case FilePermission::ShareFilePublicly: return "Share File Publicly";
+        case FilePermission::ShareFileWithGroup: return "Share File With Group";
+        case FilePermission::LockFile: return "Lock File";
+        case FilePermission::RenameFile: return "Rename File";
+        case FilePermission::MoveFile: return "Move File";
+        default: return "Unknown File Permission";
+    }
+}
+
+std::string to_string(const DirectoryPermission p) {
+    switch (p) {
+        case DirectoryPermission::CreateDirectory: return "Create Directory";
+        case DirectoryPermission::DeleteDirectory: return "Delete Directory";
+        case DirectoryPermission::RenameDirectory: return "Rename Directory";
+        case DirectoryPermission::MoveDirectory: return "Move Directory";
+        case DirectoryPermission::ListDirectory: return "List Directory";
+        default: return "Unknown Directory Permission";
+    }
+}
+
+void to_json(nlohmann::json& j, const Permission& p) {
     j = {
         {"id", p.id},
-        {"name", to_string(p.name)},
+        {"name", p.name},
         {"display_name", p.display_name},
         {"description", p.description},
         {"bit_position", p.bit_position},
-        {"created_at", util::timestampToString(p.created_at)},
-        {"updated_at", util::timestampToString(p.updated_at)},
+        {"created_at", vh::util::timestampToString(p.created_at)},
+        {"updated_at", vh::util::timestampToString(p.updated_at)}
     };
 }
 
-void vh::types::from_json(const nlohmann::json& j, Permission& p) {
+void from_json(const nlohmann::json& j, Permission& p) {
     p.id = j.at("id").get<unsigned int>();
-    p.name = static_cast<PermissionName>(j.at("name").get<unsigned short>());
+    p.name = j.at("name").get<std::string>();
+    p.display_name = j.at("display_name").get<std::string>();
     p.description = j.at("description").get<std::string>();
-    p.bit_position = j.at("bit_position").get<unsigned short>();
+    p.bit_position = j.at("bit_position").get<uint16_t>();
 }
 
-void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions) {
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions) {
     j = nlohmann::json::array();
     for (const auto& perm : permissions) j.push_back(*perm);
 }
 
-uint16_t vh::types::toBitmask(const std::vector<PermissionName>& permissions) {
-    uint16_t bitmask = 0;
-    for (const auto& perm : permissions) bitmask |= static_cast<uint16_t>(perm);
-    return bitmask;
-}
-
-std::vector<PermissionName> vh::types::permsFromBitmask(const uint16_t bitmask) {
-    std::vector<PermissionName> permissions;
-    for (uint16_t i = 0; i < Permission::BITMAP_SIZE; ++i) if (bitmask & (1 << i)) permissions.push_back(static_cast<PermissionName>(1 << i));
-    return permissions;
-}
-
-std::vector<std::string> vh::types::permsFromBitmaskAsString(const uint16_t bitmask) {
-    std::vector<std::string> permissions;
-    for (uint16_t i = 0; i < Permission::BITMAP_SIZE; ++i)
-        if (bitmask & (1 << i)) permissions.push_back(to_string(static_cast<PermissionName>(1 << i)));
-    return permissions;
-}
-
-bool vh::types::hasPermission(const uint16_t bitmask, PermissionName permission) {
-    return (bitmask & static_cast<uint16_t>(permission)) != 0;
 }

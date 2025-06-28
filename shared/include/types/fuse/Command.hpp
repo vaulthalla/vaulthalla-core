@@ -8,17 +8,23 @@ namespace vh::types::fuse {
 
 enum class CommandType {
     UNKNOWN,
-    CREATE,
-    DELETE,
-    MKDIR,
-    RMDIR,
-    RENAME,
-    CHMOD,
-    CHOWN,
-    SYNC,
-    TOUCH,
-    TRUNCATE,
-    PING,
+    CREATE,        // Create a file
+    DELETE,        // Delete a file
+    MKDIR,         // Make directory
+    RMDIR,         // Remove directory
+    RENAME,        // Rename file or directory
+    CHMOD,         // Change permissions
+    CHOWN,         // Change owner/group
+    SYNC,          // Sync a file or dir to storage
+    TOUCH,         // Update timestamp or create empty file
+    TRUNCATE,      // Truncate file to size
+    PING,          // Health check
+    EXISTS,        // Check existence of file/dir
+    STAT,          // Get file/directory metadata
+    LISTDIR,       // List directory contents
+    FLUSH,         // Flush file handle (if tracking in your FUSE layer)
+    READ,          // Optional — read data (if your socket supports direct file transfer ops)
+    WRITE          // Optional — write data
 };
 
 struct Command {

@@ -11,7 +11,7 @@ using namespace vh::websocket;
 void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can create groups");
 
         const auto payload = msg.at("payload");
@@ -42,7 +42,7 @@ void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session)
 void GroupHandler::handleDeleteGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canDeactivateUser())
             throw std::runtime_error("Permission denied: Only admins can delete groups");
 
         const auto groupId = msg.at("payload").at("id").get<unsigned int>();
@@ -69,7 +69,7 @@ void GroupHandler::handleDeleteGroup(const json& msg, WebSocketSession& session)
 void GroupHandler::handleAddMemberToGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can add members to groups");
 
         const auto payload = msg.at("payload");
@@ -100,7 +100,7 @@ void GroupHandler::handleAddMemberToGroup(const json& msg, WebSocketSession& ses
 void GroupHandler::handleRemoveMemberFromGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can remove members from groups");
 
         const auto payload = msg.at("payload");
@@ -131,7 +131,7 @@ void GroupHandler::handleRemoveMemberFromGroup(const json& msg, WebSocketSession
 void GroupHandler::handleListGroups(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can list groups");
 
         const auto groups = database::GroupQueries::listGroups();
@@ -160,7 +160,7 @@ void GroupHandler::handleListGroups(const json& msg, WebSocketSession& session) 
 void GroupHandler::handleGetGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can get group details");
 
         const auto groupId = msg.at("payload").at("id").get<unsigned int>();
@@ -192,7 +192,7 @@ void GroupHandler::handleGetGroup(const json& msg, WebSocketSession& session) {
 void GroupHandler::handleGetGroupByName(const ::json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can get group by name");
 
         const auto groupName = msg.at("payload").at("name").get<std::string>();
@@ -225,7 +225,7 @@ void GroupHandler::handleGetGroupByName(const ::json& msg, WebSocketSession& ses
 void GroupHandler::handleUpdateGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can update groups");
 
         const auto payload = msg.at("payload");
@@ -256,7 +256,7 @@ void GroupHandler::handleUpdateGroup(const json& msg, WebSocketSession& session)
 void GroupHandler::handleAddStorageVolumeToGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can add storage volumes to groups");
 
         const auto payload = msg.at("payload");
@@ -287,7 +287,7 @@ void GroupHandler::handleAddStorageVolumeToGroup(const json& msg, WebSocketSessi
 void GroupHandler::handleRemoveStorageVolumeFromGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can remove storage volumes from groups");
 
         const auto payload = msg.at("payload");
@@ -318,7 +318,7 @@ void GroupHandler::handleRemoveStorageVolumeFromGroup(const json& msg, WebSocket
 void GroupHandler::handleListGroupsByUser(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can list groups by user");
 
         const auto userId = msg.at("payload").at("userId").get<unsigned int>();
@@ -348,7 +348,7 @@ void GroupHandler::handleListGroupsByUser(const json& msg, WebSocketSession& ses
 void GroupHandler::handleListGroupsByStorageVolume(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can list groups by storage volume");
 
         const auto volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
@@ -378,7 +378,7 @@ void GroupHandler::handleListGroupsByStorageVolume(const json& msg, WebSocketSes
 void GroupHandler::handleGetGroupByStorageVolume(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageUsers())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can get group by storage volume");
 
         const auto volumeId = msg.at("payload").at("volumeId").get<unsigned int>();

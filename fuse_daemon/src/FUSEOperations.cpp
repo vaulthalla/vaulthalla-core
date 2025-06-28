@@ -52,7 +52,7 @@ int readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, s
     filler(buf, ".", nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
     filler(buf, "..", nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
 
-    auto entries = proxy->listDirectory(path);
+    auto entries = proxy->listDir(path);
     for (const auto& entry : entries) {
         filler(buf, entry.name.c_str(), nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
     }

@@ -69,19 +69,19 @@ void WebSocketHandler::registerAuthHandlers() const {
 }
 
 void WebSocketHandler::registerFileSystemHandlers() const {
-    router_->registerHandler("fs.listDir", [this](const json& msg, WebSocketSession& session) {
+    router_->registerHandler("fs.dir.list", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleListDir(msg, session);
     });
 
-    router_->registerHandler("fs.readFile", [this](const json& msg, WebSocketSession& session) {
+    router_->registerHandler("fs.file.read", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleReadFile(msg, session);
     });
 
-    router_->registerHandler("fs.writeFile", [this](const json& msg, WebSocketSession& session) {
+    router_->registerHandler("fs.file.write", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleWriteFile(msg, session);
     });
 
-    router_->registerHandler("fs.deleteFile", [this](const json& msg, WebSocketSession& session) {
+    router_->registerHandler("fs.file.delete", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleDeleteFile(msg, session);
     });
 }

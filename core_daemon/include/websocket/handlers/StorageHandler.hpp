@@ -22,25 +22,25 @@ class StorageHandler {
     explicit StorageHandler(const std::shared_ptr<storage::StorageManager>& storageManager);
 
     // API commands
-    void handleAddAPIKey(const json& msg, WebSocketSession& session);
-    void handleRemoveAPIKey(const json& msg, WebSocketSession& session);
-    void handleListAPIKeys(const json& msg, WebSocketSession& session);
-    void handleListUserAPIKeys(const json& msg, WebSocketSession& session);
-    void handleGetAPIKey(const json& msg, WebSocketSession& session);
+    void handleAddAPIKey(const json& msg, WebSocketSession& session) const;
+    void handleRemoveAPIKey(const json& msg, WebSocketSession& session) const;
+    void handleListAPIKeys(const json& msg, WebSocketSession& session) const;
+    void handleListUserAPIKeys(const json& msg, WebSocketSession& session) const;
+    void handleGetAPIKey(const json& msg, WebSocketSession& session) const;
 
     // All Vault commands
-    void handleListVaults(const json& msg, WebSocketSession& session);
-    void handleAddVault(const json& msg, WebSocketSession& session);
-    void handleRemoveVault(const json& msg, WebSocketSession& session);
-    void handleGetVault(const json& msg, WebSocketSession& session);
+    void handleListVaults(const json& msg, WebSocketSession& session) const;
+    void handleAddVault(const json& msg, WebSocketSession& session) const;
+    void handleRemoveVault(const json& msg, WebSocketSession& session) const;
+    void handleGetVault(const json& msg, WebSocketSession& session) const;
 
     // Volume management
-    void handleAddVolume(const json& msg, WebSocketSession& session);
-    void handleRemoveVolume(const json& msg, WebSocketSession& session);
+    void handleAddVolume(const json& msg, WebSocketSession& session) const;
+    void handleRemoveVolume(const json& msg, WebSocketSession& session) const;
     void handleListUserVolumes(const json& msg, WebSocketSession& session);
     void handleListVaultVolumes(const json& msg, WebSocketSession& session);
     void handleListVolumes(const json& msg, WebSocketSession& session);
-    void handleGetVolume(const json& msg, WebSocketSession& session);
+    void handleGetVolume(const json& msg, WebSocketSession& session) const;
 
   private:
     std::shared_ptr<storage::StorageManager> storageManager_;

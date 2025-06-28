@@ -6,7 +6,8 @@ CREATE TABLE permissions
         initcap(replace(name, '_', ' '))
         ) STORED,
     description  TEXT,
-    bit_position INTEGER UNIQUE     NOT NULL CHECK (bit_position >= 0 AND bit_position < 16),
+    category     VARCHAR(12) NOT NULL CHECK (category IN ('admin', 'vault', 'file', 'directory')),
+    bit_position INTEGER NOT NULL CHECK (bit_position >= 0 AND bit_position < 64),
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -19,7 +20,10 @@ CREATE TABLE role
         initcap(replace(name, '_', ' '))
         ) STORED,
     description  TEXT,
-    permissions  BIT(16), -- Bitmask for role permissions
+    admin_permissions BIT(16) NOT NULL,
+    vault_permissions BIT(16) NOT NULL,
+    file_permissions BIT(16) NOT NULL,
+    directory_permissions   BIT(16) NOT NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

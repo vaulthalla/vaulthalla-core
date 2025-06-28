@@ -36,17 +36,44 @@ struct User {
     void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);
 
-    [[nodiscard]] bool canManageUsers() const;
-    [[nodiscard]] bool canManageRoles() const;
-    [[nodiscard]] bool canManageStorage() const;
-    [[nodiscard]] bool canManageFiles() const;
-    [[nodiscard]] bool canViewAuditLog() const;
-    [[nodiscard]] bool canUploadFile() const;
-    [[nodiscard]] bool canDownloadFile() const;
-    [[nodiscard]] bool canDeleteFile() const;
-    [[nodiscard]] bool canShareFile() const;
-    [[nodiscard]] bool canLockFile() const;
-    [[nodiscard]] bool canManageSettings() const;
+    // Admin checks
+    bool canCreateUser() const;
+    bool canCreateAdminUser() const;
+    bool canDeactivateUser() const;
+    bool canResetUserPassword() const;
+    bool canManageRoles() const;
+    bool canManageSettings() const;
+    bool canViewAuditLog() const;
+    bool canManageAPIKeys() const;
+
+    // Vault checks
+    bool canCreateLocalVault() const;
+    bool canCreateCloudVault() const;
+    bool canDeleteVault() const;
+    bool canAdjustVaultSettings() const;
+    bool canMigrateVaultData() const;
+    bool canCreateVolume() const;
+    bool canDeleteVolume() const;
+    bool canResizeVolume() const;
+    bool canMoveVolume() const;
+    bool canAssignVolumeToGroup() const;
+
+    // File checks
+    bool canUploadFile() const;
+    bool canDownloadFile() const;
+    bool canDeleteFile() const;
+    bool canShareFilePublicly() const;
+    bool canShareFileWithGroup() const;
+    bool canLockFile() const;
+    bool canRenameFile() const;
+    bool canMoveFile() const;
+
+    // Directory checks
+    bool canCreateDirectory() const;
+    bool canDeleteDirectory() const;
+    bool canRenameDirectory() const;
+    bool canMoveDirectory() const;
+    bool canListDirectory() const;
 };
 
 } // namespace vh::types

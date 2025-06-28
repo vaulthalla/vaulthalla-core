@@ -1,160 +1,166 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/db/BaseRole.hpp"
 #include "types/db/Role.hpp"
 #include "types/db/Permission.hpp"
-#include "util/bitmask.hpp"
 #include "util/timestamp.hpp"
 
 using namespace vh::database;
+using namespace vh::types;
 
-void PermsQueries::addRole(const std::shared_ptr<types::BaseRole>& role) {
-    Transactions::exec("PermsQueries::addRole",
-        [&](pqxx::work& txn) {
-            txn.exec(
-                "INSERT INTO role (name, description, permissions) "
-                "VALUES (" + txn.quote(role->name) + ", " +
-                txn.quote(role->description) + ", " +
-                txn.quote(util::bitmask::permissions_to_bitstring(role->permissions)) + ", " + ")");
-        });
+// Helper macro for quoting nullable values
+#define QUOTE_OR_NULL(val) ((val).has_value() ? txn.quote(*(val)) : "NULL")
+
+void PermsQueries::addRole(const std::shared_ptr<Role>& role) {
+    Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
+        txn.exec(
+            "INSERT INTO role (name, display_name, description, "
+            "admin_permissions, vault_permissions, file_permissions, directory_permissions, created_at) VALUES (" +
+            txn.quote(role->name) + ", " +
+            txn.quote(role->display_name) + ", " +
+            txn.quote(role->description) + ", " +
+            txn.quote(role->admin_permissions) + ", " +
+            txn.quote(role->vault_permissions) + ", " +
+            txn.quote(role->file_permissions) + ", " +
+            txn.quote(role->directory_permissions) + ", " +
+            txn.quote(util::timestampToString(role->created_at)) + ")");
+    });
 }
 
 void PermsQueries::deleteRole(const unsigned int id) {
-    Transactions::exec("PermsQueries::deleteRole",
-        [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM role WHERE id = " + txn.quote(id));
-        });
+    Transactions::exec("PermsQueries::deleteRole", [&](pqxx::work& txn) {
+        txn.exec("DELETE FROM role WHERE id = " + txn.quote(id));
+    });
 }
 
-void PermsQueries::updateRole(const std::shared_ptr<types::BaseRole>& role) {
-    Transactions::exec("PermsQueries::updateRole",
-        [&](pqxx::work& txn) {
-            txn.exec(
-                "UPDATE role SET name = " + txn.quote(role->name) + ", " +
-                "description = " + txn.quote(role->description) + ", " +
-                "permissions = " + txn.quote(util::bitmask::permissions_to_bitstring(role->permissions)) + ", " +
-                " WHERE id = " + txn.quote(role->id));
-        });
+void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
+    Transactions::exec("PermsQueries::updateRole", [&](pqxx::work& txn) {
+        txn.exec(
+            "UPDATE role SET "
+            "name = " + txn.quote(role->name) + ", " +
+            "display_name = " + txn.quote(role->display_name) + ", " +
+            "description = " + txn.quote(role->description) + ", " +
+            "admin_permissions = " + txn.quote(role->admin_permissions) + ", " +
+            "vault_permissions = " + txn.quote(role->vault_permissions) + ", " +
+            "file_permissions = " + txn.quote(role->file_permissions) + ", " +
+            "directory_permissions = " + txn.quote(role->directory_permissions) +
+            " WHERE id = " + txn.quote(role->id));
+    });
 }
 
-std::shared_ptr<vh::types::BaseRole> PermsQueries::getRole(const unsigned int id) {
-    return Transactions::exec("PermsQueries::getRole",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::BaseRole> {
-            const auto row = txn.exec("SELECT r.id, r.name, r.display_name, r.description, "
-                                      "r.permissions::int AS permissions, r.created_at, ur.scope, ur.scope_id, "
-                                      "ur.assigned_at FROM role r "
-                                        "JOIN roles ur ON r.id = ur.role_id "
-                                        "WHERE r.id = " + txn.quote(id)).one_row();
-
-            return std::make_shared<types::BaseRole>(row);
-        });
+static std::shared_ptr<Role> makeRoleFromRow(const pqxx::row& row) {
+    return std::make_shared<Role>(row);
 }
 
-std::shared_ptr<vh::types::BaseRole> PermsQueries::getRoleByName(const std::string& name) {
-    return Transactions::exec("PermsQueries::getRoleByName",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::BaseRole> {
-            const auto row = txn.exec("SELECT r.id, r.name, r.display_name, r.description, "
-                                      "r.permissions::int AS permissions, r.created_at, ur.scope, ur.scope_id, "
-                                      "ur.assigned_at FROM role r "
-                                        "JOIN roles ur ON r.id = ur.role_id "
-                                        "WHERE r.name = " + txn.quote(name)).one_row();
-
-            return std::make_shared<types::BaseRole>(row);
-        });
+std::shared_ptr<Role> PermsQueries::getRole(unsigned int id) {
+    return Transactions::exec("PermsQueries::getRole", [&](pqxx::work& txn) {
+        const auto row = txn.exec("SELECT * FROM role WHERE id = " + txn.quote(id)).one_row();
+        return makeRoleFromRow(row);
+    });
 }
 
-std::vector<std::shared_ptr<vh::types::BaseRole>> PermsQueries::listRoles() {
-    return Transactions::exec("PermsQueries::listRoles",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::BaseRole>> {
-            const pqxx::result res = txn.exec("SELECT id, name, display_name, description, "
-                                              "permissions::int AS permissions, created_at FROM role");
-            std::vector<std::shared_ptr<types::BaseRole>> roles;
-            for (const auto& row : res) roles.push_back(std::make_shared<types::BaseRole>(row));
-            return roles;
-        });
+std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
+    return Transactions::exec("PermsQueries::getRoleByName", [&](pqxx::work& txn) {
+        const auto row = txn.exec("SELECT * FROM role WHERE name = " + txn.quote(name)).one_row();
+        return makeRoleFromRow(row);
+    });
 }
 
-void PermsQueries::assignUserRole(const std::shared_ptr<types::Role>& userRole) {
-    Transactions::exec("PermsQueries::assignUserRole",
-        [&](pqxx::work& txn) {
-            txn.exec(
-                "INSERT INTO roles (subject_id, role_id, scope, scope_id, assigned_at) "
-                "VALUES (" + txn.quote(userRole->subject_id) + ", " +
-                txn.quote(userRole->role_id) + ", " +
-                txn.quote(userRole->scope) + ", " +
-                (userRole->scope_id.has_value() ? txn.quote(userRole->scope_id.value()) : "NULL") + ", " +
-                txn.quote(util::timestampToString(userRole->assigned_at)) + ")");
-        });
+std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
+    return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {
+        const auto res = txn.exec("SELECT r.*, rs.* FROM role r, roles rs WHERE r.id = rs.role_id");
+        std::vector<std::shared_ptr<Role>> out;
+        for (const auto& row : res) out.push_back(makeRoleFromRow(row));
+        return out;
+    });
 }
 
-void PermsQueries::removeUserRole(const unsigned int userId, const unsigned int roleId) {
-    Transactions::exec("PermsQueries::removeUserRole",
-        [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM roles WHERE subject_id = " + txn.quote(userId) +
-                     " AND role_id = " + txn.quote(roleId));
-        });
+void PermsQueries::assignUserRole(const std::shared_ptr<Role>& r) {
+    Transactions::exec("PermsQueries::assignUserRole", [&](pqxx::work& txn) {
+        txn.exec(
+            std::string("INSERT INTO roles (subject_type, subject_id, role_id, scope, scope_id, assigned_at, inherited) VALUES (") +
+            "'user', " +
+            txn.quote(r->subject_id) + ", " +
+            txn.quote(r->role_id) + ", " +
+            txn.quote(r->scope) + ", " +
+            QUOTE_OR_NULL(r->scope_id) + ", " +
+            txn.quote(util::timestampToString(r->assigned_at)) + ", " +
+            txn.quote(r->inherited) + ")");
+    });
 }
 
-std::shared_ptr<vh::types::Role> PermsQueries::getUserRole(const unsigned int userId, const unsigned int roleId) {
-    return Transactions::exec("PermsQueries::getUserRole",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::Role> {
-            const auto row = txn.exec("SELECT * FROM roles WHERE subject_id = " + txn.quote(userId) +
-                                      " AND role_id = " + txn.quote(roleId)).one_row();
-            return std::make_shared<types::Role>(row);
-        });
+void PermsQueries::removeUserRole(const unsigned int userId, unsigned int roleId) {
+    Transactions::exec("PermsQueries::removeUserRole", [&](pqxx::work& txn) {
+        txn.exec("DELETE FROM roles WHERE subject_id = " + txn.quote(userId) +
+                 " AND role_id = " + txn.quote(roleId));
+    });
 }
 
-std::vector<std::shared_ptr<vh::types::Role>> PermsQueries::listUserRoles(const unsigned int userId) {
-    return Transactions::exec("PermsQueries::listUserRoles",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Role>> {
-            const pqxx::result res = txn.exec("SELECT * FROM roles WHERE subject_id = " + txn.quote(userId));
-            std::vector<std::shared_ptr<types::Role>> userRoles;
-            for (const auto& row : res) userRoles.push_back(std::make_shared<types::Role>(row));
-            return userRoles;
-        });
+static const auto* SELECT_FULL_ROLE =
+    "SELECT ur.id                         AS id, "
+    "       ur.role_id                    AS role_id, "
+    "       ur.subject_id, ur.scope, ur.scope_id, ur.assigned_at, ur.inherited, "
+    "       r.name, r.display_name, r.description, r.created_at, "
+    "       r.admin_permissions::int      AS admin_permissions, "
+    "       r.vault_permissions::int      AS vault_permissions, "
+    "       r.file_permissions::int       AS file_permissions, "
+    "       r.directory_permissions::int  AS directory_permissions "
+    "FROM roles ur JOIN role r ON ur.role_id = r.id ";
+
+std::shared_ptr<Role> PermsQueries::getUserRole(const unsigned int userId, unsigned int roleId) {
+    return Transactions::exec("PermsQueries::getUserRole", [&](pqxx::work& txn) {
+        const auto row = txn.exec(std::string(SELECT_FULL_ROLE) +
+                             "WHERE ur.subject_id = " + txn.quote(userId) +
+                             " AND ur.role_id = " + txn.quote(roleId)).one_row();
+        return makeRoleFromRow(row);
+    });
 }
 
-std::vector<std::shared_ptr<vh::types::Role>> PermsQueries::listUserRolesByScope(const std::string& scope, unsigned int scopeId) {
-    return Transactions::exec("PermsQueries::listUserRolesByScope",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Role>> {
-            const pqxx::result res = txn.exec("SELECT * FROM roles WHERE scope = " + txn.quote(scope) +
-                                              " AND scope_id = " + txn.quote(scopeId));
-            std::vector<std::shared_ptr<types::Role>> userRoles;
-            for (const auto& row : res) userRoles.push_back(std::make_shared<types::Role>(row));
-            return userRoles;
-        });
+std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles(const unsigned int userId) {
+    return Transactions::exec("PermsQueries::listUserRoles", [&](pqxx::work& txn) {
+        const auto res = txn.exec(std::string(SELECT_FULL_ROLE) +
+                             "WHERE ur.subject_id = " + txn.quote(userId));
+        std::vector<std::shared_ptr<Role>> out;
+        for (const auto& row : res) out.push_back(makeRoleFromRow(row));
+        return out;
+    });
 }
 
-std::shared_ptr<vh::types::Permission> PermsQueries::getPermission(const unsigned int id) {
-    return Transactions::exec("PermsQueries::getPermission",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::Permission> {
-            const auto row = txn.exec("SELECT * FROM permissions WHERE id = " + txn.quote(id)).one_row();
-            return std::make_shared<types::Permission>(row);
-        });
+std::vector<std::shared_ptr<Role>> PermsQueries::listUserRolesByScope(const std::string& scope, const unsigned int scopeId) {
+    return Transactions::exec("PermsQueries::listUserRolesByScope", [&](pqxx::work& txn) {
+        const auto res = txn.exec(std::string(SELECT_FULL_ROLE) +
+                             "WHERE ur.scope = " + txn.quote(scope) +
+                             " AND ur.scope_id = " + txn.quote(scopeId));
+        std::vector<std::shared_ptr<Role>> out;
+        for (const auto& row : res) out.push_back(makeRoleFromRow(row));
+        return out;
+    });
 }
 
-std::shared_ptr<vh::types::Permission> PermsQueries::getPermissionByName(const std::string& name) {
-    return Transactions::exec("PermsQueries::getPermissionByName",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::Permission> {
-            const auto row = txn.exec("SELECT * FROM permissions WHERE name = " + txn.quote(name)).one_row();
-            return std::make_shared<types::Permission>(row);
-        });
+std::shared_ptr<Permission> PermsQueries::getPermission(unsigned int id) {
+    return Transactions::exec("PermsQueries::getPermission", [&](pqxx::work& txn) {
+        return std::make_shared<Permission>(txn.exec("SELECT * FROM permissions WHERE id = " + txn.quote(id)).one_row());
+    });
 }
 
-std::vector<std::shared_ptr<vh::types::Permission>> PermsQueries::listPermissions() {
-    return Transactions::exec("PermsQueries::listPermissions",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Permission>> {
-            const pqxx::result res = txn.exec("SELECT * FROM permissions");
-            std::vector<std::shared_ptr<types::Permission>> permissions;
-            for (const auto& row : res) permissions.push_back(std::make_shared<types::Permission>(row));
-            return permissions;
-        });
+std::shared_ptr<Permission> PermsQueries::getPermissionByName(const std::string& name) {
+    return Transactions::exec("PermsQueries::getPermissionByName", [&](pqxx::work& txn) {
+        return std::make_shared<Permission>(txn.exec("SELECT * FROM permissions WHERE name = " + txn.quote(name)).one_row());
+    });
+}
+
+std::vector<std::shared_ptr<Permission>> PermsQueries::listPermissions() {
+    return Transactions::exec("PermsQueries::listPermissions", [&](pqxx::work& txn) {
+        const auto res = txn.exec("SELECT * FROM permissions");
+        std::vector<std::shared_ptr<Permission>> out;
+        for (const auto& row : res) out.push_back(std::make_shared<Permission>(row));
+        return out;
+    });
 }
 
 unsigned short PermsQueries::countPermissions() {
-    return Transactions::exec("PermsQueries::countPermissions",
-        [&](pqxx::work& txn) -> unsigned short {
-            const pqxx::result res = txn.exec("SELECT COUNT(*) FROM permissions");
-            return res[0][0].as<unsigned short>();
-        });
+    return Transactions::exec("PermsQueries::countPermissions", [&](pqxx::work& txn) {
+        return txn.exec("SELECT COUNT(*) FROM permissions")[0][0].as<unsigned short>();
+    });
 }
+
+#undef QUOTE_OR_NULL

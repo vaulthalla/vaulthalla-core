@@ -1,16 +1,36 @@
 #include "storage/LocalDiskStorageEngine.hpp"
+#include "types/db/Vault.hpp"
+#include "types/db/Volume.hpp"
+#include "types/db/File.hpp"
 #include <utility>
 #include <fstream>
 
 namespace vh::storage {
 
-LocalDiskStorageEngine::LocalDiskStorageEngine(std::filesystem::path root_dir) : root(std::move(root_dir)) {
-    std::filesystem::create_directories(root);
+LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault,
+                                                 const std::vector<std::shared_ptr<types::Volume>>& volumes)
+    : vault_(vault), volumes_(volumes), root(vault->mount_point) {
+    if (!std::filesystem::exists(root)) std::filesystem::create_directories(root);
 }
 
-bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data,
-                                       bool overwrite) {
-    auto full_path = root / rel_path;
+void LocalDiskStorageEngine::mountVolume(const std::shared_ptr<types::Volume>& volume) {
+    if (!volume) return;
+
+    if (!std::filesystem::exists(root / volume->path_prefix))
+        std::filesystem::create_directories(root / volume->path_prefix);
+
+    volumes_.push_back(volume);
+}
+
+void LocalDiskStorageEngine::unmountVolume(const std::shared_ptr<types::Volume>& volume) {
+    if (!volume) return;
+    std::erase(volumes_, volume);
+}
+
+bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path,
+                                       const std::vector<uint8_t>& data,
+                                       const bool overwrite) {
+    const auto full_path = root / rel_path;
     std::filesystem::create_directories(full_path.parent_path());
 
     if (!overwrite && std::filesystem::exists(full_path)) return false;
@@ -37,7 +57,7 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
 }
 
 bool LocalDiskStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    auto full_path = root / rel_path;
+    const auto full_path = root / rel_path;
     return std::filesystem::remove(full_path);
 }
 
@@ -45,17 +65,44 @@ bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) c
     return std::filesystem::exists(root / rel_path);
 }
 
-std::vector<std::filesystem::path> LocalDiskStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
-                                                                          bool recursive) const {
-    std::vector<std::filesystem::path> files;
-    auto full_path = root / rel_path;
+std::vector<std::shared_ptr<types::File>> LocalDiskStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
+                                                                    const bool recursive) const {
+    std::vector<std::shared_ptr<types::File>> files;
+    const auto full_path = root / rel_path;
 
     if (!std::filesystem::exists(full_path) || !std::filesystem::is_directory(full_path)) return files;
 
     for (const auto& entry : std::filesystem::directory_iterator(full_path)) {
-        if (entry.is_regular_file()) files.push_back(entry.path());
-        else if (recursive && entry.is_directory()) {
-            auto sub_files = listFilesInDir(entry.path(), true);
+        std::shared_ptr<types::File> f{};
+        const auto status = entry.symlink_status(); // safer for symlinks
+
+        f->id = 0; // If you don't have DB IDs in this context, leave as 0 or assign some sentinel
+        f->storage_volume_id = 0; // Same here, fill if meaningful
+        f->parent_id = std::nullopt; // You can compute if needed
+
+        f->name = entry.path().filename().string();
+        f->is_directory = entry.is_directory();
+        f->mode = static_cast<unsigned long long>(status.permissions());
+        f->uid = 0; // Could use stat() to fill real UID
+        f->gid = 0; // Could use stat() to fill real GID
+        f->created_by = 0; // Application-specific
+
+        auto ftime = std::filesystem::last_write_time(entry);
+        f->updated_at = decltype(f->updated_at)(std::chrono::duration_cast<std::chrono::seconds>(
+                           ftime.time_since_epoch())
+                           .count());
+        f->created_at = f->updated_at; // No portable created time; use updated_at as placeholder
+
+        f->current_version_size_bytes = entry.is_regular_file() ? entry.file_size() : 0;
+        f->is_trashed = false;
+        f->trashed_at = 0;
+        f->trashed_by = 0;
+        f->full_path = entry.path().string();
+
+        files.push_back(f);
+
+        if (recursive && entry.is_directory()) {
+            auto sub_files = listFilesInDir(rel_path / entry.path().filename(), true);
             files.insert(files.end(), sub_files.begin(), sub_files.end());
         }
     }

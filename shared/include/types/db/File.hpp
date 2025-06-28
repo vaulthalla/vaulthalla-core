@@ -1,9 +1,13 @@
 #pragma once
 
-#include <boost/describe.hpp>
 #include <ctime>
 #include <optional>
 #include <string>
+#include <nlohmann/json_fwd.hpp>
+
+namespace pqxx {
+    class row;
+}
 
 namespace vh::types {
 
@@ -24,10 +28,14 @@ struct File {
     std::time_t trashed_at;
     unsigned int trashed_by;
     std::optional<std::string> full_path;
+
+    File() = default;
+    explicit File(const pqxx::row& row);
 };
 
-} // namespace vh::types
+void to_json(nlohmann::json& j, const File& f);
+void from_json(const nlohmann::json& j, File& f);
 
-BOOST_DESCRIBE_STRUCT(vh::types::File, (),
-                      (id, storage_volume_id, parent_id, name, is_directory, mode, uid, gid, created_by, created_at,
-                       updated_at, current_version_size_bytes, is_trashed, trashed_at, trashed_by, full_path))
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<File>>& files);
+
+} // namespace vh::types

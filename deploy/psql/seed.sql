@@ -1,33 +1,92 @@
 -- SEED DATA FOR VAULTHALLA INSTALLATION
+-- --------------------------------------
+-- Default roles and permissions for fresh deployments
 
--- Insert roles with permission bitmasks
--- Bitmask is 16 bits, written in binary or as hex
--- Bit positions are 1-indexed, so shift by (bit - 1)
+-- ROLE DEFINITIONS
+-- Super Admin: All permissions enabled
+-- Admin: All except CreateAdminUser (bit 1 disabled)
+-- PowerUser: Vault + File + Directory full control, no admin perms
+-- User: Basic file + dir operations
+-- Guest: Read-only
 
--- SuperAdmin: all 16 bits enabled (0b1111111111111111 = 0xFFFF)
--- Admin: first 10 permissions (0b0000001111111111 = 0x03FF)
--- User: Upload, Download, Share (bits 6, 7, 9 = 0b0000001011000000 = 0x02C0)
--- Guest: Download only (bit 7 = 0b0000000001000000 = 0x0040)
-
-INSERT INTO role (name, description, permissions)
+INSERT INTO role
+(name, description,
+ admin_permissions, vault_permissions, file_permissions, directory_permissions, created_at)
 VALUES
-    ('super_admin', 'Root-level internal use only',             B'1111111111111111'),
-    ('admin', 'Full system administrator with all permissions', B'0000011111111111'),
-    ('user', 'Standard user with access to personal files',     B'0000001011000000'),
-    ('guest', 'Limited access for shared files',                B'0000000001000000');
+-- ────────────────────────────────────────────────────────────────────────────────
+('super_admin', 'Root-level system owner with unrestricted access',
+ X'00000000000000FF'::bit(64), -- 8 bits (all admin perms)
+ X'000000000003FF'::bit(64),   -- 10 bits (all vault perms)
+ X'00000000000000FF'::bit(64), -- 8 bits (all file perms)
+ X'000000000000001F'::bit(64), -- 5 bits (all dir perms)
+ NOW()),
 
--- Insert permissions with snake_case identifiers
-INSERT INTO permissions (bit_position, name, description)
+('admin', 'System administrator with all non-root administrative powers',
+ X'00000000000000FD'::bit(64), -- all admin perms except CreateAdminUser (bit 1 off)
+ X'000000000003FF'::bit(64),
+ X'00000000000000FF'::bit(64),
+ X'000000000000001F'::bit(64),
+ NOW()),
+
+('power_user', 'Advanced user with full file/vault control but no admin authority',
+ X'0000000000000000'::bit(64),
+ X'000000000003FF'::bit(64),
+ X'00000000000000FF'::bit(64),
+ X'000000000000001F'::bit(64),
+ NOW()),
+
+('user', 'Standard user with basic file operations',
+ X'0000000000000000'::bit(64),
+ X'0000000000000000'::bit(64),
+ X'00000000000000C3'::bit(64), -- upload, download, share public/group
+ X'000000000000001F'::bit(64),
+ NOW()),
+
+('guest', 'Minimal access: can download files and list directories',
+ X'0000000000000000'::bit(64),
+ X'0000000000000000'::bit(64),
+ X'0000000000000002'::bit(64), -- download only
+ X'0000000000000010'::bit(64),
+ NOW());
+
+-- PERMISSION DEFINITIONS
+INSERT INTO permissions (bit_position, name, description, category)
 VALUES
-    (1, 'manage_users',     'Can manage users and assign roles'),
-    (2, 'manage_roles',     'Can manage role definitions and assignments'),
-    (3, 'manage_storage',   'Can create and configure storage backends'),
-    (4, 'manage_files',     'Can manage files and folders'),
-    (5, 'view_audit_log',   'Can view system audit logs'),
-    (6, 'upload_file',      'Can upload files'),
-    (7, 'download_file',    'Can download files'),
-    (8, 'delete_file',      'Can delete files'),
-    (9, 'share_file',       'Can create file shares'),
-    (10, 'lock_file',       'Can apply locks to files'),
-    (11, 'manage_settings', 'Can change system settings');
+-- Admin
+(0, 'create_user', 'Can create standard users', 'admin'),
+(1, 'create_admin_user', 'Can create admin users', 'admin'),
+(2, 'deactivate_user', 'Can deactivate user accounts', 'admin'),
+(3, 'reset_user_password', 'Can reset user passwords', 'admin'),
+(4, 'manage_roles', 'Can manage role definitions and assignments', 'admin'),
+(5, 'manage_settings', 'Can change system settings', 'admin'),
+(6, 'view_audit_log', 'Can view system audit logs', 'admin'),
+(7, 'manage_api_keys', 'Can create and manage API keys', 'admin'),
 
+-- Vault
+(0, 'create_local_vault', 'Can create local vaults', 'vault'),
+(1, 'create_cloud_vault', 'Can create cloud vaults', 'vault'),
+(2, 'delete_vault', 'Can delete vaults', 'vault'),
+(3, 'adjust_vault_settings', 'Can modify vault settings', 'vault'),
+(4, 'migrate_vault_data', 'Can initiate vault data migrations', 'vault'),
+(5, 'create_volume', 'Can create volumes', 'vault'),
+(6, 'delete_volume', 'Can delete volumes', 'vault'),
+(7, 'resize_volume', 'Can resize volumes', 'vault'),
+(8, 'move_volume', 'Can move volumes', 'vault'),
+(9, 'assign_volume_to_group', 'Can assign volumes to groups', 'vault'),
+
+-- File
+(0, 'upload_file', 'Can upload files', 'file'),
+(1, 'download_file', 'Can download files', 'file'),
+(2, 'delete_file', 'Can delete files', 'file'),
+(3, 'share_file_publicly', 'Can share files publicly', 'file'),
+(4, 'share_file_with_group', 'Can share files with specific groups', 'file'),
+(5, 'lock_file', 'Can apply locks to files', 'file'),
+(6, 'rename_file', 'Can rename files', 'file'),
+(7, 'move_file', 'Can move files', 'file'),
+
+-- Directory
+(0, 'create_directory', 'Can create directories', 'directory'),
+(1, 'delete_directory', 'Can delete directories', 'directory'),
+(2, 'rename_directory', 'Can rename directories', 'directory'),
+(3, 'move_directory', 'Can move directories', 'directory'),
+(4, 'list_directory', 'Can list directory contents', 'directory');

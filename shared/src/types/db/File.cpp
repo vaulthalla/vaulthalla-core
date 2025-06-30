@@ -3,8 +3,17 @@
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
+#include <format>
 
 namespace vh::types {
+
+inline std::string octMode(const unsigned long long mode) {
+    return std::format("{:04o}", mode & 07777);   // -> "0644"
+}
+
+inline std::string hexMode(const unsigned long long mode) {
+    return std::format("0x{:03X}", mode & 0xFFF); // -> "0x1A4"
+}
 
 File::File(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
@@ -31,7 +40,7 @@ void to_json(nlohmann::json& j, const File& f) {
         {"storage_volume_id", f.storage_volume_id},
         {"name", f.name},
         {"is_directory", f.is_directory},
-        {"mode", f.mode},
+        {"mode", octMode(f.mode)},
         {"uid", f.uid},
         {"gid", f.gid},
         {"created_by", f.created_by},

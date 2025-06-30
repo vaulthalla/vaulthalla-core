@@ -11,28 +11,31 @@ struct Volume;
 namespace vh::storage {
 
 class CloudStorageEngine : public StorageEngine {
-  public:
+public:
     CloudStorageEngine() = default;
+
     ~CloudStorageEngine() override = default;
+
     CloudStorageEngine(const std::shared_ptr<types::Vault>& vault,
-                       const std::vector<std::shared_ptr<types::Volume>>& volumes);
+                       const std::vector<std::shared_ptr<types::Volume> >& volumes);
 
     void mountVolume(const std::shared_ptr<types::Volume>& volume) override;
+
     void unmountVolume(const std::shared_ptr<types::Volume>& volume) override;
 
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
 
     bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
-    [[nodiscard]] std::optional<std::vector<uint8_t>> readFile(const std::filesystem::path& rel_path) const override;
+
+    [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
+
     bool deleteFile(const std::filesystem::path& rel_path) override;
+
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
-    std::vector<std::shared_ptr<types::File>> listFilesInDir(const std::filesystem::path& rel_path, bool recursive) const override;
-
-private:
-    std::shared_ptr<types::Vault> vault_;
-    std::vector<std::shared_ptr<types::Volume>> volumes_;
-    std::filesystem::path root; // Root path for cloud storage, if applicable
+    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listFilesInDir(unsigned int volume_id,
+                                                                            const std::filesystem::path& rel_path,
+                                                                            bool recursive) const override;
 };
 
 } // namespace vh::storage

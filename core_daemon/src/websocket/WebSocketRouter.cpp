@@ -18,8 +18,8 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
     try {
         std::cout << "[Router] Routing message: " << msg.dump() << std::endl;
 
-        std::string command = msg.at("command").get<std::string>();
-        std::string accessToken = msg.value("token", "");
+        const std::string command = msg.at("command").get<std::string>();
+        const std::string accessToken = msg.value("token", "");
 
         if (!command.starts_with("auth")) {
             auto client = sessionManager_->getClientSession(session.getUUID());

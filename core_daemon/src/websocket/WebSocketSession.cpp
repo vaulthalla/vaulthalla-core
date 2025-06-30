@@ -39,7 +39,9 @@ WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& route
                                    const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
                                    const std::shared_ptr<auth::AuthManager>& authManager)
     : authManager_{authManager}, ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)),
-      broadcastManager_{broadcastManager} {}
+      broadcastManager_{broadcastManager} {
+    buffer_.max_size(65536);
+}
 
 WebSocketSession::~WebSocketSession() {
     if (broadcastManager_ && isRegistered_) {
@@ -226,16 +228,13 @@ void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
         return;
     }
 
-    if (ws_->got_binary()) {
-        uploadHandler_->handleBinaryFrame(buffer_);
-        buffer_.consume(buffer_.size());
-    } else {
+    if (ws_->got_binary()) uploadHandler_->handleBinaryFrame(buffer_);
+    else {
         try {
             router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
         } catch (const std::exception& ex) {
             std::cerr << "[Session] JSON error: " << ex.what() << std::endl;
         }
-        buffer_.consume(buffer_.size());
     }
 
     buffer_.consume(buffer_.size());

@@ -266,7 +266,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Insert local mount point if not exists
 INSERT INTO local (vault_id, mount_point)
-SELECT v.id, '/mnt/vaulthalla/users/admin'
+SELECT v.id, 'users/admin'
 FROM vault v
 WHERE v.name = 'Admin Default Vault'
 AND NOT EXISTS (
@@ -275,7 +275,7 @@ AND NOT EXISTS (
 
 -- Create Admin Default Volume if not exists
 INSERT INTO volume (vault_id, name, path_prefix, quota_bytes, created_at)
-SELECT v.id, 'Admin Default Volume', '/users/admin', NULL, NOW()
+SELECT v.id, 'Admin Default Volume', 'default', NULL, NOW()
 FROM vault v
 WHERE v.name = 'Admin Default Vault'
 AND NOT EXISTS (

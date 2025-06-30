@@ -7,7 +7,7 @@ namespace vh::storage {
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<types::Vault>& vault,
                                        const std::vector<std::shared_ptr<types::Volume>>& volumes)
-    : StorageEngine(), vault_(vault), volumes_(volumes) {}
+    : StorageEngine(vault, volumes) {}
 
 void CloudStorageEngine::mountVolume(const std::shared_ptr<types::Volume>& volume) {
     // TODO: Implement S3/R2 mount logic
@@ -42,10 +42,10 @@ bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const
     return false;
 }
 
-std::vector<std::shared_ptr<types::File>> CloudStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
-                                                                               bool recursive) const {
+std::vector<std::shared_ptr<types::File>> CloudStorageEngine::listFilesInDir(unsigned int volume_id,
+                                                                              const std::filesystem::path& rel_path,
+                                                                              bool recursive) const {
     std::cout << "[CloudStorageEngine] listFilesInDir called: " << rel_path << "\n";
-    // TODO: Implement S3/R2 listFilesInDir logic
     return {};
 }
 

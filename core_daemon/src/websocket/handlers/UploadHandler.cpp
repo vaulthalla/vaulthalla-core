@@ -10,8 +10,13 @@ UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}
 void UploadHandler::startUpload(const std::string& uploadId,
                                 const std::filesystem::path& tmpPath,
                                 const std::filesystem::path& finalPath,
-                                uint64_t expectedSize) {
+                                const uint64_t expectedSize) {
     if (currentUpload_) throw std::runtime_error("Upload already in progress");
+
+    if (std::filesystem::is_directory(finalPath))
+        throw std::runtime_error("Upload final path is a directory — filename must be provided");
+
+    std::cout << "absPath: " << finalPath << ", tmpPath: " << tmpPath << std::endl;
 
     std::ofstream file(tmpPath, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) throw std::runtime_error("Cannot open temp file");

@@ -15,7 +15,7 @@ FileSystemHandler::FileSystemHandler(const std::shared_ptr<services::ServiceMana
 
 void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& session) {
     try {
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto volumeId = payload.at("volume_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
@@ -36,16 +36,16 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto absPath = localEngine->getAbsolutePath(path, volumeId);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
-        // Create temp file
-        std::ofstream tmpFile(tmpPath, std::ios::binary | std::ios::trunc);
-        if (!tmpFile.is_open()) throw std::runtime_error("Failed to open temp file for upload");
-
         session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
+
+        const json data = {
+            {"upload_id", uploadId}
+        };
 
         const json response = {{"command", "fs.upload.start.response"},
                                {"status", "ok"},
                                {"requestId", msg.at("requestId").get<std::string>()},
-                               {"data", {"upload_id", uploadId}}};
+                               {"data", data}};
 
         session.send(response);
 
@@ -61,7 +61,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
 
 void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& session) {
     try {
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto volumeId = payload.at("volume_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
@@ -70,16 +70,17 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         session.getUploadHandler()->finishUpload();
 
+        const json data = {{"path", path}};
+
         const json response = {
             {"command", "fs.upload.finish.response"},
             {"status", "ok"},
             {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", {"path", path}}
+            {"data", data}
         };
         session.send(response);
 
-        std::cout << "[FileSystemHandler] UploadFinish on vault '" << vaultId << "' path '" << path << "'"
-            << std::endl;
+        std::cout << "[FileSystemHandler] UploadFinish on vault '" << vaultId << "' path '" << path << "'" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleUploadFinish error: " << e.what() << std::endl;
@@ -95,22 +96,24 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto volumeId = payload.at("volume_id").get<unsigned int>();
         const auto path = payload.value("path", "/");
 
-        // TODO: Validate auth and permissions
+        const auto user = session.getAuthenticatedUser();
+        enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canListDirectory);
 
-        const auto engine = storageManager_->getEngine(volumeId);
+        const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("Unknown storage engine: " + vaultId);
-        const auto files = engine->listFilesInDir(path, false);
+
+        const auto files = engine->listFilesInDir(volumeId, path, false);
         if (files.empty()) throw std::runtime_error("Directory not found or empty: " + path);
 
         const json data = {
             {"vault", engine->getVault()->name},
             {"path", path},
-            {"entries", json::array()}
+            {"files", files}
         };
 
         const json response = {{"command", "fs.dir.list.response"},

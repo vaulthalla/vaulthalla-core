@@ -14,16 +14,15 @@ File::File(const pqxx::row& row)
       is_directory(row["is_directory"].as<bool>()),
       mode(row["mode"].as<unsigned long long>()),
       uid(row["uid"].as<unsigned int>()),
-      gid(row["gid"].as<unsigned int>()),
       created_by(row["created_by"].as<unsigned int>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
-      current_version_size_bytes(row["current_version_size_bytes"].as<unsigned long long>()),
-      is_trashed(row["is_trashed"].as<bool>()),
-      trashed_at(util::parsePostgresTimestamp(row["trashed_at"].as<std::string>())),
-      trashed_by(row["trashed_by"].as<unsigned int>()) {
+      current_version_size_bytes(row["current_version_size_bytes"].as<unsigned long long>()) {
+    if (!row["gid"].is_null()) gid = row["gid"].as<unsigned int>();
+    if (!row["is_trashed"].is_null()) is_trashed = row["is_trashed"].as<bool>();
+    if (!row["trashed_at"].is_null()) trashed_at = util::parsePostgresTimestamp(row["trashed_at"].as<std::string>());
+    if (!row["trashed_by"].is_null()) trashed_by = row["trashed_by"].as<unsigned int>();
     if (!row["full_path"].is_null()) full_path = row["full_path"].as<std::string>();
-    else full_path.reset();
 }
 
 void to_json(nlohmann::json& j, const File& f) {
@@ -68,7 +67,6 @@ void from_json(const nlohmann::json& j, File& f) {
     f.trashed_by = j.at("trashed_by").get<unsigned int>();
 
     if (j.contains("full_path") && !j["full_path"].is_null()) f.full_path = j.at("full_path").get<std::string>();
-    else f.full_path.reset();
 }
 
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<File>>& files) {

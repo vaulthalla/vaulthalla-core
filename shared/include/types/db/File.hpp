@@ -27,7 +27,7 @@ struct File {
     bool is_trashed{};
     std::optional<std::time_t> trashed_at;
     unsigned int trashed_by{};
-    std::optional<std::string> full_path;
+    std::string full_path;
 
     File() = default;
     explicit File(const pqxx::row& row);

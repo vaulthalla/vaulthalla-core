@@ -70,6 +70,10 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         session.getUploadHandler()->finishUpload();
 
+        UploadContext context;
+
+        storageManager_->finishUpload(vaultId, volumeId, path, session.getAuthenticatedUser());
+
         const json data = {{"path", path}};
 
         const json response = {
@@ -104,14 +108,13 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         const auto user = session.getAuthenticatedUser();
         enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canListDirectory);
 
-        const auto engine = storageManager_->getEngine(vaultId);
-        if (!engine) throw std::runtime_error("Unknown storage engine: " + vaultId);
+        const auto& vaultName = storageManager_->getVault(vaultId)->name;
 
-        const auto files = engine->listFilesInDir(volumeId, path, false);
+        const auto files = storageManager_->listDir(vaultId, volumeId, path);
         if (files.empty()) throw std::runtime_error("Directory not found or empty: " + path);
 
         const json data = {
-            {"vault", engine->getVault()->name},
+            {"vault", vaultName},
             {"path", path},
             {"files", files}
         };
@@ -124,7 +127,7 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] ListDir on mount '" << engine->getVault()->name << "' path '" << path <<
+        std::cout << "[FileSystemHandler] ListDir on mount '" << vaultName << "' path '" << path <<
             std::endl;
 
     } catch (const std::exception& e) {
@@ -138,13 +141,13 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
 void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& session) {
     try {
-        std::string mountName = msg.at("mountName").get<std::string>();
-        unsigned int volumeId = msg.at("volumeId").get<unsigned int>();
-        std::string path = msg.at("path").get<std::string>();
+        const auto mountName = msg.at("mountName").get<std::string>();
+        const auto volumeId = msg.at("volumeId").get<unsigned int>();
+        const auto path = msg.at("path").get<std::string>();
 
         // TODO: Validate auth and permissions
 
-        auto engine = storageManager_->getEngine(volumeId);
+        const auto engine = storageManager_->getEngine(volumeId);
         if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
         auto data = engine->readFile(path);
         if (!data.has_value()) throw std::runtime_error("File not found: " + path);

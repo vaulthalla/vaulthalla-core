@@ -71,7 +71,7 @@ LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::Loca
         return std::filesystem::exists(root_ / rel_path);
     }
 
-    std::vector<std::shared_ptr<types::File> > LocalDiskStorageEngine::listFilesInDir(
+    std::vector<std::shared_ptr<types::File>> LocalDiskStorageEngine::listFilesInDir(
         const unsigned int volume_id, const std::filesystem::path& rel_path,
         const bool recursive) const {
         std::vector<std::shared_ptr<types::File> > files;

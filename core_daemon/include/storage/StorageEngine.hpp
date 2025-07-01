@@ -37,6 +37,8 @@ public:
 
     virtual void unmountVolume(const std::shared_ptr<types::Volume>& volume) = 0;
 
+    virtual void mkdir(unsigned int volumeId, const fs::path& relative_path) = 0;
+
     [[nodiscard]] virtual bool writeFile(const fs::path& relative_path, const std::vector<uint8_t>& data,
                                          bool overwrite) = 0;
 

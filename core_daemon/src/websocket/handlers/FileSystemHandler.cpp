@@ -98,6 +98,37 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
     }
 }
 
+void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) {
+    try {
+        const auto& payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto volumeId = payload.at("volume_id").get<unsigned int>();
+        const auto path = payload.at("path").get<std::string>();
+
+        enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canCreateDirectory);
+
+        storageManager_->mkdir(vaultId, volumeId, path, session.getAuthenticatedUser());
+
+        const json data = {{"path", path}};
+
+        const json response = {{"command", "fs.dir.create.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
+
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] Mkdir on vault '" << vaultId << "' path '" << path << "'" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleMkdir error: " << e.what() << std::endl;
+
+        const json response = {{"command", "fs.dir.create.response"}, {"status", "error"}, {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
         const auto& payload = msg.at("payload");

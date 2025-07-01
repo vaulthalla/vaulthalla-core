@@ -159,6 +159,38 @@ void StorageManager::finishUpload(const unsigned int vaultId, const unsigned int
         ", path: " << relPath << "\n";
 }
 
+void StorageManager::mkdir(const unsigned int vaultId, const unsigned int volumeId,
+                           const std::string& relPath, const std::shared_ptr<types::User>& user) const {
+    const auto engine = getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
+    if (engine->type() == StorageType::Local) {
+        const auto localEngine = std::static_pointer_cast<LocalDiskStorageEngine>(engine);
+        const auto absPath = localEngine->getAbsolutePath(std::filesystem::path(relPath), volumeId);
+        localEngine->mkdir(volumeId, relPath);
+
+        const auto file = std::filesystem::status(absPath);
+        const auto f = std::make_shared<types::File>();
+
+        f->storage_volume_id = volumeId;
+        f->name = std::filesystem::path(relPath).filename().string();
+        f->is_directory = true;
+        f->mode = static_cast<unsigned long long>(file.permissions());
+        f->current_version_size_bytes = 0; // Directories typically have no size
+        f->uid = user->id;
+        f->gid = 1; // TODO: handle group ownership
+        f->created_by = user->id;
+        f->full_path = absPath.string();
+        if (!hasLogicalParent(relPath)) f->parent_id = std::nullopt;
+        else f->parent_id = database::FileQueries::getFileIdByPath(std::filesystem::path(relPath).parent_path());
+
+        std::lock_guard lock(mountsMutex_);
+        database::FileQueries::addFile(f);
+    } else {
+        throw std::runtime_error("Unsupported storage engine type for mkdir operation");
+    }
+}
+
 std::vector<std::shared_ptr<types::File> > StorageManager::listDir(const unsigned int vaultId,
                                                                    const unsigned int volumeId,
                                                                    const std::string& relPath,
@@ -260,6 +292,11 @@ bool StorageManager::pathsAreConflicting(const std::filesystem::path& path1, con
     if (ec) weak2 = std::filesystem::absolute(path2);
 
     return weak1 == weak2;
+}
+
+bool StorageManager::hasLogicalParent(const std::filesystem::path& relPath) {
+    if (relPath.empty() || relPath == "/") return false; // Root path has no parent
+    return relPath.has_parent_path() && !relPath.parent_path().empty() && relPath.parent_path() != "/";
 }
 
 } // namespace vh::storage

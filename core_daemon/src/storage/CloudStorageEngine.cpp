@@ -17,6 +17,10 @@ void CloudStorageEngine::unmountVolume(const std::shared_ptr<types::Volume>& vol
     // TODO: Implement S3/R2 unmount logic
 }
 
+void CloudStorageEngine::mkdir(unsigned int volumeId, const std::filesystem::path& relative_path) {
+    std::cout << "[CloudStorageEngine] mkdir called: " << relative_path << "\n";
+}
+
 bool CloudStorageEngine::writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data,
                                    bool overwrite) {
     std::cout << "[CloudStorageEngine] writeFile called: " << rel_path << "\n";

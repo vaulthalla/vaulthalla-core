@@ -19,6 +19,8 @@ public:
 
     void handleUploadFinish(const json& msg, WebSocketSession& session);
 
+    void handleMkdir(const json& msg, WebSocketSession& session);
+
     void handleListDir(const json& msg, WebSocketSession& session);
 
     void handleReadFile(const json& msg, WebSocketSession& session);

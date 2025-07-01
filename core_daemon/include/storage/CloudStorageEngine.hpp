@@ -23,6 +23,8 @@ public:
 
     void unmountVolume(const std::shared_ptr<types::Volume>& volume) override;
 
+    void mkdir(unsigned int volumeId, const fs::path& relative_path) override;
+
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
 
     bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;

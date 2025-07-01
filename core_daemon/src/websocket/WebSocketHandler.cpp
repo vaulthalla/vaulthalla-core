@@ -77,6 +77,10 @@ void WebSocketHandler::registerFileSystemHandlers() const {
         fsHandler_->handleUploadFinish(msg, session);
     });
 
+    router_->registerHandler("fs.dir.create", [this](const json& msg, WebSocketSession& session) {
+        fsHandler_->handleMkdir(msg, session);
+    });
+
     router_->registerHandler("fs.dir.list", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleListDir(msg, session);
     });

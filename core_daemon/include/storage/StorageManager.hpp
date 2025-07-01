@@ -45,6 +45,9 @@ public:
                                                                      const std::string& relPath,
                                                                      bool recursive = false) const;
 
+    void mkdir(unsigned int vaultId, unsigned int volumeId, const std::string& relPath,
+               const std::shared_ptr<types::User>& user) const;
+
     void mountVolume(const std::shared_ptr<types::Volume>& volume);
 
     void addVolume(std::shared_ptr<types::Volume> volume, unsigned int userId);
@@ -62,6 +65,8 @@ public:
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
 
     static bool pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2);
+
+    static bool hasLogicalParent(const std::filesystem::path& relPath);
 
 private:
     mutable std::mutex mountsMutex_;

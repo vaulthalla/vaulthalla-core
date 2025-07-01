@@ -25,6 +25,8 @@ public:
 
     [[nodiscard]] StorageType type() const override { return StorageType::Local; }
 
+    void mkdir(unsigned int volumeId, const fs::path& relative_path) override;
+
     bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;

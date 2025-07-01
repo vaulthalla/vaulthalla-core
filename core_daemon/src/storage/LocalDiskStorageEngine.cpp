@@ -33,6 +33,16 @@ LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::Loca
         std::erase(volumes_, volume);
     }
 
+    void LocalDiskStorageEngine::mkdir(const unsigned int volumeId, const std::filesystem::path& relative_path) {
+        const auto fullPath = getAbsolutePath(relative_path, volumeId);
+        if (std::filesystem::exists(fullPath)) {
+            if (!std::filesystem::is_directory(fullPath))
+                throw std::runtime_error("Path exists and is not a directory: " + fullPath.string());
+            return; // Directory already exists
+        }
+        std::filesystem::create_directories(fullPath);
+    }
+
     bool LocalDiskStorageEngine::writeFile(const std::filesystem::path& rel_path,
                                            const std::vector<uint8_t>& data,
                                            const bool overwrite) {

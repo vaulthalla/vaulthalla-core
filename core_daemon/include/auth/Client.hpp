@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/db/User.hpp"
+#include "../../../shared/include/types/User.hpp"
 #include "Token.hpp"
 #include "auth/RefreshToken.hpp"
 #include "websocket/WebSocketSession.hpp"

@@ -1,9 +1,9 @@
-#include "types/db/UserStorageUsage.hpp"
+#include "../../include/types/Usage.hpp"
 #include "util/timestamp.hpp"
 
 using namespace vh::types;
 
-UserStorageUsage::UserStorageUsage(const pqxx::row& row)
+Usage::Usage(const pqxx::row& row)
     : user_id(row["user_id"].as<unsigned int>()),
       storage_volume_id(row["storage_volume_id"].as<unsigned int>()),
       total_bytes(row["total_bytes"].as<unsigned long long>()),

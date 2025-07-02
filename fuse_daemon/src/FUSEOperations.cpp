@@ -1,8 +1,8 @@
 #include "FUSEOperations.hpp"
-#include "../../shared/include/types/db/File.hpp"
+#include "../../shared/include/types/db/file/File.hpp"
 #include "FUSEPermissions.hpp"
 #include "StorageBridge/RemoteFSProxy.hpp"
-#include "types/db/FileMetadata.hpp"
+#include "../../shared/include/types/db/file/FileMetadata.hpp"
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
 #include <cstring>

@@ -1,8 +1,8 @@
 #include "database/Queries/UserQueries.hpp"
-#include "types/db/User.hpp"
+#include "../../../../shared/include/types/User.hpp"
 #include "auth/RefreshToken.hpp"
 #include "database/Transactions.hpp"
-#include "types/db/AssignedRole.hpp"
+#include "../../../../shared/include/types/AssignedRole.hpp"
 #include "database/utils.hpp"
 #include <pqxx/pqxx>
 
@@ -70,8 +70,8 @@ void UserQueries::createUser(const std::shared_ptr<types::User>& user, const uns
         txn.exec("INSERT INTO roles (user_id, role_id) VALUES (" + txn.quote(userId) + ", " +
                  txn.quote(roleId) + ")");
 
-        if (user->scoped_roles.has_value()) {
-            for (const auto& role : *user->scoped_roles) {
+        if (user->roles.has_value()) {
+            for (const auto& role : *user->roles) {
                 txn.exec("INSERT INTO roles (user_id, role_id, scope, scope_id) VALUES (" +
                          txn.quote(userId) + ", " + txn.quote(role->id) + ", " + txn.quote(role->scope) +
                          ", " + txn.quote(role->scope_id) + ")");
@@ -94,8 +94,8 @@ void UserQueries::updateUser(const std::shared_ptr<types::User>& user) {
         new_roles.insert({user->global_role->id, "global", std::nullopt});
 
         // Scoped roles
-        if (user->scoped_roles.has_value()) {
-            for (const auto& role : *user->scoped_roles) {
+        if (user->roles.has_value()) {
+            for (const auto& role : *user->roles) {
                 new_roles.insert({role->id, role->scope, role->scope_id});
             }
         }

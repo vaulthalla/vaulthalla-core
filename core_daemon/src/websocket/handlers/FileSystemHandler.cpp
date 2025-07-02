@@ -1,7 +1,7 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "types/db/File.hpp"
-#include "types/db/AssignedRole.hpp"
+#include "types/File.hpp"
+#include "types/AssignedRole.hpp"
 #include "websocket/handlers/UploadHandler.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include <iostream>
@@ -107,7 +107,7 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
 
         enforcePermissions(session, vaultId, volumeId, &types::AssignedRole::canCreateDirectory);
 
-        storageManager_->mkdir(vaultId, volumeId, path, session.getAuthenticatedUser());
+        storageManager_->mkdir(vaultId, path, session.getAuthenticatedUser());
 
         const json data = {{"path", path}};
 

@@ -1,5 +1,5 @@
 #include "StorageBridge/RemoteFSProxy.hpp"
-#include "types/db/File.hpp"
+#include "../../include/types/db/file/File.hpp"
 #include "StorageBridge/UnifiedStorage.hpp"
 #include <cstring>
 #include <stdexcept>

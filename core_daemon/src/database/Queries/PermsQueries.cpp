@@ -2,8 +2,8 @@
 #include "database/Transactions.hpp"
 #include "database/utils.hpp"
 #include "types/db/Role.hpp"
-#include "types/db/AssignedRole.hpp"
-#include "types/db/Permission.hpp"
+#include "../../../../shared/include/types/AssignedRole.hpp"
+#include "../../../../shared/include/types/Permission.hpp"
 #include "util/timestamp.hpp"
 
 using namespace vh::database;

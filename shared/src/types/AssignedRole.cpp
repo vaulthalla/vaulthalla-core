@@ -1,7 +1,8 @@
-#include "types/db/AssignedRole.hpp"
+#include "types/AssignedRole.hpp"
 #include "util/timestamp.hpp"
 
 #include <pqxx/row>
+#include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
@@ -64,8 +65,14 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Ass
     for (const auto& role : roles) j.push_back(*role);
 }
 
-std::vector<std::shared_ptr<AssignedRole>> vh::types::roles_from_json(const nlohmann::json& j) {
+std::vector<std::shared_ptr<AssignedRole>> vh::types::assigned_roles_from_json(const nlohmann::json& j) {
     std::vector<std::shared_ptr<AssignedRole>> roles;
     for (const auto& roleJson : j) roles.push_back(std::make_shared<AssignedRole>(roleJson));
+    return roles;
+}
+
+std::vector<std::shared_ptr<AssignedRole>> vh::types::assigned_roles_from_pq_result(const pqxx::result& res) {
+    std::vector<std::shared_ptr<AssignedRole>> roles;
+    for (const auto& item : res) roles.push_back(std::make_shared<AssignedRole>(item));
     return roles;
 }

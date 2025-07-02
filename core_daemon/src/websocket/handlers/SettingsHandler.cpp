@@ -1,8 +1,8 @@
 #include "websocket/handlers/SettingsHandler.hpp"
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "types/config/ConfigRegistry.hpp"
-#include "types/config/Config.hpp"
+#include "config/ConfigRegistry.hpp"
+#include "config/Config.hpp"
 
 #include <nlohmann/json.hpp>
 

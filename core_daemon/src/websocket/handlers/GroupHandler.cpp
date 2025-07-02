@@ -1,8 +1,8 @@
 #include "websocket/handlers/GroupHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "database/Queries/GroupQueries.hpp"
-#include "types/db/User.hpp"
-#include "types/db/Group.hpp"
+#include "types/User.hpp"
+#include "types/Group.hpp"
 
 #include <nlohmann/json.hpp>
 

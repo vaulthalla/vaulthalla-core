@@ -25,14 +25,6 @@ struct GroupMember {
     explicit GroupMember(const pqxx::row& row);
 };
 
-struct GroupStorageVolume {
-    std::shared_ptr<Volume> volume;
-    std::time_t assigned_at;
-
-    GroupStorageVolume() = default;
-    explicit GroupStorageVolume(const pqxx::row& row);
-};
-
 struct Group {
     unsigned int id, gid{};
     std::string name;
@@ -40,7 +32,6 @@ struct Group {
     std::time_t created_at;
     std::optional<std::time_t> updated_at;
     std::vector<std::shared_ptr<GroupMember>> members;
-    std::vector<std::shared_ptr<GroupStorageVolume>> volumes;
 
     Group() = default;
     explicit Group(const pqxx::row& gr, const pqxx::result& members, const pqxx::result& storageVolumes);
@@ -54,6 +45,5 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group>>& group
 std::vector<std::shared_ptr<Group>> groups_from_json(const nlohmann::json& j);
 
 void to_json(nlohmann::json& j, const GroupMember& gm);
-void to_json(nlohmann::json& j, const GroupStorageVolume& gsv);
 
 } // namespace vh::types

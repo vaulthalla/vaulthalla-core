@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/db/Role.hpp"
+#include "Role.hpp"
 
 #include <string>
 #include <ctime>
@@ -8,9 +8,11 @@
 #include <memory>
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
+#include <pqxx/result.hxx>
 
 namespace pqxx {
 class row;
+class result;
 }
 
 namespace vh::types {
@@ -34,6 +36,7 @@ struct AssignedRole : Role {
 void to_json(nlohmann::json& j, const AssignedRole& r);
 void from_json(const nlohmann::json& j, AssignedRole& r);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<AssignedRole>>& roles);
-std::vector<std::shared_ptr<AssignedRole>> roles_from_json(const nlohmann::json& j);
+std::vector<std::shared_ptr<AssignedRole>> assigned_roles_from_json(const nlohmann::json& j);
+std::vector<std::shared_ptr<AssignedRole>> assigned_roles_from_pq_result(const pqxx::result& res);
 
 } // namespace vh::types

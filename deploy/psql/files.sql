@@ -16,8 +16,8 @@ CREATE TABLE directory_stats
 (
     directory_id  INTEGER PRIMARY KEY REFERENCES directories (id) ON DELETE CASCADE,
     file_count    INTEGER   DEFAULT 0,
-    subdir_count  INTEGER   DEFAULT 0, -- Count of immediate subdirectories
-    total_size    BIGINT    DEFAULT 0, -- Total size of all files in this directory
+    subdirectory_count  INTEGER   DEFAULT 0, -- Count of immediate subdirectories
+    size_bytes    BIGINT    DEFAULT 0, -- Total size of all files in this directory
     last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,7 +40,6 @@ CREATE TABLE files
 
 CREATE TABLE files_trashed
 (
-    -- same schema as files + trashed metadata if you want
     LIKE files INCLUDING ALL,
     trashed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     trashed_by INTEGER REFERENCES users (id)

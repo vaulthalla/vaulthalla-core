@@ -1,5 +1,5 @@
 #include "websocket/handlers/ShareHandler.hpp"
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include "share/LinkResolver.hpp"
 #include "share/ShareLink.hpp"
 #include "websocket/WebSocketSession.hpp"

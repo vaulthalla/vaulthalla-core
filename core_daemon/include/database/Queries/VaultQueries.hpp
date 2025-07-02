@@ -1,8 +1,11 @@
 #pragma once
 
-#include "types/db/Volume.hpp"
-#include "types/db/Vault.hpp"
-#include "database/Transactions.hpp"
+#include <memory>
+#include <vector>
+
+namespace vh::types {
+    struct Vault;
+}
 
 namespace vh::database {
 
@@ -16,13 +19,6 @@ struct VaultQueries {
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId);
 
     static bool localDiskVaultExists();
-
-    static unsigned int addVolume(unsigned int userID, const std::shared_ptr<types::Volume>& volume);
-    static void removeVolume(unsigned int volumeId);
-    static std::vector<std::shared_ptr<types::Volume>> listUserVolumes(unsigned int userId);
-    static std::vector<std::shared_ptr<types::Volume>> listVaultVolumes(unsigned int vaultId);
-    static std::vector<std::shared_ptr<types::Volume>> listVolumes();
-    static std::shared_ptr<types::Volume> getVolume(unsigned int volumeId);
 };
 
 } // namespace vh::database

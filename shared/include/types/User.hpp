@@ -5,8 +5,11 @@
 #include <memory>
 #include <vector>
 #include <ctime>
+#include <cstdint>
 
 #include <nlohmann/json_fwd.hpp> // Forward-decl only
+
+#include "Permission.hpp"
 
 namespace pqxx {
 class row;
@@ -18,22 +21,23 @@ namespace vh::types {
 struct AssignedRole;
 
 struct User {
-    unsigned short id, uid{};
-    std::string name;
-    std::string email;
-    std::string password_hash;
-    std::time_t created_at;
+    static constexpr uint16_t ADMIN_MASK = 0x00FD;
+
+    unsigned short id{};
+    std::string name, password_hash;
+    std::optional<std::string> email{std::nullopt};
+    uint16_t permissions = 0; // Bitmask of permissions
+    std::time_t created_at{};
     std::optional<std::time_t> last_login;
-    bool is_active;
-    std::shared_ptr<AssignedRole> global_role; // Global role
-    std::optional<std::vector<std::shared_ptr<AssignedRole>>> scoped_roles;  // Scoped roles, if any
+    bool is_active{true};
+    std::vector<std::shared_ptr<AssignedRole>> roles;
 
     User();
-    User(std::string name, std::string email, bool isActive);
+    User(std::string name, std::string email = "");
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::result& roles);
 
-    std::shared_ptr<AssignedRole> getBestFitRole(unsigned int vaultId, unsigned int volumeId) const;
+    [[nodiscard]] std::shared_ptr<AssignedRole> getRole(unsigned int vaultId) const;
 
     void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);

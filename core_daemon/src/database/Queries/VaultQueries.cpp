@@ -1,5 +1,6 @@
 #include "database/Queries/VaultQueries.hpp"
-#include "types/db/Vault.hpp"
+#include "database/Transactions.hpp"
+#include "../../../../shared/include/types/Vault.hpp"
 
 namespace vh::database {
 unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) {
@@ -125,71 +126,6 @@ bool VaultQueries::localDiskVaultExists() {
         const auto res = txn.exec("SELECT COUNT(*) FROM vaults WHERE type = " +
                                   txn.quote(static_cast<int>(types::VaultType::Local)));
         return res[0][0].as<int>() > 0;
-    });
-}
-
-unsigned int VaultQueries::addVolume(const unsigned int userID, const std::shared_ptr<types::Volume>& volume) {
-    return Transactions::exec("VaultQueries::addVolume", [&](pqxx::work& txn) {
-        const auto res = txn.exec("INSERT INTO volume (vault_id, name, path_prefix, quota_bytes) "
-                                  "VALUES (" +
-                                  txn.quote(volume->vault_id) + ", " + txn.quote(volume->name) + ", " +
-                                  txn.quote(volume->path_prefix.string()) + ", " +
-                                  txn.quote(volume->quota_bytes.value_or(0ULL)) + ") RETURNING id");
-
-        const auto volumeId = res[0][0].as<unsigned int>();
-        txn.exec("INSERT INTO volumes (user_id, volume_id) VALUES (" + txn.quote(userID) + ", " +
-                 txn.quote(volumeId) + ")");
-
-        txn.commit();
-
-        return volumeId;
-    });
-}
-
-void VaultQueries::removeVolume(const unsigned int volumeId) {
-    Transactions::exec("VaultQueries::removeVolume", [&](pqxx::work& txn) {
-        txn.exec("DELETE FROM volumes WHERE volume_id = " + txn.quote(volumeId));
-        txn.exec("DELETE FROM volume WHERE id = " + txn.quote(volumeId));
-        txn.commit();
-    });
-}
-
-std::vector<std::shared_ptr<types::Volume> > VaultQueries::listUserVolumes(const unsigned int userId) {
-    return Transactions::exec("VaultQueries::listVolumes", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT sv.* FROM volume sv "
-                                  "JOIN volumes vs ON sv.id = vs.volume_id "
-                                  "WHERE vs.subject_id = " +
-                                  txn.quote(userId));
-        std::vector<std::shared_ptr<types::Volume> > volumes;
-        for (const auto& row : res) volumes.push_back(std::make_shared<types::Volume>(row));
-        return volumes;
-    });
-}
-
-std::vector<std::shared_ptr<types::Volume> > VaultQueries::listVolumes() {
-    return Transactions::exec("VaultQueries::listVolumes", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT sv.* FROM volume sv "
-            "JOIN volumes vs ON sv.id = vs.volume_id ");
-        std::vector<std::shared_ptr<types::Volume> > volumes;
-        for (const auto& row : res) volumes.push_back(std::make_shared<types::Volume>(row));
-        return volumes;
-    });
-}
-
-std::vector<std::shared_ptr<types::Volume> > VaultQueries::listVaultVolumes(const unsigned int vaultId) {
-    return Transactions::exec("VaultQueries::listVaultVolumes", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT * FROM volume WHERE vault_id = " + txn.quote(vaultId));
-        std::vector<std::shared_ptr<types::Volume> > volumes;
-        for (const auto& row : res) volumes.push_back(std::make_shared<types::Volume>(row));
-        return volumes;
-    });
-}
-
-std::shared_ptr<types::Volume> VaultQueries::getVolume(const unsigned int volumeId) {
-    return Transactions::exec("VaultQueries::getVolume", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT * FROM volume WHERE id = " + txn.quote(volumeId));
-        if (res.empty()) throw std::runtime_error("No storage volume found with ID: " + std::to_string(volumeId));
-        return std::make_shared<types::Volume>(res[0]);
     });
 }
 

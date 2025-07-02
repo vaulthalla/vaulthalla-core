@@ -16,14 +16,9 @@ public:
 
     ~CloudStorageEngine() override = default;
 
-    CloudStorageEngine(const std::shared_ptr<types::Vault>& vault,
-                       const std::vector<std::shared_ptr<types::Volume> >& volumes);
+    explicit CloudStorageEngine(const std::shared_ptr<types::Vault>& vault);
 
-    void mountVolume(const std::shared_ptr<types::Volume>& volume) override;
-
-    void unmountVolume(const std::shared_ptr<types::Volume>& volume) override;
-
-    void mkdir(unsigned int volumeId, const fs::path& relative_path) override;
+    void mkdir(const fs::path& relative_path) override;
 
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
 
@@ -35,8 +30,7 @@ public:
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
-    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listFilesInDir(unsigned int volume_id,
-                                                                            const std::filesystem::path& rel_path,
+    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listFilesInDir(const std::filesystem::path& rel_path,
                                                                             bool recursive) const override;
 };
 

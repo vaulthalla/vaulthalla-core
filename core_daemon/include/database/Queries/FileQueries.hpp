@@ -6,7 +6,10 @@
 #include <vector>
 
 namespace vh::types {
+struct FSEntry;
 struct File;
+struct Directory;
+struct DirectoryStats;
 }
 
 namespace vh::database {
@@ -27,8 +30,20 @@ public:
 
     [[nodiscard]] static unsigned int getFileIdByPath(const std::filesystem::path& path);
 
-    static std::vector<std::shared_ptr<types::File> > listFilesInDir(unsigned int volumeId, const std::string& absPath,
-                                                              bool recursive = false);
+    static void addDirectory(const std::shared_ptr<types::Directory>& directory);
+
+    static void updateDirectory(const std::shared_ptr<types::Directory>& directory);
+
+    static void updateDirectoryStats(const std::shared_ptr<types::Directory>& directory);
+
+    static void deleteDirectory(unsigned int directoryId);
+
+    static std::shared_ptr<types::Directory> getDirectory(unsigned int directoryId);
+
+    static std::shared_ptr<types::Directory> getDirectoryByPath(const std::filesystem::path& path);
+
+    static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
+                                                                 bool recursive = false);
 };
 
 } // namespace vh::database

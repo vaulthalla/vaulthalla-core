@@ -1,4 +1,4 @@
-#include "types/db/FileShare.hpp"
+#include "../../../include/types/db/file/FileShare.hpp"
 #include "util/timestamp.hpp"
 
 using namespace vh::types;

@@ -5,7 +5,7 @@
 
 namespace vh::types {
 
-struct UserStorageUsage {
+struct Usage {
     unsigned int user_id;
     unsigned int storage_volume_id;
     unsigned long long total_bytes;
@@ -13,7 +13,7 @@ struct UserStorageUsage {
     std::time_t created_at;
     std::time_t updated_at;
 
-    explicit UserStorageUsage(const pqxx::row& row);
+    explicit Usage(const pqxx::row& row);
 };
 
 } // namespace vh::types

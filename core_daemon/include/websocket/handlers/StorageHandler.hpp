@@ -34,14 +34,6 @@ class StorageHandler {
     void handleRemoveVault(const json& msg, WebSocketSession& session) const;
     void handleGetVault(const json& msg, WebSocketSession& session) const;
 
-    // Volume management
-    void handleAddVolume(const json& msg, WebSocketSession& session) const;
-    void handleRemoveVolume(const json& msg, WebSocketSession& session) const;
-    void handleListUserVolumes(const json& msg, WebSocketSession& session);
-    void handleListVaultVolumes(const json& msg, WebSocketSession& session);
-    void handleListVolumes(const json& msg, WebSocketSession& session);
-    void handleGetVolume(const json& msg, WebSocketSession& session) const;
-
   private:
     std::shared_ptr<storage::StorageManager> storageManager_;
     std::shared_ptr<keys::APIKeyManager> apiKeyManager_;

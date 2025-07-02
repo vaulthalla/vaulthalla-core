@@ -1,13 +1,13 @@
 CREATE TABLE users
 (
     id            SERIAL PRIMARY KEY,
-    name          VARCHAR(50)         NOT NULL,
-    email         VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255)        NOT NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    name          VARCHAR(50) UNIQUE NOT NULL,
+    email         VARCHAR(255) UNIQUE DEFAULT NULL,
+    password_hash VARCHAR(255)       NOT NULL,
+    permissions   BIT(16)            NOT NULL,
+    created_at    TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP,
-    is_active     BOOLEAN   DEFAULT TRUE,
-    uid           INTEGER UNIQUE -- For filesystem UID mapping to ACL
+    is_active     BOOLEAN             DEFAULT TRUE
 );
 
 CREATE TABLE refresh_tokens
@@ -28,7 +28,6 @@ CREATE TABLE groups
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
-    gid         INTEGER UNIQUE, -- For filesystem GID mapping to ACL
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

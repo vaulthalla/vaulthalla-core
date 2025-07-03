@@ -110,30 +110,6 @@ void WebSocketHandler::registerStorageHandlers() const {
     router_->registerHandler("storage.vault.get", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleGetVault(msg, session);
     });
-
-    router_->registerHandler("storage.volume.add", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleAddVolume(msg, session);
-    });
-
-    router_->registerHandler("storage.volume.remove", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleRemoveVolume(msg, session);
-    });
-
-    router_->registerHandler("storage.volume.list", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListVolumes(msg, session);
-    });
-
-    router_->registerHandler("storage.volume.list.vault", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListVaultVolumes(msg, session);
-    });
-
-    router_->registerHandler("storage.volume.list.user", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListUserVolumes(msg, session);
-    });
-
-    router_->registerHandler("storage.volume.get", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleGetVolume(msg, session);
-    });
 }
 
 void WebSocketHandler::registerAPIKeyHandlers() const {
@@ -231,20 +207,8 @@ void WebSocketHandler::registerGroupHandlers() const {
     router_->registerHandler("group.get.byName", [this](const json& msg, WebSocketSession& session) {
         GroupHandler::handleGetGroupByName(msg, session);
     });
-    router_->registerHandler("group.volume.add", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleAddStorageVolumeToGroup(msg, session);
-    });
-    router_->registerHandler("group.volume.remove", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleRemoveStorageVolumeFromGroup(msg, session);
-    });
     router_->registerHandler("groups.list.byUser", [this](const json& msg, WebSocketSession& session) {
         GroupHandler::handleListGroupsByUser(msg, session);
-    });
-    router_->registerHandler("groups.list.byVolume", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleListGroupsByStorageVolume(msg, session);
-    });
-    router_->registerHandler("group.get.byVolume", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleGetGroupByStorageVolume(msg, session);
     });
 }
 

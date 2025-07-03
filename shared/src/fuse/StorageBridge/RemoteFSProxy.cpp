@@ -1,6 +1,6 @@
-#include "StorageBridge/RemoteFSProxy.hpp"
-#include "../../include/types/db/file/File.hpp"
-#include "StorageBridge/UnifiedStorage.hpp"
+#include "fuse/StorageBridge/RemoteFSProxy.hpp"
+#include "types/File.hpp"
+#include "fuse/StorageBridge/UnifiedStorage.hpp"
 #include <cstring>
 #include <stdexcept>
 

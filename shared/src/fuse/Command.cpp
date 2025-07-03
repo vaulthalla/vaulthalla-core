@@ -1,4 +1,4 @@
-#include "types/fuse/Command.hpp"
+#include "fuse/Command.hpp"
 #include <unordered_map>
 
 namespace vh::types::fuse {

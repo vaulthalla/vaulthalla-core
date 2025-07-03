@@ -33,7 +33,7 @@ struct User {
     std::vector<std::shared_ptr<AssignedRole>> roles;
 
     User();
-    User(std::string name, std::string email = "");
+    User(std::string name, std::string email = "", bool isActive = true);
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::result& roles);
 
@@ -54,35 +54,44 @@ struct User {
     [[nodiscard]] bool canManageSettings() const;
     [[nodiscard]] bool canViewAuditLog() const;
     [[nodiscard]] bool canManageAPIKeys() const;
-
-    // Vault checks
     [[nodiscard]] bool canCreateLocalVault() const;
     [[nodiscard]] bool canCreateCloudVault() const;
     [[nodiscard]] bool canDeleteVault() const;
-    [[nodiscard]] bool canAdjustVaultSettings() const;
+    [[nodiscard]] bool canManageVaultSettings() const;
+    [[nodiscard]] bool canManageVaultRoles() const;
     [[nodiscard]] bool canMigrateVaultData() const;
-    [[nodiscard]] bool canCreateVolume() const;
-    [[nodiscard]] bool canDeleteVolume() const;
-    [[nodiscard]] bool canResizeVolume() const;
-    [[nodiscard]] bool canMoveVolume() const;
-    [[nodiscard]] bool canAssignVolumeToGroup() const;
+    [[nodiscard]] bool canManageAllVaults() const;
 
-    // File checks
-    [[nodiscard]] bool canUploadFile() const;
-    [[nodiscard]] bool canDownloadFile() const;
-    [[nodiscard]] bool canDeleteFile() const;
-    [[nodiscard]] bool canShareFilePublicly() const;
-    [[nodiscard]] bool canShareFileWithGroup() const;
-    [[nodiscard]] bool canLockFile() const;
-    [[nodiscard]] bool canRenameFile() const;
-    [[nodiscard]] bool canMoveFile() const;
+    // Vault permissions
+    [[nodiscard]] bool canUploadFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canDownloadFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canDeleteFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canShareFilePublicly(unsigned int vaultId) const;
+    [[nodiscard]] bool canShareFileInternally(unsigned int vaultId) const;
+    [[nodiscard]] bool canLockFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canRenameFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canMoveFile(unsigned int vaultId) const;
+    [[nodiscard]] bool canSyncFileLocally(unsigned int vaultId) const;
+    [[nodiscard]] bool canSyncFileWithCloud(unsigned int vaultId) const;
+    [[nodiscard]] bool canManageFileMetadata(unsigned int vaultId) const;
+    [[nodiscard]] bool canChangeFileIcons(unsigned int vaultId) const;
+    [[nodiscard]] bool canManageVersions(unsigned int vaultId) const;
+    [[nodiscard]] bool canManageFileTags(unsigned int vaultId) const;
 
-    // Directory checks
-    [[nodiscard]] bool canCreateDirectory() const;
-    [[nodiscard]] bool canDeleteDirectory() const;
-    [[nodiscard]] bool canRenameDirectory() const;
-    [[nodiscard]] bool canMoveDirectory() const;
-    [[nodiscard]] bool canListDirectory() const;
+    [[nodiscard]] bool canUploadDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canDownloadDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canDeleteDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canShareDirPublicly(unsigned int vaultId) const;
+    [[nodiscard]] bool canShareDirInternally(unsigned int vaultId) const;
+    [[nodiscard]] bool canLockDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canRenameDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canMoveDirectory(unsigned int vaultId) const;
+    [[nodiscard]] bool canSyncDirectoryLocally(unsigned int vaultId) const;
+    [[nodiscard]] bool canSyncDirectoryWithCloud(unsigned int vaultId) const;
+    [[nodiscard]] bool canManageDirectoryMetadata(unsigned int vaultId) const;
+    [[nodiscard]] bool canChangeDirectoryIcons(unsigned int vaultId) const;
+    [[nodiscard]] bool canManageDirectoryTags(unsigned int vaultId) const;
+    [[nodiscard]] bool canListDirectory(unsigned int vaultId) const;
 };
 
 } // namespace vh::types

@@ -26,10 +26,10 @@ std::string to_string(const AdminPermission p) {
     case AdminPermission::CreateLocalVault: return "Create Local Vault";
     case AdminPermission::CreateCloudVault: return "Create Cloud Vault";
     case AdminPermission::DeleteVault: return "Delete Vault";
-    case AdminPermission::AdjustVaultSettings: return "Adjust Vault Settings";
     case AdminPermission::MigrateVaultData: return "Migrate Vault Data";
-    case AdminPermission::AssignUserToVault: return "Assign User to Vault";
-    case AdminPermission::AssignGroupToVault: return "Assign Group to Vault";
+    case AdminPermission::ManageVaultSettings: return "Manage Vault Settings";
+    case AdminPermission::ManageVaultRoles: return "Manage Vault Roles";
+    case AdminPermission::ManageAllVaults: return "Manage All Vaults";
     default: return "Unknown Admin Permission";
     }
 }
@@ -48,6 +48,8 @@ std::string to_string(const FSPermission p) {
         case FSPermission::SyncCloud: return "Sync Cloud";
         case FSPermission::ModifyMetadata: return "Modify Metadata";
         case FSPermission::ChangeIcons: return "Change Icons";
+        case FSPermission::ManageTags: return "Manage Tags";
+        case FSPermission::ManageVersions: return "Manage Versions";
         case FSPermission::List: return "List Directory";
         default: return "Unknown File/Directory Permission";
     }

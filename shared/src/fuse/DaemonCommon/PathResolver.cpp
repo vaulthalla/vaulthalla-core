@@ -1,4 +1,4 @@
-#include "DaemonCommon/PathResolver.hpp"
+#include "fuse/DaemonCommon/PathResolver.hpp"
 
 namespace vh::shared::common {
 

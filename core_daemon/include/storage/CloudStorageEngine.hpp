@@ -5,7 +5,6 @@
 namespace vh::types {
 struct File;
 struct Vault;
-struct Volume;
 }
 
 namespace vh::storage {
@@ -29,9 +28,6 @@ public:
     bool deleteFile(const std::filesystem::path& rel_path) override;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
-
-    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listFilesInDir(const std::filesystem::path& rel_path,
-                                                                            bool recursive) const override;
 };
 
 } // namespace vh::storage

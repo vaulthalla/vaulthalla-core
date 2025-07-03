@@ -1,7 +1,6 @@
 #pragma once
 
-#include "types/db/Volume.hpp"
-#include "../../../shared/include/types/Vault.hpp"
+#include "types/Vault.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include <filesystem>

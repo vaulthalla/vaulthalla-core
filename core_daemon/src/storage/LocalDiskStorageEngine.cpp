@@ -1,12 +1,12 @@
 #include "storage/LocalDiskStorageEngine.hpp"
-#include "types/config/ConfigRegistry.hpp"
-#include "../../../shared/include/types/Vault.hpp"
+#include "config/ConfigRegistry.hpp"
+#include "types/Vault.hpp"
 #include <fstream>
 
 namespace vh::storage {
 
 LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault)
-    : StorageEngine(vault, types::config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
+    : StorageEngine(vault, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
 }
 
@@ -63,7 +63,7 @@ std::filesystem::path LocalDiskStorageEngine::resolvePath(const std::string& id)
 }
 
 std::filesystem::path LocalDiskStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
-    const auto& fuse_mnt = types::config::ConfigRegistry::get().fuse.root_mount_path;
+    const auto& fuse_mnt = config::ConfigRegistry::get().fuse.root_mount_path;
 
     if (rel_path.empty()) return fuse_mnt / root_;
 

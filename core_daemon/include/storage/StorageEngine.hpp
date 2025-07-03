@@ -40,8 +40,6 @@ public:
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
-    [[nodiscard]] virtual std::vector<std::shared_ptr<types::File> > listFilesInDir(const std::filesystem::path& rel_path, bool recursive) const = 0;
-
     [[nodiscard]] fs::path root_directory() const { return root_; }
 
     [[nodiscard]] virtual StorageType type() const = 0;

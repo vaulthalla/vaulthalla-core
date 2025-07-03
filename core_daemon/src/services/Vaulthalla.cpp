@@ -1,16 +1,16 @@
 #include "services/Vaulthalla.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "database/Transactions.hpp"
-#include "types/config/ConfigRegistry.hpp"
-#include "types/config/Config.hpp"
+#include "config/ConfigRegistry.hpp"
+#include "config/Config.hpp"
 
 namespace vh::services {
 void Vaulthalla::start() {
     std::cout << "Starting Vaulthalla service..." << std::endl;
 
     try {
-        const auto config = types::config::loadConfig("/etc/vaulthalla/config.yaml");
-        types::config::ConfigRegistry::init(config);
+        const auto config = config::loadConfig("/etc/vaulthalla/config.yaml");
+        config::ConfigRegistry::init(config);
         database::Transactions::init();
 
         ioContext_ = std::make_shared<boost::asio::io_context>();

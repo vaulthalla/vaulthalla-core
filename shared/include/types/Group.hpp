@@ -26,15 +26,15 @@ struct GroupMember {
 };
 
 struct Group {
-    unsigned int id, gid{};
+    unsigned int id{};
     std::string name;
     std::optional<std::string> description;
-    std::time_t created_at;
+    std::time_t created_at{};
     std::optional<std::time_t> updated_at;
     std::vector<std::shared_ptr<GroupMember>> members;
 
     Group() = default;
-    explicit Group(const pqxx::row& gr, const pqxx::result& members, const pqxx::result& storageVolumes);
+    explicit Group(const pqxx::row& gr, const pqxx::result& members);
     explicit Group(const nlohmann::json& j);
 };
 

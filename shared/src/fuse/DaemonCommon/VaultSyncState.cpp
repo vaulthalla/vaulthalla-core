@@ -1,4 +1,4 @@
-#include "DaemonCommon/VaultSyncState.hpp"
+#include "fuse/DaemonCommon/VaultSyncState.hpp"
 
 namespace vh::shared::common {
 

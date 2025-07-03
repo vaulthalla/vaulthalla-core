@@ -72,7 +72,7 @@ void GroupHandler::handleAddMemberToGroup(const json& msg, WebSocketSession& ses
         if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can add members to groups");
 
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const unsigned int groupId = payload.at("groupId").get<unsigned int>();
         const std::string memberName = payload.at("memberName").get<std::string>();
 
@@ -253,68 +253,6 @@ void GroupHandler::handleUpdateGroup(const json& msg, WebSocketSession& session)
     }
 }
 
-void GroupHandler::handleAddStorageVolumeToGroup(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can add storage volumes to groups");
-
-        const auto payload = msg.at("payload");
-        const unsigned int groupId = payload.at("groupId").get<unsigned int>();
-        const unsigned int volumeId = payload.at("volumeId").get<unsigned int>();
-
-        database::GroupQueries::addStorageVolumeToGroup(groupId, volumeId);
-
-        const json response = {
-            {"command", "group.volume.add.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", {{"groupId", groupId}, {"volumeId", volumeId}}}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "group.volume.add.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
-}
-
-void GroupHandler::handleRemoveStorageVolumeFromGroup(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can remove storage volumes from groups");
-
-        const auto payload = msg.at("payload");
-        const unsigned int groupId = payload.at("groupId").get<unsigned int>();
-        const unsigned int volumeId = payload.at("volumeId").get<unsigned int>();
-
-        database::GroupQueries::removeStorageVolumeFromGroup(groupId, volumeId);
-
-        const json response = {
-            {"command", "group.volume.remove.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", {{"groupId", groupId}, {"volumeId", volumeId}}}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "group.volume.remove.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
-}
-
 void GroupHandler::handleListGroupsByUser(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
@@ -337,68 +275,6 @@ void GroupHandler::handleListGroupsByUser(const json& msg, WebSocketSession& ses
     } catch (const std::exception& e) {
         const json response = {
             {"command", "groups.list.byUser.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
-}
-
-void GroupHandler::handleListGroupsByStorageVolume(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can list groups by storage volume");
-
-        const auto volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
-        const auto groups = database::GroupQueries::listGroupsByStorageVolume(volumeId);
-
-        const json data = {{"groups", groups}};
-
-        const json response = {
-            {"command", "groups.list.byVolume.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", data}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "groups.list.byVolume.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
-}
-
-void GroupHandler::handleGetGroupByStorageVolume(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can get group by storage volume");
-
-        const auto volumeId = msg.at("payload").at("volumeId").get<unsigned int>();
-        auto group = database::GroupQueries::getGroupByStorageVolume(volumeId);
-
-        if (!group) throw std::runtime_error("Group not found for the specified storage volume");
-
-        const json data = {{"group", *group}};
-
-        const json response = {
-            {"command", "group.get.byVolume.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", data}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "group.get.byVolume.response"},
             {"status", "error"},
             {"requestId", msg.at("requestId").get<std::string>()},
             {"error", e.what()}

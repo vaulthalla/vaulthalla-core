@@ -18,14 +18,9 @@ class result;
 namespace vh::types {
 
 struct AssignedRole : Role {
-    unsigned int id;
+    unsigned int id, subject_id, role_id, vault_id;
     std::string subject_type;   // 'user' or 'group'
-    unsigned int subject_id;
-    unsigned int role_id;
-    std::string scope;          // 'global', 'vault', 'volume'
-    std::optional<unsigned int> scope_id;
     std::time_t assigned_at;
-    bool inherited = false;
 
     AssignedRole() = default;
     explicit AssignedRole(const pqxx::row& row);

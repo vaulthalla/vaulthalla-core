@@ -13,11 +13,12 @@ FSEntry::FSEntry(const pqxx::row& row)
       vault_id(row["vault_id"].as<unsigned int>()),
       created_by(row["created_by"].as<unsigned int>()),
       last_modified_by(row["last_modified_by"].as<unsigned int>()),
-      parent_id(row["parent_id"].is_null() ? std::nullopt : std::make_optional(row["parent_id"].as<unsigned int>())),
       name(row["name"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
-      path(row["path"].as<std::filesystem::path>()) {
+      path(std::filesystem::path(row["path"].as<std::string>())) {
+    if (row["parent_id"].is_null()) parent_id = std::nullopt;
+    else parent_id = row["parent_id"].as<unsigned int>();
 }
 
 void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
@@ -41,7 +42,7 @@ void vh::types::from_json(const nlohmann::json& j, FSEntry& entry) {
     entry.name = j.at("name").get<std::string>();
     entry.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
     entry.updated_at = util::parsePostgresTimestamp(j.at("updated_at").get<std::string>());
-    entry.path = j.at("path").get<std::filesystem::path>();
+    entry.path = std::filesystem::path(j.at("path").get<std::string>());
 
     if (j.contains("parent_id") && !j["parent_id"].is_null()) entry.parent_id = j.at("parent_id").get<unsigned int>();
     else entry.parent_id.reset();

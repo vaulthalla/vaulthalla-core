@@ -18,7 +18,7 @@ void NotificationHandler::handleSubscribe(const json& msg, WebSocketSession& ses
 
         session.send(response);
 
-        std::cout << "[NotificationHandler] User '" << user->email << "' subscribed to channels." << std::endl;
+        std::cout << "[NotificationHandler] User '" << user->name << "' subscribed to channels." << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[NotificationHandler] handleSubscribe error: " << e.what() << std::endl;
@@ -41,7 +41,7 @@ void NotificationHandler::handleUnsubscribe(const json& msg, WebSocketSession& s
 
         session.send(response);
 
-        std::cout << "[NotificationHandler] User '" << user->email << "' unsubscribed from channels." << std::endl;
+        std::cout << "[NotificationHandler] User '" << user->name << "' unsubscribed from channels." << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[NotificationHandler] handleUnsubscribe error: " << e.what() << std::endl;

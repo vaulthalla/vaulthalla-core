@@ -1,5 +1,4 @@
 #include "auth/Client.hpp"
-#include "auth/AuthManager.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -14,7 +13,7 @@ Client::Client(const std::shared_ptr<websocket::WebSocketSession>& session,
                const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<types::User>& user)
     : user_(user), session_(session), refreshToken_(refreshToken) {
     if (user) {
-        token_ = std::make_shared<Token>(generateToken(user->email), user->id);
+        token_ = std::make_shared<Token>(generateToken(user->name), user->id);
         session_->setAuthenticatedUser(user_);
     }
 }
@@ -47,7 +46,7 @@ void Client::setUser(const std::shared_ptr<types::User>& user) {
         return;
     }
     user_ = user;
-    token_ = std::make_shared<Token>(generateToken(user->email), user->id);
+    token_ = std::make_shared<Token>(generateToken(user->name), user->id);
     session_->setAuthenticatedUser(user_);
 }
 
@@ -60,7 +59,7 @@ std::string Client::getUserName() const {
 }
 
 std::string Client::getEmail() const {
-    return user_ ? user_->email : "";
+    return user_ && user_->email ? *user_->email : "";
 }
 
 std::string Client::getRawToken() const {
@@ -76,14 +75,14 @@ bool Client::isAuthenticated() const {
 }
 
 void Client::refreshToken() {
-    if (user_) token_ = std::make_shared<Token>(generateToken(user_->email), user_->id);
+    if (user_) token_ = std::make_shared<Token>(generateToken(user_->name), user_->id);
     else std::cerr << "[Client] Cannot refresh token: user is not set." << std::endl;
 }
 
 void Client::invalidateToken() {
     if (token_) {
         token_->revoke();
-        std::cout << "[Client] Token invalidated for user: " << user_->email << std::endl;
+        std::cout << "[Client] Token invalidated for user: " << user_->name << std::endl;
     } else {
         std::cerr << "[Client] Cannot invalidate token: token is not set." << std::endl;
     }
@@ -93,7 +92,7 @@ void Client::closeConnection() {
     if (session_) {
         invalidateToken();
         session_->close();
-        std::cout << "[Client] Connection closed for user: " << user_->email << std::endl;
+        std::cout << "[Client] Connection closed for user: " << user_->name << std::endl;
     } else {
         std::cerr << "[Client] Cannot close connection: session is not set." << std::endl;
     }
@@ -101,9 +100,9 @@ void Client::closeConnection() {
 
 bool Client::validateToken(const std::string& token) const {
     try {
-        auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
+        const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
 
-        auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
+        const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
             .allow_algorithm(jwt::algorithm::hs256{jwt_secret_})
             .with_issuer("vaulthalla");
 
@@ -116,28 +115,28 @@ bool Client::validateToken(const std::string& token) const {
     }
 }
 
-void Client::sendControlMessage(const std::string& type, const nlohmann::json& payload) {
+void Client::sendControlMessage(const std::string& type, const nlohmann::json& payload) const {
     if (!isAuthenticated()) {
         std::cerr << "[Client] Cannot send control message: user is not authenticated." << std::endl;
         return;
     }
 
-    nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
+    const nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
 
     if (session_) session_->send(msg);
     else std::cerr << "[Client] Cannot send control message: session is not set." << std::endl;
 }
 
-std::string Client::generateToken(const std::string& email) {
-    auto token = jwt::create<jwt::traits::nlohmann_json>()
+std::string Client::generateToken(const std::string& name) const {
+    const auto validForMinutes = config::ConfigRegistry::get().auth.token_expiry_minutes;
+
+    return jwt::create<jwt::traits::nlohmann_json>()
         .set_issuer("vaulthalla")
         .set_type("JWS")
-        .set_subject(email)
+        .set_subject(name)
         .set_issued_at(std::chrono::system_clock::now())
-        .set_expires_at(std::chrono::system_clock::now() + std::chrono::minutes(60))
+        .set_expires_at(std::chrono::system_clock::now() + std::chrono::minutes(validForMinutes))
         .sign(jwt::algorithm::hs256{jwt_secret_});
-
-    return token;
 }
 
 } // namespace vh::auth

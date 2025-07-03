@@ -4,8 +4,6 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 
-#include <pqxx/prepared_statement>
-
 using namespace vh::database;
 
 void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
@@ -21,7 +19,7 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
-        p.append(file->path);
+        p.append(file->path.string());
 
         txn.exec_prepared("insert_file", p);
     });
@@ -29,8 +27,6 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
 
 void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
-
-
 
     Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
         pqxx::params p;
@@ -42,7 +38,7 @@ void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
-        p.append(file->path);
+        p.append(file->path.string());
 
         txn.exec_prepared("update_file", p);
     });
@@ -85,7 +81,7 @@ void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& director
         p.append(directory->name);
         p.append(directory->created_by);
         p.append(directory->last_modified_by);
-        p.append(directory->path);
+        p.append(directory->path.string());
 
         txn.exec_prepared("insert_directory", p);
 
@@ -109,7 +105,7 @@ void FileQueries::updateDirectory(const std::shared_ptr<types::Directory>& direc
         p.append(directory->parent_id);
         p.append(directory->name);
         p.append(directory->last_modified_by);
-        p.append(directory->path);
+        p.append(directory->path.string());
 
         txn.exec_prepared("update_directory", p);
 
@@ -159,9 +155,7 @@ std::shared_ptr<vh::types::Directory> FileQueries::getDirectoryByPath(const std:
 
 std::vector<std::shared_ptr<vh::types::FSEntry>> FileQueries::listDir(const unsigned int vaultId, const std::string& absPath, const bool recursive) {
     return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::FSEntry>> {
-        pqxx::params p;
-        p.append(vaultId);
-        p.append(absPath);
+        pqxx::params p{vaultId, absPath};
 
         const auto files = types::files_from_pq_res(txn.exec_prepared("list_files_in_dir", p));
         const auto directories = types::directories_from_pq_res(txn.exec_prepared("list_directories_in_dir", p));

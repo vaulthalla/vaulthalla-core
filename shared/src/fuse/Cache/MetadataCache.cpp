@@ -1,4 +1,4 @@
-#include "Cache/MetadataCache.hpp"
+#include "fuse/Cache/MetadataCache.hpp"
 
 namespace vh::shared::cache {
 

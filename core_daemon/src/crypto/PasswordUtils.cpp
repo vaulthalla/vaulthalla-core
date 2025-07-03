@@ -15,7 +15,7 @@ unsigned short PasswordUtils::passwordStrengthCheck(const std::string& password)
 
     unsigned short score = 0;
 
-    size_t len = password.size();
+    const size_t len = password.size();
     if (len >= 8) score += 20;
     if (len >= 12) score += 10;
     if (len >= 16) score += 10;
@@ -56,7 +56,7 @@ bool PasswordUtils::isCommonWeakPassword(const std::string& password) {
 }
 
 size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
-    size_t newLength = size * nmemb;
+    const size_t newLength = size * nmemb;
     s->append((char*)contents, newLength);
     return newLength;
 }
@@ -76,9 +76,9 @@ bool PasswordUtils::isPwnedPassword(const std::string& password) {
     std::istringstream stream(response);
     std::string line;
     while (std::getline(stream, line)) {
-        size_t delimPos = line.find(':');
+        const size_t delimPos = line.find(':');
         if (delimPos != std::string::npos) {
-            std::string hashSuffix = line.substr(0, delimPos);
+            const std::string hashSuffix = line.substr(0, delimPos);
             if (hashSuffix == suffix) return true;
         }
     }

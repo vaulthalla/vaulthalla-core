@@ -1,11 +1,11 @@
 #pragma once
 
-#include "types/config/Config.hpp"
+#include "config/Config.hpp"
 #include <yaml-cpp/yaml.h>
 
 namespace YAML {
 
-using namespace vh::types::config;
+using namespace vh::config;
 
 // ServerConfig
 

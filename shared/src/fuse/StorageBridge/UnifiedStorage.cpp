@@ -1,5 +1,5 @@
-#include "StorageBridge/UnifiedStorage.hpp"
-#include "../../include/types/db/file/File.hpp"
+#include "fuse/StorageBridge/UnifiedStorage.hpp"
+#include "types/File.hpp"
 #include <cstring>
 #include <ctime>
 #include <stdexcept>
@@ -52,10 +52,9 @@ vh::types::File UnifiedStorage::getMetadata(const std::string& path) const {
 
     const FileNode& node = it->second;
     types::File f;
-    f.mode = node.mode;
     f.created_at = node.created_at;
     f.updated_at = node.updated_at;
-    f.current_version_size_bytes = node.data.size();
+    f.size_bytes = node.data.size();
     return f;
 }
 
@@ -70,12 +69,11 @@ std::vector<vh::types::File> UnifiedStorage::listDirectory(const std::string& pa
         auto relative = p.substr(base.size() + 1);
         if (relative.empty() || relative.find('/') != std::string::npos) continue;
 
-        vh::types::File f;
+        types::File f;
         f.name = relative;
-        f.mode = node.mode;
         f.created_at = node.created_at;
         f.updated_at = node.updated_at;
-        f.current_version_size_bytes = node.data.size();
+        f.size_bytes = node.data.size();
         entries.push_back(f);
     }
 

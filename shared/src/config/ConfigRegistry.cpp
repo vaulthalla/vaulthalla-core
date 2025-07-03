@@ -1,16 +1,16 @@
-#include "types/config/ConfigRegistry.hpp"
+#include "config/ConfigRegistry.hpp"
 #include <stdexcept>
 
-namespace vh::types::config {
+namespace vh::config {
 
-void ConfigRegistry::init(const types::config::Config& cfg) {
+void ConfigRegistry::init(const Config& cfg) {
     std::call_once(init_flag_, [&]() {
         config_ = cfg;
         initialized_ = true;
     });
 }
 
-const types::config::Config& ConfigRegistry::get() {
+const Config& ConfigRegistry::get() {
     ensureInitialized();
     return config_;
 }
@@ -21,4 +21,4 @@ void ConfigRegistry::ensureInitialized() {
     }
 }
 
-} // namespace vh::types::config
+} // namespace vh::config

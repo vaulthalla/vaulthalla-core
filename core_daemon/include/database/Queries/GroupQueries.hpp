@@ -25,7 +25,6 @@ struct GroupQueries {
     static void removeStorageVolumeFromGroup(unsigned int groupId, unsigned int volumeId);
     static std::vector<std::shared_ptr<types::Group>> listGroupsByUser(unsigned int userId);
     static std::vector<std::shared_ptr<types::Group>> listGroupsByStorageVolume(unsigned int volumeId);
-    static std::shared_ptr<types::Group> getGroupByStorageVolume(unsigned int volumeId);
 };
 
 }

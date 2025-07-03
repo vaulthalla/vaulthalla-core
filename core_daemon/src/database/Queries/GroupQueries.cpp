@@ -1,7 +1,6 @@
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Transactions.hpp"
-#include "../../../../shared/include/types/Group.hpp"
-#include "types/db/Volume.hpp"
+#include "types/Group.hpp"
 
 using namespace vh::database;
 
@@ -45,7 +44,7 @@ void GroupQueries::updateGroup(const unsigned int groupId, const std::string& ne
 
 std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups() {
     return Transactions::exec("GroupQueries::listGroups",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<vh::types::Group>> {
+        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Group>> {
             const auto res = txn.exec("SELECT * FROM groups");
 
             std::vector<std::shared_ptr<types::Group>> groups;
@@ -58,13 +57,7 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups() {
                     "JOIN group_members gm ON u.id = gm.user_id "
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
-                const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
+                groups.push_back(std::make_shared<types::Group>(group, members));
             }
             return groups;
         });
@@ -81,13 +74,7 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroup(const unsigned int grou
                 "JOIN group_members gm ON u.id = gm.user_id "
                 "WHERE gm.group_id = " + txn.quote(groupId));
 
-            const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-            return std::make_shared<types::Group>(groupRow, members, storageVolumes);
+            return std::make_shared<types::Group>(groupRow, members);
         });
 }
 
@@ -103,15 +90,9 @@ std::shared_ptr<vh::types::Group> GroupQueries::getGroupByName(const std::string
                 "SELECT u.*, gm.joined_at "
                 "FROM users u "
                 "JOIN group_members gm ON u.id = gm.user_id "
-                "WHERE gm.group_id = " + txn.quote(groupRow["id"].as<unsigned int>()));
+                "WHERE gm.group_id = " + txn.quote(groupId));
 
-            const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-            return std::make_shared<types::Group>(groupRow, members, storageVolumes);
+            return std::make_shared<types::Group>(groupRow, members);
         });
 }
 
@@ -150,13 +131,7 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByUser(co
                     "JOIN group_members gm ON u.id = gm.user_id "
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
-                const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
+                groups.push_back(std::make_shared<types::Group>(group, members));
             }
             return groups;
         });
@@ -180,40 +155,8 @@ std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByStorage
                     "JOIN group_members gm ON u.id = gm.user_id "
                     "WHERE gm.group_id = " + txn.quote(groupId));
 
-                const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members, storageVolumes));
+                groups.push_back(std::make_shared<types::Group>(group, members));
             }
             return groups;
-        });
-}
-
-std::shared_ptr<vh::types::Group> GroupQueries::getGroupByStorageVolume(const unsigned int volumeId) {
-    return Transactions::exec("GroupQueries::getGroupByStorageVolume",
-        [&](pqxx::work& txn) -> std::shared_ptr<vh::types::Group> {
-            const auto group = txn.exec(
-                "SELECT g.* FROM groups g "
-                "JOIN volumes vs ON g.id = vs.subject_id "
-                "WHERE vs.volume_id = " + txn.quote(volumeId)).one_row();
-
-            const auto groupId = group["id"].as<unsigned int>();
-
-            const auto members = txn.exec(
-                    "SELECT u.*, gm.joined_at "
-                    "FROM users u "
-                    "JOIN group_members gm ON u.id = gm.user_id "
-                    "WHERE gm.group_id = " + txn.quote(groupId));
-
-            const auto storageVolumes = txn.exec(
-                "SELECT v.*, vs.assigned_at "
-                "FROM volume v "
-                "JOIN volumes vs ON v.id = vs.volume_id "
-                "WHERE vs.subject_id = " + txn.quote(groupId));
-
-            return std::make_shared<types::Group>(group, members, storageVolumes);
         });
 }

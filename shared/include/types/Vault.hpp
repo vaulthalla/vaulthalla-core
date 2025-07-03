@@ -65,7 +65,7 @@ struct LocalDiskVault : Vault {
         : Vault(row), vault_id(row["vault_id"].as<unsigned int>()), mount_point(row["mount_point"].as<std::string>()) {}
 };
 
-struct S3Vault : public Vault {
+struct S3Vault : Vault {
     unsigned short vault_id{};
     unsigned short api_key_id{};
     std::string bucket;
@@ -73,7 +73,7 @@ struct S3Vault : public Vault {
     S3Vault() = default;
 
     S3Vault(const std::string& name, unsigned short apiKeyID, std::string bucketName)
-        : Vault(), vault_id(0), api_key_id(apiKeyID), bucket(std::move(bucketName)) {
+        : Vault(), api_key_id(apiKeyID), bucket(std::move(bucketName)) {
         this->name = name;
         this->type = VaultType::S3;
         this->is_active = true;

@@ -2,9 +2,9 @@
 #include "FUSEMountManager.hpp"
 #include "FUSEOperations.hpp"
 #include "FUSEPermissions.hpp"
-#include "StorageBridge/RemoteFSProxy.hpp"
-#include "StorageBridge/UnifiedStorage.hpp"
-#include "types/fuse/Command.hpp"
+#include "fuse/StorageBridge/RemoteFSProxy.hpp"
+#include "fuse/StorageBridge/UnifiedStorage.hpp"
+#include "fuse/Command.hpp"
 #include <iostream>
 #include <thread>
 

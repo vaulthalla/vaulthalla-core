@@ -1,5 +1,5 @@
-#include "types/config/Config.hpp"
-#include "types/config/config_yaml.hpp"
+#include "config/Config.hpp"
+#include "config/config_yaml.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace vh::types::config {
+namespace vh::config {
 
 template <typename T> T getOrDefault(const YAML::Node& node, const std::string& key, const T& def) {
     return node[key] ? node[key].as<T>() : def;
@@ -191,4 +191,4 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.advanced.rate_limit_per_ip_per_minute = j.at("advanced").at("rate_limit_per_ip_per_minute").get<int>();
 }
 
-} // namespace vh::types::config
+} // namespace vh::config

@@ -235,7 +235,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
 void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& session) const {
     try {
-        unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
+        const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
         storageManager_->removeVault(vaultId);
 
         const json response = {{"command", "storage.vault.remove.response"},
@@ -259,8 +259,8 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
 void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) const {
     try {
-        unsigned int vaultId = msg.at("payload").at("id").get<unsigned int>();
-        auto vault = storageManager_->getVault(vaultId);
+        const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
+        const auto vault = storageManager_->getVault(vaultId);
 
         const json data = {{"vault", json(*vault)}};
 

@@ -42,26 +42,26 @@ void StorageManager::initStorageEngines() {
 
 void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
     try {
-        std::cout << "[StorageManager] Initializing storage for user: " << user->email << "\n";
+        std::cout << "[StorageManager] Initializing storage for user: " << user->name << "\n";
 
         if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
         std::shared_ptr<types::Vault> vault =
             std::make_shared<types::LocalDiskVault>(user->name + "'s Local Disk Vault",
                                                     std::filesystem::path(
-                                                        types::config::ConfigRegistry::get().fuse.root_mount_path) /
-                                                    "users" / user->email); {
+                                                        config::ConfigRegistry::get().fuse.root_mount_path) /
+                                                    "users" / user->name); {
             std::lock_guard lock(mountsMutex_);
             vault->id = database::VaultQueries::addVault(vault);
             vault = database::VaultQueries::getVault(vault->id);
         }
 
-        if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->email);
+        if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->name);
 
         engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(
             std::static_pointer_cast<types::LocalDiskVault>(vault));
 
-        std::cout << "[StorageManager] Initialized storage for user: " << user->email << "\n";
+        std::cout << "[StorageManager] Initialized storage for user: " << user->name << "\n";
     } catch (const std::exception& e) {
         std::cerr << "[StorageManager] Error initializing user storage: " << e.what() << "\n";
         throw;

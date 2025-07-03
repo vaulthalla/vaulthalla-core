@@ -1,6 +1,5 @@
 #include "storage/CloudStorageEngine.hpp"
-#include "../../../shared/include/types/Vault.hpp"
-#include "types/db/Volume.hpp"
+#include "types/Vault.hpp"
 #include <iostream>
 
 namespace vh::storage {
@@ -36,12 +35,6 @@ bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const
     std::cout << "[CloudStorageEngine] fileExists called: " << rel_path << "\n";
     // TODO: Implement S3/R2 fileExists logic
     return false;
-}
-
-std::vector<std::shared_ptr<types::File> > CloudStorageEngine::listFilesInDir(const std::filesystem::path& rel_path,
-                                                                              bool recursive) const {
-    std::cout << "[CloudStorageEngine] listFilesInDir called: " << rel_path << "\n";
-    return {};
 }
 
 } // namespace vh::storage

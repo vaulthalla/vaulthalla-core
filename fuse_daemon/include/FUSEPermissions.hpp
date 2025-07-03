@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../shared/include/types/db/file/File.hpp"
+#include "types/File.hpp"
 #include <string>
 #include <sys/types.h>
 #include <unordered_map>

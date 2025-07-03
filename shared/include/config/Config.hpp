@@ -6,7 +6,7 @@
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
 
-namespace vh::types::config {
+namespace vh::config {
 
 struct ServerConfig {
     std::string host = "0.0.0.0";
@@ -96,4 +96,4 @@ Config loadConfig(const std::string& path);
 void to_json(nlohmann::json& j, const Config& c);
 void from_json(const nlohmann::json& j, Config& c);
 
-} // namespace vh::types::config
+} // namespace vh::config

@@ -32,14 +32,13 @@ private:
 
     template <typename... Funcs> static void enforcePermissions(WebSocketSession& session,
                                                                 const unsigned int vaultId,
-                                                                const unsigned int volumeId,
                                                                 Funcs... checks) {
         const auto user = session.getAuthenticatedUser();
         if (!user) throw std::runtime_error("Unauthorized");
 
         if (user->isAdmin()) return;
 
-        const auto role = user->getBestFitRole(vaultId, volumeId);
+        const auto role = user->getRole(vaultId);
         if (!role) throw std::runtime_error("No role assigned for this vault/volume");
 
         // Apply each check, succeed if any is true

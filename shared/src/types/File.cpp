@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
+#include <pqxx/result>
 #include <format>
 
 namespace vh::types {

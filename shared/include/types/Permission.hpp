@@ -12,38 +12,40 @@ namespace vh::types {
 
 // Admin-level permissions
 enum class AdminPermission : uint16_t {
-    CreateUser           = 1ULL << 0,
-    CreateAdminUser      = 1ULL << 1,
-    DeactivateUser       = 1ULL << 2,
-    ResetUserPassword    = 1ULL << 3,
-    ManageRoles          = 1ULL << 4,
-    ManageSettings       = 1ULL << 5,
-    ViewAuditLog         = 1ULL << 6,
-    ManageAPIKeys        = 1ULL << 7,
-    CreateLocalVault     = 1ULL << 8,
-    CreateCloudVault     = 1ULL << 9,
-    DeleteVault          = 1ULL << 10,
-    AdjustVaultSettings  = 1ULL << 11,
-    MigrateVaultData     = 1ULL << 12,
-    AssignUserToVault    = 1ULL << 13,
-    AssignGroupToVault   = 1ULL << 14
+    CreateUser              = 1ULL << 0,
+    CreateAdminUser         = 1ULL << 1,
+    DeactivateUser          = 1ULL << 2,
+    ResetUserPassword       = 1ULL << 3,
+    ManageRoles             = 1ULL << 4,
+    ManageSettings          = 1ULL << 5,
+    ViewAuditLog            = 1ULL << 6,
+    ManageAPIKeys           = 1ULL << 7,
+    CreateLocalVault        = 1ULL << 8,
+    CreateCloudVault        = 1ULL << 9,
+    DeleteVault             = 1ULL << 10,
+    ManageVaultSettings     = 1ULL << 11,
+    ManageVaultRoles        = 1ULL << 12,
+    MigrateVaultData        = 1ULL << 13,
+    ManageAllVaults         = 1ULL << 14,
 };
 
 // File and Directory permissions
 enum class FSPermission : uint16_t {
-    Upload          = 1ULL << 0,
-    Download        = 1ULL << 1,
-    Delete          = 1ULL << 2,
-    SharePublic     = 1ULL << 3,
-    ShareInternal   = 1ULL << 4,
-    Lock            = 1ULL << 5,
-    Rename          = 1ULL << 6,
-    Move            = 1ULL << 7,
-    SyncLocal       = 1ULL << 8,
-    SyncCloud       = 1ULL << 9,
-    ModifyMetadata  = 1ULL << 10,
-    ChangeIcons     = 1ULL << 11,
-    List            = 1ULL << 12  // Directory specific permission
+    Upload                  = 1ULL << 0,
+    Download                = 1ULL << 1,
+    Delete                  = 1ULL << 2,
+    SharePublic             = 1ULL << 3,
+    ShareInternal           = 1ULL << 4,
+    Lock                    = 1ULL << 5,
+    Rename                  = 1ULL << 6,
+    Move                    = 1ULL << 7,
+    SyncLocal               = 1ULL << 8,
+    SyncCloud               = 1ULL << 9,
+    ModifyMetadata          = 1ULL << 10,
+    ChangeIcons             = 1ULL << 11,
+    ManageTags              = 1ULL << 12,
+    List                    = 1ULL << 13,  // Directory specific
+    ManageVersions          = 1ULL << 14,  // File specific
 };
 
 struct Permission {

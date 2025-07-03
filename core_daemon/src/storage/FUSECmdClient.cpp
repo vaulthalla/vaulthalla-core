@@ -1,6 +1,6 @@
 #include "storage/FUSECmdClient.hpp"
-#include "types/fuse/Command.hpp"
-#include "types/config/ConfigRegistry.hpp"
+#include "fuse/Command.hpp"
+#include "config/ConfigRegistry.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sys/socket.h>
@@ -19,7 +19,7 @@ bool sendCommand(const types::fuse::Command& cmd) {
     sockaddr_un addr{};
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, types::config::ConfigRegistry::get().server.uds_socket.c_str(), sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, config::ConfigRegistry::get().server.uds_socket.c_str(), sizeof(addr.sun_path) - 1);
 
     if (connect(sock, (sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("connect");

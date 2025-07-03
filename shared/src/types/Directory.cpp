@@ -16,7 +16,7 @@ DirectoryStats::DirectoryStats(const pqxx::row& row) {
 
 Directory::Directory(const pqxx::row& row) : FSEntry(row), stats(std::make_shared<DirectoryStats>(row)) {}
 
-void to_json(nlohmann::json& j, const DirectoryStats& stats) {
+void vh::types::to_json(nlohmann::json& j, const DirectoryStats& stats) {
     j = {
         {"size_bytes", stats.size_bytes},
         {"file_count", stats.file_count},
@@ -25,25 +25,25 @@ void to_json(nlohmann::json& j, const DirectoryStats& stats) {
     };
 }
 
-void from_json(const nlohmann::json& j, DirectoryStats& stats) {
+void vh::types::from_json(const nlohmann::json& j, DirectoryStats& stats) {
     stats.size_bytes = j.at("size_bytes").get<unsigned long long>();
     stats.file_count = j.at("file_count").get<unsigned int>();
     stats.subdirectory_count = j.at("subdirectory_count").get<unsigned int>();
     stats.last_modified = vh::util::parsePostgresTimestamp(j.at("last_modified").get<std::string>());
 }
 
-void to_json(nlohmann::json& j, const Directory& d) {
+void vh::types::to_json(nlohmann::json& j, const Directory& d) {
     to_json(j, static_cast<const FSEntry&>(d));
     j["stats"] = *d.stats;
     j["type"] = "directory"; // Helpful for client
 }
 
-void from_json(const nlohmann::json& j, Directory& d) {
+void vh::types::from_json(const nlohmann::json& j, Directory& d) {
     from_json(j, static_cast<FSEntry&>(d));
     d.stats = std::make_shared<DirectoryStats>(j.at("stats").get<DirectoryStats>());
 }
 
-std::vector<std::shared_ptr<Directory>> directories_from_pq_res(const pqxx::result& res) {
+std::vector<std::shared_ptr<Directory>> vh::types::directories_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<Directory>> directories;
     for (const auto& row : res) directories.push_back(std::make_shared<Directory>(row));
     return directories;

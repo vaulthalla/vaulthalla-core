@@ -1,4 +1,4 @@
-#include "Cache/PreviewCache.hpp"
+#include "fuse/Cache/PreviewCache.hpp"
 
 namespace vh::shared::cache {
 

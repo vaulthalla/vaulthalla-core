@@ -13,8 +13,9 @@ std::shared_ptr<types::User> UserQueries::getUserByName(const std::string& name)
 
         pqxx::params p{"user", userRow["id"].as<unsigned int>()};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
+        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes, overridesRes);
     });
 }
 
@@ -24,8 +25,9 @@ std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
 
         pqxx::params p{"user", userRow["id"].as<unsigned int>()};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
+        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes, overridesRes);
     });
 }
 
@@ -35,8 +37,9 @@ std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::strin
 
         pqxx::params p{"user", userRow["id"].as<unsigned int>()};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
+        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, rolesRes);
+        return std::make_shared<types::User>(userRow, rolesRes, overridesRes);
     });
 }
 
@@ -95,8 +98,9 @@ std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
         for (const auto& row : res) {
             pqxx::params p{"user", row["id"].as<unsigned int>()};
             const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
+            const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-            usersWithRoles.push_back(std::make_shared<types::User>(row, rolesRes));
+            usersWithRoles.push_back(std::make_shared<types::User>(row, rolesRes, overridesRes));
         }
         return usersWithRoles;
     });

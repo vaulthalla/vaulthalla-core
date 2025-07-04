@@ -13,6 +13,15 @@ Permission::Permission(const pqxx::row& row)
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {}
 
+Permission::Permission(const nlohmann::json& j)
+    : id(j.at("id").get<unsigned int>()),
+      name(j.at("name").get<std::string>()),
+      display_name(j.at("display_name").get<std::string>()),
+      description(j.at("description").get<std::string>()),
+      bit_position(j.at("bit_position").get<uint16_t>()),
+      created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())),
+      updated_at(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {}
+
 std::string to_string(const AdminPermission p) {
     switch (p) {
     case AdminPermission::CreateUser: return "Create User";

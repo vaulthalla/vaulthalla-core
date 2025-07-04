@@ -121,27 +121,27 @@ void PermsQueries::removeAssignedRole(const unsigned int id) {
 
 std::shared_ptr<AssignedRole> PermsQueries::getSubjectAssignedRole(const unsigned int subjectId, const std::string& subjectType, const unsigned int roleId) {
     return Transactions::exec("PermsQueries::getSubjectAssignedRole", [&](pqxx::work& txn) {
-        pqxx::params p;
-        p.append(subjectType);
-        p.append(subjectId);
-        p.append(roleId);
-
-        const auto row = txn.exec_prepared("get_subject_assigned_role", p).one_row();
-        return std::make_shared<AssignedRole>(row);
+        pqxx::params role_params{subjectType, subjectId, roleId};
+        const auto role = txn.exec_prepared("get_subject_assigned_role", role_params).one_row();
+        const auto overrides = txn.exec_prepared("get_assigned_role_overrides", pqxx::params{roleId});
+        return std::make_shared<AssignedRole>(role, overrides);
     });
 }
 
 std::shared_ptr<AssignedRole> PermsQueries::getAssignedRole(const unsigned int id) {
     return Transactions::exec("PermsQueries::getAssignedRole", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_assigned_role", pqxx::params{id}).one_row();
-        return std::make_shared<AssignedRole>(row);
+        const auto role = txn.exec_prepared("get_assigned_role", pqxx::params{id}).one_row();
+        const auto overrides = txn.exec_prepared("get_assigned_role_overrides", pqxx::params{id});
+        return std::make_shared<AssignedRole>(role, overrides);
     });
 }
 
 std::vector<std::shared_ptr<AssignedRole>> PermsQueries::listAssignedRoles(const unsigned int vaultId) {
     return Transactions::exec("PermsQueries::listAssignedRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("get_vault_assigned_roles", pqxx::params{vaultId});
-        return assigned_roles_from_pq_result(res);
+        pqxx::params p{vaultId};
+        const auto roles = txn.exec_prepared("get_vault_assigned_roles", p);
+        const auto overrides = txn.exec_prepared("get_vault_permissions_overrides", p);
+        return assigned_roles_from_pq_result(roles, overrides);
     });
 }
 

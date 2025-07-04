@@ -33,9 +33,9 @@ struct User {
     std::vector<std::shared_ptr<AssignedRole>> roles;
 
     User();
-    User(std::string name, std::string email = "", bool isActive = true);
+    explicit User(std::string name, std::string email = "", bool isActive = true);
     explicit User(const pqxx::row& row);
-    User(const pqxx::row& user, const pqxx::result& roles);
+    User(const pqxx::row& user, const pqxx::result& roles, const pqxx::result& overrides);
 
     [[nodiscard]] std::shared_ptr<AssignedRole> getRole(unsigned int vaultId) const;
 

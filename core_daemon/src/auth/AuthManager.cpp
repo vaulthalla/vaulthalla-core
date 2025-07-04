@@ -210,16 +210,13 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, 
                             "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
 
     if (PasswordUtils::containsDictionaryWord(password))
-        errors.emplace_back(
-            "Password contains dictionary word — this is forbidden.");
+        errors.emplace_back("Password contains dictionary word — this is forbidden.");
 
     if (PasswordUtils::isCommonWeakPassword(password))
-        errors.emplace_back(
-            "Password matches known weak pattern — this is forbidden.");
+        errors.emplace_back("Password matches known weak pattern — this is forbidden.");
 
     if (PasswordUtils::isPwnedPassword(password))
-        errors.emplace_back(
-            "Password has been found in public breaches — choose a different one.");
+        errors.emplace_back("Password has been found in public breaches — choose a different one.");
 
     if (!errors.empty()) {
         std::ostringstream oss;
@@ -267,7 +264,7 @@ std::string generateUUID() {
 std::pair<std::string, std::shared_ptr<RefreshToken> >
 AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) {
     const auto now = std::chrono::system_clock::now();
-    const auto exp = now + std::chrono::hours(24 * 7); // 7 days
+    const auto exp = now + std::chrono::days(config::ConfigRegistry::get().auth.refresh_token_expiry_days);
     std::string jti = generateUUID();
 
     std::string token =

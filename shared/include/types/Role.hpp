@@ -23,36 +23,6 @@ struct Role {
     Role() = default;
     explicit Role(const pqxx::row& row);
     explicit Role(const nlohmann::json& j);
-
-    [[nodiscard]] bool canUploadFile() const;
-    [[nodiscard]] bool canDownloadFile() const;
-    [[nodiscard]] bool canDeleteFile() const;
-    [[nodiscard]] bool canShareFilePublicly() const;
-    [[nodiscard]] bool canShareFileInternally() const;
-    [[nodiscard]] bool canLockFile() const;
-    [[nodiscard]] bool canRenameFile() const;
-    [[nodiscard]] bool canMoveFile() const;
-    [[nodiscard]] bool canSyncFileLocally() const;
-    [[nodiscard]] bool canSyncFileWithCloud() const;
-    [[nodiscard]] bool canManageFileMetadata() const;
-    [[nodiscard]] bool canChangeFileIcons() const;
-    [[nodiscard]] bool canManageVersions() const;
-    [[nodiscard]] bool canManageFileTags() const;
-
-    [[nodiscard]] bool canUploadDirectory() const;
-    [[nodiscard]] bool canDownloadDirectory() const;
-    [[nodiscard]] bool canDeleteDirectory() const;
-    [[nodiscard]] bool canShareDirPublicly() const;
-    [[nodiscard]] bool canShareDirInternally() const;
-    [[nodiscard]] bool canLockDirectory() const;
-    [[nodiscard]] bool canRenameDirectory() const;
-    [[nodiscard]] bool canMoveDirectory() const;
-    [[nodiscard]] bool canSyncDirectoryLocally() const;
-    [[nodiscard]] bool canSyncDirectoryWithCloud() const;
-    [[nodiscard]] bool canManageDirectoryMetadata() const;
-    [[nodiscard]] bool canChangeDirectoryIcons() const;
-    [[nodiscard]] bool canManageDirectoryTags() const;
-    [[nodiscard]] bool canListDirectory() const;
 };
 
 // JSON + DB helpers

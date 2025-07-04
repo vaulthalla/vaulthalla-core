@@ -55,7 +55,11 @@ struct Permission {
     std::time_t created_at, updated_at;
 
     explicit Permission(const pqxx::row& row);
+    explicit Permission(const nlohmann::json& j);
 };
+
+inline unsigned short adminPermToBit(const AdminPermission& perm) { return static_cast<unsigned short>(perm); }
+inline unsigned short fsPermToBit(const FSPermission& perm) { return static_cast<unsigned short>(perm); }
 
 // String conversions
 std::string to_string(AdminPermission p);
@@ -95,9 +99,7 @@ std::vector<T> permsFromBitmask(uint16_t mask) {
 }
 
 template <typename T>
-bool hasPermission(uint16_t mask, T perm) {
-    return (mask & static_cast<uint16_t>(perm)) != 0;
-}
+bool hasPermission(const uint16_t mask, T perm) { return (mask & static_cast<uint16_t>(perm)) != 0; }
 
 nlohmann::json jsonFromAdminMask(uint16_t mask);
 nlohmann::json jsonFromFSMask(uint16_t mask);

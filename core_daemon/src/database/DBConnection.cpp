@@ -183,6 +183,27 @@ void DBConnection::initPreparedPerms() const {
         "JOIN simple_permissions sp ON r.id = sp.role_id "
         "JOIN permissions pp ON r.id = pp.role_id "
         "WHERE rs.id = $1");
+
+    conn_->prepare("get_permission_override",
+        "SELECT p.*, po.enabled, po.regex, po.is_file "
+        "FROM permission p "
+        "JOIN permission_overrides po ON p.id = po.permission_id "
+        "JOIN roles ar ON po.role_id = ar.id "
+        "WHERE ar.id = $1");
+
+    conn_->prepare("get_vault_permission_overrides",
+        "SELECT p.*, po.enabled, po.regex, po.role_id, po.is_file "
+        "FROM permission p "
+        "JOIN permission_overrides po ON p.id = po.permission_id "
+        "JOIN roles ar ON po.role_id = ar.id "
+        "WHERE ar.vault_id = $1");
+
+    conn_->prepare("get_subject_permission_overrides",
+        "SELECT p.*, po.enabled, po.regex, po.is_file "
+        "FROM permission p "
+        "JOIN permission_overrides po ON p.id = po.permission_id "
+        "JOIN roles ar ON po.role_id = ar.id "
+        "WHERE ar.subject_type = $1 AND ar.subject_id = $2");
 }
 
 

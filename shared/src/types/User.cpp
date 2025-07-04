@@ -34,8 +34,8 @@ User::User(const pqxx::row& row)
     else email = std::make_optional(row["email"].as<std::string>());
 }
 
-User::User(const pqxx::row& user, const pqxx::result& roles)
-: User(user) { this->roles = assigned_roles_from_pq_result(roles); }
+User::User(const pqxx::row& user, const pqxx::result& roles, const pqxx::result& overrides)
+: User(user) { this->roles = assigned_roles_from_pq_result(roles, overrides); }
 
 std::shared_ptr<AssignedRole> User::getRole(const unsigned int vaultId) const {
     const auto it = std::ranges::find_if(roles.begin(), roles.end(),

@@ -51,9 +51,10 @@ CREATE TABLE roles
 CREATE TABLE permission_overrides
 (
     id            SERIAL PRIMARY KEY,
-    role_id       INTEGER NOT NULL REFERENCES role (id) ON DELETE CASCADE,
+    role_id       INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
     permission_id INTEGER NOT NULL REFERENCES permission (id) ON DELETE CASCADE,
-    override      BOOLEAN   DEFAULT FALSE, -- If true, overrides the default permission behavior
+    is_file       BOOLEAN DEFAULT FALSE, -- Indicates if the permission is for a file or directory
+    enabled       BOOLEAN DEFAULT FALSE, -- Sets whether the permission is enabled or not
     regex         TEXT NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

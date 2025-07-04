@@ -1,4 +1,5 @@
 #include "types/Role.hpp"
+#include "types/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
 
 #include <pqxx/row>
@@ -39,7 +40,7 @@ void vh::types::to_json(nlohmann::json& j, const Role& r) {
         {"name", r.name},
         {"description", r.description},
         {"simple_permissions", r.simplePermissions},
-        {"created_at", util::timestampToString(r.created_at)},
+        {"created_at", util::timestampToString(r.created_at)}
     };
 
     if (r.simplePermissions) j["permissions"] = jsonFromFSMask(r.file_permissions);
@@ -53,8 +54,10 @@ void vh::types::from_json(const nlohmann::json& j, Role& r) {
     if (j.contains("id")) r.id = j.at("id").get<unsigned int>();
     r.name = j.at("name").get<std::string>();
     r.description = j.at("description").get<std::string>();
+    r.simplePermissions = j.value("simple_permissions", false);
     r.file_permissions = fsMaskFromJson(j.at("file_permissions"));
     r.directory_permissions = fsMaskFromJson(j.at("directory_permissions"));
+    r.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
 }
 
 void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role> >& roles) {
@@ -67,33 +70,3 @@ std::vector<std::shared_ptr<Role> > vh::types::roles_from_pq_res(const pqxx::res
     for (const auto& item : res) roles.push_back(std::make_shared<Role>(item));
     return roles;
 }
-
-bool Role::canUploadFile() const { return hasPermission(file_permissions, FSPermission::Upload); }
-bool Role::canDownloadFile() const { return hasPermission(file_permissions, FSPermission::Download); }
-bool Role::canDeleteFile() const { return hasPermission(file_permissions, FSPermission::Delete); }
-bool Role::canShareFilePublicly() const { return hasPermission(file_permissions, FSPermission::SharePublic); }
-bool Role::canShareFileInternally() const { return hasPermission(file_permissions, FSPermission::ShareInternal); }
-bool Role::canLockFile() const { return hasPermission(file_permissions, FSPermission::Lock); }
-bool Role::canRenameFile() const { return hasPermission(file_permissions, FSPermission::Rename); }
-bool Role::canMoveFile() const { return hasPermission(file_permissions, FSPermission::Move); }
-bool Role::canSyncFileLocally() const { return hasPermission(file_permissions, FSPermission::SyncLocal); }
-bool Role::canSyncFileWithCloud() const { return hasPermission(file_permissions, FSPermission::SyncCloud); }
-bool Role::canManageFileMetadata() const { return hasPermission(file_permissions, FSPermission::ModifyMetadata); }
-bool Role::canChangeFileIcons() const { return hasPermission(file_permissions, FSPermission::ChangeIcons); }
-bool Role::canManageVersions() const { return hasPermission(file_permissions, FSPermission::ManageVersions); }
-bool Role::canManageFileTags() const { return hasPermission(file_permissions, FSPermission::ManageTags); }
-
-bool Role::canUploadDirectory() const { return hasPermission(directory_permissions, FSPermission::Upload); }
-bool Role::canDownloadDirectory() const { return hasPermission(directory_permissions, FSPermission::Download); }
-bool Role::canDeleteDirectory() const { return hasPermission(directory_permissions, FSPermission::Delete); }
-bool Role::canShareDirPublicly() const { return hasPermission(directory_permissions, FSPermission::SharePublic); }
-bool Role::canShareDirInternally() const { return hasPermission(directory_permissions, FSPermission::ShareInternal); }
-bool Role::canLockDirectory() const { return hasPermission(directory_permissions, FSPermission::Lock); }
-bool Role::canRenameDirectory() const { return hasPermission(directory_permissions, FSPermission::Rename); }
-bool Role::canMoveDirectory() const { return hasPermission(directory_permissions, FSPermission::Move); }
-bool Role::canSyncDirectoryLocally() const { return hasPermission(directory_permissions, FSPermission::SyncLocal); }
-bool Role::canSyncDirectoryWithCloud() const { return hasPermission(directory_permissions, FSPermission::SyncCloud); }
-bool Role::canManageDirectoryMetadata() const { return hasPermission(directory_permissions, FSPermission::ModifyMetadata); }
-bool Role::canChangeDirectoryIcons() const { return hasPermission(directory_permissions, FSPermission::ChangeIcons); }
-bool Role::canManageDirectoryTags() const { return hasPermission(directory_permissions, FSPermission::ManageTags); }
-bool Role::canListDirectory() const { return hasPermission(directory_permissions, FSPermission::List); }

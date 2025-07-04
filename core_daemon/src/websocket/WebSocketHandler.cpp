@@ -159,6 +159,14 @@ void WebSocketHandler::registerPermissionsHandlers() const {
         PermissionsHandler::handleListRoles(msg, session);
     });
 
+    router_->registerHandler("roles.list.user", [this](const json& msg, WebSocketSession& session) {
+        PermissionsHandler::handleListUserRoles(msg, session);
+    });
+
+    router_->registerHandler("roles.list.fs", [this](const json& msg, WebSocketSession& session) {
+        PermissionsHandler::handleListFSRoles(msg, session);
+    });
+
     router_->registerHandler("permission.get", [this](const json& msg, WebSocketSession& session) {
         PermissionsHandler::handleGetPermission(msg, session);
     });

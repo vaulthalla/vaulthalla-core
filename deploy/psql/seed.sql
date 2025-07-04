@@ -10,21 +10,36 @@
 -- Guest: Read-only
 
 INSERT INTO role
-(name, description, simple_permissions, created_at)
+(name, description, simple_permissions, type, created_at)
 VALUES
 -- ────────────────────────────────────────────────────────────────────────────────
-('super_admin', 'Root-level system owner with unrestricted access', true, NOW()),
-('admin', 'System administrator with all non-root administrative powers', true, NOW()),
-('power_user', 'Advanced user with full file/vault control but no admin authority', true, NOW()),
-('user', 'Standard user with basic file operations', true, NOW()),
-('guest', 'Minimal access: can download files and list directories', true, NOW());
+('super_admin', 'Root-level system owner with unrestricted access', true, 'user', NOW()),
+('admin', 'System administrator with all non-root administrative powers', true, 'user', NOW()),
+('power_user', 'Advanced user with full file/vault control but no admin authority', true, 'user', NOW()),
+('user', 'Standard user with basic file operations', true, 'user', NOW()),
+('guest', 'Minimal access: can download files and list directories', true, 'user', NOW());
+
+-- ROLE PERMISSIONS
+INSERT INTO simple_permissions
+(role_id, permissions)
+VALUES
+-- Super Admin: All permissions enabled
+((SELECT id FROM role WHERE name = 'super_admin'), B'1111111111111111'),
+-- Admin: All except CreateAdminUser (bit 0 disabled)
+((SELECT id FROM role WHERE name = 'admin'), B'1111111111111110'),
+-- Power User: Vault + File + Directory full control, no admin perms
+((SELECT id FROM role WHERE name = 'power_user'), B'0111111100110000'),
+-- User: Basic file + dir operations
+((SELECT id FROM role WHERE name = 'user'), B'0000001100000000'),
+-- Guest: Read-only
+((SELECT id FROM role WHERE name = 'guest'), B'0000000000000000');
 
 -- PERMISSION DEFINITIONS
 INSERT INTO permission (bit_position, name, description, category)
 VALUES
 -- Admin
-(0, 'create_user', 'Can create standard users', 'admin'),
-(1, 'create_admin_user', 'Can create admin users', 'admin'),
+(0, 'create_admin_user', 'Can create admin users', 'admin'),
+(1, 'create_user', 'Can create standard users', 'admin'),
 (2, 'deactivate_user', 'Can deactivate user accounts', 'admin'),
 (3, 'reset_user_password', 'Can reset user passwords', 'admin'),
 (4, 'manage_roles', 'Can manage role definitions and assignments', 'admin'),

@@ -231,9 +231,15 @@ HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
 
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
 -- Insert Admin User if not exists
-INSERT INTO users (name, password_hash, created_at, is_active, permissions)
-VALUES ('admin', '${HASHED_PASS}', NOW(), TRUE, X'FFFF')
+INSERT INTO users (name, password_hash, created_at, is_active)
+VALUES ('admin', '${HASHED_PASS}', NOW(), TRUE)
 ON CONFLICT (name) DO NOTHING;
+
+-- Link to user_roles
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id
+FROM users u, role r
+WHERE u.name = 'admin' AND r.name = 'super_admin';
 
 -- Create Admin Group & Link
 INSERT INTO groups (name, description)
@@ -250,8 +256,8 @@ AND NOT EXISTS (
 );
 
 -- Create Admin Default Vault if not exists
-INSERT INTO vault (type, name, is_active, created_at)
-VALUES ('local', 'Default', TRUE, NOW())
+INSERT INTO vault (type, name, is_active, created_at, owner_id, description)
+VALUES ('local', 'Default', TRUE, NOW(), (SELECT id FROM users WHERE name = 'admin'), 'Default vault for admin user')
 ON CONFLICT (name) DO NOTHING;
 
 -- Insert local mount point if not exists

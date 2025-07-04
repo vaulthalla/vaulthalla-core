@@ -129,4 +129,15 @@ bool VaultQueries::localDiskVaultExists() {
     });
 }
 
+std::string VaultQueries::getVaultOwnersName(const unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::getVaultOwnersName", [&](pqxx::work& txn) {
+        const auto res = txn.exec("SELECT u.name FROM vault v "
+                                  "JOIN users u ON v.owner_id = u.id "
+                                  "WHERE v.id = " +
+                                  txn.quote(vaultId));
+        if (res.empty()) throw std::runtime_error("Vault not found with ID: " + std::to_string(vaultId));
+        return res[0][0].as<std::string>();
+    });
+}
+
 } // namespace vh::database

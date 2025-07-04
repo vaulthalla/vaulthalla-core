@@ -6,6 +6,8 @@
 #include "keys/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "websocket/WebSocketSession.hpp"
+
+#include <nlohmann/json.hpp>
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 
@@ -195,6 +197,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
         const std::string typeLower = boost::algorithm::to_lower_copy(type);
 
         std::unique_ptr<types::Vault> vault;
+        vault->owner_id = session.getAuthenticatedUser()->id;
 
         if (typeLower == "local") {
             const std::string mountPoint = payload.at("mount_point").get<std::string>();
@@ -235,6 +238,10 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
 void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& session) const {
     try {
+        const auto user = session.getAuthenticatedUser();
+        if (!user->isAdmin() && !user->canDeleteVault())
+            throw std::runtime_error("User does not have permission to delete vaults.");
+
         const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
         storageManager_->removeVault(vaultId);
 
@@ -259,10 +266,15 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
 void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) const {
     try {
+        const auto user = session.getAuthenticatedUser();
         const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
         const auto vault = storageManager_->getVault(vaultId);
+        if (!vault) throw std::runtime_error("Vault not found with ID: " + std::to_string(vaultId));
 
-        const json data = {{"vault", json(*vault)}};
+        json data = {{"vault", json(*vault)}};
+
+        if (vault->owner_id == user->id) data["vault"]["owner"] = user->name;
+        else data["vault"]["owner"] = database::VaultQueries::getVaultOwnersName(vaultId);
 
         const json response = {{"command", "storage.vault.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -286,25 +298,39 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
 void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session) const {
     try {
-        const auto vaults = storageManager_->listVaults(session.getAuthenticatedUser());
+        const auto user = session.getAuthenticatedUser();
+        const auto vaults = storageManager_->listVaults(user);
 
-        const json data = {{"vaults", types::to_json(vaults).dump(4)}};
+        nlohmann::json jVaults = nlohmann::json::array();
 
-        const json response = {{"command", "storage.vault.list.response"},
-                               {"requestId", msg.at("requestId").get<std::string>()},
-                               {"status", "ok"},
-                               {"data", data}};
+        for (const auto& vault : vaults) {
+            nlohmann::json jVault = *vault;
+            if (vault->owner_id == user->id) jVault["owner"] = user->name;
+            else jVault["owner"] = database::VaultQueries::getVaultOwnersName(vault->id);
+            jVaults.push_back(jVault);
+        }
+
+        const json data = {{"vaults", jVaults}};
+
+        const json response = {
+            {"command", "storage.vault.list.response"},
+            {"requestId", msg.at("requestId").get<std::string>()},
+            {"status", "ok"},
+            {"data", data}
+        };
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed S3 vaults." << std::endl;
+        std::cout << "[StorageHandler] Listed vaults." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListS3Vaults error: " << e.what() << std::endl;
+        std::cerr << "[StorageHandler] handleListVaults error: " << e.what() << std::endl;
 
-        const json response = {{"command", "storage.vault.list.response"},
-                               {"requestId", msg.at("requestId").get<std::string>()},
-                               {"status", "error"},
-                               {"error", e.what()}};
+        const json response = {
+            {"command", "storage.vault.list.response"},
+            {"requestId", msg.at("requestId").get<std::string>()},
+            {"status", "error"},
+            {"error", e.what()}
+        };
 
         session.send(response);
     }

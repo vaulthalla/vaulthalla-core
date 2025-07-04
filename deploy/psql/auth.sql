@@ -4,7 +4,6 @@ CREATE TABLE users
     name          VARCHAR(50) UNIQUE NOT NULL,
     email         VARCHAR(255) UNIQUE DEFAULT NULL,
     password_hash VARCHAR(255)       NOT NULL,
-    permissions   BIT(16)            NOT NULL,
     created_at    TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP,
     is_active     BOOLEAN             DEFAULT TRUE

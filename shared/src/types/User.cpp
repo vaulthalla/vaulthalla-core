@@ -1,4 +1,5 @@
 #include "types/User.hpp"
+#include "types/UserRole.hpp"
 #include "types/AssignedRole.hpp"
 #include "types/Permission.hpp"
 #include "util/timestamp.hpp"
@@ -25,9 +26,9 @@ User::User(const pqxx::row& row)
     : id(row["id"].as<unsigned short>()),
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
-      permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      is_active(row["is_active"].as<bool>()) {
+      is_active(row["is_active"].as<bool>()),
+      role(std::make_shared<UserRole>(row)) {
     if (row["last_login"].is_null()) last_login = std::nullopt;
     else last_login = std::make_optional(util::parsePostgresTimestamp(row["last_login"].as<std::string>()));
     if (row["email"].is_null()) email = std::nullopt;
@@ -53,7 +54,6 @@ void User::updateUser(const nlohmann::json& j) {
     if (j.contains("name")) name = j.at("name").get<std::string>();
     if (j.contains("email")) email = j.at("email").get<std::string>();
     if (j.contains("is_active")) is_active = j.at("is_active").get<bool>();
-    if (j.contains("permissions")) permissions = static_cast<uint16_t>(j[permissions].get<int64_t>());
 }
 
 void to_json(nlohmann::json& j, const User& u) {
@@ -63,7 +63,8 @@ void to_json(nlohmann::json& j, const User& u) {
         {"email", u.email},
         {"last_login", u.last_login.has_value() ? util::timestampToString(u.last_login.value()) : ""},
         {"created_at", util::timestampToString(u.created_at)},
-        {"is_active", u.is_active}
+        {"is_active", u.is_active},
+        {"role", *u.role}
     };
 
     if (!u.roles.empty()) j["roles"] = u.roles;
@@ -74,6 +75,7 @@ void from_json(const nlohmann::json& j, User& u) {
     u.name = j.at("name").get<std::string>();
     u.email = j.at("email").get<std::string>();
     u.is_active = j.at("is_active").get<bool>();
+    if (j.contains("role")) u.role = std::make_shared<UserRole>(j.at("role"));
 }
 
 nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users) {
@@ -88,34 +90,34 @@ nlohmann::json to_json(const std::shared_ptr<User>& user) { return nlohmann::jso
 // --- User role checks ---
 
 bool User::isAdmin() const {
-    return hasPermission(permissions, AdminPermission::CreateUser) ||
-           hasPermission(permissions, AdminPermission::CreateAdminUser) ||
-           hasPermission(permissions, AdminPermission::ManageRoles) ||
-           hasPermission(permissions, AdminPermission::ManageSettings);
+    return hasPermission(role->permissions, AdminPermission::CreateUser) ||
+           hasPermission(role->permissions, AdminPermission::CreateAdminUser) ||
+           hasPermission(role->permissions, AdminPermission::ManageRoles) ||
+           hasPermission(role->permissions, AdminPermission::ManageSettings);
 }
 
 bool User::isSuperAdmin() const {
-    return hasPermission(permissions, AdminPermission::CreateAdminUser);
+    return hasPermission(role->permissions, AdminPermission::CreateAdminUser);
 }
 
 // --- Admin checks ---
-bool User::canCreateUser() const { return hasPermission(permissions, AdminPermission::CreateUser); }
-bool User::canCreateAdminUser() const { return hasPermission(permissions, AdminPermission::CreateAdminUser); }
-bool User::canDeactivateUser() const { return hasPermission(permissions, AdminPermission::DeactivateUser); }
-bool User::canResetUserPassword() const { return hasPermission(permissions, AdminPermission::ResetUserPassword); }
-bool User::canManageRoles() const { return hasPermission(permissions, AdminPermission::ManageRoles); }
-bool User::canManageSettings() const { return hasPermission(permissions, AdminPermission::ManageSettings); }
-bool User::canViewAuditLog() const { return hasPermission(permissions, AdminPermission::ViewAuditLog); }
-bool User::canManageAPIKeys() const { return hasPermission(permissions, AdminPermission::ManageAPIKeys); }
-bool User::canCreateLocalVault() const { return hasPermission(permissions, AdminPermission::CreateLocalVault); }
-bool User::canCreateCloudVault() const { return hasPermission(permissions, AdminPermission::CreateCloudVault); }
-bool User::canDeleteVault() const { return hasPermission(permissions, AdminPermission::DeleteVault); }
-bool User::canManageVaultSettings() const { return hasPermission(permissions, AdminPermission::ManageVaultSettings); }
-bool User::canManageVaultRoles() const { return hasPermission(permissions, AdminPermission::ManageVaultRoles); }
-bool User::canManageAllVaults() const { return hasPermission(permissions, AdminPermission::ManageAllVaults); }
-bool User::canMigrateVaultData() const { return hasPermission(permissions, AdminPermission::MigrateVaultData); }
+bool User::canCreateUser() const { return hasPermission(role->permissions, AdminPermission::CreateUser); }
+bool User::canCreateAdminUser() const { return hasPermission(role->permissions, AdminPermission::CreateAdminUser); }
+bool User::canDeactivateUser() const { return hasPermission(role->permissions, AdminPermission::DeactivateUser); }
+bool User::canResetUserPassword() const { return hasPermission(role->permissions, AdminPermission::ResetUserPassword); }
+bool User::canManageRoles() const { return hasPermission(role->permissions, AdminPermission::ManageRoles); }
+bool User::canManageSettings() const { return hasPermission(role->permissions, AdminPermission::ManageSettings); }
+bool User::canViewAuditLog() const { return hasPermission(role->permissions, AdminPermission::ViewAuditLog); }
+bool User::canManageAPIKeys() const { return hasPermission(role->permissions, AdminPermission::ManageAPIKeys); }
+bool User::canCreateLocalVault() const { return hasPermission(role->permissions, AdminPermission::CreateLocalVault); }
+bool User::canCreateCloudVault() const { return hasPermission(role->permissions, AdminPermission::CreateCloudVault); }
+bool User::canDeleteVault() const { return hasPermission(role->permissions, AdminPermission::DeleteVault); }
+bool User::canManageVaultSettings() const { return hasPermission(role->permissions, AdminPermission::ManageVaultSettings); }
+bool User::canManageVaultRoles() const { return hasPermission(role->permissions, AdminPermission::ManageVaultRoles); }
+bool User::canManageAllVaults() const { return hasPermission(role->permissions, AdminPermission::ManageAllVaults); }
+bool User::canMigrateVaultData() const { return hasPermission(role->permissions, AdminPermission::MigrateVaultData); }
 
-// --- Vault permissions ---
+// --- Vault role->permissions ---
 bool User::canUploadFile(const unsigned int vaultId) const {
     const auto role = getRole(vaultId);
     return role && role->canUploadFile();

@@ -20,6 +20,9 @@ struct PermsQueries {
     static std::shared_ptr<types::Role> getRole(unsigned int id);
     static std::shared_ptr<types::Role> getRoleByName(const std::string& name);
     static std::vector<std::shared_ptr<types::Role>> listRoles();
+    static std::vector<std::shared_ptr<types::Role>> listUserRoles();
+    static std::vector<std::shared_ptr<types::Role>> listFSRoles();
+
 
     // Role assignments (user/group)
     static void assignRole(const std::shared_ptr<types::AssignedRole>& roleAssignment);

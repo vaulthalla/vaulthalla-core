@@ -1,5 +1,6 @@
 #include "database/Queries/UserQueries.hpp"
 #include "types/User.hpp"
+#include "types/UserRole.hpp"
 #include "auth/RefreshToken.hpp"
 #include "database/Transactions.hpp"
 #include "types/AssignedRole.hpp"
@@ -50,9 +51,10 @@ void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
         p.append(user->email);
         p.append(user->password_hash);
         p.append(user->is_active);
-        p.append(types::bitStringFromMask(user->permissions));
 
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
+
+        txn.exec_prepared("assign_user_role", pqxx::params{userId, user->role->id});
 
         for (const auto& role : user->roles) {
             pqxx::params role_params{"user", role->vault_id, userId, role->id};
@@ -63,7 +65,7 @@ void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
 
 void UserQueries::updateUser(const std::shared_ptr<types::User>& user) {
     Transactions::exec("UserQueries::updateUser", [&](pqxx::work& txn) {
-        pqxx::params u_params{user->id, user->name, user->email, user->password_hash, user->permissions};
+        pqxx::params u_params{user->id, user->name, user->email, user->password_hash};
         txn.exec_prepared("update_user", u_params);
     });
 }
@@ -93,7 +95,7 @@ std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
     return Transactions::exec("UserQueries::listUsersWithRoles", [&](pqxx::work& txn) {
         const pqxx::result res = txn.exec_prepared("get_users");
 
-        std::vector<std::shared_ptr<types::User> > usersWithRoles;
+        std::vector<std::shared_ptr<types::User>> usersWithRoles;
 
         for (const auto& row : res) {
             pqxx::params p{"user", row["id"].as<unsigned int>()};

@@ -18,18 +18,19 @@ class result;
 
 namespace vh::types {
 
+struct UserRole;
 struct AssignedRole;
 
 struct User {
     static constexpr uint16_t ADMIN_MASK = 0x00FD;
 
-    unsigned short id{};
+    unsigned int id{};
     std::string name, password_hash;
     std::optional<std::string> email{std::nullopt};
-    uint16_t permissions = 0; // Bitmask of permissions
     std::time_t created_at{};
     std::optional<std::time_t> last_login;
     bool is_active{true};
+    std::shared_ptr<UserRole> role;
     std::vector<std::shared_ptr<AssignedRole>> roles;
 
     User();

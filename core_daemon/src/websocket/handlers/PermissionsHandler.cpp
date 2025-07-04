@@ -170,6 +170,56 @@ void PermissionsHandler::handleListRoles(const json& msg, WebSocketSession& sess
     }
 }
 
+void PermissionsHandler::handleListUserRoles(const json& msg, WebSocketSession& session) {
+    try {
+        const auto user = session.getAuthenticatedUser();
+        if (!user || !user->canManageRoles())
+            throw std::runtime_error("Permission denied: Only admins can list user roles");
+
+        const auto roles = database::PermsQueries::listUserRoles();
+
+        const json data = {{"roles", roles}};
+
+        const json response = {{"command", "roles.list.user.response"},
+                         {"status", "ok"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"data", data}};
+
+        session.send(response);
+    } catch (const std::exception& e) {
+        const json response = {{"command", "roles.list.user.response"},
+                         {"status", "error"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"error", e.what()}};
+        session.send(response);
+    }
+}
+
+void PermissionsHandler::handleListFSRoles(const json& msg, WebSocketSession& session) {
+    try {
+        const auto user = session.getAuthenticatedUser();
+        if (!user || !user->canManageRoles())
+            throw std::runtime_error("Permission denied: Only admins can list filesystem roles");
+
+        const auto roles = database::PermsQueries::listFSRoles();
+
+        const json data = {{"roles", roles}};
+
+        const json response = {{"command", "roles.list.fs.response"},
+                         {"status", "ok"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"data", data}};
+
+        session.send(response);
+    } catch (const std::exception& e) {
+        const json response = {{"command", "roles.list.fs.response"},
+                         {"status", "error"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"error", e.what()}};
+        session.send(response);
+    }
+}
+
 void PermissionsHandler::handleGetPermission(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();

@@ -28,30 +28,54 @@ void DBConnection::initPrepared() const {
 
 void DBConnection::initPreparedUsers() const {
     conn_->prepare("insert_user",
-        "INSERT INTO users (name, email, password_hash, is_active, permissions) "
-        "VALUES ($1, $2, $3, $4, $5) RETURNING id");
+        "INSERT INTO users (name, email, password_hash, is_active) "
+        "VALUES ($1, $2, $3, $4) RETURNING id");
+
+    conn_->prepare("assign_user_role",
+        "INSERT INTO user_roles (user_id, role_id) "
+        "VALUES ($1, $2) ON CONFLICT (user_id, role_id) DO NOTHING");
 
     conn_->prepare("get_user",
-        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
-        "created_at, last_login, is_active FROM users WHERE id = $1");
+        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, "
+        "u.created_at, u.last_login, u.is_active, sp.permissions::int as role_permissions, "
+        "r.id as role_id, r.name as role_name, r.description as role_description, r.created_at as role_created_at "
+        "FROM users u "
+        "JOIN user_roles ur ON u.id = ur.user_id "
+        "JOIN simple_permissions sp ON ur.role_id = sp.role_id "
+        "JOIN role r ON ur.role_id = r.id "
+        "WHERE u.id = $1");
 
     conn_->prepare("get_user_by_name",
-        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
-        "created_at, last_login, is_active "
-        "FROM users WHERE name = $1");
+        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, "
+        "u.created_at, u.last_login, u.is_active, sp.permissions::int as role_permissions, "
+        "r.id as role_id, r.name as role_name, r.description as role_description, r.created_at as role_created_at "
+        "FROM users u "
+        "JOIN user_roles ur ON u.id = ur.user_id "
+        "JOIN simple_permissions sp ON ur.role_id = sp.role_id "
+        "JOIN role r ON ur.role_id = r.id "
+        "WHERE u.name = $1");
 
     conn_->prepare("get_user_by_refresh_token",
-        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, u.permissions::int as permissions, "
-        "u.created_at, u.last_login, u.is_active "
+        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, "
+        "u.created_at, u.last_login, u.is_active, sp.permissions::int as role_permissions, "
+        "r.id as role_id, r.name as role_name, r.description as role_description, r.created_at as role_created_at "
         "FROM users u "
+        "JOIN user_roles ur ON u.id = ur.user_id "
+        "JOIN simple_permissions sp ON ur.role_id = sp.role_id "
+        "JOIN role r ON ur.role_id = r.id "
         "JOIN refresh_tokens rt ON u.id = rt.user_id WHERE rt.jti = $1");
 
     conn_->prepare("get_users",
-        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
-        "created_at, last_login FROM users");
+        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, u.created_at, u.last_login, u.is_active, "
+        "sp.permissions::int as role_permissions, r.id as role_id, r.name as role_name, "
+        "r.description as role_description, r.created_at as role_created_at "
+        "FROM users u "
+        "JOIN user_roles ur ON u.id = ur.user_id "
+        "JOIN simple_permissions sp ON ur.role_id = sp.role_id "
+        "JOIN role r ON ur.role_id = r.id ");
 
     conn_->prepare("update_user",
-        "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5, permissions = $6 "
+        "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5 "
         "WHERE id = $1");
 
     conn_->prepare("update_user_password", "UPDATE users SET password_hash = $2 WHERE id = $1");
@@ -221,6 +245,29 @@ void DBConnection::initPreparedPerms() const {
         "JOIN permission_overrides po ON p.id = po.permission_id "
         "JOIN roles ar ON po.role_id = ar.id "
         "WHERE ar.subject_type = $1 AND ar.subject_id = $2");
+
+    conn_->prepare("list_base_roles",
+        "SELECT r.*, sp.permissions::int AS permissions, "
+        "pp.file_permissions::int AS file_permissions, pp.directory_permissions::int AS directory_permissions "
+        "FROM role r "
+        "JOIN simple_permissions sp ON r.id = sp.role_id "
+        "JOIN permissions pp ON r.id = pp.role_id");
+
+    conn_->prepare("list_user_base_roles",
+        "SELECT r.*, sp.permissions::int AS permissions, "
+        "pp.file_permissions::int AS file_permissions, pp.directory_permissions::int AS directory_permissions "
+        "FROM role r "
+        "JOIN simple_permissions sp ON r.id = sp.role_id "
+        "JOIN permissions pp ON r.id = pp.role_id "
+        "WHERE r.type = 'user'");
+
+    conn_->prepare("list_fs_base_roles",
+        "SELECT r.*, sp.permissions::int AS permissions, "
+        "pp.file_permissions::int AS file_permissions, pp.directory_permissions::int AS directory_permissions "
+        "FROM role r "
+        "JOIN simple_permissions sp ON r.id = sp.role_id "
+        "JOIN permissions pp ON r.id = pp.role_id "
+        "WHERE r.type = 'vault'");
 }
 
 

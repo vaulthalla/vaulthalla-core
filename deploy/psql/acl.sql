@@ -13,8 +13,9 @@ CREATE TABLE role
 (
     id                 SERIAL PRIMARY KEY,
     name               VARCHAR(50) UNIQUE NOT NULL,
+    type               VARCHAR(12) NOT NULL CHECK (type IN ('user', 'vault')),
     description        TEXT,
-    simple_permissions BOOLEAN   DEFAULT FALSE, -- If true, only simple permissions are used
+    simple_permissions BOOLEAN   DEFAULT TRUE, -- If true, only simple permissions are used
     created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -33,6 +34,17 @@ CREATE TABLE permissions
     file_permissions        BIT(16) NOT NULL,
     directory_permissions   BIT(16) NOT NULL,
     UNIQUE (role_id) -- Ensure only one set of advanced permissions per role
+);
+
+CREATE TABLE user_roles
+(
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    role_id      INTEGER NOT NULL REFERENCES role (id) ON DELETE CASCADE,
+    assigned_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Uniqueness: One role per user
+    UNIQUE (user_id, role_id)
 );
 
 CREATE TABLE roles

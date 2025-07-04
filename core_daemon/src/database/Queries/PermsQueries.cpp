@@ -94,10 +94,22 @@ std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
 
 std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
     return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT * FROM role");
-        std::vector<std::shared_ptr<Role>> out;
-        for (const auto& row : res) out.push_back(makeRoleFromRow(row));
-        return out;
+        const auto res = txn.exec_prepared("list_base_roles");
+        return roles_from_pq_res(res);
+    });
+}
+
+std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles() {
+    return Transactions::exec("PermsQueries::listUserRoles", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("list_user_base_roles");
+        return roles_from_pq_res(res);
+    });
+}
+
+std::vector<std::shared_ptr<Role>> PermsQueries::listFSRoles() {
+    return Transactions::exec("PermsQueries::listFSRoles", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("list_fs_base_roles");
+        return roles_from_pq_res(res);
     });
 }
 

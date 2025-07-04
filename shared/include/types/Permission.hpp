@@ -12,8 +12,8 @@ namespace vh::types {
 
 // Admin-level permissions
 enum class AdminPermission : uint16_t {
-    CreateUser              = 1ULL << 0,
-    CreateAdminUser         = 1ULL << 1,
+    CreateAdminUser         = 1ULL << 0,
+    CreateUser              = 1ULL << 1,
     DeactivateUser          = 1ULL << 2,
     ResetUserPassword       = 1ULL << 3,
     ManageRoles             = 1ULL << 4,

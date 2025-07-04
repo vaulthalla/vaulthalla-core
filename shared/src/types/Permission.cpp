@@ -91,8 +91,8 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& 
 
 nlohmann::json jsonFromAdminMask(const uint16_t mask) {
     return {
-        { "create_user",            (mask & (1 << 0)) != 0 },
-        { "create_admin_user",      (mask & (1 << 1)) != 0 },
+            { "create_admin_user",      (mask & (1 << 0)) != 0 },
+        { "create_user",            (mask & (1 << 1)) != 0 },
         { "deactivate_user",        (mask & (1 << 2)) != 0 },
         { "reset_user_password",    (mask & (1 << 3)) != 0 },
         { "manage_roles",           (mask & (1 << 4)) != 0 },

@@ -23,7 +23,7 @@ CREATE TABLE vault
     type        VARCHAR(12)         NOT NULL CHECK (type IN ('local', 's3')),
     name        VARCHAR(100) UNIQUE NOT NULL,
     description TEXT      DEFAULT NULL,
-    owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
+    owner_id    INTEGER REFERENCES users (id) ON DELETE SET NULL,
     is_active   BOOLEAN   DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP

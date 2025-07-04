@@ -47,26 +47,26 @@ void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
             if (role->simplePermissions) {
                 pqxx::params pSimple;
                 pSimple.append(role->id);
-                pSimple.append(role->file_permissions);
+                pSimple.append(bitStringFromMask(role->file_permissions));
                 txn.exec_prepared("insert_simple_permissions", pSimple);
             } else {
                 pqxx::params pPerms;
                 pPerms.append(role->id);
-                pPerms.append(role->file_permissions);
-                pPerms.append(role->directory_permissions);
+                pPerms.append(bitStringFromMask(role->file_permissions));
+                pPerms.append(bitStringFromMask(role->directory_permissions));
                 txn.exec_prepared("insert_permissions", pPerms);
             }
         } else {
             if (role->simplePermissions) {
                 pqxx::params pSimple;
                 pSimple.append(role->id);
-                pSimple.append(role->file_permissions);
+                pSimple.append(bitStringFromMask(role->file_permissions));
                 txn.exec_prepared("update_simple_permissions", pSimple);
             } else {
                 pqxx::params pPerms;
                 pPerms.append(role->id);
-                pPerms.append(role->file_permissions);
-                pPerms.append(role->directory_permissions);
+                pPerms.append(bitStringFromMask(role->file_permissions));
+                pPerms.append(bitStringFromMask(role->directory_permissions));
                 txn.exec_prepared("update_permissions", pPerms);
             }
         }

@@ -20,6 +20,7 @@ pqxx::connection& DBConnection::get() const { return *conn_; }
 void DBConnection::initPrepared() const {
     if (!conn_ || !conn_->is_open()) throw std::runtime_error("Database connection is not open");
 
+    initPreparedUsers();
     initPreparedFiles();
     initPreparedDirectories();
     initPreparedPerms();
@@ -30,8 +31,24 @@ void DBConnection::initPreparedUsers() const {
         "INSERT INTO users (name, email, password_hash, is_active, permissions) "
         "VALUES ($1, $2, $3, $4, $5) RETURNING id");
 
+    conn_->prepare("get_user",
+        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
+        "created_at, last_login, is_active FROM users WHERE id = $1");
+
+    conn_->prepare("get_user_by_name",
+        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
+        "created_at, last_login, is_active "
+        "FROM users WHERE name = $1");
+
     conn_->prepare("get_user_by_refresh_token",
-        "SELECT u.* FROM users u JOIN refresh_tokens rt ON u.id = rt.user_id WHERE rt.jti = $1");
+        "SELECT u.id, u.name, u.password_hash, u.email, u.is_active, u.permissions::int as permissions, "
+        "u.created_at, u.last_login, u.is_active "
+        "FROM users u "
+        "JOIN refresh_tokens rt ON u.id = rt.user_id WHERE rt.jti = $1");
+
+    conn_->prepare("get_users",
+        "SELECT id, name, password_hash, email, is_active, permissions::int as permissions, "
+        "created_at, last_login FROM users");
 
     conn_->prepare("update_user",
         "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5, permissions = $6 "
@@ -147,11 +164,11 @@ void DBConnection::initPreparedPerms() const {
         "WHERE rs.vault_id = $1");
 
     conn_->prepare("assign_role",
-        "INSERT INTO assigned_roles (subject_type, vault_id, subject_id, role_id, assigned_at) "
+        "INSERT INTO roles (subject_type, vault_id, subject_id, role_id, assigned_at) "
         "VALUES ($1, $2, $3, $4, NOW())");
 
     conn_->prepare("upsert_assigned_role",
-        "INSERT INTO assigned_roles (subject_type, vault_id, subject_id, role_id, assigned_at) "
+        "INSERT INTO roles (subject_type, vault_id, subject_id, role_id, assigned_at) "
         "VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT DO NOTHING");
 
     conn_->prepare("get_subject_assigned_role",

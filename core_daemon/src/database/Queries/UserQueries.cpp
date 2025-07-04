@@ -9,7 +9,7 @@ namespace vh::database {
 
 std::shared_ptr<types::User> UserQueries::getUserByName(const std::string& name) {
     return Transactions::exec("UserQueries::getUserByName", [&](pqxx::work& txn) {
-        const auto userRow = txn.exec("SELECT * FROM users WHERE name = " + txn.quote(name)).one_row();
+        const auto userRow = txn.exec_prepared("get_user_by_name", pqxx::params{name}).one_row();
 
         pqxx::params p{"user", userRow["id"].as<unsigned int>()};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
@@ -21,9 +21,9 @@ std::shared_ptr<types::User> UserQueries::getUserByName(const std::string& name)
 
 std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
     return Transactions::exec("UserQueries::getUserById", [&](pqxx::work& txn) {
-        const auto userRow = txn.exec("SELECT * FROM users WHERE id = " + txn.quote(id)).one_row();
+        const auto userRow = txn.exec_prepared("get_user", pqxx::params{id}).one_row();
 
-        pqxx::params p{"user", userRow["id"].as<unsigned int>()};
+        pqxx::params p{"user", id};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
         const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
@@ -50,7 +50,7 @@ void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
         p.append(user->email);
         p.append(user->password_hash);
         p.append(user->is_active);
-        p.append(user->permissions);
+        p.append(types::bitStringFromMask(user->permissions));
 
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
 
@@ -68,9 +68,9 @@ void UserQueries::updateUser(const std::shared_ptr<types::User>& user) {
     });
 }
 
-bool UserQueries::authenticateUser(const std::string& email, const std::string& password) {
+bool UserQueries::authenticateUser(const std::string& name, const std::string& password) {
     return Transactions::exec("UserQueries::authenticateUser", [&](pqxx::work& txn) -> bool {
-        const pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE email = " + txn.quote(email));
+        const pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE name = " + txn.quote(name));
         if (res.empty()) return false; // User not found
         const std::string& storedHash = res[0][0].as<std::string>();
         return storedHash == password;
@@ -91,7 +91,7 @@ void UserQueries::deleteUser(const unsigned int userId) {
 
 std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
     return Transactions::exec("UserQueries::listUsersWithRoles", [&](pqxx::work& txn) {
-        const pqxx::result res = txn.exec(R"(SELECT * FROM users)");
+        const pqxx::result res = txn.exec_prepared("get_users");
 
         std::vector<std::shared_ptr<types::User> > usersWithRoles;
 

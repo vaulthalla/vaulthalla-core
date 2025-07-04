@@ -25,7 +25,7 @@ User::User(const pqxx::row& row)
     : id(row["id"].as<unsigned short>()),
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
-      permissions(static_cast<uint16_t>(row["permissions"].as<int16_t>())),
+      permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       is_active(row["is_active"].as<bool>()) {
     if (row["last_login"].is_null()) last_login = std::nullopt;
@@ -53,7 +53,7 @@ void User::updateUser(const nlohmann::json& j) {
     if (j.contains("name")) name = j.at("name").get<std::string>();
     if (j.contains("email")) email = j.at("email").get<std::string>();
     if (j.contains("is_active")) is_active = j.at("is_active").get<bool>();
-    if (j.contains("permissions")) permissions = static_cast<uint16_t>(j[permissions].get<int16_t>());
+    if (j.contains("permissions")) permissions = static_cast<uint16_t>(j[permissions].get<int64_t>());
 }
 
 void to_json(nlohmann::json& j, const User& u) {

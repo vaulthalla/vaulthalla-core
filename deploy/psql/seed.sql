@@ -10,47 +10,17 @@
 -- Guest: Read-only
 
 INSERT INTO role
-(name, description,
- admin_permissions, vault_permissions, file_permissions, directory_permissions, created_at)
+(name, description, simple_permissions, created_at)
 VALUES
 -- ────────────────────────────────────────────────────────────────────────────────
-('super_admin', 'Root-level system owner with unrestricted access',
- X'00FF'::bit(16),  -- 8 bits (all admin perms)
- X'03FF'::bit(16),  -- 10 bits (all vault perms)
- X'00FF'::bit(16),  -- 8 bits (all file perms)
- X'001F'::bit(16),  -- 5 bits (all dir perms)
- NOW()),
-
-('admin', 'System administrator with all non-root administrative powers',
- X'00FD'::bit(16),  -- all admin perms except CreateAdminUser (bit 1 off)
- X'03FF'::bit(16),
- X'00FF'::bit(16),
- X'001F'::bit(16),
- NOW()),
-
-('power_user', 'Advanced user with full file/vault control but no admin authority',
- X'0000'::bit(16),
- X'03FF'::bit(16),
- X'00FF'::bit(16),
- X'001F'::bit(16),
- NOW()),
-
-('user', 'Standard user with basic file operations',
- X'0000'::bit(16),
- X'0000'::bit(16),
- X'00C3'::bit(16),  -- upload, download, share public/group
- X'001F'::bit(16),
- NOW()),
-
-('guest', 'Minimal access: can download files and list directories',
- X'0000'::bit(16),
- X'0000'::bit(16),
- X'0002'::bit(16),  -- download only
- X'0010'::bit(16),
- NOW());
+('super_admin', 'Root-level system owner with unrestricted access', true, NOW()),
+('admin', 'System administrator with all non-root administrative powers', true, NOW()),
+('power_user', 'Advanced user with full file/vault control but no admin authority', true, NOW()),
+('user', 'Standard user with basic file operations', true, NOW()),
+('guest', 'Minimal access: can download files and list directories', true, NOW());
 
 -- PERMISSION DEFINITIONS
-INSERT INTO permissions (bit_position, name, description, category)
+INSERT INTO permission (bit_position, name, description, category)
 VALUES
 -- Admin
 (0, 'create_user', 'Can create standard users', 'admin'),
@@ -61,32 +31,27 @@ VALUES
 (5, 'manage_settings', 'Can change system settings', 'admin'),
 (6, 'view_audit_log', 'Can view system audit logs', 'admin'),
 (7, 'manage_api_keys', 'Can create and manage API keys', 'admin'),
+(8, 'create_local_vault', 'Can create local vaults', 'admin'),
+(9, 'create_cloud_vault', 'Can create cloud vaults', 'admin'),
+(10, 'delete_vault', 'Can delete vaults', 'admin'),
+(11, 'manage_vault_settings', 'Can modify vault settings', 'admin'),
+(12, 'manage_vault_roles', 'Can manage vault role assignments', 'admin'),
+(13, 'migrate_vault_data', 'Can initiate vault data migrations', 'admin'),
+(14, 'manage_all_vaults', 'Can manage all vaults', 'admin'),
 
--- Vault
-(0, 'create_local_vault', 'Can create local vaults', 'vault'),
-(1, 'create_cloud_vault', 'Can create cloud vaults', 'vault'),
-(2, 'delete_vault', 'Can delete vaults', 'vault'),
-(3, 'adjust_vault_settings', 'Can modify vault settings', 'vault'),
-(4, 'migrate_vault_data', 'Can initiate vault data migrations', 'vault'),
-(5, 'create_volume', 'Can create volumes', 'vault'),
-(6, 'delete_volume', 'Can delete volumes', 'vault'),
-(7, 'resize_volume', 'Can resize volumes', 'vault'),
-(8, 'move_volume', 'Can move volumes', 'vault'),
-(9, 'assign_volume_to_group', 'Can assign volumes to groups', 'vault'),
-
--- File
-(0, 'upload_file', 'Can upload files', 'file'),
-(1, 'download_file', 'Can download files', 'file'),
-(2, 'delete_file', 'Can delete files', 'file'),
-(3, 'share_file_publicly', 'Can share files publicly', 'file'),
-(4, 'share_file_with_group', 'Can share files with specific groups', 'file'),
-(5, 'lock_file', 'Can apply locks to files', 'file'),
-(6, 'rename_file', 'Can rename files', 'file'),
-(7, 'move_file', 'Can move files', 'file'),
-
--- Directory
-(0, 'create_directory', 'Can create directories', 'directory'),
-(1, 'delete_directory', 'Can delete directories', 'directory'),
-(2, 'rename_directory', 'Can rename directories', 'directory'),
-(3, 'move_directory', 'Can move directories', 'directory'),
-(4, 'list_directory', 'Can list directory contents', 'directory');
+-- FS (File + Directory shared)
+(0, 'upload', 'Can upload files or directories', 'fs'),
+(1, 'download', 'Can download files or directories', 'fs'),
+(2, 'delete', 'Can delete files or directories', 'fs'),
+(3, 'share_public', 'Can share files or directories publicly', 'fs'),
+(4, 'share_internal', 'Can share files or directories internally', 'fs'),
+(5, 'lock', 'Can apply locks to files or directories', 'fs'),
+(6, 'rename', 'Can rename files or directories', 'fs'),
+(7, 'move', 'Can move files or directories', 'fs'),
+(8, 'sync_local', 'Can sync files or directories locally', 'fs'),
+(9, 'sync_cloud', 'Can sync files or directories to cloud', 'fs'),
+(10, 'modify_metadata', 'Can modify metadata on files or directories', 'fs'),
+(11, 'change_icons', 'Can change icons on files or directories', 'fs'),
+(12, 'manage_tags', 'Can manage tags on files or directories', 'fs'),
+(13, 'list', 'Can list contents of directories', 'fs'),
+(14, 'manage_versions', 'Can manage file versions', 'fs');

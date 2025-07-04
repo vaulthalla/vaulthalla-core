@@ -1,10 +1,10 @@
 #pragma once
 
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include "Token.hpp"
 #include "auth/RefreshToken.hpp"
 #include "websocket/WebSocketSession.hpp"
-#include "types/config/ConfigRegistry.hpp"
+#include "config/ConfigRegistry.hpp"
 #include <memory>
 #include <string>
 
@@ -43,16 +43,16 @@ class Client {
 
     [[nodiscard]] bool validateToken(const std::string& token) const;
 
-    void sendControlMessage(const std::string& type, const nlohmann::json& payload);
+    void sendControlMessage(const std::string& type, const nlohmann::json& payload) const;
 
   private:
     std::shared_ptr<types::User> user_;
     std::shared_ptr<Token> token_{nullptr};
     std::shared_ptr<websocket::WebSocketSession> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
-    const std::string jwt_secret_ = types::config::ConfigRegistry::get().auth.jwt_secret;
+    const std::string jwt_secret_ = config::ConfigRegistry::get().auth.jwt_secret;
 
-    std::string generateToken(const std::string& email);
+    std::string generateToken(const std::string& name) const;
 };
 
 } // namespace vh::auth

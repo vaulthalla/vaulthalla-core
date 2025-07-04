@@ -1,23 +1,48 @@
+CREATE TABLE directories
+(
+    id               SERIAL PRIMARY KEY,
+    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
+    parent_id        INTEGER REFERENCES directories (id) ON DELETE CASCADE,
+    name             VARCHAR(500) NOT NULL,
+    created_by       INTEGER REFERENCES users (id),
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_modified_by INTEGER REFERENCES users (id),
+    path             TEXT         NOT NULL, -- Full path for easy access
+    UNIQUE (vault_id, parent_id, name)
+);
+
+CREATE TABLE directory_stats
+(
+    directory_id  INTEGER PRIMARY KEY REFERENCES directories (id) ON DELETE CASCADE,
+    file_count    INTEGER   DEFAULT 0,
+    subdirectory_count  INTEGER   DEFAULT 0, -- Count of immediate subdirectories
+    size_bytes    BIGINT    DEFAULT 0, -- Total size of all files in this directory
+    last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE files
 (
-    id                         SERIAL PRIMARY KEY,
-    storage_volume_id          INTEGER REFERENCES volume (id) ON DELETE CASCADE,
-    parent_id                  INTEGER REFERENCES files (id) ON DELETE CASCADE,
-    name                       VARCHAR(500) NOT NULL,
-    is_directory               BOOLEAN   DEFAULT FALSE,
-    mode                       INTEGER   DEFAULT 33188,
-    uid                        INTEGER REFERENCES users (id),
-    gid                        INTEGER REFERENCES groups (id),
-    created_by                 INTEGER REFERENCES users (id),
-    created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_modified_by           INTEGER REFERENCES users (id),
-    current_version_size_bytes BIGINT    DEFAULT 0,
-    is_trashed                 BOOLEAN   DEFAULT FALSE,
-    trashed_at                 TIMESTAMP,
-    trashed_by                 INTEGER REFERENCES users (id),
-    full_path                  TEXT,
-    UNIQUE (storage_volume_id, parent_id, name)
+    id               SERIAL PRIMARY KEY,
+    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
+    parent_id        INTEGER REFERENCES directories (id) ON DELETE CASCADE,
+    name             VARCHAR(500) NOT NULL,
+    created_by       INTEGER REFERENCES users (id),
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_modified_by INTEGER REFERENCES users (id),
+    size_bytes       BIGINT    DEFAULT 0,
+    mime_type        VARCHAR(255),
+    content_hash     VARCHAR(128),          -- optional: for dedup, integrity
+    path             TEXT         NOT NULL, -- Full path for easy access
+    UNIQUE (vault_id, parent_id, name)
+);
+
+CREATE TABLE files_trashed
+(
+    LIKE files INCLUDING ALL,
+    trashed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    trashed_by INTEGER REFERENCES users (id)
 );
 
 CREATE TABLE file_xattrs
@@ -41,7 +66,7 @@ CREATE TABLE file_versions
     content_hash   VARCHAR(128) NOT NULL,
     size_bytes     BIGINT       NOT NULL,
     mime_type      VARCHAR(255),
-    storage_path   TEXT         NOT NULL,
+    path           TEXT         NOT NULL,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by     INTEGER REFERENCES users (id),
     UNIQUE (file_id, version_number)
@@ -149,7 +174,17 @@ CREATE TABLE file_search_index
     search_vector tsvector
 );
 
-CREATE INDEX idx_files_full_path ON files (full_path);
+-- Indexes for performance optimization
+CREATE INDEX idx_files_path ON files (path);
+CREATE INDEX idx_directories_path ON directories (path);
+
+-- Indexes for text pattern matching
+CREATE INDEX idx_files_path_pattern ON files (path text_pattern_ops);
+CREATE INDEX idx_directories_path_pattern ON directories (path text_pattern_ops);
+
+-- Full-text search index
+CREATE INDEX file_search_vector_idx ON file_search_index USING GIN (search_vector);
+
+-- Indexes for file_xattrs
 CREATE INDEX idx_file_xattrs_file_id ON file_xattrs (file_id);
 CREATE INDEX idx_file_xattrs_key ON file_xattrs (key);
-CREATE INDEX file_search_vector_idx ON file_search_index USING GIN (search_vector);

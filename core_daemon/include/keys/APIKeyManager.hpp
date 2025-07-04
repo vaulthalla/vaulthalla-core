@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/db/APIKey.hpp"
+#include "../../../shared/include/types/APIKey.hpp"
 #include <memory>
 #include <mutex>
 

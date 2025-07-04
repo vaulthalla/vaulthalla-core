@@ -6,7 +6,6 @@
 
 namespace vh::types {
 struct LocalDiskVault;
-struct Volume;
 struct File;
 }
 
@@ -14,18 +13,13 @@ namespace vh::storage {
 
 class LocalDiskStorageEngine : public StorageEngine {
 public:
-    LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault,
-                           const std::vector<std::shared_ptr<types::Volume> >& volumes);
+    explicit LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault);
 
     ~LocalDiskStorageEngine() override = default;
 
-    void mountVolume(const std::shared_ptr<types::Volume>& volume) override;
-
-    void unmountVolume(const std::shared_ptr<types::Volume>& volume) override;
-
     [[nodiscard]] StorageType type() const override { return StorageType::Local; }
 
-    void mkdir(unsigned int volumeId, const fs::path& relative_path) override;
+    void mkdir(const fs::path& relative_path) override;
 
     bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
 
@@ -35,12 +29,7 @@ public:
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
-    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listFilesInDir(unsigned int volume_id,
-                                                                            const std::filesystem::path& rel_path,
-                                                                            bool recursive) const override;
-
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path,
-                                                        unsigned int volumeId) const;
+    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] std::filesystem::path getRootPath() const;
 

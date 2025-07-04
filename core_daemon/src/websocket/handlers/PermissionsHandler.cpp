@@ -1,10 +1,10 @@
 #include "websocket/handlers/PermissionsHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/db/User.hpp"
-#include "types/db/Role.hpp"
-#include "types/db/AssignedRole.hpp"
-#include "types/db/Permission.hpp"
+#include "types/User.hpp"
+#include "types/Role.hpp"
+#include "types/AssignedRole.hpp"
+#include "types/Permission.hpp"
 
 #include <nlohmann/json.hpp>
 

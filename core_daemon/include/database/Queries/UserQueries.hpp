@@ -18,13 +18,13 @@ class UserQueries {
   public:
     UserQueries() = default;
 
-    [[nodiscard]] static std::shared_ptr<types::User> getUserByEmail(const std::string& email);
+    [[nodiscard]] static std::shared_ptr<types::User> getUserByName(const std::string& name);
     [[nodiscard]] static std::shared_ptr<types::User> getUserById(unsigned int id);
-    static void createUser(const std::shared_ptr<types::User>& user, unsigned int roleId);
+    static void createUser(const std::shared_ptr<types::User>& user);
     static void updateUser(const std::shared_ptr<types::User>& user);
-    static bool authenticateUser(const std::string& email, const std::string& password);
-    static void updateUserPassword(const std::string& email, const std::string& newPassword);
-    static void deleteUser(const std::string& email);
+    static bool authenticateUser(const std::string& name, const std::string& password);
+    static void updateUserPassword(unsigned int userId, const std::string& newPassword);
+    static void deleteUser(unsigned int userId);
     static std::vector<std::shared_ptr<types::User>> listUsers();
     static void updateLastLoggedInUser(unsigned int userId);
 

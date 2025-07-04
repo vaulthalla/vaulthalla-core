@@ -1,8 +1,8 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/db/File.hpp"
-
-#include <pqxx/prepared_statement>
+#include "types/FSEntry.hpp"
+#include "types/File.hpp"
+#include "types/Directory.hpp"
 
 using namespace vh::database;
 
@@ -11,16 +11,15 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
 
     Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
-        p.append(file->storage_volume_id);
+        p.append(file->vault_id);
         p.append(file->parent_id);
         p.append(file->name);
-        p.append(file->is_directory);
-        p.append(file->mode);
-        p.append(file->uid);
-        p.append(file->gid);
         p.append(file->created_by);
-        p.append(file->current_version_size_bytes);
-        p.append(file->full_path);
+        p.append(file->last_modified_by);
+        p.append(file->size_bytes);
+        p.append(file->mime_type);
+        p.append(file->content_hash);
+        p.append(file->path.string());
 
         txn.exec_prepared("insert_file", p);
     });
@@ -29,21 +28,17 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
 void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
 
-
-
     Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
         pqxx::params p;
         p.append(file->id);
-        p.append(file->storage_volume_id);
+        p.append(file->vault_id);
         p.append(file->parent_id);
         p.append(file->name);
-        p.append(file->is_directory);
-        p.append(file->mode);
-        p.append(file->uid);
-        p.append(file->gid);
-        p.append(file->created_by);
-        p.append(file->current_version_size_bytes);
-        p.append(file->full_path);
+        p.append(file->last_modified_by);
+        p.append(file->size_bytes);
+        p.append(file->mime_type);
+        p.append(file->content_hash);
+        p.append(file->path.string());
 
         txn.exec_prepared("update_file", p);
     });
@@ -76,22 +71,95 @@ unsigned int FileQueries::getFileIdByPath(const std::filesystem::path& path) {
     });
 }
 
-std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesInDir(const unsigned int volumeId, const std::string& absPath, const bool recursive) {
-    return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::File>> {
-        std::vector<std::shared_ptr<types::File>> files;
+void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& directory) {
+    if (!directory) throw std::invalid_argument("Directory cannot be null");
 
+    Transactions::exec("FileQueries::addDirectory", [&](pqxx::work& txn) {
         pqxx::params p;
-        p.append(volumeId);
-        p.append(absPath + "%"); // Use LIKE for partial matching
+        p.append(directory->vault_id);
+        p.append(directory->parent_id);
+        p.append(directory->name);
+        p.append(directory->created_by);
+        p.append(directory->last_modified_by);
+        p.append(directory->path.string());
 
-        const auto res = txn.exec_prepared("list_files_in_dir", p);
+        txn.exec_prepared("insert_directory", p);
 
-        for (const auto& row : res) files.push_back(std::make_shared<types::File>(row));
+        pqxx::params stats_params;
+        stats_params.append(directory->id);
+        stats_params.append(directory->stats->size_bytes);
+        stats_params.append(directory->stats->file_count);
+        stats_params.append(directory->stats->subdirectory_count);
 
-        if (recursive) {
-            // TODO: Implement recursive listing if needed
-        }
+        txn.exec_prepared("insert_dir_stats", stats_params);
+    });
+}
 
-        return files;
+void FileQueries::updateDirectory(const std::shared_ptr<types::Directory>& directory) {
+    if (!directory) throw std::invalid_argument("Directory cannot be null");
+
+    Transactions::exec("FileQueries::updateDirectory", [&](pqxx::work& txn) {
+        pqxx::params p;
+        p.append(directory->id);
+        p.append(directory->vault_id);
+        p.append(directory->parent_id);
+        p.append(directory->name);
+        p.append(directory->last_modified_by);
+        p.append(directory->path.string());
+
+        txn.exec_prepared("update_directory", p);
+
+        pqxx::params stats_params;
+        stats_params.append(directory->id);
+        stats_params.append(directory->stats->size_bytes);
+        stats_params.append(directory->stats->file_count);
+        stats_params.append(directory->stats->subdirectory_count);
+
+        txn.exec_prepared("update_dir_stats", stats_params);
+    });
+}
+
+void FileQueries::updateDirectoryStats(const std::shared_ptr<types::Directory>& directory) {
+    Transactions::exec("FileQueries::updateDirectoryStats", [&](pqxx::work& txn) {
+        pqxx::params p;
+        p.append(directory->id);
+        p.append(directory->stats->size_bytes);
+        p.append(directory->stats->file_count);
+        p.append(directory->stats->subdirectory_count);
+
+        txn.exec_prepared("update_dir_stats", p);
+    });
+}
+
+
+void FileQueries::deleteDirectory(const unsigned int directoryId) {
+    Transactions::exec("FileQueries::deleteDirectory", [&](pqxx::work& txn) {
+        txn.exec("DELETE FROM directories WHERE id = " + txn.quote(directoryId));
+        txn.exec("DELETE FROM dir_stats WHERE directory_id = " + txn.quote(directoryId));
+    });
+}
+
+std::shared_ptr<vh::types::Directory> FileQueries::getDirectory(const unsigned int directoryId) {
+    return Transactions::exec("FileQueries::getDirectory", [&](pqxx::work& txn) -> std::shared_ptr<types::Directory> {
+        const auto row = txn.exec("SELECT * FROM directories WHERE id = " + txn.quote(directoryId)).one_row();
+        return std::make_shared<types::Directory>(row);
+    });
+}
+
+std::shared_ptr<vh::types::Directory> FileQueries::getDirectoryByPath(const std::filesystem::path& path) {
+    return Transactions::exec("FileQueries::getDirectoryByPath", [&](pqxx::work& txn) -> std::shared_ptr<types::Directory> {
+        const auto row = txn.exec("SELECT * FROM directories WHERE full_path = " + txn.quote(path.string())).one_row();
+        return std::make_shared<types::Directory>(row);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::FSEntry>> FileQueries::listDir(const unsigned int vaultId, const std::string& absPath, const bool recursive) {
+    return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::FSEntry>> {
+        pqxx::params p{vaultId, absPath};
+
+        const auto files = types::files_from_pq_res(txn.exec_prepared("list_files_in_dir", p));
+        const auto directories = types::directories_from_pq_res(txn.exec_prepared("list_directories_in_dir", p));
+
+        return types::merge_entries(files, directories);
     });
 }

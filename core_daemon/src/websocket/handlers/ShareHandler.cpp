@@ -1,5 +1,5 @@
 #include "websocket/handlers/ShareHandler.hpp"
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include "share/LinkResolver.hpp"
 #include "share/ShareLink.hpp"
 #include "websocket/WebSocketSession.hpp"
@@ -22,14 +22,14 @@ void ShareHandler::handleCreateLink(const json& msg, WebSocketSession& session) 
         int expiresIn = msg.value("expiresIn", 0);       // optional expiration in seconds
         const auto& expiresAt = std::chrono::system_clock::now() + std::chrono::seconds(expiresIn);
 
-        share::ShareLink shareLink(user->email, mountName, path, permissions.get<std::string>(), expiresAt);
+        share::ShareLink shareLink(user->name, mountName, path, permissions.get<std::string>(), expiresAt);
         auto shareLinkUrl = linkResolver_->createShareLink(shareLink);
 
         json response = {{"command", "share.createLink.response"}, {"status", "ok"}, {"shareLinkUrl", shareLinkUrl}};
 
         session.send(response);
 
-        std::cout << "[ShareHandler] User '" << user->email << "' created share link for " << path << std::endl;
+        std::cout << "[ShareHandler] User '" << user->name << "' created share link for " << path << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[ShareHandler] handleCreateLink error: " << e.what() << std::endl;

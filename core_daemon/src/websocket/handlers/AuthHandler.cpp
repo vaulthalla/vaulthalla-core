@@ -4,9 +4,8 @@
 #include "websocket/WebSocketSession.hpp"
 #include <iostream>
 
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
 
 namespace vh::websocket {
 
@@ -18,10 +17,10 @@ AuthHandler::AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager)
 void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) const {
     try {
         json payload = msg.at("payload");
-        const auto email = payload.at("email").get<std::string>();
+        const auto username = payload.at("name").get<std::string>();
         const auto password = payload.at("password").get<std::string>();
 
-        const auto client = authManager_->loginUser(email, password, session.shared_from_this());
+        const auto client = authManager_->loginUser(username, password, session.shared_from_this());
         if (!client) throw std::runtime_error("Invalid email or password or user not found");
 
         auto user = client->getUser();
@@ -30,20 +29,20 @@ void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) const 
         // Bind user to WebSocketSession
         session.setAuthenticatedUser(user);
 
-        json data = {{"token", token}, {"user", *user}};
+        const json data = {{"token", token}, {"user", *user}};
 
-        json response = {{"command", "auth.login.response"},
+        const json response = {{"command", "auth.login.response"},
                          {"status", "ok"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"data", data}};
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User '" << email << "' logged in." << std::endl;
+        std::cout << "[AuthHandler] User '" << username << "' logged in." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleLogin error: " << e.what() << std::endl;
 
-        json response = {{"command", "auth.login.response"}, {"status", "error"}, {"error", e.what()}};
+        const json response = {{"command", "auth.login.response"}, {"status", "error"}, {"error", e.what()}};
 
         session.send(response);
     }
@@ -56,10 +55,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const auto email = payload.at("email").get<std::string>();
         const auto password = payload.at("password").get<std::string>();
         const auto isActive = payload.at("is_active").get<bool>();
-        const auto role_id = payload.at("role_id").get<unsigned int>();
 
         auto user = std::make_shared<types::User>(name, email, isActive);
-        const auto client = authManager_->registerUser(user, password, role_id, session.shared_from_this());
+        const auto client = authManager_->registerUser(user, password, session.shared_from_this());
         user = client->getUser();
         std::string token = client->getRawToken();
 
@@ -93,7 +91,7 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
         const auto user = session.getAuthenticatedUser();
         if (!user) throw std::runtime_error("User not authenticated");
 
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         user->updateUser(payload);
         authManager_->updateUser(user);
 
@@ -106,7 +104,7 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Updated user '" << user->email << "'." << std::endl;
+        std::cout << "[AuthHandler] Updated user '" << user->name << "'." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleUpdateUser error: " << e.what() << std::endl;
 
@@ -128,7 +126,7 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
         const auto oldPassword = payload.at("old_password").get<std::string>();
         const auto newPassword = payload.at("new_password").get<std::string>();
 
-        authManager_->changePassword(user->email, oldPassword, newPassword);
+        authManager_->changePassword(user->name, oldPassword, newPassword);
 
         const json response = {{"command", "auth.user.change_password.response"},
                          {"status", "ok"},
@@ -136,7 +134,7 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Changed password for user '" << user->email << "'." << std::endl;
+        std::cout << "[AuthHandler] Changed password for user '" << user->name << "'." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleChangePassword error: " << e.what() << std::endl;
 
@@ -170,7 +168,7 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Fetched user data for '" << requestedUser->email << "'." << std::endl;
+        std::cout << "[AuthHandler] Fetched user data for '" << requestedUser->name << "'." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleGetUser error: " << e.what() << std::endl;
 
@@ -201,7 +199,7 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User '" << client->getUser()->email << "' refreshed session." << std::endl;
+        std::cout << "[AuthHandler] User '" << client->getUser()->name << "' refreshed session." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleRefresh error: " << e.what() << std::endl;
 
@@ -223,7 +221,7 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
         // Clear bound user in WebSocketSession
         session.setAuthenticatedUser(nullptr);
 
-        json response = {
+        const json response = {
             {"command", "auth.logout.response"},
             {"status", "ok"},
             {"requestId", msg.at("requestId").get<std::string>()},
@@ -235,7 +233,7 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
     } catch (const std::exception& e) {
         std::cerr << "[AuthHandler] handleLogout error: " << e.what() << std::endl;
 
-        json response = {{"command", "auth.logout.response"},
+        const json response = {{"command", "auth.logout.response"},
                          {"status", "error"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"error", e.what()}};

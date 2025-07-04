@@ -1,7 +1,6 @@
 #pragma once
 
-#include "types/db/Volume.hpp"
-#include "types/db/Vault.hpp"
+#include "types/Vault.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include <filesystem>
@@ -10,17 +9,11 @@
 #include <unordered_map>
 
 namespace vh::types {
-class User;
+struct User;
+struct FSEntry;
 }
 
 namespace vh::storage {
-
-struct UploadContext {
-    unsigned int vaultId;
-    unsigned int volumeId;
-    std::filesystem::path relPath;
-    std::shared_ptr<types::User> user;
-};
 
 class StorageManager {
 public:
@@ -38,25 +31,14 @@ public:
 
     std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
 
-    void finishUpload(unsigned int vaultId, unsigned int volumeId, const std::filesystem::path& relPath,
+    void finishUpload(unsigned int vaultId, const std::filesystem::path& relPath,
                       const std::shared_ptr<types::User>& user) const;
 
-    [[nodiscard]] std::vector<std::shared_ptr<types::File> > listDir(unsigned int vaultId, unsigned int volumeId,
+    [[nodiscard]] std::vector<std::shared_ptr<types::FSEntry>> listDir(unsigned int vaultId,
                                                                      const std::string& relPath,
                                                                      bool recursive = false) const;
 
-    void mkdir(unsigned int vaultId, unsigned int volumeId, const std::string& relPath,
-               const std::shared_ptr<types::User>& user) const;
-
-    void mountVolume(const std::shared_ptr<types::Volume>& volume);
-
-    void addVolume(std::shared_ptr<types::Volume> volume, unsigned int userId);
-
-    void removeVolume(unsigned int volumeId, unsigned int userId);
-
-    std::shared_ptr<types::Volume> getVolume(unsigned int volumeId, unsigned int userId) const;
-
-    std::vector<std::shared_ptr<types::Volume> > listVolumes(unsigned int userId) const;
+    void mkdir(unsigned int vaultId, const std::string& relPath, const std::shared_ptr<types::User>& user) const;
 
     std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(unsigned int id) const;
 

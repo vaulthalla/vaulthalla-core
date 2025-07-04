@@ -19,12 +19,14 @@ CREATE TABLE s3_api_keys
 
 CREATE TABLE vault
 (
-    id         SERIAL PRIMARY KEY,
-    type       VARCHAR(50)         NOT NULL,
-    name       VARCHAR(150) UNIQUE NOT NULL,
-    is_active  BOOLEAN   DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id          SERIAL PRIMARY KEY,
+    type        VARCHAR(12)         NOT NULL CHECK (type IN ('local', 's3')),
+    name        VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT      DEFAULT NULL,
+    owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
+    is_active   BOOLEAN   DEFAULT TRUE,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE local
@@ -40,29 +42,9 @@ CREATE TABLE s3
     bucket     TEXT NOT NULL
 );
 
-CREATE TABLE volume
-(
-    id          SERIAL PRIMARY KEY,
-    vault_id    INTEGER      NOT NULL,
-    name        VARCHAR(150) NOT NULL,
-    path_prefix VARCHAR(255) DEFAULT '/',
-    quota_bytes BIGINT       DEFAULT NULL,
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE volumes
-(
-    subject_id  INTEGER NOT NULL, -- Can be user or group
-    subject_type VARCHAR(10) NOT NULL CHECK (subject_type IN ('user', 'group')),
-    volume_id   INTEGER REFERENCES volume (id) ON DELETE CASCADE,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (subject_id, subject_type, volume_id)
-);
-
 CREATE TABLE usage
 (
-    volume_id   INTEGER PRIMARY KEY REFERENCES volume (id) ON DELETE CASCADE,
+    vault_id    INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
     total_bytes BIGINT    DEFAULT 0 NOT NULL, -- actual usage
     quota_bytes BIGINT    DEFAULT NULL,       -- soft or hard cap
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -71,7 +53,7 @@ CREATE TABLE usage
 CREATE TABLE usage_log
 (
     id          SERIAL PRIMARY KEY,
-    volume_id   INTEGER NOT NULL REFERENCES volume (id),
+    vault_id    INTEGER NOT NULL REFERENCES vault (id),
     measured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_bytes BIGINT  NOT NULL
 );

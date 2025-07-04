@@ -1,8 +1,8 @@
 #include "FUSEOperations.hpp"
-#include "../../shared/include/types/db/File.hpp"
+#include "types/File.hpp"
 #include "FUSEPermissions.hpp"
-#include "StorageBridge/RemoteFSProxy.hpp"
-#include "types/db/FileMetadata.hpp"
+#include "fuse/StorageBridge/RemoteFSProxy.hpp"
+#include "types/FileMetadata.hpp"
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
 #include <cstring>
@@ -32,9 +32,9 @@ int getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi) {
     if (!proxy->fileExists(path)) return -ENOENT;
 
     types::File file = proxy->stat(path);
-    stbuf->st_mode = file.mode;
+    stbuf->st_mode = file.isDirectory() ? S_IFDIR | 0755 : S_IFREG | 0644;
     stbuf->st_nlink = 1;
-    stbuf->st_size = static_cast<off_t>(file.current_version_size_bytes);
+    stbuf->st_size = static_cast<off_t>(file.size_bytes);
     stbuf->st_mtime = file.updated_at;
     stbuf->st_ctime = file.created_at;
     stbuf->st_uid = getuid();

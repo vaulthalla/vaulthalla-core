@@ -22,10 +22,10 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         const std::string accessToken = msg.value("token", "");
 
         if (!command.starts_with("auth")) {
-            auto client = sessionManager_->getClientSession(session.getUUID());
+            const auto client = sessionManager_->getClientSession(session.getUUID());
             if (!client || !client->validateToken(accessToken)) {
                 std::cerr << "[Router] Unauthorized access attempt with command: " << command << std::endl;
-                json errorResponse = {{"command", "error"},
+                const json errorResponse = {{"command", "error"},
                                       {"status", "unauthorized"},
                                       {"message", "You must be authenticated to perform this action."}};
                 session.send(errorResponse);
@@ -33,11 +33,14 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
             }
         }
 
-        auto it = handlers_.find(command);
+        const auto it = handlers_.find(command);
         if (it != handlers_.end()) it->second(msg, session);
         else {
             std::cerr << "[Router] Unknown command: " << command << std::endl;
-            // send an error back here too
+            const json errorResponse = {{"command", "error"},
+                                        {"status", "unknown_command"},
+                                        {"message", "Unknown command: " + command}};
+            session.send(errorResponse);
         }
     } catch (const std::exception& e) {
         std::cerr << "[Router] Error routing message: " << e.what() << std::endl;

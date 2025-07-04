@@ -14,5 +14,9 @@ class DBConnection {
     std::unique_ptr<pqxx::connection> conn_;
 
     void initPrepared() const;
+    void initPreparedUsers() const;
+    void initPreparedFiles() const;
+    void initPreparedDirectories() const;
+    void initPreparedPerms() const;
 };
 } // namespace vh::database

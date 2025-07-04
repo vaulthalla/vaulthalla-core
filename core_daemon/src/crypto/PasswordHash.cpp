@@ -15,15 +15,12 @@ std::string hashPassword(const std::string& password) {
     if (crypto_pwhash_str(hashed, password.c_str(), password.size(), OPSLIMIT, MEMLIMIT) != 0)
         throw std::runtime_error("Password hashing failed (out of memory?)");
 
-    return std::string(hashed);
+    return {hashed};
 }
 
 bool verifyPassword(const std::string& password, const std::string& hash) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
-
-    int result = crypto_pwhash_str_verify(hash.c_str(), password.c_str(), password.size());
-
-    return (result == 0);
+    return crypto_pwhash_str_verify(hash.c_str(), password.c_str(), password.size()) == 0;
 }
 
 } // namespace vh::crypto

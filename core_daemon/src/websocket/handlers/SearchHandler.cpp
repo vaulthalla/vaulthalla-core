@@ -1,5 +1,5 @@
 #include "websocket/handlers/SearchHandler.hpp"
-#include "types/db/User.hpp"
+#include "types/User.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -32,7 +32,7 @@ void SearchHandler::handleSearch(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[SearchHandler] User '" << user->email << "' performed search: '" << query << std::endl;
+        std::cout << "[SearchHandler] User '" << user->name << "' performed search: '" << query << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[SearchHandler] handleSearch error: " << e.what() << std::endl;

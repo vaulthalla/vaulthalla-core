@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 namespace vh::types {
-class User;
+struct User;
 }
 
 namespace vh::websocket {
@@ -29,30 +29,29 @@ public:
 
     std::shared_ptr<Client> registerUser(std::shared_ptr<types::User> user,
                                          const std::string& password,
-                                         unsigned int roleId,
                                          const std::shared_ptr<websocket::WebSocketSession>& session);
 
-    std::shared_ptr<Client> loginUser(const std::string& email, const std::string& password,
+    std::shared_ptr<Client> loginUser(const std::string& name, const std::string& password,
                                       const std::shared_ptr<websocket::WebSocketSession>& session);
 
     void updateUser(const std::shared_ptr<types::User>& user);
 
-    void changePassword(const std::string& username, const std::string& oldPassword, const std::string& newPassword);
+    void changePassword(const std::string& name, const std::string& oldPassword, const std::string& newPassword);
 
-    std::shared_ptr<types::User> findUser(const std::string& email);
+    std::shared_ptr<types::User> findUser(const std::string& name);
 
     [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;
 
-    [[nodiscard]] bool validateToken(const std::string& token);
+    [[nodiscard]] bool validateToken(const std::string& token) const;
 
     std::shared_ptr<Client> validateRefreshToken(const std::string& refreshToken,
-                                                 const std::shared_ptr<websocket::WebSocketSession>& session);
+                                                 const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
     static std::pair<std::string, std::shared_ptr<RefreshToken> >
     createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session);
 
 private:
-    std::unordered_map<std::string, std::shared_ptr<types::User> > users_;
+    std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
     std::shared_ptr<SessionManager> sessionManager_;
     std::shared_ptr<storage::StorageManager> storageManager_;
 

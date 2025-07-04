@@ -1,5 +1,5 @@
 #include "FUSECmdRouter.hpp"
-#include "types/fuse/Command.hpp"
+#include "fuse/Command.hpp"
 #include <fcntl.h>
 #include <iostream>
 #include <nlohmann/json.hpp>

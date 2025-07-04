@@ -22,11 +22,11 @@ struct PermsQueries {
     static std::vector<std::shared_ptr<types::Role>> listRoles();
 
     // Role assignments (user/group)
-    static void assignUserRole(const std::shared_ptr<types::AssignedRole>& roleAssignment);
-    static void removeUserRole(unsigned int userId, unsigned int roleId);
-    static std::shared_ptr<types::Role> getUserRole(unsigned int userId, unsigned int roleId);
-    static std::vector<std::shared_ptr<types::Role>> listUserRoles(unsigned int userId);
-    static std::vector<std::shared_ptr<types::Role>> listUserRolesByScope(const std::string& scope, unsigned int scopeId);
+    static void assignRole(const std::shared_ptr<types::AssignedRole>& roleAssignment);
+    static void removeAssignedRole(unsigned int id);
+    static std::shared_ptr<types::AssignedRole> getSubjectAssignedRole(unsigned int subjectId, const std::string& subjectType, unsigned int roleId);
+    static std::shared_ptr<types::AssignedRole> getAssignedRole(unsigned int id);
+    static std::vector<std::shared_ptr<types::AssignedRole>> listAssignedRoles(unsigned int vaultId);
 
     // Permission queries
     static std::shared_ptr<types::Permission> getPermission(unsigned int id);

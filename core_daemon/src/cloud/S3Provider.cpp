@@ -1,6 +1,6 @@
 // S3Provider.cpp — safe header lifetime + explicit payload sizes
 #include "cloud/S3Provider.hpp"
-#include "types/db/APIKey.hpp"
+#include "../../../shared/include/types/APIKey.hpp"
 #include "util/timestamp.hpp"
 #include <ctime>
 #include <curl/curl.h>

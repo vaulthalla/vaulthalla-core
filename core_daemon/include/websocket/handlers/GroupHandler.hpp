@@ -17,11 +17,7 @@ struct GroupHandler {
     static void handleListGroups(const json& msg, WebSocketSession& session);
     static void handleGetGroup(const json& msg, WebSocketSession& session);
     static void handleGetGroupByName(const json& msg, WebSocketSession& session);
-    static void handleAddStorageVolumeToGroup(const json& msg, WebSocketSession& session);
-    static void handleRemoveStorageVolumeFromGroup(const json& msg, WebSocketSession& session);
     static void handleListGroupsByUser(const json& msg, WebSocketSession& session);
-    static void handleListGroupsByStorageVolume(const json& msg, WebSocketSession& session);
-    static void handleGetGroupByStorageVolume(const json& msg, WebSocketSession& session);
 };
 
 }

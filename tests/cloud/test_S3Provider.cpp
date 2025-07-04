@@ -1,4 +1,4 @@
-#include "../../shared/include/types/db/APIKey.hpp"
+#include "../../shared/include/types/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
 #include <filesystem>
 #include <fstream>

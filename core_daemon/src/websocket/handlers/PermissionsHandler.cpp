@@ -3,6 +3,7 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "types/User.hpp"
 #include "types/Role.hpp"
+#include "types/UserRole.hpp"
 #include "types/AssignedRole.hpp"
 #include "types/Permission.hpp"
 
@@ -195,7 +196,7 @@ void PermissionsHandler::handleListUserRoles(const json& msg, WebSocketSession& 
     }
 }
 
-void PermissionsHandler::handleListFSRoles(const json& msg, WebSocketSession& session) {
+void PermissionsHandler::handleListVaultRoles(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
         if (!user || !user->canManageRoles())
@@ -205,14 +206,14 @@ void PermissionsHandler::handleListFSRoles(const json& msg, WebSocketSession& se
 
         const json data = {{"roles", roles}};
 
-        const json response = {{"command", "roles.list.fs.response"},
+        const json response = {{"command", "roles.list.vault.response"},
                          {"status", "ok"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"data", data}};
 
         session.send(response);
     } catch (const std::exception& e) {
-        const json response = {{"command", "roles.list.fs.response"},
+        const json response = {{"command", "roles.list.vault.response"},
                          {"status", "error"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"error", e.what()}};

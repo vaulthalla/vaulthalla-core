@@ -1,6 +1,7 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/Role.hpp"
+#include "types/UserRole.hpp"
 #include "types/AssignedRole.hpp"
 #include "types/Permission.hpp"
 #include "util/timestamp.hpp"
@@ -99,10 +100,10 @@ std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
     });
 }
 
-std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles() {
+std::vector<std::shared_ptr<UserRole>> PermsQueries::listUserRoles() {
     return Transactions::exec("PermsQueries::listUserRoles", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("list_user_base_roles");
-        return roles_from_pq_res(res);
+        return userRolesFromPqRes(res);
     });
 }
 

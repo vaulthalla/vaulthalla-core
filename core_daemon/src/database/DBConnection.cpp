@@ -254,11 +254,10 @@ void DBConnection::initPreparedPerms() const {
         "JOIN permissions pp ON r.id = pp.role_id");
 
     conn_->prepare("list_user_base_roles",
-        "SELECT r.*, sp.permissions::int AS permissions, "
-        "pp.file_permissions::int AS file_permissions, pp.directory_permissions::int AS directory_permissions "
+        "SELECT r.id as role_id, r.name as role_name, r.description as role_description, "
+        "r.created_at as role_created_at, sp.permissions::int AS role_permissions "
         "FROM role r "
         "JOIN simple_permissions sp ON r.id = sp.role_id "
-        "JOIN permissions pp ON r.id = pp.role_id "
         "WHERE r.type = 'user'");
 
     conn_->prepare("list_fs_base_roles",

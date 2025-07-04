@@ -16,7 +16,7 @@ struct PermissionsHandler {
     static void handleGetRoleByName(const json& msg, WebSocketSession& session);
     static void handleListRoles(const json& msg, WebSocketSession& session);
     static void handleListUserRoles(const json& msg, WebSocketSession& session);
-    static void handleListFSRoles(const json& msg, WebSocketSession& session);
+    static void handleListVaultRoles(const json& msg, WebSocketSession& session);
 
     static void handleGetPermission(const json& msg, WebSocketSession& session);
     static void handleGetPermissionByName(const json& msg, WebSocketSession& session);

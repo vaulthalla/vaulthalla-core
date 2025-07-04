@@ -1,6 +1,8 @@
 #include "types/UserRole.hpp"
 #include "util/timestamp.hpp"
+
 #include <pqxx/row>
+#include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
@@ -34,4 +36,16 @@ void vh::types::from_json(const nlohmann::json& j, UserRole& r) {
     r.name = j.at("name").get<std::string>();
     r.description = j.at("description").get<std::string>();
     r.permissions = adminMaskFromJson(j.at("permissions"));
+}
+
+std::vector<std::shared_ptr<UserRole>> vh::types::userRolesFromPqRes(const pqxx::result& res) {
+    std::vector<std::shared_ptr<UserRole>> roles;
+    roles.reserve(res.size());
+    for (const auto& row : res) roles.push_back(std::make_shared<UserRole>(row));
+    return roles;
+}
+
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<UserRole>>& roles) {
+    j = nlohmann::json::array();
+    for (const auto& role : roles) j.push_back(*role);
 }

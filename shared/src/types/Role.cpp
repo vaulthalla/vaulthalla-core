@@ -60,7 +60,7 @@ void vh::types::from_json(const nlohmann::json& j, Role& r) {
     r.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
 }
 
-void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role> >& roles) {
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles) {
     j = nlohmann::json::array();
     for (const auto& role : roles) j.push_back(*role);
 }

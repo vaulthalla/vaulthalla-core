@@ -6,8 +6,7 @@
 
 namespace vh::types {
 struct Role;
-struct UserRole;
-struct AssignedRole;
+struct VaultRole;
 struct Permission;
 }
 
@@ -21,16 +20,15 @@ struct PermsQueries {
     static std::shared_ptr<types::Role> getRole(unsigned int id);
     static std::shared_ptr<types::Role> getRoleByName(const std::string& name);
     static std::vector<std::shared_ptr<types::Role>> listRoles();
-    static std::vector<std::shared_ptr<types::UserRole>> listUserRoles();
-    static std::vector<std::shared_ptr<types::Role>> listFSRoles();
+    static std::vector<std::shared_ptr<types::Role>> listUserRoles();
+    static std::vector<std::shared_ptr<types::Role>> listVaultRoles();
 
-
-    // Role assignments (user/group)
-    static void assignRole(const std::shared_ptr<types::AssignedRole>& roleAssignment);
-    static void removeAssignedRole(unsigned int id);
-    static std::shared_ptr<types::AssignedRole> getSubjectAssignedRole(unsigned int subjectId, const std::string& subjectType, unsigned int roleId);
-    static std::shared_ptr<types::AssignedRole> getAssignedRole(unsigned int id);
-    static std::vector<std::shared_ptr<types::AssignedRole>> listAssignedRoles(unsigned int vaultId);
+    // Vault Role CRUD
+    static void assignVaultRole(const std::shared_ptr<types::VaultRole>& roleAssignment);
+    static void removeVaultRoleAssignment(unsigned int id);
+    static std::shared_ptr<types::VaultRole> getVaultRoleBySubject(unsigned int subjectId, const std::string& subjectType, unsigned int roleId);
+    static std::shared_ptr<types::VaultRole> getVaultRole(unsigned int id);
+    static std::vector<std::shared_ptr<types::VaultRole>> listVaultAssignedRoles(unsigned int vaultId);
 
     // Permission queries
     static std::shared_ptr<types::Permission> getPermission(unsigned int id);

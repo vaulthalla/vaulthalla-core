@@ -24,42 +24,33 @@ Permission::Permission(const nlohmann::json& j)
 
 std::string to_string(const AdminPermission p) {
     switch (p) {
-    case AdminPermission::CreateUser: return "Create User";
-    case AdminPermission::CreateAdminUser: return "Create Admin User";
-    case AdminPermission::DeactivateUser: return "Deactivate User";
-    case AdminPermission::ResetUserPassword: return "Reset User Password";
-    case AdminPermission::ManageRoles: return "Manage Roles";
+    case AdminPermission::ManageAdmins: return "Manage Admins";
+    case AdminPermission::ManageUsers: return "Manage Users";
+        case AdminPermission::ManageRoles: return "Manage Roles";
     case AdminPermission::ManageSettings: return "Manage Settings";
-    case AdminPermission::ViewAuditLog: return "View Audit Log";
-    case AdminPermission::ManageAPIKeys: return "Manage API Keys";
-    case AdminPermission::CreateLocalVault: return "Create Local Vault";
-    case AdminPermission::CreateCloudVault: return "Create Cloud Vault";
-    case AdminPermission::DeleteVault: return "Delete Vault";
-    case AdminPermission::MigrateVaultData: return "Migrate Vault Data";
-    case AdminPermission::ManageVaultSettings: return "Manage Vault Settings";
-    case AdminPermission::ManageVaultRoles: return "Manage Vault Roles";
-    case AdminPermission::ManageAllVaults: return "Manage All Vaults";
+        case AdminPermission::ManageVaults: return "Manage Vaults";
+    case AdminPermission::AuditLogAccess: return "Audit Log Access";
+        case AdminPermission::FullAPIKeyAccess: return "Full API Key Access";
     default: return "Unknown Admin Permission";
     }
 }
 
-std::string to_string(const FSPermission p) {
+std::string to_string(const VaultPermission p) {
     switch (p) {
-        case FSPermission::Upload: return "Upload";
-        case FSPermission::Download: return "Download";
-        case FSPermission::Delete: return "Delete";
-        case FSPermission::SharePublic: return "Share Public";
-        case FSPermission::ShareInternal: return "Share Internal";
-        case FSPermission::Lock: return "Lock";
-        case FSPermission::Rename: return "Rename";
-        case FSPermission::Move: return "Move";
-        case FSPermission::SyncLocal: return "Sync Local";
-        case FSPermission::SyncCloud: return "Sync Cloud";
-        case FSPermission::ModifyMetadata: return "Modify Metadata";
-        case FSPermission::ChangeIcons: return "Change Icons";
-        case FSPermission::ManageTags: return "Manage Tags";
-        case FSPermission::ManageVersions: return "Manage Versions";
-        case FSPermission::List: return "List Directory";
+    case VaultPermission::MigrateData: return "Migrate Data";
+        case VaultPermission::ManageAccess: return "Manage Access";
+    case VaultPermission::ManageTags: return "Manage Tags";
+        case VaultPermission::ManageMetadata: return "Manage Metadata";
+    case VaultPermission::ManageVersions: return "Manage Versions";
+        case VaultPermission::ManageFileLocks: return "Manage File Locks";
+    case VaultPermission::Share: return "Share Files/Directories";
+        case VaultPermission::Sync : return "Sync with Cloud Storage";
+    case VaultPermission::Create: return "Create & Upload Files/Directories";
+        case VaultPermission::Download: return "Download Files/Directories";
+    case VaultPermission::Delete: return "Delete Files/Directories";
+        case VaultPermission::Rename: return "Rename Files/Directories";
+    case VaultPermission::Move: return "Move Files/Directories";
+    case VaultPermission::List: return "List Directories";
         default: return "Unknown File/Directory Permission";
     }
 }
@@ -71,8 +62,8 @@ void to_json(nlohmann::json& j, const Permission& p) {
         {"display_name", p.display_name},
         {"description", p.description},
         {"bit_position", p.bit_position},
-        {"created_at", vh::util::timestampToString(p.created_at)},
-        {"updated_at", vh::util::timestampToString(p.updated_at)}
+        {"created_at", util::timestampToString(p.created_at)},
+        {"updated_at", util::timestampToString(p.updated_at)}
     };
 }
 
@@ -91,57 +82,63 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& 
 
 nlohmann::json jsonFromAdminMask(const uint16_t mask) {
     return {
-            { "create_admin_user",      (mask & (1 << 0)) != 0 },
-        { "create_user",            (mask & (1 << 1)) != 0 },
-        { "deactivate_user",        (mask & (1 << 2)) != 0 },
-        { "reset_user_password",    (mask & (1 << 3)) != 0 },
-        { "manage_roles",           (mask & (1 << 4)) != 0 },
-        { "manage_settings",        (mask & (1 << 5)) != 0 },
-        { "view_audit_log",         (mask & (1 << 6)) != 0 },
-        { "manage_api_keys",        (mask & (1 << 7)) != 0 }
+        {"manage_admins",      (mask & (1 << 0)) != 0 },
+        {"manage_users",       (mask & (1 << 1)) != 0 },
+        {"manage_roles",       (mask & (1 << 2)) != 0 },
+        {"manage_settings",    (mask & (1 << 3)) != 0 },
+        {"manage_vaults",      (mask & (1 << 4)) != 0 },
+        {"audit_log_access",   (mask & (1 << 5)) != 0 },
+        {"full_api_key_access",(mask & (1 << 6)) != 0 }
     };
 }
 
-nlohmann::json jsonFromFSMask(const uint16_t mask) {
+nlohmann::json jsonFromVaultMask(const uint16_t mask) {
     return {
-        { "create_local_vault",     (mask & (1 << 0)) != 0 },
-        { "create_cloud_vault",     (mask & (1 << 1)) != 0 },
-        { "delete_vault",           (mask & (1 << 2)) != 0 },
-        { "adjust_vault_settings",  (mask & (1 << 3)) != 0 },
-        { "migrate_vault_data",     (mask & (1 << 4)) != 0 },
-        { "create_volume",          (mask & (1 << 5)) != 0 },
-        { "delete_volume",          (mask & (1 << 6)) != 0 },
-        { "resize_volume",          (mask & (1 << 7)) != 0 },
-        { "move_volume",            (mask & (1 << 8)) != 0 },
-        { "assign_volume_to_group", (mask & (1 << 9)) != 0 }
+        {"migrate_data",        (mask & (1 << 0)) != 0 },
+        {"manage_access",       (mask & (1 << 1)) != 0 },
+        {"manage_tags",         (mask & (1 << 2)) != 0 },
+        {"manage_metadata",     (mask & (1 << 3)) != 0 },
+        {"manage_versions",     (mask & (1 << 4)) != 0 },
+        {"manage_file_locks",   (mask & (1 << 5)) != 0 },
+        {"share",               (mask & (1 << 6)) != 0 },
+        {"sync",                (mask & (1 << 7)) != 0 },
+        {"create",              (mask & (1 << 8)) != 0 },
+        {"download",            (mask & (1 << 9)) != 0 },
+        {"delete",              (mask & (1 << 10)) != 0 },
+        {"rename",              (mask & (1 << 11)) != 0 },
+        {"move",                (mask & (1 << 12)) != 0 },
+        {"list",                (mask & (1 << 13)) != 0 }
     };
 }
 
 uint16_t adminMaskFromJson(const nlohmann::json& j) {
     uint16_t mask = 0;
-    if (j.at("create_user").get<bool>()) mask |= (1 << 0);
-    if (j.at("create_admin_user").get<bool>()) mask |= (1 << 1);
-    if (j.at("deactivate_user").get<bool>()) mask |= (1 << 2);
-    if (j.at("reset_user_password").get<bool>()) mask |= (1 << 3);
-    if (j.at("manage_roles").get<bool>()) mask |= (1 << 4);
-    if (j.at("manage_settings").get<bool>()) mask |= (1 << 5);
-    if (j.at("view_audit_log").get<bool>()) mask |= (1 << 6);
-    if (j.at("manage_api_keys").get<bool>()) mask |= (1 << 7);
+    if (j.at("manage_admins").get<bool>()) mask |= (1 << 0);
+    if (j.at("manage_users").get<bool>()) mask |= (1 << 1);
+    if (j.at("manage_roles").get<bool>()) mask |= (1 << 2);
+    if (j.at("manage_settings").get<bool>()) mask |= (1 << 3);
+    if (j.at("manage_vaults").get<bool>()) mask |= (1 << 4);
+    if (j.at("audit_log_access").get<bool>()) mask |= (1 << 5);
+    if (j.at("full_api_key_access").get<bool>()) mask |= (1 << 6);
     return mask;
 }
 
-uint16_t fsMaskFromJson(const nlohmann::json& j) {
+uint16_t vaultMaskFromJson(const nlohmann::json& j) {
     uint16_t mask = 0;
-    if (j.at("create_local_vault").get<bool>()) mask |= (1 << 0);
-    if (j.at("create_cloud_vault").get<bool>()) mask |= (1 << 1);
-    if (j.at("delete_vault").get<bool>()) mask |= (1 << 2);
-    if (j.at("adjust_vault_settings").get<bool>()) mask |= (1 << 3);
-    if (j.at("migrate_vault_data").get<bool>()) mask |= (1 << 4);
-    if (j.at("create_volume").get<bool>()) mask |= (1 << 5);
-    if (j.at("delete_volume").get<bool>()) mask |= (1 << 6);
-    if (j.at("resize_volume").get<bool>()) mask |= (1 << 7);
-    if (j.at("move_volume").get<bool>()) mask |= (1 << 8);
-    if (j.at("assign_volume_to_group").get<bool>()) mask |= (1 << 9);
+    if (j.at("migrate_data").get<bool>()) mask |= (1 << 0);
+    if (j.at("manage_access").get<bool>()) mask |= (1 << 1);
+    if (j.at("manage_tags").get<bool>()) mask |= (1 << 2);
+    if (j.at("manage_metadata").get<bool>()) mask |= (1 << 3);
+    if (j.at("manage_versions").get<bool>()) mask |= (1 << 4);
+    if (j.at("manage_file_locks").get<bool>()) mask |= (1 << 5);
+    if (j.at("share").get<bool>()) mask |= (1 << 6);
+    if (j.at("sync").get<bool>()) mask |= (1 << 7);
+    if (j.at("create").get<bool>()) mask |= (1 << 8);
+    if (j.at("download").get<bool>()) mask |= (1 << 9);
+    if (j.at("delete").get<bool>()) mask |= (1 << 10);
+    if (j.at("rename").get<bool>()) mask |= (1 << 11);
+    if (j.at("move").get<bool>()) mask |= (1 << 12);
+    if (j.at("list").get<bool>()) mask |= (1 << 13);
     return mask;
 }
 

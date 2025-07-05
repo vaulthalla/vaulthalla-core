@@ -9,54 +9,38 @@
 using namespace vh::types;
 
 Role::Role(const pqxx::row& row)
-    : id(row["id"].as<unsigned int>()),
+    : role_id(row["role_id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
       description(row["description"].as<std::string>()),
+      type(row["type"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      simplePermissions(row["simple_permissions"].as<bool>()) {
-    if (simplePermissions) file_permissions = directory_permissions = static_cast<uint16_t>(row["permissions"].as<int64_t>());
-    else {
-        file_permissions = static_cast<uint16_t>(row["file_permissions"].as<int64_t>());
-        directory_permissions = static_cast<uint16_t>(row["directory_permissions"].as<int64_t>());
-    }
-}
+      permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())) {}
 
 Role::Role(const nlohmann::json& j)
-    : id(j.contains("id") ? j.at("id").get<unsigned int>() : 0),
+    : role_id(j.contains("role_id") ? j.at("role_id").get<unsigned int>() : 0),
       name(j.at("name").get<std::string>()),
       description(j.at("description").get<std::string>()),
+      type(j.at("type").get<std::string>()),
       created_at(static_cast<std::time_t>(0)),
-      simplePermissions(j.value("simple_permissions", false)) {
-    if (simplePermissions) file_permissions = directory_permissions = fsMaskFromJson(j.at("permissions"));
-    else {
-        file_permissions = fsMaskFromJson(j.at("file_permissions"));
-        directory_permissions = fsMaskFromJson(j.at("directory_permissions"));
-    }
-}
+      permissions(type == "user" ? adminMaskFromJson(j.at("permissions")) : vaultMaskFromJson(j.at("permissions"))) {}
 
 void vh::types::to_json(nlohmann::json& j, const Role& r) {
     j = {
-        {"id", r.id},
+        {"role_id", r.role_id},
         {"name", r.name},
         {"description", r.description},
-        {"simple_permissions", r.simplePermissions},
+        {"type", r.type},
+        {"permissions", r.type == "user" ? jsonFromAdminMask(r.permissions) : jsonFromVaultMask(r.permissions)},
         {"created_at", util::timestampToString(r.created_at)}
     };
-
-    if (r.simplePermissions) j["permissions"] = jsonFromFSMask(r.file_permissions);
-    else {
-        j["file_permissions"] = jsonFromFSMask(r.file_permissions);
-        j["directory_permissions"] = jsonFromFSMask(r.directory_permissions);
-    }
 }
 
 void vh::types::from_json(const nlohmann::json& j, Role& r) {
-    if (j.contains("id")) r.id = j.at("id").get<unsigned int>();
+    if (j.contains("role_id")) r.role_id = j.at("role_id").get<unsigned int>();
     r.name = j.at("name").get<std::string>();
     r.description = j.at("description").get<std::string>();
-    r.simplePermissions = j.value("simple_permissions", false);
-    r.file_permissions = fsMaskFromJson(j.at("file_permissions"));
-    r.directory_permissions = fsMaskFromJson(j.at("directory_permissions"));
+    r.type = j.at("type").get<std::string>();
+    r.permissions = r.type == "user" ? adminMaskFromJson(j.at("permissions")) : vaultMaskFromJson(j.at("permissions"));
     r.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
 }
 

@@ -3,8 +3,7 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "types/User.hpp"
 #include "types/Role.hpp"
-#include "types/UserRole.hpp"
-#include "types/AssignedRole.hpp"
+#include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 
 #include <nlohmann/json.hpp>
@@ -202,7 +201,7 @@ void PermissionsHandler::handleListVaultRoles(const json& msg, WebSocketSession&
         if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can list filesystem roles");
 
-        const auto roles = database::PermsQueries::listFSRoles();
+        const auto roles = database::PermsQueries::listVaultRoles();
 
         const json data = {{"roles", roles}};
 

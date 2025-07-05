@@ -1,6 +1,6 @@
 #include "types/User.hpp"
 #include "types/UserRole.hpp"
-#include "types/AssignedRole.hpp"
+#include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 #include "util/timestamp.hpp"
 
@@ -28,19 +28,22 @@ User::User(const pqxx::row& row)
       password_hash(row["password_hash"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       is_active(row["is_active"].as<bool>()),
-      role(std::make_shared<UserRole>(row)) {
+      role(nullptr) {
     if (row["last_login"].is_null()) last_login = std::nullopt;
     else last_login = std::make_optional(util::parsePostgresTimestamp(row["last_login"].as<std::string>()));
     if (row["email"].is_null()) email = std::nullopt;
     else email = std::make_optional(row["email"].as<std::string>());
 }
 
-User::User(const pqxx::row& user, const pqxx::result& roles, const pqxx::result& overrides)
-: User(user) { this->roles = assigned_roles_from_pq_result(roles, overrides); }
+User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides)
+: User(user) {
+    this->role = std::make_shared<UserRole>(role);
+    this->roles = vault_roles_from_pq_result(vaultRoles, overrides);
+}
 
-std::shared_ptr<AssignedRole> User::getRole(const unsigned int vaultId) const {
+std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     const auto it = std::ranges::find_if(roles.begin(), roles.end(),
-                       [vaultId](const std::shared_ptr<AssignedRole>& role) {
+                       [vaultId](const std::shared_ptr<VaultRole>& role) {
                            return role->vault_id == vaultId;
                        });
     return it != roles.end() ? *it : nullptr;
@@ -88,174 +91,90 @@ nlohmann::json to_json(const std::shared_ptr<User>& user) { return nlohmann::jso
 
 
 // --- User role checks ---
+bool User::isSuperAdmin() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
+bool User::isAdmin() const { return isSuperAdmin() || role->permissions == ADMIN_MASK; }
 
-bool User::isAdmin() const {
-    return hasPermission(role->permissions, AdminPermission::CreateUser) ||
-           hasPermission(role->permissions, AdminPermission::CreateAdminUser) ||
-           hasPermission(role->permissions, AdminPermission::ManageRoles) ||
-           hasPermission(role->permissions, AdminPermission::ManageSettings);
-}
-
-bool User::isSuperAdmin() const {
-    return hasPermission(role->permissions, AdminPermission::CreateAdminUser);
-}
 
 // --- Admin checks ---
-bool User::canCreateUser() const { return hasPermission(role->permissions, AdminPermission::CreateUser); }
-bool User::canCreateAdminUser() const { return hasPermission(role->permissions, AdminPermission::CreateAdminUser); }
-bool User::canDeactivateUser() const { return hasPermission(role->permissions, AdminPermission::DeactivateUser); }
-bool User::canResetUserPassword() const { return hasPermission(role->permissions, AdminPermission::ResetUserPassword); }
+bool User::canManageAdmins() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
+bool User::canManageUsers() const { return hasPermission(role->permissions, AdminPermission::ManageUsers); }
 bool User::canManageRoles() const { return hasPermission(role->permissions, AdminPermission::ManageRoles); }
 bool User::canManageSettings() const { return hasPermission(role->permissions, AdminPermission::ManageSettings); }
-bool User::canViewAuditLog() const { return hasPermission(role->permissions, AdminPermission::ViewAuditLog); }
-bool User::canManageAPIKeys() const { return hasPermission(role->permissions, AdminPermission::ManageAPIKeys); }
-bool User::canCreateLocalVault() const { return hasPermission(role->permissions, AdminPermission::CreateLocalVault); }
-bool User::canCreateCloudVault() const { return hasPermission(role->permissions, AdminPermission::CreateCloudVault); }
-bool User::canDeleteVault() const { return hasPermission(role->permissions, AdminPermission::DeleteVault); }
-bool User::canManageVaultSettings() const { return hasPermission(role->permissions, AdminPermission::ManageVaultSettings); }
-bool User::canManageVaultRoles() const { return hasPermission(role->permissions, AdminPermission::ManageVaultRoles); }
-bool User::canManageAllVaults() const { return hasPermission(role->permissions, AdminPermission::ManageAllVaults); }
-bool User::canMigrateVaultData() const { return hasPermission(role->permissions, AdminPermission::MigrateVaultData); }
+bool User::canManageVaults() const { return hasPermission(role->permissions, AdminPermission::ManageVaults); }
+bool User::canAccessAuditLog() const { return hasPermission(role->permissions, AdminPermission::AuditLogAccess); }
+bool User::canAccessAnyAPIKey() const { return hasPermission(role->permissions, AdminPermission::FullAPIKeyAccess); }
+
 
 // --- Vault role->permissions ---
-bool User::canUploadFile(const unsigned int vaultId) const {
+
+bool User::canMigrateVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canUploadFile();
+    return role && role->canMigrateData(path);
 }
 
-bool User::canDownloadFile(const unsigned int vaultId) const {
+bool User::canManageVaultAccess(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canDownloadFile();
+    return role && role->canManageAccess(path);
 }
 
-bool User::canDeleteFile(const unsigned int vaultId) const {
+bool User::canManageVaultTags(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canDeleteFile();
+    return role && role->canManageTags(path);
 }
 
-bool User::canShareFilePublicly(const unsigned int vaultId) const {
+bool User::canManageVaultMetadata(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canShareFilePublicly();
+    return role && role->canManageMetadata(path);
 }
 
-bool User::canShareFileInternally(const unsigned int vaultId) const {
+bool User::canManageVaultVersions(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canShareFileInternally();
+    return role && role->canManageVersions(path);
 }
 
-bool User::canLockFile(const unsigned int vaultId) const {
+bool User::canManageVaultFileLocks(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canLockFile();
+    return role && role->canManageFileLocks(path);
 }
 
-bool User::canRenameFile(const unsigned int vaultId) const {
+bool User::canShareVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canRenameFile();
+    return role && role->canShare(path);
 }
 
-bool User::canMoveFile(const unsigned int vaultId) const {
+bool User::canSyncVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canMoveFile();
+    return role && role->canSync(path);
 }
 
-bool User::canSyncFileLocally(const unsigned int vaultId) const {
+bool User::canCreateVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canSyncFileLocally();
+    return role && role->canCreate(path);
 }
 
-bool User::canSyncFileWithCloud(const unsigned int vaultId) const {
+bool User::canDownloadVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canSyncFileWithCloud();
+    return role && role->canDownload(path);
 }
 
-bool User::canManageFileMetadata(const unsigned int vaultId) const {
+bool User::canDeleteVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canManageFileMetadata();
+    return role && role->validatePermission(role->permissions, VaultPermission::Delete, path);
 }
 
-bool User::canChangeFileIcons(const unsigned int vaultId) const {
+bool User::canRenameVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canChangeFileIcons();
+    return role && role->validatePermission(role->permissions, VaultPermission::Rename, path);
 }
 
-bool User::canManageVersions(const unsigned int vaultId) const {
+bool User::canMoveVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canManageVersions();
+    return role && role->validatePermission(role->permissions, VaultPermission::Move, path);
 }
 
-bool User::canManageFileTags(const unsigned int vaultId) const {
+bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canManageFileTags();
-}
-
-bool User::canUploadDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canUploadDirectory();
-}
-
-bool User::canDownloadDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canDownloadDirectory();
-}
-
-bool User::canDeleteDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canDeleteDirectory();
-}
-
-bool User::canShareDirPublicly(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canShareDirPublicly();
-}
-
-bool User::canShareDirInternally(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canShareDirInternally();
-}
-
-bool User::canLockDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canLockDirectory();
-}
-
-bool User::canRenameDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canRenameDirectory();
-}
-
-bool User::canMoveDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canMoveDirectory();
-}
-
-bool User::canSyncDirectoryLocally(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canSyncDirectoryLocally();
-}
-
-bool User::canSyncDirectoryWithCloud(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canSyncDirectoryWithCloud();
-}
-
-bool User::canManageDirectoryMetadata(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canManageDirectoryMetadata();
-}
-
-bool User::canChangeDirectoryIcons(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canChangeDirectoryIcons();
-}
-
-bool User::canManageDirectoryTags(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canManageDirectoryTags();
-}
-
-bool User::canListDirectory(const unsigned int vaultId) const {
-    const auto role = getRole(vaultId);
-    return role && role->canListDirectory();
+    return role && role->validatePermission(role->permissions, VaultPermission::List, path);
 }
 
 } // namespace vh::types

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types/Permission.hpp"
+#include "types/Role.hpp"
 
 #include <string>
 #include <ctime>
@@ -13,11 +14,9 @@ class result;
 
 namespace vh::types {
 
-struct UserRole {
-    unsigned int id;
-    std::string name, description;
-    std::time_t created_at;
-    uint16_t permissions{0};
+struct UserRole : Role {
+    unsigned int assignment_id, user_id;
+    std::time_t assigned_at;
 
     UserRole() = default;
     explicit UserRole(const pqxx::row& row);
@@ -27,7 +26,7 @@ struct UserRole {
 void to_json(nlohmann::json& j, const UserRole& r);
 void from_json(const nlohmann::json& j, UserRole& r);
 
-std::vector<std::shared_ptr<UserRole>> userRolesFromPqRes(const pqxx::result& res);
+std::vector<std::shared_ptr<UserRole>> user_roles_from_pq_res(const pqxx::result& res);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<UserRole>>& roles);
 
 } // namespace vh::types

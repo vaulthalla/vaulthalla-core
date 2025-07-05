@@ -17,6 +17,10 @@ class DBConnection {
     void initPreparedUsers() const;
     void initPreparedFiles() const;
     void initPreparedDirectories() const;
-    void initPreparedPerms() const;
+    void initPreparedRoles() const;
+    void initPreparedPermissions() const;
+    void initPreparedUserRoles() const;
+    void initPreparedVaultRoles() const;
+    void initPreparedPermOverrides() const;
 };
 } // namespace vh::database

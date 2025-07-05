@@ -10,42 +10,31 @@
 
 namespace vh::types {
 
-// Admin-level permissions
 enum class AdminPermission : uint16_t {
-    CreateAdminUser         = 1ULL << 0,
-    CreateUser              = 1ULL << 1,
-    DeactivateUser          = 1ULL << 2,
-    ResetUserPassword       = 1ULL << 3,
-    ManageRoles             = 1ULL << 4,
-    ManageSettings          = 1ULL << 5,
-    ViewAuditLog            = 1ULL << 6,
-    ManageAPIKeys           = 1ULL << 7,
-    CreateLocalVault        = 1ULL << 8,
-    CreateCloudVault        = 1ULL << 9,
-    DeleteVault             = 1ULL << 10,
-    ManageVaultSettings     = 1ULL << 11,
-    ManageVaultRoles        = 1ULL << 12,
-    MigrateVaultData        = 1ULL << 13,
-    ManageAllVaults         = 1ULL << 14,
+    ManageAdmins            = 1ULL << 0,
+    ManageUsers             = 1ULL << 1,
+    ManageRoles             = 1ULL << 2,
+    ManageSettings          = 1ULL << 3,
+    ManageVaults            = 1ULL << 4,   // create, delete, adjust settings of any vault
+    AuditLogAccess          = 1ULL << 5,
+    FullAPIKeyAccess        = 1ULL << 6,   // manage API keys, create, delete, list - users may only see their own keys
 };
 
-// File and Directory permissions
-enum class FSPermission : uint16_t {
-    Upload                  = 1ULL << 0,
-    Download                = 1ULL << 1,
-    Delete                  = 1ULL << 2,
-    SharePublic             = 1ULL << 3,
-    ShareInternal           = 1ULL << 4,
-    Lock                    = 1ULL << 5,
-    Rename                  = 1ULL << 6,
-    Move                    = 1ULL << 7,
-    SyncLocal               = 1ULL << 8,
-    SyncCloud               = 1ULL << 9,
-    ModifyMetadata          = 1ULL << 10,
-    ChangeIcons             = 1ULL << 11,
-    ManageTags              = 1ULL << 12,
-    List                    = 1ULL << 13,  // Directory specific
-    ManageVersions          = 1ULL << 14,  // File specific
+enum class VaultPermission : uint16_t {
+    MigrateData             = 1ULL << 0,   // migrate vault data to another storage backend
+    ManageAccess            = 1ULL << 1,   // manage vault roles, assign users/groups to vault roles
+    ManageTags              = 1ULL << 2,   // manage tags for files and directories in the vault
+    ManageMetadata          = 1ULL << 3,
+    ManageVersions          = 1ULL << 4,
+    ManageFileLocks         = 1ULL << 5,
+    Share                   = 1ULL << 6,   // public links; internal share is managed by Vault ACL
+    Sync                    = 1ULL << 7,   // sync vault with cloud storage, internal is managed by Vault ACL
+    Create                  = 1ULL << 8,   // create files/directories and upload files
+    Download                = 1ULL << 9,   // download files, read file contents
+    Delete                  = 1ULL << 10,
+    Rename                  = 1ULL << 11,
+    Move                    = 1ULL << 12,
+    List                    = 1ULL << 13,  // must be set at top-level, use overrides to restrict specific directories
 };
 
 struct Permission {
@@ -59,11 +48,11 @@ struct Permission {
 };
 
 inline unsigned short adminPermToBit(const AdminPermission& perm) { return static_cast<unsigned short>(perm); }
-inline unsigned short fsPermToBit(const FSPermission& perm) { return static_cast<unsigned short>(perm); }
+inline unsigned short vaultPermToBit(const VaultPermission& perm) { return static_cast<unsigned short>(perm); }
 
 // String conversions
 std::string to_string(AdminPermission p);
-std::string to_string(FSPermission p);
+std::string to_string(VaultPermission p);
 
 // JSON serialization
 void to_json(nlohmann::json& j, const Permission& p);
@@ -102,9 +91,9 @@ template <typename T>
 bool hasPermission(const uint16_t mask, T perm) { return (mask & static_cast<uint16_t>(perm)) != 0; }
 
 nlohmann::json jsonFromAdminMask(uint16_t mask);
-nlohmann::json jsonFromFSMask(uint16_t mask);
+nlohmann::json jsonFromVaultMask(uint16_t mask);
 
 uint16_t adminMaskFromJson(const nlohmann::json& j);
-uint16_t fsMaskFromJson(const nlohmann::json& j);
+uint16_t vaultMaskFromJson(const nlohmann::json& j);
 
 } // namespace vh::types

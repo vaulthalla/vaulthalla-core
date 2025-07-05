@@ -1,7 +1,7 @@
 #include "websocket/handlers/FileSystemHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
 #include "types/File.hpp"
-#include "types/AssignedRole.hpp"
+#include "types/VaultRole.hpp"
 #include "websocket/handlers/UploadHandler.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include <iostream>
@@ -19,7 +19,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::AssignedRole::canUploadFile);
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
 
         const auto uploadId = WebSocketSession::generateUUIDv4();
         const auto engine = storageManager_->getEngine(vaultId);
@@ -64,7 +64,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::AssignedRole::canUploadFile);
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
 
         session.getUploadHandler()->finishUpload();
 
@@ -102,7 +102,7 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::AssignedRole::canUploadDirectory);
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
 
         storageManager_->mkdir(vaultId, path, session.getAuthenticatedUser());
 
@@ -133,7 +133,7 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         const auto path = payload.value("path", "/");
 
         const auto user = session.getAuthenticatedUser();
-        enforcePermissions(session, vaultId, path, &types::AssignedRole::canListDirectory);
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canList);
 
         const auto& vaultName = storageManager_->getVault(vaultId)->name;
 

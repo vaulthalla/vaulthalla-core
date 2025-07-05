@@ -8,37 +8,34 @@
 using namespace vh::types;
 
 UserRole::UserRole(const pqxx::row& row)
-    : id(row["role_id"].as<unsigned int>()),
-      name(row["role_name"].as<std::string>()),
-      description(row["role_description"].as<std::string>()),
-      created_at(util::parsePostgresTimestamp(row["role_created_at"].as<std::string>())),
-      permissions(static_cast<uint16_t>(row["role_permissions"].as<int64_t>())) {}
+    : Role(row) {
+    assignment_id = row["assignment_id"].as<unsigned int>();
+    user_id = row["user_id"].as<unsigned int>();
+    assigned_at = util::parsePostgresTimestamp(row["assigned_at"].as<std::string>());
+}
 
 UserRole::UserRole(const nlohmann::json& j)
-    : id(j.contains("id") ? j.at("id").get<unsigned int>() : 0),
-      name(j.at("name").get<std::string>()),
-      description(j.at("description").get<std::string>()),
-      created_at(static_cast<std::time_t>(0)),
-      permissions(adminMaskFromJson(j.at("permissions"))) {}
+    : Role(j) {
+    assignment_id = j.at("assignment_id").get<unsigned int>();
+    user_id = j.at("user_id").get<unsigned int>();
+    assigned_at = util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
+}
 
 void vh::types::to_json(nlohmann::json& j, const UserRole& r) {
-    j = {
-        {"id", r.id},
-        {"name", r.name},
-        {"description", r.description},
-        {"permissions", jsonFromAdminMask(r.permissions)},
-        {"created_at", util::timestampToString(r.created_at)}
-    };
+    to_json(j, static_cast<const Role&>(r));
+    j["assignment_id"] = r.assignment_id;
+    j["user_id"] = r.user_id;
+    j["assigned_at"] = util::timestampToString(r.assigned_at);
 }
 
 void vh::types::from_json(const nlohmann::json& j, UserRole& r) {
-    if (j.contains("id")) r.id = j.at("id").get<unsigned int>();
-    r.name = j.at("name").get<std::string>();
-    r.description = j.at("description").get<std::string>();
-    r.permissions = adminMaskFromJson(j.at("permissions"));
+    from_json(j, static_cast<Role&>(r));
+    r.assignment_id = j.at("assignment_id").get<unsigned int>();
+    r.user_id = j.at("user_id").get<unsigned int>();
+    r.assigned_at = util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
 }
 
-std::vector<std::shared_ptr<UserRole>> vh::types::userRolesFromPqRes(const pqxx::result& res) {
+std::vector<std::shared_ptr<UserRole>> vh::types::user_roles_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<UserRole>> roles;
     roles.reserve(res.size());
     for (const auto& row : res) roles.push_back(std::make_shared<UserRole>(row));

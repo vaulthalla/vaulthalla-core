@@ -42,7 +42,7 @@ void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session)
 void GroupHandler::handleDeleteGroup(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canDeactivateUser())
+        if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can delete groups");
 
         const auto groupId = msg.at("payload").at("id").get<unsigned int>();

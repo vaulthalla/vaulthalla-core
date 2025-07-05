@@ -235,11 +235,11 @@ INSERT INTO users (name, password_hash, created_at, is_active)
 VALUES ('admin', '${HASHED_PASS}', NOW(), TRUE)
 ON CONFLICT (name) DO NOTHING;
 
--- Link to user_roles
-INSERT INTO user_roles (user_id, role_id)
+-- Link to user_role_assignments
+INSERT INTO user_role_assignments (user_id, role_id)
 SELECT u.id, r.id
 FROM users u, role r
-WHERE u.name = 'admin' AND r.name = 'super_admin';
+WHERE u.name = 'admin' AND r.name = 'super_admin' AND r.type = 'user';
 
 -- Create Admin Group & Link
 INSERT INTO groups (name, description)

@@ -1,0 +1,98 @@
+#pragma once
+
+#include "Role.hpp"
+
+#include <string>
+#include <ctime>
+#include <filesystem>
+#include <optional>
+#include <memory>
+#include <vector>
+#include <nlohmann/json_fwd.hpp>
+#include <pqxx/result.hxx>
+
+#include "PermissionOverride.hpp"
+
+namespace pqxx {
+class row;
+class result;
+}
+
+namespace vh::types {
+
+struct PermissionOverride;
+
+struct VaultRole : Role {
+    unsigned int assignment_id, subject_id, role_id, vault_id;
+    std::string subject_type; // 'user' or 'group'
+    std::time_t assigned_at;
+    std::vector<std::shared_ptr<PermissionOverride> > permission_overrides;
+
+    VaultRole() = default;
+
+    VaultRole(const pqxx::row& row, const pqxx::result& overrides);
+
+    VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrides);
+
+    explicit VaultRole(const nlohmann::json& j);
+
+    std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
+
+    template <typename T> bool validatePermission(const uint16_t mask, T perm,
+                                                  const std::filesystem::path& path = {}) const {
+        const bool isEnabled = (mask & static_cast<uint16_t>(perm)) != 0;
+        if (path.empty()) return isEnabled;
+
+        const auto pathStr = path.string();
+        const auto bit = vaultPermToBit(perm);
+        auto overrides = getPermissionOverrides(bit);
+        if (overrides.empty()) return isEnabled;
+
+        // Sort: best match first
+        std::sort(overrides.begin(), overrides.end(),
+                  [&pathStr](const std::shared_ptr<PermissionOverride>& a, const std::shared_ptr<PermissionOverride>& b) {
+                      std::smatch matchA, matchB;
+                      const bool aMatches = std::regex_match(pathStr, matchA, a->pattern);
+                      const bool bMatches = std::regex_match(pathStr, matchB, b->pattern);
+
+                      if (aMatches && bMatches) return matchA.str(0).size() > matchB.str(0).size();
+                      return aMatches > bMatches;
+                  });
+
+        // Apply first matching override
+        for (const auto& ovr : overrides)
+            if (std::regex_match(pathStr, ovr->pattern)) return ovr->enabled;
+
+        return isEnabled;
+    }
+
+    [[nodiscard]] bool canMigrateData(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageAccess(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageTags(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageMetadata(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageVersions(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageFileLocks(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canShare(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canSync(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canCreate(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canDownload(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canDelete(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canRename(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canMove(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canList(const std::filesystem::path& path) const;
+
+};
+
+// JSON + DB helpers
+void to_json(nlohmann::json& j, const VaultRole& r);
+
+void from_json(const nlohmann::json& j, VaultRole& r);
+
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<VaultRole> >& roles);
+
+std::vector<std::shared_ptr<VaultRole> > vault_roles_from_json(const nlohmann::json& j);
+
+std::vector<std::shared_ptr<VaultRole> > vault_roles_from_pq_result(const pqxx::result& res,
+                                                                          const pqxx::result& overrides);
+
+} // namespace vh::types

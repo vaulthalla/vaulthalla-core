@@ -14,11 +14,10 @@ class result;
 namespace vh::types {
 
 struct Role {
-    unsigned int id;
-    std::string name, description;
+    unsigned int role_id;
+    std::string name, description, type;
     std::time_t created_at;
-    bool simplePermissions{false};
-    uint16_t file_permissions{0}, directory_permissions{0};
+    uint16_t permissions{0};
 
     Role() = default;
     explicit Role(const pqxx::row& row);

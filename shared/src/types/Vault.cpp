@@ -30,7 +30,7 @@ Vault::Vault(const pqxx::row& row)
 
 // ───── LocalDiskVault ─────
 LocalDiskVault::LocalDiskVault(const std::string& name, std::filesystem::path mountPoint)
-    : Vault(), vault_id(0), mount_point(std::move(mountPoint)) {
+    : Vault(), mount_point(std::move(mountPoint)) {
     this->name = name;
     this->type = VaultType::Local;
     this->is_active = true;

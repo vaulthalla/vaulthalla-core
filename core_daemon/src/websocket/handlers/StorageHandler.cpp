@@ -239,10 +239,13 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& session) const {
     try {
         const auto user = session.getAuthenticatedUser();
-        if (!user->isAdmin() && !user->canDeleteVault())
-            throw std::runtime_error("User does not have permission to delete vaults.");
 
         const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
+        const auto vault = storageManager_->getVault(vaultId);
+
+        if (!user->isAdmin() && (!user->canManageVaults() || user->id != vault->owner_id))
+            throw std::runtime_error("User does not have permission to delete vaults.");
+
         storageManager_->removeVault(vaultId);
 
         const json response = {{"command", "storage.vault.remove.response"},

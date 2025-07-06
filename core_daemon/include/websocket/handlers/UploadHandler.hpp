@@ -6,6 +6,10 @@
 #include <nlohmann/json.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 
+namespace vh::types {
+    struct User;
+}
+
 namespace vh::websocket {
 
 class WebSocketSession; // Forward declare to avoid circular dependency
@@ -33,6 +37,10 @@ public:
     void finishUpload();
 
     bool uploadInProgress() const { return currentUpload_.has_value(); }
+
+    static void ensureDirectoriesInDb(unsigned int vaultId,
+                               const std::filesystem::path& relPath,
+                               const std::shared_ptr<types::User>& user);
 
 private:
     WebSocketSession& session_;

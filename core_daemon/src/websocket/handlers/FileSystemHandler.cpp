@@ -35,6 +35,8 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto absPath = localEngine->getAbsolutePath(path);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
+        UploadHandler::ensureDirectoriesInDb(vaultId, path, session.getAuthenticatedUser());
+
         session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
 
         const json data = {

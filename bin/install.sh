@@ -268,6 +268,14 @@ WHERE v.name = 'Default'
 AND NOT EXISTS (
   SELECT 1 FROM local WHERE vault_id = v.id
 );
+
+-- Seed root directory for admin vault
+INSERT INTO directories (vault_id, name, path, parent_id, created_by, last_modified_by)
+VALUES (
+    (SELECT id FROM vault WHERE name = 'Default'), '/', '/', NULL,
+    (SELECT id FROM users WHERE name = 'admin'), (SELECT id FROM users WHERE name = 'admin')
+    )
+ON CONFLICT DO NOTHING;
 EOF
 
 # === 11) Install systemd services ===

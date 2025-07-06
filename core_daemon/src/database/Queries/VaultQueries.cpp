@@ -1,6 +1,6 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Transactions.hpp"
-#include "../../../../shared/include/types/Vault.hpp"
+#include "types/Vault.hpp"
 
 namespace vh::database {
 unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) {
@@ -19,6 +19,12 @@ unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) 
             txn.exec("INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES (" + txn.quote(vaultId) + ", " +
                      txn.quote(s3Vault->api_key_id) + ", " + txn.quote(s3Vault->bucket) + ")");
         }
+
+        pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};
+        const auto dirId = txn.exec_prepared("insert_directory", dir_params).one_row()["id"].as<unsigned int>();
+
+        pqxx::params dir_stats_params{dirId, 0, 0, 0}; // Initialize stats with zero values
+        txn.exec_prepared("insert_dir_stats", dir_stats_params);
 
         txn.commit();
 

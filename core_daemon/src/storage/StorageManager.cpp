@@ -127,10 +127,11 @@ void StorageManager::finishUpload(const unsigned int vaultId,
         f->name = relPath.filename().string();
         f->size_bytes = std::filesystem::file_size(absPath);
         f->created_by = user->id;
-        f->path = absPath.string();
+        f->last_modified_by = user->id;
+        f->path = relPath.string();
 
         if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
-        else f->parent_id = database::FileQueries::getFileIdByPath(relPath.parent_path());
+        else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
     } {
         std::lock_guard lock(mountsMutex_);
         database::FileQueries::addFile(f);
@@ -149,18 +150,18 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
         const auto absPath = localEngine->getAbsolutePath(std::filesystem::path(relPath));
         localEngine->mkdir(relPath);
 
-        const auto d = std::make_shared<types::Directory>();
+        types::Directory d;
 
-        d->vault_id = vaultId;
-        d->name = std::filesystem::path(relPath).filename().string();
-        d->created_by = user->id;
-        d->last_modified_by = user->id;
-        d->path = absPath.string();
-        if (!hasLogicalParent(relPath)) d->parent_id = std::nullopt;
-        else d->parent_id = database::FileQueries::getFileIdByPath(std::filesystem::path(relPath).parent_path());
+        d.vault_id = vaultId;
+        d.name = std::filesystem::path(relPath).filename().string();
+        d.created_by = user->id;
+        d.last_modified_by = user->id;
+        d.path = relPath;
+        if (!hasLogicalParent(relPath)) d.parent_id = std::nullopt;
+        else d.parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, std::filesystem::path(relPath).parent_path());
 
         std::lock_guard lock(mountsMutex_);
-        database::FileQueries::addDirectory(d);
+        const auto id = database::FileQueries::addDirectory(d);
     } else {
         throw std::runtime_error("Unsupported storage engine type for mkdir operation");
     }
@@ -169,17 +170,8 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
 std::vector<std::shared_ptr<types::FSEntry> > StorageManager::listDir(const unsigned int vaultId,
                                                                       const std::string& relPath,
                                                                       const bool recursive) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-
-    if (engine->type() == StorageType::Local) {
-        const auto localEngine = std::static_pointer_cast<LocalDiskStorageEngine>(engine);
-        const auto absPath = localEngine->getAbsolutePath(std::filesystem::path(relPath));
-        std::lock_guard lock(mountsMutex_);
-        return database::FileQueries::listDir(vaultId, absPath, recursive);
-    }
-
-    return {};
+    std::lock_guard lock(mountsMutex_);
+    return database::FileQueries::listDir(vaultId, relPath, recursive);
 }
 
 std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const unsigned int id) const {

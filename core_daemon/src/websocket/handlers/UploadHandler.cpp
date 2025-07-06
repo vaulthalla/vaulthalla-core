@@ -1,5 +1,9 @@
 #include "websocket/handlers/UploadHandler.hpp"
 #include "websocket/WebSocketSession.hpp"
+#include "database/Queries/FileQueries.hpp"
+#include "types/User.hpp"
+#include "types/Directory.hpp"
+
 #include <filesystem>
 #include <iostream>
 
@@ -16,6 +20,8 @@ void UploadHandler::startUpload(const std::string& uploadId,
     if (std::filesystem::is_directory(finalPath))
         throw std::runtime_error("Upload final path is a directory — filename must be provided");
 
+    std::filesystem::create_directories(finalPath.parent_path());
+
     std::cout << "absPath: " << finalPath << ", tmpPath: " << tmpPath << std::endl;
 
     std::ofstream file(tmpPath, std::ios::binary | std::ios::trunc);
@@ -29,6 +35,39 @@ void UploadHandler::startUpload(const std::string& uploadId,
         .bytesReceived = 0,
         .file = std::move(file)
     };
+}
+
+void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
+                                          const std::filesystem::path& relPath,
+                                          const std::shared_ptr<types::User>& user) {
+    std::filesystem::path current;
+    std::optional<unsigned int> parentId = database::FileQueries::getRootDirectoryId(vaultId);
+
+    for (const auto& part : relPath.parent_path()) {
+        current /= part;
+
+        std::cout << "Calling getDirectoryIdByPath: " << current << std::endl;
+
+        if (auto dirId = database::FileQueries::getDirectoryIdByPath(vaultId, current)) {
+            parentId = dirId;
+            continue;  // directory already exists in DB
+        }
+
+        types::Directory dir;
+        dir.vault_id = vaultId;
+        dir.name = part.string();
+        dir.created_by = user->id;
+        dir.last_modified_by = user->id;
+        dir.path = current.string();
+        dir.parent_id = parentId;
+
+        dir.stats = std::make_shared<types::DirectoryStats>();
+        dir.stats->size_bytes = 0;
+        dir.stats->file_count = 0;
+        dir.stats->subdirectory_count = 0;
+
+        parentId = database::FileQueries::addDirectory(dir);
+    }
 }
 
 void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {

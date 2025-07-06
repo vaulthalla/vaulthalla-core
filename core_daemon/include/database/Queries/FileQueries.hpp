@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace vh::types {
 struct FSEntry;
@@ -28,15 +29,19 @@ public:
 
     static std::shared_ptr<types::File> getFileByPath(const std::filesystem::path& path);
 
-    [[nodiscard]] static unsigned int getFileIdByPath(const std::filesystem::path& path);
+    [[nodiscard]] static std::optional<unsigned int> getFileIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
-    static void addDirectory(const std::shared_ptr<types::Directory>& directory);
+    [[nodiscard]] static unsigned int addDirectory(const types::Directory& directory);
 
     static void updateDirectory(const std::shared_ptr<types::Directory>& directory);
 
     static void updateDirectoryStats(const std::shared_ptr<types::Directory>& directory);
 
     static void deleteDirectory(unsigned int directoryId);
+
+    [[nodiscard]] static std::optional<unsigned int> getDirectoryIdByPath(unsigned int vaultId, const std::filesystem::path& path);
+
+    [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);
 
     static std::shared_ptr<types::Directory> getDirectory(unsigned int directoryId);
 

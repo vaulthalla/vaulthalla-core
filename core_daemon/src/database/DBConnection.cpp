@@ -105,13 +105,19 @@ void DBConnection::initPreparedFiles() const {
     conn_->prepare("delete_file", "DELETE FROM files WHERE id = $1");
 
     conn_->prepare("list_files_in_dir",
-                   "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
+               "SELECT * FROM files "
+               "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
+
+    conn_->prepare("list_files_in_dir_recursive",
+               "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
+
+    conn_->prepare("get_file_id_by_path", "SELECT id FROM files WHERE vault_id = $1 AND path = $2");
 }
 
 void DBConnection::initPreparedDirectories() const {
     conn_->prepare("insert_directory",
                    "INSERT INTO directories (vault_id, parent_id, name, created_by, last_modified_by, path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6)");
+                   "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id");
 
     conn_->prepare("update_directory",
                    "UPDATE directories SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "
@@ -123,12 +129,20 @@ void DBConnection::initPreparedDirectories() const {
 
     conn_->prepare("insert_dir_stats",
                    "INSERT INTO directory_stats (directory_id, size_bytes, file_count, subdirectory_count, last_modified) "
-                   "VALUES ($1, $2, $3, $4, $5)");
+                   "VALUES ($1, $2, $3, $4, NOW())");
 
     conn_->prepare("delete_directory", "DELETE FROM directories WHERE id = $1");
 
     conn_->prepare("list_directories_in_dir",
-                   "SELECT * FROM directories WHERE vault_id = $1 AND path LIKE $2");
+                   "SELECT d.*, ds.* "
+                   "FROM directories d "
+                   "JOIN directory_stats ds ON d.id = ds.directory_id "
+                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3");
+
+    conn_->prepare("list_directories_in_dir_recursive",
+               "SELECT d.*, ds.* FROM directories d JOIN directory_stats ds ON d.id = ds.directory_id WHERE d.vault_id = $1 AND d.path LIKE $2");
+
+    conn_->prepare("get_directory_id_by_path", "SELECT id FROM directories WHERE vault_id = $1 AND path = $2");
 }
 
 void DBConnection::initPreparedRoles() const {

@@ -2,6 +2,7 @@
 #include <pqxx/connection>
 
 namespace vh::database {
+
 class DBConnection {
   public:
     DBConnection();
@@ -23,4 +24,15 @@ class DBConnection {
     void initPreparedVaultRoles() const;
     void initPreparedPermOverrides() const;
 };
+
+struct PathPatterns {
+    std::string like;
+    std::string not_like;
+};
+
+inline PathPatterns computePatterns(const std::string& absPath, const bool recursive) {
+    if (recursive) return {absPath + "/%", ""};  // No NOT LIKE in recursive
+    else return {absPath + "/%", absPath + "/%/%"};
+}
+
 } // namespace vh::database

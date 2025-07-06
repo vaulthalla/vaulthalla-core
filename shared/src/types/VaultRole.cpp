@@ -49,7 +49,6 @@ void vh::types::to_json(nlohmann::json& j, const VaultRole& r) {
         {"vault_id", r.vault_id},
         {"subject_type", r.subject_type},
         {"subject_id", r.subject_id},
-        {"role_id", r.role_id},
         {"assigned_at", util::timestampToString(r.assigned_at)},
         {"permission_overrides", r.permission_overrides}
     });

@@ -107,7 +107,7 @@ std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
         for (const auto& row : res) {
             const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{row["id"].as<unsigned int>()}).one_row();
             pqxx::params p{"user", row["id"].as<unsigned int>()};
-            const auto rolesRes = txn.exec_prepared("get_subject_assigned_roles", p);
+            const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
             const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
             usersWithRoles.push_back(std::make_shared<types::User>(row, userRoleRow, rolesRes, overridesRes));

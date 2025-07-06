@@ -11,7 +11,8 @@ Permission::Permission(const pqxx::row& row)
       description(row["description"].as<std::string>()),
       bit_position(row["bit_position"].as<uint16_t>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {}
+      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
+}
 
 Permission::Permission(const nlohmann::json& j)
     : id(j.at("id").get<unsigned int>()),
@@ -20,17 +21,18 @@ Permission::Permission(const nlohmann::json& j)
       description(j.at("description").get<std::string>()),
       bit_position(j.at("bit_position").get<uint16_t>()),
       created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())),
-      updated_at(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {}
+      updated_at(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {
+}
 
 std::string to_string(const AdminPermission p) {
     switch (p) {
     case AdminPermission::ManageAdmins: return "Manage Admins";
     case AdminPermission::ManageUsers: return "Manage Users";
-        case AdminPermission::ManageRoles: return "Manage Roles";
+    case AdminPermission::ManageRoles: return "Manage Roles";
     case AdminPermission::ManageSettings: return "Manage Settings";
-        case AdminPermission::ManageVaults: return "Manage Vaults";
+    case AdminPermission::ManageVaults: return "Manage Vaults";
     case AdminPermission::AuditLogAccess: return "Audit Log Access";
-        case AdminPermission::FullAPIKeyAccess: return "Full API Key Access";
+    case AdminPermission::FullAPIKeyAccess: return "Full API Key Access";
     default: return "Unknown Admin Permission";
     }
 }
@@ -38,20 +40,20 @@ std::string to_string(const AdminPermission p) {
 std::string to_string(const VaultPermission p) {
     switch (p) {
     case VaultPermission::MigrateData: return "Migrate Data";
-        case VaultPermission::ManageAccess: return "Manage Access";
+    case VaultPermission::ManageAccess: return "Manage Access";
     case VaultPermission::ManageTags: return "Manage Tags";
-        case VaultPermission::ManageMetadata: return "Manage Metadata";
+    case VaultPermission::ManageMetadata: return "Manage Metadata";
     case VaultPermission::ManageVersions: return "Manage Versions";
-        case VaultPermission::ManageFileLocks: return "Manage File Locks";
+    case VaultPermission::ManageFileLocks: return "Manage File Locks";
     case VaultPermission::Share: return "Share Files/Directories";
-        case VaultPermission::Sync : return "Sync with Cloud Storage";
+    case VaultPermission::Sync: return "Sync with Cloud Storage";
     case VaultPermission::Create: return "Create & Upload Files/Directories";
-        case VaultPermission::Download: return "Download Files/Directories";
+    case VaultPermission::Download: return "Download Files/Directories";
     case VaultPermission::Delete: return "Delete Files/Directories";
-        case VaultPermission::Rename: return "Rename Files/Directories";
+    case VaultPermission::Rename: return "Rename Files/Directories";
     case VaultPermission::Move: return "Move Files/Directories";
     case VaultPermission::List: return "List Directories";
-        default: return "Unknown File/Directory Permission";
+    default: return "Unknown File/Directory Permission";
     }
 }
 
@@ -75,39 +77,39 @@ void from_json(const nlohmann::json& j, Permission& p) {
     p.bit_position = j.at("bit_position").get<uint16_t>();
 }
 
-void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions) {
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission> >& permissions) {
     j = nlohmann::json::array();
     for (const auto& perm : permissions) j.push_back(*perm);
 }
 
 nlohmann::json jsonFromAdminMask(const uint16_t mask) {
     return {
-        {"manage_admins",      (mask & (1 << 0)) != 0 },
-        {"manage_users",       (mask & (1 << 1)) != 0 },
-        {"manage_roles",       (mask & (1 << 2)) != 0 },
-        {"manage_settings",    (mask & (1 << 3)) != 0 },
-        {"manage_vaults",      (mask & (1 << 4)) != 0 },
-        {"audit_log_access",   (mask & (1 << 5)) != 0 },
-        {"full_api_key_access",(mask & (1 << 6)) != 0 }
+        {"manage_admins", (mask & (1 << 0)) != 0},
+        {"manage_users", (mask & (1 << 1)) != 0},
+        {"manage_roles", (mask & (1 << 2)) != 0},
+        {"manage_settings", (mask & (1 << 3)) != 0},
+        {"manage_vaults", (mask & (1 << 4)) != 0},
+        {"audit_log_access", (mask & (1 << 5)) != 0},
+        {"full_api_key_access", (mask & (1 << 6)) != 0}
     };
 }
 
 nlohmann::json jsonFromVaultMask(const uint16_t mask) {
     return {
-        {"migrate_data",        (mask & (1 << 0)) != 0 },
-        {"manage_access",       (mask & (1 << 1)) != 0 },
-        {"manage_tags",         (mask & (1 << 2)) != 0 },
-        {"manage_metadata",     (mask & (1 << 3)) != 0 },
-        {"manage_versions",     (mask & (1 << 4)) != 0 },
-        {"manage_file_locks",   (mask & (1 << 5)) != 0 },
-        {"share",               (mask & (1 << 6)) != 0 },
-        {"sync",                (mask & (1 << 7)) != 0 },
-        {"create",              (mask & (1 << 8)) != 0 },
-        {"download",            (mask & (1 << 9)) != 0 },
-        {"delete",              (mask & (1 << 10)) != 0 },
-        {"rename",              (mask & (1 << 11)) != 0 },
-        {"move",                (mask & (1 << 12)) != 0 },
-        {"list",                (mask & (1 << 13)) != 0 }
+        {"migrate_data", (mask & (1 << 0)) != 0},
+        {"manage_access", (mask & (1 << 1)) != 0},
+        {"manage_tags", (mask & (1 << 2)) != 0},
+        {"manage_metadata", (mask & (1 << 3)) != 0},
+        {"manage_versions", (mask & (1 << 4)) != 0},
+        {"manage_file_locks", (mask & (1 << 5)) != 0},
+        {"share", (mask & (1 << 6)) != 0},
+        {"sync", (mask & (1 << 7)) != 0},
+        {"create", (mask & (1 << 8)) != 0},
+        {"download", (mask & (1 << 9)) != 0},
+        {"delete", (mask & (1 << 10)) != 0},
+        {"rename", (mask & (1 << 11)) != 0},
+        {"move", (mask & (1 << 12)) != 0},
+        {"list", (mask & (1 << 13)) != 0}
     };
 }
 

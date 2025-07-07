@@ -24,6 +24,7 @@ VaultType from_string(const std::string& type) {
 Vault::Vault(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
+      description(row["description"].as<std::string>()),
       type(from_string(row["type"].as<std::string>())),
       is_active(row["is_active"].as<bool>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].c_str())) {}
@@ -40,7 +41,7 @@ LocalDiskVault::LocalDiskVault(const std::string& name, std::filesystem::path mo
 LocalDiskVault::LocalDiskVault(const pqxx::row& row)
     : Vault(row),
       vault_id(row["vault_id"].as<unsigned int>()),
-      mount_point(row["mount_point"].as<std::string>()) {}
+      mount_point(std::filesystem::path(row["mount_point"].as<std::string>())) {}
 
 // ───── S3Vault ─────
 S3Vault::S3Vault(const std::string& name, unsigned short apiKeyID, std::string bucketName)
@@ -63,6 +64,7 @@ void to_json(nlohmann::json& j, const Vault& v) {
         {"id", v.id},
         {"name", v.name},
         {"type", to_string(v.type)},
+        {"description", v.description},
         {"owner_id", v.owner_id},
         {"is_active", v.is_active},
         {"created_at", util::timestampToString(v.created_at)}
@@ -72,6 +74,7 @@ void to_json(nlohmann::json& j, const Vault& v) {
 void from_json(const nlohmann::json& j, Vault& v) {
     v.id = j.at("id").get<unsigned int>();
     v.name = j.at("name").get<std::string>();
+    v.description = j.at("description").get<std::string>();
     v.type = from_string(j.at("type").get<std::string>());
     v.is_active = j.at("is_active").get<bool>();
     v.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());

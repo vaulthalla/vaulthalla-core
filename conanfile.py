@@ -19,7 +19,8 @@ class VaulthallaConan(ConanFile):
         "jwt-cpp/0.7.1",
         "libcurl/8.12.1",
         "libfuse/3.16.2",
-        "yaml-cpp/0.8.0"
+        "yaml-cpp/0.8.0",
+        "libmagic/5.45"
     ]
     generators = "PkgConfigDeps", "MesonToolchain"
     exports_sources = "meson.build", "src/*", "main.cpp", "tests/*", "meson/*"

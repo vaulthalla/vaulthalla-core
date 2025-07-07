@@ -5,11 +5,8 @@
 namespace vh::database {
 unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) {
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-        const auto res = txn.exec("INSERT INTO vault (name, type) VALUES (" + txn.quote(vault->name) + ", " +
-                                  txn.quote(types::to_string(vault->type)) + ") RETURNING id");
-
-        if (res.empty()) throw std::runtime_error("Failed to insert vault into database");
-        auto vaultId = res[0][0].as<unsigned int>();
+        pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
+        const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();
 
         // dynamic cast
         if (auto* localVault = dynamic_cast<const types::LocalDiskVault*>(&*vault)) {
@@ -42,27 +39,12 @@ void VaultQueries::removeVault(const unsigned int vaultId) {
 std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
     return Transactions::exec("VaultQueries::getVault",
                               [vaultID](pqxx::work& txn) -> std::shared_ptr<types::Vault> {
-                                  const auto typeRow =
-                                      txn.exec("SELECT type FROM vault WHERE id = " + txn.quote(vaultID)).one_row();
-
-                                  const auto typeStr = typeRow["type"].as<std::string>();
+                                  const auto row = txn.exec_prepared("get_vault", pqxx::params{vaultID}).one_row();
+                                  const auto typeStr = row["type"].as<std::string>();
 
                                   switch (types::from_string(typeStr)) {
-                                  case types::VaultType::Local: {
-                                      const auto res = txn.exec(
-                                          "SELECT * FROM vault "
-                                          "INNER JOIN local ON vault.id = local.vault_id "
-                                          "WHERE vault.id = " +
-                                          txn.quote(vaultID));
-                                      return std::make_shared<types::LocalDiskVault>(res.one_row());
-                                  }
-                                  case types::VaultType::S3: {
-                                      const auto res = txn.exec("SELECT * FROM vault "
-                                                                "INNER JOIN s3 ON vault.id = s3.vault_id "
-                                                                "WHERE vault.id = " +
-                                                                txn.quote(vaultID));
-                                      return std::make_shared<types::S3Vault>(res.one_row());
-                                  }
+                                  case types::VaultType::Local: return std::make_shared<types::LocalDiskVault>(row);
+                                  case types::VaultType::S3: return std::make_shared<types::S3Vault>(row);
                                   default: throw std::runtime_error("Unsupported VaultType: " + typeStr);
                                   }
                               });
@@ -70,14 +52,9 @@ std::shared_ptr<types::Vault> VaultQueries::getVault(unsigned int vaultID) {
 
 std::vector<std::shared_ptr<types::Vault> > VaultQueries::listVaults() {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec(R"SQL(
-            SELECT *
-            FROM vault
-            LEFT JOIN local ON local.vault_id = vault.id
-            LEFT JOIN s3         ON s3.vault_id = vault.id
-        )SQL");
+        const auto res = txn.exec_prepared("list_vaults");
 
-        std::vector<std::shared_ptr<types::Vault> > vaults;
+        std::vector<std::shared_ptr<types::Vault>> vaults;
 
         for (const auto& row : res) {
             switch (types::from_string(row["type"].as<std::string>())) {
@@ -99,18 +76,7 @@ std::vector<std::shared_ptr<types::Vault> > VaultQueries::listVaults() {
 
 std::vector<std::shared_ptr<types::Vault> > VaultQueries::listUserVaults(const unsigned int userId) {
     return Transactions::exec("VaultQueries::listUserVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec(R"SQL(
-            SELECT DISTINCT v.*
-            FROM vault v
-            JOIN roles r ON (
-                (r.scope = 'vault' AND r.scope_id = v.id)
-                OR
-                (r.scope = 'volume' AND r.scope_id IN (
-                    SELECT id FROM volume WHERE vault_id = v.id
-                ))
-            )
-            WHERE r.subject_type = 'user'
-              AND r.subject_id = )SQL" + txn.quote(userId));
+        const auto res = txn.exec_prepared("list_user_vaults", pqxx::params{userId});
 
         std::vector<std::shared_ptr<types::Vault> > vaults;
         for (const auto& row : res) {
@@ -129,7 +95,7 @@ std::vector<std::shared_ptr<types::Vault> > VaultQueries::listUserVaults(const u
 
 bool VaultQueries::localDiskVaultExists() {
     return Transactions::exec("VaultQueries::localDiskVaultExists", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT COUNT(*) FROM vaults WHERE type = " +
+        const auto res = txn.exec("SELECT COUNT(*) FROM vault WHERE type = " +
                                   txn.quote(static_cast<int>(types::VaultType::Local)));
         return res[0][0].as<int>() > 0;
     });
@@ -137,12 +103,8 @@ bool VaultQueries::localDiskVaultExists() {
 
 std::string VaultQueries::getVaultOwnersName(const unsigned int vaultId) {
     return Transactions::exec("VaultQueries::getVaultOwnersName", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT u.name FROM vault v "
-                                  "JOIN users u ON v.owner_id = u.id "
-                                  "WHERE v.id = " +
-                                  txn.quote(vaultId));
-        if (res.empty()) throw std::runtime_error("Vault not found with ID: " + std::to_string(vaultId));
-        return res[0][0].as<std::string>();
+        const auto row = txn.exec_prepared("get_vault_owners_name", pqxx::params{vaultId}).one_row();
+        return row["name"].as<std::string>();
     });
 }
 

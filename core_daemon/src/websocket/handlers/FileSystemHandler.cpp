@@ -138,9 +138,7 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         enforcePermissions(session, vaultId, path, &types::VaultRole::canList);
 
         const auto& vaultName = storageManager_->getVault(vaultId)->name;
-
         const auto files = storageManager_->listDir(vaultId, path);
-        if (files.empty()) throw std::runtime_error("Directory not found or empty: " + path);
 
         const json data = {
             {"vault", vaultName},

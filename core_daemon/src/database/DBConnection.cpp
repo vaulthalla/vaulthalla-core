@@ -21,6 +21,7 @@ void DBConnection::initPrepared() const {
     if (!conn_ || !conn_->is_open()) throw std::runtime_error("Database connection is not open");
 
     initPreparedUsers();
+    initPreparedVaults();
     initPreparedFiles();
     initPreparedDirectories();
     initPreparedRoles();
@@ -91,6 +92,38 @@ void DBConnection::initPreparedUserRoles() const {
     conn_->prepare("change_user_role", "UPDATE user_role_assignments SET role_id = $2 WHERE user_id = $1");
 }
 
+void DBConnection::initPreparedVaults() const {
+    conn_->prepare("insert_vault",
+        "INSERT INTO vault (name, type, description, owner_id) "
+        "VALUES ($1, $2, $3, $4) RETURNING id");
+
+    conn_->prepare("get_vault",
+        "SELECT v.*, l.*, s.* "
+        "FROM vault v "
+        "LEFT JOIN local l ON v.id = l.vault_id "
+        "LEFT JOIN s3 s ON v.id = s.vault_id "
+        "WHERE v.id = $1");
+
+    conn_->prepare("list_vaults",
+        "SELECT v.*, l.*, s.* "
+        "FROM vault v "
+        "LEFT JOIN local l ON v.id = l.vault_id "
+        "LEFT JOIN s3 s ON v.id = s.vault_id");
+
+    conn_->prepare("list_user_vaults",
+        "SELECT v.*, l.*, s.* "
+        "FROM vault v "
+        "LEFT JOIN local l ON v.id = l.vault_id "
+        "LEFT JOIN s3 s ON v.id = s.vault_id "
+        "WHERE v.owner_id = $1");
+
+    conn_->prepare("get_vault_owners_name",
+        "SELECT u.name FROM users u "
+        "JOIN vault v ON u.id = v.owner_id "
+        "WHERE v.id = $1");
+}
+
+
 void DBConnection::initPreparedFiles() const {
     conn_->prepare("insert_file",
                    "INSERT INTO files (vault_id, parent_id, name, created_by, last_modified_by, size_bytes, "
@@ -137,10 +170,12 @@ void DBConnection::initPreparedDirectories() const {
                    "SELECT d.*, ds.* "
                    "FROM directories d "
                    "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3");
+                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3 AND d.path != '/'");
 
     conn_->prepare("list_directories_in_dir_recursive",
-               "SELECT d.*, ds.* FROM directories d JOIN directory_stats ds ON d.id = ds.directory_id WHERE d.vault_id = $1 AND d.path LIKE $2");
+               "SELECT d.*, ds.* FROM directories d "
+               "JOIN directory_stats ds ON d.id = ds.directory_id "
+               "WHERE d.vault_id = $1 AND d.path LIKE $2");
 
     conn_->prepare("get_directory_id_by_path", "SELECT id FROM directories WHERE vault_id = $1 AND path = $2");
 }

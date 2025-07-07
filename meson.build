@@ -13,6 +13,7 @@ boost_dep       = dependency('boost', modules: ['filesystem', 'system'], require
 nlohmann_json   = dependency('nlohmann_json', required: true)
 libpqxx         = dependency('libpqxx', required: true)
 libsodium       = dependency('libsodium', required: true)
+libmagic        = dependency('libmagic', required: true)
 jwt_cpp         = dependency('jwt-cpp', required: true)
 libcurl         = dependency('libcurl', required: true)
 libfuse         = dependency('fuse3', required: true)
@@ -21,7 +22,7 @@ uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
-global_deps     = [boost_dep, nlohmann_json, libpqxx, yaml_cpp, uuid, thread_dep]
+global_deps     = [boost_dep, nlohmann_json, libpqxx, yaml_cpp, libmagic, uuid, thread_dep]
 core_deps       = global_deps + [libsodium, jwt_cpp, libcurl]
 fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]

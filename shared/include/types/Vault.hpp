@@ -21,7 +21,7 @@ VaultType from_string(const std::string& type);
 struct Vault {
     unsigned int id{};
     unsigned int owner_id{};
-    std::string name;
+    std::string name, description{};
     VaultType type{VaultType::Local};
     bool is_active{true};
     std::time_t created_at{};

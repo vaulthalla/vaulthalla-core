@@ -16,6 +16,7 @@ class DBConnection {
 
     void initPrepared() const;
     void initPreparedUsers() const;
+    void initPreparedVaults() const;
     void initPreparedFiles() const;
     void initPreparedDirectories() const;
     void initPreparedRoles() const;
@@ -32,7 +33,7 @@ struct PathPatterns {
 
 inline PathPatterns computePatterns(const std::string& absPath, const bool recursive) {
     if (recursive) return {absPath + "/%", ""};  // No NOT LIKE in recursive
-    else return {absPath + "/%", absPath + "/%/%"};
+    return {absPath + "/%", absPath + "/%/%"};
 }
 
 } // namespace vh::database

@@ -113,7 +113,7 @@ struct S3APIKey : public APIKey {
 };
 
 inline nlohmann::json to_json(const std::shared_ptr<APIKey>& key) {
-    nlohmann::json key_json = {{"id", key->id},
+    nlohmann::json key_json = {{"api_key_id", key->id},
                                {"user_id", key->user_id},
                                {"type", to_string(key->type)},
                                {"name", key->name},

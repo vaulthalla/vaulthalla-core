@@ -9,6 +9,7 @@
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
+#include "util/Magic.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -68,11 +69,11 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
     }
 }
 
-void StorageManager::addVault(std::shared_ptr<types::Vault>&& vault) {
+void StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::lock_guard lock(mountsMutex_);
 
-    database::VaultQueries::addVault(vault);
+    vault->id = database::VaultQueries::addVault(vault);
     vault = database::VaultQueries::getVault(vault->id);
     if (vault->type == types::VaultType::Local) {
         auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
@@ -99,7 +100,7 @@ std::vector<std::shared_ptr<types::Vault> > StorageManager::listVaults(const std
     return database::VaultQueries::listUserVaults(user->id);
 }
 
-std::shared_ptr<types::Vault> StorageManager::getVault(unsigned int vaultId) const {
+std::shared_ptr<types::Vault> StorageManager::getVault(const unsigned int vaultId) const {
     std::lock_guard lock(mountsMutex_);
     if (engines_.find(vaultId) != engines_.end()) return engines_.at(vaultId)->getVault();
     return database::VaultQueries::getVault(vaultId);
@@ -129,6 +130,7 @@ void StorageManager::finishUpload(const unsigned int vaultId,
         f->created_by = user->id;
         f->last_modified_by = user->id;
         f->path = relPath.string();
+        f->mime_type = util::Magic::get_mime_type(absPath);
 
         if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
         else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());

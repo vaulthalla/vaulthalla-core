@@ -3,6 +3,7 @@
 #include "services/ServiceManager.hpp"
 #include "auth/AuthManager.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <boost/beast/http/file_body.hpp>
 #include <iostream>
@@ -45,9 +46,8 @@ void HttpPreviewServer::do_accept() {
 }
 
 void HttpPreviewServer::handle_session(tcp::socket socket) const {
-    beast::flat_buffer buffer;
-
     try {
+        beast::flat_buffer buffer;
         for (;;) {
             http::request<http::string_body> req;
             http::read(socket, buffer, req);
@@ -61,18 +61,20 @@ void HttpPreviewServer::handle_session(tcp::socket socket) const {
                 continue;
             }
 
-            try {
-                const auto refresh_token = util::extractCookie(req, "refresh");
-                authManager_->validateRefreshToken(refresh_token);
-            } catch (const std::exception& e) {
-                std::cerr << "Authentication error: " << e.what() << std::endl;
-                http::response<http::string_body> res{http::status::unauthorized, req.version()};
-                res.set(http::field::content_type, "text/plain");
-                res.body() = "Unauthorized: " + std::string(e.what());
-                res.prepare_payload();
-                http::write(socket, res);
-                continue;
-            }
+            if (!config::ConfigRegistry::get().advanced.dev_mode) {
+                try {
+                    const auto refresh_token = util::extractCookie(req, "refresh");
+                    authManager_->validateRefreshToken(refresh_token);
+                } catch (const std::exception& e) {
+                    std::cerr << "Authentication error: " << e.what() << std::endl;
+                    http::response<http::string_body> res{http::status::unauthorized, req.version()};
+                    res.set(http::field::content_type, "text/plain");
+                    res.body() = "Unauthorized: " + std::string(e.what());
+                    res.prepare_payload();
+                    http::write(socket, res);
+                    continue;
+                }
+            } else std::cout << "[HttpPreviewServer] Dev mode enabled, skipping authentication." << std::endl;
 
             auto params = util::parse_query_params(req.target());
 

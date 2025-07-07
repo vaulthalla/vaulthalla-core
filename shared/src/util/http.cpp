@@ -1,6 +1,9 @@
 #include "util/http.hpp"
 
 #include <regex>
+#include <sstream>
+#include <iomanip>
+#include <stdexcept>
 
 namespace vh::util {
 
@@ -15,6 +18,21 @@ std::string extractCookie(const boost::beast::http::request<boost::beast::http::
     return "";
 }
 
+std::string url_decode(const std::string& value) {
+    std::ostringstream result;
+    for (size_t i = 0; i < value.length(); ++i) {
+        if (value[i] == '%' && i + 2 < value.length()) {
+            if (int hex = 0; std::istringstream(value.substr(i + 1, 2)) >> std::hex >> hex) {
+                result << static_cast<char>(hex);
+                i += 2;
+            } else throw std::runtime_error("Invalid percent-encoding in URL");
+        }
+        else if (value[i] == '+') result << ' ';
+        else result << value[i];
+    }
+    return result.str();
+}
+
 std::unordered_map<std::string, std::string> parse_query_params(const std::string& target) {
     std::unordered_map<std::string, std::string> params;
 
@@ -26,10 +44,9 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
     std::string pair;
 
     while (std::getline(stream, pair, '&')) {
-        const auto eq = pair.find('=');
-        if (eq != std::string::npos) {
-            auto key = pair.substr(0, eq);
-            const auto value = pair.substr(eq + 1);
+        if (const auto eq = pair.find('=') != std::string::npos) {
+            const auto key = url_decode(pair.substr(0, eq));
+            const auto value = url_decode(pair.substr(eq + 1));
             params[key] = value;
         }
     }
@@ -37,4 +54,4 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
     return params;
 }
 
-}
+} // namespace vh::util

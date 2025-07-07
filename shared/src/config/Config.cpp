@@ -28,13 +28,8 @@ Config loadConfig(const std::string& path) {
     if (auto node = root["advanced"])  YAML::convert<AdvancedConfig>::decode(node, cfg.advanced);
 
     // 👇 Handle ENV overrides separately
-    if (const char* pw = std::getenv("VAULTHALLA_DB_PASSWORD")) {
-        cfg.database.password = pw;
-    }
-
-    if (const char* jwt = std::getenv("VAULTHALLA_JWT_SECRET")) {
-        cfg.auth.jwt_secret = jwt;
-    }
+    if (const char* pw = std::getenv("VAULTHALLA_DB_PASSWORD")) cfg.database.password = pw;
+    if (const char* jwt = std::getenv("VAULTHALLA_JWT_SECRET")) cfg.auth.jwt_secret = jwt;
 
     return cfg;
 }
@@ -48,9 +43,7 @@ void Config::save() const {
 
     // Read in the static template with comments
     ifstream templateIn(templateFile);
-    if (!templateIn.is_open()) {
-        throw runtime_error("Failed to open config template file");
-    }
+    if (!templateIn.is_open()) throw runtime_error("Failed to open config template file");
 
     stringstream buffer;
     buffer << templateIn.rdbuf();
@@ -78,10 +71,8 @@ void Config::save() const {
     for (const auto& [key, yaml] : sectionMap) {
         string searchKey = key + ": {}";
         string replacement = key + ":\n" + string(yaml);
-        size_t pos = templateContent.find(searchKey);
-        if (pos != string::npos) {
+        if (const auto& pos = templateContent.find(searchKey) != string::npos)
             templateContent.replace(pos, searchKey.length(), replacement);
-        }
     }
 
     // Write the final result
@@ -143,7 +134,8 @@ void to_json(nlohmann::json& j, const Config& c) {
             {"max_upload_size_mb", c.advanced.max_upload_size_mb},
             {"enable_sharing", c.advanced.enable_sharing},
             {"enable_public_links", c.advanced.enable_public_links},
-            {"rate_limit_per_ip_per_minute", c.advanced.rate_limit_per_ip_per_minute}
+            {"rate_limit_per_ip_per_minute", c.advanced.rate_limit_per_ip_per_minute},
+            {"dev_mode", c.advanced.dev_mode}
         }}
     };
 }
@@ -189,6 +181,7 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.advanced.enable_sharing = j.at("advanced").at("enable_sharing").get<bool>();
     c.advanced.enable_public_links = j.at("advanced").at("enable_public_links").get<bool>();
     c.advanced.rate_limit_per_ip_per_minute = j.at("advanced").at("rate_limit_per_ip_per_minute").get<int>();
+    c.advanced.dev_mode = j.at("advanced").at("dev_mode").get<bool>();
 }
 
 } // namespace vh::config

@@ -63,3 +63,4 @@ advanced:
   enable_sharing: true              # Allow internal file sharing
   enable_public_links: true         # Allow external share links
   rate_limit_per_ip_per_minute: 60  # API request limiter
+  dev_mode: false                   # Enable development features (not for production)

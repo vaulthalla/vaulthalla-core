@@ -179,6 +179,7 @@ struct convert<AdvancedConfig> {
         node["enable_sharing"] = rhs.enable_sharing;
         node["enable_public_links"] = rhs.enable_public_links;
         node["rate_limit_per_ip_per_minute"] = rhs.rate_limit_per_ip_per_minute;
+        node["dev_mode"] = rhs.dev_mode;
         return node;
     }
 
@@ -189,6 +190,7 @@ struct convert<AdvancedConfig> {
         rhs.enable_sharing = node["enable_sharing"].as<bool>(true);
         rhs.enable_public_links = node["enable_public_links"].as<bool>(true);
         rhs.rate_limit_per_ip_per_minute = node["rate_limit_per_ip_per_minute"].as<int>(60);
+        rhs.dev_mode = node["dev_mode"].as<bool>(false);
         return true;
     }
 };

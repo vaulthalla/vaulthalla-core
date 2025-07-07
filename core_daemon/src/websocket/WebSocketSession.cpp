@@ -78,7 +78,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         self->ws_->set_option(websocket::stream_base::decorator([refreshTokenCopy](websocket::response_type& res) {
             res.set(http::field::server, "Vaulthalla");
             res.set(http::field::set_cookie,
-                    "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=None; Secure; Domain=https://vaulthalla.cooperhlarson.com Max-Age=604800;");
+                    "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
         }));
     };
 

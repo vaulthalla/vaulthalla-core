@@ -75,6 +75,7 @@ struct AdvancedConfig {
     bool enable_sharing = true;
     bool enable_public_links = true;
     int rate_limit_per_ip_per_minute = 60;
+    bool dev_mode = false;
 };
 
 struct Config {

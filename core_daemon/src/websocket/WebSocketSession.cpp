@@ -1,13 +1,15 @@
 #include "websocket/WebSocketSession.hpp"
 
-#include "../../../shared/include/types/User.hpp"
+#include "types/User.hpp"
 #include "auth/AuthManager.hpp"
 #include "websocket/WebSocketRouter.hpp"
 #include "websocket/handlers/NotificationBroadcastManager.hpp"
+#include "websocket/handlers/UploadHandler.hpp"
+#include "util/http.hpp"
+
 #include <boost/beast/http.hpp>
 #include <iostream>
 #include <regex>
-#include "websocket/handlers/UploadHandler.hpp"
 
 namespace {
 namespace beast = boost::beast;
@@ -20,17 +22,6 @@ using json = nlohmann::json;
 } // namespace
 
 namespace vh::websocket {
-
-std::string extractCookie(const http::request<http::string_body>& req,
-                          const std::string& key) {
-    if (const auto it = req.find(http::field::cookie); it != req.end()) {
-        const std::string cookieHeader = it->value();
-        const std::regex cookieRegex(key + "=([^;]+)");
-        std::smatch match;
-        if (std::regex_search(cookieHeader, match, cookieRegex)) return match[1];
-    }
-    return "";
-}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ‑‑ construction & destruction
@@ -87,7 +78,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         self->ws_->set_option(websocket::stream_base::decorator([refreshTokenCopy](websocket::response_type& res) {
             res.set(http::field::server, "Vaulthalla");
             res.set(http::field::set_cookie,
-                    "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
+                    "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=None; Secure; Domain=https://vaulthalla.cooperhlarson.com Max-Age=604800;");
         }));
     };
 
@@ -118,7 +109,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         self->ipAddress_ = self->ws_->next_layer().remote_endpoint().address().to_string();
         self->userAgent_ = (*req)[http::field::user_agent];
         self->handshakeRequest_ = *req;
-        self->refreshToken_ = extractCookie(*req, "refresh");
+        self->refreshToken_ = util::extractCookie(*req, "refresh");
 
         if (!self->refreshToken_.empty()) std::cout << "[Session] Found refresh token in cookies" << std::endl;
         else std::cout << "[Session] No refresh token found in Cookie header" << std::endl;

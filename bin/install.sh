@@ -25,6 +25,15 @@ fi
 # === 2) Ensure Build Dependencies ===
 echo "🔍 Checking for required build dependencies..."
 
+# -- LibMagic --
+if ! dpkg -l | grep -q libmagic1; then
+    echo "🔌 Installing libmagic1..."
+    sudo apt update
+    sudo apt install -y libmagic1
+else
+    echo "✅ libmagic1 already installed."
+fi
+
 # -- PostgreSQL --
 if ! command -v psql &>/dev/null; then
     echo "🔌 Installing PostgreSQL client tools..."

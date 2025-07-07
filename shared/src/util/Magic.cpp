@@ -6,7 +6,7 @@ using namespace vh::util;
 Magic::Magic() {
     cookie = magic_open(MAGIC_MIME_TYPE);
     if (!cookie) throw std::runtime_error("Failed to create magic cookie");
-    if (magic_load(cookie, nullptr) != 0) {
+    if (magic_load(cookie, "/usr/share/misc/magic.mgc") != 0) {
         const std::string err = magic_error(cookie);
         magic_close(cookie);
         throw std::runtime_error("Failed to load magic database: " + err);

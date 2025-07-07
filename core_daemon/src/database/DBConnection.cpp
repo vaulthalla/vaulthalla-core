@@ -137,6 +137,8 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("delete_file", "DELETE FROM files WHERE id = $1");
 
+    conn_->prepare("get_file_mime_type", "SELECT mime_type FROM files WHERE vault_id = $1 AND path = $2");
+
     conn_->prepare("list_files_in_dir",
                "SELECT * FROM files "
                "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");

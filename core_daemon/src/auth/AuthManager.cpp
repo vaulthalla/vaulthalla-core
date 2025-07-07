@@ -10,11 +10,9 @@
 #include "config/ConfigRegistry.hpp"
 #include <chrono>
 #include <iostream>
-#include <jwt-cpp/jwt.h>
 #include <sodium.h>
 #include <stdexcept>
 #include <uuid/uuid.h>
-#include <jwt-cpp/traits/nlohmann-json/traits.h>
 #include <ranges>
 
 namespace vh::auth {
@@ -130,6 +128,21 @@ void AuthManager::updateUser(const std::shared_ptr<types::User>& user) {
         std::cerr << "[AuthManager] updateUser failed: " << e.what() << std::endl;
     }
 }
+
+void AuthManager::validateRefreshToken(const std::string& refreshToken) const {
+    const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
+    const std::string tokenJti = decoded.get_id();
+
+    if (const auto session = sessionManager_->getClientSession(tokenJti)) {
+        if (!session->isAuthenticated()) throw std::runtime_error("Prior session is not authenticated");
+        return;
+    }
+
+    throw std::runtime_error("HTTP validation requires an existing websocket authenticated session. "
+                             "Please authenticate via WebSocket first. "
+                             "Session not found for token JTI: " + tokenJti);
+}
+
 
 std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& refreshToken,
                                   const std::shared_ptr<websocket::WebSocketSession>& session) const {

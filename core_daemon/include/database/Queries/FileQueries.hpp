@@ -25,6 +25,8 @@ public:
 
     static void deleteFile(unsigned int fileId);
 
+    [[nodiscard]] static std::string getMimeType(unsigned int vaultId, const std::filesystem::path& relPath);
+
     static std::shared_ptr<types::File> getFile(unsigned int fileId);
 
     static std::shared_ptr<types::File> getFileByPath(const std::filesystem::path& path);

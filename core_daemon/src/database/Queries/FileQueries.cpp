@@ -50,6 +50,13 @@ void FileQueries::deleteFile(const unsigned int fileId) {
     });
 }
 
+std::string FileQueries::getMimeType(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getMimeType", [&](pqxx::work& txn) -> std::string {
+        pqxx::params p{vaultId, relPath.string()};
+        return txn.exec_prepared("get_file_mime_type", p).one_row()["mime_type"].as<std::string>();
+    });
+}
+
 std::shared_ptr<vh::types::File> FileQueries::getFile(const unsigned int fileId) {
     return Transactions::exec("FileQueries::getFile", [&](pqxx::work& txn) -> std::shared_ptr<types::File> {
         const auto row = txn.exec("SELECT * FROM files WHERE id = " + txn.quote(fileId)).one_row();

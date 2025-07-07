@@ -1,4 +1,5 @@
 #include "services/Vaulthalla.hpp"
+#include <iostream>
 
 int main() {
     try {

@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <jwt-cpp/jwt.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
 
 namespace vh::types {
 struct User;
@@ -43,6 +45,8 @@ public:
     [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;
 
     [[nodiscard]] bool validateToken(const std::string& token) const;
+
+    void validateRefreshToken(const std::string& refreshToken) const;
 
     std::shared_ptr<Client> validateRefreshToken(const std::string& refreshToken,
                                                  const std::shared_ptr<websocket::WebSocketSession>& session) const;

@@ -3,6 +3,16 @@
 #include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
+#include "services/ConnectionLifecycleManager.hpp"
+#include "websocket/WebSocketHandler.hpp"
+#include "websocket/WebSocketRouter.hpp"
+#include "websocket/WebSocketServer.hpp"
+#include "services/ServiceManager.hpp"
+#include "http/HttpPreviewServer.hpp"
+
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <iostream>
 
 namespace vh::services {
 void Vaulthalla::start() {
@@ -35,6 +45,16 @@ void Vaulthalla::start() {
         std::cout << "Websocket listening on: " << addr << ":" << port << std::endl;
 
         wsServer_->run();
+
+        const auto http_port = port + 1; // HTTP preview server on next port
+        httpServer_ = std::make_shared<http::HttpPreviewServer>(
+            *ioContext_,
+            boost::asio::ip::tcp::endpoint(addr, http_port),
+            serviceManager_
+        );
+        httpServer_->run();
+
+        std::cout << "HTTP preview server listening on: " << addr << ":" << http_port << std::endl;
 
         ioContext_->run();
 

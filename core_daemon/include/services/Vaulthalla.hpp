@@ -1,14 +1,26 @@
 #pragma once
 
-#include "services/ConnectionLifecycleManager.hpp"
-#include "websocket/WebSocketHandler.hpp"
-#include "websocket/WebSocketRouter.hpp"
-#include "websocket/WebSocketServer.hpp"
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <iostream>
+#include <memory>
+
+namespace vh::websocket {
+    class WebSocketServer;
+    class WebSocketRouter;
+    class WebSocketHandler;
+}
+
+namespace boost::asio {
+    class io_context;
+}
+
+namespace vh::http {
+    class HttpPreviewServer;
+}
 
 namespace vh::services {
+
+class ConnectionLifecycleManager;
+class ServiceManager;
+
 class Vaulthalla {
   public:
     void start();
@@ -24,5 +36,7 @@ class Vaulthalla {
     std::shared_ptr<websocket::WebSocketHandler> wsHandler_;
     std::shared_ptr<websocket::WebSocketServer> wsServer_;
     std::shared_ptr<ConnectionLifecycleManager> lifecycleManager_;
+    std::shared_ptr<http::HttpPreviewServer> httpServer_;
 };
+
 } // namespace vh::services

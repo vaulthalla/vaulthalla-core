@@ -45,7 +45,7 @@ void WebSocketServer::onAccept(tcp::socket socket) {
     socket.set_option(tcp::no_delay(true));
     socket.set_option(asio::socket_base::keep_alive(true));
 
-    auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
+    const auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
     session->accept(std::move(socket));
 }
 

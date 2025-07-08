@@ -12,6 +12,7 @@ namespace vh::http {
 
 class HttpSession;
 class ImagePreviewHandler;
+class PdfPreviewHandler;
 
 namespace http = boost::beast::http;
 
@@ -27,6 +28,7 @@ private:
     std::shared_ptr<storage::StorageManager> storageManager_;
 
     std::shared_ptr<ImagePreviewHandler> imagePreviewHandler_;
+    std::shared_ptr<PdfPreviewHandler> pdfPreviewHandler_;
 };
 
 }

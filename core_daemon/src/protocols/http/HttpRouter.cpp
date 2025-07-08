@@ -1,5 +1,6 @@
 #include "protocols/http/HttpRouter.hpp"
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
+#include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/parse.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -9,7 +10,9 @@ namespace vh::http {
 
 HttpRouter::HttpRouter(const std::shared_ptr<auth::AuthManager>& authManager,
                        const std::shared_ptr<storage::StorageManager>& storageManager)
-    : authManager_(authManager), storageManager_(storageManager), imagePreviewHandler_(std::make_shared<ImagePreviewHandler>(storageManager)) {
+    : authManager_(authManager), storageManager_(storageManager),
+imagePreviewHandler_(std::make_shared<ImagePreviewHandler>(storageManager)),
+      pdfPreviewHandler_(std::make_shared<PdfPreviewHandler>(storageManager)) {
     if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
     if (!storageManager) throw std::invalid_argument("StorageManager cannot be null");
 }
@@ -50,8 +53,10 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
     const std::string rel_path = path_it->second;
     const std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
-    if (mime_type.starts_with("image/") || mime_type.ends_with("octet-stream"))
+    if (mime_type.starts_with("image/") || mime_type.ends_with("/octet-stream"))
         return imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+
+    if (mime_type.ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
 
     http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
     res.body() = "Unsupported preview type: " + mime_type;

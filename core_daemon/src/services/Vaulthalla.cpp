@@ -4,11 +4,11 @@
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
 #include "services/ConnectionLifecycleManager.hpp"
-#include "websocket/WebSocketHandler.hpp"
-#include "websocket/WebSocketRouter.hpp"
-#include "websocket/WebSocketServer.hpp"
+#include "protocols/websocket/WebSocketHandler.hpp"
+#include "protocols/websocket/WebSocketRouter.hpp"
+#include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
-#include "http/HttpServer.hpp"
+#include "protocols/http/HttpServer.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>

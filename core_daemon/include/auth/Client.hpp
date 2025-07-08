@@ -3,7 +3,7 @@
 #include "types/User.hpp"
 #include "Token.hpp"
 #include "auth/RefreshToken.hpp"
-#include "websocket/WebSocketSession.hpp"
+#include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include <memory>
 #include <string>

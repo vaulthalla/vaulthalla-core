@@ -6,7 +6,7 @@
 #include "crypto/PasswordUtils.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "storage/StorageManager.hpp"
-#include "websocket/WebSocketSession.hpp"
+#include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include <chrono>
 #include <iostream>

@@ -1,6 +1,6 @@
 #include "types/VaultRole.hpp"
 #include "types/PermissionOverride.hpp"
-#include "util/timestamp.hpp"
+#include "shared_util/timestamp.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>

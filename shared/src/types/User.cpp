@@ -2,7 +2,7 @@
 #include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
-#include "util/timestamp.hpp"
+#include "shared_util/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>

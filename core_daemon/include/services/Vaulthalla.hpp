@@ -13,7 +13,7 @@ namespace boost::asio {
 }
 
 namespace vh::http {
-    class HttpPreviewServer;
+    class HttpServer;
 }
 
 namespace vh::services {
@@ -36,7 +36,7 @@ class Vaulthalla {
     std::shared_ptr<websocket::WebSocketHandler> wsHandler_;
     std::shared_ptr<websocket::WebSocketServer> wsServer_;
     std::shared_ptr<ConnectionLifecycleManager> lifecycleManager_;
-    std::shared_ptr<http::HttpPreviewServer> httpServer_;
+    std::shared_ptr<http::HttpServer> httpServer_;
 };
 
 } // namespace vh::services

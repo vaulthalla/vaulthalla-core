@@ -14,14 +14,14 @@ namespace vh::websocket {
 
 class WebSocketHandler {
   public:
-    explicit WebSocketHandler(const std::shared_ptr<vh::services::ServiceManager>& serviceManager,
+    explicit WebSocketHandler(const std::shared_ptr<services::ServiceManager>& serviceManager,
                               const std::shared_ptr<WebSocketRouter>& router);
 
     void registerAllHandlers() const;
 
   private:
     std::shared_ptr<WebSocketRouter> router_;
-    std::shared_ptr<vh::services::ServiceManager> serviceManager_;
+    std::shared_ptr<services::ServiceManager> serviceManager_;
 
     std::shared_ptr<AuthHandler> authHandler_;
     std::shared_ptr<FileSystemHandler> fsHandler_;

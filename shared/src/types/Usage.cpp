@@ -1,5 +1,5 @@
-#include "../../include/types/Usage.hpp"
-#include "util/timestamp.hpp"
+#include "types/Usage.hpp"
+#include "shared_util/timestamp.hpp"
 
 using namespace vh::types;
 

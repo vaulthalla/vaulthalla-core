@@ -1,5 +1,5 @@
 #include "types/Vault.hpp"
-#include "util/timestamp.hpp"
+#include "shared_util/timestamp.hpp"
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <utility>

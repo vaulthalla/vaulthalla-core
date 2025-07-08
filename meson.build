@@ -18,12 +18,15 @@ jwt_cpp         = dependency('jwt-cpp', required: true)
 libcurl         = dependency('libcurl', required: true)
 libfuse         = dependency('fuse3', required: true)
 yaml_cpp        = dependency('yaml-cpp', required: true)
+libjpeg_turbo   = dependency('libjpeg-turbo', required: true)
+stb             = dependency('stb', required: true)
+pdfium          = dependency('pdfium', required: true)
 uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
 global_deps     = [boost_dep, nlohmann_json, libpqxx, yaml_cpp, libmagic, uuid, thread_dep]
-core_deps       = global_deps + [libsodium, jwt_cpp, libcurl]
+core_deps       = global_deps + [libsodium, jwt_cpp, libcurl, libjpeg_turbo, stb, pdfium]
 fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]
 

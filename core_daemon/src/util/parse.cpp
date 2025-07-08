@@ -1,9 +1,6 @@
-#include "util/http.hpp"
+#include "util/parse.hpp"
 
 #include <regex>
-#include <sstream>
-#include <iomanip>
-#include <stdexcept>
 
 namespace vh::util {
 
@@ -44,7 +41,8 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
     std::string pair;
 
     while (std::getline(stream, pair, '&')) {
-        if (const auto eq = pair.find('=') != std::string::npos) {
+        const auto eq = pair.find('=');
+        if (eq != std::string::npos) {
             const auto key = url_decode(pair.substr(0, eq));
             const auto value = url_decode(pair.substr(eq + 1));
             params[key] = value;
@@ -54,4 +52,4 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
     return params;
 }
 
-} // namespace vh::util
+}

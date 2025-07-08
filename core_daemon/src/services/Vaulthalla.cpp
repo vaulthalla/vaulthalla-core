@@ -8,7 +8,7 @@
 #include "websocket/WebSocketRouter.hpp"
 #include "websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
-#include "http/HttpPreviewServer.hpp"
+#include "http/HttpServer.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -47,7 +47,7 @@ void Vaulthalla::start() {
         wsServer_->run();
 
         const auto http_port = port + 1; // HTTP preview server on next port
-        httpServer_ = std::make_shared<http::HttpPreviewServer>(
+        httpServer_ = std::make_shared<http::HttpServer>(
             *ioContext_,
             boost::asio::ip::tcp::endpoint(addr, http_port),
             serviceManager_

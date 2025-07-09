@@ -4,6 +4,8 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 
+#include <optional>
+
 using namespace vh::database;
 
 void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
@@ -22,6 +24,13 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->path.string());
 
         txn.exec_prepared("insert_file", p);
+
+        std::optional<unsigned int> parentId = file->parent_id;
+        while (parentId) {
+            pqxx::params stats_params{parentId, file->size_bytes, 1, 0}; // Increment size_bytes and file_count
+            txn.exec_prepared("update_dir_stats", stats_params);
+            parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
+        }
     });
 }
 
@@ -29,6 +38,9 @@ void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
 
     Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
+        const auto prevSize = txn.exec_prepared("get_file_size_bytes", file->id).one_field().as<unsigned int>();
+        const auto diff = file->size_bytes - prevSize;
+
         pqxx::params p;
         p.append(file->id);
         p.append(file->vault_id);
@@ -41,12 +53,30 @@ void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
         p.append(file->path.string());
 
         txn.exec_prepared("update_file", p);
+
+        std::optional<unsigned int> parentId = file->parent_id;
+        while (parentId) {
+            pqxx::params stats_params{parentId, diff, 0, 0}; // Update size_bytes with diff, file_count remains unchanged
+            txn.exec_prepared("update_dir_stats", stats_params);
+            parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
+        }
     });
 }
 
 void FileQueries::deleteFile(const unsigned int fileId) {
     Transactions::exec("FileQueries::deleteFile", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_file_parent_id_and_size", fileId).one_row();
+        const auto parentId = row["parent_id"].as<std::optional<unsigned int>>();
+        const auto sizeBytes = row["size_bytes"].as<unsigned int>();
+
         txn.exec("DELETE FROM files WHERE id = " + txn.quote(fileId));
+
+        std::optional<unsigned int> currentParentId = parentId;
+        while (currentParentId) {
+            pqxx::params stats_params{currentParentId, -static_cast<int>(sizeBytes), -1, 0}; // Decrement size_bytes and file_count
+            txn.exec_prepared("update_dir_stats", stats_params);
+            currentParentId = txn.exec_prepared("get_dir_parent_id", currentParentId).one_field().as<std::optional<unsigned int>>();
+        }
     });
 }
 

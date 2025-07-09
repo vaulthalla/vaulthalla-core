@@ -147,9 +147,22 @@ void DBConnection::initPreparedFiles() const {
                "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
 
     conn_->prepare("get_file_id_by_path", "SELECT id FROM files WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("get_file_size_bytes", "SELECT size_bytes FROM files WHERE id = $1");
+
+    conn_->prepare("get_file_parent_id_and_size",
+        "SELECT parent_id, size_bytes FROM files WHERE id = $1");
 }
 
 void DBConnection::initPreparedDirectories() const {
+    conn_->prepare("update_dir_stats",
+        "UPDATE directory_stats "
+        "SET size_bytes = size_bytes + $2, file_count = file_count + $3, subdirectory_count = subdirectory_count + $4, "
+        "last_modified = NOW() "
+        "WHERE directory_id = $1");
+
+    conn_->prepare("get_dir_parent_id", "SELECT parent_id FROM directories WHERE id = $1");
+
     conn_->prepare("insert_directory",
                    "INSERT INTO directories (vault_id, parent_id, name, created_by, last_modified_by, path) "
                    "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id");
@@ -157,10 +170,6 @@ void DBConnection::initPreparedDirectories() const {
     conn_->prepare("update_directory",
                    "UPDATE directories SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "
                    "last_modified_by = $5, path = $6 WHERE id = $1");
-
-    conn_->prepare("update_dir_stats",
-                   "UPDATE directory_stats SET size_bytes = $2, file_count = $3, subdirectory_count = $4, "
-                   "last_modified = NOW() WHERE directory_id = $1");
 
     conn_->prepare("insert_dir_stats",
                    "INSERT INTO directory_stats (directory_id, size_bytes, file_count, subdirectory_count, last_modified) "

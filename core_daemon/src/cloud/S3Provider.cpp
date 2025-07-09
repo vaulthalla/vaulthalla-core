@@ -483,3 +483,101 @@ bool S3Provider::uploadLargeObject(const std::string& bucket, const std::string&
 
     return completeMultipartUpload(bucket, key, uploadId, etags);
 }
+
+std::vector<std::string> S3Provider::listObjects(const std::string& bucket, const std::string& prefix) {
+    std::vector<std::string> allKeys;
+    std::string continuationToken;
+    bool moreResults = true;
+
+    while (moreResults) {
+        CURL* curl = curl_easy_init();
+        if (!curl) break;
+
+        std::ostringstream uri;
+        uri << "/" << bucket << "?list-type=2";
+        if (!prefix.empty()) uri << "&prefix=" << curl_easy_escape(curl, prefix.c_str(), prefix.length());
+        if (!continuationToken.empty()) {
+            uri << "&continuation-token=" << curl_easy_escape(curl, continuationToken.c_str(), continuationToken.length());
+        }
+
+        const std::string uriStr = uri.str();
+        const std::string url = apiKey_->endpoint + uriStr;
+
+        const std::string payloadHash = "UNSIGNED-PAYLOAD";
+        std::map<std::string, std::string> hdrMap{
+            {"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
+            {"x-amz-content-sha256", payloadHash},
+            {"x-amz-date", util::getCurrentTimestamp()}
+        };
+        std::string authHeader = buildAuthorizationHeader("GET", uriStr, hdrMap, payloadHash);
+
+        HeaderList headers;
+        headers.add("Authorization: " + authHeader);
+        for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+
+        std::string response;
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* p, const size_t s, const size_t n, std::string* d) {
+            d->append(p, s * n);
+            return s * n;
+        });
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+        const CURLcode res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        if (res != CURLE_OK) break;
+
+        // Extract keys
+        std::regex keyRe("<Key>([^<]+)</Key>");
+        for (auto it = std::sregex_iterator(response.begin(), response.end(), keyRe); it != std::sregex_iterator(); ++it) {
+            allKeys.push_back((*it)[1].str());
+        }
+
+        // Check for <IsTruncated>true</IsTruncated>
+        moreResults = std::regex_search(response, std::regex("<IsTruncated>true</IsTruncated>"));
+
+        // Extract <NextContinuationToken>
+        std::smatch tokenMatch;
+        if (moreResults && std::regex_search(response, tokenMatch, std::regex("<NextContinuationToken>([^<]+)</NextContinuationToken>"))) {
+            continuationToken = tokenMatch[1].str();
+        } else {
+            moreResults = false;
+        }
+    }
+
+    return allKeys;
+}
+
+bool S3Provider::downloadToBuffer(const std::string& bucket, const std::string& key, std::string& outBuffer) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return false;
+
+    const std::string uri = "/" + bucket + "/" + key;
+    const std::string url = apiKey_->endpoint + uri;
+
+    const std::string payloadHash = "UNSIGNED-PAYLOAD";
+    std::map<std::string, std::string> hdrMap{
+            {"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
+            {"x-amz-content-sha256", payloadHash},
+            {"x-amz-date", util::getCurrentTimestamp()}
+    };
+    const std::string authHeader = buildAuthorizationHeader("GET", uri, hdrMap, payloadHash);
+
+    HeaderList headers;
+    headers.add("Authorization: " + authHeader);
+    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+
+    outBuffer.clear();
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* ptr, size_t size, size_t nmemb, std::string* data) {
+        data->append(ptr, size * nmemb);
+        return size * nmemb;
+    });
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outBuffer);
+
+    const CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    return res == CURLE_OK;
+}

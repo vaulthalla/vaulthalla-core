@@ -7,6 +7,7 @@
 #include <stb_image_resize.h>
 #include <turbojpeg.h>
 #include <stdexcept>
+#include <fpdfview.h>
 
 namespace vh::util {
 
@@ -52,7 +53,7 @@ std::vector<uint8_t> resize_and_compress_image(
 
     int new_w = width, new_h = height;
     if (scale_opt) {
-        float scale = std::stof(*scale_opt);
+        const float scale = std::stof(*scale_opt);
         new_w = static_cast<int>(static_cast<float>(width) * scale);
         new_h = static_cast<int>(static_cast<float>(height) * scale);
     } else if (size_opt) {
@@ -70,6 +71,101 @@ std::vector<uint8_t> resize_and_compress_image(
     std::vector<uint8_t> compressed;
     compress_to_jpeg(resized.data(), new_w, new_h, compressed);
     return compressed;
+}
+
+std::vector<uint8_t> resize_and_compress_image_buffer(
+    const uint8_t* data, size_t size,
+    const std::optional<std::string>& scale_opt,
+    const std::optional<std::string>& size_opt) {
+
+    int width, height, channels;
+    unsigned char* decoded = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, 3);
+    if (!decoded) throw std::runtime_error("Failed to decode image from memory");
+
+    int new_w = width;
+    int new_h = height;
+
+    if (scale_opt) {
+        float scale = std::stof(*scale_opt);
+        new_w = static_cast<int>(width * scale);
+        new_h = static_cast<int>(height * scale);
+    } else if (size_opt) {
+        int max_dim = std::stoi(*size_opt);
+        float ratio = std::min(static_cast<float>(max_dim) / width, static_cast<float>(max_dim) / height);
+        new_w = static_cast<int>(width * ratio);
+        new_h = static_cast<int>(height * ratio);
+    }
+
+    std::vector<uint8_t> resized(new_w * new_h * 3);
+    stbir_resize_uint8(decoded, width, height, 0, resized.data(), new_w, new_h, 0, 3);
+    stbi_image_free(decoded);
+
+    std::vector<uint8_t> compressed;
+    compress_to_jpeg(resized.data(), new_w, new_h, compressed);
+    return compressed;
+}
+
+std::vector<uint8_t> resize_and_compress_pdf_buffer(
+    const uint8_t* data, size_t size,
+    const std::optional<std::string>& scale_opt,
+    const std::optional<std::string>& size_opt) {
+
+    FPDF_InitLibrary();
+
+    FPDF_DOCUMENT doc = FPDF_LoadMemDocument(data, static_cast<int>(size), nullptr);
+    if (!doc) {
+        FPDF_DestroyLibrary();
+        throw std::runtime_error("Failed to load PDF from memory");
+    }
+
+    FPDF_PAGE page = FPDF_LoadPage(doc, 0);
+    if (!page) {
+        FPDF_CloseDocument(doc);
+        FPDF_DestroyLibrary();
+        throw std::runtime_error("Failed to load first page");
+    }
+
+    int width = static_cast<int>(FPDF_GetPageWidth(page));
+    int height = static_cast<int>(FPDF_GetPageHeight(page));
+
+    int new_w = width;
+    int new_h = height;
+    if (scale_opt) {
+        float scale = std::stof(*scale_opt);
+        new_w = static_cast<int>(width * scale);
+        new_h = static_cast<int>(height * scale);
+    } else if (size_opt) {
+        int max_dim = std::stoi(*size_opt);
+        float ratio = std::min(static_cast<float>(max_dim) / width, static_cast<float>(max_dim) / height);
+        new_w = static_cast<int>(width * ratio);
+        new_h = static_cast<int>(height * ratio);
+    }
+
+    FPDF_BITMAP bitmap = FPDFBitmap_Create(new_w, new_h, 0); // 0 = BGRx
+    FPDFBitmap_FillRect(bitmap, 0, 0, new_w, new_h, 0xFFFFFFFF);
+    FPDF_RenderPageBitmap(bitmap, page, 0, 0, new_w, new_h, 0, 0);
+
+    uint8_t* raw = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
+    std::vector<uint8_t> rgb(new_w * new_h * 3);
+
+    for (int y = 0; y < new_h; ++y) {
+        for (int x = 0; x < new_w; ++x) {
+            int idx = y * new_w + x;
+            rgb[idx * 3 + 0] = raw[idx * 4 + 2]; // R
+            rgb[idx * 3 + 1] = raw[idx * 4 + 1]; // G
+            rgb[idx * 3 + 2] = raw[idx * 4 + 0]; // B
+        }
+    }
+
+    std::vector<uint8_t> jpeg_buf;
+    compress_to_jpeg(rgb.data(), new_w, new_h, jpeg_buf);
+
+    FPDFBitmap_Destroy(bitmap);
+    FPDF_ClosePage(page);
+    FPDF_CloseDocument(doc);
+    FPDF_DestroyLibrary();
+
+    return jpeg_buf;
 }
 
 }

@@ -13,4 +13,14 @@ std::vector<uint8_t> resize_and_compress_image(const std::string& path,
                                                const std::optional<std::string>& scale_opt,
                                                const std::optional<std::string>& size_opt);
 
+std::vector<uint8_t> resize_and_compress_image_buffer(
+    const uint8_t* data, size_t size,
+    const std::optional<std::string>& scale,
+    const std::optional<std::string>& max_size);
+
+std::vector<uint8_t> resize_and_compress_pdf_buffer(
+    const uint8_t* data, size_t size,
+    const std::optional<std::string>& scale,
+    const std::optional<std::string>& max_size);
+
 }

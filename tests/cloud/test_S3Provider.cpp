@@ -1,5 +1,7 @@
-#include "../../shared/include/types/APIKey.hpp"
+#include "types/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
+#include "util/imageUtil.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -117,4 +119,61 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
 
     bool abortSuccess = s3Provider_->abortMultipartUpload(bucket_, key, uploadId);
     EXPECT_TRUE(abortSuccess);
+}
+
+TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
+    const std::string key = "list-download-test.txt";
+    const auto filePath = test_dir / key;
+    writeTextFile(filePath, "This file should appear in listObjects and download into buffer.");
+    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, filePath.string()));
+
+    auto keys = s3Provider_->listObjects(bucket_, "");
+    auto it = std::find(keys.begin(), keys.end(), key);
+    EXPECT_NE(it, keys.end()) << "Uploaded key not found in listObjects()";
+
+    std::string buffer;
+    EXPECT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+    EXPECT_TRUE(buffer.find("appear in listObjects") != std::string::npos);
+
+    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+}
+
+TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
+    const std::string key = "test-image.jpg";
+    const auto srcPath = fs::path("sample.jpg");
+    ASSERT_TRUE(fs::exists(srcPath));
+    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, srcPath.string()));
+
+    std::string buffer;
+    ASSERT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+
+    auto jpeg = vh::util::resize_and_compress_image_buffer(
+        reinterpret_cast<const uint8_t*>(buffer.data()),
+        buffer.size(),
+        std::nullopt,
+        std::make_optional("128")
+    );
+
+    EXPECT_GT(jpeg.size(), 100); // sanity check: JPEG data exists
+    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+}
+
+TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
+    const std::string key = "test-pdf.pdf";
+    const auto srcPath = fs::path("sample.pdf");
+    ASSERT_TRUE(fs::exists(srcPath));
+    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, srcPath.string()));
+
+    std::string buffer;
+    ASSERT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+
+    auto jpeg = vh::util::resize_and_compress_pdf_buffer(
+        reinterpret_cast<const uint8_t*>(buffer.data()),
+        buffer.size(),
+        std::nullopt,
+        std::make_optional("128")
+    );
+
+    EXPECT_GT(jpeg.size(), 100);
+    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
 }

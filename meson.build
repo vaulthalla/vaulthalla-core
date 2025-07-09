@@ -60,14 +60,11 @@ foreach f : run_command('find', fuse_src_dir, '-type', 'f', '-name', '*.cpp', ch
     fuse_sources += files(f)
 endforeach
 
-# Core Daemon: add the entrypoint
-core_sources += core_main
-
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
 # === ⚙️ Core Daemon ===
 executable('core_daemon',
-           core_sources,
+           core_sources + core_main,
            dependencies: core_deps,
            include_directories: core_inc,
            install: true
@@ -87,6 +84,22 @@ executable('hash_password',
            include_directories: hash_pass_inc,
            install: true
 )
+
+test_assets = files(
+    'test-assets/sample.jpg',
+    'test-assets/sample.pdf'
+)
+
+foreach asset : test_assets
+    asset_path = '@0@'.format(asset)
+    asset_name = asset_path.split('/')[-1]
+
+    configure_file(
+        input: asset,
+        output: asset_name,
+        copy: true
+    )
+endforeach
 
 # === 🧪 Cloud-Side Tests ===
 cloud_test_sources = core_sources

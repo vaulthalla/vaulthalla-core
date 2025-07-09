@@ -19,7 +19,7 @@ class FileQueries {
 public:
     FileQueries() = default;
 
-    static void addFile(const std::shared_ptr<types::File>& file);
+    [[nodiscard]] static unsigned int addFile(const std::shared_ptr<types::File>& file);
 
     static void updateFile(const std::shared_ptr<types::File>& file);
 
@@ -34,6 +34,8 @@ public:
     [[nodiscard]] static std::optional<unsigned int> getFileIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
     [[nodiscard]] static unsigned int addDirectory(const types::Directory& directory);
+
+    static void addDirectory(const std::shared_ptr<types::Directory>& directory);
 
     static void updateDirectory(const std::shared_ptr<types::Directory>& directory);
 

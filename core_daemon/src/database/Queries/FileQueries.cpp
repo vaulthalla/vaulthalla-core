@@ -8,10 +8,10 @@
 
 using namespace vh::database;
 
-void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
+unsigned int FileQueries::addFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
 
-    Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
+    return Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
         p.append(file->vault_id);
         p.append(file->parent_id);
@@ -23,7 +23,7 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->content_hash);
         p.append(file->path.string());
 
-        txn.exec_prepared("insert_file", p);
+        const auto id = txn.exec_prepared("insert_file", p).one_field().as<unsigned int>();
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
@@ -31,6 +31,8 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
             txn.exec_prepared("update_dir_stats", stats_params);
             parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
         }
+
+        return id;
     });
 }
 
@@ -129,6 +131,24 @@ unsigned int FileQueries::addDirectory(const types::Directory& directory) {
     });
 }
 
+void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& directory) {
+    Transactions::exec("FileQueries::addDirectory", [&](pqxx::work& txn) {
+        pqxx::params p;
+        p.append(directory->vault_id);
+        p.append(directory->parent_id);
+        p.append(directory->name);
+        p.append(directory->created_by);
+        p.append(directory->last_modified_by);
+        p.append(directory->path.string());
+
+        const auto id = txn.exec_prepared("insert_directory", p).one_row()["id"].as<unsigned int>();
+
+        pqxx::params stats_params{id, 0, 0, 0}; // Initialize stats with zero values
+        txn.exec_prepared("insert_dir_stats", stats_params);
+    });
+}
+
+
 void FileQueries::updateDirectory(const std::shared_ptr<types::Directory>& directory) {
     if (!directory) throw std::invalid_argument("Directory cannot be null");
 
@@ -224,4 +244,3 @@ std::vector<std::shared_ptr<vh::types::FSEntry>> FileQueries::listDir(const unsi
         return types::merge_entries(files, directories);
     });
 }
-

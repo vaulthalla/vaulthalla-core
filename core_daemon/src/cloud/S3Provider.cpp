@@ -1,7 +1,6 @@
-// S3Provider.cpp — safe header lifetime + explicit payload sizes
 #include "cloud/S3Provider.hpp"
-#include "../../../shared/include/types/APIKey.hpp"
-#include "../../../shared/include/shared_util/timestamp.hpp"
+#include "types/APIKey.hpp"
+#include "shared_util/timestamp.hpp"
 #include <ctime>
 #include <curl/curl.h>
 #include <fstream>
@@ -14,7 +13,7 @@
 #include <sstream>
 #include <vector>
 
-using namespace vh::cloud::s3;
+using namespace vh::cloud;
 
 // --- helpers --------------------------------------------------------------
 namespace {

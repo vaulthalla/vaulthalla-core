@@ -40,6 +40,8 @@ public:
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
+    [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const = 0;
+
     [[nodiscard]] fs::path root_directory() const { return root_; }
 
     [[nodiscard]] virtual StorageType type() const = 0;

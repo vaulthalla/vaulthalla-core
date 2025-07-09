@@ -11,17 +11,29 @@ namespace vh::config {
 struct ServerConfig {
     std::string host = "0.0.0.0";
     uint16_t port = 8080;
-    std::string uds_socket = "/tmp/vaulthalla.sock";
+    std::filesystem::path uds_socket = "/tmp/vaulthalla.sock";
     std::string log_level = "info";
     int max_connections = 1024;
 };
 
 struct FuseConfig {
     bool enabled = true;
-    std::string root_mount_path = "/mnt/vaulthalla";
+    std::filesystem::path root_mount_path = "/mnt/vaulthalla";
     bool mount_per_user = true;
     int fuse_timeout_seconds = 60;
     bool allow_other = true;
+};
+
+struct CloudCacheConfig {
+    bool enabled = true;
+    unsigned short expiry_days = 30;
+    bool thumbnails_only = true;
+    std::filesystem::path cache_path = "/.cache";
+};
+
+struct CloudConfig {
+    bool enabled = true;
+    CloudCacheConfig cache;
 };
 
 struct DatabaseConfig {
@@ -34,7 +46,7 @@ struct DatabaseConfig {
 };
 
 struct LocalStorageConfig {
-    std::string mount_point = "/data/vaulthalla";
+    std::filesystem::path mount_point = "/data/vaulthalla";
 };
 
 struct S3StorageConfig {
@@ -83,6 +95,7 @@ struct Config {
 
     ServerConfig server;
     FuseConfig fuse;
+    CloudConfig cloud;
     DatabaseConfig database;
     AuthConfig auth;
     MetricsConfig metrics;

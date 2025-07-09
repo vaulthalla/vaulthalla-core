@@ -12,7 +12,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
   protected:
     std::shared_ptr<vh::types::api::S3APIKey> apiKey_;
     std::string bucket_;
-    std::shared_ptr<vh::cloud::s3::S3Provider> s3Provider_;
+    std::shared_ptr<vh::cloud::S3Provider> s3Provider_;
     std::filesystem::path test_dir;
 
     void SetUp() override {
@@ -29,7 +29,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
 
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
-        s3Provider_ = std::make_shared<vh::cloud::s3::S3Provider>(apiKey_);
+        s3Provider_ = std::make_shared<vh::cloud::S3Provider>(apiKey_);
     }
 
     void TearDown() override { fs::remove_all(test_dir); }

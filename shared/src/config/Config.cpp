@@ -20,6 +20,7 @@ Config loadConfig(const std::string& path) {
 
     if (auto node = root["server"])    YAML::convert<ServerConfig>::decode(node, cfg.server);
     if (auto node = root["fuse"])      YAML::convert<FuseConfig>::decode(node, cfg.fuse);
+    if (auto node = root["cloud"])     YAML::convert<CloudConfig>::decode(node, cfg.cloud);
     if (auto node = root["database"])  YAML::convert<DatabaseConfig>::decode(node, cfg.database);
     if (auto node = root["auth"])      YAML::convert<AuthConfig>::decode(node, cfg.auth);
     if (auto node = root["metrics"])   YAML::convert<MetricsConfig>::decode(node, cfg.metrics);
@@ -59,6 +60,7 @@ void Config::save() const {
     unordered_map<string, string> sectionMap = {
         { "server",     encode(server) },
         { "fuse",       encode(fuse) },
+        { "cloud",      encode(cloud) },
         { "database",   encode(database) },
         { "auth",       encode(auth) },
         { "metrics",    encode(metrics) },
@@ -100,6 +102,15 @@ void to_json(nlohmann::json& j, const Config& c) {
             {"mount_per_user", c.fuse.mount_per_user},
             {"fuse_timeout_seconds", c.fuse.fuse_timeout_seconds},
             {"allow_other", c.fuse.allow_other}
+        }},
+        {"cloud", {
+            {"enabled", c.cloud.enabled},
+            {"cache", {
+                {"enabled", c.cloud.cache.enabled},
+                {"expiry_days", c.cloud.cache.expiry_days},
+                {"thumbnails_only", c.cloud.cache.thumbnails_only},
+                {"cache_path", c.cloud.cache.cache_path}
+            }}
         }},
         {"database", {
             {"host", c.database.host},
@@ -152,6 +163,13 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.fuse.mount_per_user = j.at("fuse").at("mount_per_user").get<bool>();
     c.fuse.fuse_timeout_seconds = j.at("fuse").at("fuse_timeout_seconds").get<int>();
     c.fuse.allow_other = j.at("fuse").at("allow_other").get<bool>();
+
+    c.cloud.enabled = j.at("cloud").at("enabled").get<bool>();
+    c.cloud.cache = CloudCacheConfig();
+    c.cloud.cache.enabled = j.at("cloud").at("cache").at("enabled").get<bool>();
+    c.cloud.cache.expiry_days = j.at("cloud").at("cache").at("expiry_days").get<int>();
+    c.cloud.cache.thumbnails_only = j.at("cloud").at("cache").value("thumbnails_only", false);
+    c.cloud.cache.cache_path = j.at("cloud").at("cache").at("cache_path").get<std::string>();
 
     c.database.host = j.at("database").at("host").get<std::string>();
     c.database.port = j.at("database").at("port").get<uint16_t>();

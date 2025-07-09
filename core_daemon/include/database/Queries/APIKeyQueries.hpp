@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../../shared/include/types/APIKey.hpp"
+#include "types/APIKey.hpp"
 #include <memory>
 
 namespace vh::database {

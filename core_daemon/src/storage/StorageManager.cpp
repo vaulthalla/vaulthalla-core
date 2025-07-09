@@ -10,6 +10,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "util/Magic.hpp"
+#include "database/Queries/APIKeyQueries.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -32,7 +33,8 @@ void StorageManager::initStorageEngines() {
             } else if (vault->type == types::VaultType::S3) {
                 auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
                 if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
-                engines_[vault->id] = std::make_shared<CloudStorageEngine>(vaultS3);
+                const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
+                engines_[vault->id] = std::make_shared<CloudStorageEngine>(vaultS3, key);
             }
         }
     } catch (const std::exception& e) {
@@ -82,7 +84,10 @@ void StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
     } else if (vault->type == types::VaultType::S3) {
         auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
         if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
-        engines_[vault->id] = std::make_shared<CloudStorageEngine>(vaultS3);
+        const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
+        const auto engine = std::make_shared<CloudStorageEngine>(vaultS3, key);
+        engine->initCloudStorage();
+        engines_[vault->id] = engine;
     }
 }
 
@@ -136,7 +141,7 @@ void StorageManager::finishUpload(const unsigned int vaultId,
         else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
     } {
         std::lock_guard lock(mountsMutex_);
-        database::FileQueries::addFile(f);
+        const auto fileId = database::FileQueries::addFile(f);
     }
 
     std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << "\n";

@@ -9,7 +9,7 @@ namespace vh::types::api {
 class S3APIKey;
 }
 
-namespace vh::cloud::s3 {
+namespace vh::cloud {
 class S3Provider {
   public:
     explicit S3Provider(const std::shared_ptr<types::api::S3APIKey>& apiKey);
@@ -38,8 +38,6 @@ class S3Provider {
                                          const std::string& payloadHash);
     std::string sha256Hex(const std::string& data);
     std::string hmacSha256Hex(const std::string& key, const std::string& data);
-
-    bool isPreviewableKey(const std::string& key);
 
     std::shared_ptr<types::api::S3APIKey> apiKey_;
 };

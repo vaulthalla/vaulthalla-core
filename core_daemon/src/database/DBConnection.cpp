@@ -128,7 +128,7 @@ void DBConnection::initPreparedFiles() const {
     conn_->prepare("insert_file",
                    "INSERT INTO files (vault_id, parent_id, name, created_by, last_modified_by, size_bytes, "
                    "mime_type, content_hash, path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)");
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id");
 
     conn_->prepare("update_file",
                    "UPDATE files SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "

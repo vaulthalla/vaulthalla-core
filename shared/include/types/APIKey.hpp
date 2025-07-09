@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../shared_util/timestamp.hpp"
+#include "shared_util/timestamp.hpp"
 #include <boost/describe.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
@@ -15,7 +15,7 @@ namespace vh::types::api {
 
 enum class APIKeyType { S3 };
 
-inline std::string to_string(APIKeyType type) {
+inline std::string to_string(const APIKeyType& type) {
     switch (type) {
     case APIKeyType::S3: return "s3";
     default: throw std::runtime_error("Unknown API key type");
@@ -84,11 +84,9 @@ struct APIKey {
             provider = s3_provider_from_string(row["provider"].as<std::string>());
         }
     }
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(APIKey, id, user_id, type, name, created_at, provider)
 };
 
-struct S3APIKey : public APIKey {
+struct S3APIKey : APIKey {
     S3Provider provider{S3Provider::AWS};
     std::string access_key;
     std::string secret_access_key;
@@ -107,9 +105,6 @@ struct S3APIKey : public APIKey {
           access_key(row["access_key"].as<std::string>()),
           secret_access_key(row["secret_access_key"].as<std::string>()), region(row["region"].as<std::string>()),
           endpoint(row["endpoint"].as<std::string>()) {}
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(vh::types::api::S3APIKey, id, user_id, type, name, created_at, provider, access_key,
-                                   secret_access_key, region, endpoint)
 };
 
 inline nlohmann::json to_json(const std::shared_ptr<APIKey>& key) {
@@ -132,9 +127,21 @@ inline nlohmann::json to_json(const std::vector<std::shared_ptr<APIKey>>& keys) 
     return j;
 }
 
-} // namespace vh::types::api
+inline void to_json(nlohmann::json& j, const std::shared_ptr<APIKey>& key) {
+    j = to_json(key);
+}
 
-BOOST_DESCRIBE_STRUCT(vh::types::api::APIKey, (), (id, user_id, name, created_at))
+inline void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<APIKey>>& keys) {
+    j = to_json(keys);
+}
 
-BOOST_DESCRIBE_STRUCT(vh::types::api::S3APIKey, (vh::types::api::APIKey),
-                      (access_key, secret_access_key, region, endpoint))
+inline void to_json(nlohmann::json& j, const std::shared_ptr<S3APIKey>& key) {
+    to_json(j, std::static_pointer_cast<APIKey>(key));
+    j.push_back({"provider", to_string(key->provider)});
+    j.push_back({"access_key", key->access_key});
+    j.push_back({"secret_access_key", key->secret_access_key});
+    j.push_back({"region", key->region});
+    j.push_back({"endpoint", key->endpoint});
+}
+
+}

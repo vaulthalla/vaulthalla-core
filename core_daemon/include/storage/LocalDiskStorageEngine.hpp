@@ -29,7 +29,7 @@ public:
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
+    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getRootPath() const;
 

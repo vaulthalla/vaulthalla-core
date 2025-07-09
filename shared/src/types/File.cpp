@@ -5,6 +5,7 @@
 #include <pqxx/row>
 #include <pqxx/result>
 #include <format>
+#include <regex>
 
 namespace vh::types {
 
@@ -24,6 +25,11 @@ File::File(const pqxx::row& row)
 
     if (row.at("content_hash").is_null()) content_hash = std::nullopt;
     else content_hash = row.at("content_hash").as<std::string>();
+}
+
+File::File(const std::string& s3_key, const uint64_t size, const std::optional<std::time_t>& updated)
+    : FSEntry(s3_key), size_bytes(size) {
+    if (updated) updated_at = *updated;
 }
 
 void to_json(nlohmann::json& j, const File& f) {

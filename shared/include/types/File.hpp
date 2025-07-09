@@ -10,6 +10,8 @@ struct File : FSEntry {
 
     File() = default;
     explicit File(const pqxx::row& row);
+    File(const std::string& s3_key, uint64_t size, const std::optional<std::time_t>& updated = {});
+
     [[nodiscard]] bool isDirectory() const override { return false; }
 };
 

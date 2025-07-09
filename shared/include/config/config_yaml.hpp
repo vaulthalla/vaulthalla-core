@@ -57,6 +57,46 @@ struct convert<FuseConfig> {
     }
 };
 
+// CloudCacheConfig
+template<>
+struct convert<CloudCacheConfig> {
+    static Node encode(const CloudCacheConfig& rhs) {
+        Node node;
+        node["enabled"] = rhs.enabled;
+        node["expiry_days"] = rhs.expiry_days;
+        node["thumbnails_only"] = rhs.thumbnails_only;
+        node["cache_path"] = rhs.cache_path;
+        return node;
+    }
+
+    static bool decode(const Node& node, CloudCacheConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(true);
+        rhs.expiry_days = node["expiry_days"].as<unsigned short>(30);
+        rhs.thumbnails_only = node["thumbnails_only"].as<bool>(true);
+        rhs.cache_path = node["cache_path"].as<std::string>("/.cache");
+        return true;
+    }
+};
+
+// CloudConfig
+template<>
+struct convert<CloudConfig> {
+    static Node encode(const CloudConfig& rhs) {
+        Node node;
+        node["enabled"] = rhs.enabled;
+        node["cache"] = convert<CloudCacheConfig>::encode(rhs.cache);
+        return node;
+    }
+
+    static bool decode(const Node& node, CloudConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(true);
+        if (const auto cacheNode = node["cache"]) convert<CloudCacheConfig>::decode(cacheNode, rhs.cache);
+        return true;
+    }
+};
+
 // DatabaseConfig
 
 template<>
@@ -191,6 +231,19 @@ struct convert<AdvancedConfig> {
         rhs.enable_public_links = node["enable_public_links"].as<bool>(true);
         rhs.rate_limit_per_ip_per_minute = node["rate_limit_per_ip_per_minute"].as<int>(60);
         rhs.dev_mode = node["dev_mode"].as<bool>(false);
+        return true;
+    }
+};
+
+template<>
+struct convert<std::filesystem::path> {
+    static Node encode(const std::filesystem::path& rhs) {
+        return Node(rhs.string());
+    }
+
+    static bool decode(const Node& node, std::filesystem::path& rhs) {
+        if (!node.IsScalar()) return false;
+        rhs = std::filesystem::path(node.as<std::string>());
         return true;
     }
 };

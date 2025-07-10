@@ -25,14 +25,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("Unknown storage engine");
 
-        if (engine->type() != storage::StorageType::Local) {
-            // TODO: Handle other storage types (e.g., S3, Azure, etc.)
-            throw std::runtime_error("Unsupported storage engine type for upload, requires Local");
-        }
-
-        const auto localEngine = std::static_pointer_cast<storage::LocalDiskStorageEngine>(engine);
-
-        const auto absPath = localEngine->getAbsolutePath(path);
+        const auto absPath = engine->getAbsolutePath(path);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
         UploadHandler::ensureDirectoriesInDb(vaultId, path, session.getAuthenticatedUser());

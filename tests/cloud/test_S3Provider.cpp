@@ -30,7 +30,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
 
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
-        s3Provider_ = std::make_shared<vh::cloud::S3Provider>(apiKey_);
+        s3Provider_ = std::make_shared<vh::cloud::S3Provider>(apiKey_, bucket_);
     }
 
     void TearDown() override { fs::remove_all(test_dir); }
@@ -51,12 +51,12 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     ASSERT_TRUE(fs::exists(filePath));
 
     // Upload the file
-    bool uploadSuccess = s3Provider_->uploadObject(bucket_, key, filePath.string());
+    bool uploadSuccess = s3Provider_->uploadObject(key, filePath.string());
     EXPECT_TRUE(uploadSuccess);
 
     // Download the file for verification
     const auto downloadedPath = test_dir / "downloaded.txt";
-    bool downloadSuccess = s3Provider_->downloadObject(bucket_, key, downloadedPath.string());
+    bool downloadSuccess = s3Provider_->downloadObject(key, downloadedPath.string());
     EXPECT_TRUE(downloadSuccess);
 
     // Compare original and downloaded files
@@ -68,7 +68,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
@@ -84,12 +84,12 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
     ASSERT_TRUE(fs::exists(filePath));
 
     // Upload the file using multipart logic
-    bool uploadSuccess = s3Provider_->uploadLargeObject(bucket_, key, filePath.string(), 5 * 1024 * 1024);
+    bool uploadSuccess = s3Provider_->uploadLargeObject(key, filePath.string(), 5 * 1024 * 1024);
     EXPECT_TRUE(uploadSuccess);
 
     // Download for verification
     const auto downloadedPath = test_dir / "downloaded.txt";
-    bool downloadSuccess = s3Provider_->downloadObject(bucket_, key, downloadedPath.string());
+    bool downloadSuccess = s3Provider_->downloadObject(key, downloadedPath.string());
     EXPECT_TRUE(downloadSuccess);
 
     // Compare original and downloaded files
@@ -102,23 +102,23 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
     const std::string key = "abort-test.txt";
 
-    std::string uploadId = s3Provider_->initiateMultipartUpload(bucket_, key);
+    std::string uploadId = s3Provider_->initiateMultipartUpload(key);
     ASSERT_FALSE(uploadId.empty());
 
     std::string bogus = std::string(5 * 1024 * 1024, 'Z');
     std::string etag;
 
     // Simulate partial upload then abort
-    bool part1 = s3Provider_->uploadPart(bucket_, key, uploadId, 1, bogus, etag);
+    bool part1 = s3Provider_->uploadPart(key, uploadId, 1, bogus, etag);
     EXPECT_TRUE(part1);
 
-    bool abortSuccess = s3Provider_->abortMultipartUpload(bucket_, key, uploadId);
+    bool abortSuccess = s3Provider_->abortMultipartUpload(key, uploadId);
     EXPECT_TRUE(abortSuccess);
 }
 
@@ -126,9 +126,9 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     const std::string key = "list-download-test.txt";
     const auto filePath = test_dir / key;
     writeTextFile(filePath, "This file should appear in listObjects and download into buffer.");
-    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, filePath.string()));
+    ASSERT_TRUE(s3Provider_->uploadObject(key, filePath.string()));
 
-    const std::string xml = s3Provider_->listObjects(bucket_);
+    const std::string xml = s3Provider_->listObjects();
     const auto entries = vh::types::fromS3XML(xml);
     EXPECT_FALSE(entries.empty()) << "fromS3XML should return at least one entry";
     auto match = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
@@ -137,20 +137,20 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     EXPECT_TRUE(match != entries.end()) << "Uploaded key not found in fromS3XML()";
 
     std::string buffer;
-    EXPECT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+    EXPECT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
     EXPECT_TRUE(buffer.find("appear in listObjects") != std::string::npos);
 
-    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     const std::string key = "test-image.jpg";
     const auto srcPath = fs::path("sample.jpg");
     ASSERT_TRUE(fs::exists(srcPath));
-    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, srcPath.string()));
+    ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
 
     std::string buffer;
-    ASSERT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+    ASSERT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
 
     auto jpeg = vh::util::resize_and_compress_image_buffer(
         reinterpret_cast<const uint8_t*>(buffer.data()),
@@ -160,17 +160,17 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100); // sanity check: JPEG data exists
-    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     const std::string key = "test-pdf.pdf";
     const auto srcPath = fs::path("sample.pdf");
     ASSERT_TRUE(fs::exists(srcPath));
-    ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, srcPath.string()));
+    ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
 
     std::string buffer;
-    ASSERT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));
+    ASSERT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
 
     auto jpeg = vh::util::resize_and_compress_pdf_buffer(
         reinterpret_cast<const uint8_t*>(buffer.data()),
@@ -180,5 +180,5 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100);
-    EXPECT_TRUE(s3Provider_->deleteObject(bucket_, key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }

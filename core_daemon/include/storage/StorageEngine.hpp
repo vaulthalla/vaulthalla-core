@@ -31,9 +31,6 @@ public:
 
     virtual void mkdir(const fs::path& relative_path) = 0;
 
-    [[nodiscard]] virtual bool writeFile(const fs::path& relative_path, const std::vector<uint8_t>& data,
-                                         bool overwrite) = 0;
-
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
     [[nodiscard]] virtual bool deleteFile(const fs::path& relative_path) = 0;

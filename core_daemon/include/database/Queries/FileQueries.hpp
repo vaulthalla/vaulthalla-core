@@ -19,7 +19,7 @@ class FileQueries {
 public:
     FileQueries() = default;
 
-    [[nodiscard]] static unsigned int addFile(const std::shared_ptr<types::File>& file);
+    static void addFile(const std::shared_ptr<types::File>& file);
 
     static void updateFile(const std::shared_ptr<types::File>& file);
 

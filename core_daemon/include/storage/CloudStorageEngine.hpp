@@ -6,7 +6,7 @@
 
 namespace vh::types {
 struct File;
-struct Vault;
+struct S3Vault;
 
 namespace api {
 struct APIKey;
@@ -22,14 +22,12 @@ public:
 
     ~CloudStorageEngine() override = default;
 
-    CloudStorageEngine(const std::shared_ptr<types::Vault>& vault,
+    CloudStorageEngine(const std::shared_ptr<types::S3Vault>& vault,
                        const std::shared_ptr<types::api::APIKey>& key);
 
     void mkdir(const fs::path& relative_path) override;
 
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
-
-    bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite) override;
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
@@ -38,6 +36,8 @@ public:
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
+
+    void uploadFile(const std::filesystem::path& rel_path, bool overwrite = false);
 
     void initCloudStorage() const;
 

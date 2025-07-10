@@ -124,31 +124,34 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
+    const auto absPath = engine->getAbsolutePath(relPath);
+
+    if (!std::filesystem::exists(absPath))
+        throw std::runtime_error(
+            "File does not exist at path: " + absPath.string());
+    if (!std::filesystem::is_regular_file(absPath))
+        throw std::runtime_error(
+            "Path is not a regular file: " + absPath.string());
+
     const auto f = std::make_shared<types::File>();
+    f->vault_id = vaultId;
+    f->name = relPath.filename().string();
+    f->size_bytes = std::filesystem::file_size(absPath);
+    f->created_by = user->id;
+    f->last_modified_by = user->id;
+    f->path = relPath.string();
+    f->mime_type = util::Magic::get_mime_type(absPath);
+    if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
+    else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
 
-    if (engine->type() == StorageType::Local) {
-        const auto localEngine = std::static_pointer_cast<LocalDiskStorageEngine>(engine);
-        const auto absPath = localEngine->getAbsolutePath(relPath);
-        if (!std::filesystem::exists(absPath))
-            throw std::runtime_error(
-                "File does not exist at path: " + absPath.string());
-        if (!std::filesystem::is_regular_file(absPath))
-            throw std::runtime_error(
-                "Path is not a regular file: " + absPath.string());
+    if (engine->type() == StorageType::Cloud) {
+        const auto cloudEngine = std::static_pointer_cast<CloudStorageEngine>(engine);
+        cloudEngine->uploadFile(relPath);
+    }
 
-        f->vault_id = vaultId;
-        f->name = relPath.filename().string();
-        f->size_bytes = std::filesystem::file_size(absPath);
-        f->created_by = user->id;
-        f->last_modified_by = user->id;
-        f->path = relPath.string();
-        f->mime_type = util::Magic::get_mime_type(absPath);
-
-        if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
-        else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
-    } {
+    {
         std::lock_guard lock(mountsMutex_);
-        const auto fileId = database::FileQueries::addFile(f);
+        database::FileQueries::addFile(f);
     }
 
     std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << std::endl;

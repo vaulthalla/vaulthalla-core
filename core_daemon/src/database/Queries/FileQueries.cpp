@@ -8,11 +8,11 @@
 
 using namespace vh::database;
 
-unsigned int FileQueries::addFile(const std::shared_ptr<types::File>& file) {
+void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
     if (!file->path.string().starts_with("/")) file->setPath("/" + file->path.string());
 
-    return Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
+    Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
         p.append(file->vault_id);
         p.append(file->parent_id);
@@ -24,7 +24,7 @@ unsigned int FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->content_hash);
         p.append(file->path.string());
 
-        const auto id = txn.exec_prepared("insert_file", p).one_field().as<unsigned int>();
+        txn.exec_prepared("insert_file", p);
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
@@ -32,8 +32,6 @@ unsigned int FileQueries::addFile(const std::shared_ptr<types::File>& file) {
             txn.exec_prepared("update_dir_stats", stats_params);
             parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
         }
-
-        return id;
     });
 }
 

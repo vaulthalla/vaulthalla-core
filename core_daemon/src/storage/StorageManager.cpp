@@ -135,8 +135,7 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     f->vault_id = vaultId;
     f->name = relPath.filename().string();
     f->size_bytes = std::filesystem::file_size(absPath);
-    f->created_by = user->id;
-    f->last_modified_by = user->id;
+    f->created_by = f->last_modified_by = user->id;
     f->path = relPath.string();
     f->mime_type = util::Magic::get_mime_type(absPath);
     if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
@@ -166,8 +165,7 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
 
         d.vault_id = vaultId;
         d.name = std::filesystem::path(relPath).filename().string();
-        d.created_by = user->id;
-        d.last_modified_by = user->id;
+        d.created_by = d.last_modified_by = user->id;
         d.path = relPath;
         if (!hasLogicalParent(relPath)) d.parent_id = std::nullopt;
         else d.parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, std::filesystem::path(relPath).parent_path());

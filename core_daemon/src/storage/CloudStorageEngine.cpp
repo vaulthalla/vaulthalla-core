@@ -21,6 +21,12 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<types::Vault>& vaul
     const auto conf = config::ConfigRegistry::get();
     cache_expiry_days_ = conf.cloud.cache.expiry_days;
     root_ = conf.fuse.root_mount_path / conf.cloud.cache.cache_path / std::to_string(vault->id);
+    if (!std::filesystem::exists(root_)) {
+        std::cout << "[CloudStorageEngine] Creating cache directory: " << root_ << std::endl;
+        std::filesystem::create_directories(root_);
+    } else {
+        std::cout << "[CloudStorageEngine] Cache directory already exists: " << root_ << std::endl;
+    }
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -64,24 +70,11 @@ std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem:
 
 void CloudStorageEngine::initCloudStorage() const {
     std::cout << "[CloudStorageEngine] Initializing cloud storage for vault: " << vault_->id << std::endl;
-
     const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault_);
-
-    types::Directory rootDir;
-    rootDir.vault_id = vault_->id;
-    rootDir.name = "/";
-    rootDir.created_by = vault_->owner_id;
-    rootDir.last_modified_by = vault_->owner_id;
-    rootDir.path = "/";
-    rootDir.stats = std::make_shared<types::DirectoryStats>();
-    rootDir.stats->size_bytes = 0;
-    rootDir.stats->file_count = 0;
-    rootDir.stats->subdirectory_count = 0;
-
-    const auto rootId = database::FileQueries::addDirectory(rootDir);
 
     std::string buffer;
     for (auto& item : types::fromS3XML(s3Provider_->listObjects(s3Vault->bucket))) {
+        buffer.clear(); // Clear buffer for each item
         item->vault_id = vault_->id;
         item->created_by = vault_->owner_id;
         item->last_modified_by = vault_->owner_id;
@@ -92,29 +85,66 @@ void CloudStorageEngine::initCloudStorage() const {
             database::FileQueries::addDirectory(dir);
         } else {
             auto file = std::static_pointer_cast<types::File>(item);
-            file->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, file->path.parent_path());
+            const auto parentPath = file->path.parent_path().empty() ? std::filesystem::path("/") : file->path.parent_path();
+            file->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
             file->mime_type = getMimeType(file->path);
             const auto fileId = database::FileQueries::addFile(file);
 
-            if (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application")) {
-                const auto success = s3Provider_->downloadToBuffer(s3Vault->bucket, file->path.string(), buffer);
-                if (success) {
-                    const auto jpeg = util::resize_and_compress_image(buffer, std::nullopt, std::make_optional("128"));
+            // Process image or PDF thumbnails
+            const bool isImage = file->mime_type->starts_with("image/");
+            const bool isPdf   = file->mime_type->starts_with("application/pdf");
+
+            if (isImage || isPdf) {
+                try {
+                    const auto s3Path = file->path.string().starts_with("/") ? file->path.string().substr(1) : file->path.string();
+                    if (!s3Provider_->downloadToBuffer(s3Vault->bucket, s3Path, buffer)) {
+                        std::cerr << "[CloudStorageEngine] Failed to download file: " << s3Path << std::endl;
+                        continue;
+                    }
+
+                    std::cout << "[CloudStorageEngine] Downloaded " << buffer.size()
+          << " bytes from " << s3Path
+          << " (mime: " << *file->mime_type << ")" << std::endl;
+
+
+                    std::vector<uint8_t> jpeg;
+                    if (isImage) {
+                        std::vector<uint8_t> raw(buffer.begin(), buffer.end());
+                        jpeg = util::resize_and_compress_image_buffer(
+                            raw.data(),
+                            raw.size(),
+                            std::nullopt,
+                            std::make_optional("128")
+                        );
+                    } else if (isPdf) {
+                        jpeg = util::resize_and_compress_pdf_buffer(
+                            reinterpret_cast<const uint8_t*>(buffer.data()),
+                            buffer.size(),
+                            std::nullopt,
+                            std::make_optional("128")
+                        );
+                    }
+
                     if (!jpeg.empty()) {
-                        std::filesystem::path localPath = root_ / file->path;
+                        std::filesystem::path localPath = root_ / s3Path;
+                        localPath.replace_extension(".jpg");
+                        std::cout << "[CloudStorageEngine] Resizing and caching file: " << file->path << " to " << localPath << std::endl;
                         std::filesystem::create_directories(localPath.parent_path());
-                        std::ofstream outFile(localPath, std::ios::binary);
                         try {
+                            std::ofstream outFile(localPath, std::ios::binary);
                             outFile.write(reinterpret_cast<const char*>(jpeg.data()), jpeg.size());
                             outFile.close();
+                            std::cout << "[CloudStorageEngine] Successfully resized and cached: " << file->path << std::endl;
                         } catch (const std::exception& e) {
-                            std::cerr << "[CloudStorageEngine] Error writing resized image to file: " << e.what() << std::endl;
-                            continue;
+                            std::cerr << "[CloudStorageEngine] Error writing file: " << e.what() << std::endl;
+                            throw;
                         }
-
-                        std::cout << "[CloudStorageEngine] Successfully downloaded and resized file: " << file->path << std::endl;
-                    } else std::cerr << "[CloudStorageEngine] Failed to resize image: " << file->path << std::endl;
-                } else std::cerr << "[CloudStorageEngine] Failed to download file: " << file->path << std::endl;
+                    } else {
+                        std::cerr << "[CloudStorageEngine] Failed to resize file: " << file->path << std::endl;
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[CloudStorageEngine] Error processing file: " << file->path << " - " << e.what() << std::endl;
+                }
             }
         }
     }
@@ -128,7 +158,6 @@ std::string getMimeType(const std::filesystem::path& path) {
         {".pdf", "application/pdf"},
         {".txt", "text/plain"},
         {".html", "text/html"},
-        // Add more as needed
     };
 
     std::string ext = path.extension().string();
@@ -138,4 +167,4 @@ std::string getMimeType(const std::filesystem::path& path) {
     return it != mimeMap.end() ? it->second : "application/octet-stream";
 }
 
-} // namespace vh::storage
+}

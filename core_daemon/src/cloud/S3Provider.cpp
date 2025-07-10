@@ -483,8 +483,8 @@ bool S3Provider::uploadLargeObject(const std::string& bucket, const std::string&
     return completeMultipartUpload(bucket, key, uploadId, etags);
 }
 
-std::vector<std::string> S3Provider::listObjects(const std::string& bucket, const std::string& prefix) {
-    std::vector<std::string> allKeys;
+std::string S3Provider::listObjects(const std::string& bucket, const std::string& prefix) {
+    std::string fullXmlResponse;
     std::string continuationToken;
     bool moreResults = true;
 
@@ -517,7 +517,7 @@ std::vector<std::string> S3Provider::listObjects(const std::string& bucket, cons
         std::string response;
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* p, const size_t s, const size_t n, std::string* d) {
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* p, size_t s, size_t n, std::string* d) {
             d->append(p, s * n);
             return s * n;
         });
@@ -525,18 +525,17 @@ std::vector<std::string> S3Provider::listObjects(const std::string& bucket, cons
 
         const CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
-        if (res != CURLE_OK) break;
-
-        // Extract keys
-        std::regex keyRe("<Key>([^<]+)</Key>");
-        for (auto it = std::sregex_iterator(response.begin(), response.end(), keyRe); it != std::sregex_iterator(); ++it) {
-            allKeys.push_back((*it)[1].str());
+        if (res != CURLE_OK) {
+            std::cerr << "[S3Provider] curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+            break;
         }
 
-        // Check for <IsTruncated>true</IsTruncated>
+        fullXmlResponse += response;
+
+        // Check if truncated
         moreResults = std::regex_search(response, std::regex("<IsTruncated>true</IsTruncated>"));
 
-        // Extract <NextContinuationToken>
+        // Get next continuation token
         std::smatch tokenMatch;
         if (moreResults && std::regex_search(response, tokenMatch, std::regex("<NextContinuationToken>([^<]+)</NextContinuationToken>"))) {
             continuationToken = tokenMatch[1].str();
@@ -545,14 +544,16 @@ std::vector<std::string> S3Provider::listObjects(const std::string& bucket, cons
         }
     }
 
-    return allKeys;
+    return fullXmlResponse;
 }
 
 bool S3Provider::downloadToBuffer(const std::string& bucket, const std::string& key, std::string& outBuffer) {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    const std::string uri = "/" + bucket + "/" + key;
+    char* encodedKey = curl_easy_escape(curl, key.c_str(), key.length());
+    const std::string uri = "/" + bucket + "/" + encodedKey;
+    curl_free(encodedKey);
     const std::string url = apiKey_->endpoint + uri;
 
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
@@ -578,5 +579,9 @@ bool S3Provider::downloadToBuffer(const std::string& bucket, const std::string& 
 
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
+    if (res != CURLE_OK) {
+        std::cerr << "[S3Provider] curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        std::cerr << "[S3Provider] Failed to download key: " << key << std::endl;
+    }
     return res == CURLE_OK;
 }

@@ -97,6 +97,10 @@ void DBConnection::initPreparedVaults() const {
         "INSERT INTO vault (name, type, description, owner_id) "
         "VALUES ($1, $2, $3, $4) RETURNING id");
 
+    conn_->prepare("insert_local_vault", "INSERT INTO local (vault_id, mount_point) VALUES ($1, $2)");
+
+    conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3)");
+
     conn_->prepare("get_vault",
         "SELECT v.*, l.*, s.* "
         "FROM vault v "

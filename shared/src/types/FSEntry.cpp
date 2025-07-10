@@ -8,7 +8,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
-#include <regex>
+#include <pugixml.hpp>
+#include <iostream>
 
 using namespace vh::types;
 
@@ -82,20 +83,40 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xm
     std::unordered_map<std::string, std::shared_ptr<Directory>> directories;
     std::vector<std::shared_ptr<File>> files;
 
-    const std::regex entryRe(
-        R"(<Contents>[\s\S]*?<Key>([^<]+)</Key>[\s\S]*?<LastModified>([^<]+)</LastModified>[\s\S]*?<Size>(\d+)</Size>[\s\S]*?</Contents>)"
-    );
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_string(xml.c_str());
 
-    for (auto it = std::sregex_iterator(xml.begin(), xml.end(), entryRe); it != std::sregex_iterator(); ++it) {
-        const std::string key = (*it)[1].str();
-        const std::string lastMod = (*it)[2].str();
-        const uint64_t size = std::stoull((*it)[3].str());
+    if (!result) {
+        std::cerr << "[fromS3XML] Failed to parse XML: " << result.description() << std::endl;
+        return {};
+    }
 
-        // Parse timestamp
+    // Register namespace
+    pugi::xml_node root = doc.child("ListBucketResult");
+    if (!root) {
+        std::cerr << "[fromS3XML] Missing <ListBucketResult> root node" << std::endl;
+        return {};
+    }
+
+    for (pugi::xml_node content : root.children("Contents")) {
+        auto keyNode = content.child("Key");
+        auto sizeNode = content.child("Size");
+        auto modifiedNode = content.child("LastModified");
+
+        if (!keyNode || !sizeNode || !modifiedNode) {
+            std::cerr << "[fromS3XML] Skipping entry due to missing child elements" << std::endl;
+            continue;
+        }
+
+        const std::string key = keyNode.text().get();
+        const std::string lastMod = modifiedNode.text().get();
+        const uint64_t size = std::stoull(sizeNode.text().get());
+
+        // Parse timestamp safely
         std::tm tm{};
         std::istringstream ss(lastMod);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
-        std::time_t ts = timegm(&tm);
+        std::time_t ts = ss.fail() ? std::time(nullptr) : timegm(&tm);
 
         // Build parent directories
         std::filesystem::path full_path(key);
@@ -109,7 +130,7 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xm
                 auto dir = std::make_shared<Directory>();
                 dir->path = dir_str;
                 dir->name = current.filename().string();
-                dir->updated_at = dir->created_at = ts;
+                dir->created_at = dir->updated_at = ts;
                 directories[dir_str] = dir;
             }
 
@@ -121,23 +142,16 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xm
         files.push_back(file);
     }
 
-    // Sort directories by path depth ascending
+    // Sort directories by path depth
     std::vector<std::shared_ptr<FSEntry>> ordered;
     std::vector<std::shared_ptr<Directory>> dirList;
-    for (const auto& [_, dir] : directories) {
-        dirList.push_back(dir);
-    }
+    for (const auto& [_, dir] : directories) dirList.push_back(dir);
 
-    std::ranges::sort(dirList.begin(), dirList.end(), [](const std::shared_ptr<Directory>& a, const std::shared_ptr<Directory>& b) {
-        const auto depth_a = std::distance(a->path.begin(), a->path.end());
-        const auto depth_b = std::distance(b->path.begin(), b->path.end());
-        return depth_a < depth_b;
+    std::ranges::sort(dirList, [](const auto& a, const auto& b) {
+        return std::distance(a->path.begin(), a->path.end()) < std::distance(b->path.begin(), b->path.end());
     });
 
-    // Add sorted directories first
     ordered.insert(ordered.end(), dirList.begin(), dirList.end());
-
-    // Then append all file entries
     ordered.insert(ordered.end(), files.begin(), files.end());
 
     return ordered;

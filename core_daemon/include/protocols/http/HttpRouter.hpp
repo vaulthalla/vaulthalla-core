@@ -23,6 +23,8 @@ public:
 
     PreviewResponse route(http::request<http::string_body>&& req) const;
 
+    static http::response<http::string_body> makeErrorResponse(const http::request<http::string_body>& req, const std::string& msg);
+
 private:
     std::shared_ptr<auth::AuthManager> authManager_;
     std::shared_ptr<storage::StorageManager> storageManager_;

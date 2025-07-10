@@ -29,7 +29,7 @@ class S3Provider {
                                  const std::vector<std::string>& etags);
     bool abortMultipartUpload(const std::string& bucket, const std::string& key, const std::string& uploadId);
 
-    std::vector<std::string> listObjects(const std::string& bucket, const std::string& prefix = "");
+    std::string listObjects(const std::string& bucket, const std::string& prefix = "");
     bool downloadToBuffer(const std::string& bucket, const std::string& key, std::string& outBuffer);
 
   private:

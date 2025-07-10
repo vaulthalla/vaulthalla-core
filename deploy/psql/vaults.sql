@@ -3,7 +3,7 @@ CREATE TABLE api_keys
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER REFERENCES users (id) ON DELETE CASCADE,
     type       VARCHAR(50)  NOT NULL, -- 'S3', etc.
-    name       VARCHAR(100) NOT NULL,
+    name       VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

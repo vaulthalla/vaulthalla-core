@@ -23,7 +23,7 @@ public:
 
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
-    void addVault(std::shared_ptr<types::Vault> vault);
+    std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault);
 
     void removeVault(unsigned int vaultId);
 

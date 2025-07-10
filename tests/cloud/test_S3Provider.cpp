@@ -1,6 +1,7 @@
 #include "types/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
 #include "util/imageUtil.hpp"
+#include "types/FSEntry.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -127,9 +128,13 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     writeTextFile(filePath, "This file should appear in listObjects and download into buffer.");
     ASSERT_TRUE(s3Provider_->uploadObject(bucket_, key, filePath.string()));
 
-    auto keys = s3Provider_->listObjects(bucket_, "");
-    auto it = std::find(keys.begin(), keys.end(), key);
-    EXPECT_NE(it, keys.end()) << "Uploaded key not found in listObjects()";
+    const std::string xml = s3Provider_->listObjects(bucket_);
+    const auto entries = vh::types::fromS3XML(xml);
+    EXPECT_FALSE(entries.empty()) << "fromS3XML should return at least one entry";
+    auto match = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+        return !entry->isDirectory() && entry->path.filename() == key;
+    });
+    EXPECT_TRUE(match != entries.end()) << "Uploaded key not found in fromS3XML()";
 
     std::string buffer;
     EXPECT_TRUE(s3Provider_->downloadToBuffer(bucket_, key, buffer));

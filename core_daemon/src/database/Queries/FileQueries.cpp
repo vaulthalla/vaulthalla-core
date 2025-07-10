@@ -10,6 +10,7 @@ using namespace vh::database;
 
 unsigned int FileQueries::addFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
+    if (!file->path.string().starts_with("/")) file->setPath("/" + file->path.string());
 
     return Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
@@ -132,6 +133,8 @@ unsigned int FileQueries::addDirectory(const types::Directory& directory) {
 }
 
 void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& directory) {
+    if (!directory->path.string().starts_with("/")) directory->setPath("/" + directory->path.string());
+
     Transactions::exec("FileQueries::addDirectory", [&](pqxx::work& txn) {
         pqxx::params p;
         p.append(directory->vault_id);

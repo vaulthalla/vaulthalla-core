@@ -33,7 +33,6 @@ struct Vault {
 };
 
 struct LocalDiskVault : Vault {
-    unsigned int vault_id{};
     std::filesystem::path mount_point;
 
     LocalDiskVault() = default;
@@ -42,12 +41,11 @@ struct LocalDiskVault : Vault {
 };
 
 struct S3Vault : Vault {
-    unsigned short vault_id{};
-    unsigned short api_key_id{};
+    unsigned int api_key_id{};
     std::string bucket;
 
     S3Vault() = default;
-    S3Vault(const std::string& name, unsigned short apiKeyID, std::string bucketName);
+    S3Vault(const std::string& name, unsigned int apiKeyID, std::string bucketName);
     explicit S3Vault(const pqxx::row& row);
 };
 

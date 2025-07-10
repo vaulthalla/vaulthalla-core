@@ -26,7 +26,7 @@ cloud:
   cache:
     enabled: true              # Enable local cache for cloud files
     thumbnails_only: true      # Only cache thumbnails, not full files (recommended for performance and space constraints)
-    cache_path: /.cache        # Local cache directory (relative to root_mount_path)
+    cache_path: .cache         # Local cache directory (relative to root_mount_path)
 
 # === 🐘 DATABASE SETTINGS ===
 database:

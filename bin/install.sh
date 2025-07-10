@@ -285,6 +285,23 @@ VALUES (
     (SELECT id FROM users WHERE name = 'admin'), (SELECT id FROM users WHERE name = 'admin')
     )
 ON CONFLICT DO NOTHING;
+
+-- Cloud Test Vault and keys
+INSERT INTO api_keys (name, user_id, type, created_at)
+VALUES ('R2 Test Key', (SELECT id FROM users WHERE name = 'admin'), 's3', NOW())
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO s3_api_keys (api_key_id, provider, access_key, secret_access_key, region, endpoint)
+SELECT
+  (SELECT id FROM api_keys WHERE name = 'R2 Test Key'),
+  'Cloudflare R2',
+  '${VAULTHALLA_TEST_R2_ACCESS_KEY}',
+  '${VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY}',
+  'wnam',
+  '${VAULTHALLA_TEST_R2_ENDPOINT}'
+WHERE NOT EXISTS (
+  SELECT 1 FROM s3_api_keys WHERE api_key_id = (SELECT id FROM api_keys WHERE name = 'R2 Test Key')
+);
 EOF
 
 # === 11) Install systemd services ===

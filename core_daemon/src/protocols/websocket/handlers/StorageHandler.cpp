@@ -198,20 +198,16 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
             const std::string mountPoint = payload.at("mount_point").get<std::string>();
             vault = std::make_shared<types::LocalDiskVault>(name, mountPoint);
         } else if (typeLower == "s3") {
-            unsigned short apiKeyID = payload.at("api_key_id").get<unsigned short>();
+            const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
             const std::string bucket = payload.at("bucket").get<std::string>();
-            vault = std::make_unique<types::S3Vault>(name, apiKeyID, bucket);
+            vault = std::make_shared<types::S3Vault>(name, apiKeyID, bucket);
         } else throw std::runtime_error("Unsupported vault type: " + typeLower);
 
         vault->owner_id = session.getAuthenticatedUser()->id;
 
-        storageManager_->addVault(vault);
+        vault = storageManager_->addVault(vault);
 
-        const json data = {{"id", vault->id},
-                           {"name", vault->name},
-                           {"type", to_string(vault->type)},
-                           {"isActive", vault->is_active},
-                           {"createdAt", vault->created_at}};
+        const json data = {{"vault", *vault}};
 
         const json response = {{"command", "storage.vault.add.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},

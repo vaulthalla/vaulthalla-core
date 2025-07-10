@@ -30,6 +30,8 @@ struct FSEntry {
     explicit FSEntry(const pqxx::row& row);
 
     [[nodiscard]] virtual bool isDirectory() const = 0;
+
+    void setPath(const std::filesystem::path& path) { this->path = path; }
 };
 
 void to_json(nlohmann::json& j, const FSEntry& entry);

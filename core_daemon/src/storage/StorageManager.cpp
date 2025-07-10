@@ -38,14 +38,14 @@ void StorageManager::initStorageEngines() {
             }
         }
     } catch (const std::exception& e) {
-        std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << "\n";
+        std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << std::endl;
         throw;
     }
 }
 
 void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
     try {
-        std::cout << "[StorageManager] Initializing storage for user: " << user->name << "\n";
+        std::cout << "[StorageManager] Initializing storage for user: " << user->name << std::endl;
 
         if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
@@ -64,30 +64,37 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
         engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(
             std::static_pointer_cast<types::LocalDiskVault>(vault));
 
-        std::cout << "[StorageManager] Initialized storage for user: " << user->name << "\n";
+        std::cout << "[StorageManager] Initialized storage for user: " << user->name << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageManager] Error initializing user storage: " << e.what() << "\n";
+        std::cerr << "[StorageManager] Error initializing user storage: " << e.what() << std::endl;
         throw;
     }
 }
 
-void StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
+std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::lock_guard lock(mountsMutex_);
 
-    vault->id = database::VaultQueries::addVault(vault);
-    vault = database::VaultQueries::getVault(vault->id);
-    if (vault->type == types::VaultType::Local) {
-        auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
-        if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
-        engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(localVault);
-    } else if (vault->type == types::VaultType::S3) {
-        auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
-        if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
-        const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-        const auto engine = std::make_shared<CloudStorageEngine>(vaultS3, key);
-        engine->initCloudStorage();
-        engines_[vault->id] = engine;
+    try {
+        vault->id = database::VaultQueries::addVault(vault);
+        vault = database::VaultQueries::getVault(vault->id);
+        if (vault->type == types::VaultType::Local) {
+            auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+            if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
+            engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(localVault);
+        } else if (vault->type == types::VaultType::S3) {
+            auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
+            if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
+            const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
+            const auto engine = std::make_shared<CloudStorageEngine>(vaultS3, key);
+            engine->initCloudStorage();
+            engines_[vault->id] = engine;
+        }
+
+        return vault;
+    } catch (const std::exception& e) {
+        std::cerr << "[StorageManager] Error adding vault: " << e.what() << std::endl;
+        throw;
     }
 }
 
@@ -96,7 +103,7 @@ void StorageManager::removeVault(const unsigned int vaultId) {
     database::VaultQueries::removeVault(vaultId);
 
     engines_.erase(vaultId);
-    std::cout << "[StorageManager] Removed vault with ID: " << vaultId << "\n";
+    std::cout << "[StorageManager] Removed vault with ID: " << vaultId << std::endl;
 }
 
 std::vector<std::shared_ptr<types::Vault> > StorageManager::listVaults(const std::shared_ptr<types::User>& user) const {
@@ -144,7 +151,7 @@ void StorageManager::finishUpload(const unsigned int vaultId,
         const auto fileId = database::FileQueries::addFile(f);
     }
 
-    std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << "\n";
+    std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << std::endl;
 }
 
 void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,

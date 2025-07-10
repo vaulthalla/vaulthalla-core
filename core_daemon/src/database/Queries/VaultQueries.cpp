@@ -8,13 +8,12 @@ unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault) 
         pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
         const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();
 
-        // dynamic cast
-        if (auto* localVault = dynamic_cast<const types::LocalDiskVault*>(&*vault)) {
-            txn.exec("INSERT INTO local (vault_id, mount_point) VALUES (" + txn.quote(vaultId) + ", " +
-                     txn.quote(localVault->mount_point.string()) + ")");
-        } else if (auto* s3Vault = dynamic_cast<const types::S3Vault*>(&*vault)) {
-            txn.exec("INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES (" + txn.quote(vaultId) + ", " +
-                     txn.quote(s3Vault->api_key_id) + ", " + txn.quote(s3Vault->bucket) + ")");
+        if (vault->type == types::VaultType::Local) {
+            const auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+            txn.exec_prepared("insert_local_vault", pqxx::params{vaultId, localVault->mount_point.string()});
+        } else if (vault->type == types::VaultType::S3) {
+            const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault);
+            txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
         }
 
         pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};

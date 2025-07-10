@@ -25,6 +25,8 @@ public:
     CloudStorageEngine(const std::shared_ptr<types::S3Vault>& vault,
                        const std::shared_ptr<types::api::APIKey>& key);
 
+    void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
+
     void mkdir(const fs::path& relative_path) override;
 
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
@@ -36,8 +38,6 @@ public:
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
-
-    void uploadFile(const std::filesystem::path& rel_path, bool overwrite = false);
 
     void initCloudStorage() const;
 

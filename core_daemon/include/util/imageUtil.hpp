@@ -4,6 +4,7 @@
 #include <string>
 #include <optional>
 #include <cstdint>
+#include <filesystem>
 
 namespace vh::util {
 
@@ -22,5 +23,7 @@ std::vector<uint8_t> resize_and_compress_pdf_buffer(
     const uint8_t* data, size_t size,
     const std::optional<std::string>& scale,
     const std::optional<std::string>& max_size);
+
+void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath, const std::string& mime);
 
 }

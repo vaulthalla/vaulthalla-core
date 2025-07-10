@@ -8,6 +8,9 @@
 #include <turbojpeg.h>
 #include <stdexcept>
 #include <fpdfview.h>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 
 namespace vh::util {
 
@@ -76,15 +79,20 @@ std::vector<uint8_t> resize_and_compress_image(
 std::vector<uint8_t> resize_and_compress_image_buffer(
     const uint8_t* data, size_t size,
     const std::optional<std::string>& scale_opt,
-    const std::optional<std::string>& size_opt) {
+    const std::optional<std::string>& size_opt)
+{
+    if (size < 4) {
+        throw std::runtime_error("Buffer too small to be a valid image");
+    }
 
-    int width, height, channels;
+    int width = 0, height = 0, channels = 0;
     unsigned char* decoded = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, 3);
-    if (!decoded) throw std::runtime_error("Failed to decode image from memory");
+    if (!decoded) {
+        const char* reason = stbi_failure_reason();
+        throw std::runtime_error(std::string("Failed to decode image from memory: ") + (reason ? reason : "unknown error"));
+    }
 
-    int new_w = width;
-    int new_h = height;
-
+    int new_w = width, new_h = height;
     if (scale_opt) {
         float scale = std::stof(*scale_opt);
         new_w = static_cast<int>(width * scale);
@@ -166,6 +174,41 @@ std::vector<uint8_t> resize_and_compress_pdf_buffer(
     FPDF_DestroyLibrary();
 
     return jpeg_buf;
+}
+
+void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath, const std::string& mime) {
+    std::vector<uint8_t> jpeg;
+
+    if (mime.starts_with("image/")) {
+        std::vector<uint8_t> raw(buffer.begin(), buffer.end());
+        jpeg = resize_and_compress_image_buffer(
+            raw.data(), raw.size(), std::nullopt, std::make_optional("128")
+        );
+    } else if (mime == "application/pdf") {
+        jpeg = resize_and_compress_pdf_buffer(
+            reinterpret_cast<const uint8_t*>(buffer.data()),
+            buffer.size(), std::nullopt, std::make_optional("128")
+        );
+    } else {
+        throw std::runtime_error("Unsupported MIME type for thumbnail generation: " + mime);
+    }
+
+    if (jpeg.empty()) {
+        throw std::runtime_error("Thumbnail JPEG buffer is empty after processing");
+    }
+
+    std::filesystem::create_directories(outputPath.parent_path());
+    std::ofstream out(outputPath, std::ios::binary);
+    if (!out.is_open()) {
+        throw std::runtime_error("Failed to open thumbnail output path: " + outputPath.string());
+    }
+
+    out.write(reinterpret_cast<const char*>(jpeg.data()), jpeg.size());
+    if (!out.good()) {
+        throw std::runtime_error("Failed to write thumbnail to disk: " + outputPath.string());
+    }
+
+    out.close();
 }
 
 }

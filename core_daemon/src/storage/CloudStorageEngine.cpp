@@ -19,16 +19,35 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<types::S3Vault>& va
                                              key_(key) {
     const auto conf = config::ConfigRegistry::get();
     cache_expiry_days_ = conf.cloud.cache.expiry_days;
-    root_ = conf.fuse.root_mount_path / conf.cloud.cache.cache_path / std::to_string(vault->id);
-    if (!std::filesystem::exists(root_)) {
-        std::cout << "[CloudStorageEngine] Creating cache directory: " << root_ << std::endl;
-        std::filesystem::create_directories(root_);
-    } else {
-        std::cout << "[CloudStorageEngine] Cache directory already exists: " << root_ << std::endl;
-    }
+    if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
+    if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
 
     const auto s3Key = std::static_pointer_cast<types::api::S3APIKey>(key_);
     s3Provider_ = std::make_shared<cloud::S3Provider>(s3Key, vault->bucket);
+}
+
+void CloudStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
+    const auto absPath = getAbsolutePath(rel_path);
+    if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath)) {
+        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
+    }
+
+    const auto s3Key = rel_path.string().starts_with("/") ? rel_path.string().substr(1) : rel_path.string();
+
+    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(s3Key, absPath.string());
+    else s3Provider_->uploadLargeObject(s3Key, absPath.string());
+
+    std::string buffer;
+    if (!s3Provider_->downloadToBuffer(s3Key, buffer))
+        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
+
+    auto thumbnailPath = getAbsoluteCachePath(rel_path);
+    try {
+        util::generateAndStoreThumbnail(buffer, thumbnailPath, mime_type);
+    } catch (const std::exception& e) {
+        s3Provider_->deleteObject(rel_path);
+        std::cerr << "[CloudStorageEngine] Thumbnail gen failed, deleted: " << rel_path << std::endl;
+    }
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -53,56 +72,6 @@ bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const
     return false;
 }
 
-void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path, bool overwrite) {
-    const auto absPath = getAbsolutePath(rel_path);
-    if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath)) {
-        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
-    }
-
-    const auto s3Key = rel_path.string().starts_with("/") ? rel_path.string().substr(1) : rel_path.string();
-
-    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024)
-        s3Provider_->uploadObject(s3Key, absPath.string());
-    else
-        s3Provider_->uploadLargeObject(s3Key, absPath.string());
-
-    std::string buffer;
-    if (!s3Provider_->downloadToBuffer(s3Key, buffer)) {
-        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
-    }
-
-    const auto mime = getMimeType(rel_path);
-    const bool isImage = mime.starts_with("image/");
-    const bool isPdf = mime == "application/pdf";
-
-    if (!isImage && !isPdf) {
-        s3Provider_->deleteObject(s3Key);
-        std::cerr << "[CloudStorageEngine] Unsupported file type, deleted from remote: " << s3Key << std::endl;
-        return;
-    }
-
-    std::vector<uint8_t> jpeg;
-    if (isImage) {
-        std::vector<uint8_t> raw(buffer.begin(), buffer.end());
-        jpeg = util::resize_and_compress_image_buffer(raw.data(), raw.size(), std::nullopt, std::make_optional("128"));
-    } else if (isPdf) {
-        jpeg = util::resize_and_compress_pdf_buffer(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size(), std::nullopt, std::make_optional("128"));
-    }
-
-    if (jpeg.empty()) {
-        s3Provider_->deleteObject(s3Key);
-        std::cerr << "[CloudStorageEngine] Failed to generate thumbnail, deleted: " << s3Key << std::endl;
-        return;
-    }
-
-    const std::filesystem::path thumbnailPath = absPath.parent_path() / rel_path.filename().replace_extension(".jpg");
-    std::ofstream outFile(thumbnailPath, std::ios::binary);
-    outFile.write(reinterpret_cast<const char*>(jpeg.data()), jpeg.size());
-    outFile.close();
-
-    std::cout << "[CloudStorageEngine] Successfully uploaded and cached thumbnail: " << thumbnailPath << std::endl;
-}
-
 std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
     if (rel_path.empty()) return root_;
 
@@ -125,6 +94,7 @@ void CloudStorageEngine::initCloudStorage() const {
         item->last_modified_by = vault_->owner_id;
 
         if (item->isDirectory()) {
+            if (item->path.string() == "/") continue;
             auto dir = std::static_pointer_cast<types::Directory>(item);
             dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, dir->path.parent_path());
             database::FileQueries::addDirectory(dir);
@@ -135,54 +105,16 @@ void CloudStorageEngine::initCloudStorage() const {
             file->mime_type = getMimeType(file->path);
             database::FileQueries::addFile(file);
 
-            // Process image or PDF thumbnails
-            const bool isImage = file->mime_type->starts_with("image/");
-            const bool isPdf   = file->mime_type->starts_with("application/pdf");
-
-            if (isImage || isPdf) {
+            if (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/pdf")) {
+                const auto s3Path = getAbsoluteCachePath(file->path).string();
+                std::filesystem::path cachePath = root_ / s3Path;
+                cachePath.replace_extension(".jpg");
                 try {
-                    const auto s3Path = file->path.string().starts_with("/") ? file->path.string().substr(1) : file->path.string();
-                    if (!s3Provider_->downloadToBuffer(s3Path, buffer)) {
-                        std::cerr << "[CloudStorageEngine] Failed to download file: " << s3Path << std::endl;
-                        continue;
-                    }
-
-                    std::vector<uint8_t> jpeg;
-                    if (isImage) {
-                        std::vector<uint8_t> raw(buffer.begin(), buffer.end());
-                        jpeg = util::resize_and_compress_image_buffer(
-                            raw.data(),
-                            raw.size(),
-                            std::nullopt,
-                            std::make_optional("128")
-                        );
-                    } else if (isPdf) {
-                        jpeg = util::resize_and_compress_pdf_buffer(
-                            reinterpret_cast<const uint8_t*>(buffer.data()),
-                            buffer.size(),
-                            std::nullopt,
-                            std::make_optional("128")
-                        );
-                    }
-
-                    if (!jpeg.empty()) {
-                        std::filesystem::path localPath = root_ / s3Path;
-                        localPath.replace_extension(".jpg");
-                        std::filesystem::create_directories(localPath.parent_path());
-                        try {
-                            std::ofstream outFile(localPath, std::ios::binary);
-                            outFile.write(reinterpret_cast<const char*>(jpeg.data()), jpeg.size());
-                            outFile.close();
-                            std::cout << "[CloudStorageEngine] Successfully resized and cached: " << file->path << std::endl;
-                        } catch (const std::exception& e) {
-                            std::cerr << "[CloudStorageEngine] Error writing file: " << e.what() << std::endl;
-                            throw;
-                        }
-                    } else {
-                        std::cerr << "[CloudStorageEngine] Failed to resize file: " << file->path << std::endl;
-                    }
+                    util::generateAndStoreThumbnail(s3Path, cachePath, *file->mime_type);
                 } catch (const std::exception& e) {
-                    std::cerr << "[CloudStorageEngine] Error processing file: " << file->path << " - " << e.what() << std::endl;
+                    std::cerr << "[CloudStorageEngine] Thumbnail generation failed for " << file->path
+                              << ": " << e.what() << std::endl;
+                    s3Provider_->deleteObject(file->path.string());  // Clean up if thumbnail generation fails
                 }
             }
         }

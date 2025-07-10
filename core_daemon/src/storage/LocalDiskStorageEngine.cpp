@@ -1,13 +1,41 @@
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
+#include "util/imageUtil.hpp"
+
 #include <fstream>
+#include <iostream>
 
 namespace vh::storage {
 
 LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault)
     : StorageEngine(vault, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
+}
+
+void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
+    try {
+        auto cachePath = getAbsoluteCachePath(rel_path);
+        cachePath.replace_extension(".jpg");
+        if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
+
+        const auto fullPath = getAbsolutePath(rel_path);
+        if (!std::filesystem::exists(fullPath))
+            throw std::runtime_error("File does not exist: " + fullPath.string());
+
+        std::string buffer;
+        std::ifstream in(fullPath, std::ios::binary | std::ios::ate);
+        if (!in) throw std::runtime_error("Failed to open file: " + fullPath.string());
+        std::streamsize size = in.tellg();
+        in.seekg(0, std::ios::beg);
+        buffer.resize(size);
+        if (!in.read(buffer.data(), size)) throw std::runtime_error("Failed to read file: " + fullPath.string());
+        in.close();
+
+        util::generateAndStoreThumbnail(buffer, cachePath, mime_type);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
 }
 
 void LocalDiskStorageEngine::mkdir(const std::filesystem::path& relative_path) {

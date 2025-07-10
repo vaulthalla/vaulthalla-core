@@ -20,14 +20,11 @@ enum class StorageType { Local, Cloud };
 class StorageEngine {
 public:
     StorageEngine() = default;
-    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
-                  fs::path root_mount_path = fs::path("/"))
-        : vault_(vault), root_(std::move(root_mount_path)) {
-    }
+    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::path root_mount_path = fs::path());
 
     virtual ~StorageEngine() = default;
 
-    [[nodiscard]] std::shared_ptr<types::Vault> getVault() const { return vault_; }
+    virtual void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) = 0;
 
     virtual void mkdir(const fs::path& relative_path) = 0;
 
@@ -39,13 +36,17 @@ public:
 
     [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const = 0;
 
+    [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path) const;
+
+    [[nodiscard]] std::shared_ptr<types::Vault> getVault() const { return vault_; }
+
     [[nodiscard]] fs::path root_directory() const { return root_; }
 
     [[nodiscard]] virtual StorageType type() const = 0;
 
 protected:
     std::shared_ptr<types::Vault> vault_;
-    fs::path root_;
+    fs::path cache_path_, root_;
 };
 
 } // namespace vh::storage

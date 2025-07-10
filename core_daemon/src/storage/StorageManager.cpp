@@ -127,11 +127,9 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     const auto absPath = engine->getAbsolutePath(relPath);
 
     if (!std::filesystem::exists(absPath))
-        throw std::runtime_error(
-            "File does not exist at path: " + absPath.string());
+        throw std::runtime_error("File does not exist at path: " + absPath.string());
     if (!std::filesystem::is_regular_file(absPath))
-        throw std::runtime_error(
-            "Path is not a regular file: " + absPath.string());
+        throw std::runtime_error("Path is not a regular file: " + absPath.string());
 
     const auto f = std::make_shared<types::File>();
     f->vault_id = vaultId;
@@ -144,10 +142,7 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
     else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
 
-    if (engine->type() == StorageType::Cloud) {
-        const auto cloudEngine = std::static_pointer_cast<CloudStorageEngine>(engine);
-        cloudEngine->uploadFile(relPath);
-    }
+    engine->finishUpload(relPath, f->mime_type.value_or("application/octet-stream"));
 
     {
         std::lock_guard lock(mountsMutex_);

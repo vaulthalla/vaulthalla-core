@@ -166,7 +166,7 @@ void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& sessio
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        // TODO: Validate auth and permissions
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canDownload);
 
         const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
@@ -199,7 +199,7 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        // TODO: Validate auth and permissions
+        enforcePermissions(session, vaultId, path, &types::VaultRole::canDelete);
 
         storageManager_->removeEntry(vaultId, path);
 

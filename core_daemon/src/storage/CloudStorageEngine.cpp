@@ -6,6 +6,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "util/imageUtil.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "services/ThumbnailWorker.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -13,10 +14,11 @@
 
 namespace vh::storage {
 
-CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<types::S3Vault>& vault,
+CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                                       const std::shared_ptr<types::S3Vault>& vault,
                                        const std::shared_ptr<types::api::APIKey>& key)
-                                           : StorageEngine(vault),
-                                             key_(key) {
+    : StorageEngine(vault, thumbnailWorker),
+      key_(key) {
     const auto conf = config::ConfigRegistry::get();
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
@@ -40,17 +42,7 @@ void CloudStorageEngine::finishUpload(const std::filesystem::path& rel_path, con
     if (!s3Provider_->downloadToBuffer(s3Key, buffer))
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
 
-    try {
-        for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-            auto cachePath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
-            if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath.append(".jpg");
-            if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
-            util::generateAndStoreThumbnail(buffer, cachePath, mime_type, size);
-        }
-    } catch (const std::exception& e) {
-        s3Provider_->deleteObject(rel_path);
-        std::cerr << "[CloudStorageEngine] Thumbnail gen failed, deleted: " << rel_path << std::endl;
-    }
+    thumbnailWorker_->enqueue(shared_from_this(), buffer, rel_path, mime_type);
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -64,11 +56,11 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
 }
 
 void CloudStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path)))
-        throw std::runtime_error("[CloudStorageEngine] Failed to delete cache file: " + rel_path.string());
+    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path))) throw std::runtime_error(
+        "[CloudStorageEngine] Failed to delete cache file: " + rel_path.string());
 
-    if (!s3Provider_->deleteObject(rel_path))
-        throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+    if (!s3Provider_->deleteObject(rel_path)) throw std::runtime_error(
+        "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
@@ -95,7 +87,7 @@ std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem:
 }
 
 
-void CloudStorageEngine::initCloudStorage() const {
+void CloudStorageEngine::initCloudStorage() {
     std::cout << "[CloudStorageEngine] Initializing cloud storage for vault: " << vault_->id << std::endl;
     const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault_);
 
@@ -113,23 +105,15 @@ void CloudStorageEngine::initCloudStorage() const {
             database::FileQueries::addDirectory(dir);
         } else {
             auto file = std::static_pointer_cast<types::File>(item);
-            const auto parentPath = file->path.parent_path().empty() ? std::filesystem::path("/") : file->path.parent_path();
+            const auto parentPath = file->path.parent_path().empty()
+                                        ? std::filesystem::path("/")
+                                        : file->path.parent_path();
             file->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
             file->mime_type = getMimeType(file->path);
             database::FileQueries::addFile(file);
 
-            if (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/pdf")) {
-                const auto s3Path = getAbsoluteCachePath(file->path).string();
-                std::filesystem::path cachePath = root_ / s3Path;
-                cachePath.replace_extension(".jpg");
-                try {
-                    util::generateAndStoreThumbnail(s3Path, cachePath, *file->mime_type);
-                } catch (const std::exception& e) {
-                    std::cerr << "[CloudStorageEngine] Thumbnail generation failed for " << file->path
-                              << ": " << e.what() << std::endl;
-                    s3Provider_->deleteObject(file->path.string());  // Clean up if thumbnail generation fails
-                }
-            }
+            if (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/pdf"))
+                thumbnailWorker_->enqueue(shared_from_this(), buffer, file->path, *file->mime_type);
         }
     }
 }

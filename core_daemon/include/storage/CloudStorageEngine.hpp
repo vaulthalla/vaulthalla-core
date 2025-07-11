@@ -10,9 +10,7 @@ struct S3Vault;
 
 namespace api {
 struct APIKey;
-}
-
-}
+}}
 
 namespace vh::storage {
 
@@ -22,7 +20,8 @@ public:
 
     ~CloudStorageEngine() override = default;
 
-    CloudStorageEngine(const std::shared_ptr<types::S3Vault>& vault,
+    CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                       const std::shared_ptr<types::S3Vault>& vault,
                        const std::shared_ptr<types::api::APIKey>& key);
 
     void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
@@ -43,7 +42,7 @@ public:
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
 
-    void initCloudStorage() const;
+    void initCloudStorage();
 
 private:
     std::shared_ptr<types::api::APIKey> key_;

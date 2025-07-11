@@ -13,6 +13,10 @@ struct User;
 struct FSEntry;
 }
 
+namespace vh::services {
+class ThumbnailWorker;
+}
+
 namespace vh::storage {
 
 class StorageManager {
@@ -57,6 +61,7 @@ public:
 private:
     mutable std::mutex mountsMutex_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine> > engines_;
+    std::shared_ptr<services::ThumbnailWorker> thumbnailWorker_;
 };
 
 } // namespace vh::storage

@@ -2,14 +2,16 @@
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "util/imageUtil.hpp"
+#include "services/ThumbnailWorker.hpp"
 
 #include <fstream>
 #include <iostream>
 
 namespace vh::storage {
 
-LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault)
-    : StorageEngine(vault, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
+LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                                               const std::shared_ptr<types::LocalDiskVault>& vault)
+    : StorageEngine(vault, thumbnailWorker, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
 }
 
@@ -17,8 +19,7 @@ void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path,
     try {
         std::string buffer;
         const auto fullPath = getAbsolutePath(rel_path);
-        if (!std::filesystem::exists(fullPath))
-            throw std::runtime_error("File does not exist: " + fullPath.string());
+        if (!std::filesystem::exists(fullPath)) throw std::runtime_error("File does not exist: " + fullPath.string());
 
         std::ifstream in(fullPath, std::ios::binary | std::ios::ate);
         if (!in) throw std::runtime_error("Failed to open file: " + fullPath.string());
@@ -28,12 +29,8 @@ void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path,
         if (!in.read(buffer.data(), inSize)) throw std::runtime_error("Failed to read file: " + fullPath.string());
         in.close();
 
-        for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-            auto cachePath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
-            if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath.append(".jpg");
-            if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
-            util::generateAndStoreThumbnail(buffer, cachePath, mime_type, size);
-        }
+        thumbnailWorker_->enqueue(shared_from_this(), buffer, rel_path, mime_type);
+
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
@@ -42,8 +39,9 @@ void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path,
 void LocalDiskStorageEngine::mkdir(const std::filesystem::path& relative_path) {
     const auto fullPath = getAbsolutePath(relative_path);
     if (std::filesystem::exists(fullPath)) {
-        if (!std::filesystem::is_directory(fullPath)) throw std::runtime_error(
-            "Path exists and is not a directory: " + fullPath.string());
+        if (!std::filesystem::is_directory(fullPath))
+            throw std::runtime_error(
+                "Path exists and is not a directory: " + fullPath.string());
         return; // Directory already exists
     }
     std::filesystem::create_directories(fullPath);
@@ -79,11 +77,11 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
 }
 
 void LocalDiskStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path)))
-        throw std::runtime_error("Failed to delete thumbnail cache: " + rel_path.string());
+    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path))) throw std::runtime_error(
+        "Failed to delete thumbnail cache: " + rel_path.string());
 
-    if (!std::filesystem::remove(getAbsolutePath(rel_path)))
-        throw std::runtime_error("Failed to delete file: " + rel_path.string());
+    if (!std::filesystem::remove(getAbsolutePath(rel_path))) throw std::runtime_error(
+        "Failed to delete file: " + rel_path.string());
 }
 
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

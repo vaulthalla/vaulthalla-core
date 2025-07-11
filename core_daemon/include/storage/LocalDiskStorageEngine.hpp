@@ -13,7 +13,8 @@ namespace vh::storage {
 
 class LocalDiskStorageEngine : public StorageEngine {
 public:
-    explicit LocalDiskStorageEngine(const std::shared_ptr<types::LocalDiskVault>& vault);
+    explicit LocalDiskStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                                    const std::shared_ptr<types::LocalDiskVault>& vault);
 
     ~LocalDiskStorageEngine() override = default;
 

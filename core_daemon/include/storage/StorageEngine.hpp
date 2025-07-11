@@ -13,15 +13,21 @@ struct Vault;
 struct File;
 }
 
+namespace vh::services {
+class ThumbnailWorker;
+}
+
 namespace vh::storage {
 
 enum class StorageType { Local, Cloud };
 
-class StorageEngine {
+class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 public:
     StorageEngine() = default;
 
-    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::path root_mount_path = fs::path());
+    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
+                           const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                           fs::path root_mount_path = fs::path());
 
     virtual ~StorageEngine() = default;
 
@@ -53,6 +59,7 @@ public:
 protected:
     std::shared_ptr<types::Vault> vault_;
     fs::path cache_path_, root_;
+    std::shared_ptr<services::ThumbnailWorker> thumbnailWorker_;
 };
 
 } // namespace vh::storage

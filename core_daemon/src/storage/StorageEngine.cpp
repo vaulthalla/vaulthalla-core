@@ -1,13 +1,16 @@
 #include "storage/StorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
+#include "services/ThumbnailWorker.hpp"
 
 #include <iostream>
 
 namespace vh::storage {
 
-StorageEngine::StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::path root_mount_path)
-: vault_(vault) {
+StorageEngine::StorageEngine(const std::shared_ptr<types::Vault>& vault,
+                             const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                             fs::path root_mount_path)
+    : vault_(vault), thumbnailWorker_(thumbnailWorker) {
     const auto conf = config::ConfigRegistry::get();
     cache_path_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id);
 
@@ -20,7 +23,8 @@ StorageEngine::StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::pat
     } else std::cout << "[StorageEngine] Root directory already exists: " << root_ << std::endl;
 }
 
-std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path, const std::filesystem::path& prefix) const {
+std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path,
+                                                          const std::filesystem::path& prefix) const {
     const auto relPath = rel_path.string().starts_with("/") ? fs::path(rel_path.string().substr(1)) : rel_path;
     if (prefix.empty()) return cache_path_ / relPath;
 

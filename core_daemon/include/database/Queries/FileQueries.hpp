@@ -25,6 +25,8 @@ public:
 
     static void deleteFile(unsigned int fileId);
 
+    static void deleteFile(unsigned int vaultId, const std::filesystem::path& relPath);
+
     [[nodiscard]] static std::string getMimeType(unsigned int vaultId, const std::filesystem::path& relPath);
 
     static std::shared_ptr<types::File> getFile(unsigned int fileId);
@@ -43,6 +45,12 @@ public:
 
     static void deleteDirectory(unsigned int directoryId);
 
+    static void deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    [[nodiscard]] static bool isDirectory(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    [[nodiscard]] static bool isFile(unsigned int vaultId, const std::filesystem::path& relPath);
+
     [[nodiscard]] static std::optional<unsigned int> getDirectoryIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);
@@ -50,6 +58,8 @@ public:
     static std::shared_ptr<types::Directory> getDirectory(unsigned int directoryId);
 
     static std::shared_ptr<types::Directory> getDirectoryByPath(const std::filesystem::path& path);
+
+    static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
 
     static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
                                                                  bool recursive = false);

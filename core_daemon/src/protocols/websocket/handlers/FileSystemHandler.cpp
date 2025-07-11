@@ -193,7 +193,7 @@ void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& sessio
     }
 }
 
-void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& session) {
+void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session) {
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
@@ -201,17 +201,10 @@ void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& sess
 
         // TODO: Validate auth and permissions
 
-        bool success = false;
+        storageManager_->removeEntry(vaultId, path);
 
-        try {
-            success = storageManager_->getLocalEngine(vaultId)->deleteFile(path);
-        } catch (...) {
-            storageManager_->getCloudEngine(vaultId)->deleteFile(path);
-            success = true;
-        }
-
-        const json response = {{"command", "fs.deleteFile.response"},
-                               {"status", success ? "ok" : "error"},
+        const json response = {{"command", "fs.entry.delete.response"},
+                               {"status", "ok"},
                                {"requestId", msg.at("requestId").get<std::string>()},
                                {"data", {{"path", path}}}};
 
@@ -222,7 +215,7 @@ void FileSystemHandler::handleDeleteFile(const json& msg, WebSocketSession& sess
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleDeleteFile error: " << e.what() << std::endl;
 
-        const json response = {{"command", "fs.deleteFile.response"}, {"status", "error"}, {"error", e.what()}};
+        const json response = {{"command", "fs.entry.delete.response"}, {"status", "error"}, {"error", e.what()}};
 
         session.send(response);
     }

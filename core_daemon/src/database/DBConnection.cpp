@@ -141,6 +141,8 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("delete_file", "DELETE FROM files WHERE id = $1");
 
+    conn_->prepare("delete_file_by_vault_and_path", "DELETE FROM files WHERE vault_id = $1 AND path = $2");
+
     conn_->prepare("get_file_mime_type", "SELECT mime_type FROM files WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("list_files_in_dir",
@@ -156,6 +158,8 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("get_file_parent_id_and_size",
         "SELECT parent_id, size_bytes FROM files WHERE id = $1");
+
+    conn_->prepare("is_file", "SELECT EXISTS (SELECT 1 FROM files WHERE vault_id = $1 AND path = $2)");
 }
 
 void DBConnection::initPreparedDirectories() const {
@@ -181,6 +185,8 @@ void DBConnection::initPreparedDirectories() const {
 
     conn_->prepare("delete_directory", "DELETE FROM directories WHERE id = $1");
 
+    conn_->prepare("delete_directory_by_vault_and_path", "DELETE FROM directories WHERE vault_id = $1 AND path = $2");
+
     conn_->prepare("list_directories_in_dir",
                    "SELECT d.*, ds.* "
                    "FROM directories d "
@@ -193,6 +199,8 @@ void DBConnection::initPreparedDirectories() const {
                "WHERE d.vault_id = $1 AND d.path LIKE $2");
 
     conn_->prepare("get_directory_id_by_path", "SELECT id FROM directories WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("is_directory", "SELECT EXISTS (SELECT 1 FROM directories WHERE vault_id = $1 AND path = $2)");
 }
 
 void DBConnection::initPreparedRoles() const {

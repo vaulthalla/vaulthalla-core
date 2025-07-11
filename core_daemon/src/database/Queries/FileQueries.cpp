@@ -81,6 +81,15 @@ void FileQueries::deleteFile(const unsigned int fileId) {
     });
 }
 
+void FileQueries::deleteFile(unsigned int vaultId, const std::filesystem::path& relPath) {
+    Transactions::exec("FileQueries::deleteFileByPath", [&](pqxx::work& txn) {
+        pqxx::params p{vaultId, relPath.string()};
+        if (txn.exec_prepared("delete_file_by_vault_and_path", p).affected_rows() == 0)
+            throw std::runtime_error("No file found for vault ID: " + std::to_string(vaultId) + " and path: " + relPath.string());
+    });
+}
+
+
 std::string FileQueries::getMimeType(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getMimeType", [&](pqxx::work& txn) -> std::string {
         pqxx::params p{vaultId, relPath.string()};
@@ -194,6 +203,15 @@ void FileQueries::deleteDirectory(const unsigned int directoryId) {
     });
 }
 
+void FileQueries::deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath) {
+    Transactions::exec("FileQueries::deleteDirectoryByPath", [&](pqxx::work& txn) {
+        pqxx::params p{vaultId, relPath.string()};
+        if (txn.exec_prepared("delete_directory_by_vault_and_path", p).affected_rows() == 0)
+            throw std::runtime_error("No directory found for vault ID: " + std::to_string(vaultId) + " and path: " + relPath.string());
+    });
+}
+
+
 std::shared_ptr<vh::types::Directory> FileQueries::getDirectory(const unsigned int directoryId) {
     return Transactions::exec("FileQueries::getDirectory", [&](pqxx::work& txn) -> std::shared_ptr<types::Directory> {
         const auto row = txn.exec("SELECT * FROM directories WHERE id = " + txn.quote(directoryId)).one_row();
@@ -225,8 +243,34 @@ unsigned int FileQueries::getRootDirectoryId(const unsigned int vaultId) {
     });
 }
 
-std::vector<std::shared_ptr<vh::types::FSEntry>> FileQueries::listDir(const unsigned int vaultId, const std::string& absPath, const bool recursive) {
+bool FileQueries::isDirectory(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::isDirectory", [&](pqxx::work& txn) -> bool {
+        pqxx::params p{vaultId, relPath.string()};
+        return txn.exec_prepared("is_directory", p).one_row()["exists"].as<bool>();
+    });
+}
+
+bool FileQueries::isFile(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::isFile", [&](pqxx::work& txn) -> bool {
+        pqxx::params p{vaultId, relPath.string()};
+        return txn.exec_prepared("is_file", p).one_row()["exists"].as<bool>();
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesInDir(const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
     return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) {
+        const auto patterns = computePatterns(path.string(), recursive);
+        pqxx::params p{vaultId, patterns.like, patterns.not_like};
+        const auto res = recursive
+            ? txn.exec_prepared("list_files_in_dir_recursive", p)
+            : txn.exec_prepared("list_files_in_dir", p);
+
+        return types::files_from_pq_res(res);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::FSEntry>> FileQueries::listDir(const unsigned int vaultId, const std::string& absPath, const bool recursive) {
+    return Transactions::exec("FileQueries::listDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(absPath, recursive);
         pqxx::params p{vaultId, patterns.like, patterns.not_like};
 

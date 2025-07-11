@@ -60,16 +60,26 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
     return std::nullopt;
 }
 
-bool CloudStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    std::cout << "[CloudStorageEngine] deleteFile called: " << rel_path << std::endl;
-    // TODO: Implement S3/R2 delete logic
-    return true;
+void CloudStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
+    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path)))
+        throw std::runtime_error("[CloudStorageEngine] Failed to delete cache file: " + rel_path.string());
+
+    if (!s3Provider_->deleteObject(rel_path))
+        throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
     std::cout << "[CloudStorageEngine] fileExists called: " << rel_path << std::endl;
     // TODO: Implement S3/R2 fileExists logic
     return false;
+}
+
+bool CloudStorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
+    return database::FileQueries::isDirectory(vault_->id, rel_path);
+}
+
+bool CloudStorageEngine::isFile(const std::filesystem::path& rel_path) const {
+    return database::FileQueries::isFile(vault_->id, rel_path);
 }
 
 std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {

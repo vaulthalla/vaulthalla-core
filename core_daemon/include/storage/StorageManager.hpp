@@ -27,12 +27,16 @@ public:
 
     void removeVault(unsigned int vaultId);
 
-    std::vector<std::shared_ptr<types::Vault> > listVaults(const std::shared_ptr<types::User>& user) const;
+    std::vector<std::shared_ptr<types::Vault>> listVaults(const std::shared_ptr<types::User>& user) const;
 
     std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
 
     void finishUpload(unsigned int vaultId, const std::filesystem::path& relPath,
                       const std::shared_ptr<types::User>& user) const;
+
+    void removeEntry(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    [[nodiscard]] std::filesystem::path getAbsolutePath(unsigned int vaultId, const std::filesystem::path& relPath) const;
 
     [[nodiscard]] std::vector<std::shared_ptr<types::FSEntry>> listDir(unsigned int vaultId,
                                                                      const std::string& relPath,

@@ -146,24 +146,10 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
         const auto user = session.getAuthenticatedUser();
         auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
-        json data;
-
-        if (key->type == types::api::APIKeyType::S3) {
-            auto s3Key = std::dynamic_pointer_cast<types::api::S3APIKey>(key);
-            data = {{"key",
-                     {{"id", s3Key->id},
-                      {"user_id", s3Key->user_id},
-                      {"type", types::api::to_string(s3Key->type)},
-                      {"name", s3Key->name},
-                      {"created_at", util::timestampToString(s3Key->created_at)},
-                      {"provider", types::api::to_string(s3Key->provider)},
-                      {"access_key", s3Key->access_key},
-                      {"secret_access_key", s3Key->secret_access_key},
-                      {"region", s3Key->region},
-                      {"endpoint", s3Key->endpoint}}}};
-        } else {
+        if (key->type != types::api::APIKeyType::S3)
             throw std::runtime_error("Unsupported API key type: " + types::api::to_string(key->type));
-        }
+
+        json data = {{"api_key", key}};
 
         const json response = {{"command", "storage.apiKey.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},

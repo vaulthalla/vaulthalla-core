@@ -25,7 +25,7 @@ public:
 
     void handleReadFile(const json& msg, WebSocketSession& session);
 
-    void handleDeleteFile(const json& msg, WebSocketSession& session);
+    void handleDelete(const json& msg, WebSocketSession& session);
 
 private:
     std::shared_ptr<storage::StorageManager> storageManager_;

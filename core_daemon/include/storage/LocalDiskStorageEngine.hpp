@@ -27,9 +27,13 @@ public:
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
-    bool deleteFile(const std::filesystem::path& rel_path) override;
+    void deleteFile(const std::filesystem::path& rel_path) override;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
+
+    [[nodiscard]] bool isDirectory(const fs::path& rel_path) const override;
+
+    [[nodiscard]] bool isFile(const fs::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
 

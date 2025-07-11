@@ -30,9 +30,13 @@ public:
 
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
-    [[nodiscard]] virtual bool deleteFile(const fs::path& relative_path) = 0;
+    virtual void deleteFile(const fs::path& relative_path) = 0;
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
+
+    [[nodiscard]] virtual bool isDirectory(const fs::path& rel_path) const = 0;
+
+    [[nodiscard]] virtual bool isFile(const fs::path& rel_path) const = 0;
 
     [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const = 0;
 

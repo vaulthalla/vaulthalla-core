@@ -77,13 +77,24 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
     return buffer;
 }
 
-bool LocalDiskStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    const auto full_path = root_ / rel_path;
-    return std::filesystem::remove(full_path);
+void LocalDiskStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
+    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path)))
+        throw std::runtime_error("Failed to delete thumbnail cache: " + rel_path.string());
+
+    if (!std::filesystem::remove(getAbsolutePath(rel_path)))
+        throw std::runtime_error("Failed to delete file: " + rel_path.string());
 }
 
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
     return std::filesystem::exists(root_ / rel_path);
+}
+
+bool LocalDiskStorageEngine::isDirectory(const fs::path& rel_path) const {
+    return std::filesystem::is_directory(getAbsolutePath(rel_path));
+}
+
+bool LocalDiskStorageEngine::isFile(const fs::path& rel_path) const {
+    return std::filesystem::is_regular_file(getAbsolutePath(rel_path));
 }
 
 std::filesystem::path LocalDiskStorageEngine::resolvePath(const std::string& id) const {

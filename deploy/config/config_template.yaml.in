@@ -10,8 +10,8 @@ server: {}
 # === 🪓 FUSE MOUNT SETTINGS ===
 fuse: {}
 
-# === ☁️ CLOUD STORAGE SETTINGS ===
-cloud: {}
+# === Caching & Previews ===
+caching: {}
 
 # === 🐘 DATABASE SETTINGS ===
 database: {}

@@ -9,7 +9,7 @@ namespace vh::storage {
 StorageEngine::StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::path root_mount_path)
 : vault_(vault) {
     const auto conf = config::ConfigRegistry::get();
-    cache_path_ = conf.fuse.root_mount_path / conf.cloud.cache.cache_path / std::to_string(vault->id);
+    cache_path_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id);
 
     if (root_mount_path.empty()) root_ = cache_path_;
     else root_ = std::move(root_mount_path);

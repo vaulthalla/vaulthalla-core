@@ -24,16 +24,48 @@ struct FuseConfig {
     bool allow_other = true;
 };
 
-struct CloudCacheConfig {
+struct PDFDocumentConfig {
     bool enabled = true;
-    unsigned short expiry_days = 30;
-    bool thumbnails_only = true;
-    std::filesystem::path cache_path = "/.cache";
+    unsigned int max_pages = 0;
+    unsigned int expiry_days = 15;
 };
 
-struct CloudConfig {
-    bool enabled = true;
-    CloudCacheConfig cache;
+struct DocumentPreviewConfig {
+    PDFDocumentConfig pdf;
+};
+
+struct PreviewConfig {
+    DocumentPreviewConfig documents;
+};
+
+struct ThumbnailsConfig {
+    std::vector<std::string> formats = {"jpg", "jpeg", "png", "webp", "pdf"};
+    std::vector<unsigned int> sizes = {128, 256, 512};
+    unsigned int expiry_days = 30;
+};
+
+struct FullSizeCacheConfig {
+    bool mirror = true;
+    unsigned int expiry_days = 7;
+};
+
+struct SourceCacheFlags {
+    bool thumbnails = true;
+    struct {
+        bool pdf = true;
+    } documents;
+};
+
+struct CachingConfig {
+    std::filesystem::path path = ".cache";
+    unsigned int max_size_mb = 10240;
+
+    SourceCacheFlags cloud;
+    SourceCacheFlags local;
+
+    FullSizeCacheConfig cloud_preview;
+    ThumbnailsConfig thumbnails;
+    PreviewConfig previews;
 };
 
 struct DatabaseConfig {
@@ -95,7 +127,7 @@ struct Config {
 
     ServerConfig server;
     FuseConfig fuse;
-    CloudConfig cloud;
+    CachingConfig caching;
     DatabaseConfig database;
     AuthConfig auth;
     MetricsConfig metrics;

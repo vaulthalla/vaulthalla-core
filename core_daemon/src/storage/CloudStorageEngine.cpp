@@ -18,7 +18,6 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<types::S3Vault>& va
                                            : StorageEngine(vault),
                                              key_(key) {
     const auto conf = config::ConfigRegistry::get();
-    cache_expiry_days_ = conf.cloud.cache.expiry_days;
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
 

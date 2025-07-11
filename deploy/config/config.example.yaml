@@ -20,13 +20,42 @@ fuse:
   fuse_timeout_seconds: 60          # Idle timeout for auto-unmount
   allow_other: true                 # Allow access by non-calling users (e.g. Nextcloud)
 
-# === ☁️ CLOUD INTEGRATION SETTINGS ===
-cloud:
-  enabled: true                # Enable cloud storage integration
-  cache:
-    enabled: true              # Enable local cache for cloud files
-    thumbnails_only: true      # Only cache thumbnails, not full files (recommended for performance and space constraints)
-    cache_path: .cache         # Local cache directory (relative to root_mount_path)
+# === Caching & Previews ===
+caching:
+  path: ".cache"               # Local cache directory (relative to root_mount_path)
+  max_size_mb: 10240           # Max size for full-size cache (10 GB)
+
+  # Cloud caching settings
+  cloud:
+    thumbnails: true
+    full_size: true
+    documents:
+      pdf: true
+  # Local caching settings
+  local:
+    thumbnails: true
+    documents:
+      pdf: true
+
+  # Cloud preview settings
+  cloud_preview:
+    expiry_days: 7
+    mirror: true               # Mirror full-size files to local storage, false = on demand caching of cloud files
+
+  # Thumbnail settings
+  thumbnails:
+    formats: [jpg, jpeg, png, webp, pdf]
+    sizes: [128, 256, 512]                    # Thumbnail sizes in pixels
+    expiry_days: 30
+
+  # Document previews
+  previews:
+    # General document preview settings
+    documents:
+      # PDF preview settings
+      pdf:
+        max_pages: 0                  # Max pages to generate previews for (0 = all)
+        expiry_days: 15               # How long to keep PDF previews
 
 # === 🐘 DATABASE SETTINGS ===
 database:

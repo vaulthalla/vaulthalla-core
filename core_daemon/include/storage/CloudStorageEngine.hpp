@@ -46,7 +46,6 @@ public:
     void initCloudStorage() const;
 
 private:
-    unsigned int cache_expiry_days_;
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;
 };

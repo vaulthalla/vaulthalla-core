@@ -4,14 +4,19 @@
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
+#include "protocols/http/handlers/ImagePreviewHandler.hpp"
+#include "protocols/http/handlers/PdfPreviewHandler.hpp"
 
 #include <iostream>
+#include <ranges>
 
 namespace vh::http {
 
 HttpRouter::HttpRouter(const std::shared_ptr<auth::AuthManager>& authManager,
                        const std::shared_ptr<storage::StorageManager>& storageManager)
-    : authManager_(authManager), storageManager_(storageManager) {
+    : authManager_(authManager), storageManager_(storageManager),
+      imagePreviewHandler_(std::make_shared<ImagePreviewHandler>(storageManager)),
+      pdfPreviewHandler_(std::make_shared<PdfPreviewHandler>(storageManager)) {
     if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
     if (!storageManager) throw std::invalid_argument("StorageManager cannot be null");
 }
@@ -52,22 +57,47 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
     std::string rel_path = path_it->second;
     const std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
-    const auto engine = storageManager_->getEngine(vault_id);
-    const auto pathToJpegCache = engine->getAbsoluteCachePath(rel_path);
+    const auto size_it = params.find("size");
+
+    if (size_it != params.end() && !size_it->second.empty()) {
+        const auto thumbnail_sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
+        const auto size = std::stoi(size_it->second);
+        if (std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
+            try {
+                return handleCachedPreview(vault_id, rel_path, mime_type, req, size);
+            } catch (const std::exception& e) {
+                std::cerr << "[HttpRouter] Error handling cached preview: " << e.what() << std::endl;
+            }
+        }
+    }
+
+    if (mime_type.starts_with("image/") || mime_type.ends_with("/octet-stream"))
+        return imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+
+    if (mime_type.ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+
+    http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
+    res.body() = "Unsupported preview type: " + mime_type;
+    res.prepare_payload();
+    return res;
+}
+
+PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, const std::filesystem::path& rel_path,
+                                     const std::string& mime_type, const http::request<http::string_body>& req,
+                                     const unsigned int size) const {
+    const auto engine = storageManager_->getEngine(vaultId);
+    const auto pathToJpegCache = engine->getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
 
     // Force `.jpg` extension if this is a PDF or image preview
     if (mime_type.starts_with("image/") || mime_type.starts_with("application/")) {
         std::filesystem::path jpegPath = pathToJpegCache;
-        jpegPath.replace_extension(".jpg");
+        if (jpegPath.extension() != ".jpg" && jpegPath.extension() != ".jpeg") jpegPath.append(".jpg");
 
         if (std::filesystem::exists(jpegPath)) {
             http::file_body::value_type body;
             boost::beast::error_code ec;
             body.open(jpegPath.c_str(), boost::beast::file_mode::scan, ec);
-            if (ec) {
-                std::cerr << "[PdfPreviewHandler] Error opening JPEG file: " << ec.message() << std::endl;
-                return makeErrorResponse(req, "Failed to open preview file");
-            }
+            if (ec) throw std::runtime_error("[PdfPreviewHandler] Error opening JPEG file: " + ec.message());
 
             http::response<http::file_body> res{
                 std::piecewise_construct,
@@ -78,19 +108,16 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
             res.content_length(body.size());
             res.keep_alive(req.keep_alive());
             return res;
-        } else {
-            std::cerr << "[PdfPreviewHandler] Cached preview not found: " << jpegPath << std::endl;
-            return makeErrorResponse(req, "Preview not found");
         }
-    }
 
-    http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
-    res.body() = "Unsupported preview type: " + mime_type;
-    res.prepare_payload();
-    return res;
+        throw std::runtime_error("[PdfPreviewHandler] JPEG file does not exist: " + jpegPath.string());
+    }
+    return makeErrorResponse(req, "Unsupported preview type: " + mime_type);
 }
 
-http::response<http::string_body> HttpRouter::makeErrorResponse(const http::request<http::string_body>& req, const std::string& msg) {
+
+http::response<http::string_body> HttpRouter::makeErrorResponse(const http::request<http::string_body>& req,
+                                                                const std::string& msg) {
     http::response<http::string_body> res{http::status::not_found, req.version()};
     res.set(http::field::content_type, "text/plain");
     res.body() = msg;

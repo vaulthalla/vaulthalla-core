@@ -14,7 +14,8 @@
 
 namespace vh::util {
 
-void compress_to_jpeg(const uint8_t* rgb_data, const int width, const int height, std::vector<uint8_t>& out_buf, const int quality) {
+void compress_to_jpeg(const uint8_t* rgb_data, const int width, const int height, std::vector<uint8_t>& out_buf,
+                      const int quality) {
     tjhandle tj = tjInitCompress();
     if (!tj) throw std::runtime_error("Failed to initialize TurboJPEG compressor");
 
@@ -38,7 +39,7 @@ void compress_to_jpeg(const uint8_t* rgb_data, const int width, const int height
         std::string err = tjGetErrorStr();
         tjDestroy(tj);
         throw std::runtime_error("JPEG compression failed: " + err);
-            }
+    }
 
     out_buf.assign(jpeg_buf, jpeg_buf + jpeg_size);
     tjFree(jpeg_buf);
@@ -61,7 +62,8 @@ std::vector<uint8_t> resize_and_compress_image(
         new_h = static_cast<int>(static_cast<float>(height) * scale);
     } else if (size_opt) {
         const int max_dim = std::stoi(*size_opt);
-        const float ratio = std::min(static_cast<float>(max_dim) / static_cast<float>(width), static_cast<float>(max_dim) / static_cast<float>(height));
+        const float ratio = std::min(static_cast<float>(max_dim) / static_cast<float>(width),
+                                     static_cast<float>(max_dim) / static_cast<float>(height));
         new_w = static_cast<int>(static_cast<float>(width) * ratio);
         new_h = static_cast<int>(static_cast<float>(height) * ratio);
     }
@@ -79,8 +81,7 @@ std::vector<uint8_t> resize_and_compress_image(
 std::vector<uint8_t> resize_and_compress_image_buffer(
     const uint8_t* data, size_t size,
     const std::optional<std::string>& scale_opt,
-    const std::optional<std::string>& size_opt)
-{
+    const std::optional<std::string>& size_opt) {
     if (size < 4) {
         throw std::runtime_error("Buffer too small to be a valid image");
     }
@@ -89,7 +90,8 @@ std::vector<uint8_t> resize_and_compress_image_buffer(
     unsigned char* decoded = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, 3);
     if (!decoded) {
         const char* reason = stbi_failure_reason();
-        throw std::runtime_error(std::string("Failed to decode image from memory: ") + (reason ? reason : "unknown error"));
+        throw std::runtime_error(
+            std::string("Failed to decode image from memory: ") + (reason ? reason : "unknown error"));
     }
 
     int new_w = width, new_h = height;
@@ -176,19 +178,20 @@ std::vector<uint8_t> resize_and_compress_pdf_buffer(
     return jpeg_buf;
 }
 
-void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath, const std::string& mime) {
+void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath,
+                               const std::string& mime, const unsigned int size) {
     std::vector<uint8_t> jpeg;
 
     if (mime.starts_with("image/")) {
         std::vector<uint8_t> raw(buffer.begin(), buffer.end());
         jpeg = resize_and_compress_image_buffer(
-            raw.data(), raw.size(), std::nullopt, std::make_optional("128")
-        );
+            raw.data(), raw.size(), std::nullopt, std::make_optional(std::to_string(size))
+            );
     } else if (mime == "application/pdf") {
         jpeg = resize_and_compress_pdf_buffer(
             reinterpret_cast<const uint8_t*>(buffer.data()),
-            buffer.size(), std::nullopt, std::make_optional("128")
-        );
+            buffer.size(), std::nullopt, std::make_optional(std::to_string(size))
+            );
     } else {
         throw std::runtime_error("Unsupported MIME type for thumbnail generation: " + mime);
     }

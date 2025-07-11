@@ -15,24 +15,25 @@ LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<types::Loca
 
 void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
     try {
-        auto cachePath = getAbsoluteCachePath(rel_path);
-        cachePath.replace_extension(".jpg");
-        if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
-
+        std::string buffer;
         const auto fullPath = getAbsolutePath(rel_path);
         if (!std::filesystem::exists(fullPath))
             throw std::runtime_error("File does not exist: " + fullPath.string());
 
-        std::string buffer;
         std::ifstream in(fullPath, std::ios::binary | std::ios::ate);
         if (!in) throw std::runtime_error("Failed to open file: " + fullPath.string());
-        std::streamsize size = in.tellg();
+        std::streamsize inSize = in.tellg();
         in.seekg(0, std::ios::beg);
-        buffer.resize(size);
-        if (!in.read(buffer.data(), size)) throw std::runtime_error("Failed to read file: " + fullPath.string());
+        buffer.resize(inSize);
+        if (!in.read(buffer.data(), inSize)) throw std::runtime_error("Failed to read file: " + fullPath.string());
         in.close();
 
-        util::generateAndStoreThumbnail(buffer, cachePath, mime_type);
+        for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+            auto cachePath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
+            if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath.append(".jpg");
+            if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
+            util::generateAndStoreThumbnail(buffer, cachePath, mime_type, size);
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }

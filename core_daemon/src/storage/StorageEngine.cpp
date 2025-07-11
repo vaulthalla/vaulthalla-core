@@ -20,9 +20,12 @@ StorageEngine::StorageEngine(const std::shared_ptr<types::Vault>& vault, fs::pat
     } else std::cout << "[StorageEngine] Root directory already exists: " << root_ << std::endl;
 }
 
-std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path) const {
+std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path, const std::filesystem::path& prefix) const {
     const auto relPath = rel_path.string().starts_with("/") ? fs::path(rel_path.string().substr(1)) : rel_path;
-    return cache_path_ / relPath;
+    if (prefix.empty()) return cache_path_ / relPath;
+
+    const auto prefixPath = prefix.string().starts_with("/") ? fs::path(prefix.string().substr(1)) : prefix;
+    return cache_path_ / prefixPath / relPath;
 }
 
 

@@ -24,6 +24,7 @@ std::vector<uint8_t> resize_and_compress_pdf_buffer(
     const std::optional<std::string>& scale,
     const std::optional<std::string>& max_size);
 
-void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath, const std::string& mime);
+void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath,
+                               const std::string& mime, unsigned int size = 128);
 
 }

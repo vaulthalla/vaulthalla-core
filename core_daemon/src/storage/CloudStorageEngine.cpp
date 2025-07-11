@@ -40,9 +40,13 @@ void CloudStorageEngine::finishUpload(const std::filesystem::path& rel_path, con
     if (!s3Provider_->downloadToBuffer(s3Key, buffer))
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
 
-    auto thumbnailPath = getAbsoluteCachePath(rel_path);
     try {
-        util::generateAndStoreThumbnail(buffer, thumbnailPath, mime_type);
+        for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+            auto cachePath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
+            if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath.append(".jpg");
+            if (!std::filesystem::exists(cachePath.parent_path())) std::filesystem::create_directories(cachePath.parent_path());
+            util::generateAndStoreThumbnail(buffer, cachePath, mime_type, size);
+        }
     } catch (const std::exception& e) {
         s3Provider_->deleteObject(rel_path);
         std::cerr << "[CloudStorageEngine] Thumbnail gen failed, deleted: " << rel_path << std::endl;

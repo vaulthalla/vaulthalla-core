@@ -137,18 +137,25 @@ bool S3Provider::downloadObject(const std::string& key, const std::string& outpu
     return res == CURLE_OK;
 }
 
-bool S3Provider::deleteObject(const std::string& key) {
+bool S3Provider::deleteObject(const std::u8string& key) {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    const std::string url = apiKey_->endpoint + "/" + bucket_ + "/" + key;
+    const std::string keyStr = reinterpret_cast<const char*>(key.c_str());
+    const std::string url = apiKey_->endpoint + "/" + bucket_ + "/" + curl_easy_escape(curl, keyStr.c_str(), keyStr.length());
     const std::string payloadHash = sha256Hex("");
 
-    std::map<std::string, std::string> hdrMap{{"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
-                                              {"x-amz-content-sha256", payloadHash},
-                                              {"x-amz-date", util::getCurrentTimestamp()}};
+    const std::string timestamp = util::getCurrentTimestamp();
+    const std::string host = apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2);
+    const std::string canonicalPath = "/" + bucket_ + "/" + keyStr;
 
-    const std::string authHeader = buildAuthorizationHeader("DELETE", "/" + bucket_ + "/" + key, hdrMap, payloadHash);
+    std::map<std::string, std::string> hdrMap{
+            {"host", host},
+            {"x-amz-content-sha256", payloadHash},
+            {"x-amz-date", timestamp}
+    };
+
+    const std::string authHeader = buildAuthorizationHeader("DELETE", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
@@ -158,9 +165,27 @@ bool S3Provider::deleteObject(const std::string& key) {
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
 
+    std::string responseBody;
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](char* ptr, size_t size, size_t nmemb, std::string* out) {
+        out->append(ptr, size * nmemb);
+        return size * nmemb;
+    });
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+
+    long httpCode = 0;
     CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
-    return res == CURLE_OK;
+
+    if (res != CURLE_OK) {
+        std::cerr << "[S3Provider] curl error: " << curl_easy_strerror(res) << "\n";
+        return false;
+    }
+
+    if (httpCode >= 200 && httpCode < 300) return true;
+
+    std::cerr << "[S3Provider] DELETE " << keyStr << " failed (HTTP " << httpCode << "):\n" << responseBody << "\n";
+    return false;
 }
 
 std::string S3Provider::sha256Hex(const std::string& data) {
@@ -484,8 +509,8 @@ bool S3Provider::uploadLargeObject(const std::string& key, const std::string& fi
     return completeMultipartUpload(key, uploadId, etags);
 }
 
-std::string S3Provider::listObjects(const std::string& prefix) {
-    std::string fullXmlResponse;
+std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
+    std::u8string fullXmlResponse;
     std::string continuationToken;
     bool moreResults = true;
 
@@ -495,7 +520,7 @@ std::string S3Provider::listObjects(const std::string& prefix) {
 
         std::ostringstream uri;
         uri << "/" << bucket_ << "?list-type=2";
-        if (!prefix.empty()) uri << "&prefix=" << curl_easy_escape(curl, prefix.c_str(), prefix.length());
+        if (!prefix.empty()) uri << "&prefix=" << curl_easy_escape(curl, prefix.c_str(), prefix.string().length());
         if (!continuationToken.empty()) {
             uri << "&continuation-token=" << curl_easy_escape(curl, continuationToken.c_str(), continuationToken.length());
         }
@@ -524,19 +549,19 @@ std::string S3Provider::listObjects(const std::string& prefix) {
         });
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-        const CURLcode res = curl_easy_perform(curl);
+        CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         if (res != CURLE_OK) {
             std::cerr << "[S3Provider] curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
             break;
         }
 
-        fullXmlResponse += response;
+        // Preserve raw bytes
+        fullXmlResponse += std::u8string(reinterpret_cast<const char8_t*>(response.data()), response.size());
 
-        // Check if truncated
+        // Check for pagination
         moreResults = std::regex_search(response, std::regex("<IsTruncated>true</IsTruncated>"));
 
-        // Get next continuation token
         std::smatch tokenMatch;
         if (moreResults && std::regex_search(response, tokenMatch, std::regex("<NextContinuationToken>([^<]+)</NextContinuationToken>"))) {
             continuationToken = tokenMatch[1].str();

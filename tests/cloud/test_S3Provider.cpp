@@ -42,7 +42,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
 };
 
 TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
-    const std::string key = "simple-test.txt";
+    const std::filesystem::path key = {"simple-test.txt"};
     const auto filePath = test_dir / key;
 
     // Write some test content to the file
@@ -68,11 +68,11 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
-    const std::string key = "multipart-test-2.txt";
+    const std::filesystem::path key = {"multipart-test-2.txt"};
 
     // Generate a temporary file with ~15MB of data
     const auto filePath = test_dir / key;
@@ -102,11 +102,11 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
-    const std::string key = "abort-test.txt";
+    const std::filesystem::path key = {"abort-test.txt"};
 
     std::string uploadId = s3Provider_->initiateMultipartUpload(key);
     ASSERT_FALSE(uploadId.empty());
@@ -123,12 +123,13 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
-    const std::string key = "list-download-test.txt";
+    const std::filesystem::path key = {"list-download-test.txt"};
     const auto filePath = test_dir / key;
     writeTextFile(filePath, "This file should appear in listObjects and download into buffer.");
     ASSERT_TRUE(s3Provider_->uploadObject(key, filePath.string()));
 
-    const std::string xml = s3Provider_->listObjects();
+    const auto xml = s3Provider_->listObjects();
+
     const auto entries = vh::types::fromS3XML(xml);
     EXPECT_FALSE(entries.empty()) << "fromS3XML should return at least one entry";
     auto match = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
@@ -140,11 +141,11 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     EXPECT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
     EXPECT_TRUE(buffer.find("appear in listObjects") != std::string::npos);
 
-    EXPECT_TRUE(s3Provider_->deleteObject(key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
-    const std::string key = "test-image.jpg";
+    const std::filesystem::path key = {"test-image.jpg"};
     const auto srcPath = fs::path("sample.jpg");
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
@@ -160,11 +161,11 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100); // sanity check: JPEG data exists
-    EXPECT_TRUE(s3Provider_->deleteObject(key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
-    const std::string key = "test-pdf.pdf";
+    const std::filesystem::path key = {"test-pdf.pdf"};
     const auto srcPath = fs::path("sample.pdf");
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
@@ -180,5 +181,5 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100);
-    EXPECT_TRUE(s3Provider_->deleteObject(key));
+    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
 }

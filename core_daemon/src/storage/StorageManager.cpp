@@ -152,28 +152,11 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << std::endl;
 }
 
-void StorageManager::removeEntry(const unsigned int vaultId, const std::filesystem::path& relPath) {
+void StorageManager::removeEntry(const unsigned int vaultId, const std::filesystem::path& relPath) const {
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-
-    if (engine->isFile(relPath)) {
-        try {
-            engine->deleteFile(relPath);
-            std::lock_guard lock(mountsMutex_);
-            database::FileQueries::deleteFile(vaultId, relPath);
-        } catch (const std::exception& e) {
-            std::cerr << "[StorageManager] Error removing file: " << e.what() << std::endl;
-            throw;
-        }
-    } else if (engine->isDirectory(relPath)) {
-        const auto entries = listDir(vaultId, relPath, false);
-        for (const auto& entry : entries) removeEntry(entry->vault_id, entry->path); {
-            std::lock_guard lock(mountsMutex_);
-            database::FileQueries::deleteDirectory(vaultId, relPath);
-        }
-    }
+    engine->remove(relPath);
 }
-
 
 void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,
                            const std::shared_ptr<types::User>& user) const {

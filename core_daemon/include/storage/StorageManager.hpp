@@ -38,7 +38,7 @@ public:
     void finishUpload(unsigned int vaultId, const std::filesystem::path& relPath,
                       const std::shared_ptr<types::User>& user) const;
 
-    void removeEntry(unsigned int vaultId, const std::filesystem::path& relPath);
+    void removeEntry(unsigned int vaultId, const std::filesystem::path& relPath) const;
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(unsigned int vaultId, const std::filesystem::path& relPath) const;
 

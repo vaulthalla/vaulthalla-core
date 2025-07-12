@@ -17,6 +17,7 @@ struct DirectoryStats {
 
 struct Directory : FSEntry {
     std::shared_ptr<DirectoryStats> stats{};
+    std::u8string u8_path; // UTF-8 encoded path for S3 keys
 
     Directory() = default;
     explicit Directory(const pqxx::row& row);

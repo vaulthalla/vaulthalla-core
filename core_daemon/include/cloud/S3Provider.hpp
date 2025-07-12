@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <string>
@@ -17,7 +18,7 @@ class S3Provider {
 
     bool uploadObject(const std::string& key, const std::string& filePath);
     bool downloadObject(const std::string& key, const std::string& outputPath);
-    bool deleteObject(const std::string& key);
+    bool deleteObject(const std::u8string& key);
 
     bool uploadLargeObject(const std::string& key, const std::string& filePath,
                            size_t partSize = 5 * 1024 * 1024);
@@ -29,7 +30,7 @@ class S3Provider {
                                  const std::vector<std::string>& etags);
     bool abortMultipartUpload(const std::string& key, const std::string& uploadId);
 
-    std::string listObjects(const std::string& prefix = "");
+    std::u8string listObjects(const std::filesystem::path& prefix = {});
     bool downloadToBuffer(const std::string& key, std::string& outBuffer);
 
   private:

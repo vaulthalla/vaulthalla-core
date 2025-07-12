@@ -237,9 +237,8 @@ std::optional<unsigned int> FileQueries::getDirectoryIdByPath(const unsigned int
 
 unsigned int FileQueries::getRootDirectoryId(const unsigned int vaultId) {
     return Transactions::exec("FileQueries::getRootDirectoryId", [&](pqxx::work& txn) -> unsigned int {
-        const auto row = txn.exec("SELECT id FROM directories WHERE vault_id = " + txn.quote(vaultId) +
-                                  " AND parent_id IS NULL").one_row();
-        return row["id"].as<unsigned int>();
+        pqxx::params p{vaultId, "/"};
+        return txn.exec_prepared("get_directory_id_by_path", p).one_row()["id"].as<unsigned int>();
     });
 }
 

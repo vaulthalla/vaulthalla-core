@@ -37,7 +37,7 @@ public:
 
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
-    virtual void deleteFile(const fs::path& relative_path) = 0;
+    virtual void remove(const fs::path& relative_path) = 0;
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 

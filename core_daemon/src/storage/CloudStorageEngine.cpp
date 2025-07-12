@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <ranges>
+#include <pugixml.hpp>
 
 namespace vh::storage {
 
@@ -55,12 +56,33 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
     return std::nullopt;
 }
 
-void CloudStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path))) throw std::runtime_error(
-        "[CloudStorageEngine] Failed to delete cache file: " + rel_path.string());
+void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
+    if (isDirectory(rel_path)) {
+        auto files = types::fromS3XML(s3Provider_->listObjects(rel_path));
 
-    if (!s3Provider_->deleteObject(rel_path)) throw std::runtime_error(
+        // Reverse the order so longest paths are deleted first, followed by directories
+        std::ranges::reverse(files.begin(), files.end());
+
+        for (const auto& entry : files) {
+            if (entry->isDirectory()) database::FileQueries::deleteDirectory(vault_->id, entry->path);
+            else {
+                if (!s3Provider_->deleteObject(stripLeadingSlash(entry->path)))
+                    throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + entry->path.string());
+
+                for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+                    const auto thumbnailPath = getAbsoluteCachePath(entry->path, fs::path("thumbnails") / std::to_string(size));
+                    if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
+                }
+
+                database::FileQueries::deleteFile(vault_->id, entry->path);
+            }
+        }
+
+        database::FileQueries::deleteDirectory(vault_->id, rel_path);
+    } else {
+        if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+    }
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
@@ -133,6 +155,61 @@ std::string getMimeType(const std::filesystem::path& path) {
 
     const auto it = mimeMap.find(ext);
     return it != mimeMap.end() ? it->second : "application/octet-stream";
+}
+
+std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path) {
+    std::vector<std::string> keys;
+
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_string(xml.c_str());
+
+    if (!result) {
+        std::cerr << "[s3KeysFromXML] Failed to parse XML: " << result.description() << std::endl;
+        return {};
+    }
+
+    pugi::xml_node root = doc.child("ListBucketResult");
+    if (!root) {
+        std::cerr << "[s3KeysFromXML] Missing <ListBucketResult> root node" << std::endl;
+        return {};
+    }
+
+    const std::string prefix = rel_path.string().empty() ? "" : rel_path.string().append(rel_path.string().back() == '/' ? "" : "/");
+
+    for (pugi::xml_node content : root.children("Contents")) {
+        auto keyNode = content.child("Key");
+        if (!keyNode) continue;
+
+        std::string key = keyNode.text().get();
+
+        // Only include if it matches or is under the requested rel_path prefix
+        if (key.starts_with(prefix)) {
+            keys.push_back(std::move(key));
+        }
+    }
+
+    return keys;
+}
+
+std::string normalizeUnicodeFilename(const std::string& input) {
+    std::string output;
+    for (unsigned char c : input) {
+        // Replace known space-like characters
+        if (c == '\u00A0' || c == '\u202F') {
+            output += ' ';
+        } else if (std::isprint(c)) {
+            output += c;
+        }
+    }
+    return output;
+}
+
+std::u8string stripLeadingSlash(const std::filesystem::path& path) {
+    std::u8string u8 = path.u8string();
+    if (!u8.empty() && u8[0] == u8'/') {
+        return u8.substr(1);
+    }
+    return u8;
 }
 
 }

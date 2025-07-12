@@ -88,7 +88,8 @@ executable('hash_password',
 
 test_assets = files(
     'test-assets/sample.jpg',
-    'test-assets/sample.pdf'
+    'test-assets/sample.pdf',
+    'test-assets/Screenshot 2025-06-26 at 3.29.35\u202FPM.png'
 )
 
 foreach asset : test_assets

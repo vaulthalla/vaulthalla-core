@@ -197,21 +197,17 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto path = payload.at("path").get<std::string>();
+        const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
         enforcePermissions(session, vaultId, path, &types::VaultRole::canDelete);
-
         storageManager_->removeEntry(vaultId, path);
 
         const json response = {{"command", "fs.entry.delete.response"},
                                {"status", "ok"},
                                {"requestId", msg.at("requestId").get<std::string>()},
-                               {"data", {{"path", path}}}};
+                               {"data", {{"path", path.string()}}}};
 
         session.send(response);
-
-        std::cout << "[FileSystemHandler] DeleteFile on mount '" << vaultId << "' path '" << path << std::endl;
-
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleDeleteFile error: " << e.what() << std::endl;
 

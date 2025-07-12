@@ -79,19 +79,18 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::merge_entries(
     return entries;
 }
 
-std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xml) {
-    std::unordered_map<std::string, std::shared_ptr<Directory>> directories;
+std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& xml) {
+    std::unordered_map<std::u8string, std::shared_ptr<Directory>> directories;
     std::vector<std::shared_ptr<File>> files;
 
     pugi::xml_document doc;
-    pugi::xml_parse_result result = doc.load_string(xml.c_str());
+    pugi::xml_parse_result result = doc.load_string(reinterpret_cast<const char*>(xml.c_str()));
 
     if (!result) {
         std::cerr << "[fromS3XML] Failed to parse XML: " << result.description() << std::endl;
         return {};
     }
 
-    // Register namespace
     pugi::xml_node root = doc.child("ListBucketResult");
     if (!root) {
         std::cerr << "[fromS3XML] Missing <ListBucketResult> root node" << std::endl;
@@ -108,27 +107,26 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xm
             continue;
         }
 
-        const std::string key = keyNode.text().get();
+        const std::u8string key = reinterpret_cast<const char8_t*>(keyNode.text().get());
         const std::string lastMod = modifiedNode.text().get();
         const uint64_t size = std::stoull(sizeNode.text().get());
 
-        // Parse timestamp safely
         std::tm tm{};
         std::istringstream ss(lastMod);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
         std::time_t ts = ss.fail() ? std::time(nullptr) : timegm(&tm);
 
-        // Build parent directories
-        std::filesystem::path full_path(key);
+        std::filesystem::path full_path = std::filesystem::path(reinterpret_cast<const char*>(key.c_str()));
         std::filesystem::path current;
 
         for (auto pit = full_path.begin(); pit != std::prev(full_path.end()); ++pit) {
             current /= *pit;
-            std::string dir_str = current.string();
+
+            const auto dir_str = current.u8string();
 
             if (!directories.contains(dir_str)) {
                 auto dir = std::make_shared<Directory>();
-                dir->path = dir_str;
+                dir->path = current;
                 dir->name = current.filename().string();
                 dir->created_at = dir->updated_at = ts;
                 directories[dir_str] = dir;
@@ -137,31 +135,20 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::string& xm
             directories[dir_str]->updated_at = std::max(directories[dir_str]->updated_at, ts);
         }
 
-        // Create file entry
-        auto file = std::make_shared<File>(key, size, ts);
+        auto file = std::make_shared<File>(std::string(reinterpret_cast<const char*>(key.c_str())), size, ts);
         files.push_back(file);
     }
 
-    // Sort directories by path depth
     std::vector<std::shared_ptr<FSEntry>> ordered;
     std::vector<std::shared_ptr<Directory>> dirList;
     for (const auto& [_, dir] : directories) dirList.push_back(dir);
 
     std::ranges::sort(dirList, [](const auto& a, const auto& b) {
-        return std::distance(a->path.begin(), a->path.end()) < std::distance(b->path.begin(), b->path.end());
+        return std::distance(a->u8_path.begin(), a->u8_path.end()) < std::distance(b->u8_path.begin(), b->u8_path.end());
     });
 
     ordered.insert(ordered.end(), dirList.begin(), dirList.end());
     ordered.insert(ordered.end(), files.begin(), files.end());
 
     return ordered;
-}
-
-std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::vector<std::string>& xmlVector) {
-    std::vector<std::shared_ptr<FSEntry>> all;
-    for (const auto& xml : xmlVector) {
-        auto partial = fromS3XML(xml);
-        all.insert(all.end(), partial.begin(), partial.end());
-    }
-    return all;
 }

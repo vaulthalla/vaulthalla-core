@@ -43,7 +43,6 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<FSEntry>>& ent
 std::vector<std::shared_ptr<FSEntry> > merge_entries(const std::vector<std::shared_ptr<File>>& files,
                                                      const std::vector<std::shared_ptr<Directory>>& directories);
 
-std::vector<std::shared_ptr<FSEntry>> fromS3XML(const std::string& xml);
-std::vector<std::shared_ptr<FSEntry>> fromS3XML(const std::vector<std::string>& xmlVector);
+std::vector<std::shared_ptr<FSEntry>> fromS3XML(const std::u8string& xml);
 
 }

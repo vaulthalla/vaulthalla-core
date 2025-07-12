@@ -11,6 +11,9 @@
 #include <iostream>
 #include <fstream>
 #include <ranges>
+#include <pugixml.hpp>
+
+#include "protocols/websocket/handlers/UploadHandler.hpp"
 
 namespace vh::storage {
 
@@ -55,12 +58,32 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
     return std::nullopt;
 }
 
-void CloudStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path))) throw std::runtime_error(
-        "[CloudStorageEngine] Failed to delete cache file: " + rel_path.string());
-
-    if (!s3Provider_->deleteObject(rel_path)) throw std::runtime_error(
+void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
+    if (isFile(rel_path)) {
+        if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+        purgeThumbnails(rel_path);
+        database::FileQueries::deleteFile(vault_->id, rel_path);
+    } else {
+        std::cout << "[CloudStorageEngine] remove called for directory: " << rel_path << std::endl;
+        const auto files = database::FileQueries::listFilesInDir(vault_->id, rel_path, true);
+        const auto directories = database::FileQueries::listDirectoriesInDir(vault_->id, rel_path, true);
+
+        for (const auto& file : files) {
+            std::cout << "[CloudStorageEngine] Deleting file: " << file->path << std::endl;
+            if (!s3Provider_->deleteObject(stripLeadingSlash(file->path)))
+                throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + file->path.string());
+            purgeThumbnails(file->path);
+            database::FileQueries::deleteFile(vault_->id, file->path);
+        }
+
+        std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << std::endl;
+        for (const auto& dir : directories)
+            database::FileQueries::deleteDirectory(vault_->id, dir->path);
+
+        std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << std::endl;
+        database::FileQueries::deleteDirectory(vault_->id, rel_path);
+    }
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
@@ -101,7 +124,10 @@ void CloudStorageEngine::initCloudStorage() {
         if (item->isDirectory()) {
             if (item->path.string() == "/") continue;
             auto dir = std::static_pointer_cast<types::Directory>(item);
-            dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, dir->path.parent_path());
+            const auto parentPath = dir->path.parent_path().empty()
+                                        ? std::filesystem::path("/")
+                                        : dir->path.parent_path();
+            dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
             database::FileQueries::addDirectory(dir);
         } else {
             auto file = std::static_pointer_cast<types::File>(item);
@@ -133,6 +159,42 @@ std::string getMimeType(const std::filesystem::path& path) {
 
     const auto it = mimeMap.find(ext);
     return it != mimeMap.end() ? it->second : "application/octet-stream";
+}
+
+std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path) {
+    std::vector<std::string> keys;
+
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_string(xml.c_str());
+
+    if (!result) {
+        std::cerr << "[s3KeysFromXML] Failed to parse XML: " << result.description() << std::endl;
+        return {};
+    }
+
+    pugi::xml_node root = doc.child("ListBucketResult");
+    if (!root) {
+        std::cerr << "[s3KeysFromXML] Missing <ListBucketResult> root node" << std::endl;
+        return {};
+    }
+
+    const std::string prefix = rel_path.string().empty() ? "" : rel_path.string().append(rel_path.string().back() == '/' ? "" : "/");
+
+    for (pugi::xml_node content : root.children("Contents")) {
+        auto keyNode = content.child("Key");
+        if (!keyNode) continue;
+
+        std::string key = keyNode.text().get();
+        if (key.starts_with(prefix)) keys.push_back(std::move(key));
+    }
+
+    return keys;
+}
+
+std::u8string stripLeadingSlash(const std::filesystem::path& path) {
+    std::u8string u8 = path.u8string();
+    if (!u8.empty() && u8[0] == u8'/') return u8.substr(1);
+    return u8;
 }
 
 }

@@ -28,7 +28,7 @@ public:
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
-    void deleteFile(const std::filesystem::path& rel_path) override;
+    void remove(const std::filesystem::path& rel_path) override;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 

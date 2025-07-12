@@ -3,6 +3,7 @@
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
+#include "shared_util/u8.hpp"
 
 #include <optional>
 
@@ -10,7 +11,7 @@ using namespace vh::database;
 
 void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
-    if (!file->path.string().starts_with("/")) file->setPath("/" + file->path.string());
+    if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
 
     Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
@@ -22,7 +23,7 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
-        p.append(file->path.string());
+        p.append(to_utf8_string(file->path.u8string()));
 
         txn.exec_prepared("insert_file", p);
 
@@ -51,7 +52,7 @@ void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
-        p.append(file->path.string());
+        p.append(to_utf8_string(file->path.u8string()));
 
         txn.exec_prepared("update_file", p);
 
@@ -128,7 +129,7 @@ unsigned int FileQueries::addDirectory(const types::Directory& directory) {
         p.append(directory.name);
         p.append(directory.created_by);
         p.append(directory.last_modified_by);
-        p.append(directory.path.string());
+        p.append(to_utf8_string(directory.path.u8string()));
 
         const auto id = txn.exec_prepared("insert_directory", p).one_row()["id"].as<unsigned int>();
 
@@ -140,7 +141,7 @@ unsigned int FileQueries::addDirectory(const types::Directory& directory) {
 }
 
 void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& directory) {
-    if (!directory->path.string().starts_with("/")) directory->setPath("/" + directory->path.string());
+    if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
 
     Transactions::exec("FileQueries::addDirectory", [&](pqxx::work& txn) {
         pqxx::params p;
@@ -149,7 +150,7 @@ void FileQueries::addDirectory(const std::shared_ptr<types::Directory>& director
         p.append(directory->name);
         p.append(directory->created_by);
         p.append(directory->last_modified_by);
-        p.append(directory->path.string());
+        p.append(to_utf8_string(directory->path.u8string()));
 
         const auto id = txn.exec_prepared("insert_directory", p).one_row()["id"].as<unsigned int>();
 
@@ -169,7 +170,7 @@ void FileQueries::updateDirectory(const std::shared_ptr<types::Directory>& direc
         p.append(directory->parent_id);
         p.append(directory->name);
         p.append(directory->last_modified_by);
-        p.append(directory->path.string());
+        p.append(to_utf8_string(directory->path.u8string()));
 
         txn.exec_prepared("update_directory", p);
 
@@ -237,9 +238,8 @@ std::optional<unsigned int> FileQueries::getDirectoryIdByPath(const unsigned int
 
 unsigned int FileQueries::getRootDirectoryId(const unsigned int vaultId) {
     return Transactions::exec("FileQueries::getRootDirectoryId", [&](pqxx::work& txn) -> unsigned int {
-        const auto row = txn.exec("SELECT id FROM directories WHERE vault_id = " + txn.quote(vaultId) +
-                                  " AND parent_id IS NULL").one_row();
-        return row["id"].as<unsigned int>();
+        pqxx::params p{vaultId, "/"};
+        return txn.exec_prepared("get_directory_id_by_path", p).one_row()["id"].as<unsigned int>();
     });
 }
 
@@ -260,12 +260,22 @@ bool FileQueries::isFile(const unsigned int vaultId, const std::filesystem::path
 std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesInDir(const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
     return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(path.string(), recursive);
-        pqxx::params p{vaultId, patterns.like, patterns.not_like};
         const auto res = recursive
-            ? txn.exec_prepared("list_files_in_dir_recursive", p)
-            : txn.exec_prepared("list_files_in_dir", p);
+            ? txn.exec_prepared("list_files_in_dir_recursive", pqxx::params{vaultId, patterns.like})
+            : txn.exec_prepared("list_files_in_dir", pqxx::params{vaultId, patterns.like, patterns.not_like});
 
         return types::files_from_pq_res(res);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::Directory>> FileQueries::listDirectoriesInDir(const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
+    return Transactions::exec("FileQueries::listDirectoriesInDir", [&](pqxx::work& txn) {
+        const auto patterns = computePatterns(path.string(), recursive);
+        const auto res = recursive
+            ? txn.exec_prepared("list_directories_in_dir_recursive", pqxx::params{vaultId, patterns.like})
+            : txn.exec_prepared("list_directories_in_dir", pqxx::params{vaultId, patterns.like, patterns.not_like});
+
+        return types::directories_from_pq_res(res);
     });
 }
 

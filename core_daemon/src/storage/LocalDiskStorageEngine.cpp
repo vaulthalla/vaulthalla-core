@@ -3,6 +3,7 @@
 #include "types/Vault.hpp"
 #include "util/imageUtil.hpp"
 #include "services/ThumbnailWorker.hpp"
+#include "database/Queries/FileQueries.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -76,12 +77,25 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
     return buffer;
 }
 
-void LocalDiskStorageEngine::deleteFile(const std::filesystem::path& rel_path) {
-    if (!std::filesystem::remove(getAbsoluteCachePath(rel_path))) throw std::runtime_error(
-        "Failed to delete thumbnail cache: " + rel_path.string());
+void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path) {
+    const auto absPath = getAbsolutePath(rel_path);
 
-    if (!std::filesystem::remove(getAbsolutePath(rel_path))) throw std::runtime_error(
-        "Failed to delete file: " + rel_path.string());
+    if (isDirectory(rel_path)) {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {
+            if (std::filesystem::is_regular_file(absPath)) {
+                std::filesystem::remove(absPath);
+                purgeThumbnails(entry.path());
+                database::FileQueries::deleteFile(vault_->id, rel_path);
+            }
+        }
+
+        std::filesystem::remove_all(absPath);
+        database::FileQueries::deleteDirectory(vault_->id, rel_path);
+    } else {
+        std::filesystem::remove(absPath);
+        purgeThumbnails(rel_path);
+        database::FileQueries::deleteFile(vault_->id, rel_path);
+    }
 }
 
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

@@ -81,10 +81,8 @@ private:
             const auto& sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
             for (const auto& size : sizes) {
                 auto cachePath = job.engine->getAbsoluteCachePath(job.rel_path, fs::path("thumbnails") / to_string(size));
-                if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath.append(".jpg");
-
+                if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath += ".jpg";
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
-
                 util::generateAndStoreThumbnail(job.buffer, cachePath, job.mime_type, size);
             }
         } catch (const std::exception& e) {

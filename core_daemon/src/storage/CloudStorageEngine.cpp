@@ -185,34 +185,15 @@ std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesy
         if (!keyNode) continue;
 
         std::string key = keyNode.text().get();
-
-        // Only include if it matches or is under the requested rel_path prefix
-        if (key.starts_with(prefix)) {
-            keys.push_back(std::move(key));
-        }
+        if (key.starts_with(prefix)) keys.push_back(std::move(key));
     }
 
     return keys;
 }
 
-std::string normalizeUnicodeFilename(const std::string& input) {
-    std::string output;
-    for (unsigned char c : input) {
-        // Replace known space-like characters
-        if (c == '\u00A0' || c == '\u202F') {
-            output += ' ';
-        } else if (std::isprint(c)) {
-            output += c;
-        }
-    }
-    return output;
-}
-
 std::u8string stripLeadingSlash(const std::filesystem::path& path) {
     std::u8string u8 = path.u8string();
-    if (!u8.empty() && u8[0] == u8'/') {
-        return u8.substr(1);
-    }
+    if (!u8.empty() && u8[0] == u8'/') return u8.substr(1);
     return u8;
 }
 

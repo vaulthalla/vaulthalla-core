@@ -2,6 +2,7 @@
 #include "types/APIKey.hpp"
 #include "shared_util/timestamp.hpp"
 #include "shared_util/u8.hpp"
+#include "util/s3Helpers.hpp"
 
 #include <ctime>
 #include <curl/curl.h>
@@ -9,8 +10,6 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
-#include <openssl/hmac.h>
-#include <openssl/sha.h>
 #include <regex>
 #include <sstream>
 #include <vector>
@@ -66,7 +65,7 @@ bool S3Provider::uploadObject(const std::filesystem::path& key, const std::files
 
     std::ostringstream bodyHashStream;
     bodyHashStream << file.rdbuf();
-    const std::string payloadHash = sha256Hex(bodyHashStream.str());
+    const std::string payloadHash = util::sha256Hex(bodyHashStream.str());
     file.clear(); file.seekg(startPos);
 
     auto hdrMap = buildHeaderMap(payloadHash);
@@ -142,7 +141,7 @@ bool S3Provider::deleteObject(const std::filesystem::path& path) {
 
     const auto [canonicalPath, url] = constructPaths(curl, path);
 
-    const std::string payloadHash = sha256Hex("");
+    const std::string payloadHash = util::sha256Hex("");
     const auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("DELETE", canonicalPath, hdrMap, payloadHash);
 
@@ -155,7 +154,7 @@ bool S3Provider::deleteObject(const std::filesystem::path& path) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
 
     std::string responseBody;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, util::writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
 
     long httpCode = 0;
@@ -175,14 +174,10 @@ bool S3Provider::deleteObject(const std::filesystem::path& path) {
 }
 
 std::string S3Provider::buildAuthorizationHeader(const std::string& method,
-                                                 const std::string& fullPath, // may include ?query
+                                                 const std::string& fullPath,
                                                  const std::map<std::string, std::string>& headers,
                                                  const std::string& payloadHash) {
-    // Split path and query for canonical request
-    std::string canonicalPath;
-    std::string canonicalQuery;
-
-    // Per AWS spec, query parameters must be URI‑encoded and sorted; we only ever send fixed params so safe.
+    std::string canonicalPath, canonicalQuery;
     const auto qpos = fullPath.find('?');
     if (qpos == std::string::npos) canonicalPath = fullPath;
     else {
@@ -196,59 +191,47 @@ std::string S3Provider::buildAuthorizationHeader(const std::string& method,
     const std::string amzDate = headers.at("x-amz-date");
     const std::string dateStamp = util::getDate();
 
-    // 1. Canonical headers
-    std::string canonicalHeaders;
-    std::string signedHeaders;
+    // Headers
+    std::string canonicalHeaders, signedHeaders;
     for (auto it = headers.begin(); it != headers.end(); ++it) {
         canonicalHeaders += it->first + ":" + it->second + "\n";
         signedHeaders += it->first;
         if (std::next(it) != headers.end()) signedHeaders += ";";
     }
 
-    // 2. Canonical request
+    // Canonical Request
     std::ostringstream canonicalRequestStream;
     canonicalRequestStream << method << "\n"
-        << canonicalPath << "\n"
-        << canonicalQuery << "\n"
-        << canonicalHeaders << "\n"
-        << signedHeaders << "\n"
-        << payloadHash;
+                           << canonicalPath << "\n"
+                           << canonicalQuery << "\n"
+                           << canonicalHeaders << "\n"
+                           << signedHeaders << "\n"
+                           << payloadHash;
 
     const std::string canonicalRequest = canonicalRequestStream.str();
-    const std::string hashedCanonicalRequest = sha256Hex(canonicalRequest);
+    const std::string hashedCanonicalRequest = util::sha256Hex(canonicalRequest);
 
-    // 3. String to sign
+    // String to Sign
     const std::string credentialScope = dateStamp + "/" + apiKey_->region + "/" + service + "/aws4_request";
     std::ostringstream stringToSignStream;
     stringToSignStream << algorithm << "\n" << amzDate << "\n" << credentialScope << "\n" << hashedCanonicalRequest;
     const std::string stringToSign = stringToSignStream.str();
 
-    // 4. Calculate signature key
-    auto hmac = [](const std::string& key, const std::string& data) {
-        unsigned char* digest =
-            HMAC(EVP_sha256(), key.data(), key.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(),
-                 nullptr, nullptr);
-        return std::string(reinterpret_cast<char*>(digest), SHA256_DIGEST_LENGTH);
-    };
+    // Signing key
+    std::string kDate    = util::hmacSha256Raw("AWS4" + apiKey_->secret_access_key, dateStamp);
+    std::string kRegion  = util::hmacSha256Raw(kDate, apiKey_->region);
+    std::string kService = util::hmacSha256Raw(kRegion, service);
+    std::string kSigning = util::hmacSha256Raw(kService, "aws4_request");
 
-    std::string kDate = hmac("AWS4" + apiKey_->secret_access_key, dateStamp);
-    std::string kRegion = hmac(kDate, apiKey_->region);
-    std::string kService = hmac(kRegion, service);
-    std::string kSigning = hmac(kService, "aws4_request");
+    // Signature
+    const std::string signature = util::hmacSha256HexFromRaw(kSigning, stringToSign);
 
-    unsigned char sigRaw[SHA256_DIGEST_LENGTH];
-    HMAC(EVP_sha256(), kSigning.data(), kSigning.size(), reinterpret_cast<const unsigned char*>(stringToSign.data()),
-         stringToSign.size(), sigRaw, nullptr);
-
-    std::ostringstream sigHex;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++
-         i)
-        sigHex << std::hex << std::setw(2) << std::setfill('0') << (int)sigRaw[i];
-
-    // 5. Final header
+    // Final header
     std::ostringstream authHeader;
-    authHeader << algorithm << " " << "Credential=" << apiKey_->access_key << "/" << credentialScope << ", "
-        << "SignedHeaders=" << signedHeaders << ", " << "Signature=" << sigHex.str();
+    authHeader << algorithm << " "
+               << "Credential=" << apiKey_->access_key << "/" << credentialScope << ", "
+               << "SignedHeaders=" << signedHeaders << ", "
+               << "Signature=" << signature;
 
     return authHeader.str();
 }
@@ -262,10 +245,7 @@ std::string S3Provider::initiateMultipartUpload(const std::string& key) {
     if (!curl) return "";
 
     const std::string rawKey = key;
-    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
-
     const auto [canonicalPath, url] = constructPaths(curl, key, "?uploads");
-
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
 
     auto hdrMap = buildHeaderMap(payloadHash);
@@ -281,7 +261,7 @@ std::string S3Provider::initiateMultipartUpload(const std::string& key) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)0);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, util::writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
     CURLcode res = curl_easy_perform(curl);
@@ -311,13 +291,11 @@ bool S3Provider::uploadPart(const std::string& key, const std::string& uploadId,
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
-
     // Compose URL and Canonical Path
     const std::string query = "?partNumber=" + std::to_string(partNumber) + "&uploadId=" + uploadId;
     const auto [canonicalPath, url] = constructPaths(curl, key, query);
 
-    const std::string payloadHash = sha256Hex(partData);
+    const std::string payloadHash = util::sha256Hex(partData);
     const auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("PUT", canonicalPath, hdrMap, payloadHash);
 
@@ -332,23 +310,14 @@ bool S3Provider::uploadPart(const std::string& key, const std::string& uploadId,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, partData.data());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(partData.size()));
-    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, writeToString);
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, util::writeToString);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &respHdr);
 
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) return false;
 
-    // Extract ETag
-    auto pos = respHdr.find("ETag:");
-    if (pos == std::string::npos) return false;
-    pos += 5; // Skip "ETag:"
-    while (pos < respHdr.size() && (respHdr[pos] == ' ' || respHdr[pos] == '\t')) ++pos;
-    auto end = respHdr.find_first_of("\r\n", pos);
-    etagOut = respHdr.substr(pos, end - pos);
-    while (!etagOut.empty() && (etagOut.back() == ' ' || etagOut.back() == '\t')) etagOut.pop_back();
-
-    return !etagOut.empty();
+    return util::extractETag(respHdr, etagOut);
 }
 
 bool S3Provider::completeMultipartUpload(const std::string& key,
@@ -359,23 +328,13 @@ bool S3Provider::completeMultipartUpload(const std::string& key,
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
-
     // Build URI and Canonical Path
     const std::string query = "?uploadId=" + uploadId;
     const auto [canonicalPath, url] = constructPaths(curl, key, query);
 
-    // Compose XML body
-    std::ostringstream xml;
-    xml << "<CompleteMultipartUpload>";
-    for (size_t i = 0; i < etags.size(); ++i) {
-        xml << "<Part><PartNumber>" << (i + 1)
-            << "</PartNumber><ETag>" << etags[i] << "</ETag></Part>";
-    }
-    xml << "</CompleteMultipartUpload>";
-    const std::string body = xml.str();
+    const auto body = util::composeMultiPartUploadXMLBody(etags);
 
-    const std::string payloadHash = sha256Hex(body);
+    const std::string payloadHash = util::sha256Hex(body);
     auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("POST", canonicalPath, hdrMap, payloadHash);
 
@@ -390,7 +349,7 @@ bool S3Provider::completeMultipartUpload(const std::string& key,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.data());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(body.size()));
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, util::writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
     CURLcode res = curl_easy_perform(curl);
@@ -411,12 +370,10 @@ bool S3Provider::abortMultipartUpload(const std::string& key, const std::string&
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
-
     const std::string query = "?uploadId=" + uploadId;
     const auto [canonicalPath, url] = constructPaths(curl, key, query);
 
-    const std::string payloadHash = sha256Hex("");
+    const std::string payloadHash = util::sha256Hex("");
     const auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("DELETE", canonicalPath, hdrMap, payloadHash);
 
@@ -481,7 +438,7 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
         if (!curl) break;
 
         std::string escapedPrefix;
-        if (!prefix.empty()) escapedPrefix = escapeKeyPreserveSlashes(curl, prefix);
+        if (!prefix.empty()) escapedPrefix = util::escapeKeyPreserveSlashes(curl, prefix);
 
         std::ostringstream uri;
         uri << "/" << bucket_ << "?list-type=2";
@@ -510,7 +467,7 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
         std::string response;
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, util::writeToString);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
         const CURLcode res = curl_easy_perform(curl);
@@ -524,12 +481,7 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
         // Append raw XML as UTF-8
         fullXmlResponse += std::u8string(reinterpret_cast<const char8_t*>(response.data()), response.size());
 
-        // Parse pagination
-        moreResults = std::regex_search(response, std::regex("<IsTruncated>true</IsTruncated>"));
-        std::smatch tokenMatch;
-        if (moreResults && std::regex_search(response, tokenMatch, std::regex("<NextContinuationToken>([^<]+)</NextContinuationToken>")))
-            continuationToken = tokenMatch[1].str();
-        else moreResults = false;
+        util::parsePagination(response, continuationToken, moreResults);
     }
 
     return fullXmlResponse;
@@ -540,9 +492,7 @@ bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer
     if (!curl) return false;
 
     const auto [canonicalPath, url] = constructPaths(curl, key);
-
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
-
     const auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("GET", canonicalPath, hdrMap, payloadHash);
 
@@ -563,68 +513,23 @@ bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) std::cerr << "[S3Provider] downloadToBuffer failed: "
-                                   << curl_easy_strerror(res) << "\nKey: " << key << std::endl;
+    if (res != CURLE_OK)
+        std::cerr << "[S3Provider] downloadToBuffer failed: " << curl_easy_strerror(res)
+                  << "\nKey: " << key << std::endl;
 
     return res == CURLE_OK;
 }
 
-std::string S3Provider::sha256Hex(const std::string& data) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256((unsigned char*)data.c_str(), data.size(), hash);
-    std::ostringstream oss;
-    for (unsigned char c : hash) oss << std::hex << std::setw(2) << std::setfill('0') << (int)c;
-    return oss.str();
-}
-
-std::string S3Provider::hmacSha256Hex(const std::string& key, const std::string& data) {
-    unsigned char* digest;
-    digest = HMAC(EVP_sha256(), key.c_str(), key.length(), (unsigned char*)data.c_str(), data.length(), NULL, NULL);
-    std::ostringstream oss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-        oss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
-    return oss.str();
-}
-
-std::string S3Provider::getHost() const {
-    return apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2);
-}
-
 std::map<std::string, std::string> S3Provider::buildHeaderMap(const std::string& payloadHash) const {
     return {
-            {"host", getHost()},
+            {"host", apiKey_->endpoint.substr(apiKey_->endpoint.find("//") + 2)},
             {"x-amz-content-sha256", payloadHash},
             {"x-amz-date", util::getCurrentTimestamp()}
     };
 }
 
-size_t S3Provider::writeToString(char* ptr, size_t size, size_t nmemb, void* userdata) {
-    auto* out = static_cast<std::string*>(userdata);
-    out->append(ptr, size * nmemb);
-    return size * nmemb;
-}
-
-std::string S3Provider::escapeKeyPreserveSlashes(CURL* curl, const std::filesystem::path& p) const {
-    std::ostringstream out;
-    bool first = true;
-    for (const auto& part : p) {
-        if (!first) out << '/';          // keep the slash literal
-        first = false;
-
-        const std::string seg = to_utf8_string(part.u8string());
-        char* esc = curl_easy_escape(curl, seg.c_str(), seg.length());
-        if (!esc) {
-            curl_easy_cleanup(curl);
-            throw std::runtime_error("escape failed");
-        }
-        out << esc;
-        curl_free(esc);
-    }
-    return out.str();
-}
-
 std::pair<std::string, std::string> S3Provider::constructPaths(CURL* curl, const std::filesystem::path& p, const std::string& query) const {
-    const auto escapedKey = escapeKeyPreserveSlashes(curl, p);
+    const auto escapedKey = util::escapeKeyPreserveSlashes(curl, p);
     const auto canonicalPath = "/" + bucket_ + "/" + escapedKey + query;
     const auto url = apiKey_->endpoint + canonicalPath;
     return {canonicalPath, url};

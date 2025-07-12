@@ -51,8 +51,6 @@ private:
 
 std::string getMimeType(const std::filesystem::path& path);
 std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path);
-std::string normalizeKeyForMatch(const std::string& input);
-std::string normalizeUnicodeFilename(const std::string& input);
 std::u8string stripLeadingSlash(const std::filesystem::path& path);
 
 } // namespace vh::storage

@@ -38,7 +38,7 @@ class S3Provider {
     std::shared_ptr<types::api::S3APIKey> apiKey_;
     std::string bucket_;
 
-    std::string buildAuthorizationHeader(const std::string& method, const std::string& canonicalUri,
+    std::string buildAuthorizationHeader(const std::string& method, const std::string& fullPath,
                                          const std::map<std::string, std::string>& headers,
                                          const std::string& payloadHash);
     std::string sha256Hex(const std::string& data);
@@ -46,9 +46,8 @@ class S3Provider {
 
     std::string getHost() const;
     std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
-    std::string buildURL(const std::string& canonicalPath) const;
-    std::string buildCanonicalPath(const std::string& escapedKey) const;
     std::string escapeKeyPreserveSlashes(CURL* curl, const std::filesystem::path& p) const;
+    std::pair<std::string, std::string> constructPaths(CURL* curl, const std::filesystem::path& p, const std::string& query = "") const;
 
     static size_t writeToString(char* ptr, size_t size, size_t nmemb, void* userdata);
 

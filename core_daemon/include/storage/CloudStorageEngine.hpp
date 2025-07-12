@@ -44,6 +44,10 @@ public:
 
     void initCloudStorage();
 
+protected:
+    void removeFile(const fs::path& rel_path) override;
+    void removeDirectory(const fs::path& rel_path) override;
+
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;

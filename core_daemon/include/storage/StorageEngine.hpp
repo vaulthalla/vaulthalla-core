@@ -37,7 +37,7 @@ public:
 
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
-    virtual void remove(const fs::path& relative_path) = 0;
+    virtual void remove(const fs::path& rel_path) = 0;
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
@@ -62,6 +62,10 @@ protected:
     std::shared_ptr<types::Vault> vault_;
     fs::path cache_path_, root_;
     std::shared_ptr<services::ThumbnailWorker> thumbnailWorker_;
+
+    virtual void removeFile(const fs::path& rel_path) = 0;
+
+    virtual void removeDirectory(const fs::path& rel_path) = 0;
 };
 
 } // namespace vh::storage

@@ -534,3 +534,4 @@ std::pair<std::string, std::string> S3Provider::constructPaths(CURL* curl, const
     const auto url = apiKey_->endpoint + canonicalPath;
     return {canonicalPath, url};
 }
+

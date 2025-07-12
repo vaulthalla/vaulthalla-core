@@ -43,6 +43,11 @@ public:
     [[nodiscard]] fs::path resolvePath(const std::string& id) const;
 
     [[nodiscard]] fs::path getRelativePath(const fs::path& absolute_path) const;
+
+protected:
+
+    void removeFile(const fs::path& rel_path) override;
+    void removeDirectory(const fs::path& rel_path) override;
 };
 
 } // namespace vh::storage

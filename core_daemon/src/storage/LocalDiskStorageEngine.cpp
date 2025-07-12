@@ -78,24 +78,34 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
 }
 
 void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path) {
+    if (isDirectory(rel_path)) removeDirectory(rel_path);
+    else if (isFile(rel_path)) removeFile(rel_path);
+    else throw std::runtime_error("Path does not exist: " + rel_path.string());
+}
+
+void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path) {
     const auto absPath = getAbsolutePath(rel_path);
 
-    if (isDirectory(rel_path)) {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {
-            if (std::filesystem::is_regular_file(absPath)) {
-                std::filesystem::remove(absPath);
-                purgeThumbnails(entry.path());
-                database::FileQueries::deleteFile(vault_->id, rel_path);
-            }
-        }
-
-        std::filesystem::remove_all(absPath);
-        database::FileQueries::deleteDirectory(vault_->id, rel_path);
-    } else {
+    if (std::filesystem::exists(absPath)) {
         std::filesystem::remove(absPath);
         purgeThumbnails(rel_path);
         database::FileQueries::deleteFile(vault_->id, rel_path);
     }
+}
+
+void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_path) {
+    const auto absPath = getAbsolutePath(rel_path);
+
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {
+        if (std::filesystem::is_regular_file(absPath)) {
+            std::filesystem::remove(absPath);
+            purgeThumbnails(entry.path());
+            database::FileQueries::deleteFile(vault_->id, rel_path);
+        }
+    }
+
+    std::filesystem::remove_all(absPath);
+    database::FileQueries::deleteDirectory(vault_->id, rel_path);
 }
 
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

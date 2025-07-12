@@ -2,6 +2,7 @@
 #include "cloud/S3Provider.hpp"
 #include "util/imageUtil.hpp"
 #include "types/FSEntry.hpp"
+#include "shared_util/u8.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -41,6 +42,16 @@ class S3ProviderIntegrationTest : public ::testing::Test {
     }
 };
 
+TEST_F(S3ProviderIntegrationTest, test_DeleteUnicodeFilename) {
+    const std::filesystem::path key = u8"Screenshot 2025-06-26 at 3.29.35\u202FPM.png";
+    ASSERT_TRUE(fs::exists(key));
+
+    ASSERT_TRUE(s3Provider_->uploadObject(key, key));
+    const auto downloadedPath = test_dir / "downloaded.png";
+    ASSERT_TRUE(s3Provider_->downloadObject(key, downloadedPath));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
+}
+
 TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     const std::filesystem::path key = {"simple-test.txt"};
     const auto filePath = test_dir / key;
@@ -48,15 +59,17 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     // Write some test content to the file
     writeTextFile(filePath, "This is a test file for S3 upload.");
 
-    ASSERT_TRUE(fs::exists(filePath));
+    ASSERT_TRUE(fs::exists(filePath)) << "File not created at: " << filePath;
 
+    std::cout << "Uploading file: " << filePath << std::endl;
     // Upload the file
-    bool uploadSuccess = s3Provider_->uploadObject(key, filePath.string());
-    EXPECT_TRUE(uploadSuccess);
+    bool uploadSuccess = s3Provider_->uploadObject(key, filePath);
+    EXPECT_TRUE(uploadSuccess) << "Failed to upload file to S3: " << key;
 
+    std::cout << "Downloading file: " << filePath << std::endl;
     // Download the file for verification
     const auto downloadedPath = test_dir / "downloaded.txt";
-    bool downloadSuccess = s3Provider_->downloadObject(key, downloadedPath.string());
+    bool downloadSuccess = s3Provider_->downloadObject(key, downloadedPath);
     EXPECT_TRUE(downloadSuccess);
 
     // Compare original and downloaded files
@@ -68,7 +81,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
@@ -102,7 +115,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
     EXPECT_EQ(originalContent.str(), downloadedContent.str());
 
     // Cleanup
-    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
@@ -141,7 +154,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     EXPECT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
     EXPECT_TRUE(buffer.find("appear in listObjects") != std::string::npos);
 
-    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
@@ -161,7 +174,7 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100); // sanity check: JPEG data exists
-    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
@@ -181,5 +194,5 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     );
 
     EXPECT_GT(jpeg.size(), 100);
-    EXPECT_TRUE(s3Provider_->deleteObject(key.u8string()));
+    EXPECT_TRUE(s3Provider_->deleteObject(key));
 }

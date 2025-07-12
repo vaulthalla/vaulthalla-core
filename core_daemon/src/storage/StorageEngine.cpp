@@ -32,5 +32,11 @@ std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem:
     return cache_path_ / prefixPath / relPath;
 }
 
+void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
+    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+        const auto thumbnailPath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
+        if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
+    }
+}
 
 }

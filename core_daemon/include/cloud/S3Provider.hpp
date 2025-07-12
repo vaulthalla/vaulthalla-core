@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <curl/curl.h>
 
 namespace vh::types::api {
 class S3APIKey;
@@ -16,9 +17,9 @@ class S3Provider {
     S3Provider(const std::shared_ptr<types::api::S3APIKey>& apiKey, const std::string& bucket);
     ~S3Provider();
 
-    bool uploadObject(const std::string& key, const std::string& filePath);
-    bool downloadObject(const std::string& key, const std::string& outputPath);
-    bool deleteObject(const std::u8string& key);
+    bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath);
+    bool downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath);
+    bool deleteObject(const std::filesystem::path& path);
 
     bool uploadLargeObject(const std::string& key, const std::string& filePath,
                            size_t partSize = 5 * 1024 * 1024);
@@ -42,5 +43,13 @@ class S3Provider {
                                          const std::string& payloadHash);
     std::string sha256Hex(const std::string& data);
     std::string hmacSha256Hex(const std::string& key, const std::string& data);
+
+    std::string getHost() const;
+    std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
+    std::string buildURL(const std::string& escapedKey) const;
+    std::string buildCanonicalPath(const std::string& escapedKey) const;
+    std::optional<std::string> escapeS3Key(CURL* curl, const std::string& key) const;
+    std::optional<std::string> escapeS3Key(CURL* curl, const std::filesystem::path& key) const;
+
 };
 } // namespace vh::cloud::s3

@@ -121,11 +121,12 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
 
         for (auto pit = full_path.begin(); pit != std::prev(full_path.end()); ++pit) {
             current /= *pit;
-            std::u8string dir_str = reinterpret_cast<const char8_t*>(current.string().c_str());
+
+            const auto dir_str = current.u8string();
 
             if (!directories.contains(dir_str)) {
                 auto dir = std::make_shared<Directory>();
-                dir->u8_path = dir_str;
+                dir->path = current;
                 dir->name = current.filename().string();
                 dir->created_at = dir->updated_at = ts;
                 directories[dir_str] = dir;

@@ -13,6 +13,8 @@
 #include <ranges>
 #include <pugixml.hpp>
 
+#include "protocols/websocket/handlers/UploadHandler.hpp"
+
 namespace vh::storage {
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
@@ -68,12 +70,7 @@ void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
             else {
                 if (!s3Provider_->deleteObject(stripLeadingSlash(entry->path)))
                     throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + entry->path.string());
-
-                for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-                    const auto thumbnailPath = getAbsoluteCachePath(entry->path, fs::path("thumbnails") / std::to_string(size));
-                    if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
-                }
-
+                purgeThumbnails(entry->path);
                 database::FileQueries::deleteFile(vault_->id, entry->path);
             }
         }
@@ -82,6 +79,8 @@ void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
     } else {
         if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+        purgeThumbnails(rel_path);
+        database::FileQueries::deleteFile(vault_->id, rel_path);
     }
 }
 

@@ -56,6 +56,8 @@ public:
 
     [[nodiscard]] virtual StorageType type() const = 0;
 
+    void purgeThumbnails(const fs::path& rel_path) const;
+
 protected:
     std::shared_ptr<types::Vault> vault_;
     fs::path cache_path_, root_;

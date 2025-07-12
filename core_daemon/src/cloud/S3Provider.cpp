@@ -63,21 +63,16 @@ bool S3Provider::uploadObject(const std::filesystem::path& key, const std::files
     const curl_off_t fileSize = file.tellg();
     file.seekg(startPos);
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
+    const std::string canonicalPath = buildCanonicalPath(escapedKey);
+    const std::string url = buildURL(canonicalPath);
 
-    const std::string url = buildURL(escapedKey);
     std::ostringstream bodyHashStream;
     bodyHashStream << file.rdbuf();
     const std::string payloadHash = sha256Hex(bodyHashStream.str());
     file.clear(); file.seekg(startPos);
 
     auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string canonicalPath = buildCanonicalPath(escapedKey);
     const std::string authHeader = buildAuthorizationHeader("PUT", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
@@ -114,20 +109,13 @@ bool S3Provider::downloadObject(const std::filesystem::path& key,
         return false;
     }
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        file.close();
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
-
-    const std::string uriPath = buildCanonicalPath(escapedKey);
-    const std::string url = buildURL(escapedKey);
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
+    const std::string canonicalPath = buildCanonicalPath(escapedKey);
+    const std::string url = buildURL(canonicalPath);
 
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
     auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader = buildAuthorizationHeader("GET", uriPath, hdrMap, payloadHash);
+    const std::string authHeader = buildAuthorizationHeader("GET", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
@@ -153,17 +141,14 @@ bool S3Provider::downloadObject(const std::filesystem::path& key,
 
 bool S3Provider::deleteObject(const std::filesystem::path& path) {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to initialize cURL");
 
-    auto escapedKeyOpt = escapeS3Key(curl, path);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    std::cout << "[S3Provider] Deleting object: " << to_utf8_string(path.u8string()) << std::endl;
 
-    const std::string url = buildURL(escapedKey);
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, path);
     const std::string canonicalPath = buildCanonicalPath(escapedKey);
+    const std::string url = buildURL(canonicalPath);
+
     const std::string payloadHash = sha256Hex("");
     const auto hdrMap = buildHeaderMap(payloadHash);
     const std::string authHeader = buildAuthorizationHeader("DELETE", canonicalPath, hdrMap, payloadHash);
@@ -177,10 +162,7 @@ bool S3Provider::deleteObject(const std::filesystem::path& path) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
 
     std::string responseBody;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](char* ptr, size_t size, size_t nmemb, std::string* out) {
-        out->append(ptr, size * nmemb);
-        return size * nmemb;
-    });
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
 
     long httpCode = 0;
@@ -288,16 +270,10 @@ std::string S3Provider::initiateMultipartUpload(const std::string& key) {
     if (!curl) return "";
 
     const std::string rawKey = key;
-    auto escapedKeyOpt = escapeS3Key(curl, rawKey);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return "false";
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
-
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
 
     const std::string canonicalPath = buildCanonicalPath(escapedKey) + "?uploads";
-    const std::string url = buildURL(escapedKey) + "?uploads";
+    const std::string url = buildURL(canonicalPath);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
 
     auto hdrMap = buildHeaderMap(payloadHash);
@@ -346,17 +322,12 @@ bool S3Provider::uploadPart(const std::string& key, const std::string& uploadId,
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
 
     // Compose URL and Canonical Path
     const std::string query = "?partNumber=" + std::to_string(partNumber) + "&uploadId=" + uploadId;
     const std::string canonicalPath = buildCanonicalPath(escapedKey) + query;
-    const std::string url = buildURL(escapedKey) + query;
+    const std::string url = buildURL(canonicalPath);
 
     const std::string payloadHash = sha256Hex(partData);
     const auto hdrMap = buildHeaderMap(payloadHash);
@@ -403,17 +374,12 @@ bool S3Provider::completeMultipartUpload(const std::string& key,
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
 
     // Build URI and Canonical Path
     const std::string query = "?uploadId=" + uploadId;
     const std::string canonicalPath = buildCanonicalPath(escapedKey) + query;
-    const std::string url = buildURL(escapedKey) + query;
+    const std::string url = buildURL(canonicalPath);
 
     // Compose XML body
     std::ostringstream xml;
@@ -464,16 +430,11 @@ bool S3Provider::abortMultipartUpload(const std::string& key, const std::string&
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
 
     const std::string query = "?uploadId=" + uploadId;
     const std::string canonicalPath = buildCanonicalPath(escapedKey) + query;
-    const std::string url = buildURL(escapedKey) + query;
+    const std::string url = buildURL(canonicalPath);
 
     const std::string payloadHash = sha256Hex("");
     const auto hdrMap = buildHeaderMap(payloadHash);
@@ -540,14 +501,7 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
         if (!curl) break;
 
         std::string escapedPrefix;
-        if (!prefix.empty()) {
-            auto escapedOpt = escapeS3Key(curl, prefix);
-            if (!escapedOpt) {
-                curl_easy_cleanup(curl);
-                break;
-            }
-            escapedPrefix = *escapedOpt;
-        }
+        if (!prefix.empty()) escapedPrefix = escapeKeyPreserveSlashes(curl, prefix);
 
         std::ostringstream uri;
         uri << "/" << bucket_ << "?list-type=2";
@@ -563,7 +517,7 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) {
         }
 
         const std::string uriStr = uri.str();
-        const std::string url = apiKey_->endpoint + uriStr;
+        const std::string url = buildURL(uriStr);
 
         const std::string payloadHash = "UNSIGNED-PAYLOAD";
         const auto hdrMap = buildHeaderMap(payloadHash);
@@ -610,19 +564,14 @@ bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    auto escapedKeyOpt = escapeS3Key(curl, key);
-    if (!escapedKeyOpt) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    const std::string& escapedKey = *escapedKeyOpt;
+    const std::string escapedKey = escapeKeyPreserveSlashes(curl, key);
 
-    const std::string uri = buildCanonicalPath(escapedKey);
-    const std::string url = buildURL(escapedKey);
+    const std::string canonicalPath = buildCanonicalPath(escapedKey);
+    const std::string url = buildURL(canonicalPath);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
 
     const auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader = buildAuthorizationHeader("GET", uri, hdrMap, payloadHash);
+    const std::string authHeader = buildAuthorizationHeader("GET", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
@@ -678,22 +627,35 @@ std::map<std::string, std::string> S3Provider::buildHeaderMap(const std::string&
     };
 }
 
-std::string S3Provider::buildURL(const std::string& escapedKey) const {
-    return apiKey_->endpoint + "/" + bucket_ + "/" + escapedKey;
+std::string S3Provider::buildURL(const std::string& canonicalPath) const {
+    return apiKey_->endpoint + canonicalPath;
 }
 
 std::string S3Provider::buildCanonicalPath(const std::string& escapedKey) const {
     return "/" + bucket_ + "/" + escapedKey;
 }
 
-std::optional<std::string> S3Provider::escapeS3Key(CURL* curl, const std::string& key) const {
-    char* escaped = curl_easy_escape(curl, key.c_str(), static_cast<int>(key.length()));
-    if (!escaped) return std::nullopt;
-    std::string result{escaped};
-    curl_free(escaped);
-    return result;
+size_t S3Provider::writeToString(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    auto* out = static_cast<std::string*>(userdata);
+    out->append(ptr, size * nmemb);
+    return size * nmemb;
 }
 
-std::optional<std::string> S3Provider::escapeS3Key(CURL* curl, const std::filesystem::path& key) const {
-    return escapeS3Key(curl, to_utf8_string(key.u8string()));
+std::string S3Provider::escapeKeyPreserveSlashes(CURL* curl, const std::filesystem::path& p) const {
+    std::ostringstream out;
+    bool first = true;
+    for (const auto& part : p) {
+        if (!first) out << '/';          // keep the slash literal
+        first = false;
+
+        const std::string seg = to_utf8_string(part.u8string());
+        char* esc = curl_easy_escape(curl, seg.c_str(), seg.length());
+        if (!esc) {
+            curl_easy_cleanup(curl);
+            throw std::runtime_error("escape failed");
+        }
+        out << esc;
+        curl_free(esc);
+    }
+    return out.str();
 }

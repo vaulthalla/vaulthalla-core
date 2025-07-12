@@ -46,10 +46,12 @@ class S3Provider {
 
     std::string getHost() const;
     std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
-    std::string buildURL(const std::string& escapedKey) const;
+    std::string buildURL(const std::string& canonicalPath) const;
     std::string buildCanonicalPath(const std::string& escapedKey) const;
-    std::optional<std::string> escapeS3Key(CURL* curl, const std::string& key) const;
-    std::optional<std::string> escapeS3Key(CURL* curl, const std::filesystem::path& key) const;
+    std::string escapeKeyPreserveSlashes(CURL* curl, const std::filesystem::path& p) const;
+
+    static size_t writeToString(char* ptr, size_t size, size_t nmemb, void* userdata);
 
 };
+
 } // namespace vh::cloud::s3

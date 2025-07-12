@@ -61,6 +61,8 @@ public:
 
     static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
 
+    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
+
     static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
                                                                  bool recursive = false);
 };

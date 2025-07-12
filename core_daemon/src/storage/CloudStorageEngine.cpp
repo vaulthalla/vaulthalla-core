@@ -59,28 +59,30 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
 }
 
 void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
-    if (isDirectory(rel_path)) {
-        auto files = types::fromS3XML(s3Provider_->listObjects(rel_path));
-
-        // Reverse the order so longest paths are deleted first, followed by directories
-        std::ranges::reverse(files.begin(), files.end());
-
-        for (const auto& entry : files) {
-            if (entry->isDirectory()) database::FileQueries::deleteDirectory(vault_->id, entry->path);
-            else {
-                if (!s3Provider_->deleteObject(stripLeadingSlash(entry->path)))
-                    throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + entry->path.string());
-                purgeThumbnails(entry->path);
-                database::FileQueries::deleteFile(vault_->id, entry->path);
-            }
-        }
-
-        database::FileQueries::deleteDirectory(vault_->id, rel_path);
-    } else {
+    if (isFile(rel_path)) {
         if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
         purgeThumbnails(rel_path);
         database::FileQueries::deleteFile(vault_->id, rel_path);
+    } else {
+        std::cout << "[CloudStorageEngine] remove called for directory: " << rel_path << std::endl;
+        const auto files = database::FileQueries::listFilesInDir(vault_->id, rel_path, true);
+        const auto directories = database::FileQueries::listDirectoriesInDir(vault_->id, rel_path, true);
+
+        for (const auto& file : files) {
+            std::cout << "[CloudStorageEngine] Deleting file: " << file->path << std::endl;
+            if (!s3Provider_->deleteObject(stripLeadingSlash(file->path)))
+                throw std::runtime_error("[CloudStorageEngine] Failed to delete object from S3: " + file->path.string());
+            purgeThumbnails(file->path);
+            database::FileQueries::deleteFile(vault_->id, file->path);
+        }
+
+        std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << std::endl;
+        for (const auto& dir : directories)
+            database::FileQueries::deleteDirectory(vault_->id, dir->path);
+
+        std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << std::endl;
+        database::FileQueries::deleteDirectory(vault_->id, rel_path);
     }
 }
 
@@ -122,7 +124,10 @@ void CloudStorageEngine::initCloudStorage() {
         if (item->isDirectory()) {
             if (item->path.string() == "/") continue;
             auto dir = std::static_pointer_cast<types::Directory>(item);
-            dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, dir->path.parent_path());
+            const auto parentPath = dir->path.parent_path().empty()
+                                        ? std::filesystem::path("/")
+                                        : dir->path.parent_path();
+            dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
             database::FileQueries::addDirectory(dir);
         } else {
             auto file = std::static_pointer_cast<types::File>(item);

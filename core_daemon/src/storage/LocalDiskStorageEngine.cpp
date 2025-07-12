@@ -84,13 +84,7 @@ void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path) {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {
             if (std::filesystem::is_regular_file(absPath)) {
                 std::filesystem::remove(absPath);
-
-                // Handle cache cleanup
-                for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-                    const auto thumbnailPath = getAbsoluteCachePath(entry.path(), fs::path("thumbnails") / std::to_string(size));
-                    if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
-                }
-
+                purgeThumbnails(entry.path());
                 database::FileQueries::deleteFile(vault_->id, rel_path);
             }
         }
@@ -99,12 +93,7 @@ void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path) {
         database::FileQueries::deleteDirectory(vault_->id, rel_path);
     } else {
         std::filesystem::remove(absPath);
-
-        for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-            const auto thumbnailPath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
-            if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
-        }
-
+        purgeThumbnails(rel_path);
         database::FileQueries::deleteFile(vault_->id, rel_path);
     }
 }

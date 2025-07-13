@@ -7,10 +7,19 @@
 namespace vh::types {
 struct File;
 struct S3Vault;
+struct ProxySync;
 
 namespace api {
 struct APIKey;
 }}
+
+namespace vh::cloud {
+class SyncTask;
+}
+
+namespace vh::services {
+class SyncController;
+}
 
 namespace vh::storage {
 
@@ -22,7 +31,8 @@ public:
 
     CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
                        const std::shared_ptr<types::S3Vault>& vault,
-                       const std::shared_ptr<types::api::APIKey>& key);
+                       const std::shared_ptr<types::api::APIKey>& key,
+                       const std::shared_ptr<types::ProxySync>& proxySync);
 
     void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
 
@@ -42,6 +52,10 @@ public:
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
 
+    void uploadFile(const std::filesystem::path& rel_path) const;
+
+    void uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const;
+
     void initCloudStorage();
 
 protected:
@@ -51,6 +65,10 @@ protected:
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;
+    std::shared_ptr<types::ProxySync> proxySync_;
+
+    friend class cloud::SyncTask;
+    friend class services::SyncController;
 };
 
 std::string getMimeType(const std::filesystem::path& path);

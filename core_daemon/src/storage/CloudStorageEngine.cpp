@@ -3,6 +3,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"
+#include "types/ProxySync.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "services/ThumbnailWorker.hpp"
@@ -17,9 +18,10 @@ namespace vh::storage {
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
                                        const std::shared_ptr<types::S3Vault>& vault,
-                                       const std::shared_ptr<types::api::APIKey>& key)
+                                       const std::shared_ptr<types::api::APIKey>& key,
+                                       const std::shared_ptr<types::ProxySync>& proxySync)
     : StorageEngine(vault, thumbnailWorker),
-      key_(key) {
+      key_(key), proxySync_(proxySync) {
     const auto conf = config::ConfigRegistry::get();
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
@@ -29,20 +31,8 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::Thumbnail
 }
 
 void CloudStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
-    const auto absPath = getAbsolutePath(rel_path);
-    if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath)) {
-        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
-    }
-
-    const auto s3Key = rel_path.string().starts_with("/") ? rel_path.string().substr(1) : rel_path.string();
-
-    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(s3Key, absPath.string());
-    else s3Provider_->uploadLargeObject(s3Key, absPath.string());
-
     std::string buffer;
-    if (!s3Provider_->downloadToBuffer(s3Key, buffer))
-        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
-
+    uploadFile(rel_path, buffer);
     thumbnailWorker_->enqueue(shared_from_this(), buffer, rel_path, mime_type);
 }
 
@@ -114,6 +104,26 @@ std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem:
     return root_ / safe_rel;
 }
 
+void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
+    std::string buffer;
+    uploadFile(rel_path, buffer);
+}
+
+void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const {
+    const auto absPath = getAbsolutePath(rel_path);
+    if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
+        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
+
+    const auto s3Key = rel_path.string().starts_with("/") ? rel_path.string().substr(1) : rel_path.string();
+
+    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
+    else s3Provider_->uploadLargeObject(stripLeadingSlash(rel_path), absPath);
+
+    if (!s3Provider_->downloadToBuffer(s3Key, buffer))
+        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
+}
+
+
 void CloudStorageEngine::initCloudStorage() {
     std::cout << "[CloudStorageEngine] Initializing cloud storage for vault: " << vault_->id << std::endl;
     const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault_);
@@ -140,8 +150,8 @@ void CloudStorageEngine::initCloudStorage() {
             file->mime_type = getMimeType(file->path);
             database::FileQueries::addFile(file);
 
-            if (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/pdf"))
-                thumbnailWorker_->enqueue(shared_from_this(), buffer, file->path, *file->mime_type);
+            if (file->mime_type.starts_with("image/") || file->mime_type.starts_with("application/pdf"))
+                thumbnailWorker_->enqueue(shared_from_this(), buffer, file->path, file->mime_type);
         }
     }
 }

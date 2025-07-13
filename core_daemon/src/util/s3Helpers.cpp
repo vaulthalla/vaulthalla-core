@@ -170,4 +170,16 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>
     return authHeader.str();
 }
 
+void trimInPlace(std::string& s) {
+    // Trim start
+    s.erase(s.begin(), std::ranges::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+
+    // Trim end
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
 }

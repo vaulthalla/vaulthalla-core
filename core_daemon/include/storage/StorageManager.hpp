@@ -58,6 +58,16 @@ public:
 
     static bool hasLogicalParent(const std::filesystem::path& relPath);
 
+    template <typename T>
+    std::vector<std::shared_ptr<T>> getEngines() const {
+        std::lock_guard lock(mountsMutex_);
+        std::vector<std::shared_ptr<T>> result;
+        for (const auto& [id, engine] : engines_)
+            if (auto specificEngine = std::dynamic_pointer_cast<T>(engine))
+                result.push_back(specificEngine);
+        return result;
+    }
+
 private:
     mutable std::mutex mountsMutex_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine> > engines_;

@@ -127,6 +127,45 @@ inline nlohmann::json to_json(const std::vector<std::shared_ptr<APIKey>>& keys) 
     return j;
 }
 
+inline void to_json(nlohmann::json& j, const APIKey& key) {
+    j = {
+        {"api_key_id", key.id},
+        {"user_id", key.user_id},
+        {"type", to_string(key.type)},
+        {"name", key.name},
+        {"created_at", util::timestampToString(key.created_at)}
+    };
+    if (key.provider.has_value()) j["provider"] = to_string(key.provider.value());
+}
+
+inline void from_json(const nlohmann::json& j, APIKey& key) {
+    key.id = j.at("api_key_id").get<unsigned int>();
+    key.user_id = j.at("user_id").get<unsigned int>();
+    key.type = from_string(j.at("type").get<std::string>());
+    key.name = j.at("name").get<std::string>();
+    key.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
+    if (j.contains("provider")) key.provider = s3_provider_from_string(j.at("provider").get<std::string>());
+    else key.provider.reset();
+}
+
+inline void from_json(const nlohmann::json& j, S3APIKey& key) {
+    from_json(j, static_cast<APIKey&>(key));
+    key.provider = s3_provider_from_string(j.at("provider").get<std::string>());
+    key.access_key = j.at("access_key").get<std::string>();
+    key.secret_access_key = j.at("secret_access_key").get<std::string>();
+    key.region = j.at("region").get<std::string>();
+    key.endpoint = j.at("endpoint").get<std::string>();
+}
+
+inline void to_json(nlohmann::json& j, const S3APIKey& key) {
+    to_json(j, static_cast<const APIKey&>(key));
+    j["provider"] = to_string(key.provider);
+    j["access_key"] = key.access_key;
+    j["secret_access_key"] = key.secret_access_key;
+    j["region"] = key.region;
+    j["endpoint"] = key.endpoint;
+}
+
 inline void to_json(nlohmann::json& j, const std::shared_ptr<APIKey>& key) {
     j = to_json(key);
 }

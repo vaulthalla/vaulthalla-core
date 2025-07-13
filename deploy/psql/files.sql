@@ -14,11 +14,11 @@ CREATE TABLE directories
 
 CREATE TABLE directory_stats
 (
-    directory_id  INTEGER PRIMARY KEY REFERENCES directories (id) ON DELETE CASCADE,
-    file_count    INTEGER   DEFAULT 0,
-    subdirectory_count  INTEGER   DEFAULT 0, -- Count of immediate subdirectories
-    size_bytes    BIGINT    DEFAULT 0, -- Total size of all files in this directory
-    last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    directory_id       INTEGER PRIMARY KEY REFERENCES directories (id) ON DELETE CASCADE,
+    file_count         INTEGER   DEFAULT 0,
+    subdirectory_count INTEGER   DEFAULT 0, -- Count of immediate subdirectories
+    size_bytes         BIGINT    DEFAULT 0, -- Total size of all files in this directory
+    last_modified      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE files
@@ -123,14 +123,18 @@ CREATE TABLE file_locks
     expires_at TIMESTAMP
 );
 
-CREATE TABLE file_icons
+CREATE TABLE thumbnails
 (
-    file_id        INTEGER PRIMARY KEY REFERENCES files (id) ON DELETE CASCADE,
-    icon_path      TEXT,
-    thumbnail_path TEXT,
-    preview_path   TEXT,
-    generated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    vault_id     INTEGER REFERENCES vault (id),
+    path         TEXT      NOT NULL,
+    updated_at   TIMESTAMP NOT NULL,
+    content_hash TEXT      NOT NULL,
+    width        INTEGER,
+    height       INTEGER,
+    cached_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (vault_id, path)
 );
+
 
 CREATE TABLE audit_log
 (

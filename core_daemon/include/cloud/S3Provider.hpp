@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <curl/curl.h>
+#include <unordered_map>
 
 namespace vh::types::api {
 class S3APIKey;
@@ -27,20 +28,25 @@ public:
 
     bool deleteObject(const std::filesystem::path& path) const;
 
-    bool uploadLargeObject(const std::string& key, const std::string& filePath,
+    bool uploadLargeObject(const std::filesystem::path& key,
+                           const std::filesystem::path& filePath,
                            size_t partSize = 5 * 1024 * 1024) const;
 
-    std::string initiateMultipartUpload(const std::string& key) const;
+    std::string initiateMultipartUpload(const std::filesystem::path& key) const;
 
-    bool uploadPart(const std::string& key, const std::string& uploadId, int partNumber,
-                    const std::string& partData, std::string& etagOut) const;
+    bool uploadPart(const std::filesystem::path& key, const std::string& uploadId,
+                    int partNumber, const std::string& partData, std::string& etagOut) const;
 
-    bool completeMultipartUpload(const std::string& key, const std::string& uploadId,
+    bool completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
                                  const std::vector<std::string>& etags) const;
 
-    bool abortMultipartUpload(const std::string& key, const std::string& uploadId) const;
+    bool abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const;
 
     std::u8string listObjects(const std::filesystem::path& prefix = {}) const;
+
+    std::optional<std::unordered_map<std::string, std::string>> getHeadObject(const std::filesystem::path& key) const;
+
+    bool setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const;
 
     bool downloadToBuffer(const std::string& key, std::string& outBuffer) const;
 

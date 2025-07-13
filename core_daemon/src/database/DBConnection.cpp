@@ -317,5 +317,29 @@ void DBConnection::initPreparedPermOverrides() const {
                    "WHERE vra.subject_type = $1 AND vra.subject_id = $2");
 }
 
+void DBConnection::initPreparedSync() const {
+    conn_->prepare("insert_sync",
+        "INSERT INTO sync (id, interval, conflict_policy, strategy) "
+        "VALUES ($1, $2, $3, $4) RETURNING id");
+
+    conn_->prepare("update_sync",
+        "UPDATE sync SET interval = $2, conflict_policy = $3, strategy = $4, "
+        "enabled = $5, last_sync_at = $6, last_success_at = $7, updated_at = NOW() "
+        "WHERE id = $1");
+
+    conn_->prepare("report_sync_started", "UPDATE sync SET last_sync_at = NOW() WHERE id = $1");
+
+    conn_->prepare("report_sync_success", "UPDATE sync SET last_success_at = NOW(), last_sync_at = NOW() WHERE id = $1");
+
+    conn_->prepare("insert_proxy_sync",
+                   "INSERT INTO proxy_sync (sync_id, cache_thumbnails, cache_full_size_objects, max_cache_size) "
+                   "VALUES ($1, $2, $3, $4) RETURNING id");
+
+    conn_->prepare("get_proxy_sync_config",
+                   "SELECT s.*, ps.* "
+                   "FROM proxy_sync ps "
+                   "JOIN sync s ON ps.sync_id = s.id "
+                   "WHERE ps.vault_id = $1");
+}
 
 } // namespace vh::database

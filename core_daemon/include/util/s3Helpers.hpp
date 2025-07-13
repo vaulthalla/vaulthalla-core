@@ -25,5 +25,6 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>
                                      const std::string& method, const std::string& fullPath,
                                      const std::map<std::string, std::string>& headers,
                                      const std::string& payloadHash);
+void trimInPlace(std::string& s);
 
 }

@@ -17,6 +17,10 @@ namespace vh::services {
 class ThumbnailWorker;
 }
 
+namespace vh::cloud {
+class SyncTask;
+}
+
 namespace vh::storage {
 
 enum class StorageType { Local, Cloud };
@@ -66,6 +70,8 @@ protected:
     virtual void removeFile(const fs::path& rel_path) = 0;
 
     virtual void removeDirectory(const fs::path& rel_path) = 0;
+
+    friend class cloud::SyncTask;
 };
 
 } // namespace vh::storage

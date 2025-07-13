@@ -11,7 +11,9 @@
 #include "types/Directory.hpp"
 #include "util/Magic.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
+#include "database/Queries/SyncQueries.hpp"
 #include "services/ThumbnailWorker.hpp"
+#include "crypto/Hash.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -37,7 +39,8 @@ void StorageManager::initStorageEngines() {
                 auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
                 if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
                 const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-                engines_[vault->id] = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key);
+                const auto proxySync = database::SyncQueries::getProxySyncConfig(vaultS3->id);
+                engines_[vault->id] = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key, proxySync);
             }
         }
     } catch (const std::exception& e) {
@@ -90,7 +93,8 @@ std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Va
             auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
             if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
             const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-            const auto engine = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key);
+            const auto proxySync = database::SyncQueries::getProxySyncConfig(vaultS3->id);
+            const auto engine = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key, proxySync);
             engine->initCloudStorage();
             engines_[vault->id] = engine;
         }
@@ -139,12 +143,15 @@ void StorageManager::finishUpload(const unsigned int vaultId,
     f->name = relPath.filename().string();
     f->size_bytes = std::filesystem::file_size(absPath);
     f->created_by = f->last_modified_by = user->id;
-    f->path = relPath.string();
+    f->path = relPath;
     f->mime_type = util::Magic::get_mime_type(absPath);
+    f->content_hash = crypto::Hash::blake2b(relPath.string());
     if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
     else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
 
-    engine->finishUpload(relPath, f->mime_type.value_or("application/octet-stream")); {
+    engine->finishUpload(relPath, f->mime_type);
+
+    {
         std::lock_guard lock(mountsMutex_);
         database::FileQueries::addFile(f);
     }

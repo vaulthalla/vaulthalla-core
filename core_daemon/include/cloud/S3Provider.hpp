@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/curlWrappers.hpp"
+
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -48,12 +50,16 @@ private:
 
     std::string buildAuthorizationHeader(const std::string& method, const std::string& fullPath,
                                          const std::map<std::string, std::string>& headers,
-                                         const std::string& payloadHash);
+                                         const std::string& payloadHash) const;
 
     std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
 
     std::pair<std::string, std::string> constructPaths(CURL* curl, const std::filesystem::path& p,
                                                        const std::string& query = "") const;
+
+    SList makeSigHeaders(const std::string& method,
+                         const std::string& canonical,
+                         const std::string& payloadHash) const;
 
 };
 

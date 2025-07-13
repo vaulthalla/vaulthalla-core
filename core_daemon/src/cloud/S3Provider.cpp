@@ -49,49 +49,54 @@ S3Provider::~S3Provider() = default;
 // -------------------------------------------------------------------------
 // uploadObject / downloadObject / deleteObject
 // -------------------------------------------------------------------------
+
+inline std::string slurp(std::istream& in) {
+    std::ostringstream oss;
+    oss << in.rdbuf();          // copy entire buffer
+    return oss.str();
+}
+
 bool S3Provider::uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    std::ifstream fin(filePath, std::ios::binary);
+    if (!fin) return false;
 
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file) return false;
+    // 1. Get file size
+    fin.seekg(0, std::ios::end);
+    const curl_off_t sz = fin.tellg();
+    fin.seekg(0);
 
-    const auto startPos = file.tellg();
-    file.seekg(0, std::ios::end);
-    const curl_off_t fileSize = file.tellg();
-    file.seekg(startPos);
+    // 2. Read file contents for hashing
+    const std::string fileContents = slurp(fin);
+    const std::string payloadHash = util::sha256Hex(fileContents);
 
-    const auto [canonicalPath, url] = constructPaths(curl, key);
+    // 3. Rewind stream again for actual read
+    fin.clear();
+    fin.seekg(0);
 
-    std::ostringstream bodyHashStream;
-    bodyHashStream << file.rdbuf();
-    const std::string payloadHash = util::sha256Hex(bodyHashStream.str());
-    file.clear(); file.seekg(startPos);
+    // 4. Setup canonical path and URL using a temporary CURL handle
+    CurlEasy tmpHandle;
+    const auto [canonical, url] = constructPaths(tmpHandle, key);
 
-    auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader = buildAuthorizationHeader("PUT", canonicalPath, hdrMap, payloadHash);
+    // 5. Build headers (must live past lambda)
+    SList hdrs = makeSigHeaders("PUT", canonical, payloadHash);
+    hdrs.add("Content-Type: application/octet-stream");
 
-    HeaderList headers;
-    headers.add("Content-Type: application/octet-stream");
-    headers.add("Authorization: " + authHeader);
-    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+    // 6. Execute curl request
+    HttpResponse resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_UPLOAD, 1L);
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
+        curl_easy_setopt(h, CURLOPT_READDATA, &fin);
+        curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, sz);
+        curl_easy_setopt(h, CURLOPT_READFUNCTION,
+            +[](char* buf, size_t sz, size_t nm, void* ud) -> size_t {
+                auto* fp = static_cast<std::ifstream*>(ud);
+                fp->read(buf, static_cast<std::streamsize>(sz * nm));
+                return static_cast<size_t>(fp->gcount());
+            });
+    });
 
-    auto readFn = +[](char* buf, size_t sz, size_t nm, void* ud) -> size_t {
-        auto* fin = static_cast<std::ifstream*>(ud);
-        fin->read(buf, static_cast<std::streamsize>(sz * nm));
-        return static_cast<size_t>(fin->gcount());
-    };
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-    curl_easy_setopt(curl, CURLOPT_READFUNCTION, readFn);
-    curl_easy_setopt(curl, CURLOPT_READDATA, &file);
-    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, fileSize);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
-
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    return res == CURLE_OK;
+    return resp.ok();
 }
 
 bool S3Provider::downloadObject(const std::filesystem::path& key,
@@ -133,50 +138,35 @@ bool S3Provider::downloadObject(const std::filesystem::path& key,
     return res == CURLE_OK;
 }
 
-bool S3Provider::deleteObject(const std::filesystem::path& path) {
-    CURL* curl = curl_easy_init();
-    if (!curl) throw std::runtime_error("Failed to initialize cURL");
+bool S3Provider::deleteObject(const std::filesystem::path& key) {
+    // 1. Construct canonical path and URL using a valid CURL handle for escaping
+    CurlEasy tmpHandle;
+    const auto [canonical, url] = constructPaths(tmpHandle, key);
 
-    std::cout << "[S3Provider] Deleting object: " << to_utf8_string(path.u8string()) << std::endl;
-
-    const auto [canonicalPath, url] = constructPaths(curl, path);
-
+    // 2. Build headers
     const std::string payloadHash = util::sha256Hex("");
-    const auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader = buildAuthorizationHeader("DELETE", canonicalPath, hdrMap, payloadHash);
+    SList hdrs = makeSigHeaders("DELETE", canonical, payloadHash);
 
-    HeaderList headers;
-    headers.add("Authorization: " + authHeader);
-    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+    // 3. Perform the DELETE request
+    HttpResponse resp = performCurl([&](CURL* h){
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_CUSTOMREQUEST, "DELETE");
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
+    });
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
-
-    std::string responseBody;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, util::writeToString);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
-
-    long httpCode = 0;
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK) {
-        std::cerr << "[S3Provider] curl error: " << curl_easy_strerror(res) << "\n";
-        return false;
+    if (!resp.ok()) {
+        std::cerr << "[S3Provider] DELETE " << canonical
+                  << " failed CURL=" << resp.curl
+                  << " HTTP=" << resp.http << '\n' << resp.body << std::endl;
     }
 
-    if (httpCode >= 200 && httpCode < 300) return true;
-
-    std::cerr << "[S3Provider] DELETE " << canonicalPath << " failed (HTTP " << httpCode << "):\n" << responseBody << "\n";
-    return false;
+    return resp.ok();
 }
 
 std::string S3Provider::buildAuthorizationHeader(const std::string& method,
                                                  const std::string& fullPath,
                                                  const std::map<std::string, std::string>& headers,
-                                                 const std::string& payloadHash) {
+                                                 const std::string& payloadHash) const {
     std::string canonicalPath, canonicalQuery;
     const auto qpos = fullPath.find('?');
     if (qpos == std::string::npos) canonicalPath = fullPath;
@@ -535,3 +525,14 @@ std::pair<std::string, std::string> S3Provider::constructPaths(CURL* curl, const
     return {canonicalPath, url};
 }
 
+SList S3Provider::makeSigHeaders(const std::string& method,
+                                 const std::string& canonical,
+                                 const std::string& payloadHash) const {
+    auto base = buildHeaderMap(payloadHash);      // host + dates
+    const auto auth = buildAuthorizationHeader(method, canonical, base, payloadHash);
+
+    SList out;
+    out.add("Authorization: " + auth);
+    for (auto& [k, v] : base) out.add(k + ": " + v);
+    return out;                                   // RAII slist
+}

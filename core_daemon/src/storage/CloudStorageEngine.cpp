@@ -114,7 +114,6 @@ std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem:
     return root_ / safe_rel;
 }
 
-
 void CloudStorageEngine::initCloudStorage() {
     std::cout << "[CloudStorageEngine] Initializing cloud storage for vault: " << vault_->id << std::endl;
     const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault_);

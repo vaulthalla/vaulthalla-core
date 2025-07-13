@@ -1,5 +1,7 @@
 #include "util/s3Helpers.hpp"
 #include "shared_util/u8.hpp"
+#include "shared_util/timestamp.hpp"
+#include "types/APIKey.hpp"
 
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
@@ -104,5 +106,68 @@ bool extractETag(const std::string& respHdr, std::string& etagOut) {
     return !etagOut.empty();
 }
 
+std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>& api_key,
+                                                 const std::string& method,
+                                                 const std::string& fullPath,
+                                                 const std::map<std::string, std::string>& headers,
+                                                 const std::string& payloadHash) {
+    std::string canonicalPath, canonicalQuery;
+    const auto qpos = fullPath.find('?');
+    if (qpos == std::string::npos) canonicalPath = fullPath;
+    else {
+        canonicalPath = fullPath.substr(0, qpos);
+        canonicalQuery = fullPath.substr(qpos + 1);
+        if (canonicalQuery.find('=') == std::string::npos) canonicalQuery += '=';
+    }
+
+    const std::string service = "s3";
+    const std::string algorithm = "AWS4-HMAC-SHA256";
+    const std::string amzDate = headers.at("x-amz-date");
+    const std::string dateStamp = util::getDate();
+
+    // Headers
+    std::string canonicalHeaders, signedHeaders;
+    for (auto it = headers.begin(); it != headers.end(); ++it) {
+        canonicalHeaders += it->first + ":" + it->second + "\n";
+        signedHeaders += it->first;
+        if (std::next(it) != headers.end()) signedHeaders += ";";
+    }
+
+    // Canonical Request
+    std::ostringstream canonicalRequestStream;
+    canonicalRequestStream << method << "\n"
+                           << canonicalPath << "\n"
+                           << canonicalQuery << "\n"
+                           << canonicalHeaders << "\n"
+                           << signedHeaders << "\n"
+                           << payloadHash;
+
+    const std::string canonicalRequest = canonicalRequestStream.str();
+    const std::string hashedCanonicalRequest = sha256Hex(canonicalRequest);
+
+    // String to Sign
+    const std::string credentialScope = dateStamp + "/" + api_key->region + "/" + service + "/aws4_request";
+    std::ostringstream stringToSignStream;
+    stringToSignStream << algorithm << "\n" << amzDate << "\n" << credentialScope << "\n" << hashedCanonicalRequest;
+    const std::string stringToSign = stringToSignStream.str();
+
+    // Signing key
+    std::string kDate    = util::hmacSha256Raw("AWS4" + api_key->secret_access_key, dateStamp);
+    std::string kRegion  = util::hmacSha256Raw(kDate, api_key->region);
+    std::string kService = util::hmacSha256Raw(kRegion, service);
+    std::string kSigning = util::hmacSha256Raw(kService, "aws4_request");
+
+    // Signature
+    const std::string signature = util::hmacSha256HexFromRaw(kSigning, stringToSign);
+
+    // Final header
+    std::ostringstream authHeader;
+    authHeader << algorithm << " "
+               << "Credential=" << api_key->access_key << "/" << credentialScope << ", "
+               << "SignedHeaders=" << signedHeaders << ", "
+               << "Signature=" << signature;
+
+    return authHeader.str();
+}
 
 }

@@ -21,36 +21,32 @@ public:
 
     ~S3Provider();
 
-    bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath);
+    bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const;
 
-    bool downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath);
+    bool downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath) const;
 
-    bool deleteObject(const std::filesystem::path& path);
+    bool deleteObject(const std::filesystem::path& path) const;
 
     bool uploadLargeObject(const std::string& key, const std::string& filePath,
-                           size_t partSize = 5 * 1024 * 1024);
+                           size_t partSize = 5 * 1024 * 1024) const;
 
-    std::string initiateMultipartUpload(const std::string& key);
+    std::string initiateMultipartUpload(const std::string& key) const;
 
     bool uploadPart(const std::string& key, const std::string& uploadId, int partNumber,
-                    const std::string& partData, std::string& etagOut);
+                    const std::string& partData, std::string& etagOut) const;
 
     bool completeMultipartUpload(const std::string& key, const std::string& uploadId,
-                                 const std::vector<std::string>& etags);
+                                 const std::vector<std::string>& etags) const;
 
-    bool abortMultipartUpload(const std::string& key, const std::string& uploadId);
+    bool abortMultipartUpload(const std::string& key, const std::string& uploadId) const;
 
-    std::u8string listObjects(const std::filesystem::path& prefix = {});
+    std::u8string listObjects(const std::filesystem::path& prefix = {}) const;
 
-    bool downloadToBuffer(const std::string& key, std::string& outBuffer);
+    bool downloadToBuffer(const std::string& key, std::string& outBuffer) const;
 
 private:
     std::shared_ptr<types::api::S3APIKey> apiKey_;
     std::string bucket_;
-
-    std::string buildAuthorizationHeader(const std::string& method, const std::string& fullPath,
-                                         const std::map<std::string, std::string>& headers,
-                                         const std::string& payloadHash) const;
 
     std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
 

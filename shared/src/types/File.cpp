@@ -30,7 +30,7 @@ File::File(const std::string& s3_key, const uint64_t size, const std::optional<s
     if (updated) updated_at = *updated;
 }
 
-void to_json(nlohmann::json& j, const File& f) {
+void vh::types::to_json(nlohmann::json& j, const File& f) {
     to_json(j, static_cast<const FSEntry&>(f));
     j["size_bytes"] = f.size_bytes;
     j["mime_type"] = f.mime_type;
@@ -38,14 +38,14 @@ void to_json(nlohmann::json& j, const File& f) {
     j["type"] = "file"; // Helpful for client
 }
 
-void from_json(const nlohmann::json& j, File& f) {
+void vh::types::from_json(const nlohmann::json& j, File& f) {
     from_json(j, static_cast<FSEntry&>(f));
     f.size_bytes = j.at("size_bytes").get<unsigned long long>();
     f.mime_type = j.at("mime_type").get<std::string>();
     f.content_hash = j.at("content_hash").get<std::string>();
 }
 
-void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<File>>& files) {
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<File>>& files) {
     j = nlohmann::json::array();
     for (const auto& file : files) j.push_back(*file);
 }

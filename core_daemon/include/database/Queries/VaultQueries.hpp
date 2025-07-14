@@ -5,6 +5,7 @@
 
 namespace vh::types {
     struct Vault;
+    struct ProxySync;
 }
 
 namespace vh::database {
@@ -12,7 +13,8 @@ namespace vh::database {
 struct VaultQueries {
     VaultQueries() = default;
 
-    static unsigned int addVault(const std::shared_ptr<types::Vault>& vault);
+    static unsigned int addVault(const std::shared_ptr<types::Vault>& vault,
+                                 const std::shared_ptr<types::ProxySync>& proxySync = nullptr);
     static void removeVault(unsigned int vaultId);
     static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
     static std::vector<std::shared_ptr<types::Vault>> listVaults();

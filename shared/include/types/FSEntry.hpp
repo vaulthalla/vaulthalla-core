@@ -6,6 +6,8 @@
 #include <optional>
 #include <unordered_map>
 #include <nlohmann/json_fwd.hpp>
+#include <vector>
+#include <memory>
 
 namespace pqxx {
 class row;
@@ -41,7 +43,7 @@ void from_json(const nlohmann::json& j, FSEntry& entry);
 
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<FSEntry>>& entries);
 
-std::vector<std::shared_ptr<FSEntry> > merge_entries(const std::vector<std::shared_ptr<File>>& files,
+std::vector<std::shared_ptr<FSEntry>> merge_entries(const std::vector<std::shared_ptr<File>>& files,
                                                      const std::vector<std::shared_ptr<Directory>>& directories);
 
 std::vector<std::shared_ptr<FSEntry>> fromS3XML(const std::u8string& xml);

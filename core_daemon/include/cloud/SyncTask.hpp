@@ -28,18 +28,21 @@ public:
     explicit SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
                       const std::shared_ptr<services::SyncController>& syncController);
 
-    ExpectedFuture operator()() override;
+    void operator()() override;
 
     bool operator<(const SyncTask& other) const;
 
 private:
-    static constexpr std::string CONTENT_HASH_ID = "x-amz-meta-content-hash";
+    inline static const std::string CONTENT_HASH_ID = "x-amz-meta-content-hash";
+
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
 
     void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
 
     void downloadDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
+
+    static std::vector<std::shared_ptr<types::File>> uMap2Vector(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map);
 };
 
 }

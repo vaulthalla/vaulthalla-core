@@ -17,7 +17,7 @@ CREATE TABLE s3_api_keys
     endpoint          TEXT DEFAULT NULL
 );
 
-CREATE TABLE s3_buckets
+CREATE TABLE s3_bucket
 (
     id         SERIAL PRIMARY KEY,
     s3_api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
@@ -57,7 +57,7 @@ CREATE TABLE s3
 CREATE TABLE backup_policy
 (
     vault_id        INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
-    backup_interval INTERVAL DEFAULT '1 day',
+    backup_interval BIGINT NOT NULL DEFAULT 86400, -- 1 day in seconds
     last_backup_at  TIMESTAMP        DEFAULT NULL,
     last_success_at TIMESTAMP        DEFAULT NULL,
     retention       INTERVAL DEFAULT NULL, -- how long to keep backups
@@ -81,10 +81,10 @@ CREATE TABLE backup_targets
 CREATE TABLE sync
 (
     id              SERIAL PRIMARY KEY,
-    interval        INTERVAL DEFAULT '5 minute',
+    interval        BIGINT NOT NULL DEFAULT 300, -- 5 minutes in seconds
     conflict_policy VARCHAR(12)      DEFAULT 'keep_local' CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask')),
     strategy        VARCHAR(12)      DEFAULT 'sync' CHECK (strategy IN ('sync', 'mirror', 'merge')),
-    enabled         BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
     last_sync_at    TIMESTAMP        DEFAULT NULL,
     last_success_at TIMESTAMP        DEFAULT NULL,
     created_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP,

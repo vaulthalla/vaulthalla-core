@@ -9,7 +9,7 @@ using namespace vh::types;
 
 Sync::Sync(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),
-      interval(util::parsePostgresInterval(row.at("interval").as<std::string>())),
+      interval(std::chrono::seconds(row.at("interval").as<uint64_t>())),
       conflict_policy(row.at("conflict_policy").as<std::string>()),
       strategy(row.at("strategy").as<std::string>()),
       enabled(row.at("enabled").as<bool>()),
@@ -35,7 +35,7 @@ void vh::types::to_json(nlohmann::json& j, const Sync& s) {
 
 void vh::types::from_json(const nlohmann::json& j, Sync& s) {
     s.id = j.at("id").get<unsigned int>();
-    s.interval = util::parsePostgresInterval(j.at("interval").get<std::string>());
+    s.interval = std::chrono::seconds(j.at("interval").get<uint64_t>());
     s.conflict_policy = j.at("conflict_policy").get<std::string>();
     s.strategy = j.at("strategy").get<std::string>();
     s.enabled = j.at("enabled").get<bool>();

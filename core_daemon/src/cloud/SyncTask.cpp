@@ -81,7 +81,7 @@ void SyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<types::Fil
 
 
 void SyncTask::downloadDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const {
-    for (const auto& file : std::vector<std::shared_ptr<types::File>>(s3Map.begin(), s3Map.end())) {
+    for (const auto& file : uMap2Vector(s3Map)) {
         std::cout << "[SyncWorker] Downloading new S3 file: " << file->path << "\n";
         const auto absPath = engine_->getAbsolutePath(file->path);
 
@@ -112,6 +112,15 @@ void SyncTask::downloadDiff(std::unordered_map<std::u8string, std::shared_ptr<ty
         database::FileQueries::updateFile(f);
     }
 }
+
+std::vector<std::shared_ptr<vh::types::File> > SyncTask::uMap2Vector(std::unordered_map<std::u8string, std::shared_ptr<types::File> >& map) {
+    std::vector<std::shared_ptr<types::File>> files;
+    files.reserve(map.size());
+    std::ranges::transform(map.begin(), map.end(), std::back_inserter(files),
+                   [](const auto& pair) { return pair.second; });
+    return files;
+}
+
 
 bool SyncTask::operator<(const SyncTask& other) const {
     return next_run > other.next_run;

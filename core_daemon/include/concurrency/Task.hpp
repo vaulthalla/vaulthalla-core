@@ -2,6 +2,9 @@
 
 #include "concurrency/types.hpp"
 
+#include <future>
+#include <optional>
+
 namespace vh::concurrency {
 
 struct Task {

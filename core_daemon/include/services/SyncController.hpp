@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <queue>
+#include <atomic>
+#include <thread>
 
 namespace vh::concurrency {
 class ThreadPool;
@@ -19,16 +21,22 @@ namespace vh::services {
 
 class SyncController : public std::enable_shared_from_this<SyncController> {
 public:
-    std::priority_queue<std::shared_ptr<cloud::SyncTask>> pq{};
-
     explicit SyncController(std::shared_ptr<storage::StorageManager> storage_manager);
     ~SyncController();
 
-    void operator()();
+    void start();
+    void stop();
 
 private:
+    void run();
+    std::priority_queue<std::shared_ptr<cloud::SyncTask>> pq{};
+
     std::shared_ptr<storage::StorageManager> storage_;
     std::shared_ptr<concurrency::ThreadPool> pool_;
+    std::thread controllerThread_;
+    std::atomic<bool> running_{false};
+
+    friend class cloud::SyncTask;
 };
 
 }

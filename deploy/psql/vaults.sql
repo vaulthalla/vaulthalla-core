@@ -17,10 +17,10 @@ CREATE TABLE s3_api_keys
     endpoint          TEXT DEFAULT NULL
 );
 
-CREATE TABLE s3_bucket
+CREATE TABLE s3_buckets
 (
     id         SERIAL PRIMARY KEY,
-    s3_api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
+    api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
     name       TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -50,13 +50,13 @@ CREATE TABLE local
 CREATE TABLE s3
 (
     vault_id      INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
-    api_key_id    INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
-    bucket_id     INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE,
+    bucket_id     INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE
 );
 
 CREATE TABLE backup_policy
 (
-    vault_id        INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    id              SERIAL PRIMARY KEY,
+    vault_id        INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
     backup_interval BIGINT NOT NULL DEFAULT 86400, -- 1 day in seconds
     last_backup_at  TIMESTAMP        DEFAULT NULL,
     last_success_at TIMESTAMP        DEFAULT NULL,
@@ -65,13 +65,12 @@ CREATE TABLE backup_policy
     enabled         BOOLEAN NOT NULL DEFAULT FALSE,
     last_error      TEXT DEFAULT NULL,
     status          VARCHAR(12) DEFAULT 'idle' CHECK (status IN ('idle', 'syncing', 'error'))
-
 );
 
 CREATE TABLE backup_targets
 (
     id        SERIAL PRIMARY KEY,
-    backup_id INTEGER REFERENCES backu_policy (id) ON DELETE CASCADE,
+    backup_id INTEGER REFERENCES backup_policy (id) ON DELETE CASCADE,
     type      VARCHAR(12) NOT NULL CHECK (type IN ('local', 's3')),
     path      TEXT DEFAULT NULL,
     bucket_id INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE,
@@ -106,7 +105,7 @@ CREATE TABLE proxy_sync
     vault_id                 INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
     cache_thumbnails         BOOLEAN NOT NULL DEFAULT TRUE,
     cache_full_size_objects  BOOLEAN NOT NULL DEFAULT TRUE,
-    max_cache_size           BIGINT NOT NULL DEFAULT 10 * 1024 * 1024 * 1024, -- 10 GB
+    max_cache_size           BIGINT NOT NULL DEFAULT (10::BIGINT * 1024 * 1024 * 1024), -- 10 GB default
 
     UNIQUE (vault_id) -- Only one proxy sync per vault
 );

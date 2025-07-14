@@ -4,7 +4,9 @@
 #include "cloud/SyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
+#include "database/Queries/VaultQueries.hpp"
 
+#include <boost/dynamic_bitset.hpp>
 #include <iostream>
 #include <thread>
 
@@ -24,7 +26,10 @@ SyncController::~SyncController() {
 void SyncController::start() {
     if (running_) return;
     running_ = true;
-    controllerThread_ = std::thread(&SyncController::run, this);
+
+    const auto self = shared_from_this();
+    controllerThread_ = std::thread([self]() { self->run(); });
+
     std::cout << "[SyncController] Started." << std::endl;
 }
 
@@ -34,18 +39,58 @@ void SyncController::stop() {
     std::cout << "[SyncController] Stopped." << std::endl;
 }
 
+void SyncController::requeue(const std::shared_ptr<cloud::SyncTask>& task) {
+    std::scoped_lock lock(pqMutex_);
+    pq.push(task);
+}
+
+
 void SyncController::run() {
-    const auto cloudEngines = storage_->getEngines<storage::CloudStorageEngine>();
+    std::vector<std::shared_ptr<storage::CloudStorageEngine>> engineBuffer;
 
-    if (cloudEngines.empty()) {
-        std::cerr << "[SyncController] No cloud storage engines found, exiting." << std::endl;
-        return;
-    }
+    const auto refreshEngines = [&]() {
+        engineBuffer.clear();
 
-    auto self = shared_from_this(); // safe to call now — we're inside start()
-    for (const auto& cloudEngine : cloudEngines) {
-        pq.push(std::make_shared<cloud::SyncTask>(cloudEngine, self));
-    }
+        const auto latestEngines = storage_->getEngines<storage::CloudStorageEngine>();
+
+        boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
+        for (const auto& engine : latestEngines) latestBitset.set(engine->getVault()->id);
+
+        {
+            std::unique_lock lock(engineMapMutex_);
+
+            // Remove engines that are no longer present
+            std::vector<unsigned int> staleIds;
+
+            for (const auto& [id, engine] : engineMap_)
+                if (!latestBitset[engine->getVault()->id]) staleIds.push_back(id);
+
+            for (auto id : staleIds) engineMap_.erase(id);
+
+            // Add new engines that are not already in the map
+            for (const auto& engine : latestEngines) {
+                if (!engineMap_.contains(engine->getVault()->id)) {
+                    engineMap_[engine->getVault()->id] = {engine};
+                    engineBuffer.push_back(engine);
+                }
+            }
+        }
+
+        if (engineBuffer.empty()) {
+            std::cout << "[SyncController] No new engines found." << std::endl;
+            return;
+        }
+
+        // Add sync tasks for each engine
+        std::scoped_lock lock(pqMutex_);
+        for (const auto& engine : engineBuffer)
+            pq.push(std::make_shared<cloud::SyncTask>(engine, this->shared_from_this()));
+    };
+
+    refreshEngines();
+
+    std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
+    unsigned int refreshTries = 0;
 
     while (running_) {
         if (pool_->interrupted()) {
@@ -53,13 +98,33 @@ void SyncController::run() {
             return;
         }
 
-        if (pq.empty()) {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+        if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
+            std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
+            lastRefresh = std::chrono::system_clock::now();
+        }
+
+        bool pqIsEmpty = false;
+        {
+            std::scoped_lock lock(pqMutex_);
+            pqIsEmpty = pq.empty();
+        }
+
+        if (pqIsEmpty) {
+            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(15));
+            std::cout << "[SyncController] No sync tasks available." << std::endl;
+            refreshEngines();
         } else {
-            const auto task = pq.top();
-            if (task->next_run > std::chrono::system_clock::now()) {
-                std::this_thread::sleep_until(task->next_run);
-            } else {
+            refreshTries = 0;
+            std::shared_ptr<cloud::SyncTask> task;
+
+            {
+                std::scoped_lock lock(pqMutex_);
+                task = pq.top();
+            }
+
+            if (task->next_run > std::chrono::system_clock::now()) std::this_thread::sleep_until(task->next_run);
+            else {
+                std::scoped_lock lock(pqMutex_);
                 pq.pop();
                 pool_->submit(task);
             }

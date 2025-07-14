@@ -3,6 +3,21 @@ set -euo pipefail
 
 echo "🗡️  Initiating Vaulthalla uninstallation sequence..."
 
+DEV_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--dev)
+            DEV_MODE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
 # === 1) Stop and disable systemd service (if exists) ===
 echo "🗑️  Removing systemd services..."
 
@@ -43,11 +58,10 @@ else
     echo "✅ System user 'vaulthalla' not present."
 fi
 
-# === 5) Prompt to drop the PostgreSQL DB and user ===
+# === 5) Drop PostgreSQL DB and user ===
 echo
-read -p "⚠️  Drop PostgreSQL database and user 'vaulthalla'? [y/N]: " confirm
-if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-    echo "🧨 Dropping PostgreSQL DB and user..."
+if [[ "$DEV_MODE" == true ]]; then
+    echo "⚠️  [DEV_MODE] Dropping PostgreSQL DB and user 'vaulthalla'..."
     sudo -u postgres psql <<EOF
 REVOKE CONNECT ON DATABASE vaulthalla FROM public;
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'vaulthalla';
@@ -55,26 +69,42 @@ DROP DATABASE IF EXISTS vaulthalla;
 DROP USER IF EXISTS vaulthalla;
 EOF
 else
-    echo "🛡️  Skipping database deletion. You can do it manually with psql if needed."
+    read -p "⚠️  Drop PostgreSQL database and user 'vaulthalla'? [y/N]: " confirm
+    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+        echo "🧨 Dropping PostgreSQL DB and user..."
+        sudo -u postgres psql <<EOF
+REVOKE CONNECT ON DATABASE vaulthalla FROM public;
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'vaulthalla';
+DROP DATABASE IF EXISTS vaulthalla;
+DROP USER IF EXISTS vaulthalla;
+EOF
+    else
+        echo "🛡️  Skipping database deletion. You can do it manually with psql if needed."
+    fi
 fi
 
-# === 6) Prompt to uninstall Conan and Meson (optional) ===
-echo
-read -p "❓ Uninstall Conan (Python package manager)? [y/N]: " remove_conan
-if [[ "$remove_conan" == "y" || "$remove_conan" == "Y" ]]; then
-    echo "🚫 Removing Conan..."
-    pip uninstall -y conan || sudo pip uninstall -y conan || echo "⚠️ Conan uninstall failed or not found"
+# === 6) Uninstall Conan and Meson ===
+if [[ "$DEV_MODE" == true ]]; then
+    echo
+    echo "🚫 Skipping Conan and Meson uninstall in DEV_MODE."
 else
-    echo "✅ Conan left installed."
-fi
+    echo
+    read -p "❓ Uninstall Conan (Python package manager)? [y/N]: " remove_conan
+    if [[ "$remove_conan" == "y" || "$remove_conan" == "Y" ]]; then
+        echo "🚫 Removing Conan..."
+        pip uninstall -y conan || sudo pip uninstall -y conan || echo "⚠️ Conan uninstall failed or not found"
+    else
+        echo "✅ Conan left installed."
+    fi
 
-echo
-read -p "❓ Uninstall Meson build system and Ninja? [y/N]: " remove_meson
-if [[ "$remove_meson" == "y" || "$remove_meson" == "Y" ]]; then
-    echo "🧨 Removing Meson and Ninja..."
-    sudo apt remove -y meson ninja-build || echo "⚠️ Could not remove Meson/Ninja"
-else
-    echo "✅ Meson left installed."
+    echo
+    read -p "❓ Uninstall Meson build system and Ninja? [y/N]: " remove_meson
+    if [[ "$remove_meson" == "y" || "$remove_meson" == "Y" ]]; then
+        echo "🧨 Removing Meson and Ninja..."
+        sudo apt remove -y meson ninja-build || echo "⚠️ Could not remove Meson/Ninja"
+    else
+        echo "✅ Meson left installed."
+    fi
 fi
 
 # === Done ===

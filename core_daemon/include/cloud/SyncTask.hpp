@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <string>
 #include <chrono>
+#include <filesystem>
 
 namespace vh::services {
 class SyncController;
@@ -17,6 +18,7 @@ struct CloudStorageEngine;
 
 namespace vh::types {
 struct File;
+struct Directory;
 }
 
 namespace vh::cloud {
@@ -42,7 +44,13 @@ private:
 
     void downloadDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
 
+    void cacheDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
+
     static std::vector<std::shared_ptr<types::File>> uMap2Vector(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map);
+
+    static std::string getMimeType(const std::filesystem::path& path);
+
+    std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 };
 
 }

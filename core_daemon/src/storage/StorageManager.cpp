@@ -78,12 +78,13 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
     }
 }
 
-std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
+std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Vault> vault,
+                                                       const std::shared_ptr<types::ProxySync>& proxySync) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::lock_guard lock(mountsMutex_);
 
     try {
-        vault->id = database::VaultQueries::addVault(vault);
+        vault->id = database::VaultQueries::addVault(vault, proxySync);
         vault = database::VaultQueries::getVault(vault->id);
         if (vault->type == types::VaultType::Local) {
             auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);

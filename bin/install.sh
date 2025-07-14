@@ -6,6 +6,31 @@ set -euo pipefail
 #       This script sets up the entire environment
 # ═══════════════════════════════════════════════════════
 
+DEV_MODE=false
+
+# parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--dev)
+            DEV_MODE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+
+# Check if we're root OR have passwordless sudo
+if [[ $EUID -ne 0 ]]; then
+    if ! sudo -n true 2>/dev/null; then
+        echo "❗️ This script must be run as root or with passwordless sudo."
+        exit 1
+    fi
+fi
+
 # Clean build environment
 #if [[ -d build ]]; then
 #    echo "🧹 Cleaning previous build artifacts..."
@@ -173,7 +198,6 @@ echo "✅ Custom Conan profile written to $VAULTHALLA_PROFILE_PATH"
 # Install dependencies
 conan install . --build=missing -pr:a vaulthalla
 
-
 echo "🔨 Building binaries..."
 conan build . -pr:a vaulthalla
 
@@ -231,78 +255,47 @@ done
 echo "🌱 Seeding database..."
 sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/seed.sql
 
-echo "🔐 Set admin password (Enter = vh!adm1n):"
-read -rs ADMIN_PLAIN
+echo "🔐 Set admin password:"
 ADMIN_PLAIN="${ADMIN_PLAIN:-vh!adm1n}"
 
-echo "🔒 Hashing admin password..."
-HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
+if [[ "$DEV_MODE" == true ]]; then
+    echo "⚠️  [DEV_MODE] Using default admin password vh!adm1n"
+else
+    while true; do
+        echo "🔑 Please enter a secure admin password:"
+        read -rs ADMIN_PLAIN
+        echo
 
-cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
--- Insert Admin User if not exists
-INSERT INTO users (name, password_hash, created_at, is_active)
-VALUES ('admin', '${HASHED_PASS}', NOW(), TRUE)
-ON CONFLICT (name) DO NOTHING;
+        if [[ -z "$ADMIN_PLAIN" ]]; then
+            echo "❗ Password cannot be empty."
+            continue
+        fi
 
--- Link to user_role_assignments
-INSERT INTO user_role_assignments (user_id, role_id)
-SELECT u.id, r.id
-FROM users u, role r
-WHERE u.name = 'admin' AND r.name = 'super_admin' AND r.type = 'user';
+        # Try to hash and validate
+        if HASHED_PASS=$(./deploy/psql/hash_password --validate "$ADMIN_PLAIN" 2>&1); then
+            echo "✅ Password accepted."
+            break
+        else
+            echo "❌ Password rejected:"
+            echo "$HASHED_PASS"
+        fi
+    done
+fi
 
--- Create Admin Group & Link
-INSERT INTO groups (name, description)
-VALUES ('admin', 'Core admin group')
-ON CONFLICT (name) DO NOTHING;
+# In dev mode, we still hash after the conditional block:
+if [[ "$DEV_MODE" == true ]]; then
+    HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
+fi
 
-INSERT INTO group_members (group_id, user_id)
-SELECT g.id, u.id
-FROM groups g, users u
-WHERE g.name = 'admin'
-AND NOT EXISTS (
-  SELECT 1 FROM group_members
-  WHERE group_id = g.id AND user_id = u.id
-);
+echo "🔑 Seeding admin user..."
+sudo ./bin/setup/seed_admin.sh "$HASHED_PASS"
 
--- Create Admin Default Vault if not exists
-INSERT INTO vault (type, name, is_active, created_at, owner_id, description)
-VALUES ('local', 'Default', TRUE, NOW(), (SELECT id FROM users WHERE name = 'admin'), 'Default vault for admin user')
-ON CONFLICT (name) DO NOTHING;
-
--- Insert local mount point if not exists
-INSERT INTO local (vault_id, mount_point)
-SELECT v.id, 'users/admin'
-FROM vault v
-WHERE v.name = 'Default'
-AND NOT EXISTS (
-  SELECT 1 FROM local WHERE vault_id = v.id
-);
-
--- Seed root directory for admin vault
-INSERT INTO directories (vault_id, name, path, parent_id, created_by, last_modified_by)
-VALUES (
-    (SELECT id FROM vault WHERE name = 'Default'), '/', '/', NULL,
-    (SELECT id FROM users WHERE name = 'admin'), (SELECT id FROM users WHERE name = 'admin')
-    )
-ON CONFLICT DO NOTHING;
-
--- Cloud Test Vault and keys
-INSERT INTO api_keys (name, user_id, type, created_at)
-VALUES ('R2 Test Key', (SELECT id FROM users WHERE name = 'admin'), 's3', NOW())
-ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO s3_api_keys (api_key_id, provider, access_key, secret_access_key, region, endpoint)
-SELECT
-  (SELECT id FROM api_keys WHERE name = 'R2 Test Key'),
-  'Cloudflare R2',
-  '${VAULTHALLA_TEST_R2_ACCESS_KEY}',
-  '${VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY}',
-  'wnam',
-  '${VAULTHALLA_TEST_R2_ENDPOINT}'
-WHERE NOT EXISTS (
-  SELECT 1 FROM s3_api_keys WHERE api_key_id = (SELECT id FROM api_keys WHERE name = 'R2 Test Key')
-);
-EOF
+if [[ $DEV_MODE == true ]]; then
+    echo "🔄 Running cloud test vault setup..."
+    source ./bin/test/init_cloud_test_vault.sh
+else
+    echo "🌐 Skipping cloud test vault setup in production mode."
+fi
 
 # === 11) Install systemd services ===
 echo "🛠️  Installing systemd services..."
@@ -315,3 +308,7 @@ sudo systemctl enable --now vaulthalla-fuse.service
 
 echo ""
 echo "🏁 Vaulthalla installed successfully!"
+
+if [[ "$DEV_MODE" == true ]]; then
+    sudo journalctl -f -u vaulthalla-core
+fi

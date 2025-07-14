@@ -10,6 +10,7 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <iostream>
@@ -21,10 +22,11 @@ void Vaulthalla::start() {
     try {
         initConfig();
         database::Transactions::init();
+        concurrency::ThreadPoolRegistry::instance().init();
         serviceManager_ = std::make_shared<ServiceManager>();
-        initProtocols();
         initServices();
         initThreatIntelligence();
+        initProtocols();
         std::cout << "Vaulthalla service started." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[Vaulthalla] Exception: " << e.what() << std::endl;
@@ -80,9 +82,10 @@ void Vaulthalla::initHttpServer(const boost::asio::ip::tcp::endpoint& endpoint) 
 }
 
 void Vaulthalla::initServices() {
-    lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(serviceManager_->authManager()->sessionManager());
+    // TODO: fix segfaults in ConnectionLifecycleManager
+    // lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(serviceManager_->authManager()->sessionManager());
+    // lifecycleManager_->start();
     syncController_ = std::make_shared<SyncController>(serviceManager_->storageManager());
-    lifecycleManager_->start();
     syncController_->start();
 }
 

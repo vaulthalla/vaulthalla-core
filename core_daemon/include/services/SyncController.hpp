@@ -4,6 +4,9 @@
 #include <queue>
 #include <atomic>
 #include <thread>
+#include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
 
 namespace vh::concurrency {
 class ThreadPool;
@@ -11,6 +14,7 @@ class ThreadPool;
 
 namespace vh::storage {
 class StorageManager;
+class CloudStorageEngine;
 }
 
 namespace vh::cloud {
@@ -27,6 +31,8 @@ public:
     void start();
     void stop();
 
+    void requeue(const std::shared_ptr<cloud::SyncTask>& task);
+
 private:
     void run();
     std::priority_queue<std::shared_ptr<cloud::SyncTask>> pq{};
@@ -35,6 +41,11 @@ private:
     std::shared_ptr<concurrency::ThreadPool> pool_;
     std::thread controllerThread_;
     std::atomic<bool> running_{false};
+
+    mutable std::mutex pqMutex_;
+    mutable std::shared_mutex engineMapMutex_;
+
+    std::unordered_map<unsigned int, std::shared_ptr<storage::CloudStorageEngine>> engineMap_{};
 
     friend class cloud::SyncTask;
 };

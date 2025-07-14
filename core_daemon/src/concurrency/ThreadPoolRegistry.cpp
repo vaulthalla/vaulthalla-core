@@ -9,12 +9,12 @@ ThreadPoolRegistry& ThreadPoolRegistry::instance() {
 }
 
 void ThreadPoolRegistry::init() {
-    if (stopFlag_.load()) {
-        sync_ = std::make_shared<ThreadPool>();
-        cloud_ = std::make_shared<ThreadPool>();
-        thumb_ = std::make_shared<ThreadPool>();
-        stopFlag_.store(false);
-    }
+    if (sync_ && cloud_ && thumb_) return; // already initialized
+
+    sync_  = std::make_shared<ThreadPool>();
+    cloud_ = std::make_shared<ThreadPool>();
+    thumb_ = std::make_shared<ThreadPool>();
+    stopFlag_.store(false);
 }
 
 void ThreadPoolRegistry::shutdown() {

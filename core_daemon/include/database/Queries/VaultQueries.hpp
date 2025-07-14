@@ -21,6 +21,8 @@ struct VaultQueries {
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId);
     static std::string getVaultOwnersName(unsigned int vaultId);
 
+    [[nodiscard]] static unsigned int maxVaultId();
+
     static bool localDiskVaultExists();
 };
 

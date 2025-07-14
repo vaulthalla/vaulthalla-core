@@ -24,7 +24,7 @@ unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault,
             pqxx::params psync_params{syncId, vaultId, proxySync->enabled, proxySync->last_sync_at, proxySync->last_success_at};
             txn.exec_prepared("insert_proxy_sync", psync_params);
 
-            txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
+            txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
         }
 
         pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};
@@ -115,6 +115,12 @@ std::string VaultQueries::getVaultOwnersName(const unsigned int vaultId) {
     return Transactions::exec("VaultQueries::getVaultOwnersName", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_vault_owners_name", pqxx::params{vaultId}).one_row();
         return row["name"].as<std::string>();
+    });
+}
+
+unsigned int VaultQueries::maxVaultId() {
+    return Transactions::exec("VaultQueries::maxVaultId", [](pqxx::work& txn) {
+        return txn.exec_prepared("get_max_vault_id").one_field().as<unsigned int>();
     });
 }
 

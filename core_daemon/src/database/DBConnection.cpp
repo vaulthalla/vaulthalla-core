@@ -28,6 +28,7 @@ void DBConnection::initPrepared() const {
     initPreparedUserRoles();
     initPreparedVaultRoles();
     initPreparedPermOverrides();
+    initPreparedSync();
 }
 
 void DBConnection::initPreparedUsers() const {
@@ -99,37 +100,39 @@ void DBConnection::initPreparedVaults() const {
 
     conn_->prepare("insert_local_vault", "INSERT INTO local (vault_id, mount_point) VALUES ($1, $2)");
 
-    conn_->prepare("insert_s3_bucket", "INSERT INTO s3_bucket (name, s3_api_key_id) VALUES ($1, $2) RETURNING id");
+    conn_->prepare("insert_s3_bucket", "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) RETURNING id");
 
-    conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket_id) VALUES ($1, $2, $3)");
+    conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
 
     conn_->prepare("get_vault",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.s3_api_key_id AS api_key_id "
+        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
         "FROM vault v "
         "LEFT JOIN local l ON v.id = l.vault_id "
         "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_bucket s3b ON s.bucket_id = s3b.id "
+        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
         "WHERE v.id = $1");
 
     conn_->prepare("list_vaults",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.s3_api_key_id AS api_key_id "
+        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
         "FROM vault v "
         "LEFT JOIN local l ON v.id = l.vault_id "
         "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_bucket s3b ON s.bucket_id = s3b.id");
+        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id");
 
     conn_->prepare("list_user_vaults",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.s3_api_key_id AS api_key_id "
+        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
         "FROM vault v "
         "LEFT JOIN local l ON v.id = l.vault_id "
         "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_bucket s3b ON s.bucket_id = s3b.id "
+        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
         "WHERE v.owner_id = $1");
 
     conn_->prepare("get_vault_owners_name",
         "SELECT u.name FROM users u "
         "JOIN vault v ON u.id = v.owner_id "
         "WHERE v.id = $1");
+
+    conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 }
 
 
@@ -338,7 +341,7 @@ void DBConnection::initPreparedSync() const {
 
     conn_->prepare("insert_proxy_sync",
                    "INSERT INTO proxy_sync (sync_id, vault_id, cache_thumbnails, cache_full_size_objects, max_cache_size) "
-                   "VALUES ($1, $2, $3, $4, $5) RETURNING id");
+                   "VALUES ($1, $2, $3, $4, $5)");
 
     conn_->prepare("get_proxy_sync_config",
                    "SELECT s.*, ps.* "

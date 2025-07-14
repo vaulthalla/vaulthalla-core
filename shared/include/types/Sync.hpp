@@ -18,6 +18,7 @@ struct Sync {
     bool enabled{};
     std::time_t last_sync_at{}, last_success_at{}, created_at{}, updated_at{};
 
+    Sync() = default;
     explicit Sync(const pqxx::row& row);
 };
 

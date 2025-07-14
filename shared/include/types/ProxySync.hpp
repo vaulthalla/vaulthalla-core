@@ -8,6 +8,7 @@ struct ProxySync : Sync {
     bool cache_thumbnails{true}, cache_full_size_objects{true};
     unsigned long long max_cache_size{0}; // in bytes
 
+    ProxySync() = default;
     explicit ProxySync(const pqxx::row& row);
 };
 

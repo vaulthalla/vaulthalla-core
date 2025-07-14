@@ -13,10 +13,10 @@ Sync::Sync(const pqxx::row& row)
       conflict_policy(row.at("conflict_policy").as<std::string>()),
       strategy(row.at("strategy").as<std::string>()),
       enabled(row.at("enabled").as<bool>()),
-      last_sync_at(row.at("last_sync_at").as<std::time_t>()),
-      last_success_at(row.at("last_success_at").as<std::time_t>()),
-      created_at(row.at("created_at").as<std::time_t>()),
-      updated_at(row.at("updated_at").as<std::time_t>()) {
+      created_at(util::parsePostgresTimestamp(row.at("created_at").as<std::string>())),
+      updated_at(util::parsePostgresTimestamp(row.at("updated_at").as<std::string>())) {
+    if (!row["last_sync_at"].is_null()) last_sync_at = util::parsePostgresTimestamp(row["last_sync_at"].as<std::string>());
+    if (!row["last_success_at"].is_null()) last_success_at = util::parsePostgresTimestamp(row["last_success_at"].as<std::string>());
 }
 
 void vh::types::to_json(nlohmann::json& j, const Sync& s) {
@@ -34,13 +34,13 @@ void vh::types::to_json(nlohmann::json& j, const Sync& s) {
 }
 
 void vh::types::from_json(const nlohmann::json& j, Sync& s) {
-    s.id = j.at("id").get<unsigned int>();
+    if (j.contains("id")) s.id = j.at("id").get<unsigned int>();
     s.interval = std::chrono::seconds(j.at("interval").get<uint64_t>());
     s.conflict_policy = j.at("conflict_policy").get<std::string>();
     s.strategy = j.at("strategy").get<std::string>();
-    s.enabled = j.at("enabled").get<bool>();
-    s.last_sync_at = util::parseTimestampFromString(j.at("last_sync_at").get<std::string>());
-    s.last_success_at = util::parseTimestampFromString(j.at("last_success_at").get<std::string>());
-    s.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
-    s.updated_at = util::parseTimestampFromString(j.at("updated_at").get<std::string>());
+    s.enabled = j.value("enabled", true);
+    if (j.contains("last_sync_at")) s.last_sync_at = util::parseTimestampFromString(j.at("last_sync_at").get<std::string>());
+    if (j.contains("last_success_at")) s.last_success_at = util::parseTimestampFromString(j.at("last_success_at").get<std::string>());
+    if (j.contains("created_at")) s.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
+    if (j.contains("updated_at")) s.updated_at = util::parseTimestampFromString(j.at("updated_at").get<std::string>());
 }

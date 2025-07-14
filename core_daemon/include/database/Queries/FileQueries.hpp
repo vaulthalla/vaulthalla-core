@@ -51,6 +51,10 @@ public:
 
     [[nodiscard]] static bool isFile(unsigned int vaultId, const std::filesystem::path& relPath);
 
+    [[nodiscard]] static bool directoryExists(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    [[nodiscard]] static bool fileExists(unsigned int vaultId, const std::filesystem::path& relPath);
+
     [[nodiscard]] static std::optional<unsigned int> getDirectoryIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);

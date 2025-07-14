@@ -257,6 +257,14 @@ bool FileQueries::isFile(const unsigned int vaultId, const std::filesystem::path
     });
 }
 
+bool FileQueries::directoryExists(unsigned int vaultId, const std::filesystem::path& relPath) {
+    return isDirectory(vaultId, relPath);
+}
+
+bool FileQueries::fileExists(unsigned int vaultId, const std::filesystem::path& relPath) {
+    return isFile(vaultId, relPath);
+}
+
 std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesInDir(const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
     return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(path.string(), recursive);

@@ -11,6 +11,7 @@
 namespace vh::types {
 struct User;
 struct FSEntry;
+struct ProxySync;
 }
 
 namespace vh::services {
@@ -27,7 +28,8 @@ public:
 
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
-    std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault);
+    std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
+                                           const std::shared_ptr<types::ProxySync>& proxySync = nullptr);
 
     void removeVault(unsigned int vaultId);
 
@@ -53,6 +55,8 @@ public:
     std::shared_ptr<CloudStorageEngine> getCloudEngine(unsigned int id) const;
 
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
+
+    std::shared_ptr<services::ThumbnailWorker> getThumbnailWorker() const { return thumbnailWorker_; }
 
     static bool pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2);
 

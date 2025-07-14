@@ -1,7 +1,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
-#include "cloud/SyncTask.hpp"
+#include "concurrency/sync/SyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -42,8 +42,8 @@ void SyncController::stop() {
 void SyncController::requeue(const std::shared_ptr<cloud::SyncTask>& task) {
     std::scoped_lock lock(pqMutex_);
     pq.push(task);
+    std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
 }
-
 
 void SyncController::run() {
     std::vector<std::shared_ptr<storage::CloudStorageEngine>> engineBuffer;
@@ -76,10 +76,7 @@ void SyncController::run() {
             }
         }
 
-        if (engineBuffer.empty()) {
-            std::cout << "[SyncController] No new engines found." << std::endl;
-            return;
-        }
+        if (engineBuffer.empty()) return;
 
         // Add sync tasks for each engine
         std::scoped_lock lock(pqMutex_);
@@ -110,7 +107,7 @@ void SyncController::run() {
         }
 
         if (pqIsEmpty) {
-            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(15));
+            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(30));
             std::cout << "[SyncController] No sync tasks available." << std::endl;
             refreshEngines();
         } else {

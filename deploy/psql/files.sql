@@ -35,6 +35,7 @@ CREATE TABLE files
     mime_type        VARCHAR(255),
     content_hash     VARCHAR(128),          -- optional: for dedup, integrity
     path             TEXT         NOT NULL, -- Full path for easy access
+
     UNIQUE (vault_id, parent_id, name)
 );
 

@@ -57,6 +57,8 @@ void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
 void SyncController::run() {
     std::vector<std::shared_ptr<CloudStorageEngine>> engineBuffer;
 
+    // TODO: instance var for uMap of running tasks by vault ID for 'run now' functionality
+
     const auto refreshEngines = [&]() {
         engineBuffer.clear();
 

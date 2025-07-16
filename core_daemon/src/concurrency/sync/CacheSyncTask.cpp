@@ -37,13 +37,15 @@ void CacheSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File>
             continue;
         }
 
-        ensureFreeSpace(rFile->size_bytes);
+        {
+            std::unique_lock lock(engine_->mutex_);
+            ensureFreeSpace(rFile->size_bytes);
 
-        if (file->updated_at <= rFile->updated_at) {
-            if (shouldPurgeNewFiles())  engine_->indexAndDeleteFile(file->path);
-            else *free_ -= engine_->cacheFile(file->path)->size;
-            s3Map.erase(match);
-            continue;
+            if (file->updated_at <= rFile->updated_at) {
+                engine_->cacheFile(file->path)->size;
+                s3Map.erase(match);
+                continue;
+            }
         }
 
         std::cout << "[CacheSyncTask][1/2] Local file is newer than remote copy: " << file->path << "\n"
@@ -65,9 +67,19 @@ void CacheSyncTask::handleDiff(std::unordered_map<std::u8string, std::shared_ptr
     const auto files = uMap2Vector(s3Map);
     std::vector<std::future<ExpectedFuture>> futures;
 
+    const auto freeSpace = engine_->freeSpace();
+    const auto reqFreeSpace = computeReqFreeSpaceForDownload(files);
+    const auto [purgeableSpace, maxSize] = computeIndicesSizeAndMaxSize(CacheQueries::listCacheIndicesByType(vaultId(), CacheIndex::Type::File));
+    const bool freeAfterDownload = freeSpace + purgeableSpace < reqFreeSpace;
+
+    if (freeAfterDownload) {
+        std::cout << "[CacheSyncTask] Not enough free space for download, purging cache indices.\n";
+        ensureFreeSpace(maxSize);
+    }
+
     const auto threadPool = ThreadPoolRegistry::instance().syncPool();
     for (const auto& file : files) {
-        auto task = std::make_shared<DownloadTask>(engine_, file, free_.get());
+        auto task = std::make_shared<DownloadTask>(engine_, file, freeAfterDownload);
         futures.push_back(task->getFuture().value());
         threadPool->submit(task);
     }
@@ -76,30 +88,31 @@ void CacheSyncTask::handleDiff(std::unordered_map<std::u8string, std::shared_ptr
         if (std::get<bool>(f.get()) == false) std::cerr << "[CacheSyncTask] A file sync task failed.\n";
 }
 
-uintmax_t CacheSyncTask::sumIndicesSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {
+std::pair<uintmax_t, uintmax_t> CacheSyncTask::computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {
     uintmax_t sum = 0;
-    for (const auto& index : indices) sum += index->size;
-    return sum;
-}
-
-bool CacheSyncTask::shouldPurgeNewFiles() const {
-    return engine_->getVault()->quota != 0 && *free_ < StorageEngine::MIN_FREE_SPACE * 2; // 20MB threshold
+    uintmax_t maxSize = 0;
+    for (const auto& index : indices) {
+        sum += index->size;
+        if (index->size > maxSize) maxSize = index->size;
+    }
+    return {sum, maxSize};
 }
 
 void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
-    if (engine_->getVault()->quota != 0 && *free_ < size) {
+    auto free = engine_->freeSpace();
+    if (engine_->getVault()->quota != 0 && free < size) {
         const auto numFileIndices = CacheQueries::countCacheIndices(
             vaultId(), std::make_optional(CacheIndex::Type::File));
 
         if (numFileIndices == 0) throw std::runtime_error("Not enough space to cache file");
 
-        intmax_t needed = size - *free_;
+        intmax_t needed = size - free;
         std::vector<std::shared_ptr<CacheIndex> > purgeable;
         unsigned int numRequested = 1;
 
         do {
             purgeable = CacheQueries::nLargestCacheIndicesByType(numRequested, vaultId(), CacheIndex::Type::File);
-            if (sumIndicesSize(purgeable) >= needed) break;
+            if (computeIndicesSizeAndMaxSize(purgeable).first >= needed) break;
             numRequested *= 2;
         } while (numRequested < numFileIndices);
 
@@ -112,7 +125,7 @@ void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
             }
 
             CacheQueries::deleteCacheIndex(index->id);
-            *free_ += index->size;
+            free += index->size;
             needed -= index->size;
             if (needed <= 0) break;
         }

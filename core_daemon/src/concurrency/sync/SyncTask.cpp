@@ -40,8 +40,6 @@ void SyncTask::operator()() {
     std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
     database::SyncQueries::reportSyncStarted(engine_->sync->id);
 
-    *free_ = engine_->freeSpace();
-
     if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
         auto dir = std::make_shared<Directory>();
         dir->vault_id = engine_->vault_->id;
@@ -63,6 +61,12 @@ void SyncTask::operator()() {
     controller_->requeue(shared_from_this());
 }
 
+uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File>>& files) {
+    uintmax_t totalSize = 0;
+    for (const auto& file : files) totalSize += file->size_bytes;
+    return totalSize;
+}
+
 unsigned int SyncTask::vaultId() const { return engine_->vault_->id; }
 
 bool SyncTask::operator<(const SyncTask& other) const { return next_run > other.next_run; }
@@ -75,4 +79,9 @@ std::vector<std::shared_ptr<File>> SyncTask::uMap2Vector(
     std::ranges::transform(map.begin(), map.end(), std::back_inserter(files),
                            [](const auto& pair) { return pair.second; });
     return files;
+}
+
+void SyncTask::ensureFreeSpace(const uintmax_t size) const {
+    if (engine_->getVault()->quota != 0 && engine_->freeSpace() < size)
+        throw std::runtime_error("Not enough space to cache file");
 }

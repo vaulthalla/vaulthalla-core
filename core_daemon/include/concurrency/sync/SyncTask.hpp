@@ -43,7 +43,10 @@ public:
 protected:
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
-    std::shared_ptr<std::atomic<uintmax_t>> free_{std::make_shared<std::atomic<uintmax_t>>(0)};
+
+    virtual void ensureFreeSpace(uintmax_t size) const;
+
+    static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File>>& files);
 
     static std::vector<std::shared_ptr<types::File>> uMap2Vector(
         std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map) ;

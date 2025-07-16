@@ -5,10 +5,13 @@
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
+#include "types/Sync.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <iostream>
 #include <thread>
+
+#include "concurrency/sync/SafeSyncTask.hpp"
 
 using namespace vh::services;
 using namespace vh::storage;
@@ -86,8 +89,13 @@ void SyncController::run() {
 
         // Add sync tasks for each engine
         std::scoped_lock lock(pqMutex_);
-        for (const auto& engine : engineBuffer)
-            pq.push(std::make_shared<CacheSyncTask>(engine, shared_from_this()));
+        for (const auto& engine : engineBuffer) {
+            if (engine->sync->strategy == types::Sync::Strategy::Cache)
+                pq.push(std::make_shared<CacheSyncTask>(engine, shared_from_this()));
+            else if (engine->sync->strategy == types::Sync::Strategy::Sync)
+                pq.push(std::make_shared<SafeSyncTask>(engine, shared_from_this()));
+            else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
+        }
     };
 
     refreshEngines();

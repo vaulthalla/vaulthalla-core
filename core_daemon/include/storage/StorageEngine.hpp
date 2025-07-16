@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 #include <memory>
+#include <shared_mutex>
 
 namespace fs = std::filesystem;
 
@@ -27,6 +28,8 @@ enum class StorageType { Local, Cloud };
 
 class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 public:
+    std::shared_mutex mutex_;
+
     static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB
 
     StorageEngine() = default;

@@ -27,7 +27,7 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::Thumbnail
     : StorageEngine(vault, thumbnailWorker),
       key_(key), sync(sync) {
     const auto conf = config::ConfigRegistry::get();
-    root_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id) / "full";
+    root_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id) / "files";
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
 

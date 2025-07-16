@@ -2,32 +2,23 @@
 
 #include "concurrency/sync/SyncTask.hpp"
 
-#include <utility>
-
 namespace vh::types {
-    struct CacheIndex;
+struct CacheIndex;
 }
 
 namespace vh::concurrency {
 
-class CacheSyncTask : public SyncTask {
+class SafeSyncTask : public SyncTask {
 public:
     using SyncTask::SyncTask;
 
-    ~CacheSyncTask() override = default;
+    ~SafeSyncTask() override = default;
 
-    CacheSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
+    SafeSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
              const std::shared_ptr<services::SyncController>& controller) : SyncTask(engine, controller) {}
 
     void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
     void handleDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
-
-private:
-    static std::pair<uintmax_t, uintmax_t> computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<types::CacheIndex>>& indices);
-
-    void ensureFreeSpace(uintmax_t size) const override;
-
-    [[nodiscard]] bool shouldPurgeNewFiles() const;
 };
 
 

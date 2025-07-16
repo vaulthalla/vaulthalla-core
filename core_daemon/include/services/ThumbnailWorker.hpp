@@ -3,6 +3,9 @@
 #include "config/ConfigRegistry.hpp"
 #include "util/imageUtil.hpp"
 #include "storage/StorageEngine.hpp"
+#include "types/CacheIndex.hpp"
+#include "database/Queries/CacheQueries.hpp"
+#include "types/File.hpp"
 
 #include <string>
 #include <thread>
@@ -14,6 +17,8 @@
 #include <functional>
 #include <iostream>
 
+using namespace vh::types;
+
 namespace vh::services {
 
 class ThumbnailWorker {
@@ -21,24 +26,24 @@ public:
     struct Job {
         std::shared_ptr<const storage::StorageEngine> engine;
         std::string buffer;
-        std::filesystem::path rel_path;
-        std::string mime_type;
+        std::shared_ptr<File> file;
     };
 
     using CachePathResolver = std::function<std::filesystem::path(
         const std::filesystem::path& rel_path,
         const std::filesystem::path& subpath)>;
 
-    explicit ThumbnailWorker() : stopFlag(false) {}
+    explicit ThumbnailWorker() : stopFlag(false) {
+    }
 
     void start() {
         workerThread = std::thread([this] { run(); });
     }
 
     void enqueue(const std::shared_ptr<storage::StorageEngine>& engine, const std::string& buffer,
-                 const std::filesystem::path& rel_path, const std::string& mime_type) { {
+                 const std::shared_ptr<File>& file) { {
             std::lock_guard lock(queueMutex);
-            jobs.push(Job{engine, buffer, rel_path, mime_type});
+            jobs.push(Job{engine, buffer, file});
         }
         queueCond.notify_one();
     }
@@ -80,10 +85,20 @@ private:
         try {
             const auto& sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
             for (const auto& size : sizes) {
-                auto cachePath = job.engine->getAbsoluteCachePath(job.rel_path, fs::path("thumbnails") / to_string(size));
+                auto cachePath = job.engine->getAbsoluteCachePath(job.file->path,
+                                                                  fs::path("thumbnails") / to_string(size));
                 if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath += ".jpg";
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
-                util::generateAndStoreThumbnail(job.buffer, cachePath, job.mime_type, size);
+                util::generateAndStoreThumbnail(job.buffer, cachePath, job.file->mime_type, size);
+
+                const auto index = std::make_shared<CacheIndex>();
+                index->vault_id = job.engine->vaultId();
+                index->file_id = job.file->id;
+                index->path = job.engine->getRelativeCachePath(cachePath);
+                index->type = CacheIndex::Type::Thumbnail;
+                index->size = fs::file_size(cachePath);
+
+                database::CacheQueries::upsertCacheIndex(index);
             }
         } catch (const std::exception& e) {
             std::cerr << "[ThumbnailWorker] Failed to generate thumbnail(s): " << e.what() << std::endl;

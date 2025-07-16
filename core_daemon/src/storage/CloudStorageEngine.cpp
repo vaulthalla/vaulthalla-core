@@ -2,9 +2,11 @@
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
-#include "types/Vault.hpp"
-#include "types/ProxySync.hpp"
+#include "types/S3Vault.hpp"
+#include "types/Sync.hpp"
+#include "types/CacheIndex.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "services/ThumbnailWorker.hpp"
 
@@ -14,26 +16,40 @@
 
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 
-namespace vh::storage {
+using namespace vh::storage;
+using namespace vh::types;
+using namespace vh::database;
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
-                                       const std::shared_ptr<types::S3Vault>& vault,
-                                       const std::shared_ptr<types::api::APIKey>& key,
-                                       const std::shared_ptr<types::ProxySync>& proxySync)
+                                       const std::shared_ptr<S3Vault>& vault,
+                                       const std::shared_ptr<api::APIKey>& key,
+                                       const std::shared_ptr<Sync>& sync)
     : StorageEngine(vault, thumbnailWorker),
-      key_(key), proxySync_(proxySync) {
+      key_(key), sync(sync) {
     const auto conf = config::ConfigRegistry::get();
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
 
-    const auto s3Key = std::static_pointer_cast<types::api::S3APIKey>(key_);
+    const auto s3Key = std::static_pointer_cast<api::S3APIKey>(key_);
     s3Provider_ = std::make_shared<cloud::S3Provider>(s3Key, vault->bucket);
 }
 
-void CloudStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
+void CloudStorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
+    const auto absPath = getAbsolutePath(relPath);
+
+    if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
+    if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error(
+        "Path is not a regular file: " + absPath.string());
+
+    const auto f = createFile(relPath);
+    f->created_by = f->last_modified_by = userId;
+
     std::string buffer;
-    uploadFile(rel_path, buffer);
-    thumbnailWorker_->enqueue(shared_from_this(), buffer, rel_path, mime_type);
+    uploadFile(f->path, buffer);
+    thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
+
+    if (!FileQueries::fileExists(vault_->id, f->path)) FileQueries::addFile(f);
+    else FileQueries::updateFile(f);
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -60,23 +76,23 @@ void CloudStorageEngine::removeFile(const fs::path& rel_path) {
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
 
     purgeThumbnails(rel_path);
-    database::FileQueries::deleteFile(vault_->id, rel_path);
+    FileQueries::deleteFile(vault_->id, rel_path);
 }
 
 void CloudStorageEngine::removeDirectory(const fs::path& rel_path) {
     std::cout << "[CloudStorageEngine] remove called for directory: " << rel_path << std::endl;
 
-    const auto files = database::FileQueries::listFilesInDir(vault_->id, rel_path, true);
-    const auto directories = database::FileQueries::listDirectoriesInDir(vault_->id, rel_path, true);
+    const auto files = FileQueries::listFilesInDir(vault_->id, rel_path, true);
+    const auto directories = DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true);
 
     for (const auto& file : files) removeFile(file->path);
 
     std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << "\n";
     for (const auto& dir : directories)
-        database::FileQueries::deleteDirectory(vault_->id, dir->path);
+        DirectoryQueries::deleteDirectory(vault_->id, dir->path);
 
     std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << "\n";
-    database::FileQueries::deleteDirectory(vault_->id, rel_path);
+    DirectoryQueries::deleteDirectory(vault_->id, rel_path);
 
     std::cout << "[CloudStorageEngine] Directory removed: " << rel_path << std::endl;
 }
@@ -88,20 +104,11 @@ bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const
 }
 
 bool CloudStorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
-    return database::FileQueries::isDirectory(vault_->id, rel_path);
+    return DirectoryQueries::isDirectory(vault_->id, rel_path);
 }
 
 bool CloudStorageEngine::isFile(const std::filesystem::path& rel_path) const {
-    return database::FileQueries::isFile(vault_->id, rel_path);
-}
-
-std::filesystem::path CloudStorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
-    if (rel_path.empty()) return root_;
-
-    std::filesystem::path safe_rel = rel_path;
-    if (safe_rel.is_absolute()) safe_rel = safe_rel.lexically_relative("/");
-
-    return root_ / safe_rel;
+    return FileQueries::isFile(vault_->id, rel_path);
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
@@ -123,55 +130,68 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path, std::
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
 }
 
-
-void CloudStorageEngine::initCloudStorage() {
-    std::cout << "[CloudStorageEngine] Initializing cloud storage for vault: " << vault_->id << std::endl;
-    const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault_);
-
+std::string CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
     std::string buffer;
-    for (auto& item : types::fromS3XML(s3Provider_->listObjects())) {
-        buffer.clear(); // Clear buffer for each item
-        item->vault_id = vault_->id;
-        item->created_by = vault_->owner_id;
-        item->last_modified_by = vault_->owner_id;
+    if (!s3Provider_->downloadToBuffer(rel_path, buffer))
+        throw std::runtime_error("[CloudStorageEngine] Failed to download file: " + rel_path.string());
 
-        const auto parentPath = item->path.parent_path().empty()
-                                        ? std::filesystem::path("/")
-                                        : item->path.parent_path();
-
-        if (item->isDirectory()) {
-            if (item->path.string() == "/") continue;
-            auto dir = std::static_pointer_cast<types::Directory>(item);
-            dir->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
-            database::FileQueries::addDirectory(dir);
-        } else {
-            auto file = std::static_pointer_cast<types::File>(item);
-            file->parent_id = database::FileQueries::getDirectoryIdByPath(vault_->id, parentPath);
-            file->mime_type = getMimeType(file->path);
-            database::FileQueries::addFile(file);
-
-            if (file->mime_type.starts_with("image/") || file->mime_type.starts_with("application/pdf"))
-                thumbnailWorker_->enqueue(shared_from_this(), buffer, file->path, file->mime_type);
-        }
-    }
+    return buffer;
 }
 
-std::string getMimeType(const std::filesystem::path& path) {
-    static const std::unordered_map<std::string, std::string> mimeMap = {
-        {".jpg", "image/jpeg"},
-        {".jpeg", "image/jpeg"},
-        {".png", "image/png"},
-        {".pdf", "application/pdf"},
-        {".txt", "text/plain"},
-        {".html", "text/html"},
-    };
+std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::path& rel_path) {
+    const auto buffer = downloadToBuffer(rel_path);
+    const auto absPath = getAbsolutePath(rel_path);
+    writeFile(absPath, buffer);
+    const auto file = createFile(absPath);
+    thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
 
-    std::string ext = path.extension().string();
-    std::ranges::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
+    else FileQueries::updateFile(file);
 
-    const auto it = mimeMap.find(ext);
-    return it != mimeMap.end() ? it->second : "application/octet-stream";
+    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+
+    return file;
 }
+
+std::shared_ptr<CacheIndex> CloudStorageEngine::cacheFile(const std::filesystem::path& rel_path) {
+    const auto buffer = downloadToBuffer(rel_path);
+    const auto cacheAbsPath = getAbsoluteCachePath(rel_path, {"files"});
+    writeFile(cacheAbsPath, buffer);
+    const auto file = createFile(cacheAbsPath);
+    thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
+
+    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
+    else FileQueries::updateFile(file);
+
+    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+
+    const auto cacheIndex = std::make_shared<CacheIndex>();
+    cacheIndex->vault_id = vault_->id;
+    cacheIndex->path = getRelativeCachePath(cacheAbsPath);
+    cacheIndex->file_id = file->id;
+    cacheIndex->type = CacheIndex::Type::File;
+    cacheIndex->size = std::filesystem::file_size(cacheAbsPath);
+
+    CacheQueries::upsertCacheIndex(cacheIndex);
+
+    return CacheQueries::getCacheIndexByPath(vault_->id, cacheIndex->path);
+}
+
+void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_path) {
+    const auto file = downloadFile(rel_path);
+    thumbnailWorker_->enqueue(shared_from_this(), file->path, file);
+
+    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
+    else FileQueries::updateFile(file);
+
+    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+    removeFile(rel_path);
+}
+
+std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {
+    return groupEntriesByPath(filesFromS3XML(s3Provider_->listObjects(prefix)));
+}
+
 
 std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path) {
     std::vector<std::string> keys;
@@ -203,10 +223,46 @@ std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesy
     return keys;
 }
 
+std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(
+    const std::vector<std::shared_ptr<File>>& files) const {
+
+    std::unordered_map<std::u8string, std::shared_ptr<Directory>> directories;
+
+    for (const auto& file : files) {
+        std::filesystem::path current = "/";
+        std::filesystem::path full_path = file->path.parent_path();
+
+        for (const auto& part : full_path) {
+            current /= part;
+            auto dir_str = current.u8string();
+
+            if (!directories.contains(dir_str)) {
+                auto dir = std::make_shared<Directory>();
+                dir->path = current;
+                dir->name = current.filename().string();
+                dir->created_by = dir->last_modified_by = vault_->owner_id;
+                dir->vault_id = vault_->id;
+                const auto parent_path = current.has_parent_path() ? current.parent_path() : "/";
+                dir->parent_id = DirectoryQueries::getDirectoryIdByPath(vault_->id, parent_path);
+
+                directories[dir_str] = dir;
+            }
+        }
+    }
+
+    std::vector<std::shared_ptr<Directory>> result;
+    for (const auto& [_, dir] : directories)
+        result.push_back(dir);
+
+    std::ranges::sort(result, [](const auto& a, const auto& b) {
+        return std::distance(a->path.begin(), a->path.end()) < std::distance(b->path.begin(), b->path.end());
+    });
+
+    return result;
+}
+
 std::u8string stripLeadingSlash(const std::filesystem::path& path) {
     std::u8string u8 = path.u8string();
     if (!u8.empty() && u8[0] == u8'/') return u8.substr(1);
     return u8;
-}
-
 }

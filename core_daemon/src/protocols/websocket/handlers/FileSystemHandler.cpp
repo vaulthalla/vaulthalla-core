@@ -65,7 +65,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         UploadContext context;
 
-        storageManager_->finishUpload(vaultId, path, session.getAuthenticatedUser());
+        storageManager_->finishUpload(vaultId, session.getAuthenticatedUser()->id, path);
 
         const json data = {{"path", path}};
 

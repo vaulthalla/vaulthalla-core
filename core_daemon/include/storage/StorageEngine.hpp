@@ -17,7 +17,7 @@ namespace vh::services {
 class ThumbnailWorker;
 }
 
-namespace vh::cloud {
+namespace vh::concurrency {
 class SyncTask;
 }
 
@@ -27,6 +27,8 @@ enum class StorageType { Local, Cloud };
 
 class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 public:
+    static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB
+
     StorageEngine() = default;
 
     explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
@@ -35,7 +37,7 @@ public:
 
     virtual ~StorageEngine() = default;
 
-    virtual void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) = 0;
+    virtual void finishUpload(unsigned int userId, const std::filesystem::path& relPath) = 0;
 
     virtual void mkdir(const fs::path& relative_path) = 0;
 
@@ -49,18 +51,40 @@ public:
 
     [[nodiscard]] virtual bool isFile(const fs::path& rel_path) const = 0;
 
-    [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const = 0;
+    [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
+
+    [[nodiscard]] std::filesystem::path getRelativePath(const std::filesystem::path& abs_path) const;
+
+    [[nodiscard]] static uintmax_t getDirectorySize(const std::filesystem::path& path);
+
+    [[nodiscard]] uintmax_t getVaultSize() const;
+
+    [[nodiscard]] uintmax_t getCacheSize() const;
+
+    [[nodiscard]] uintmax_t getVaultAndCacheTotalSize() const;
+
+    [[nodiscard]] uintmax_t freeSpace() const;
+
+    [[nodiscard]] std::shared_ptr<types::File> createFile(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path,
                                                              const std::filesystem::path& prefix = {}) const;
 
+    [[nodiscard]] std::filesystem::path getRelativeCachePath(const std::filesystem::path& abs_path) const;
+
+    void writeFile(const std::filesystem::path& abs_path, const std::string& buffer) const;
+
     [[nodiscard]] std::shared_ptr<types::Vault> getVault() const { return vault_; }
+
+    [[nodiscard]] unsigned int vaultId() const;
 
     [[nodiscard]] fs::path root_directory() const { return root_; }
 
     [[nodiscard]] virtual StorageType type() const = 0;
 
     void purgeThumbnails(const fs::path& rel_path) const;
+
+    static std::string getMimeType(const std::filesystem::path& path);
 
 protected:
     std::shared_ptr<types::Vault> vault_;
@@ -71,7 +95,7 @@ protected:
 
     virtual void removeDirectory(const fs::path& rel_path) = 0;
 
-    friend class cloud::SyncTask;
+    friend class concurrency::SyncTask;
 };
 
 } // namespace vh::storage

@@ -11,7 +11,7 @@
 namespace vh::types {
 struct User;
 struct FSEntry;
-struct ProxySync;
+struct Sync;
 }
 
 namespace vh::services {
@@ -29,7 +29,7 @@ public:
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
     std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
-                                           const std::shared_ptr<types::ProxySync>& proxySync = nullptr);
+                                           const std::shared_ptr<types::Sync>& sync = nullptr);
 
     void removeVault(unsigned int vaultId);
 
@@ -37,12 +37,9 @@ public:
 
     std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
 
-    void finishUpload(unsigned int vaultId, const std::filesystem::path& relPath,
-                      const std::shared_ptr<types::User>& user) const;
+    void finishUpload(unsigned int vaultId, unsigned int userId, const std::filesystem::path& relPath) const;
 
     void removeEntry(unsigned int vaultId, const std::filesystem::path& relPath) const;
-
-    [[nodiscard]] std::filesystem::path getAbsolutePath(unsigned int vaultId, const std::filesystem::path& relPath) const;
 
     [[nodiscard]] std::vector<std::shared_ptr<types::FSEntry>> listDir(unsigned int vaultId,
                                                                      const std::string& relPath,

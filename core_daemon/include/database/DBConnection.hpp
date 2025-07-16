@@ -25,6 +25,7 @@ class DBConnection {
     void initPreparedVaultRoles() const;
     void initPreparedPermOverrides() const;
     void initPreparedSync() const;
+    void initPreparedCache() const;
 };
 
 struct PathPatterns {

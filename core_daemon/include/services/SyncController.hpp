@@ -1,5 +1,7 @@
 #pragma once
 
+#include "concurrency/sync/SyncTask.hpp"
+
 #include <memory>
 #include <queue>
 #include <atomic>
@@ -17,11 +19,11 @@ class StorageManager;
 class CloudStorageEngine;
 }
 
-namespace vh::cloud {
-class SyncTask;
-}
-
 namespace vh::services {
+
+struct SyncTaskCompare {
+    bool operator()(const std::shared_ptr<concurrency::SyncTask>& a, const std::shared_ptr<concurrency::SyncTask>& b) const;
+};
 
 class SyncController : public std::enable_shared_from_this<SyncController> {
 public:
@@ -31,11 +33,13 @@ public:
     void start();
     void stop();
 
-    void requeue(const std::shared_ptr<cloud::SyncTask>& task);
+    void requeue(const std::shared_ptr<concurrency::SyncTask>& task);
 
 private:
     void run();
-    std::priority_queue<std::shared_ptr<cloud::SyncTask>> pq{};
+    std::priority_queue<std::shared_ptr<concurrency::SyncTask>,
+                    std::vector<std::shared_ptr<concurrency::SyncTask>>,
+                    SyncTaskCompare> pq;
 
     std::shared_ptr<storage::StorageManager> storage_;
     std::shared_ptr<concurrency::ThreadPool> pool_;
@@ -47,7 +51,7 @@ private:
 
     std::unordered_map<unsigned int, std::shared_ptr<storage::CloudStorageEngine>> engineMap_{};
 
-    friend class cloud::SyncTask;
+    friend class concurrency::SyncTask;
 };
 
 }

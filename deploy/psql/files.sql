@@ -39,6 +39,20 @@ CREATE TABLE files
     UNIQUE (vault_id, parent_id, name)
 );
 
+CREATE TABLE cache_index
+(
+    id            SERIAL PRIMARY KEY,
+    vault_id      INTEGER     NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    file_id       INTEGER     REFERENCES files (id) ON DELETE CASCADE,
+    path          TEXT        NOT NULL, -- relative path inside cache
+    type          VARCHAR(12) NOT NULL CHECK (type IN ('thumbnail', 'file')),
+    size          BIGINT      NOT NULL,
+    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (vault_id, path, type)  -- Ensure no duplicate entries for same vault, path, and type
+);
+
 CREATE TABLE files_trashed
 (
     LIKE files INCLUDING ALL,
@@ -186,6 +200,10 @@ CREATE INDEX idx_directories_path ON directories (path);
 -- Indexes for text pattern matching
 CREATE INDEX idx_files_path_pattern ON files (path text_pattern_ops);
 CREATE INDEX idx_directories_path_pattern ON directories (path text_pattern_ops);
+
+-- Indexes for cache_index
+CREATE INDEX idx_cache_index_size ON cache_index(size DESC);
+CREATE INDEX idx_cache_index_vault_type_size ON cache_index(vault_id, type, size DESC);
 
 -- Full-text search index
 CREATE INDEX file_search_vector_idx ON file_search_index USING GIN (search_vector);

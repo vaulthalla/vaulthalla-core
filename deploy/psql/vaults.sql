@@ -35,6 +35,7 @@ CREATE TABLE vault
     type        VARCHAR(12)         NOT NULL CHECK (type IN ('local', 's3')),
     name        VARCHAR(100) UNIQUE NOT NULL,
     description TEXT      DEFAULT NULL,
+    quota       BIGINT NOT NULL DEFAULT (0), -- 0 means no quota
     owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
     is_active   BOOLEAN   DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -81,33 +82,29 @@ CREATE TABLE sync
 (
     id              SERIAL PRIMARY KEY,
     interval        BIGINT NOT NULL DEFAULT 300, -- 5 minutes in seconds
-    conflict_policy VARCHAR(12)      DEFAULT 'keep_local' CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask')),
-    strategy        VARCHAR(12)      DEFAULT 'sync' CHECK (strategy IN ('sync', 'mirror', 'merge')),
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    vault_id                 INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    strategy                 VARCHAR(8)      DEFAULT 'cache' CHECK (strategy IN ('cache', 'sync', 'mirror')),
+    conflict_policy VARCHAR(12)      DEFAULT 'keep_local' CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask')),
     last_sync_at    TIMESTAMP        DEFAULT NULL,
     last_success_at TIMESTAMP        DEFAULT NULL,
     created_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP
+    updated_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (vault_id)  -- Only one sync per vault
 );
 
-CREATE TABLE v2v_sync
+CREATE TABLE sync_conflicts
 (
-    sync_id INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
-    src     INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    dst     INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    id          SERIAL PRIMARY KEY,
+    sync_id     INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
+    file_id     INTEGER NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+    conflict_type VARCHAR(12) DEFAULT 'content' CHECK (conflict_type IN ('content', 'metadata', 'both')),
+    resolved_at TIMESTAMP DEFAULT NULL,
+    resolution   VARCHAR(12) DEFAULT 'unresolved' CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote')),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE (src, dst)
-);
-
-CREATE TABLE proxy_sync
-(
-    sync_id                  INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
-    vault_id                 INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    cache_thumbnails         BOOLEAN NOT NULL DEFAULT TRUE,
-    cache_full_size_objects  BOOLEAN NOT NULL DEFAULT TRUE,
-    max_cache_size           BIGINT NOT NULL DEFAULT (10::BIGINT * 1024 * 1024 * 1024), -- 10 GB default
-
-    UNIQUE (vault_id) -- Only one proxy sync per vault
+    UNIQUE (sync_id, file_id)  -- Ensure no duplicate conflicts for the same file in a sync
 );
 
 CREATE TABLE vault_usage

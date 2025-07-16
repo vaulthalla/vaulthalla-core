@@ -6,14 +6,16 @@
 
 namespace vh::types {
 struct File;
+struct Directory;
 struct S3Vault;
-struct ProxySync;
+struct Sync;
+struct CacheIndex;
 
 namespace api {
 struct APIKey;
 }}
 
-namespace vh::cloud {
+namespace vh::concurrency {
 class SyncTask;
 }
 
@@ -25,6 +27,8 @@ namespace vh::storage {
 
 class CloudStorageEngine : public StorageEngine {
 public:
+    std::shared_ptr<types::Sync> sync;
+
     CloudStorageEngine() = default;
 
     ~CloudStorageEngine() override = default;
@@ -32,9 +36,9 @@ public:
     CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
                        const std::shared_ptr<types::S3Vault>& vault,
                        const std::shared_ptr<types::api::APIKey>& key,
-                       const std::shared_ptr<types::ProxySync>& proxySync);
+                       const std::shared_ptr<types::Sync>& sync);
 
-    void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
+    void finishUpload(unsigned int userId, const std::filesystem::path& relPath) override;
 
     void mkdir(const fs::path& relative_path) override;
 
@@ -50,13 +54,15 @@ public:
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const override;
 
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
-
     void uploadFile(const std::filesystem::path& rel_path) const;
-
     void uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const;
+    std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
+    std::shared_ptr<types::CacheIndex> cacheFile(const std::filesystem::path& rel_path);
+    void indexAndDeleteFile(const std::filesystem::path& rel_path);
 
-    void initCloudStorage();
+    [[nodiscard]] std::unordered_map<std::u8string, std::shared_ptr<types::File>> getGroupedFilesFromS3(const std::filesystem::path& prefix = {}) const;
+
+    std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 
 protected:
     void removeFile(const fs::path& rel_path) override;
@@ -65,10 +71,8 @@ protected:
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;
-    std::shared_ptr<types::ProxySync> proxySync_;
 
-    friend class cloud::SyncTask;
-    friend class services::SyncController;
+    std::string downloadToBuffer(const std::filesystem::path& rel_path) const;
 };
 
 std::string getMimeType(const std::filesystem::path& path);

@@ -1,7 +1,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
-#include "concurrency/sync/SyncTask.hpp"
+#include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -11,10 +11,16 @@
 #include <thread>
 
 using namespace vh::services;
+using namespace vh::storage;
+using namespace vh::concurrency;
 
-SyncController::SyncController(std::shared_ptr<storage::StorageManager> storage_manager)
+bool SyncTaskCompare::operator()(const std::shared_ptr<SyncTask>& a, const std::shared_ptr<SyncTask>& b) const {
+    return a->next_run > b->next_run; // Min-heap based on next_run time
+}
+
+SyncController::SyncController(std::shared_ptr<StorageManager> storage_manager)
     : storage_(std::move(storage_manager)),
-      pool_(concurrency::ThreadPoolRegistry::instance().syncPool()) {
+      pool_(ThreadPoolRegistry::instance().syncPool()) {
     if (!storage_) throw std::runtime_error("Storage manager is not initialized");
 }
 
@@ -39,19 +45,19 @@ void SyncController::stop() {
     std::cout << "[SyncController] Stopped." << std::endl;
 }
 
-void SyncController::requeue(const std::shared_ptr<cloud::SyncTask>& task) {
+void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
     std::scoped_lock lock(pqMutex_);
     pq.push(task);
     std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
 }
 
 void SyncController::run() {
-    std::vector<std::shared_ptr<storage::CloudStorageEngine>> engineBuffer;
+    std::vector<std::shared_ptr<CloudStorageEngine>> engineBuffer;
 
     const auto refreshEngines = [&]() {
         engineBuffer.clear();
 
-        const auto latestEngines = storage_->getEngines<storage::CloudStorageEngine>();
+        const auto latestEngines = storage_->getEngines<CloudStorageEngine>();
 
         boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
         for (const auto& engine : latestEngines) latestBitset.set(engine->getVault()->id);
@@ -81,7 +87,7 @@ void SyncController::run() {
         // Add sync tasks for each engine
         std::scoped_lock lock(pqMutex_);
         for (const auto& engine : engineBuffer)
-            pq.push(std::make_shared<cloud::SyncTask>(engine, this->shared_from_this()));
+            pq.push(std::make_shared<CacheSyncTask>(engine, shared_from_this()));
     };
 
     refreshEngines();
@@ -112,7 +118,7 @@ void SyncController::run() {
             refreshEngines();
         } else {
             refreshTries = 0;
-            std::shared_ptr<cloud::SyncTask> task;
+            std::shared_ptr<SyncTask> task;
 
             {
                 std::scoped_lock lock(pqMutex_);

@@ -20,7 +20,7 @@ public:
 
     [[nodiscard]] StorageType type() const override { return StorageType::Local; }
 
-    void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
+    void finishUpload(unsigned int userId, const std::filesystem::path& relPath) override;
 
     void mkdir(const fs::path& relative_path) override;
 

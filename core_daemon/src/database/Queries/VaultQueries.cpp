@@ -1,11 +1,13 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/Vault.hpp"
-#include "types/ProxySync.hpp"
+#include "types/LocalDiskVault.hpp"
+#include "types/S3Vault.hpp"
+#include "types/Sync.hpp"
 
 namespace vh::database {
 unsigned int VaultQueries::addVault(const std::shared_ptr<types::Vault>& vault,
-                                    const std::shared_ptr<types::ProxySync>& proxySync) {
+                                    const std::shared_ptr<types::Sync>& proxySync) {
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
         pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
         const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();

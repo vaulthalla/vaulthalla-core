@@ -1,13 +1,13 @@
 #include "database/Queries/SyncQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/ProxySync.hpp"
+#include "types/Sync.hpp"
 
 namespace vh::database {
 
-std::shared_ptr<types::ProxySync> SyncQueries::getProxySyncConfig(const unsigned int vaultId) {
+std::shared_ptr<types::Sync> SyncQueries::getSync(const unsigned int vaultId) {
     return Transactions::exec("SyncQueries::getProxySyncConfig", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_proxy_sync_config", vaultId).one_row();
-        return std::make_shared<types::ProxySync>(row);
+        return std::make_shared<types::Sync>(row);
     });
 }
 

@@ -43,7 +43,7 @@ CREATE TABLE cache_index
 (
     id            SERIAL PRIMARY KEY,
     vault_id      INTEGER     NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    file_id       INTEGER     REFERENCES files (id) ON DELETE CASCADE,
+    file_id       INTEGER     NOT NULL REFERENCES files (id) ON DELETE CASCADE,
     path          TEXT        NOT NULL, -- relative path inside cache
     type          VARCHAR(12) NOT NULL CHECK (type IN ('thumbnail', 'file')),
     size          BIGINT      NOT NULL,

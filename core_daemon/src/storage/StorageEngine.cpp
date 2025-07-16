@@ -46,24 +46,24 @@ std::filesystem::path StorageEngine::getRelativeCachePath(const std::filesystem:
     return abs_path.lexically_relative(cache_path_).make_preferred();
 }
 
-std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path) const {
-    const auto abs_path = getAbsolutePath(rel_path);
+std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path, const std::filesystem::path& abs_path) const {
+    const auto absPath = abs_path.empty() ? getAbsolutePath(rel_path) : abs_path;
 
-    if (!std::filesystem::exists(abs_path)) {
-        throw std::runtime_error("File does not exist at path: " + abs_path.string());
+    if (!std::filesystem::exists(absPath)) {
+        throw std::runtime_error("File does not exist at path: " + absPath.string());
     }
-    if (!std::filesystem::is_regular_file(abs_path)) {
-        throw std::runtime_error("Path is not a regular file: " + abs_path.string());
+    if (!std::filesystem::is_regular_file(absPath)) {
+        throw std::runtime_error("Path is not a regular file: " + absPath.string());
     }
 
-    auto file = std::make_shared<types::File>();
+    auto file = std::make_shared<File>();
     file->vault_id = vault_->id;
-    file->name = abs_path.filename().string();
-    file->size_bytes = std::filesystem::file_size(abs_path);
+    file->name = absPath.filename().string();
+    file->size_bytes = std::filesystem::file_size(absPath);
     file->created_by = file->last_modified_by = vault_->owner_id;
     file->path = rel_path;
-    file->mime_type = util::Magic::get_mime_type(abs_path);
-    file->content_hash = crypto::Hash::blake2b(abs_path.string());
+    file->mime_type = util::Magic::get_mime_type(absPath);
+    file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? file->path.parent_path() : std::filesystem::path("/");
     file->parent_id = database::DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
@@ -71,6 +71,7 @@ std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel
 }
 
 void StorageEngine::writeFile(const std::filesystem::path& abs_path, const std::string& buffer) const {
+    if (buffer.empty()) std::cerr << "Warning: empty buffer, writing 0 bytes to: " << abs_path << std::endl;
     if (!std::filesystem::exists(abs_path.parent_path())) std::filesystem::create_directories(abs_path.parent_path());
     std::ofstream file(abs_path, std::ios::binary);
     if (!file) throw std::runtime_error("Failed to open file for writing: " + abs_path.string());
@@ -78,7 +79,6 @@ void StorageEngine::writeFile(const std::filesystem::path& abs_path, const std::
     file.close();
     std::cout << "[StorageEngine] File written: " << abs_path << std::endl;
 }
-
 
 std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path,
                                                           const std::filesystem::path& prefix) const {
@@ -96,17 +96,11 @@ uintmax_t StorageEngine::getDirectorySize(const std::filesystem::path& path) {
     return total;
 }
 
-uintmax_t StorageEngine::getVaultSize() const {
-    return getDirectorySize(root_);
-}
+unsigned int StorageEngine::vaultId() const { return vault_ ? vault_->id : 0; }
 
-uintmax_t StorageEngine::getCacheSize() const {
-    return getDirectorySize(cache_path_);
-}
-
-uintmax_t StorageEngine::getVaultAndCacheTotalSize() const {
-    return getVaultSize() + getCacheSize();
-}
+uintmax_t StorageEngine::getVaultSize() const { return getDirectorySize(root_); }
+uintmax_t StorageEngine::getCacheSize() const { return getDirectorySize(cache_path_); }
+uintmax_t StorageEngine::getVaultAndCacheTotalSize() const { return getVaultSize() + getCacheSize(); }
 
 uintmax_t StorageEngine::freeSpace() const {
     return vault_->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE;

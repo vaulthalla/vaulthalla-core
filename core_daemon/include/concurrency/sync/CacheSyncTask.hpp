@@ -23,6 +23,8 @@ public:
 private:
     static uintmax_t sumIndicesSize(const std::vector<std::shared_ptr<types::CacheIndex>>& indices);
 
+    void ensureFreeSpace(uintmax_t size) const;
+
     [[nodiscard]] bool shouldPurgeNewFiles() const;
 };
 

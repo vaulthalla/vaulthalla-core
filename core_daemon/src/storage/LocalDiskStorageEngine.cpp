@@ -38,8 +38,8 @@ void LocalDiskStorageEngine::finishUpload(const unsigned int userId, const std::
         const auto f = createFile(relPath);
         f->created_by = f->last_modified_by = userId;
 
+        f->id = database::FileQueries::upsertFile(f);
         thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
-        database::FileQueries::addFile(f);
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

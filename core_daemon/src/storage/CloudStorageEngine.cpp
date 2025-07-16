@@ -48,8 +48,7 @@ void CloudStorageEngine::finishUpload(const unsigned int userId, const std::file
     uploadFile(f->path, buffer);
     thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
 
-    if (!FileQueries::fileExists(vault_->id, f->path)) FileQueries::addFile(f);
-    else FileQueries::updateFile(f);
+    f->id = FileQueries::upsertFile(f);
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -70,7 +69,7 @@ void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
 }
 
 void CloudStorageEngine::removeFile(const fs::path& rel_path) {
-    std::cout << "[CloudStorageEngine] Deleting file: " << rel_path << "\n";
+    std::cout << "[CloudStorageEngine] Deleting file: " << rel_path << std::endl;
 
     if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
@@ -87,11 +86,11 @@ void CloudStorageEngine::removeDirectory(const fs::path& rel_path) {
 
     for (const auto& file : files) removeFile(file->path);
 
-    std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << "\n";
+    std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << std::endl;
     for (const auto& dir : directories)
         DirectoryQueries::deleteDirectory(vault_->id, dir->path);
 
-    std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << "\n";
+    std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << std::endl;
     DirectoryQueries::deleteDirectory(vault_->id, rel_path);
 
     std::cout << "[CloudStorageEngine] Directory removed: " << rel_path << std::endl;
@@ -142,13 +141,13 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
     const auto buffer = downloadToBuffer(rel_path);
     const auto absPath = getAbsolutePath(rel_path);
     writeFile(absPath, buffer);
-    const auto file = createFile(absPath);
+
+    const auto file = createFile(rel_path, absPath);
+    file->id = FileQueries::upsertFile(file);
+
     thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
 
-    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
-    else FileQueries::updateFile(file);
-
-    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
 
     return file;
 }
@@ -157,13 +156,13 @@ std::shared_ptr<CacheIndex> CloudStorageEngine::cacheFile(const std::filesystem:
     const auto buffer = downloadToBuffer(rel_path);
     const auto cacheAbsPath = getAbsoluteCachePath(rel_path, {"files"});
     writeFile(cacheAbsPath, buffer);
-    const auto file = createFile(cacheAbsPath);
+
+    const auto file = createFile(rel_path, cacheAbsPath);
+    file->id = FileQueries::upsertFile(file);
+
     thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
 
-    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
-    else FileQueries::updateFile(file);
-
-    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
 
     const auto cacheIndex = std::make_shared<CacheIndex>();
     cacheIndex->vault_id = vault_->id;
@@ -181,15 +180,20 @@ void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_pat
     const auto file = downloadFile(rel_path);
     thumbnailWorker_->enqueue(shared_from_this(), file->path, file);
 
-    if (!FileQueries::fileExists(vault_->id, file->path)) FileQueries::addFile(file);
-    else FileQueries::updateFile(file);
+    file->id = FileQueries::upsertFile(file);
 
-    s3Provider_->setObjectContentHash(file->path, file->content_hash);
+    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
     removeFile(rel_path);
 }
 
 std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {
     return groupEntriesByPath(filesFromS3XML(s3Provider_->listObjects(prefix)));
+}
+
+std::string CloudStorageEngine::getRemoteContentHash(const std::filesystem::path& rel_path) const {
+    if (const auto head = s3Provider_->getHeadObject(stripLeadingSlash(rel_path)))
+        if (head->contains("x-amz-meta-content-hash")) return head->at("x-amz-meta-content-hash");
+    return "";
 }
 
 
@@ -261,7 +265,7 @@ std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(
     return result;
 }
 
-std::u8string stripLeadingSlash(const std::filesystem::path& path) {
+std::u8string vh::storage::stripLeadingSlash(const std::filesystem::path& path) {
     std::u8string u8 = path.u8string();
     if (!u8.empty() && u8[0] == u8'/') return u8.substr(1);
     return u8;

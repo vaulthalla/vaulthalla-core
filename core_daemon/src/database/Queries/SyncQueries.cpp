@@ -6,7 +6,7 @@ namespace vh::database {
 
 std::shared_ptr<types::Sync> SyncQueries::getSync(const unsigned int vaultId) {
     return Transactions::exec("SyncQueries::getProxySyncConfig", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_proxy_sync_config", vaultId).one_row();
+        const auto row = txn.exec_prepared("get_sync_config", vaultId).one_row();
         return std::make_shared<types::Sync>(row);
     });
 }

@@ -48,32 +48,34 @@ void vh::types::from_json(const nlohmann::json& j, Sync& s) {
     if (j.contains("updated_at")) s.updated_at = util::parseTimestampFromString(j.at("updated_at").get<std::string>());
 }
 
-void vh::types::to_string(std::string& str, const Sync::Strategy& s) {
+std::string vh::types::to_string(const Sync::Strategy& s) {
     switch (s) {
-        case Sync::Strategy::Cache: str = "Cache"; break;
-        case Sync::Strategy::Sync: str = "Sync"; break;
-        case Sync::Strategy::Mirror: str = "Mirror"; break;
+        case Sync::Strategy::Cache: return "Cache";
+        case Sync::Strategy::Sync: return "Sync";
+        case Sync::Strategy::Mirror: return "Mirror";
+        default: throw std::invalid_argument("Unknown sync strategy");
     }
 }
 
-void vh::types::to_string(std::string& str, const Sync::ConflictPolicy& cp) {
+std::string vh::types::to_string(const Sync::ConflictPolicy& cp) {
     switch (cp) {
-        case Sync::ConflictPolicy::KeepLocal: str = "KeepLocal"; break;
-        case Sync::ConflictPolicy::KeepRemote: str = "KeepRemote"; break;
-        case Sync::ConflictPolicy::Ask: str = "Ask"; break;
+        case Sync::ConflictPolicy::KeepLocal: return "keep_local";
+        case Sync::ConflictPolicy::KeepRemote: return "keep_remote";
+        case Sync::ConflictPolicy::Ask: return "ask";
+        default: throw std::invalid_argument("Unknown conflict policy");
     }
 }
 
 Sync::Strategy vh::types::strategyFromString(const std::string& str) {
-    if (str == "Cache") return Sync::Strategy::Cache;
-    if (str == "Sync") return Sync::Strategy::Sync;
-    if (str == "Mirror") return Sync::Strategy::Mirror;
+    if (str == "cache") return Sync::Strategy::Cache;
+    if (str == "sync") return Sync::Strategy::Sync;
+    if (str == "mirror") return Sync::Strategy::Mirror;
     throw std::invalid_argument("Unknown sync strategy: " + str);
 }
 
 Sync::ConflictPolicy vh::types::conflictPolicyFromString(const std::string& str) {
-    if (str == "KeepLocal") return Sync::ConflictPolicy::KeepLocal;
-    if (str == "KeepRemote") return Sync::ConflictPolicy::KeepRemote;
-    if (str == "Ask") return Sync::ConflictPolicy::Ask;
+    if (str == "keep_local") return Sync::ConflictPolicy::KeepLocal;
+    if (str == "keep_remote") return Sync::ConflictPolicy::KeepRemote;
+    if (str == "ask") return Sync::ConflictPolicy::Ask;
     throw std::invalid_argument("Unknown conflict policy: " + str);
 }

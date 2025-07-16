@@ -178,10 +178,15 @@ OS=$(uname)
 # Write profile
 mkdir -p "$(dirname "$VAULTHALLA_PROFILE_PATH")"
 
+BUILD_TYPE="Release"
+if [ "$DEV_MODE" = true ]; then
+  BUILD_TYPE="Debug"
+fi
+
 cat > "$VAULTHALLA_PROFILE_PATH" <<EOF
 [settings]
 arch=$ARCH
-build_type=Release
+build_type=$BUILD_TYPE
 compiler=$COMPILER
 compiler.version=$COMPILER_VERSION
 compiler.cppstd=gnu23
@@ -201,24 +206,20 @@ conan install . --build=missing -pr:a vaulthalla
 echo "🔨 Building binaries..."
 conan build . -pr:a vaulthalla
 
-# === 4) Deploy helper binary ===
-echo "📁 Deploying hash_password helper..."
-sudo mv build/hash_password deploy/psql/
-
-# === 5) Setup Runtime Directories ===
+# === 4) Setup Runtime Directories ===
 echo "📁 Creating runtime directories..."
 for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthalla; do
     sudo install -d -o vaulthalla -g vaulthalla -m 755 "$dir"
 done
 sudo chmod 750 /var/log/vaulthalla
 
-# === 6) Install Binaries ===
+# === 5) Install Binaries ===
 echo "🚀 Installing core executables..."
 sudo install -d -o vaulthalla -g vaulthalla -m 755 /usr/local/bin/vaulthalla
 sudo install -m 755 build/fuse_daemon /usr/local/bin/vaulthalla/
 sudo install -m 755 build/core_daemon /usr/local/bin/vaulthalla/
 
-# === 7) Deploy Config ===
+# === 6) Deploy Config ===
 echo "⚙️  Deploying default config..."
 sudo install -d -m 755 /etc/vaulthalla
 sudo cp deploy/config/config_template.yaml.in /etc/vaulthalla/
@@ -230,7 +231,7 @@ else
     sudo cp deploy/config/config.example.yaml /etc/vaulthalla/config.yaml
 fi
 
-# === 8) Setup Database ===
+# === 7) Setup Database ===
 VAUL_PG_PASS=$(uuidgen)
 echo "🔐 Creating PostgreSQL user and database..."
 
@@ -242,12 +243,12 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'"
 
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaulthalla;"
 
-# === 9) Inject DB Password into Config ===
+# === 8) Inject DB Password into Config ===
 echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
-# === 10) Apply Schema + Seed DB ===
-for sql_file in auth vaults files acl; do
+# === 9) Apply Schema + Seed DB ===
+for sql_file in auth vaults files sync acl; do
     echo "📄 Applying $sql_file.sql..."
     sudo -u vaulthalla psql -d vaulthalla -f "deploy/psql/$sql_file.sql"
 done
@@ -272,7 +273,7 @@ else
         fi
 
         # Try to hash and validate
-        if HASHED_PASS=$(./deploy/psql/hash_password --validate "$ADMIN_PLAIN" 2>&1); then
+        if HASHED_PASS=$(./build/hash_password --validate "$ADMIN_PLAIN" 2>&1); then
             echo "✅ Password accepted."
             break
         else
@@ -284,7 +285,7 @@ fi
 
 # In dev mode, we still hash after the conditional block:
 if [[ "$DEV_MODE" == true ]]; then
-    HASHED_PASS=$(./deploy/psql/hash_password "$ADMIN_PLAIN")
+    HASHED_PASS=$(./build/hash_password "$ADMIN_PLAIN")
 fi
 
 echo "🔑 Seeding admin user..."
@@ -297,7 +298,7 @@ else
     echo "🌐 Skipping cloud test vault setup in production mode."
 fi
 
-# === 11) Install systemd services ===
+# === 10) Install systemd services ===
 echo "🛠️  Installing systemd services..."
 sudo install -m 644 deploy/systemd/vaulthalla-core.service /etc/systemd/system/
 sudo install -m 644 deploy/systemd/vaulthalla-fuse.service /etc/systemd/system/

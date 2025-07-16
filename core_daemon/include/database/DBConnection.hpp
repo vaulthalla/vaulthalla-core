@@ -34,8 +34,9 @@ struct PathPatterns {
 };
 
 inline PathPatterns computePatterns(const std::string& absPath, const bool recursive) {
-    if (recursive) return {absPath + "/%", ""};  // No NOT LIKE in recursive
-    return {absPath + "/%", absPath + "/%/%"};
+    const std::string base = (absPath == "/") ? "" : absPath;
+    if (recursive) return {base + "/%", ""};
+    return {base + "/%", base + "/%/%"};
 }
 
 } // namespace vh::database

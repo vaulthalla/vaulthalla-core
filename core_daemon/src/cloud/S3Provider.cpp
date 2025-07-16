@@ -28,7 +28,7 @@ void ensureCurlGlobalInit() {
 struct HeaderList {
     std::vector<std::string> store; // owns the memory
     curl_slist* list = nullptr;     // raw list pointer
-    ~HeaderList() { curl_slist_free_all(list); }
+    ~HeaderList() { if (list) curl_slist_free_all(list); }
 
     void add(const std::string& h) {
         store.push_back(h);

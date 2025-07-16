@@ -8,11 +8,11 @@
 
 using namespace vh::database;
 
-void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
+unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
     if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
 
-    Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
+    return Transactions::exec("FileQueries::addFile" ,[&](pqxx::work& txn) {
         pqxx::params p;
         p.append(file->vault_id);
         p.append(file->parent_id);
@@ -24,7 +24,7 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
         p.append(file->content_hash);
         p.append(to_utf8_string(file->path.u8string()));
 
-        txn.exec_prepared("insert_file", p);
+        const auto fileId = txn.exec_prepared("upsert_file", p).one_row()["id"].as<unsigned int>();
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
@@ -32,35 +32,8 @@ void FileQueries::addFile(const std::shared_ptr<types::File>& file) {
             txn.exec_prepared("update_dir_stats", stats_params);
             parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
         }
-    });
-}
 
-void FileQueries::updateFile(const std::shared_ptr<types::File>& file) {
-    if (!file) throw std::invalid_argument("File cannot be null");
-
-    Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
-        const auto prevSize = txn.exec_prepared("get_file_size_bytes", file->id).one_field().as<unsigned int>();
-        const auto diff = file->size_bytes - prevSize;
-
-        pqxx::params p;
-        p.append(file->id);
-        p.append(file->vault_id);
-        p.append(file->parent_id);
-        p.append(file->name);
-        p.append(file->last_modified_by);
-        p.append(file->size_bytes);
-        p.append(file->mime_type);
-        p.append(file->content_hash);
-        p.append(to_utf8_string(file->path.u8string()));
-
-        txn.exec_prepared("update_file", p);
-
-        std::optional<unsigned int> parentId = file->parent_id;
-        while (parentId) {
-            pqxx::params stats_params{parentId, diff, 0, 0}; // Update size_bytes with diff, file_count remains unchanged
-            txn.exec_prepared("update_dir_stats", stats_params);
-            parentId = txn.exec_prepared("get_dir_parent_id", parentId).one_field().as<std::optional<unsigned int>>();
-        }
+        return fileId;
     });
 }
 

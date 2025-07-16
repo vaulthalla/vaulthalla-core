@@ -35,8 +35,8 @@ struct Sync {
 void to_json(nlohmann::json& j, const Sync& s);
 void from_json(const nlohmann::json& j, Sync& s);
 
-void to_string(std::string& str, const Sync::Strategy& s);
-void to_string(std::string& str, const Sync::ConflictPolicy& cp);
+std::string to_string(const Sync::Strategy& s);
+std::string to_string(const Sync::ConflictPolicy& cp);
 
 Sync::Strategy strategyFromString(const std::string& str);
 Sync::ConflictPolicy conflictPolicyFromString(const std::string& str);

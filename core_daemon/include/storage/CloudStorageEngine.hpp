@@ -60,6 +60,8 @@ public:
     std::shared_ptr<types::CacheIndex> cacheFile(const std::filesystem::path& rel_path);
     void indexAndDeleteFile(const std::filesystem::path& rel_path);
 
+    [[nodiscard]] std::string getRemoteContentHash(const std::filesystem::path& rel_path) const;
+
     [[nodiscard]] std::unordered_map<std::u8string, std::shared_ptr<types::File>> getGroupedFilesFromS3(const std::filesystem::path& prefix = {}) const;
 
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;

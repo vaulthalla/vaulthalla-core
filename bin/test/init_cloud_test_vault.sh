@@ -28,14 +28,9 @@ VALUES (
 ON CONFLICT (name) DO NOTHING;
 
 -- Create sync entry for R2 Test Vault
-WITH inserted_sync AS (
-  INSERT INTO sync (interval, conflict_policy, strategy)
-  VALUES (60, 'keep_local', 'sync')
-  RETURNING id
-)
-INSERT INTO proxy_sync (vault_id, sync_id)
-SELECT v.id, i.id
-FROM vault v, inserted_sync i
+INSERT INTO sync (vault_id, interval, conflict_policy, strategy)
+SELECT v.id, 30, 'keep_local', 'sync'
+FROM vault v
 WHERE v.name = 'R2 Test Vault';
 
 -- Create test bucket for R2

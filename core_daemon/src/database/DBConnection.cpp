@@ -96,8 +96,8 @@ void DBConnection::initPreparedUserRoles() const {
 
 void DBConnection::initPreparedVaults() const {
     conn_->prepare("insert_vault",
-        "INSERT INTO vault (name, type, description, owner_id) "
-        "VALUES ($1, $2, $3, $4) RETURNING id");
+                   "INSERT INTO vault (name, type, description, owner_id) "
+                   "VALUES ($1, $2, $3, $4) RETURNING id");
 
     conn_->prepare("insert_local_vault", "INSERT INTO local (vault_id, mount_point) VALUES ($1, $2)");
 
@@ -106,47 +106,50 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
 
     conn_->prepare("get_vault",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
-        "FROM vault v "
-        "LEFT JOIN local l ON v.id = l.vault_id "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
-        "WHERE v.id = $1");
+                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "FROM vault v "
+                   "LEFT JOIN local l ON v.id = l.vault_id "
+                   "LEFT JOIN s3 s ON v.id = s.vault_id "
+                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
+                   "WHERE v.id = $1");
 
     conn_->prepare("list_vaults",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
-        "FROM vault v "
-        "LEFT JOIN local l ON v.id = l.vault_id "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id");
+                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "FROM vault v "
+                   "LEFT JOIN local l ON v.id = l.vault_id "
+                   "LEFT JOIN s3 s ON v.id = s.vault_id "
+                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id");
 
     conn_->prepare("list_user_vaults",
-        "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
-        "FROM vault v "
-        "LEFT JOIN local l ON v.id = l.vault_id "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
-        "WHERE v.owner_id = $1");
+                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "FROM vault v "
+                   "LEFT JOIN local l ON v.id = l.vault_id "
+                   "LEFT JOIN s3 s ON v.id = s.vault_id "
+                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
+                   "WHERE v.owner_id = $1");
 
     conn_->prepare("get_vault_owners_name",
-        "SELECT u.name FROM users u "
-        "JOIN vault v ON u.id = v.owner_id "
-        "WHERE v.id = $1");
+                   "SELECT u.name FROM users u "
+                   "JOIN vault v ON u.id = v.owner_id "
+                   "WHERE v.id = $1");
 
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 }
 
 
 void DBConnection::initPreparedFiles() const {
-    conn_->prepare("insert_file",
+    conn_->prepare("upsert_file",
                    "INSERT INTO files (vault_id, parent_id, name, created_by, last_modified_by, size_bytes, "
                    "mime_type, content_hash, path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id");
-
-    conn_->prepare("update_file",
-                   "UPDATE files SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "
-                   "last_modified_by = $5, size_bytes = $6, mime_type = $7, content_hash = $8, path = $9 "
-                   "WHERE id = $1");
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
+                   "ON CONFLICT (vault_id, parent_id, name) DO UPDATE SET "
+                   "updated_at = NOW(), "
+                   "last_modified_by = EXCLUDED.last_modified_by, "
+                   "size_bytes = EXCLUDED.size_bytes, "
+                   "mime_type = EXCLUDED.mime_type, "
+                   "content_hash = EXCLUDED.content_hash, "
+                   "path = EXCLUDED.path "
+                   "RETURNING files.id");
 
     conn_->prepare("delete_file", "DELETE FROM files WHERE id = $1");
 
@@ -155,28 +158,28 @@ void DBConnection::initPreparedFiles() const {
     conn_->prepare("get_file_mime_type", "SELECT mime_type FROM files WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("list_files_in_dir",
-               "SELECT * FROM files "
-               "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
+                   "SELECT * FROM files "
+                   "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
 
     conn_->prepare("list_files_in_dir_recursive",
-               "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
+                   "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
 
     conn_->prepare("get_file_id_by_path", "SELECT id FROM files WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("get_file_size_bytes", "SELECT size_bytes FROM files WHERE id = $1");
 
     conn_->prepare("get_file_parent_id_and_size",
-        "SELECT parent_id, size_bytes FROM files WHERE id = $1");
+                   "SELECT parent_id, size_bytes FROM files WHERE id = $1");
 
     conn_->prepare("is_file", "SELECT EXISTS (SELECT 1 FROM files WHERE vault_id = $1 AND path = $2)");
 }
 
 void DBConnection::initPreparedDirectories() const {
     conn_->prepare("update_dir_stats",
-        "UPDATE directory_stats "
-        "SET size_bytes = size_bytes + $2, file_count = file_count + $3, subdirectory_count = subdirectory_count + $4, "
-        "last_modified = NOW() "
-        "WHERE directory_id = $1");
+                   "UPDATE directory_stats "
+                   "SET size_bytes = size_bytes + $2, file_count = file_count + $3, subdirectory_count = subdirectory_count + $4, "
+                   "last_modified = NOW() "
+                   "WHERE directory_id = $1");
 
     conn_->prepare("get_dir_parent_id", "SELECT parent_id FROM directories WHERE id = $1");
 
@@ -203,9 +206,9 @@ void DBConnection::initPreparedDirectories() const {
                    "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3 AND d.path != '/'");
 
     conn_->prepare("list_directories_in_dir_recursive",
-               "SELECT d.*, ds.* FROM directories d "
-               "JOIN directory_stats ds ON d.id = ds.directory_id "
-               "WHERE d.vault_id = $1 AND d.path LIKE $2");
+                   "SELECT d.*, ds.* FROM directories d "
+                   "JOIN directory_stats ds ON d.id = ds.directory_id "
+                   "WHERE d.vault_id = $1 AND d.path LIKE $2");
 
     conn_->prepare("get_dir_by_path", "SELECT * FROM directories WHERE vault_id = $1 AND path = $2");
 
@@ -330,43 +333,33 @@ void DBConnection::initPreparedPermOverrides() const {
 
 void DBConnection::initPreparedSync() const {
     conn_->prepare("insert_sync",
-        "INSERT INTO sync (interval, conflict_policy, strategy) "
-        "VALUES ($1, $2, $3) RETURNING id");
+                   "INSERT INTO sync (vault_id, interval, conflict_policy, strategy) "
+                   "VALUES ($1, $2, $3, $4) RETURNING id");
 
     conn_->prepare("update_sync",
-        "UPDATE sync SET interval = $2, conflict_policy = $3, strategy = $4, "
-        "enabled = $5, last_sync_at = $6, last_success_at = $7, updated_at = NOW() "
-        "WHERE id = $1");
+                   "UPDATE sync SET interval = $2, conflict_policy = $3, strategy = $4, "
+                   "enabled = $5, last_sync_at = $6, last_success_at = $7, updated_at = NOW() "
+                   "WHERE id = $1");
 
     conn_->prepare("report_sync_started", "UPDATE sync SET last_sync_at = NOW() WHERE id = $1");
 
-    conn_->prepare("report_sync_success", "UPDATE sync SET last_success_at = NOW(), last_sync_at = NOW() WHERE id = $1");
+    conn_->prepare("report_sync_success",
+                   "UPDATE sync SET last_success_at = NOW(), last_sync_at = NOW() WHERE id = $1");
 
-    conn_->prepare("insert_proxy_sync",
-                   "INSERT INTO proxy_sync (sync_id, vault_id, cache_thumbnails, cache_full_size_objects, max_cache_size) "
-                   "VALUES ($1, $2, $3, $4, $5)");
-
-    conn_->prepare("get_proxy_sync_config",
-                   "SELECT s.*, ps.* "
-                   "FROM proxy_sync ps "
-                   "JOIN sync s ON ps.sync_id = s.id "
-                   "WHERE ps.vault_id = $1");
+    conn_->prepare("get_sync_config", "SELECT * FROM sync WHERE vault_id = $1");
 }
 
 void DBConnection::initPreparedCache() const {
-    conn_->prepare("insert_cache_index",
-        "INSERT INTO cache_index (vault_id, path, type, size) VALUES ($1, $2, $3, $4)");
-
     conn_->prepare("upsert_cache_index",
-    "INSERT INTO cache_index (vault_id, path, type, size) "
-    "VALUES ($1, $2, $3, $4) "
-    "ON CONFLICT (vault_id, path, type) DO UPDATE "
-    "SET type = EXCLUDED.type, "
-    "    size = EXCLUDED.size, "
-    "    last_accessed = CURRENT_TIMESTAMP");
+                   "INSERT INTO cache_index (vault_id, file_id, path, type, size) "
+                   "VALUES ($1, $2, $3, $4, $5) "
+                   "ON CONFLICT (vault_id, path, type) DO UPDATE "
+                   "SET type = EXCLUDED.type, "
+                   "    size = EXCLUDED.size, "
+                   "    last_accessed = CURRENT_TIMESTAMP");
 
     conn_->prepare("update_cache_index",
-        "UPDATE cache_index SET path = $2, type = $3, size = $4, last_accessed = NOW() WHERE id = $1");
+                   "UPDATE cache_index SET path = $2, type = $3, size = $4, last_accessed = NOW() WHERE id = $1");
 
     conn_->prepare("get_cache_index", "SELECT * FROM cache_index WHERE id = $1");
 
@@ -379,31 +372,31 @@ void DBConnection::initPreparedCache() const {
     conn_->prepare("list_cache_indices", "SELECT * FROM cache_index WHERE vault_id = $1");
 
     conn_->prepare("list_cache_indices_by_path_recursive",
-        "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2");
 
     conn_->prepare("list_cache_indices_by_path",
-        "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
 
     conn_->prepare("list_cache_indices_by_type",
-        "SELECT * FROM cache_index WHERE vault_id = $1 AND type = $2");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 AND type = $2");
 
     conn_->prepare("list_cache_indices_by_file", "SELECT * FROM cache_index WHERE file_id = $1");
 
     conn_->prepare("n_largest_cache_indices",
-        "SELECT * FROM cache_index WHERE vault_id = $1 ORDER BY size DESC LIMIT $2");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 ORDER BY size DESC LIMIT $2");
 
     conn_->prepare("n_largest_cache_indices_by_path",
-        "SELECT * FROM cache_index WHERE vault_id = $1 "
-        "AND path LIKE $2 AND path NOT LIKE $3 ORDER BY size DESC LIMIT $4");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 "
+                   "AND path LIKE $2 AND path NOT LIKE $3 ORDER BY size DESC LIMIT $4");
 
     conn_->prepare("n_largest_cache_indices_by_path_recursive",
-        "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2 ORDER BY size DESC LIMIT $3");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 AND path LIKE $2 ORDER BY size DESC LIMIT $3");
 
     conn_->prepare("n_largest_cache_indices_by_type",
-        "SELECT * FROM cache_index WHERE vault_id = $1 AND type = $2 ORDER BY size DESC LIMIT $3");
+                   "SELECT * FROM cache_index WHERE vault_id = $1 AND type = $2 ORDER BY size DESC LIMIT $3");
 
     conn_->prepare("cache_index_exists",
-        "SELECT EXISTS (SELECT 1 FROM cache_index WHERE vault_id = $1 AND path = $2)");
+                   "SELECT EXISTS (SELECT 1 FROM cache_index WHERE vault_id = $1 AND path = $2)");
 
     conn_->prepare("count_cache_indices", "SELECT COUNT(*) FROM cache_index WHERE vault_id = $1");
 

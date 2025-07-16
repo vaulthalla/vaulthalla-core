@@ -6,27 +6,17 @@
 using namespace vh::database;
 using namespace vh::types;
 
-void CacheQueries::addCacheIndex(const std::shared_ptr<CacheIndex>& index) {
-    if (!index) throw std::invalid_argument("CacheIndex cannot be null");
-    Transactions::exec("CacheQueries::addCacheIndex", [&](pqxx::work& txn) {
-        pqxx::params p{index->vault_id, to_utf8_string(index->path.u8string()), to_string(index->type), index->size};
-        txn.exec_prepared("insert_cache_index", p);
-    });
-}
-
 void CacheQueries::upsertCacheIndex(const std::shared_ptr<CacheIndex>& index) {
     if (!index) throw std::invalid_argument("CacheIndex cannot be null");
     Transactions::exec("CacheQueries::upsertCacheIndex", [&](pqxx::work& txn) {
-        pqxx::params p{index->vault_id, to_utf8_string(index->path.u8string()), to_string(index->type), index->size};
-        txn.exec_prepared("upsert_cache_index", p);
-    });
-}
+        pqxx::params p;
+        p.append(index->vault_id);
+        p.append(index->file_id);
+        p.append(to_utf8_string(index->path.u8string()));
+        p.append(to_string(index->type));
+        p.append(index->size);
 
-void CacheQueries::updateCacheIndex(const std::shared_ptr<CacheIndex>& index) {
-    if (!index) throw std::invalid_argument("CacheIndex cannot be null");
-    Transactions::exec("CacheQueries::updateCacheIndex", [&](pqxx::work& txn) {
-        pqxx::params p{index->id, index->vault_id, to_utf8_string(index->path.u8string()), to_string(index->type), index->size};
-        txn.exec_prepared("update_cache_index", p);
+        txn.exec_prepared("upsert_cache_index", p);
     });
 }
 
@@ -51,7 +41,7 @@ std::shared_ptr<CacheIndex> CacheQueries::getCacheIndex(unsigned int indexId) {
 
 std::shared_ptr<CacheIndex> CacheQueries::getCacheIndexByPath(unsigned int vaultId, const std::filesystem::path& path) {
     return Transactions::exec("CacheQueries::getCacheIndexByPath", [&](pqxx::work& txn) -> std::shared_ptr<CacheIndex> {
-        const auto row = txn.exec_prepared("get_cache_index_by_path", pqxx::params{vaultId, }).one_row();
+        const auto row = txn.exec_prepared("get_cache_index_by_path", pqxx::params{vaultId, to_utf8_string(path.u8string())}).one_row();
         return std::make_shared<CacheIndex>(row);
     });
 }

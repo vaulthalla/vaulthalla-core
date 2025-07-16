@@ -65,7 +65,8 @@ public:
 
     [[nodiscard]] uintmax_t freeSpace() const;
 
-    [[nodiscard]] std::shared_ptr<types::File> createFile(const std::filesystem::path& rel_path) const;
+    [[nodiscard]] std::shared_ptr<types::File> createFile(const std::filesystem::path& rel_path,
+                                                          const std::filesystem::path& abs_path = {}) const;
 
     [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path,
                                                              const std::filesystem::path& prefix = {}) const;

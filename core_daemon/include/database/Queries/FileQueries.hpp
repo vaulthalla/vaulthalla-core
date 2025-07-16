@@ -19,9 +19,7 @@ class FileQueries {
 public:
     FileQueries() = default;
 
-    static void addFile(const std::shared_ptr<types::File>& file);
-
-    static void updateFile(const std::shared_ptr<types::File>& file);
+    static unsigned int upsertFile(const std::shared_ptr<types::File>& file);
 
     static void deleteFile(unsigned int fileId);
 
@@ -39,7 +37,7 @@ public:
 
     [[nodiscard]] static bool fileExists(unsigned int vaultId, const std::filesystem::path& relPath);
 
-    static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
+    static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path = {"/"}, bool recursive = true);
 };
 
 } // namespace vh::database

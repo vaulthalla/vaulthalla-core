@@ -25,10 +25,7 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
     if (root_mount_path.empty()) root_ = cache_path_;
     else root_ = std::move(root_mount_path);
 
-    if (!std::filesystem::exists(root_)) {
-        std::cout << "[StorageEngine] Creating root directory: " << root_ << std::endl;
-        std::filesystem::create_directories(root_);
-    } else std::cout << "[StorageEngine] Root directory already exists: " << root_ << std::endl;
+    if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
 }
 
 std::filesystem::path StorageEngine::getRelativePath(const std::filesystem::path& abs_path) const {
@@ -51,12 +48,10 @@ std::filesystem::path StorageEngine::getRelativeCachePath(const std::filesystem:
 std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path, const std::filesystem::path& abs_path) const {
     const auto absPath = abs_path.empty() ? getAbsolutePath(rel_path) : abs_path;
 
-    if (!std::filesystem::exists(absPath)) {
+    if (!std::filesystem::exists(absPath))
         throw std::runtime_error("File does not exist at path: " + absPath.string());
-    }
-    if (!std::filesystem::is_regular_file(absPath)) {
+    if (!std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("Path is not a regular file: " + absPath.string());
-    }
 
     auto file = std::make_shared<File>();
     file->vault_id = vault_->id;
@@ -67,7 +62,6 @@ std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel
     file->mime_type = util::Magic::get_mime_type(absPath);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? std::filesystem::path{"/"} / file->path.parent_path() : std::filesystem::path("/");
-    std::cout << "Creating file with parent: { vaultId: " << vault_->id << ", path: " << parentPath.string() << " }" << std::endl;
     file->parent_id = database::DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
     return file;
@@ -80,7 +74,6 @@ void StorageEngine::writeFile(const std::filesystem::path& abs_path, const std::
     if (!file) throw std::runtime_error("Failed to open file for writing: " + abs_path.string());
     file.write(buffer.data(), buffer.size());
     file.close();
-    std::cout << "[StorageEngine] File written: " << abs_path << std::endl;
 }
 
 std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path,

@@ -43,12 +43,7 @@ void CloudStorageEngine::finishUpload(const unsigned int userId, const std::file
 
     const auto f = createFile(relPath);
     f->created_by = f->last_modified_by = userId;
-
-    std::string buffer;
-    uploadFile(f->path, buffer);
-    thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
-
-    f->id = FileQueries::upsertFile(f);
+    FileQueries::upsertFile(f);
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -84,11 +79,7 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path) c
 
 void CloudStorageEngine::removeFile(const fs::path& rel_path) {
     std::cout << "[CloudStorageEngine] Deleting file: " << rel_path << std::endl;
-
-    if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
-        "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
-
-    purgeThumbnails(rel_path);
+    removeRemotely(rel_path);
     FileQueries::deleteFile(vault_->id, rel_path);
 }
 
@@ -204,37 +195,6 @@ std::string CloudStorageEngine::getRemoteContentHash(const std::filesystem::path
     if (const auto head = s3Provider_->getHeadObject(stripLeadingSlash(rel_path)))
         if (head->contains("x-amz-meta-content-hash")) return head->at("x-amz-meta-content-hash");
     return "";
-}
-
-
-std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path) {
-    std::vector<std::string> keys;
-
-    pugi::xml_document doc;
-    pugi::xml_parse_result result = doc.load_string(xml.c_str());
-
-    if (!result) {
-        std::cerr << "[s3KeysFromXML] Failed to parse XML: " << result.description() << std::endl;
-        return {};
-    }
-
-    pugi::xml_node root = doc.child("ListBucketResult");
-    if (!root) {
-        std::cerr << "[s3KeysFromXML] Missing <ListBucketResult> root node" << std::endl;
-        return {};
-    }
-
-    const std::string prefix = rel_path.string().empty() ? "" : rel_path.string().append(rel_path.string().back() == '/' ? "" : "/");
-
-    for (pugi::xml_node content : root.children("Contents")) {
-        auto keyNode = content.child("Key");
-        if (!keyNode) continue;
-
-        std::string key = keyNode.text().get();
-        if (key.starts_with(prefix)) keys.push_back(std::move(key));
-    }
-
-    return keys;
 }
 
 std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(

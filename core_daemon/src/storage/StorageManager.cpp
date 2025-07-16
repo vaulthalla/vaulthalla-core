@@ -13,7 +13,7 @@
 #include "util/Magic.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "crypto/Hash.hpp"
 
 #include <filesystem>
@@ -25,8 +25,7 @@ using namespace vh::types;
 using namespace vh::database;
 
 StorageManager::StorageManager()
-    : thumbnailWorker_(std::make_shared<services::ThumbnailWorker>()) {
-    thumbnailWorker_->start();
+    : thumbnailWorker_(std::make_shared<concurrency::ThumbnailWorker>()) {
     initStorageEngines();
 }
 

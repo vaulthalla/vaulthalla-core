@@ -179,7 +179,7 @@ void DBConnection::initPreparedDirectories() const {
                    "UPDATE directory_stats "
                    "SET size_bytes = size_bytes + $2, file_count = file_count + $3, subdirectory_count = subdirectory_count + $4, "
                    "last_modified = NOW() "
-                   "WHERE directory_id = $1");
+                   "WHERE directory_id = $1 RETURNING file_count");
 
     conn_->prepare("get_dir_parent_id", "SELECT parent_id FROM directories WHERE id = $1");
 

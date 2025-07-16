@@ -29,7 +29,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Create sync entry for R2 Test Vault
 INSERT INTO sync (vault_id, interval, conflict_policy, strategy)
-SELECT v.id, 30, 'keep_local', 'sync'
+SELECT v.id, 30, 'keep_local', 'mirror'
 FROM vault v
 WHERE v.name = 'R2 Test Vault';
 

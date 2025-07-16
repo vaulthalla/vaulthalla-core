@@ -18,7 +18,8 @@ SyncTask::SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
     : next_run(std::chrono::system_clock::from_time_t(engine->sync->last_sync_at)
                + std::chrono::seconds(engine->sync->interval.count())),
       engine_(engine),
-      controller_(controller) {}
+      controller_(controller) {
+}
 
 void SyncTask::operator()() {
     if (!engine_) {
@@ -26,8 +27,7 @@ void SyncTask::operator()() {
         return;
     }
 
-    bool active;
-    {
+    bool active; {
         std::shared_lock lock(controller_->engineMapMutex_);
         active = engine_->sync->enabled && controller_->engineMap_.contains(engine_->vault_->id);
     }
@@ -61,7 +61,7 @@ void SyncTask::operator()() {
     controller_->requeue(shared_from_this());
 }
 
-uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File>>& files) {
+uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {
     uintmax_t totalSize = 0;
     for (const auto& file : files) totalSize += file->size_bytes;
     return totalSize;
@@ -71,10 +71,10 @@ unsigned int SyncTask::vaultId() const { return engine_->vault_->id; }
 
 bool SyncTask::operator<(const SyncTask& other) const { return next_run > other.next_run; }
 
-std::vector<std::shared_ptr<File>> SyncTask::uMap2Vector(
-    std::unordered_map<std::u8string, std::shared_ptr<File>>& map) {
+std::vector<std::shared_ptr<File> > SyncTask::uMap2Vector(
+    std::unordered_map<std::u8string, std::shared_ptr<File> >& map) {
 
-    std::vector<std::shared_ptr<File>> files;
+    std::vector<std::shared_ptr<File> > files;
     files.reserve(map.size());
     std::ranges::transform(map.begin(), map.end(), std::back_inserter(files),
                            [](const auto& pair) { return pair.second; });
@@ -82,6 +82,17 @@ std::vector<std::shared_ptr<File>> SyncTask::uMap2Vector(
 }
 
 void SyncTask::ensureFreeSpace(const uintmax_t size) const {
-    if (engine_->getVault()->quota != 0 && engine_->freeSpace() < size)
-        throw std::runtime_error("Not enough space to cache file");
+    if (engine_->getVault()->quota != 0 && engine_->freeSpace() < size) throw std::runtime_error(
+        "Not enough space to cache file");
+}
+
+std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::symmetric_diff(
+    const std::unordered_map<std::u8string, std::shared_ptr<File> >& a,
+    const std::unordered_map<std::u8string, std::shared_ptr<File> >& b) {
+    std::unordered_map<std::u8string, std::shared_ptr<File>> result;
+
+    for (const auto& item : a) if (!b.contains(item.first)) result.insert(item);
+    for (const auto& item : b) if (!a.contains(item.first)) result.insert(item);
+
+    return result;
 }

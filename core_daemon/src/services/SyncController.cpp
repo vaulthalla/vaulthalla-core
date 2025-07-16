@@ -2,6 +2,8 @@
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
 #include "concurrency/sync/CacheSyncTask.hpp"
+#include "concurrency/sync/SafeSyncTask.hpp"
+#include "concurrency/sync/MirrorSyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -10,8 +12,6 @@
 #include <boost/dynamic_bitset.hpp>
 #include <iostream>
 #include <thread>
-
-#include "concurrency/sync/SafeSyncTask.hpp"
 
 using namespace vh::services;
 using namespace vh::storage;
@@ -94,6 +94,8 @@ void SyncController::run() {
                 pq.push(std::make_shared<CacheSyncTask>(engine, shared_from_this()));
             else if (engine->sync->strategy == types::Sync::Strategy::Sync)
                 pq.push(std::make_shared<SafeSyncTask>(engine, shared_from_this()));
+            else if (engine->sync->strategy == types::Sync::Strategy::Mirror)
+                pq.push(std::make_shared<MirrorSyncTask>(engine, shared_from_this()));
             else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
         }
     };

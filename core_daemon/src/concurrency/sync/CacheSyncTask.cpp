@@ -9,7 +9,7 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "../../../include/concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 

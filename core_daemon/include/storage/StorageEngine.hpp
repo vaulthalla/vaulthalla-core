@@ -14,12 +14,9 @@ struct Vault;
 struct File;
 }
 
-namespace vh::services {
-class ThumbnailWorker;
-}
-
 namespace vh::concurrency {
 class SyncTask;
+class ThumbnailWorker;
 }
 
 namespace vh::storage {
@@ -35,7 +32,7 @@ public:
     StorageEngine() = default;
 
     explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
-                           const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                           const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                            fs::path root_mount_path = fs::path());
 
     virtual ~StorageEngine() = default;
@@ -93,7 +90,7 @@ public:
 protected:
     std::shared_ptr<types::Vault> vault_;
     fs::path cache_path_, root_;
-    std::shared_ptr<services::ThumbnailWorker> thumbnailWorker_;
+    std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
 
     virtual void removeFile(const fs::path& rel_path) = 0;
 

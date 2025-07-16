@@ -3,7 +3,7 @@
 #include "types/Vault.hpp"
 #include "types/LocalDiskVault.hpp"
 #include "util/imageUtil.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "types/File.hpp"
@@ -11,9 +11,11 @@
 #include <fstream>
 #include <iostream>
 
+using namespace vh::types;
+
 namespace vh::storage {
 
-LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                                                const std::shared_ptr<LocalDiskVault>& vault)
     : StorageEngine(vault, thumbnailWorker, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);

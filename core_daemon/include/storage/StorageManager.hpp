@@ -14,7 +14,7 @@ struct FSEntry;
 struct Sync;
 }
 
-namespace vh::services {
+namespace vh::concurrency {
 class ThumbnailWorker;
 }
 
@@ -53,7 +53,7 @@ public:
 
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
 
-    std::shared_ptr<services::ThumbnailWorker> getThumbnailWorker() const { return thumbnailWorker_; }
+    std::shared_ptr<concurrency::ThumbnailWorker> getThumbnailWorker() const { return thumbnailWorker_; }
 
     static bool pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2);
 
@@ -72,7 +72,7 @@ public:
 private:
     mutable std::mutex mountsMutex_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine> > engines_;
-    std::shared_ptr<services::ThumbnailWorker> thumbnailWorker_;
+    std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
 };
 
 } // namespace vh::storage

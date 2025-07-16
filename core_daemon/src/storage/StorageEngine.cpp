@@ -2,7 +2,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/File.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "util/Magic.hpp"
 #include "crypto/Hash.hpp"
@@ -11,10 +11,12 @@
 #include <algorithm>
 #include <fstream>
 
+using namespace vh::types;
+
 namespace vh::storage {
 
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
-                             const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+                             const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                              fs::path root_mount_path)
     : vault_(vault), thumbnailWorker_(thumbnailWorker) {
     const auto conf = config::ConfigRegistry::get();

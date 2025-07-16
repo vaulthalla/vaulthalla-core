@@ -8,7 +8,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -20,7 +20,7 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 
-CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                                        const std::shared_ptr<S3Vault>& vault,
                                        const std::shared_ptr<api::APIKey>& key,
                                        const std::shared_ptr<Sync>& sync)
@@ -66,6 +66,20 @@ void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
     if (isDirectory(rel_path)) removeDirectory(rel_path);
     else if (isFile(rel_path)) removeFile(rel_path);
     else throw std::runtime_error("[CloudStorageEngine] Path does not exist: " + rel_path.string());
+}
+
+void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) const {
+    const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
+    purgeThumbnails(path);
+    FileQueries::deleteFile(vault_->id, path);
+    const auto absPath = getAbsolutePath(path);
+    if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
+}
+
+void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path) const {
+    if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
+        "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+    purgeThumbnails(rel_path);
 }
 
 void CloudStorageEngine::removeFile(const fs::path& rel_path) {

@@ -26,8 +26,6 @@ private:
     static std::pair<uintmax_t, uintmax_t> computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<types::CacheIndex>>& indices);
 
     void ensureFreeSpace(uintmax_t size) const override;
-
-    [[nodiscard]] bool shouldPurgeNewFiles() const;
 };
 
 

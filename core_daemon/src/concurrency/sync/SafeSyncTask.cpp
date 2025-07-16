@@ -6,10 +6,9 @@
 #include "concurrency/ThreadPoolRegistry.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/CacheQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 
@@ -43,9 +42,7 @@ void SafeSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File> 
             continue;
         }
 
-        std::cout << "[SafeSyncTask][1/2] Local file is newer than remote copy: " << file->path << "\n"
-            << "[SafeSyncTask][2/2] Assuming an upload is scheduled, skipping download.\n";
-
+        engine_->uploadFile(file->path);
         s3Map.erase(match);
     }
 }

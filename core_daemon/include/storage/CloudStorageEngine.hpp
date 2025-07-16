@@ -33,7 +33,7 @@ public:
 
     ~CloudStorageEngine() override = default;
 
-    CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+    CloudStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                        const std::shared_ptr<types::S3Vault>& vault,
                        const std::shared_ptr<types::api::APIKey>& key,
                        const std::shared_ptr<types::Sync>& sync);
@@ -47,6 +47,10 @@ public:
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
     void remove(const std::filesystem::path& rel_path) override;
+
+    void removeLocally(const std::filesystem::path& rel_path) const;
+
+    void removeRemotely(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 

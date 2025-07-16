@@ -2,10 +2,6 @@
 
 #include "concurrency/sync/SyncTask.hpp"
 
-namespace vh::types {
-struct CacheIndex;
-}
-
 namespace vh::concurrency {
 
 class SafeSyncTask : public SyncTask {
@@ -20,6 +16,5 @@ public:
     void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
     void handleDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
 };
-
 
 }

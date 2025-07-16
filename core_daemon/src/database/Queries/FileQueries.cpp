@@ -48,7 +48,8 @@ void FileQueries::deleteFile(const unsigned int fileId) {
         std::optional<unsigned int> currentParentId = parentId;
         while (currentParentId) {
             pqxx::params stats_params{currentParentId, -static_cast<int>(sizeBytes), -1, 0}; // Decrement size_bytes and file_count
-            txn.exec_prepared("update_dir_stats", stats_params);
+            const auto fCount = txn.exec_prepared("update_dir_stats", stats_params).one_row()["file_count"].as<unsigned int>();
+            if (fCount == 0) txn.exec_prepared("delete_directory", currentParentId);
             currentParentId = txn.exec_prepared("get_dir_parent_id", currentParentId).one_field().as<std::optional<unsigned int>>();
         }
     });

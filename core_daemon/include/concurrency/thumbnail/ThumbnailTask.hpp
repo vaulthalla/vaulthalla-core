@@ -19,7 +19,7 @@ class ThumbnailTask : public Task {
 public:
     ThumbnailTask(std::shared_ptr<const storage::StorageEngine> engine,
                   std::string buffer,
-                  std::shared_ptr<vh::types::File> file)
+                  std::shared_ptr<types::File> file)
         : engine_(std::move(engine)), buffer_(std::move(buffer)), file_(std::move(file)) {}
 
     void operator()() override {
@@ -39,14 +39,14 @@ public:
 
                 util::generateAndStoreThumbnail(buffer_, cachePath, file_->mime_type, size);
 
-                auto index = std::make_shared<vh::types::CacheIndex>();
+                auto index = std::make_shared<types::CacheIndex>();
                 index->vault_id = engine_->vaultId();
                 index->file_id = file_->id;
                 index->path = engine_->getRelativeCachePath(cachePath);
-                index->type = vh::types::CacheIndex::Type::Thumbnail;
+                index->type = types::CacheIndex::Type::Thumbnail;
                 index->size = fs::file_size(cachePath);
 
-                vh::database::CacheQueries::upsertCacheIndex(index);
+                database::CacheQueries::upsertCacheIndex(index);
             }
         } catch (const std::exception& e) {
             std::cerr << "[ThumbnailTask] Failed to generate thumbnail(s): " << e.what() << std::endl;
@@ -56,7 +56,7 @@ public:
 private:
     std::shared_ptr<const storage::StorageEngine> engine_;
     std::string buffer_;
-    std::shared_ptr<vh::types::File> file_;
+    std::shared_ptr<types::File> file_;
 };
 
 }

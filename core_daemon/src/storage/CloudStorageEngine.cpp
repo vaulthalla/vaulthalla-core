@@ -12,7 +12,6 @@
 
 #include <iostream>
 #include <fstream>
-#include <pugixml.hpp>
 
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 

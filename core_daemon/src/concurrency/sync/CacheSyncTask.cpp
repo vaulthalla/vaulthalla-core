@@ -1,6 +1,9 @@
 #pragma once
 
 #include "concurrency/sync/CacheSyncTask.hpp"
+#include "concurrency/sync/DownloadTask.hpp"
+#include "concurrency/ThreadPool.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
@@ -11,8 +14,6 @@
 #include "types/Directory.hpp"
 
 #include <optional>
-
-#include "shared_util/u8.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -39,8 +40,8 @@ void CacheSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File>
         ensureFreeSpace(rFile->size_bytes);
 
         if (file->updated_at <= rFile->updated_at) {
-            if (shouldPurgeNewFiles()) engine_->indexAndDeleteFile(file->path);
-            else free_ -= engine_->cacheFile(file->path)->size;
+            if (shouldPurgeNewFiles())  engine_->indexAndDeleteFile(file->path);
+            else *free_ -= engine_->cacheFile(file->path)->size;
             s3Map.erase(match);
             continue;
         }
@@ -56,14 +57,23 @@ void CacheSyncTask::handleDiff(std::unordered_map<std::u8string, std::shared_ptr
     for (const auto& dir : engine_->extractDirectories(uMap2Vector(s3Map))) {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
+            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());
             DirectoryQueries::addDirectory(dir);
         }
     }
 
-    for (const auto& file : uMap2Vector(s3Map)) {
-        if (shouldPurgeNewFiles()) engine_->indexAndDeleteFile(file->path);
-        else free_ -= engine_->cacheFile(file->path)->size;
+    const auto files = uMap2Vector(s3Map);
+    std::vector<std::future<ExpectedFuture>> futures;
+
+    const auto threadPool = ThreadPoolRegistry::instance().syncPool();
+    for (const auto& file : files) {
+        auto task = std::make_shared<DownloadTask>(engine_, file, free_.get());
+        futures.push_back(task->getFuture().value());
+        threadPool->submit(task);
     }
+
+    for (auto& f : futures)
+        if (std::get<bool>(f.get()) == false) std::cerr << "[CacheSyncTask] A file sync task failed.\n";
 }
 
 uintmax_t CacheSyncTask::sumIndicesSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {
@@ -73,17 +83,17 @@ uintmax_t CacheSyncTask::sumIndicesSize(const std::vector<std::shared_ptr<CacheI
 }
 
 bool CacheSyncTask::shouldPurgeNewFiles() const {
-    return engine_->getVault()->quota != 0 && free_ < StorageEngine::MIN_FREE_SPACE * 2; // 20MB threshold
+    return engine_->getVault()->quota != 0 && *free_ < StorageEngine::MIN_FREE_SPACE * 2; // 20MB threshold
 }
 
 void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
-    if (engine_->getVault()->quota != 0 && free_ < size) {
+    if (engine_->getVault()->quota != 0 && *free_ < size) {
         const auto numFileIndices = CacheQueries::countCacheIndices(
             vaultId(), std::make_optional(CacheIndex::Type::File));
 
         if (numFileIndices == 0) throw std::runtime_error("Not enough space to cache file");
 
-        intmax_t needed = size - free_;
+        intmax_t needed = size - *free_;
         std::vector<std::shared_ptr<CacheIndex> > purgeable;
         unsigned int numRequested = 1;
 
@@ -102,7 +112,7 @@ void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
             }
 
             CacheQueries::deleteCacheIndex(index->id);
-            free_ += index->size;
+            *free_ += index->size;
             needed -= index->size;
             if (needed <= 0) break;
         }

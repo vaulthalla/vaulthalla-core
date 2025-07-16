@@ -64,7 +64,8 @@ std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel
     file->path = rel_path;
     file->mime_type = util::Magic::get_mime_type(absPath);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
-    const auto parentPath = file->path.has_parent_path() ? file->path.parent_path() : std::filesystem::path("/");
+    const auto parentPath = file->path.has_parent_path() ? std::filesystem::path{"/"} / file->path.parent_path() : std::filesystem::path("/");
+    std::cout << "Creating file with parent: { vaultId: " << vault_->id << ", path: " << parentPath.string() << " }" << std::endl;
     file->parent_id = database::DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
     return file;

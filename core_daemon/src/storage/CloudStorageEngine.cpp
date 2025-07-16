@@ -27,6 +27,7 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<services::Thumbnail
     : StorageEngine(vault, thumbnailWorker),
       key_(key), sync(sync) {
     const auto conf = config::ConfigRegistry::get();
+    root_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id) / "full";
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
 
@@ -38,8 +39,7 @@ void CloudStorageEngine::finishUpload(const unsigned int userId, const std::file
     const auto absPath = getAbsolutePath(relPath);
 
     if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
-    if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error(
-        "Path is not a regular file: " + absPath.string());
+    if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
 
     const auto f = createFile(relPath);
     f->created_by = f->last_modified_by = userId;
@@ -177,13 +177,9 @@ std::shared_ptr<CacheIndex> CloudStorageEngine::cacheFile(const std::filesystem:
 }
 
 void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_path) {
-    const auto file = downloadFile(rel_path);
-    thumbnailWorker_->enqueue(shared_from_this(), file->path, file);
-
-    file->id = FileQueries::upsertFile(file);
-
-    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
-    removeFile(rel_path);
+    const auto index = cacheFile(rel_path);
+    std::filesystem::remove(getAbsoluteCachePath(index->path, {"files"}));
+    CacheQueries::deleteCacheIndex(index->id);
 }
 
 std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {

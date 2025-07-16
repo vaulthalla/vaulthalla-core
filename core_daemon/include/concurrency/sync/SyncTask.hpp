@@ -43,7 +43,7 @@ public:
 protected:
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
-    mutable uintmax_t free_{0};
+    std::shared_ptr<std::atomic<uintmax_t>> free_{std::make_shared<std::atomic<uintmax_t>>(0)};
 
     static std::vector<std::shared_ptr<types::File>> uMap2Vector(
         std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map) ;

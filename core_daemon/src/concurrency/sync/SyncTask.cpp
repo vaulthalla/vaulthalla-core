@@ -40,7 +40,7 @@ void SyncTask::operator()() {
     std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
     database::SyncQueries::reportSyncStarted(engine_->sync->id);
 
-    free_ = engine_->freeSpace();
+    *free_ = engine_->freeSpace();
 
     if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
         auto dir = std::make_shared<Directory>();

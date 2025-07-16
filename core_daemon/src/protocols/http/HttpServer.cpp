@@ -2,6 +2,8 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
 #include "services/ServiceManager.hpp"
+
+#include <iostream>
 #include <thread>
 
 namespace vh::http {
@@ -24,6 +26,7 @@ HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint,
 }
 
 void HttpServer::run() {
+    std::cout << "[HttpServer] Preview server listening on " << acceptor_.local_endpoint() << std::endl;
     do_accept();
 }
 

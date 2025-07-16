@@ -13,14 +13,14 @@ namespace vh::storage {
 
 class LocalDiskStorageEngine : public StorageEngine {
 public:
-    explicit LocalDiskStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+    explicit LocalDiskStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                                     const std::shared_ptr<types::LocalDiskVault>& vault);
 
     ~LocalDiskStorageEngine() override = default;
 
     [[nodiscard]] StorageType type() const override { return StorageType::Local; }
 
-    void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
+    void finishUpload(unsigned int userId, const std::filesystem::path& relPath) override;
 
     void mkdir(const fs::path& relative_path) override;
 

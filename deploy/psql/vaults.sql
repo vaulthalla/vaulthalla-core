@@ -2,7 +2,7 @@ CREATE TABLE api_keys
 (
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    type       VARCHAR(50)  NOT NULL, -- 'S3', etc.
+    type       VARCHAR(50)         NOT NULL, -- 'S3', etc.
     name       VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -17,13 +17,26 @@ CREATE TABLE s3_api_keys
     endpoint          TEXT DEFAULT NULL
 );
 
+CREATE TABLE s3_buckets
+(
+    id         SERIAL PRIMARY KEY,
+    api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    enabled    BOOLEAN DEFAULT TRUE,
+
+    UNIQUE (api_key_id, name)
+);
+
 CREATE TABLE vault
 (
     id          SERIAL PRIMARY KEY,
     type        VARCHAR(12)         NOT NULL CHECK (type IN ('local', 's3')),
     name        VARCHAR(100) UNIQUE NOT NULL,
     description TEXT      DEFAULT NULL,
-    owner_id    INTEGER REFERENCES users (id) ON DELETE SET NULL,
+    quota       BIGINT NOT NULL DEFAULT (0), -- 0 means no quota
+    owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
     is_active   BOOLEAN   DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -37,12 +50,11 @@ CREATE TABLE local
 
 CREATE TABLE s3
 (
-    vault_id   INTEGER REFERENCES vault (id) ON DELETE CASCADE,
-    api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
-    bucket     TEXT NOT NULL
+    vault_id      INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    bucket_id     INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE
 );
 
-CREATE TABLE usage
+CREATE TABLE vault_usage
 (
     vault_id    INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
     total_bytes BIGINT    DEFAULT 0 NOT NULL, -- actual usage
@@ -53,7 +65,7 @@ CREATE TABLE usage
 CREATE TABLE usage_log
 (
     id          SERIAL PRIMARY KEY,
-    vault_id    INTEGER NOT NULL REFERENCES vault (id),
+    vault_id    INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
     measured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_bytes BIGINT  NOT NULL
 );

@@ -1,36 +1,47 @@
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
+#include "types/LocalDiskVault.hpp"
 #include "util/imageUtil.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
+#include "types/File.hpp"
 
 #include <fstream>
 #include <iostream>
 
+using namespace vh::types;
+
 namespace vh::storage {
 
-LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
-                                               const std::shared_ptr<types::LocalDiskVault>& vault)
+LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
+                                               const std::shared_ptr<LocalDiskVault>& vault)
     : StorageEngine(vault, thumbnailWorker, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
 }
 
-void LocalDiskStorageEngine::finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) {
+void LocalDiskStorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
     try {
-        std::string buffer;
-        const auto fullPath = getAbsolutePath(rel_path);
-        if (!std::filesystem::exists(fullPath)) throw std::runtime_error("File does not exist: " + fullPath.string());
+        const auto absPath = getAbsolutePath(relPath);
 
-        std::ifstream in(fullPath, std::ios::binary | std::ios::ate);
-        if (!in) throw std::runtime_error("Failed to open file: " + fullPath.string());
+        if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
+        if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
+
+        std::string buffer;
+        std::ifstream in(absPath, std::ios::binary | std::ios::ate);
+        if (!in) throw std::runtime_error("Failed to open file: " + absPath.string());
         std::streamsize inSize = in.tellg();
         in.seekg(0, std::ios::beg);
         buffer.resize(inSize);
-        if (!in.read(buffer.data(), inSize)) throw std::runtime_error("Failed to read file: " + fullPath.string());
+        if (!in.read(buffer.data(), inSize)) throw std::runtime_error("Failed to read file: " + absPath.string());
         in.close();
 
-        thumbnailWorker_->enqueue(shared_from_this(), buffer, rel_path, mime_type);
+        const auto f = createFile(relPath);
+        f->created_by = f->last_modified_by = userId;
+
+        f->id = database::FileQueries::upsertFile(f);
+        thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -105,7 +116,7 @@ void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_pa
     }
 
     std::filesystem::remove_all(absPath);
-    database::FileQueries::deleteDirectory(vault_->id, rel_path);
+    database::DirectoryQueries::deleteDirectory(vault_->id, rel_path);
 }
 
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

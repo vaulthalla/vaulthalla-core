@@ -4,8 +4,8 @@ project('vaulthalla', 'cpp',
 
 # ╭──────────────────── DEBUG FLAGS ─────────────────────╮
 if get_option('buildtype') == 'debug'
-    add_project_arguments('-fsanitize=undefined', language: 'cpp')
-    add_project_link_arguments('-fsanitize=undefined', language: 'cpp')
+    add_project_arguments('-fsanitize=address,undefined', language: 'cpp')
+    add_project_link_arguments('-fsanitize=address,undefined', language: 'cpp')
 endif
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
@@ -38,8 +38,8 @@ fuse_src_dir        = source_root + '/fuse_daemon/src'
 shared_src_dir      = source_root + '/shared/src'
 tests_src_dir       = source_root + '/tests'
 core_main           = files(source_root + '/main.cpp')
-hash_pass_src       = files(core_src_dir + '/crypto/PasswordHash.cpp')
-hash_pass_main      = files(source_root + '/deploy/psql/hash_password.cpp')
+hash_pass_src       = files(core_src_dir + '/crypto/PasswordHash.cpp', core_src_dir + '/crypto/PasswordUtils.cpp')
+hash_pass_main      = files(source_root + '/deploy/hash_password.cpp')
 
 core_inc            = include_directories('core_daemon/include', 'shared/include')
 fuse_inc            = include_directories('fuse_daemon/include', 'shared/include')
@@ -81,7 +81,7 @@ executable('fuse_daemon',
 
 executable('hash_password',
            [hash_pass_src, hash_pass_main],
-           dependencies: libsodium,
+           dependencies: [libsodium, libcurl],
            include_directories: hash_pass_inc,
            install: true
 )

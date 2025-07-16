@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <filesystem>
 #include <nlohmann/json_fwd.hpp>
 
 namespace pqxx {
@@ -22,6 +21,7 @@ struct Vault {
     unsigned int id{};
     unsigned int owner_id{};
     std::string name, description{};
+    unsigned long long quota{};
     VaultType type{VaultType::Local};
     bool is_active{true};
     std::time_t created_at{};
@@ -32,33 +32,9 @@ struct Vault {
     explicit Vault(const pqxx::row& row);
 };
 
-struct LocalDiskVault : Vault {
-    std::filesystem::path mount_point;
-
-    LocalDiskVault() = default;
-    LocalDiskVault(const std::string& name, std::filesystem::path mountPoint);
-    explicit LocalDiskVault(const pqxx::row& row);
-};
-
-struct S3Vault : Vault {
-    unsigned int api_key_id{};
-    std::string bucket;
-
-    S3Vault() = default;
-    S3Vault(const std::string& name, unsigned int apiKeyID, std::string bucketName);
-    explicit S3Vault(const pqxx::row& row);
-};
-
-// JSON serialization
 void to_json(nlohmann::json& j, const Vault& v);
 void from_json(const nlohmann::json& j, Vault& v);
 
-void to_json(nlohmann::json& j, const LocalDiskVault& v);
-void from_json(const nlohmann::json& j, LocalDiskVault& v);
-
-void to_json(nlohmann::json& j, const S3Vault& v);
-void from_json(const nlohmann::json& j, S3Vault& v);
-
 nlohmann::json to_json(const std::vector<std::shared_ptr<Vault>>& vaults);
 
-} // namespace vh::types
+}

@@ -2,6 +2,9 @@
 #include "types/APIKey.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
+#include "types/S3Vault.hpp"
+#include "types/LocalDiskVault.hpp"
+#include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "keys/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
@@ -179,6 +182,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
         const std::string typeLower = boost::algorithm::to_lower_copy(type);
 
         std::shared_ptr<types::Vault> vault;
+        std::shared_ptr<types::Sync> sync = nullptr;
 
         if (typeLower == "local") {
             const std::string mountPoint = payload.at("mount_point").get<std::string>();
@@ -187,11 +191,12 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
             const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
             const std::string bucket = payload.at("bucket").get<std::string>();
             vault = std::make_shared<types::S3Vault>(name, apiKeyID, bucket);
+            sync = std::make_shared<types::Sync>(payload);
         } else throw std::runtime_error("Unsupported vault type: " + typeLower);
 
         vault->owner_id = session.getAuthenticatedUser()->id;
 
-        vault = storageManager_->addVault(vault);
+        vault = storageManager_->addVault(vault, sync);
 
         const json data = {{"vault", *vault}};
 

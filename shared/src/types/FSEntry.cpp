@@ -152,3 +152,17 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
 
     return ordered;
 }
+
+std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntriesByPath(const std::vector<std::shared_ptr<FSEntry>>& entries) {
+    std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> grouped;
+
+    for (const auto& entry : entries) {
+        if (grouped.contains(entry->path.u8string())) {
+            std::cerr << "[groupEntriesByPath] Duplicate entry found for path: " << entry->path.string() << std::endl;
+            continue;
+        }
+        grouped[entry->path.u8string()] = entry;
+    }
+
+    return grouped;
+}

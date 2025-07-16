@@ -1,4 +1,5 @@
 #include "services/Vaulthalla.hpp"
+#include "services/SyncController.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -9,9 +10,9 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/ip/tcp.hpp>
 #include <iostream>
 
 namespace vh::services {
@@ -19,54 +20,13 @@ void Vaulthalla::start() {
     std::cout << "Starting Vaulthalla service..." << std::endl;
 
     try {
-        const auto config = config::loadConfig("/etc/vaulthalla/config.yaml");
-        config::ConfigRegistry::init(config);
+        initConfig();
         database::Transactions::init();
-
-        ioContext_ = std::make_shared<boost::asio::io_context>();
-
+        concurrency::ThreadPoolRegistry::instance().init();
         serviceManager_ = std::make_shared<ServiceManager>();
-
-        lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(
-            serviceManager_->authManager()->sessionManager());
-
-        wsRouter_ = std::make_shared<websocket::WebSocketRouter>(serviceManager_->authManager()->sessionManager());
-
-        wsHandler_ = std::make_shared<websocket::WebSocketHandler>(serviceManager_, wsRouter_);
-
-        const auto ws_config = config.server;
-        const auto addr = boost::asio::ip::make_address(ws_config.host);
-        const auto port = ws_config.port;
-
-        wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_,
-                                                                     boost::asio::ip::tcp::endpoint(addr, port),
-                                                                     wsRouter_, serviceManager_->authManager());
-
-        std::cout << "Websocket listening on: " << addr << ":" << port << std::endl;
-
-        wsServer_->run();
-
-        const auto http_port = port + 1; // HTTP preview server on next port
-        httpServer_ = std::make_shared<http::HttpServer>(
-            *ioContext_,
-            boost::asio::ip::tcp::endpoint(addr, http_port),
-            serviceManager_
-        );
-        httpServer_->run();
-
-        std::cout << "HTTP preview server listening on: " << addr << ":" << http_port << std::endl;
-
-        ioContext_->run();
-
-        auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
-            {"https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
-             "100k-most-used-passwords-NCSC.txt",
-             "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
-             "probable-v2_top-12000.txt"});
-
-        auth::PasswordUtils::loadDictionaryFromURL(
-            "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt");
-
+        initServices();
+        initThreatIntelligence();
+        initProtocols();
         std::cout << "Vaulthalla service started." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[Vaulthalla] Exception: " << e.what() << std::endl;
@@ -87,4 +47,59 @@ bool Vaulthalla::isRunning() const {
     // Placeholder for actual running state check
     return true;
 }
+
+void Vaulthalla::initConfig() {
+    config::ConfigRegistry::init(config::loadConfig("/etc/vaulthalla/config.yaml"));
+    config_ = std::make_shared<config::Config>(config::ConfigRegistry::get());
+}
+
+
+void Vaulthalla::initProtocols() {
+    const auto addr = boost::asio::ip::make_address(config_->server.host);
+    auto port = config_->server.port;
+
+    ioContext_ = std::make_shared<boost::asio::io_context>();
+
+    initWebsocketServer(boost::asio::ip::tcp::endpoint(addr, port++));
+    initHttpServer(boost::asio::ip::tcp::endpoint(addr, port));
+
+    ioContext_->run();
+}
+
+
+void Vaulthalla::initWebsocketServer(const boost::asio::ip::tcp::endpoint& endpoint) {
+    wsRouter_ = std::make_shared<websocket::WebSocketRouter>(serviceManager_->authManager()->sessionManager());
+    wsHandler_ = std::make_shared<websocket::WebSocketHandler>(serviceManager_, wsRouter_);
+    wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint,
+                                                                     wsRouter_, serviceManager_->authManager());
+
+    wsServer_->run();
+}
+
+void Vaulthalla::initHttpServer(const boost::asio::ip::tcp::endpoint& endpoint) {
+    httpServer_ = std::make_shared<http::HttpServer>(*ioContext_, endpoint, serviceManager_);
+    httpServer_->run();
+}
+
+void Vaulthalla::initServices() {
+    // TODO: fix segfaults in ConnectionLifecycleManager
+    // lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(serviceManager_->authManager()->sessionManager());
+    // lifecycleManager_->start();
+    syncController_ = std::make_shared<SyncController>(serviceManager_->storageManager());
+    syncController_->start();
+}
+
+void Vaulthalla::initThreatIntelligence() {
+    auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
+            {"https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
+             "100k-most-used-passwords-NCSC.txt",
+             "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
+             "probable-v2_top-12000.txt"});
+
+    auth::PasswordUtils::loadDictionaryFromURL(
+        "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt");
+}
+
+
+
 } // namespace vh::services

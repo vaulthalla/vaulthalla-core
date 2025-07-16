@@ -28,7 +28,7 @@ void ensureCurlGlobalInit() {
 struct HeaderList {
     std::vector<std::string> store; // owns the memory
     curl_slist* list = nullptr;     // raw list pointer
-    ~HeaderList() { curl_slist_free_all(list); }
+    ~HeaderList() { if (list) curl_slist_free_all(list); }
 
     void add(const std::string& h) {
         store.push_back(h);
@@ -152,12 +152,12 @@ bool S3Provider::deleteObject(const std::filesystem::path& key) const {
     return resp.ok();
 }
 
-std::string S3Provider::initiateMultipartUpload(const std::string& key) const {
+std::string S3Provider::initiateMultipartUpload(const std::filesystem::path& key) const {
     CURL* curl = curl_easy_init();
     if (!curl) return "";
 
-    const std::string rawKey = key;
-    const auto [canonicalPath, url] = constructPaths(curl, key, "?uploads");
+    std::u8string keyStr = key.u8string();
+    const auto [canonicalPath, url] = constructPaths(curl, keyStr, "?uploads");
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
 
     auto hdrMap = buildHeaderMap(payloadHash);
@@ -196,19 +196,18 @@ std::string S3Provider::initiateMultipartUpload(const std::string& key) const {
     return "";
 }
 
-bool S3Provider::uploadPart(const std::string& key, const std::string& uploadId,
-                            const int partNumber, const std::string& partData, std::string& etagOut) const {
-    std::cout << "Uploading part " << partNumber << " for " << key << " to bucket " << bucket_ << std::endl;
-
+bool S3Provider::uploadPart(const std::filesystem::path& key, const std::string& uploadId,
+                             const int partNumber, const std::string& partData, std::string& etagOut) const {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
+    std::u8string keyStr = key.u8string();
     const std::string query = "?partNumber=" + std::to_string(partNumber) + "&uploadId=" + uploadId;
-    const auto [canonicalPath, url] = constructPaths(curl, key, query);
+    const auto [canonicalPath, url] = constructPaths(curl, keyStr, query);
 
     const std::string payloadHash = util::sha256Hex(partData);
     const auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader =  util::buildAuthorizationHeader(apiKey_, "PUT", canonicalPath, hdrMap, payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "PUT", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Content-Type: application/octet-stream");
@@ -226,27 +225,24 @@ bool S3Provider::uploadPart(const std::string& key, const std::string& uploadId,
 
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
-    if (res != CURLE_OK) return false;
-
-    return util::extractETag(respHdr, etagOut);
+    return res == CURLE_OK && util::extractETag(respHdr, etagOut);
 }
 
-bool S3Provider::completeMultipartUpload(const std::string& key,
-                                         const std::string& uploadId,
+bool S3Provider::completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
                                          const std::vector<std::string>& etags) const {
     if (etags.empty()) return false;
 
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
+    std::u8string keyStr = key.u8string();
     const std::string query = "?uploadId=" + uploadId;
-    const auto [canonicalPath, url] = constructPaths(curl, key, query);
+    const auto [canonicalPath, url] = constructPaths(curl, keyStr, query);
 
     const auto body = util::composeMultiPartUploadXMLBody(etags);
-
     const std::string payloadHash = util::sha256Hex(body);
     auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader =  util::buildAuthorizationHeader(apiKey_, "POST", canonicalPath, hdrMap, payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "POST", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Content-Type: application/xml");
@@ -276,16 +272,17 @@ bool S3Provider::completeMultipartUpload(const std::string& key,
     return true;
 }
 
-bool S3Provider::abortMultipartUpload(const std::string& key, const std::string& uploadId) const {
+bool S3Provider::abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
+    std::u8string keyStr = key.u8string();
     const std::string query = "?uploadId=" + uploadId;
-    const auto [canonicalPath, url] = constructPaths(curl, key, query);
+    const auto [canonicalPath, url] = constructPaths(curl, keyStr, query);
 
     const std::string payloadHash = util::sha256Hex("");
     const auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader =  util::buildAuthorizationHeader(apiKey_, "DELETE", canonicalPath, hdrMap, payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "DELETE", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
@@ -297,12 +294,11 @@ bool S3Provider::abortMultipartUpload(const std::string& key, const std::string&
 
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
-
     return res == CURLE_OK;
 }
 
-bool S3Provider::uploadLargeObject(const std::string& key,
-                                   const std::string& filePath,
+bool S3Provider::uploadLargeObject(const std::filesystem::path& key,
+                                   const std::filesystem::path& filePath,
                                    size_t partSize) const {
     std::ifstream file(filePath, std::ios::binary);
     if (!file) return false;
@@ -320,7 +316,7 @@ bool S3Provider::uploadLargeObject(const std::string& key,
         std::streamsize bytesRead = file.gcount();
         if (bytesRead <= 0) break;
 
-        part.resize(static_cast<size_t>(bytesRead));  // trim excess buffer
+        part.resize(static_cast<size_t>(bytesRead));
 
         std::string etag;
         success = uploadPart(key, uploadId, partNo++, part, etag);
@@ -392,6 +388,80 @@ std::u8string S3Provider::listObjects(const std::filesystem::path& prefix) const
     }
 
     return fullXmlResponse;
+}
+
+std::optional<std::unordered_map<std::string, std::string>>
+S3Provider::getHeadObject(const std::filesystem::path& key) const {
+    const auto [canonicalPath, url] = constructPaths(nullptr, key);
+    const std::string payloadHash = "UNSIGNED-PAYLOAD";
+
+    auto hdrMap = buildHeaderMap(payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "HEAD", canonicalPath, hdrMap, payloadHash);
+
+    SList headers;
+    headers.add("Authorization: " + authHeader);
+    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+
+    HttpResponse resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_NOBODY, 1L);            // HEAD request
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, headers.get());
+    });
+
+    if (!resp.ok()) {
+        std::cerr << "[S3Provider] getHeadObject failed for " << key << ": HTTP " << resp.http << std::endl;
+        return std::nullopt;
+    }
+
+    // Parse response headers into key-value pairs
+    std::unordered_map<std::string, std::string> metadata;
+    std::istringstream headerStream(resp.hdr);
+    std::string line;
+    while (std::getline(headerStream, line)) {
+        if (auto pos = line.find(':'); pos != std::string::npos) {
+            std::string key = line.substr(0, pos);
+            std::string value = line.substr(pos + 1);
+            util::trimInPlace(key);
+            util::trimInPlace(value);
+            metadata.emplace(std::move(key), std::move(value));
+        }
+    }
+
+    return metadata;
+}
+
+bool S3Provider::setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const {
+    CurlEasy curl;
+    const auto [canonicalPath, url] = constructPaths(curl, key);
+
+    const std::string payloadHash = "UNSIGNED-PAYLOAD";
+
+    auto hdrMap = buildHeaderMap(payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "PUT", canonicalPath, hdrMap, payloadHash);
+
+    SList headers;
+    headers.add("Authorization: " + authHeader);
+    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+
+    std::ostringstream source;
+    source << "/" << bucket_ << "/" << util::escapeKeyPreserveSlashes(curl, key);
+
+    headers.add("x-amz-copy-source: " + source.str());
+    headers.add("x-amz-metadata-directive: REPLACE");
+    headers.add("x-amz-meta-content-hash: " + hash);
+
+    HttpResponse resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, headers.get());
+    });
+
+    if (!resp.ok()) {
+        std::cerr << "[S3Provider] setObjectContentHash failed for " << key
+                  << ": HTTP " << resp.http << std::endl;
+    }
+
+    return resp.ok();
 }
 
 bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer) const {

@@ -1,43 +1,48 @@
 #include "storage/StorageManager.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
+#include "types/LocalDiskVault.hpp"
+#include "types/S3Vault.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/FSEntry.hpp"
-#include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "util/Magic.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "database/Queries/SyncQueries.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
+#include "crypto/Hash.hpp"
 
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 
-namespace vh::storage {
+using namespace vh::storage;
+using namespace vh::types;
+using namespace vh::database;
 
 StorageManager::StorageManager()
-    : thumbnailWorker_(std::make_shared<services::ThumbnailWorker>()) {
-    thumbnailWorker_->start();
+    : thumbnailWorker_(std::make_shared<concurrency::ThumbnailWorker>()) {
     initStorageEngines();
 }
 
 void StorageManager::initStorageEngines() {
     std::lock_guard lock(mountsMutex_);
     try {
-        for (auto& vault : database::VaultQueries::listVaults()) {
-            if (vault->type == types::VaultType::Local) {
-                auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+        for (auto& vault : VaultQueries::listVaults()) {
+            if (vault->type == VaultType::Local) {
+                auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
                 if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
                 engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, localVault);
-            } else if (vault->type == types::VaultType::S3) {
-                auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
+            } else if (vault->type == VaultType::S3) {
+                auto vaultS3 = std::static_pointer_cast<S3Vault>(vault);
                 if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
-                const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-                engines_[vault->id] = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key);
+                const auto key = APIKeyQueries::getAPIKey(vaultS3->api_key_id);
+                const auto sync = SyncQueries::getSync(vaultS3->id);
+                engines_[vault->id] = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key, sync);
             }
         }
     } catch (const std::exception& e) {
@@ -46,27 +51,27 @@ void StorageManager::initStorageEngines() {
     }
 }
 
-void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
+void StorageManager::initUserStorage(const std::shared_ptr<User>& user) {
     try {
         std::cout << "[StorageManager] Initializing storage for user: " << user->name << std::endl;
 
         if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
-        std::shared_ptr<types::Vault> vault =
-            std::make_shared<types::LocalDiskVault>(user->name + "'s Local Disk Vault",
-                                                    std::filesystem::path(
-                                                        config::ConfigRegistry::get().fuse.root_mount_path) /
-                                                    "users" / user->name); {
+        std::shared_ptr<Vault> vault =
+            std::make_shared<LocalDiskVault>(user->name + "'s Local Disk Vault",
+                                             std::filesystem::path(
+                                                 config::ConfigRegistry::get().fuse.root_mount_path) /
+                                             "users" / user->name); {
             std::lock_guard lock(mountsMutex_);
-            vault->id = database::VaultQueries::addVault(vault);
-            vault = database::VaultQueries::getVault(vault->id);
+            vault->id = VaultQueries::addVault(vault);
+            vault = VaultQueries::getVault(vault->id);
         }
 
         if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->name);
 
         engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(
             thumbnailWorker_,
-            std::static_pointer_cast<types::LocalDiskVault>(vault));
+            std::static_pointer_cast<LocalDiskVault>(vault));
 
         std::cout << "[StorageManager] Initialized storage for user: " << user->name << std::endl;
     } catch (const std::exception& e) {
@@ -75,23 +80,23 @@ void StorageManager::initUserStorage(const std::shared_ptr<types::User>& user) {
     }
 }
 
-std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Vault> vault) {
+std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
+                                                const std::shared_ptr<Sync>& sync) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::lock_guard lock(mountsMutex_);
 
     try {
-        vault->id = database::VaultQueries::addVault(vault);
-        vault = database::VaultQueries::getVault(vault->id);
-        if (vault->type == types::VaultType::Local) {
-            auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
+        vault->id = VaultQueries::addVault(vault, sync);
+        vault = VaultQueries::getVault(vault->id);
+        if (vault->type == VaultType::Local) {
+            auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
             if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
             engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, localVault);
-        } else if (vault->type == types::VaultType::S3) {
-            auto vaultS3 = std::static_pointer_cast<types::S3Vault>(vault);
+        } else if (vault->type == VaultType::S3) {
+            auto vaultS3 = std::static_pointer_cast<S3Vault>(vault);
             if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
-            const auto key = database::APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-            const auto engine = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key);
-            engine->initCloudStorage();
+            const auto key = APIKeyQueries::getAPIKey(vaultS3->api_key_id);
+            const auto engine = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key, sync);
             engines_[vault->id] = engine;
         }
 
@@ -104,52 +109,29 @@ std::shared_ptr<types::Vault> StorageManager::addVault(std::shared_ptr<types::Va
 
 void StorageManager::removeVault(const unsigned int vaultId) {
     std::lock_guard lock(mountsMutex_);
-    database::VaultQueries::removeVault(vaultId);
+    VaultQueries::removeVault(vaultId);
 
     engines_.erase(vaultId);
     std::cout << "[StorageManager] Removed vault with ID: " << vaultId << std::endl;
 }
 
-std::vector<std::shared_ptr<types::Vault> > StorageManager::listVaults(const std::shared_ptr<types::User>& user) const {
+std::vector<std::shared_ptr<Vault> > StorageManager::listVaults(const std::shared_ptr<User>& user) const {
     std::lock_guard lock(mountsMutex_);
-    if (user->isAdmin()) return database::VaultQueries::listVaults();
-    return database::VaultQueries::listUserVaults(user->id);
+    if (user->isAdmin()) return VaultQueries::listVaults();
+    return VaultQueries::listUserVaults(user->id);
 }
 
-std::shared_ptr<types::Vault> StorageManager::getVault(const unsigned int vaultId) const {
+std::shared_ptr<Vault> StorageManager::getVault(const unsigned int vaultId) const {
     std::lock_guard lock(mountsMutex_);
     if (engines_.find(vaultId) != engines_.end()) return engines_.at(vaultId)->getVault();
-    return database::VaultQueries::getVault(vaultId);
+    return VaultQueries::getVault(vaultId);
 }
 
-void StorageManager::finishUpload(const unsigned int vaultId,
-                                  const std::filesystem::path& relPath,
-                                  const std::shared_ptr<types::User>& user) const {
+void StorageManager::finishUpload(const unsigned int vaultId, const unsigned int userId,
+                                  const std::filesystem::path& relPath) const {
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-
-    const auto absPath = engine->getAbsolutePath(relPath);
-
-    if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
-    if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error(
-        "Path is not a regular file: " + absPath.string());
-
-    const auto f = std::make_shared<types::File>();
-    f->vault_id = vaultId;
-    f->name = relPath.filename().string();
-    f->size_bytes = std::filesystem::file_size(absPath);
-    f->created_by = f->last_modified_by = user->id;
-    f->path = relPath.string();
-    f->mime_type = util::Magic::get_mime_type(absPath);
-    if (!relPath.has_parent_path() || relPath.parent_path().string() == "/") f->parent_id = std::nullopt;
-    else f->parent_id = database::FileQueries::getDirectoryIdByPath(vaultId, relPath.parent_path());
-
-    engine->finishUpload(relPath, f->mime_type.value_or("application/octet-stream")); {
-        std::lock_guard lock(mountsMutex_);
-        database::FileQueries::addFile(f);
-    }
-
-    std::cout << "[StorageManager] Finished upload for vault ID: " << vaultId << ", path: " << relPath << std::endl;
+    engine->finishUpload(userId, relPath);
 }
 
 void StorageManager::removeEntry(const unsigned int vaultId, const std::filesystem::path& relPath) const {
@@ -159,7 +141,7 @@ void StorageManager::removeEntry(const unsigned int vaultId, const std::filesyst
 }
 
 void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,
-                           const std::shared_ptr<types::User>& user) const {
+                           const std::shared_ptr<User>& user) const {
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
@@ -168,28 +150,29 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
         const auto absPath = localEngine->getAbsolutePath(std::filesystem::path(relPath));
         localEngine->mkdir(relPath);
 
-        types::Directory d;
+        const auto d = std::make_shared<Directory>();
 
-        d.vault_id = vaultId;
-        d.name = std::filesystem::path(relPath).filename().string();
-        d.created_by = d.last_modified_by = user->id;
-        d.path = relPath;
-        if (!hasLogicalParent(relPath)) d.parent_id = std::nullopt;
-        else d.parent_id = database::FileQueries::getDirectoryIdByPath(
-                 vaultId, std::filesystem::path(relPath).parent_path());
+        d->vault_id = vaultId;
+        d->name = std::filesystem::path(relPath).filename().string();
+        d->created_by = d->last_modified_by = user->id;
+        d->path = relPath;
+        if (!hasLogicalParent(relPath)) d->parent_id = std::nullopt;
+        else
+            d->parent_id = DirectoryQueries::getDirectoryIdByPath(
+                vaultId, std::filesystem::path(relPath).parent_path());
 
         std::lock_guard lock(mountsMutex_);
-        const auto id = database::FileQueries::addDirectory(d);
+        DirectoryQueries::addDirectory(d);
     } else {
         throw std::runtime_error("Unsupported storage engine type for mkdir operation");
     }
 }
 
-std::vector<std::shared_ptr<types::FSEntry> > StorageManager::listDir(const unsigned int vaultId,
-                                                                      const std::string& relPath,
-                                                                      const bool recursive) const {
+std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned int vaultId,
+                                                               const std::string& relPath,
+                                                               const bool recursive) const {
     std::lock_guard lock(mountsMutex_);
-    return database::FileQueries::listDir(vaultId, relPath, recursive);
+    return DirectoryQueries::listDir(vaultId, relPath, recursive);
 }
 
 std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const unsigned int id) const {
@@ -229,5 +212,3 @@ bool StorageManager::hasLogicalParent(const std::filesystem::path& relPath) {
     if (relPath.empty() || relPath == "/") return false; // Root path has no parent
     return relPath.has_parent_path() && !relPath.parent_path().empty() && relPath.parent_path() != "/";
 }
-
-} // namespace vh::storage

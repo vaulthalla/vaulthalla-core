@@ -2,7 +2,7 @@
 # ⚒️  Forge build & deployment targets
 # =========================================
 
-.PHONY: all build install clean uninstall
+.PHONY: all build install dev clean uninstall
 
 # Default target: build
 all: build
@@ -15,9 +15,16 @@ build:
 
 ## 🛠️ Install system-wide
 install:
-	./bin/install_guard.sh
+	./bin/setup/install_guard.sh
 	@echo "🛡️  Running install script..."
 	./bin/install.sh
+
+## 🛠️ Install in development mode
+dev:
+	./bin/uninstall.sh -d
+	./bin/setup/install_guard.sh
+	@echo "🛡️  Running install script..."
+	./bin/install.sh -d
 
 ## 🧼 Uninstall everything
 clean uninstall:

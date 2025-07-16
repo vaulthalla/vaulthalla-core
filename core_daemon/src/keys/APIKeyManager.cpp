@@ -14,6 +14,7 @@ void APIKeyManager::initAPIKeys() {
 
 void APIKeyManager::addAPIKey(std::shared_ptr<types::api::APIKey>& key) {
     std::lock_guard lock(apiKeysMutex_);
+    // TODO: generate master key on install and use it to encrypt API secrets
     key->id = database::APIKeyQueries::addAPIKey(key);
     key = database::APIKeyQueries::getAPIKey(key->id);
     apiKeys_[key->id] = key; // Store in local cache

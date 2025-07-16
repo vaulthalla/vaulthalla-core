@@ -1,6 +1,6 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "types/User.hpp"
 #include "types/Directory.hpp"
 
@@ -41,12 +41,12 @@ void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
                                           const std::filesystem::path& relPath,
                                           const std::shared_ptr<types::User>& user) {
     std::filesystem::path current;
-    std::optional<unsigned int> parentId = database::FileQueries::getRootDirectoryId(vaultId);
+    std::optional<unsigned int> parentId = database::DirectoryQueries::getRootDirectoryId(vaultId);
 
     for (const auto& part : relPath.parent_path()) {
         current /= part;
 
-        if (auto dirId = database::FileQueries::getDirectoryIdByPath(vaultId, current)) {
+        if (auto dirId = database::DirectoryQueries::getDirectoryIdByPath(vaultId, current)) {
             parentId = dirId;
             continue;  // directory already exists in DB
         }
@@ -64,7 +64,7 @@ void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
         dir.stats->file_count = 0;
         dir.stats->subdirectory_count = 0;
 
-        parentId = database::FileQueries::addDirectory(dir);
+        parentId = database::DirectoryQueries::addDirectory(dir);
     }
 }
 

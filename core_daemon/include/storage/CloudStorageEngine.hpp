@@ -6,25 +6,39 @@
 
 namespace vh::types {
 struct File;
+struct Directory;
 struct S3Vault;
+struct Sync;
+struct CacheIndex;
 
 namespace api {
 struct APIKey;
 }}
 
+namespace vh::concurrency {
+class SyncTask;
+}
+
+namespace vh::services {
+class SyncController;
+}
+
 namespace vh::storage {
 
 class CloudStorageEngine : public StorageEngine {
 public:
+    std::shared_ptr<types::Sync> sync;
+
     CloudStorageEngine() = default;
 
     ~CloudStorageEngine() override = default;
 
-    CloudStorageEngine(const std::shared_ptr<services::ThumbnailWorker>& thumbnailWorker,
+    CloudStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                        const std::shared_ptr<types::S3Vault>& vault,
-                       const std::shared_ptr<types::api::APIKey>& key);
+                       const std::shared_ptr<types::api::APIKey>& key,
+                       const std::shared_ptr<types::Sync>& sync);
 
-    void finishUpload(const std::filesystem::path& rel_path, const std::string& mime_type) override;
+    void finishUpload(unsigned int userId, const std::filesystem::path& relPath) override;
 
     void mkdir(const fs::path& relative_path) override;
 
@@ -34,15 +48,27 @@ public:
 
     void remove(const std::filesystem::path& rel_path) override;
 
+    void removeLocally(const std::filesystem::path& rel_path) const;
+
+    void removeRemotely(const std::filesystem::path& rel_path) const;
+
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] bool isDirectory(const fs::path& rel_path) const override;
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const override;
 
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
+    void uploadFile(const std::filesystem::path& rel_path) const;
+    void uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const;
+    std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
+    std::shared_ptr<types::CacheIndex> cacheFile(const std::filesystem::path& rel_path);
+    void indexAndDeleteFile(const std::filesystem::path& rel_path);
 
-    void initCloudStorage();
+    [[nodiscard]] std::string getRemoteContentHash(const std::filesystem::path& rel_path) const;
+
+    [[nodiscard]] std::unordered_map<std::u8string, std::shared_ptr<types::File>> getGroupedFilesFromS3(const std::filesystem::path& prefix = {}) const;
+
+    std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 
 protected:
     void removeFile(const fs::path& rel_path) override;
@@ -51,10 +77,11 @@ protected:
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;
+
+    std::string downloadToBuffer(const std::filesystem::path& rel_path) const;
 };
 
 std::string getMimeType(const std::filesystem::path& path);
-std::vector<std::string> s3KeysFromXML(const std::string& xml, const std::filesystem::path& rel_path);
 std::u8string stripLeadingSlash(const std::filesystem::path& path);
 
 } // namespace vh::storage

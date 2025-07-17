@@ -25,7 +25,6 @@ namespace vh::services {
 
 class ConnectionLifecycleManager;
 class ServiceManager;
-class SyncController;
 
 class Vaulthalla {
   public:
@@ -45,7 +44,6 @@ class Vaulthalla {
     std::shared_ptr<http::HttpServer> httpServer_;
 
     std::shared_ptr<ConnectionLifecycleManager> lifecycleManager_;
-    std::shared_ptr<SyncController> syncController_;
 
     void initConfig();
     void initProtocols();

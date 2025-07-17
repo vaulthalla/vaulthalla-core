@@ -18,13 +18,19 @@ namespace vh::concurrency {
 class ThumbnailWorker;
 }
 
+namespace vh::services {
+class SyncController;
+}
+
 namespace vh::storage {
 
-class StorageManager {
+class StorageManager : public std::enable_shared_from_this<StorageManager> {
 public:
     StorageManager();
 
     void initStorageEngines();
+
+    void initializeControllers();
 
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
@@ -46,6 +52,8 @@ public:
                                                                      bool recursive = false) const;
 
     void mkdir(unsigned int vaultId, const std::string& relPath, const std::shared_ptr<types::User>& user) const;
+
+    void syncNow(unsigned int vaultId) const;
 
     std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(unsigned int id) const;
 
@@ -73,6 +81,7 @@ private:
     mutable std::mutex mountsMutex_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine> > engines_;
     std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
+    std::shared_ptr<services::SyncController> syncController_;
 };
 
 } // namespace vh::storage

@@ -21,8 +21,8 @@ void Vaulthalla::start() {
 
     try {
         initConfig();
-        database::Transactions::init();
         concurrency::ThreadPoolRegistry::instance().init();
+        database::Transactions::init();
         serviceManager_ = std::make_shared<ServiceManager>();
         initServices();
         initThreatIntelligence();
@@ -85,8 +85,7 @@ void Vaulthalla::initServices() {
     // TODO: fix segfaults in ConnectionLifecycleManager
     // lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(serviceManager_->authManager()->sessionManager());
     // lifecycleManager_->start();
-    syncController_ = std::make_shared<SyncController>(serviceManager_->storageManager());
-    syncController_->start();
+    serviceManager_->storageManager()->initializeControllers();
 }
 
 void Vaulthalla::initThreatIntelligence() {

@@ -331,4 +331,35 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
     }
 }
 
+void StorageHandler::handleSyncVault(const json& msg, WebSocketSession& session) const {
+    try {
+        const auto user = session.getAuthenticatedUser();
+        const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
+
+        storageManager_->syncNow(vaultId);
+
+        const json response = {
+            {"command", "storage.vault.sync.response"},
+            {"requestId", msg.at("requestId").get<std::string>()},
+            {"status", "ok"}
+        };
+
+        session.send(response);
+
+        std::cout << "[StorageHandler] Triggered sync for vault ID: " << vaultId << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[StorageHandler] handleSyncVault error: " << e.what() << std::endl;
+
+        const json response = {
+            {"command", "storage.vault.sync.response"},
+            {"requestId", msg.at("requestId").get<std::string>()},
+            {"status", "error"},
+            {"error", e.what()}
+        };
+
+        session.send(response);
+    }
+}
+
+
 } // namespace vh::websocket

@@ -1,6 +1,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/sync/SyncTask.hpp"
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/sync/SafeSyncTask.hpp"
 #include "concurrency/sync/MirrorSyncTask.hpp"
@@ -21,11 +22,9 @@ bool SyncTaskCompare::operator()(const std::shared_ptr<SyncTask>& a, const std::
     return a->next_run > b->next_run; // Min-heap based on next_run time
 }
 
-SyncController::SyncController(std::shared_ptr<StorageManager> storage_manager)
-    : storage_(std::move(storage_manager)),
-      pool_(ThreadPoolRegistry::instance().syncPool()) {
-    if (!storage_) throw std::runtime_error("Storage manager is not initialized");
-}
+SyncController::SyncController(const std::weak_ptr<StorageManager>& storage_manager)
+    : storage_(storage_manager),
+      pool_(ThreadPoolRegistry::instance().syncPool()) {}
 
 SyncController::~SyncController() {
     stop();
@@ -55,55 +54,7 @@ void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
 }
 
 void SyncController::run() {
-    std::vector<std::shared_ptr<CloudStorageEngine>> engineBuffer;
-
-    // TODO: instance var for uMap of running tasks by vault ID for 'run now' functionality
-
-    const auto refreshEngines = [&]() {
-        engineBuffer.clear();
-
-        const auto latestEngines = storage_->getEngines<CloudStorageEngine>();
-
-        boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
-        for (const auto& engine : latestEngines) latestBitset.set(engine->getVault()->id);
-
-        {
-            std::unique_lock lock(engineMapMutex_);
-
-            // Remove engines that are no longer present
-            std::vector<unsigned int> staleIds;
-
-            for (const auto& [id, engine] : engineMap_)
-                if (!latestBitset[engine->getVault()->id]) staleIds.push_back(id);
-
-            for (auto id : staleIds) engineMap_.erase(id);
-
-            // Add new engines that are not already in the map
-            for (const auto& engine : latestEngines) {
-                if (!engineMap_.contains(engine->getVault()->id)) {
-                    engineMap_[engine->getVault()->id] = {engine};
-                    engineBuffer.push_back(engine);
-                }
-            }
-        }
-
-        if (engineBuffer.empty()) return;
-
-        // Add sync tasks for each engine
-        std::scoped_lock lock(pqMutex_);
-        for (const auto& engine : engineBuffer) {
-            if (engine->sync->strategy == types::Sync::Strategy::Cache)
-                pq.push(std::make_shared<CacheSyncTask>(engine, shared_from_this()));
-            else if (engine->sync->strategy == types::Sync::Strategy::Sync)
-                pq.push(std::make_shared<SafeSyncTask>(engine, shared_from_this()));
-            else if (engine->sync->strategy == types::Sync::Strategy::Mirror)
-                pq.push(std::make_shared<MirrorSyncTask>(engine, shared_from_this()));
-            else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
-        }
-    };
-
     refreshEngines();
-
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
     unsigned int refreshTries = 0;
 
@@ -135,14 +86,112 @@ void SyncController::run() {
             {
                 std::scoped_lock lock(pqMutex_);
                 task = pq.top();
+                pq.pop();
             }
 
+            if (!task) continue;
+
             if (task->next_run > std::chrono::system_clock::now()) std::this_thread::sleep_until(task->next_run);
-            else {
-                std::scoped_lock lock(pqMutex_);
-                pq.pop();
-                pool_->submit(task);
-            }
+            else pool_->submit(task);
         }
     }
 }
+
+void SyncController::runNow(const unsigned int vaultId) {
+    std::unique_lock lock(taskMapMutex_);
+    std::cout << "[SyncController] Running sync task immediately for vault ID: " << vaultId << std::endl;
+
+    if (!taskMap_.contains(vaultId)) {
+        std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
+        return;
+    }
+
+    auto task = taskMap_[vaultId];
+
+    lock.unlock();
+
+    task->next_run = std::chrono::system_clock::now();
+
+    if (task->isRunning()) {
+        std::cerr << "[SyncController] Task for vault ID " << vaultId << " is already running." << std::endl;
+        return;
+    }
+
+    const auto engine = task->engine();
+    if (!engine) {
+        std::cerr << "[SyncController] Engine not initialized for vault ID: " << vaultId << std::endl;
+        return;
+    }
+
+    task = nullptr;
+    processTask(engine);
+
+    {
+        std::scoped_lock pq_lock(pqMutex_);
+        pq.push(task);
+    }
+}
+
+
+void SyncController::refreshEngines() {
+    if (const auto s = storage_.lock()) {
+        std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
+        const auto latestEngines = s->getEngines<CloudStorageEngine>();
+        std::cout << "[SyncController] Found " << latestEngines.size() << " cloud storage engines." << std::endl;
+        pruneStaleTasks(latestEngines);
+        for (const auto& engine : latestEngines) processTask(engine);
+    }
+}
+
+
+void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<CloudStorageEngine> >& engines) {
+    boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
+    for (const auto& engine : engines) latestBitset.set(engine->vaultId());
+
+    {
+        std::unique_lock lock(taskMapMutex_);
+
+        // Remove engines that are no longer present
+        std::vector<unsigned int> staleIds;
+
+        for (const auto& [id, task] : taskMap_)
+            if (!latestBitset[task->vaultId()]) staleIds.push_back(id);
+
+        for (auto id : staleIds) taskMap_.erase(id);
+    }
+}
+
+
+void SyncController::processTask(const std::shared_ptr<CloudStorageEngine>& engine) {
+    bool taskExists = false;
+
+    {
+        std::shared_lock lock(taskMapMutex_);
+        taskExists = taskMap_.contains(engine->getVault()->id);
+    }
+
+    if (!taskExists) {
+        const auto task = createTask(engine);
+
+        {
+            std::unique_lock lock(taskMapMutex_);
+            taskMap_[engine->getVault()->id] = task;
+        }
+
+        {
+            std::scoped_lock lock(pqMutex_);
+            pq.push(task);
+        }
+    }
+}
+
+std::shared_ptr<SyncTask> SyncController::createTask(const std::shared_ptr<CloudStorageEngine>& engine) {
+    std::shared_ptr<SyncTask> task;
+    if (engine->sync->strategy == types::Sync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
+    else if (engine->sync->strategy == types::Sync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
+    else if (engine->sync->strategy == types::Sync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
+    else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
+    return task;
+}
+
+

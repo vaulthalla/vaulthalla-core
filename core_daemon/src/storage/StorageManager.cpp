@@ -14,7 +14,7 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
-#include "crypto/Hash.hpp"
+#include "services/SyncController.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -49,6 +49,11 @@ void StorageManager::initStorageEngines() {
         std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << std::endl;
         throw;
     }
+}
+
+void StorageManager::initializeControllers() {
+    syncController_ = std::make_shared<services::SyncController>(shared_from_this());
+    syncController_->start();
 }
 
 void StorageManager::initUserStorage(const std::shared_ptr<User>& user) {
@@ -174,6 +179,17 @@ std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned in
     std::lock_guard lock(mountsMutex_);
     return DirectoryQueries::listDir(vaultId, relPath, recursive);
 }
+
+void StorageManager::syncNow(const unsigned int vaultId) const {
+    const auto engine = getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
+    if (engine->type() != StorageType::Cloud)
+        throw std::runtime_error("Sync operation is only supported for cloud storage engines");
+
+    syncController_->runNow(vaultId);
+}
+
 
 std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const unsigned int id) const {
     std::lock_guard lock(mountsMutex_);

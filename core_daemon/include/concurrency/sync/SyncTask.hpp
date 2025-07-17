@@ -44,9 +44,14 @@ public:
 
     bool operator<(const SyncTask& other) const;
 
+    [[nodiscard]] bool isRunning() const { return isRunning_; }
+
+    std::shared_ptr<storage::CloudStorageEngine> engine() const { return engine_; }
+
 protected:
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
+    bool isRunning_ = false;
 
     virtual void ensureFreeSpace(uintmax_t size) const;
 

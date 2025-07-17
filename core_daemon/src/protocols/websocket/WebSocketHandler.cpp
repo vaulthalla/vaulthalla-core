@@ -110,6 +110,10 @@ void WebSocketHandler::registerStorageHandlers() const {
     router_->registerHandler("storage.vault.get", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleGetVault(msg, session);
     });
+
+    router_->registerHandler("storage.vault.sync", [this](const json& msg, WebSocketSession& session) {
+        storageHandler_->handleSyncVault(msg, session);
+    });
 }
 
 void WebSocketHandler::registerAPIKeyHandlers() const {

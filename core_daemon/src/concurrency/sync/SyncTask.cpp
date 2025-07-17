@@ -28,8 +28,8 @@ void SyncTask::operator()() {
     }
 
     bool active; {
-        std::shared_lock lock(controller_->engineMapMutex_);
-        active = engine_->sync->enabled && controller_->engineMap_.contains(engine_->vault_->id);
+        std::shared_lock lock(controller_->taskMapMutex_);
+        active = engine_->sync->enabled && controller_->taskMap_.contains(engine_->vault_->id);
     }
 
     if (!active) {
@@ -38,6 +38,7 @@ void SyncTask::operator()() {
     }
 
     std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
+    isRunning_ = true;
     database::SyncQueries::reportSyncStarted(engine_->sync->id);
 
     if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
@@ -59,6 +60,7 @@ void SyncTask::operator()() {
     database::SyncQueries::reportSyncSuccess(engine_->sync->id);
     next_run = std::chrono::system_clock::now() + std::chrono::seconds(engine_->sync->interval.count());
     controller_->requeue(shared_from_this());
+    isRunning_ = false;
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {

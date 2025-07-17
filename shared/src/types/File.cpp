@@ -22,7 +22,11 @@ inline std::string hexMode(const unsigned long long mode) {
 File::File(const pqxx::row& row)
     : FSEntry(row), size_bytes(row.at("size_bytes").as<unsigned long long>()),
       mime_type(row.at("mime_type").as<std::string>()),
-      content_hash(row.at("content_hash").as<std::string>()) {
+      content_hash(row.at("content_hash").as<std::string>()),
+      is_trashed(row.at("is_trashed").as<bool>()) {
+    if (!row.at("trashed_by").is_null()) trashed_by = row.at("trashed_by").as<unsigned int>();
+    if (!row.at("trashed_at").is_null())
+        trashed_at = util::parsePostgresTimestamp(row.at("trashed_at").as<std::string>());
 }
 
 File::File(const std::string& s3_key, const uint64_t size, const std::optional<std::time_t>& updated)
@@ -36,6 +40,15 @@ void vh::types::to_json(nlohmann::json& j, const File& f) {
     j["mime_type"] = f.mime_type;
     j["content_hash"] = f.content_hash;
     j["type"] = "file"; // Helpful for client
+    j["is_trashed"] = f.is_trashed;
+    if (f.is_trashed) {
+        if (f.trashed_at) j["trashed_at"] = util::timestampToString(*f.trashed_at);
+        else j["trashed_at"] = nullptr;
+        j["trashed_by"] = f.trashed_by;
+    } else {
+        j["trashed_at"] = nullptr;
+        j["trashed_by"] = 0;
+    }
 }
 
 void vh::types::from_json(const nlohmann::json& j, File& f) {
@@ -43,6 +56,15 @@ void vh::types::from_json(const nlohmann::json& j, File& f) {
     f.size_bytes = j.at("size_bytes").get<unsigned long long>();
     f.mime_type = j.at("mime_type").get<std::string>();
     f.content_hash = j.at("content_hash").get<std::string>();
+    f.is_trashed = j.value("is_trashed", false);
+    if (f.is_trashed) {
+        if (j.contains("trashed_at")) f.trashed_at = util::parseTimestampFromString(j.at("trashed_at").get<std::string>());
+        else f.trashed_at = std::nullopt;
+        f.trashed_by = j.value("trashed_by", 0);
+    } else {
+        f.trashed_at = std::nullopt;
+        f.trashed_by = 0;
+    }
 }
 
 void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<File>>& files) {

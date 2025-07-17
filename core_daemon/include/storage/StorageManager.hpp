@@ -45,7 +45,7 @@ public:
 
     void finishUpload(unsigned int vaultId, unsigned int userId, const std::filesystem::path& relPath) const;
 
-    void removeEntry(unsigned int vaultId, const std::filesystem::path& relPath) const;
+    void removeEntry(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath) const;
 
     [[nodiscard]] std::vector<std::shared_ptr<types::FSEntry>> listDir(unsigned int vaultId,
                                                                      const std::string& relPath,

@@ -29,7 +29,7 @@ class SyncTask : public Task, public std::enable_shared_from_this<SyncTask> {
 public:
     std::chrono::system_clock::time_point next_run;
 
-    virtual ~SyncTask() = default;
+    ~SyncTask() override = default;
 
     SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
              const std::shared_ptr<services::SyncController>& controller);
@@ -46,12 +46,21 @@ public:
 
     [[nodiscard]] bool isRunning() const { return isRunning_; }
 
+    void interrupt();
+
+    [[nodiscard]] bool isInterrupted() const;
+
     std::shared_ptr<storage::CloudStorageEngine> engine() const { return engine_; }
 
 protected:
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
     bool isRunning_ = false;
+    std::atomic<bool> interruptFlag_{false};
+
+    void handleInterrupt() const;
+
+    virtual void removeTrashedFiles();
 
     virtual void ensureFreeSpace(uintmax_t size) const;
 

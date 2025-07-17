@@ -6,7 +6,10 @@ namespace vh::types {
 
 struct File : FSEntry {
     unsigned long long size_bytes{};
-    std::string mime_type, content_hash;
+    std::string mime_type{"application/octet-stream"}, content_hash;
+    bool is_trashed{};
+    std::optional<std::time_t> trashed_at;
+    unsigned int trashed_by{0};
 
     File() = default;
     explicit File(const pqxx::row& row);

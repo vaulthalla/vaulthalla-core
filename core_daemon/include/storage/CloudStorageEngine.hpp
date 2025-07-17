@@ -46,11 +46,13 @@ public:
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
-    void remove(const std::filesystem::path& rel_path) override;
+    void remove(const std::filesystem::path& rel_path, unsigned int userId) override;
+
+    void purge(const std::filesystem::path& rel_path) const;
 
     void removeLocally(const std::filesystem::path& rel_path) const;
 
-    void removeRemotely(const std::filesystem::path& rel_path) const;
+    void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
@@ -71,8 +73,8 @@ public:
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 
 protected:
-    void removeFile(const fs::path& rel_path) override;
-    void removeDirectory(const fs::path& rel_path) override;
+    void removeFile(const fs::path& rel_path, unsigned int userId) override;
+    void removeDirectory(const fs::path& rel_path, unsigned int userId) override;
 
 private:
     std::shared_ptr<types::api::APIKey> key_;

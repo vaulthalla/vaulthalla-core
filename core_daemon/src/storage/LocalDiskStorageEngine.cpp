@@ -88,13 +88,13 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
     return buffer;
 }
 
-void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path) {
-    if (isDirectory(rel_path)) removeDirectory(rel_path);
-    else if (isFile(rel_path)) removeFile(rel_path);
+void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) {
+    if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
+    else if (isFile(rel_path)) removeFile(rel_path, userId);
     else throw std::runtime_error("Path does not exist: " + rel_path.string());
 }
 
-void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path) {
+void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path, const unsigned int userId) {
     const auto absPath = getAbsolutePath(rel_path);
 
     if (std::filesystem::exists(absPath)) {
@@ -104,7 +104,7 @@ void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path) {
     }
 }
 
-void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_path) {
+void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_path, const unsigned int userId) {
     const auto absPath = getAbsolutePath(rel_path);
 
     for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {

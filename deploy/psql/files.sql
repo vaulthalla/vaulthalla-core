@@ -9,6 +9,10 @@ CREATE TABLE directories
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
     path             TEXT         NOT NULL, -- Full path for easy access
+    is_trashed       BOOLEAN   DEFAULT FALSE,
+    trashed_at       TIMESTAMP DEFAULT NULL,
+    trashed_by       INTEGER REFERENCES users (id),
+
     UNIQUE (vault_id, parent_id, name)
 );
 
@@ -35,6 +39,9 @@ CREATE TABLE files
     mime_type        VARCHAR(255),
     content_hash     VARCHAR(128),          -- optional: for dedup, integrity
     path             TEXT         NOT NULL, -- Full path for easy access
+    is_trashed       BOOLEAN   DEFAULT FALSE,
+    trashed_at       TIMESTAMP DEFAULT NULL,
+    trashed_by       INTEGER REFERENCES users (id),
 
     UNIQUE (vault_id, parent_id, name)
 );

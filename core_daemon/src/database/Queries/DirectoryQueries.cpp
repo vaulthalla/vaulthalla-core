@@ -88,7 +88,7 @@ void DirectoryQueries::updateDirectoryStats(const std::shared_ptr<types::Directo
 void DirectoryQueries::deleteDirectory(const unsigned int directoryId) {
     Transactions::exec("DirectoryQueries::deleteDirectory", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM directories WHERE id = " + txn.quote(directoryId));
-        txn.exec("DELETE FROM dir_stats WHERE directory_id = " + txn.quote(directoryId));
+        txn.exec("DELETE FROM directory_stats WHERE directory_id = " + txn.quote(directoryId));
     });
 }
 
@@ -171,5 +171,18 @@ std::vector<std::shared_ptr<vh::types::FSEntry>> DirectoryQueries::listDir(const
         );
 
         return types::merge_entries(files, directories);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::Directory>> DirectoryQueries::listTrashedDirs(const unsigned int vaultId) {
+    return Transactions::exec("DirectoryQueries::listTrashedDirs", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("list_trashed_dirs", vaultId);
+        return types::directories_from_pq_res(res);
+    });
+}
+
+void DirectoryQueries::markDirAsTrashed(const unsigned int userId, const unsigned int vaultId, const std::filesystem::path& relPath) {
+    Transactions::exec("DirectoryQueries::markDirAsTrashed", [&](pqxx::work& txn) {
+        txn.exec_prepared("mark_dir_trashed", pqxx::params{vaultId, relPath.string(), userId});
     });
 }

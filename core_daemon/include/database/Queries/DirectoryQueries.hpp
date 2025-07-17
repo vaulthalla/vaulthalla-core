@@ -47,6 +47,10 @@ public:
 
     static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
                                                                  bool recursive = false);
+
+    static std::vector<std::shared_ptr<types::Directory>> listTrashedDirs(unsigned int vaultId);
+
+    static void markDirAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
 };
 
 } // namespace vh::database

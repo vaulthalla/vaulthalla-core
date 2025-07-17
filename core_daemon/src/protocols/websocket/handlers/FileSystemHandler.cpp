@@ -200,7 +200,7 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
         const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
         enforcePermissions(session, vaultId, path, &types::VaultRole::canDelete);
-        storageManager_->removeEntry(vaultId, path);
+        storageManager_->removeEntry(session.getAuthenticatedUser()->id, vaultId, path);
 
         const json response = {{"command", "fs.entry.delete.response"},
                                {"status", "ok"},

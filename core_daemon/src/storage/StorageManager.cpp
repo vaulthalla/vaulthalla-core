@@ -139,10 +139,11 @@ void StorageManager::finishUpload(const unsigned int vaultId, const unsigned int
     engine->finishUpload(userId, relPath);
 }
 
-void StorageManager::removeEntry(const unsigned int vaultId, const std::filesystem::path& relPath) const {
+void StorageManager::removeEntry(const unsigned int userId, const unsigned int vaultId, const std::filesystem::path& relPath) const {
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->remove(relPath);
+    engine->remove(relPath, userId);
+    if (engine->type() == StorageType::Cloud) syncNow(vaultId);
 }
 
 void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,

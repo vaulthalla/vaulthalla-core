@@ -36,6 +36,8 @@ public:
 
     void requeue(const std::shared_ptr<concurrency::SyncTask>& task);
 
+    void interruptTask(unsigned int vaultId);
+
     void runNow(unsigned int vaultId);
 
 private:

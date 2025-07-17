@@ -28,7 +28,7 @@ public:
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
-    void remove(const std::filesystem::path& rel_path) override;
+    void remove(const std::filesystem::path& rel_path, unsigned int userId) override;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
@@ -46,8 +46,8 @@ public:
 
 protected:
 
-    void removeFile(const fs::path& rel_path) override;
-    void removeDirectory(const fs::path& rel_path) override;
+    void removeFile(const fs::path& rel_path, unsigned int userId) override;
+    void removeDirectory(const fs::path& rel_path, unsigned int userId) override;
 };
 
 } // namespace vh::storage

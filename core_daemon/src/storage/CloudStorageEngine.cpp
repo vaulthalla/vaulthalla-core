@@ -55,12 +55,18 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
     return std::nullopt;
 }
 
-void CloudStorageEngine::remove(const std::filesystem::path& rel_path) {
+void CloudStorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) {
     std::cout << "[CloudStorageEngine] remove called for: " << rel_path << std::endl;
-    if (isDirectory(rel_path)) removeDirectory(rel_path);
-    else if (isFile(rel_path)) removeFile(rel_path);
+    if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
+    else if (isFile(rel_path)) removeFile(rel_path, userId);
     else throw std::runtime_error("[CloudStorageEngine] Path does not exist: " + rel_path.string());
 }
+
+void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
+    removeLocally(rel_path);
+    removeRemotely(rel_path, false);
+}
+
 
 void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) const {
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
@@ -70,34 +76,24 @@ void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) co
     if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
 }
 
-void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path) const {
+void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, const bool rmThumbnails) const {
     if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
-    purgeThumbnails(rel_path);
+    if (rmThumbnails) purgeThumbnails(rel_path);
 }
 
-void CloudStorageEngine::removeFile(const fs::path& rel_path) {
-    std::cout << "[CloudStorageEngine] Deleting file: " << rel_path << std::endl;
-    removeRemotely(rel_path);
-    FileQueries::deleteFile(vault_->id, rel_path);
+void CloudStorageEngine::removeFile(const fs::path& rel_path, const unsigned int userId) {
+    FileQueries::markFileAsTrashed(userId, vault_->id, rel_path);
 }
 
-void CloudStorageEngine::removeDirectory(const fs::path& rel_path) {
-    std::cout << "[CloudStorageEngine] remove called for directory: " << rel_path << std::endl;
+void CloudStorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) {
+    for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
+        removeFile(file->path, userId);
 
-    const auto files = FileQueries::listFilesInDir(vault_->id, rel_path, true);
-    const auto directories = DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true);
+    for (const auto& dir : DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true))
+        DirectoryQueries::markDirAsTrashed(userId, vault_->id, dir->path);
 
-    for (const auto& file : files) removeFile(file->path);
-
-    std::cout << "[CloudStorageEngine] Deleting directories in: " << rel_path << std::endl;
-    for (const auto& dir : directories)
-        DirectoryQueries::deleteDirectory(vault_->id, dir->path);
-
-    std::cout << "[CloudStorageEngine] Deleting directory: " << rel_path << std::endl;
-    DirectoryQueries::deleteDirectory(vault_->id, rel_path);
-
-    std::cout << "[CloudStorageEngine] Directory removed: " << rel_path << std::endl;
+    DirectoryQueries::markDirAsTrashed(userId, vaultId(), rel_path);
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

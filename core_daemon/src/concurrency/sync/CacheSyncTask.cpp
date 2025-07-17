@@ -9,7 +9,7 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "../../../include/concurrency/thumbnail/ThumbnailWorker.hpp"
+#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 
@@ -106,7 +106,7 @@ void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
 
         if (numFileIndices == 0) throw std::runtime_error("Not enough space to cache file");
 
-        intmax_t needed = size - free;
+        uintmax_t needed = size - free;
         std::vector<std::shared_ptr<CacheIndex> > purgeable;
         unsigned int numRequested = 1;
 

@@ -157,12 +157,18 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("get_file_mime_type", "SELECT mime_type FROM files WHERE vault_id = $1 AND path = $2");
 
+    conn_->prepare("mark_file_trashed",
+                   "UPDATE files SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $3 "
+                   "WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("list_trashed_files", "SELECT * FROM files WHERE vault_id = $1 AND is_trashed = TRUE");
+
     conn_->prepare("list_files_in_dir",
                    "SELECT * FROM files "
-                   "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3");
+                   "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3 AND is_trashed = FALSE");
 
     conn_->prepare("list_files_in_dir_recursive",
-                   "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2");
+                   "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2 AND is_trashed = FALSE");
 
     conn_->prepare("get_file_id_by_path", "SELECT id FROM files WHERE vault_id = $1 AND path = $2");
 
@@ -191,6 +197,16 @@ void DBConnection::initPreparedDirectories() const {
                    "UPDATE directories SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "
                    "last_modified_by = $5, path = $6 WHERE id = $1");
 
+    conn_->prepare("mark_dir_trashed",
+                   "UPDATE directories SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $3 "
+                   "WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("list_trashed_dirs",
+                   "SELECT d.*, ds.* "
+                   "FROM directories d "
+                   "JOIN directory_stats ds ON d.id = ds.directory_id "
+                   "WHERE d.vault_id = $1 AND d.is_trashed = TRUE");
+
     conn_->prepare("insert_dir_stats",
                    "INSERT INTO directory_stats (directory_id, size_bytes, file_count, subdirectory_count, last_modified) "
                    "VALUES ($1, $2, $3, $4, NOW())");
@@ -203,12 +219,12 @@ void DBConnection::initPreparedDirectories() const {
                    "SELECT d.*, ds.* "
                    "FROM directories d "
                    "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3 AND d.path != '/'");
+                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3 AND d.path != '/' AND is_trashed = FALSE");
 
     conn_->prepare("list_directories_in_dir_recursive",
                    "SELECT d.*, ds.* FROM directories d "
                    "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.path LIKE $2");
+                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND is_trashed = FALSE");
 
     conn_->prepare("get_dir_by_path", "SELECT * FROM directories WHERE vault_id = $1 AND path = $2");
 

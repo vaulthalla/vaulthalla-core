@@ -53,6 +53,20 @@ void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
     std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
 }
 
+void SyncController::interruptTask(unsigned int vaultId) {
+    std::scoped_lock lock(taskMapMutex_, pqMutex_);
+
+    if (!taskMap_.contains(vaultId)) {
+        std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
+        return;
+    }
+
+    if (const auto& task = taskMap_[vaultId]) {
+        task->interrupt();
+        std::cout << "[SyncController] Interrupted sync task for vault ID: " << vaultId << std::endl;
+    } else std::cerr << "[SyncController] Task for vault ID " << vaultId << " is not running." << std::endl;
+}
+
 void SyncController::run() {
     refreshEngines();
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
@@ -79,65 +93,53 @@ void SyncController::run() {
             if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(30));
             std::cout << "[SyncController] No sync tasks available." << std::endl;
             refreshEngines();
-        } else {
-            refreshTries = 0;
-            std::shared_ptr<SyncTask> task;
-
-            {
-                std::scoped_lock lock(pqMutex_);
-                task = pq.top();
-                pq.pop();
-            }
-
-            if (!task) continue;
-
-            if (task->next_run > std::chrono::system_clock::now()) std::this_thread::sleep_until(task->next_run);
-            else pool_->submit(task);
+            continue;
         }
+
+        refreshTries = 0;
+        std::shared_ptr<SyncTask> task;
+
+        {
+            std::scoped_lock lock(pqMutex_);
+            task = pq.top();
+            pq.pop();
+        }
+
+        if (!task || task->isInterrupted()) continue;
+
+        if (task->next_run > std::chrono::system_clock::now()) std::this_thread::sleep_for(std::chrono::seconds(3));
+        else pool_->submit(task);
     }
 }
 
 void SyncController::runNow(const unsigned int vaultId) {
-    std::unique_lock lock(taskMapMutex_);
     std::cout << "[SyncController] Running sync task immediately for vault ID: " << vaultId << std::endl;
 
-    if (!taskMap_.contains(vaultId)) {
-        std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
-        return;
-    }
-
-    auto task = taskMap_[vaultId];
-
-    lock.unlock();
-
-    task->next_run = std::chrono::system_clock::now();
-
-    if (task->isRunning()) {
-        std::cerr << "[SyncController] Task for vault ID " << vaultId << " is already running." << std::endl;
-        return;
-    }
-
-    const auto engine = task->engine();
-    if (!engine) {
-        std::cerr << "[SyncController] Engine not initialized for vault ID: " << vaultId << std::endl;
-        return;
-    }
-
-    task = nullptr;
-    processTask(engine);
+    std::shared_ptr<SyncTask> task;
 
     {
-        std::scoped_lock pq_lock(pqMutex_);
-        pq.push(task);
+        std::scoped_lock lock(taskMapMutex_);
+        if (!taskMap_.contains(vaultId)) {
+            std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
+            return;
+        }
+        task = taskMap_[vaultId];
     }
-}
 
+    task->interrupt();
+
+    while (task->isRunning()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    const auto engine = task->engine();
+    task = createTask(engine);
+    task->next_run = std::chrono::system_clock::now();
+    taskMap_[vaultId] = task;
+    pq.push(task);
+}
 
 void SyncController::refreshEngines() {
     if (const auto s = storage_.lock()) {
-        std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
         const auto latestEngines = s->getEngines<CloudStorageEngine>();
-        std::cout << "[SyncController] Found " << latestEngines.size() << " cloud storage engines." << std::endl;
         pruneStaleTasks(latestEngines);
         for (const auto& engine : latestEngines) processTask(engine);
     }
@@ -163,25 +165,12 @@ void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<CloudStor
 
 
 void SyncController::processTask(const std::shared_ptr<CloudStorageEngine>& engine) {
-    bool taskExists = false;
+    std::scoped_lock lock(taskMapMutex_, pqMutex_);
 
-    {
-        std::shared_lock lock(taskMapMutex_);
-        taskExists = taskMap_.contains(engine->getVault()->id);
-    }
-
-    if (!taskExists) {
+    if (!taskMap_.contains(engine->getVault()->id)) {
         const auto task = createTask(engine);
-
-        {
-            std::unique_lock lock(taskMapMutex_);
-            taskMap_[engine->getVault()->id] = task;
-        }
-
-        {
-            std::scoped_lock lock(pqMutex_);
-            pq.push(task);
-        }
+        taskMap_[engine->getVault()->id] = task;
+        pq.push(task);
     }
 }
 

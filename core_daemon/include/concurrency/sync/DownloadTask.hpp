@@ -4,10 +4,8 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/File.hpp"
-#include "types/Vault.hpp"
 #include "types/CacheIndex.hpp"
 
-#include <atomic>
 #include <memory>
 #include <iostream>
 
@@ -20,8 +18,8 @@ struct DownloadTask : PromisedTask {
 
     DownloadTask(std::shared_ptr<storage::CloudStorageEngine> eng,
                  std::shared_ptr<types::File> f,
-                 bool freeAfter = false)
-        : engine(std::move(eng)), file(std::move(f)) {}
+                 const bool freeAfter = false)
+        : engine(std::move(eng)), file(std::move(f)), freeAfterDownload(freeAfter) {}
 
     void operator()() override {
         try {
@@ -34,6 +32,5 @@ struct DownloadTask : PromisedTask {
         }
     }
 };
-
 
 }

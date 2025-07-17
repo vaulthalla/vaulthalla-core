@@ -2,6 +2,7 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "types/Vault.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "services/SyncController.hpp"
 #include "types/File.hpp"
@@ -22,46 +23,63 @@ SyncTask::SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
 }
 
 void SyncTask::operator()() {
-    if (!engine_) {
-        std::cerr << "[SyncWorker] Engine not initialized!\n";
-        return;
+    try {
+        handleInterrupt();
+
+        if (!engine_) {
+            std::cerr << "[SyncWorker] Engine not initialized!\n";
+            return;
+        }
+
+        std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
+        isRunning_ = true;
+        database::SyncQueries::reportSyncStarted(engine_->sync->id);
+
+        if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
+            auto dir = std::make_shared<Directory>();
+            dir->vault_id = engine_->vault_->id;
+            dir->name = "/";
+            dir->path = "/";
+            dir->created_by = dir->last_modified_by = engine_->vault_->owner_id;
+            dir->parent_id = std::nullopt;
+            database::DirectoryQueries::addDirectory(dir);
+        }
+
+        removeTrashedFiles();
+
+        handleInterrupt();
+        auto s3Map = engine_->getGroupedFilesFromS3();
+        sync(s3Map);
+        handleInterrupt();
+        handleDiff(s3Map);
+
+        handleInterrupt();
+        std::cout << "[SyncWorker] Sync done: " << engine_->vault_->name << "\n";
+        database::SyncQueries::reportSyncSuccess(engine_->sync->id);
+        next_run = std::chrono::system_clock::now() + std::chrono::seconds(engine_->sync->interval.count());
+        controller_->requeue(shared_from_this());
+        isRunning_ = false;
+    } catch (const std::exception& e) {
+        isRunning_ = false;
+        if (std::string(e.what()).contains("Sync task interrupted")) {
+            std::cout << "[SyncWorker] Sync task interrupted for vault ID: " << engine_->vault_->id << "\n";
+            return;
+        }
+        std::cerr << "[SyncWorker] Error during sync: " << e.what() << "\n";
+    } catch (...) {
+        std::cerr << "[SyncWorker] Unknown error during sync.\n";
+        isRunning_ = false;
     }
-
-    bool active; {
-        std::shared_lock lock(controller_->taskMapMutex_);
-        active = engine_->sync->enabled && controller_->taskMap_.contains(engine_->vault_->id);
-    }
-
-    if (!active) {
-        std::cout << "[SyncWorker] Engine missing from map for vault ID: " << engine_->vault_->id << "\n";
-        return;
-    }
-
-    std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
-    isRunning_ = true;
-    database::SyncQueries::reportSyncStarted(engine_->sync->id);
-
-    if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
-        auto dir = std::make_shared<Directory>();
-        dir->vault_id = engine_->vault_->id;
-        dir->name = "/";
-        dir->path = "/";
-        dir->created_by = dir->last_modified_by = engine_->vault_->owner_id;
-        dir->parent_id = std::nullopt;
-        database::DirectoryQueries::addDirectory(dir);
-    }
-
-    auto s3Map = engine_->getGroupedFilesFromS3();
-
-    sync(s3Map);
-    handleDiff(s3Map);
-
-    std::cout << "[SyncWorker] Sync done: " << engine_->vault_->name << "\n";
-    database::SyncQueries::reportSyncSuccess(engine_->sync->id);
-    next_run = std::chrono::system_clock::now() + std::chrono::seconds(engine_->sync->interval.count());
-    controller_->requeue(shared_from_this());
-    isRunning_ = false;
 }
+
+void SyncTask::removeTrashedFiles() {
+    for (const auto& file : database::FileQueries::listTrashedFiles(vaultId()))
+        engine_->purge(file->path);
+
+    for (const auto& dir : database::DirectoryQueries::listTrashedDirs(vaultId()))
+        database::DirectoryQueries::deleteDirectory(dir->id);
+}
+
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {
     uintmax_t totalSize = 0;
@@ -98,3 +116,8 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::symmetric_dif
 
     return result;
 }
+
+void SyncTask::interrupt() { interruptFlag_.store(true); }
+bool SyncTask::isInterrupted() const { return interruptFlag_.load(); }
+void SyncTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
+

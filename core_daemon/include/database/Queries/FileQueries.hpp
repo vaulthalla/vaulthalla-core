@@ -38,6 +38,10 @@ public:
     [[nodiscard]] static bool fileExists(unsigned int vaultId, const std::filesystem::path& relPath);
 
     static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path = {"/"}, bool recursive = true);
+
+    static std::vector<std::shared_ptr<types::File>> listTrashedFiles(unsigned int vaultId);
+
+    static void markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
 };
 
 } // namespace vh::database

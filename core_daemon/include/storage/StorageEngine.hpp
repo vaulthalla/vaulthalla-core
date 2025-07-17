@@ -43,7 +43,7 @@ public:
 
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
-    virtual void remove(const fs::path& rel_path) = 0;
+    virtual void remove(const fs::path& rel_path, unsigned int userId) = 0;
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
@@ -92,9 +92,9 @@ protected:
     fs::path cache_path_, root_;
     std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
 
-    virtual void removeFile(const fs::path& rel_path) = 0;
+    virtual void removeFile(const fs::path& rel_path, unsigned int userId) = 0;
 
-    virtual void removeDirectory(const fs::path& rel_path) = 0;
+    virtual void removeDirectory(const fs::path& rel_path, unsigned int userId) = 0;
 
     friend class concurrency::SyncTask;
 };

@@ -58,7 +58,6 @@ void SyncTask::operator()() {
         localMap_ = groupEntriesByPath(localFiles_);
 
         futures_.clear();
-        futures_.reserve(std::max(s3Map_.size(), localMap_.size()));
 
         sync();
 

@@ -45,12 +45,9 @@ void FileQueries::deleteFile(const unsigned int fileId) {
 
 void FileQueries::deleteFile(unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("FileQueries::deleteFileByPath", [&](pqxx::work& txn) {
-        pqxx::params p{vaultId, relPath.string()};
-        if (txn.exec_prepared("delete_file_by_vault_and_path", p).affected_rows() == 0) throw std::runtime_error(
-            "No file found for vault ID: " + std::to_string(vaultId) + " and path: " + relPath.string());
+        txn.exec_prepared("delete_file_by_vault_and_path", pqxx::params{vaultId, relPath.string()});
     });
 }
-
 
 std::string FileQueries::getMimeType(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getMimeType", [&](pqxx::work& txn) -> std::string {
@@ -114,25 +111,43 @@ std::vector<std::shared_ptr<vh::types::File> > FileQueries::listTrashedFiles(uns
     });
 }
 
-void FileQueries::markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath) {
+void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("FileQueries::markFileAsTrashed", [&](pqxx::work& txn) {
-        txn.exec_prepared("mark_file_trashed", pqxx::params{vaultId, relPath.string(), userId});
+        // const auto res = txn.exec_prepared("get_file_parent_id_and_size_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
+        // if (res.empty()) throw std::runtime_error("[markFileAsTrashed] File not found: " + relPath.string());
 
-        const auto fileId = txn.exec_prepared("get_file_id_by_path",
-            pqxx::params{vaultId, relPath.string()}).one_row()["id"].as<unsigned int>();
+        txn.exec_prepared("mark_file_trashed", pqxx::params{vaultId, to_utf8_string(relPath.u8string()), userId});
 
-        const auto row = txn.exec_prepared("get_file_parent_id_and_size", fileId).one_row();
-        const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
-        const auto sizeBytes = row["size_bytes"].as<unsigned int>();
-        std::optional<unsigned int> currentParentId = parentId;
-        while (currentParentId) {
-            // Decrement size_bytes and file_count
-            pqxx::params stats_params{currentParentId, -static_cast<int>(sizeBytes), -1, 0};
-            const auto fCount = txn.exec_prepared("update_dir_stats", stats_params).one_row()["file_count"].as<unsigned
-                int>();
-            if (fCount == 0) txn.exec_prepared("delete_directory", currentParentId);
-            currentParentId = txn.exec_prepared("get_dir_parent_id", currentParentId).one_field().as<std::optional<
-                unsigned int> >();
-        }
+        // const auto row = res[0];
+        // const auto parentId = row["parent_id"].as<std::optional<unsigned int>>();
+        // const auto sizeBytes = row["size_bytes"].as<unsigned int>();
+
+        // TODO: fix this
+        // updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
     });
+}
+
+void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
+                                               std::optional<unsigned int> parentId,
+                                               const unsigned int sizeBytes) {
+    while (parentId) {
+        std::cout << "[updateParentStats] Updating stats for parentId: " << *parentId
+                  << ", sizeDelta: -" << sizeBytes << std::endl;
+
+        pqxx::params stats_params{parentId, -static_cast<int>(sizeBytes), -1, 0};
+        const auto result = txn.exec_prepared("update_dir_stats", stats_params).one_row();
+        const auto fCount = result["file_count"].as<unsigned int>();
+
+        if (fCount == 0) {
+            std::cout << "[updateParentStats] Deleting empty directory with id: " << *parentId << std::endl;
+            txn.exec_prepared("delete_directory", parentId);
+        }
+
+        const auto res = txn.exec_prepared("get_dir_parent_id", parentId);
+        if (res.empty()) break;
+
+        parentId = res[0]["parent_id"].as<std::optional<unsigned int>>();
+    }
+
+    txn.commit();
 }

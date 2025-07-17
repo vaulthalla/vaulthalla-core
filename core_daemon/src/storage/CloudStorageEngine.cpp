@@ -62,11 +62,24 @@ void CloudStorageEngine::remove(const std::filesystem::path& rel_path, const uns
     else throw std::runtime_error("[CloudStorageEngine] Path does not exist: " + rel_path.string());
 }
 
+void CloudStorageEngine::removeFile(const fs::path& rel_path, const unsigned int userId) {
+    FileQueries::markFileAsTrashed(userId, vault_->id, rel_path);
+}
+
+void CloudStorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) {
+    for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
+        removeFile(file->path, userId);
+
+    for (const auto& dir : DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true))
+        DirectoryQueries::markDirAsTrashed(userId, vault_->id, dir->path);
+
+    DirectoryQueries::markDirAsTrashed(userId, vaultId(), rel_path);
+}
+
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);
     removeRemotely(rel_path, false);
 }
-
 
 void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) const {
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
@@ -80,20 +93,6 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
     if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
     if (rmThumbnails) purgeThumbnails(rel_path);
-}
-
-void CloudStorageEngine::removeFile(const fs::path& rel_path, const unsigned int userId) {
-    FileQueries::markFileAsTrashed(userId, vault_->id, rel_path);
-}
-
-void CloudStorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) {
-    for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
-        removeFile(file->path, userId);
-
-    for (const auto& dir : DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true))
-        DirectoryQueries::markDirAsTrashed(userId, vault_->id, dir->path);
-
-    DirectoryQueries::markDirAsTrashed(userId, vaultId(), rel_path);
 }
 
 bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {

@@ -1,14 +1,16 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
+#include "concurrency/sync/DeleteTask.hpp"
 
 #include <memory>
 #include <unordered_map>
 #include <string>
 #include <chrono>
 #include <filesystem>
-
-#include "storage/CloudStorageEngine.hpp"
+#include <future>
+#include <atomic>
+#include <vector>
 
 namespace vh::services {
 class SyncController;
@@ -34,11 +36,9 @@ public:
     SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
              const std::shared_ptr<services::SyncController>& controller);
 
-    virtual void operator()();
+    void operator()() override;
 
-    virtual void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const = 0;
-
-    virtual void handleDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const = 0;
+    virtual void sync() = 0;
 
     unsigned int vaultId() const;
 
@@ -55,14 +55,24 @@ public:
 protected:
     std::shared_ptr<storage::CloudStorageEngine> engine_;
     std::shared_ptr<services::SyncController> controller_;
+    std::vector<std::future<ExpectedFuture>> futures_;
+    std::vector<std::shared_ptr<types::File>> localFiles_, s3Files_;
+    std::unordered_map<std::u8string, std::shared_ptr<types::File>> localMap_, s3Map_;
     bool isRunning_ = false;
     std::atomic<bool> interruptFlag_{false};
+
+    void push(const std::shared_ptr<Task>& task);
+    void upload(const std::shared_ptr<types::File>& file);
+    void download(const std::shared_ptr<types::File>& file, bool freeAfterDownload = false);
+    void remove(const std::shared_ptr<types::File>& file, const DeleteTask::Type& type = DeleteTask::Type::PURGE);
 
     void handleInterrupt() const;
 
     virtual void removeTrashedFiles();
 
     virtual void ensureFreeSpace(uintmax_t size) const;
+
+    void processFutures();
 
     static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File>>& files);
 

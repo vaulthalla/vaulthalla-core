@@ -136,7 +136,6 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 }
 
-
 void DBConnection::initPreparedFiles() const {
     conn_->prepare("upsert_file",
                    "INSERT INTO files (vault_id, parent_id, name, created_by, last_modified_by, size_bytes, "
@@ -161,6 +160,10 @@ void DBConnection::initPreparedFiles() const {
                    "UPDATE files SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $3 "
                    "WHERE vault_id = $1 AND path = $2");
 
+    conn_->prepare("mark_file_trashed_by_id",
+                   "UPDATE files SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $2 "
+                   "WHERE id = $1");
+
     conn_->prepare("list_trashed_files", "SELECT * FROM files WHERE vault_id = $1 AND is_trashed = TRUE");
 
     conn_->prepare("list_files_in_dir",
@@ -176,6 +179,9 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("get_file_parent_id_and_size",
                    "SELECT parent_id, size_bytes FROM files WHERE id = $1");
+
+    conn_->prepare("get_file_parent_id_and_size_by_path",
+                   "SELECT parent_id, size_bytes FROM files WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("is_file", "SELECT EXISTS (SELECT 1 FROM files WHERE vault_id = $1 AND path = $2)");
 }

@@ -195,12 +195,15 @@ void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& sessio
 
 void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session) {
     try {
+        const auto userId = session.getAuthenticatedUser()->id;
+        if (userId == 0) throw std::runtime_error("User not authenticated");
+
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
         enforcePermissions(session, vaultId, path, &types::VaultRole::canDelete);
-        storageManager_->removeEntry(session.getAuthenticatedUser()->id, vaultId, path);
+        storageManager_->removeEntry(userId, vaultId, path);
 
         const json response = {{"command", "fs.entry.delete.response"},
                                {"status", "ok"},

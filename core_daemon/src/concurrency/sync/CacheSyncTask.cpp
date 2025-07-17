@@ -3,13 +3,11 @@
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 
@@ -20,20 +18,20 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 
-void CacheSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File> >& s3Map) const {
-    for (const auto& file : FileQueries::listFilesInDir(engine_->vaultId())) {
-        const auto match = s3Map.find(stripLeadingSlash(file->path));
+void CacheSyncTask::sync() {
+    for (const auto& file : localFiles_) {
+        const auto match = s3Map_.find(stripLeadingSlash(file->path));
 
-        if (match == s3Map.end()) {
+        if (match == s3Map_.end()) {
             std::cout << "[CacheSyncTask] Local file not found in S3 map, caching: " << file->path << "\n";
-            engine_->uploadFile(file->path);
+            upload(file);
             continue;
         }
 
         const auto rFile = match->second;
 
         if (file->content_hash == engine_->getRemoteContentHash(rFile->path)) {
-            s3Map.erase(match);
+            s3Map_.erase(match);
             continue;
         }
 
@@ -42,8 +40,8 @@ void CacheSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File>
             ensureFreeSpace(rFile->size_bytes);
 
             if (file->updated_at <= rFile->updated_at) {
-                engine_->cacheFile(file->path)->size;
-                s3Map.erase(match);
+                download(file);
+                s3Map_.erase(match);
                 continue;
             }
         }
@@ -51,12 +49,13 @@ void CacheSyncTask::sync(std::unordered_map<std::u8string, std::shared_ptr<File>
         std::cout << "[CacheSyncTask][1/2] Local file is newer than remote copy: " << file->path << "\n"
             << "[CacheSyncTask][2/2] Assuming an upload is scheduled, skipping download.\n";
 
-        s3Map.erase(match);
+        s3Map_.erase(match);
     }
-}
 
-void CacheSyncTask::handleDiff(std::unordered_map<std::u8string, std::shared_ptr<File> >& s3Map) const {
-    for (const auto& dir : engine_->extractDirectories(uMap2Vector(s3Map))) {
+    processFutures();
+
+    // Ensure all directories in the S3 map exist locally
+    for (const auto& dir : engine_->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());
@@ -64,28 +63,19 @@ void CacheSyncTask::handleDiff(std::unordered_map<std::u8string, std::shared_ptr
         }
     }
 
-    const auto files = uMap2Vector(s3Map);
-    std::vector<std::future<ExpectedFuture>> futures;
+    const auto files = uMap2Vector(s3Map_);
+    futures_.reserve(files.size());
 
     const auto freeSpace = engine_->freeSpace();
     const auto reqFreeSpace = computeReqFreeSpaceForDownload(files);
     const auto [purgeableSpace, maxSize] = computeIndicesSizeAndMaxSize(CacheQueries::listCacheIndicesByType(vaultId(), CacheIndex::Type::File));
     const bool freeAfterDownload = freeSpace + purgeableSpace < reqFreeSpace;
 
-    if (freeAfterDownload) {
-        std::cout << "[CacheSyncTask] Not enough free space for download, purging cache indices.\n";
-        ensureFreeSpace(maxSize);
-    }
+    if (freeAfterDownload) ensureFreeSpace(maxSize);
 
-    const auto threadPool = ThreadPoolRegistry::instance().syncPool();
-    for (const auto& file : files) {
-        auto task = std::make_shared<DownloadTask>(engine_, file, freeAfterDownload);
-        futures.push_back(task->getFuture().value());
-        threadPool->submit(task);
-    }
+    for (const auto& file : files) download(file, freeAfterDownload);
 
-    for (auto& f : futures)
-        if (std::get<bool>(f.get()) == false) std::cerr << "[CacheSyncTask] A file sync task failed.\n";
+    processFutures();
 }
 
 std::pair<uintmax_t, uintmax_t> CacheSyncTask::computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {

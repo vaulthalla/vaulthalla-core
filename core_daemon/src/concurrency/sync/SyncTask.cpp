@@ -1,5 +1,9 @@
 #include "concurrency/sync/SyncTask.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
+#include "concurrency/sync/DownloadTask.hpp"
+#include "concurrency/sync/UploadTask.hpp"
 #include "types/Vault.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
@@ -8,8 +12,8 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
+
 #include <iostream>
-#include <filesystem>
 
 using namespace vh::concurrency;
 using namespace vh::types;
@@ -46,17 +50,23 @@ void SyncTask::operator()() {
         }
 
         removeTrashedFiles();
+        handleInterrupt();
 
-        handleInterrupt();
-        auto s3Map = engine_->getGroupedFilesFromS3();
-        sync(s3Map);
-        handleInterrupt();
-        handleDiff(s3Map);
+        s3Map_ = engine_->getGroupedFilesFromS3();
+        s3Files_ = uMap2Vector(s3Map_);
+        localFiles_ = database::FileQueries::listFilesInDir(engine_->vaultId());
+        localMap_ = groupEntriesByPath(localFiles_);
 
-        handleInterrupt();
+        futures_.clear();
+        futures_.reserve(std::max(s3Map_.size(), localMap_.size()));
+
+        sync();
+
         std::cout << "[SyncWorker] Sync done: " << engine_->vault_->name << "\n";
         database::SyncQueries::reportSyncSuccess(engine_->sync->id);
         next_run = std::chrono::system_clock::now() + std::chrono::seconds(engine_->sync->interval.count());
+
+        handleInterrupt();
         controller_->requeue(shared_from_this());
         isRunning_ = false;
     } catch (const std::exception& e) {
@@ -73,13 +83,42 @@ void SyncTask::operator()() {
 }
 
 void SyncTask::removeTrashedFiles() {
-    for (const auto& file : database::FileQueries::listTrashedFiles(vaultId()))
-        engine_->purge(file->path);
+    const auto files = database::FileQueries::listTrashedFiles(vaultId());
+    futures_.reserve(files.size());
+    std::cout << "[SyncWorker] Removing " << files.size() << " trashed files from vault ID: " << vaultId() << std::endl;
+
+    for (const auto& file : files) remove(file);
 
     for (const auto& dir : database::DirectoryQueries::listTrashedDirs(vaultId()))
         database::DirectoryQueries::deleteDirectory(dir->id);
+
+    processFutures();
 }
 
+void SyncTask::processFutures() {
+    for (auto& f : futures_)
+        if (std::get<bool>(f.get()) == false)
+            std::cerr << "[SafeSyncTask] A file sync task failed.\n";
+    futures_.clear();
+}
+
+
+void SyncTask::push(const std::shared_ptr<Task>& task) {
+    futures_.push_back(task->getFuture().value());
+    ThreadPoolRegistry::instance().syncPool()->submit(task);
+}
+
+void SyncTask::upload(const std::shared_ptr<File>& file) {
+    push(std::make_shared<UploadTask>(engine_, file));
+}
+
+void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterDownload) {
+    push(std::make_shared<DownloadTask>(engine_, file, freeAfterDownload));
+}
+
+void SyncTask::remove(const std::shared_ptr<File>& file, const DeleteTask::Type& type) {
+    push(std::make_shared<DeleteTask>(engine_, file, type));
+}
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {
     uintmax_t totalSize = 0;

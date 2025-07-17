@@ -19,8 +19,7 @@ public:
     CacheSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
              const std::shared_ptr<services::SyncController>& controller) : SyncTask(engine, controller) {}
 
-    void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
-    void handleDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
+    void sync() override;
 
 private:
     static std::pair<uintmax_t, uintmax_t> computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<types::CacheIndex>>& indices);

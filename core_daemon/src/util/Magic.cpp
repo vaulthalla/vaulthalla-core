@@ -18,7 +18,7 @@ Magic::~Magic() { if (cookie) magic_close(cookie); }
 std::string Magic::mime_type(const std::string& path) const {
     const char* result = magic_file(cookie, path.c_str());
     if (!result) throw std::runtime_error("magic_file failed: " + std::string(magic_error(cookie)));
-    return std::string(result);
+    return {result};
 }
 
 std::string Magic::get_mime_type(const std::string& path) {

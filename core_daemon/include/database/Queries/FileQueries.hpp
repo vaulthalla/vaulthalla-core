@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <pqxx/pqxx>
 
 namespace vh::types {
 struct FSEntry;
@@ -42,6 +43,10 @@ public:
     static std::vector<std::shared_ptr<types::File>> listTrashedFiles(unsigned int vaultId);
 
     static void markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
+
+    static void updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
+                                               std::optional<unsigned int> parentId,
+                                               unsigned int sizeBytes);
 };
 
 } // namespace vh::database

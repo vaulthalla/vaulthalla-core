@@ -10,12 +10,11 @@ public:
 
     ~MirrorSyncTask() override = default;
 
-    void sync(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
-    void handleDiff(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const override;
+    void sync();
 
 private:
-    void syncKeepLocal(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
-    void syncKeepRemote(std::unordered_map<std::u8string, std::shared_ptr<types::File>>& s3Map) const;
+    void syncKeepLocal();
+    void syncKeepRemote();
 };
 
 }

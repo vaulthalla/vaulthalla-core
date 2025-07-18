@@ -17,25 +17,28 @@
 
 using namespace vh::concurrency;
 using namespace vh::types;
+using namespace std::chrono;
 
 SyncTask::SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
                    const std::shared_ptr<services::SyncController>& controller)
-    : next_run(std::chrono::system_clock::from_time_t(engine->sync->last_sync_at)
-               + std::chrono::seconds(engine->sync->interval.count())),
+    : next_run(system_clock::from_time_t(engine->sync->last_sync_at)
+               + seconds(engine->sync->interval.count())),
       engine_(engine),
       controller_(controller) {
 }
 
 void SyncTask::operator()() {
+    std::cout << "[SyncWorker] Started sync for vault: " << engine_->vault_->name << std::endl;
+    auto start = steady_clock::now();
+
     try {
         handleInterrupt();
 
         if (!engine_) {
-            std::cerr << "[SyncWorker] Engine not initialized!\n";
+            std::cerr << "[SyncWorker] Engine not initialized!" << std::endl;
             return;
         }
 
-        std::cout << "[SyncWorker] Sync start: " << engine_->vault_->name << "\n";
         isRunning_ = true;
         database::SyncQueries::reportSyncStarted(engine_->sync->id);
 
@@ -61,9 +64,9 @@ void SyncTask::operator()() {
 
         sync();
 
-        std::cout << "[SyncWorker] Sync done: " << engine_->vault_->name << "\n";
+        std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault_->name << std::endl;
         database::SyncQueries::reportSyncSuccess(engine_->sync->id);
-        next_run = std::chrono::system_clock::now() + std::chrono::seconds(engine_->sync->interval.count());
+        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
 
         handleInterrupt();
         controller_->requeue(shared_from_this());
@@ -71,14 +74,18 @@ void SyncTask::operator()() {
     } catch (const std::exception& e) {
         isRunning_ = false;
         if (std::string(e.what()).contains("Sync task interrupted")) {
-            std::cout << "[SyncWorker] Sync task interrupted for vault ID: " << engine_->vault_->id << "\n";
+            std::cout << "[SyncWorker] Sync task interrupted for vault: " << engine_->vault_-> name << std::endl;
             return;
         }
-        std::cerr << "[SyncWorker] Error during sync: " << e.what() << "\n";
+        std::cerr << "[SyncWorker] Error during sync: " << e.what() << std::endl;
     } catch (...) {
-        std::cerr << "[SyncWorker] Unknown error during sync.\n";
+        std::cerr << "[SyncWorker] Unknown error during sync." << std::endl;
         isRunning_ = false;
     }
+
+    std::cout << "[SyncWorker] Sync task completed for vault: " << engine_->vault_->name
+              << " in " << duration_cast<milliseconds>(steady_clock::now() - start).count()
+              << " ms" << std::endl;
 }
 
 void SyncTask::removeTrashedFiles() {
@@ -97,7 +104,7 @@ void SyncTask::removeTrashedFiles() {
 void SyncTask::processFutures() {
     for (auto& f : futures_)
         if (std::get<bool>(f.get()) == false)
-            std::cerr << "[SafeSyncTask] A file sync task failed.\n";
+            std::cerr << "[SafeSyncTask] A file sync task failed." << std::endl;
     futures_.clear();
 }
 
@@ -158,4 +165,3 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::symmetric_dif
 void SyncTask::interrupt() { interruptFlag_.store(true); }
 bool SyncTask::isInterrupted() const { return interruptFlag_.load(); }
 void SyncTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
-

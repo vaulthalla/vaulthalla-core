@@ -15,13 +15,13 @@ public:
     void shutdown();
 
     std::shared_ptr<ThreadPool>& syncPool();
-    std::shared_ptr<ThreadPool>& cloudPool();
     std::shared_ptr<ThreadPool>& thumbPool();
+    std::shared_ptr<ThreadPool>& httpPool();
 
 private:
     std::shared_ptr<ThreadPool> sync_;
-    std::shared_ptr<ThreadPool> cloud_;
     std::shared_ptr<ThreadPool> thumb_;
+    std::shared_ptr<ThreadPool> http_;
     std::atomic<bool> stopFlag_{false};
 };
 

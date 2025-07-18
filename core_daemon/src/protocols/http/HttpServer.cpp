@@ -2,9 +2,13 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
 #include "services/ServiceManager.hpp"
+#include "concurrency/protocol/HttpSessionTask.hpp"
+#include "concurrency/ThreadPool.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 
 #include <iostream>
-#include <thread>
+
+using namespace vh::concurrency;
 
 namespace vh::http {
 
@@ -33,9 +37,10 @@ void HttpServer::run() {
 void HttpServer::do_accept() {
     acceptor_.async_accept(socket_, [self = shared_from_this()](beast::error_code ec) mutable {
         if (!ec) {
-            std::make_shared<HttpSession>(
+            auto session = std::make_shared<HttpSession>(
                 std::move(self->socket_), self->router_, self->authManager_, self->storageManager_
-            )->run();
+            );
+            ThreadPoolRegistry::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
         }
         self->do_accept();
     });

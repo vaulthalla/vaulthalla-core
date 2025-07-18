@@ -53,7 +53,7 @@ void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
     std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
 }
 
-void SyncController::interruptTask(unsigned int vaultId) {
+void SyncController::interruptTask(const unsigned int vaultId) {
     std::scoped_lock lock(taskMapMutex_, pqMutex_);
 
     if (!taskMap_.contains(vaultId)) {

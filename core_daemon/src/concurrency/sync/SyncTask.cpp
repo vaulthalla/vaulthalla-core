@@ -97,10 +97,7 @@ void SyncTask::operator()() {
 void SyncTask::removeTrashedFiles() {
     const auto files = database::FileQueries::listTrashedFiles(vaultId());
     futures_.reserve(files.size());
-    std::cout << "[SyncWorker] Removing " << files.size() << " trashed files from vault ID: " << vaultId() << std::endl;
-
     for (const auto& file : files) remove(file);
-
     processFutures();
 }
 

@@ -80,6 +80,7 @@ void SyncController::run() {
 
         if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
             std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
+            refreshEngines();
             lastRefresh = std::chrono::system_clock::now();
         }
 
@@ -90,8 +91,7 @@ void SyncController::run() {
         }
 
         if (pqIsEmpty) {
-            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(30));
-            std::cout << "[SyncController] No sync tasks available." << std::endl;
+            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(3));
             refreshEngines();
             continue;
         }
@@ -107,8 +107,11 @@ void SyncController::run() {
 
         if (!task || task->isInterrupted()) continue;
 
-        if (task->next_run > std::chrono::system_clock::now()) std::this_thread::sleep_for(std::chrono::seconds(3));
-        else pool_->submit(task);
+        if (task->next_run <= std::chrono::system_clock::now()) pool_->submit(task);
+        else {
+            std::scoped_lock lock(pqMutex_);
+            pq.push(task);
+        }
     }
 }
 

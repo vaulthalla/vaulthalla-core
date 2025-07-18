@@ -200,21 +200,73 @@ CREATE TABLE file_search_index
     search_vector tsvector
 );
 
--- Indexes for performance optimization
+-- ===============================
+-- 🔧 Performance Optimization
+-- ===============================
 CREATE INDEX idx_files_path ON files (path);
 CREATE INDEX idx_directories_path ON directories (path);
 
--- Indexes for text pattern matching
+-- ===============================
+-- 🔎 Text Pattern Matching (prefix LIKE)
+-- ===============================
 CREATE INDEX idx_files_path_pattern ON files (path text_pattern_ops);
 CREATE INDEX idx_directories_path_pattern ON directories (path text_pattern_ops);
 
--- Indexes for cache_index
-CREATE INDEX idx_cache_index_size ON cache_index(size DESC);
-CREATE INDEX idx_cache_index_vault_type_size ON cache_index(vault_id, type, size DESC);
+-- ===============================
+-- 📁 Composite Indexes for Directory Scans
+-- ===============================
+CREATE INDEX idx_directories_vault_path_trash
+    ON directories (vault_id, path text_pattern_ops, is_trashed)
+    WHERE path != '/';
 
--- Full-text search index
-CREATE INDEX file_search_vector_idx ON file_search_index USING GIN (search_vector);
+-- ===============================
+-- 🗑️ Partial Indexes for Trashed Views
+-- ===============================
+CREATE INDEX idx_files_vault_trashed
+    ON files (vault_id)
+    WHERE is_trashed = TRUE;
 
--- Indexes for file_xattrs
-CREATE INDEX idx_file_xattrs_file_id ON file_xattrs (file_id);
-CREATE INDEX idx_file_xattrs_key ON file_xattrs (key);
+CREATE INDEX idx_dirs_vault_trashed
+    ON directories (vault_id)
+    WHERE is_trashed = TRUE;
+
+-- For path listing on trashed items (e.g. preview/restore UI)
+CREATE INDEX idx_files_path_trashed
+    ON files (path text_pattern_ops)
+    WHERE is_trashed = TRUE;
+
+CREATE INDEX idx_dirs_path_trashed
+    ON directories (path text_pattern_ops)
+    WHERE is_trashed = TRUE;
+
+-- ===============================
+-- ⚡ Cache Indexes
+-- ===============================
+CREATE INDEX idx_cache_index_size
+    ON cache_index(size DESC);
+
+CREATE INDEX idx_cache_index_vault_type_size
+    ON cache_index(vault_id, type, size DESC);
+
+-- ===============================
+-- 🧠 Full-text Search
+-- ===============================
+CREATE INDEX file_search_vector_idx
+    ON file_search_index
+    USING GIN (search_vector);
+
+-- ===============================
+-- 🧬 XAttr Lookups
+-- ===============================
+CREATE INDEX idx_file_xattrs_file_id
+    ON file_xattrs (file_id);
+
+CREATE INDEX idx_file_xattrs_key
+    ON file_xattrs (key);
+
+-- ===============================
+-- 🔍 Optional: Deep LIKE search (enable pg_trgm first)
+-- ===============================
+-- CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- CREATE INDEX idx_files_path_trgm ON files USING gin (path gin_trgm_ops);
+-- CREATE INDEX idx_directories_path_trgm ON directories USING gin (path gin_trgm_ops);

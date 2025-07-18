@@ -20,6 +20,7 @@ using namespace vh::database;
 
 void CacheSyncTask::sync() {
     for (const auto& file : localFiles_) {
+        const auto strippedPath = stripLeadingSlash(file->path);
         const auto match = s3Map_.find(stripLeadingSlash(file->path));
 
         if (match == s3Map_.end()) {
@@ -31,20 +32,16 @@ void CacheSyncTask::sync() {
         const auto rFile = match->second;
         const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
 
-        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
+        if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
             continue;
         }
 
-        {
-            std::unique_lock lock(engine_->mutex_);
+        if (file->updated_at <= rFile->updated_at) {
             ensureFreeSpace(rFile->size_bytes);
-
-            if (file->updated_at <= rFile->updated_at) {
-                download(file);
-                s3Map_.erase(match);
-                continue;
-            }
+            download(file);
+            s3Map_.erase(match);
+            continue;
         }
 
         std::cout << "[CacheSyncTask][1/2] Local file is newer than remote copy: " << file->path << "\n"

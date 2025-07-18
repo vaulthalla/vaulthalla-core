@@ -58,6 +58,7 @@ protected:
     std::vector<std::future<ExpectedFuture>> futures_;
     std::vector<std::shared_ptr<types::File>> localFiles_, s3Files_;
     std::unordered_map<std::u8string, std::shared_ptr<types::File>> localMap_, s3Map_;
+    std::unordered_map<std::u8string, std::optional<std::string>> remoteHashMap_;
     bool isRunning_ = false;
     std::atomic<bool> interruptFlag_{false};
 
@@ -78,6 +79,10 @@ protected:
 
     static std::vector<std::shared_ptr<types::File>> uMap2Vector(
         std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map);
+
+    static std::unordered_map<std::u8string, std::shared_ptr<types::File>> intersect(
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& a,
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& b);
 
     static std::unordered_map<std::u8string, std::shared_ptr<types::File> > symmetric_diff(
         const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& a,

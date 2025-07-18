@@ -12,8 +12,10 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
+#include "shared_util/u8.hpp"
 
 #include <iostream>
+#include <utility>
 
 using namespace vh::concurrency;
 using namespace vh::types;
@@ -60,6 +62,10 @@ void SyncTask::operator()() {
         localFiles_ = database::FileQueries::listFilesInDir(engine_->vaultId());
         localMap_ = groupEntriesByPath(localFiles_);
 
+        for (const auto& [path, entry] : intersect(s3Map_, localMap_))
+            remoteHashMap_.insert({entry->path.u8string(), engine_->getRemoteContentHash(entry->path)});
+
+
         futures_.clear();
 
         sync();
@@ -74,6 +80,7 @@ void SyncTask::operator()() {
         s3Files_.clear();
         s3Map_.clear();
         localMap_.clear();
+        remoteHashMap_.clear();
 
         controller_->requeue(shared_from_this());
         isRunning_ = false;
@@ -158,6 +165,16 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::symmetric_dif
 
     for (const auto& item : a) if (!b.contains(item.first)) result.insert(item);
     for (const auto& item : b) if (!a.contains(item.first)) result.insert(item);
+
+    return result;
+}
+
+std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::intersect(
+    const std::unordered_map<std::u8string, std::shared_ptr<File> >& a,
+    const std::unordered_map<std::u8string, std::shared_ptr<File> >& b) {
+    std::unordered_map<std::u8string, std::shared_ptr<File>> result;
+
+    for (const auto& item : a) if (b.contains(item.first)) result.insert(item);
 
     return result;
 }

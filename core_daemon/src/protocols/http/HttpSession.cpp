@@ -42,9 +42,10 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
         return;
     }
 
-    std::cout << "[HttpSession] Async request: " << req_.target() << std::endl;
+    // TODO: Add more robust and efficient logging
+    // std::cout << "[HttpSession] Async request: " << req_.target() << std::endl;
 
-    auto self = shared_from_this();  // 🔧 define it once here
+    auto self = shared_from_this();
 
     try {
         auto res = router_->route(std::move(req_));

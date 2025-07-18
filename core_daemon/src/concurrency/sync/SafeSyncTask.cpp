@@ -27,15 +27,12 @@ void SafeSyncTask::sync() {
             continue;
         }
 
-        const auto rFile = match->second;
-        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
-
-        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
+        if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
             continue;
         }
 
-        if (file->updated_at <= rFile->updated_at) download(file);
+        if (file->updated_at <= match->second->updated_at) download(file);
         else upload(file);
 
         s3Map_.erase(match);

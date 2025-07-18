@@ -24,17 +24,15 @@ void MirrorSyncTask::sync() {
 
 void MirrorSyncTask::syncKeepLocal() {
     for (const auto& file : localFiles_) {
-        const auto match = s3Map_.find(stripLeadingSlash(file->path));
+        const auto strippedPath = stripLeadingSlash(file->path);
+        const auto match = s3Map_.find(strippedPath);
 
         if (match == s3Map_.end()) {
             upload(file);
             continue;
         }
 
-        const auto rFile = match->second;
-        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
-
-        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
+        if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
             continue;
         }

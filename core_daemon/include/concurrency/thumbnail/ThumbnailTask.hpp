@@ -17,10 +17,10 @@ namespace vh::concurrency {
 
 class ThumbnailTask : public Task {
 public:
-    ThumbnailTask(std::shared_ptr<const storage::StorageEngine> engine,
-                  std::string buffer,
-                  std::shared_ptr<types::File> file)
-        : engine_(std::move(engine)), buffer_(std::move(buffer)), file_(std::move(file)) {}
+    ThumbnailTask(const std::shared_ptr<const storage::StorageEngine>& engine,
+                  const std::string& buffer,
+                  const std::shared_ptr<types::File>& file)
+        : engine_(engine), buffer_(buffer), file_(file) {}
 
     void operator()() override {
         namespace fs = std::filesystem;
@@ -29,15 +29,16 @@ public:
             const auto& sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
             for (const auto& size : sizes) {
                 fs::path cachePath = engine_->getAbsoluteCachePath(file_->path, fs::path("thumbnails") / std::to_string(size));
-                if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") {
-                    cachePath += ".jpg";
+                if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath += ".jpg";
+
+                if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
+
+                if (!file_->mime_type || file_->mime_type->empty()) {
+                    std::cerr << "Thumbnail has no mime_type" << std::endl;
+                    return;
                 }
 
-                if (!fs::exists(cachePath.parent_path())) {
-                    fs::create_directories(cachePath.parent_path());
-                }
-
-                util::generateAndStoreThumbnail(buffer_, cachePath, file_->mime_type, size);
+                util::generateAndStoreThumbnail(buffer_, cachePath, *file_->mime_type, size);
 
                 auto index = std::make_shared<types::CacheIndex>();
                 index->vault_id = engine_->vaultId();

@@ -43,13 +43,13 @@ void SyncTask::operator()() {
         database::SyncQueries::reportSyncStarted(engine_->sync->id);
 
         if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
-            auto dir = std::make_shared<Directory>();
+            const auto dir = std::make_shared<Directory>();
             dir->vault_id = engine_->vault_->id;
             dir->name = "/";
             dir->path = "/";
             dir->created_by = dir->last_modified_by = engine_->vault_->owner_id;
             dir->parent_id = std::nullopt;
-            database::DirectoryQueries::addDirectory(dir);
+            database::DirectoryQueries::upsertDirectory(dir);
         }
 
         removeTrashedFiles();
@@ -94,9 +94,6 @@ void SyncTask::removeTrashedFiles() {
     std::cout << "[SyncWorker] Removing " << files.size() << " trashed files from vault ID: " << vaultId() << std::endl;
 
     for (const auto& file : files) remove(file);
-
-    for (const auto& dir : database::DirectoryQueries::listTrashedDirs(vaultId()))
-        database::DirectoryQueries::deleteDirectory(dir->id);
 
     processFutures();
 }

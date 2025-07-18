@@ -29,8 +29,9 @@ void CacheSyncTask::sync() {
         }
 
         const auto rFile = match->second;
+        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
 
-        if (file->content_hash == engine_->getRemoteContentHash(rFile->path)) {
+        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
             s3Map_.erase(match);
             continue;
         }
@@ -59,7 +60,7 @@ void CacheSyncTask::sync() {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());
-            DirectoryQueries::addDirectory(dir);
+            DirectoryQueries::upsertDirectory(dir);
         }
     }
 

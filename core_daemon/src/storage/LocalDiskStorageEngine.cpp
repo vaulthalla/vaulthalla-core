@@ -100,7 +100,7 @@ void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path, c
     if (std::filesystem::exists(absPath)) {
         std::filesystem::remove(absPath);
         purgeThumbnails(rel_path);
-        database::FileQueries::deleteFile(vault_->id, rel_path);
+        database::FileQueries::deleteFile(userId, vault_->id, rel_path);
     }
 }
 
@@ -111,7 +111,7 @@ void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_pa
         if (std::filesystem::is_regular_file(absPath)) {
             std::filesystem::remove(absPath);
             purgeThumbnails(entry.path());
-            database::FileQueries::deleteFile(vault_->id, rel_path);
+            database::FileQueries::deleteFile(userId, vault_->id, rel_path);
         }
     }
 

@@ -168,7 +168,7 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
                 vaultId, std::filesystem::path(relPath).parent_path());
 
         std::lock_guard lock(mountsMutex_);
-        DirectoryQueries::addDirectory(d);
+        DirectoryQueries::upsertDirectory(d);
     } else {
         throw std::runtime_error("Unsupported storage engine type for mkdir operation");
     }

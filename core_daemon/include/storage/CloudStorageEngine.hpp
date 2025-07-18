@@ -61,9 +61,7 @@ public:
     [[nodiscard]] bool isFile(const fs::path& rel_path) const override;
 
     void uploadFile(const std::filesystem::path& rel_path) const;
-    void uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const;
     std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
-    std::shared_ptr<types::CacheIndex> cacheFile(const std::filesystem::path& rel_path);
     void indexAndDeleteFile(const std::filesystem::path& rel_path);
 
     [[nodiscard]] std::string getRemoteContentHash(const std::filesystem::path& rel_path) const;

@@ -1,24 +1,21 @@
-CREATE TABLE directories
+CREATE TABLE fs_entry
 (
     id               SERIAL PRIMARY KEY,
     vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
-    parent_id        INTEGER REFERENCES directories (id) ON DELETE CASCADE,
+    parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
     path             TEXT         NOT NULL, -- Full path for easy access
-    is_trashed       BOOLEAN   DEFAULT FALSE,
-    trashed_at       TIMESTAMP DEFAULT NULL,
-    trashed_by       INTEGER REFERENCES users (id),
 
     UNIQUE (vault_id, parent_id, name)
 );
 
-CREATE TABLE directory_stats
+CREATE TABLE directories
 (
-    directory_id       INTEGER PRIMARY KEY REFERENCES directories (id) ON DELETE CASCADE,
+    fs_entry_id        INTEGER PRIMARY KEY REFERENCES fs_entry (id) ON DELETE CASCADE,
     file_count         INTEGER   DEFAULT 0,
     subdirectory_count INTEGER   DEFAULT 0, -- Count of immediate subdirectories
     size_bytes         BIGINT    DEFAULT 0, -- Total size of all files in this directory
@@ -27,50 +24,51 @@ CREATE TABLE directory_stats
 
 CREATE TABLE files
 (
-    id               SERIAL PRIMARY KEY,
-    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
-    parent_id        INTEGER REFERENCES directories (id) ON DELETE CASCADE,
+    fs_entry_id  INTEGER PRIMARY KEY REFERENCES fs_entry (id) ON DELETE CASCADE,
+    size_bytes   BIGINT DEFAULT 0,
+    mime_type    VARCHAR(255),
+    content_hash VARCHAR(128)
+);
+
+CREATE TABLE files_trashed
+(
+    fs_entry_id      INTEGER, -- from fs_entry.id, no FK
+    vault_id         INTEGER, -- from fs_entry.vault_id, no FK
+    parent_id        INTEGER, -- from fs_entry.parent_id, no FK
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at       TIMESTAMP,
+    updated_at       TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
+    path             TEXT         NOT NULL,
+
     size_bytes       BIGINT    DEFAULT 0,
     mime_type        VARCHAR(255),
-    content_hash     VARCHAR(128),          -- optional: for dedup, integrity
-    path             TEXT         NOT NULL, -- Full path for easy access
-    is_trashed       BOOLEAN   DEFAULT FALSE,
-    trashed_at       TIMESTAMP DEFAULT NULL,
-    trashed_by       INTEGER REFERENCES users (id),
+    content_hash     VARCHAR(128),
 
-    UNIQUE (vault_id, parent_id, name)
+    trashed_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    trashed_by       INTEGER REFERENCES users (id),
+    deleted_at       TIMESTAMP -- NULL if not permanently deleted
 );
 
 CREATE TABLE cache_index
 (
     id            SERIAL PRIMARY KEY,
     vault_id      INTEGER     NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    file_id       INTEGER     NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+    file_id       INTEGER     NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     path          TEXT        NOT NULL, -- relative path inside cache
     type          VARCHAR(12) NOT NULL CHECK (type IN ('thumbnail', 'file')),
     size          BIGINT      NOT NULL,
     last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE (vault_id, path, type)  -- Ensure no duplicate entries for same vault, path, and type
-);
-
-CREATE TABLE files_trashed
-(
-    LIKE files INCLUDING ALL,
-    trashed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    trashed_by INTEGER REFERENCES users (id)
+    UNIQUE (vault_id, path, type)       -- Ensure no duplicate entries for same vault, path, and type
 );
 
 CREATE TABLE file_xattrs
 (
     id         SERIAL PRIMARY KEY,
-    file_id    INTEGER      NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+    file_id    INTEGER      NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     namespace  VARCHAR(64)  NOT NULL DEFAULT 'user',
     key        VARCHAR(255) NOT NULL,
     value      BYTEA        NOT NULL, -- Store as raw bytes (can be stringified at API layer)
@@ -83,7 +81,7 @@ CREATE TABLE file_xattrs
 CREATE TABLE file_versions
 (
     id             SERIAL PRIMARY KEY,
-    file_id        INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    file_id        INTEGER REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     version_number INTEGER      NOT NULL,
     content_hash   VARCHAR(128) NOT NULL,
     size_bytes     BIGINT       NOT NULL,
@@ -99,7 +97,7 @@ CREATE TYPE file_metadata_type AS ENUM ('string', 'integer', 'boolean', 'timesta
 CREATE TABLE file_metadata
 (
     id         SERIAL PRIMARY KEY,
-    file_id    INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    file_id    INTEGER REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     key        VARCHAR(255)       NOT NULL,
     type       file_metadata_type NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -139,7 +137,7 @@ CREATE TABLE file_metadata_float
 
 CREATE TABLE file_locks
 (
-    file_id    INTEGER PRIMARY KEY REFERENCES files (id) ON DELETE CASCADE,
+    file_id    INTEGER PRIMARY KEY REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     locked_by  INTEGER REFERENCES users (id),
     locked_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP
@@ -163,7 +161,7 @@ CREATE TABLE audit_log
     id             SERIAL PRIMARY KEY,
     user_id        INTEGER REFERENCES users (id),
     action         VARCHAR(100) NOT NULL,
-    target_file_id INTEGER REFERENCES files (id),
+    target_file_id INTEGER REFERENCES files (fs_entry_id),
     timestamp      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ip_address     VARCHAR(50),
     user_agent     TEXT
@@ -172,7 +170,7 @@ CREATE TABLE audit_log
 CREATE TABLE file_activity
 (
     id        SERIAL PRIMARY KEY,
-    file_id   INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    file_id   INTEGER REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     user_id   INTEGER REFERENCES users (id),
     action    VARCHAR(100) NOT NULL, -- 'upload', 'download', 'rename', 'move', etc.
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -188,7 +186,7 @@ CREATE TABLE file_tags
 
 CREATE TABLE file_tag_assignments
 (
-    file_id     INTEGER REFERENCES files (id) ON DELETE CASCADE,
+    file_id     INTEGER REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     tag_id      INTEGER REFERENCES file_tags (id) ON DELETE CASCADE,
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (file_id, tag_id)
@@ -196,57 +194,39 @@ CREATE TABLE file_tag_assignments
 
 CREATE TABLE file_search_index
 (
-    file_id       INTEGER PRIMARY KEY REFERENCES files (id) ON DELETE CASCADE,
+    file_id       INTEGER PRIMARY KEY REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     search_vector tsvector
 );
 
 -- ===============================
--- 🔧 Performance Optimization
+-- 🔧 FS Entry Optimization
 -- ===============================
-CREATE INDEX idx_files_path ON files (path);
-CREATE INDEX idx_directories_path ON directories (path);
+-- Fast lookup by vault and full path (e.g. for resolving UI paths)
+CREATE INDEX idx_fs_entry_vault_path
+    ON fs_entry (vault_id, path text_pattern_ops);
+
+-- Fast lookup of direct children within a directory
+CREATE INDEX idx_fs_entry_parent
+    ON fs_entry (parent_id);
 
 -- ===============================
--- 🔎 Text Pattern Matching (prefix LIKE)
+-- 🗑️ Trashed Files Optimization
 -- ===============================
-CREATE INDEX idx_files_path_pattern ON files (path text_pattern_ops);
-CREATE INDEX idx_directories_path_pattern ON directories (path text_pattern_ops);
+-- Index to efficiently fetch trashed files by vault
+CREATE INDEX idx_files_trashed_vault
+    ON files (fs_entry_id) WHERE is_trashed = TRUE;
 
--- ===============================
--- 📁 Composite Indexes for Directory Scans
--- ===============================
-CREATE INDEX idx_directories_vault_path_trash
-    ON directories (vault_id, path text_pattern_ops, is_trashed)
-    WHERE path != '/';
-
--- ===============================
--- 🗑️ Partial Indexes for Trashed Views
--- ===============================
-CREATE INDEX idx_files_vault_trashed
-    ON files (vault_id)
-    WHERE is_trashed = TRUE;
-
-CREATE INDEX idx_dirs_vault_trashed
-    ON directories (vault_id)
-    WHERE is_trashed = TRUE;
-
--- For path listing on trashed items (e.g. preview/restore UI)
-CREATE INDEX idx_files_path_trashed
-    ON files (path text_pattern_ops)
-    WHERE is_trashed = TRUE;
-
-CREATE INDEX idx_dirs_path_trashed
-    ON directories (path text_pattern_ops)
-    WHERE is_trashed = TRUE;
+-- If you commonly JOIN to fs_entry to get vault_id, consider:
+-- CREATE INDEX idx_files_trashed_including_fs_entry ON files (is_trashed) INCLUDE (fs_entry_id);
 
 -- ===============================
 -- ⚡ Cache Indexes
 -- ===============================
 CREATE INDEX idx_cache_index_size
-    ON cache_index(size DESC);
+    ON cache_index (size DESC);
 
 CREATE INDEX idx_cache_index_vault_type_size
-    ON cache_index(vault_id, type, size DESC);
+    ON cache_index (vault_id, type, size DESC);
 
 -- ===============================
 -- 🧠 Full-text Search
@@ -265,8 +245,13 @@ CREATE INDEX idx_file_xattrs_key
     ON file_xattrs (key);
 
 -- ===============================
--- 🔍 Optional: Deep LIKE search (enable pg_trgm first)
+-- 📁 Metadata Lookups
+-- ===============================
+CREATE INDEX idx_file_metadata_key
+    ON file_metadata (key);
+
+-- ===============================
+-- 🔍 Optional: Deep LIKE (pg_trgm)
 -- ===============================
 -- CREATE EXTENSION IF NOT EXISTS pg_trgm;
--- CREATE INDEX idx_files_path_trgm ON files USING gin (path gin_trgm_ops);
--- CREATE INDEX idx_directories_path_trgm ON directories USING gin (path gin_trgm_ops);
+-- CREATE INDEX idx_fs_entry_path_trgm ON fs_entry USING gin (path gin_trgm_ops);

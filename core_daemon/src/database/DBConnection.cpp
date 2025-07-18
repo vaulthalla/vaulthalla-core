@@ -22,6 +22,7 @@ void DBConnection::initPrepared() const {
 
     initPreparedUsers();
     initPreparedVaults();
+    initPreparedFsEntries();
     initPreparedFiles();
     initPreparedDirectories();
     initPreparedRoles();
@@ -136,107 +137,220 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 }
 
-void DBConnection::initPreparedFiles() const {
-    conn_->prepare("upsert_file",
-                   "INSERT INTO files (vault_id, parent_id, name, created_by, last_modified_by, size_bytes, "
-                   "mime_type, content_hash, path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
+void DBConnection::initPreparedFsEntries() const {
+    conn_->prepare("delete_fs_entry", "DELETE FROM fs_entry WHERE id = $1");
+
+    conn_->prepare("delete_fs_entry_by_path", "DELETE FROM fs_entry WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("upsert_fs_entry",
+                   "INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path) "
+                   "VALUES ($1, $2, $3, $4, $5, $6) "
                    "ON CONFLICT (vault_id, parent_id, name) DO UPDATE SET "
                    "updated_at = NOW(), "
                    "last_modified_by = EXCLUDED.last_modified_by, "
+                   "path = EXCLUDED.path "
+                   "RETURNING id");
+
+    conn_->prepare("get_fs_entry_parent_id", "SELECT parent_id FROM fs_entry WHERE id = $1");
+
+    conn_->prepare("get_fs_entry_id_by_path", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = $2");
+}
+
+
+void DBConnection::initPreparedFiles() const {
+    conn_->prepare("upsert_file_by_entry_id",
+                   "INSERT INTO files (fs_entry_id, size_bytes, mime_type, content_hash) "
+                   "VALUES ($1, $2, $3, $4) "
+                   "ON CONFLICT (fs_entry_id) DO UPDATE SET "
                    "size_bytes = EXCLUDED.size_bytes, "
                    "mime_type = EXCLUDED.mime_type, "
-                   "content_hash = EXCLUDED.content_hash, "
-                   "path = EXCLUDED.path "
-                   "RETURNING files.id");
+                   "content_hash = EXCLUDED.content_hash");
 
-    conn_->prepare("delete_file", "DELETE FROM files WHERE id = $1");
+    conn_->prepare("upsert_file_full",
+                   "WITH upsert_entry AS ("
+                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path) "
+                   "  VALUES ($1, $2, $3, $4, $5, $6) "
+                   "  ON CONFLICT (vault_id, parent_id, name) DO UPDATE SET "
+                   "    updated_at = NOW(), "
+                   "    last_modified_by = EXCLUDED.last_modified_by, "
+                   "    path = EXCLUDED.path "
+                   "  RETURNING id"
+                   ") "
+                   "INSERT INTO files (fs_entry_id, size_bytes, mime_type, content_hash) "
+                   "SELECT id, $7, $8, $9 FROM upsert_entry "
+                   "ON CONFLICT (fs_entry_id) DO UPDATE SET "
+                   "  size_bytes = EXCLUDED.size_bytes, "
+                   "  mime_type = EXCLUDED.mime_type, "
+                   "  content_hash = EXCLUDED.content_hash "
+                   "RETURNING fs_entry_id");
 
-    conn_->prepare("delete_file_by_vault_and_path", "DELETE FROM files WHERE vault_id = $1 AND path = $2");
-
-    conn_->prepare("get_file_mime_type", "SELECT mime_type FROM files WHERE vault_id = $1 AND path = $2");
+    conn_->prepare("get_file_mime_type",
+                   "SELECT f.mime_type FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 
     conn_->prepare("mark_file_trashed",
-                   "UPDATE files SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $3 "
-                   "WHERE vault_id = $1 AND path = $2");
+                   "WITH target AS ("
+                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, "
+                   "         fs.vault_id, fs.parent_id, fs.name, fs.created_by, fs.created_at, "
+                   "         fs.updated_at, fs.last_modified_by, fs.path "
+                   "  FROM files f "
+                   "  JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "  WHERE fs.vault_id = $1 AND fs.path = $2"
+                   "), moved AS ("
+                   "  INSERT INTO files_trashed ("
+                   "    fs_entry_id, size_bytes, mime_type, content_hash, trashed_at, trashed_by, "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path"
+                   "  ) "
+                   "  SELECT "
+                   "    fs_entry_id, size_bytes, mime_type, content_hash, NOW(), $3, "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path "
+                   "  FROM target"
+                   "), removed AS ("
+                   "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
+                   ") "
+                   "DELETE FROM fs_entry WHERE id IN (SELECT fs_entry_id FROM target);"
+        );
 
     conn_->prepare("mark_file_trashed_by_id",
-                   "UPDATE files SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $2 "
-                   "WHERE id = $1");
+                   "WITH target AS ("
+                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, "
+                   "         fs.vault_id, fs.parent_id, fs.name, fs.created_by, fs.created_at, "
+                   "         fs.updated_at, fs.last_modified_by, fs.path "
+                   "  FROM files f "
+                   "  JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "  WHERE f.fs_entry_id = $1"
+                   "), moved AS ("
+                   "  INSERT INTO files_trashed ("
+                   "    fs_entry_id, size_bytes, mime_type, content_hash, trashed_at, trashed_by, "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path"
+                   "  ) "
+                   "  SELECT "
+                   "    fs_entry_id, size_bytes, mime_type, content_hash, NOW(), $2, "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path "
+                   "  FROM target"
+                   "), removed AS ("
+                   "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
+                   ") "
+                   "DELETE FROM fs_entry WHERE id IN (SELECT fs_entry_id FROM target);"
+        );
 
-    conn_->prepare("list_trashed_files", "SELECT * FROM files WHERE vault_id = $1 AND is_trashed = TRUE");
+    conn_->prepare("list_trashed_files",
+        "SELECT *, fs_entry_id as id FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
+
+    conn_->prepare("mark_trashed_file_deleted",
+                   "UPDATE files_trashed SET deleted_at = NOW() "
+                   "WHERE fs_entry_id = $1 AND deleted_at IS NULL");
+
+    conn_->prepare("mark_trashed_file_deleted_by_path",
+        "UPDATE files_trashed SET deleted_at = NOW() "
+        "WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL");
 
     conn_->prepare("list_files_in_dir",
-                   "SELECT * FROM files "
-                   "WHERE vault_id = $1 AND path LIKE $2 AND path NOT LIKE $3 AND is_trashed = FALSE");
+                   "SELECT f.*, fs.* "
+                   "FROM fs_entry fs "
+                   "JOIN files f ON fs.id = f.fs_entry_id "
+                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2 AND fs.path NOT LIKE $3");
 
     conn_->prepare("list_files_in_dir_recursive",
-                   "SELECT * FROM files WHERE vault_id = $1 AND path LIKE $2 AND is_trashed = FALSE");
+                   "SELECT f.*, fs.* "
+                   "FROM fs_entry fs "
+                   "JOIN files f ON fs.id = f.fs_entry_id "
+                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
 
-    conn_->prepare("get_file_id_by_path", "SELECT id FROM files WHERE vault_id = $1 AND path = $2");
+    conn_->prepare("get_file_id_by_path",
+                   "SELECT fs.id "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("get_file_size_bytes", "SELECT size_bytes FROM files WHERE id = $1");
+    conn_->prepare("get_file_size_bytes", "SELECT size_bytes FROM files WHERE fs_entry_id = $1");
 
     conn_->prepare("get_file_parent_id_and_size",
-                   "SELECT parent_id, size_bytes FROM files WHERE id = $1");
+                   "SELECT fs.parent_id, f.size_bytes "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.id = $1");
 
     conn_->prepare("get_file_parent_id_and_size_by_path",
-                   "SELECT parent_id, size_bytes FROM files WHERE vault_id = $1 AND path = $2");
+                   "SELECT fs.parent_id, f.size_bytes "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("is_file", "SELECT EXISTS (SELECT 1 FROM files WHERE vault_id = $1 AND path = $2)");
+    conn_->prepare("is_file",
+                   "SELECT EXISTS (SELECT 1 FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2)");
+
+    conn_->prepare("is_file_trashed",
+        "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE fs_entry_id = $1 AND deleted_at IS NULL)");
+
+    conn_->prepare("is_file_trashed_by_path",
+        "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL)");
 }
 
 void DBConnection::initPreparedDirectories() const {
     conn_->prepare("update_dir_stats",
-                   "UPDATE directory_stats "
+                   "UPDATE directories "
                    "SET size_bytes = size_bytes + $2, file_count = file_count + $3, subdirectory_count = subdirectory_count + $4, "
                    "last_modified = NOW() "
-                   "WHERE directory_id = $1 RETURNING file_count");
+                   "WHERE fs_entry_id = $1 RETURNING file_count");
 
-    conn_->prepare("get_dir_parent_id", "SELECT parent_id FROM directories WHERE id = $1");
+    conn_->prepare("get_dir_file_count", "SELECT file_count FROM directories WHERE fs_entry_id = $1");
 
-    conn_->prepare("insert_directory",
-                   "INSERT INTO directories (vault_id, parent_id, name, created_by, last_modified_by, path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id");
+    conn_->prepare("delete_empty_dir",
+                   "DELETE FROM fs_entry f "
+                   "USING directories d "
+                   "WHERE f.id = d.fs_entry_id AND f.id = $1 AND d.file_count = 0 AND d.subdirectory_count = 0");
 
-    conn_->prepare("update_directory",
-                   "UPDATE directories SET vault_id = $2, parent_id = $3, name = $4, updated_at = NOW(), "
-                   "last_modified_by = $5, path = $6 WHERE id = $1");
-
-    conn_->prepare("mark_dir_trashed",
-                   "UPDATE directories SET is_trashed = TRUE, trashed_at = NOW(), trashed_by = $3 "
-                   "WHERE vault_id = $1 AND path = $2");
-
-    conn_->prepare("list_trashed_dirs",
-                   "SELECT d.*, ds.* "
-                   "FROM directories d "
-                   "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.is_trashed = TRUE");
-
-    conn_->prepare("insert_dir_stats",
-                   "INSERT INTO directory_stats (directory_id, size_bytes, file_count, subdirectory_count, last_modified) "
-                   "VALUES ($1, $2, $3, $4, NOW())");
-
-    conn_->prepare("delete_directory", "DELETE FROM directories WHERE id = $1");
-
-    conn_->prepare("delete_directory_by_vault_and_path", "DELETE FROM directories WHERE vault_id = $1 AND path = $2");
+    conn_->prepare("upsert_directory",
+                   "WITH inserted AS ( "
+                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path) "
+                   "  VALUES ($1, $2, $3, $4, $5, $6) "
+                   "  ON CONFLICT (vault_id, parent_id, name) "
+                   "  DO UPDATE SET "
+                   "    vault_id = EXCLUDED.vault_id, "
+                   "    parent_id = EXCLUDED.parent_id, "
+                   "    name = EXCLUDED.name, "
+                   "    updated_at = NOW(), "
+                   "    last_modified_by = EXCLUDED.last_modified_by, "
+                   "    path = EXCLUDED.path "
+                   "  RETURNING id "
+                   ") "
+                   "INSERT INTO directories (fs_entry_id, size_bytes, file_count, subdirectory_count, last_modified) "
+                   "SELECT id, $7, $8, $9, NOW() "
+                   "FROM inserted "
+                   "ON CONFLICT (fs_entry_id) "
+                   "DO UPDATE SET "
+                   "  size_bytes = EXCLUDED.size_bytes, "
+                   "  file_count = EXCLUDED.file_count, "
+                   "  subdirectory_count = EXCLUDED.subdirectory_count, "
+                   "  last_modified = NOW();"
+        );
 
     conn_->prepare("list_directories_in_dir",
-                   "SELECT d.*, ds.* "
-                   "FROM directories d "
-                   "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND d.path NOT LIKE $3 AND d.path != '/' AND is_trashed = FALSE");
+                   "SELECT fs.*, d.* "
+                   "FROM fs_entry fs "
+                   "JOIN directories d ON fs.id = d.fs_entry_id "
+                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2 AND fs.path NOT LIKE $3 AND fs.path != '/'");
 
     conn_->prepare("list_directories_in_dir_recursive",
-                   "SELECT d.*, ds.* FROM directories d "
-                   "JOIN directory_stats ds ON d.id = ds.directory_id "
-                   "WHERE d.vault_id = $1 AND d.path LIKE $2 AND is_trashed = FALSE");
+                   "SELECT fs.*, d.* "
+                   "FROM fs_entry fs "
+                   "JOIN directories d ON fs.id = d.fs_entry_id "
+                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
 
-    conn_->prepare("get_dir_by_path", "SELECT * FROM directories WHERE vault_id = $1 AND path = $2");
+    conn_->prepare("get_dir_by_path",
+                   "SELECT fs.*, d.* "
+                   "FROM fs_entry fs "
+                   "JOIN directories d ON fs.id = d.fs_entry_id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("get_directory_id_by_path", "SELECT id FROM directories WHERE vault_id = $1 AND path = $2");
-
-    conn_->prepare("is_directory", "SELECT EXISTS (SELECT 1 FROM directories WHERE vault_id = $1 AND path = $2)");
+    conn_->prepare("is_directory",
+                   "SELECT EXISTS (SELECT 1 FROM directories d "
+                   "JOIN fs_entry fs ON d.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2)");
 }
 
 void DBConnection::initPreparedRoles() const {

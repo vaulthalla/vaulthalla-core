@@ -42,11 +42,19 @@ AND NOT EXISTS (
   SELECT 1 FROM local WHERE vault_id = v.id
 );
 
--- Seed root directory for admin vault
-INSERT INTO directories (vault_id, name, path, parent_id, created_by, last_modified_by)
-VALUES (
-    (SELECT id FROM vault WHERE name = 'Default'), '/', '/', NULL,
-    (SELECT id FROM users WHERE name = 'admin'), (SELECT id FROM users WHERE name = 'admin')
+-- Seed root directory for admin vault, including directories table
+WITH inserted_fs_entry AS (
+    INSERT INTO fs_entry (vault_id, name, path, parent_id, created_by, last_modified_by)
+    VALUES (
+        (SELECT id FROM vault WHERE name = 'Default'),
+        '/', '/', NULL,
+        (SELECT id FROM users WHERE name = 'admin'),
+        (SELECT id FROM users WHERE name = 'admin')
     )
+    ON CONFLICT DO NOTHING
+    RETURNING id
+)
+INSERT INTO directories (fs_entry_id)
+SELECT id FROM inserted_fs_entry
 ON CONFLICT DO NOTHING;
 EOF

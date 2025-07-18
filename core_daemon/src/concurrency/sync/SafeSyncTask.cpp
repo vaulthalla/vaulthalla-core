@@ -20,28 +20,25 @@ using namespace vh::database;
 void SafeSyncTask::sync() {
     for (const auto& file : localFiles_) {
         const auto strippedPath = stripLeadingSlash(file->path);
-        auto matchIter = s3Map_.find(strippedPath);
+        auto match = s3Map_.find(strippedPath);
 
-        if (matchIter == s3Map_.end()) {
+        if (match == s3Map_.end()) {
             upload(file);
             continue;
         }
 
-        const auto& remoteFile = matchIter->second;
-        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(remoteFile->path));
+        const auto rFile = match->second;
+        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
 
-        if (remoteHash && file->content_hash == remoteHash) {
-            s3Map_.erase(matchIter);
+        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
+            s3Map_.erase(match);
             continue;
         }
 
-        if (file->updated_at <= remoteFile->updated_at) {
-            download(file);
-        } else {
-            upload(file);
-        }
+        if (file->updated_at <= rFile->updated_at) download(file);
+        else upload(file);
 
-        s3Map_.erase(matchIter);
+        s3Map_.erase(match);
     }
 
     processFutures();
@@ -51,7 +48,7 @@ void SafeSyncTask::sync() {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());
-            DirectoryQueries::addDirectory(dir);
+            DirectoryQueries::upsertDirectory(dir);
         }
     }
 

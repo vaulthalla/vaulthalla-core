@@ -32,8 +32,9 @@ void MirrorSyncTask::syncKeepLocal() {
         }
 
         const auto rFile = match->second;
+        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
 
-        if (file->content_hash == engine_->getRemoteContentHash(rFile->path)) {
+        if (file->content_hash && remoteHash && *file->content_hash == remoteHash) {
             s3Map_.erase(match);
             continue;
         }

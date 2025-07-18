@@ -10,7 +10,6 @@ namespace vh::types {
 struct FSEntry;
 struct File;
 struct Directory;
-struct DirectoryStats;
 }
 
 namespace vh::database {
@@ -19,13 +18,7 @@ class DirectoryQueries {
 public:
     DirectoryQueries() = default;
 
-    [[nodiscard]] static unsigned int addDirectory(const types::Directory& directory);
-
-    static void addDirectory(const std::shared_ptr<types::Directory>& directory);
-
-    static void updateDirectory(const std::shared_ptr<types::Directory>& directory);
-
-    static void updateDirectoryStats(const std::shared_ptr<types::Directory>& directory);
+    static void upsertDirectory(const std::shared_ptr<types::Directory>& directory);
 
     static void deleteDirectory(unsigned int directoryId);
 
@@ -39,18 +32,10 @@ public:
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);
 
-    static std::shared_ptr<types::Directory> getDirectory(unsigned int directoryId);
-
-    static std::shared_ptr<types::Directory> getDirectoryByPath(unsigned int vaultId, const std::filesystem::path& path);
-
     static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
 
     static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
                                                                  bool recursive = false);
-
-    static std::vector<std::shared_ptr<types::Directory>> listTrashedDirs(unsigned int vaultId);
-
-    static void markDirAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
 };
 
 } // namespace vh::database

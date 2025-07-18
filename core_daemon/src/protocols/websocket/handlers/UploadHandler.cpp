@@ -51,20 +51,18 @@ void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
             continue;  // directory already exists in DB
         }
 
-        types::Directory dir;
-        dir.vault_id = vaultId;
-        dir.name = part.string();
-        dir.created_by = user->id;
-        dir.last_modified_by = user->id;
-        dir.path = current.string();
-        dir.parent_id = parentId;
+        const auto dir = std::make_shared<types::Directory>();
+        dir->vault_id = vaultId;
+        dir->name = part.string();
+        dir->created_by = user->id;
+        dir->last_modified_by = user->id;
+        dir->path = current.string();
+        dir->parent_id = parentId;
+        dir->size_bytes = 0;
+        dir->file_count = 0;
+        dir->subdirectory_count = 0;
 
-        dir.stats = std::make_shared<types::DirectoryStats>();
-        dir.stats->size_bytes = 0;
-        dir.stats->file_count = 0;
-        dir.stats->subdirectory_count = 0;
-
-        parentId = database::DirectoryQueries::addDirectory(dir);
+        database::DirectoryQueries::upsertDirectory(dir);
     }
 }
 

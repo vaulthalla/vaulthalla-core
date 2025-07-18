@@ -144,7 +144,7 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
     for (const auto& [_, dir] : directories) dirList.push_back(dir);
 
     std::ranges::sort(dirList, [](const auto& a, const auto& b) {
-        return std::distance(a->u8_path.begin(), a->u8_path.end()) < std::distance(b->u8_path.begin(), b->u8_path.end());
+        return std::distance(a->path.begin(), a->path.end()) < std::distance(b->path.begin(), b->path.end());
     });
 
     ordered.insert(ordered.end(), dirList.begin(), dirList.end());

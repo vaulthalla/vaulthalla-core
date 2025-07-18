@@ -42,7 +42,7 @@ CREATE TABLE sync_conflicts
 (
     id          SERIAL PRIMARY KEY,
     sync_id     INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
-    file_id     INTEGER NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+    file_id     INTEGER NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
     conflict_type VARCHAR(12) DEFAULT 'content' CHECK (conflict_type IN ('content', 'metadata', 'both')),
     resolved_at TIMESTAMP DEFAULT NULL,
     resolution   VARCHAR(12) DEFAULT 'unresolved' CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote')),

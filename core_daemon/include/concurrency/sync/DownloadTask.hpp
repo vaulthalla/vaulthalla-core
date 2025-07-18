@@ -24,7 +24,7 @@ struct DownloadTask : PromisedTask {
     void operator()() override {
         try {
             if (freeAfterDownload) engine->indexAndDeleteFile(file->path);
-            else engine->cacheFile(file->path);
+            else engine->downloadFile(file->path);
             promise.set_value(true);
         } catch (const std::exception& e) {
             std::cerr << "[DownloadTask] Error: " << e.what() << " (path = " << file->path << ")\n";

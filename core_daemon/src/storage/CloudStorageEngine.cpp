@@ -68,12 +68,7 @@ void CloudStorageEngine::removeFile(const fs::path& rel_path, const unsigned int
 
 void CloudStorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) {
     for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
-        removeFile(file->path, userId);
-
-    for (const auto& dir : DirectoryQueries::listDirectoriesInDir(vault_->id, rel_path, true))
-        DirectoryQueries::markDirAsTrashed(userId, vault_->id, dir->path);
-
-    DirectoryQueries::markDirAsTrashed(userId, vaultId(), rel_path);
+        FileQueries::markFileAsTrashed(userId, file->id);
 }
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
@@ -84,7 +79,7 @@ void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
 void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) const {
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
     purgeThumbnails(path);
-    FileQueries::deleteFile(vault_->id, path);
+    FileQueries::deleteFile(vault_->owner_id, vault_->id, path);
     const auto absPath = getAbsolutePath(path);
     if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
 }
@@ -110,11 +105,6 @@ bool CloudStorageEngine::isFile(const std::filesystem::path& rel_path) const {
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
-    std::string buffer;
-    uploadFile(rel_path, buffer);
-}
-
-void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path, std::string& buffer) const {
     const auto absPath = getAbsolutePath(rel_path);
     if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
@@ -124,6 +114,7 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path, std::
     if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
     else s3Provider_->uploadLargeObject(stripLeadingSlash(rel_path), absPath);
 
+    std::string buffer;
     if (!s3Provider_->downloadToBuffer(s3Key, buffer))
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
 }
@@ -146,39 +137,14 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
 
     thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
 
-    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
+    if (file->content_hash) s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), *file->content_hash);
 
     return file;
 }
 
-std::shared_ptr<CacheIndex> CloudStorageEngine::cacheFile(const std::filesystem::path& rel_path) {
-    const auto buffer = downloadToBuffer(rel_path);
-    const auto cacheAbsPath = getAbsoluteCachePath(rel_path, {"files"});
-    writeFile(cacheAbsPath, buffer);
-
-    const auto file = createFile(rel_path, cacheAbsPath);
-    file->id = FileQueries::upsertFile(file);
-
-    thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
-
-    s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), file->content_hash);
-
-    const auto cacheIndex = std::make_shared<CacheIndex>();
-    cacheIndex->vault_id = vault_->id;
-    cacheIndex->path = getRelativeCachePath(cacheAbsPath);
-    cacheIndex->file_id = file->id;
-    cacheIndex->type = CacheIndex::Type::File;
-    cacheIndex->size = std::filesystem::file_size(cacheAbsPath);
-
-    CacheQueries::upsertCacheIndex(cacheIndex);
-
-    return CacheQueries::getCacheIndexByPath(vault_->id, cacheIndex->path);
-}
-
 void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_path) {
-    const auto index = cacheFile(rel_path);
+    const auto index = downloadFile(rel_path);
     std::filesystem::remove(getAbsoluteCachePath(index->path, {"files"}));
-    CacheQueries::deleteCacheIndex(index->id);
 }
 
 std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {

@@ -9,26 +9,8 @@
 
 using namespace vh::database;
 
-unsigned int DirectoryQueries::addDirectory(const types::Directory& directory) {
-    return Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
-        pqxx::params p;
-        p.append(directory.vault_id);
-        p.append(directory.parent_id);
-        p.append(directory.name);
-        p.append(directory.created_by);
-        p.append(directory.last_modified_by);
-        p.append(to_utf8_string(directory.path.u8string()));
 
-        const auto id = txn.exec_prepared("insert_directory", p).one_row()["id"].as<unsigned int>();
-
-        pqxx::params stats_params{id, 0, 0, 0}; // Initialize stats with zero values
-        txn.exec_prepared("insert_dir_stats", stats_params);
-
-        return id;
-    });
-}
-
-void DirectoryQueries::addDirectory(const std::shared_ptr<types::Directory>& directory) {
+void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
 
     Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
@@ -39,86 +21,30 @@ void DirectoryQueries::addDirectory(const std::shared_ptr<types::Directory>& dir
         p.append(directory->created_by);
         p.append(directory->last_modified_by);
         p.append(to_utf8_string(directory->path.u8string()));
+        p.append(directory->size_bytes);
+        p.append(directory->file_count);
+        p.append(directory->subdirectory_count);
 
-        const auto id = txn.exec_prepared("insert_directory", p).one_row()["id"].as<unsigned int>();
-
-        pqxx::params stats_params{id, 0, 0, 0}; // Initialize stats with zero values
-        txn.exec_prepared("insert_dir_stats", stats_params);
+        txn.exec_prepared("upsert_directory", p);
     });
 }
-
-
-void DirectoryQueries::updateDirectory(const std::shared_ptr<types::Directory>& directory) {
-    if (!directory) throw std::invalid_argument("Directory cannot be null");
-
-    Transactions::exec("DirectoryQueries::updateDirectory", [&](pqxx::work& txn) {
-        pqxx::params p;
-        p.append(directory->id);
-        p.append(directory->vault_id);
-        p.append(directory->parent_id);
-        p.append(directory->name);
-        p.append(directory->last_modified_by);
-        p.append(to_utf8_string(directory->path.u8string()));
-
-        txn.exec_prepared("update_directory", p);
-
-        pqxx::params stats_params;
-        stats_params.append(directory->id);
-        stats_params.append(directory->stats->size_bytes);
-        stats_params.append(directory->stats->file_count);
-        stats_params.append(directory->stats->subdirectory_count);
-
-        txn.exec_prepared("update_dir_stats", stats_params);
-    });
-}
-
-void DirectoryQueries::updateDirectoryStats(const std::shared_ptr<types::Directory>& directory) {
-    Transactions::exec("DirectoryQueries::updateDirectoryStats", [&](pqxx::work& txn) {
-        pqxx::params p;
-        p.append(directory->id);
-        p.append(directory->stats->size_bytes);
-        p.append(directory->stats->file_count);
-        p.append(directory->stats->subdirectory_count);
-
-        txn.exec_prepared("update_dir_stats", p);
-    });
-}
-
 
 void DirectoryQueries::deleteDirectory(const unsigned int directoryId) {
     Transactions::exec("DirectoryQueries::deleteDirectory", [&](pqxx::work& txn) {
-        txn.exec("DELETE FROM directories WHERE id = " + txn.quote(directoryId));
-        txn.exec("DELETE FROM directory_stats WHERE directory_id = " + txn.quote(directoryId));
+        txn.exec_prepared("delete_fs_entry", directoryId);
     });
 }
 
 void DirectoryQueries::deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("DirectoryQueries::deleteDirectoryByPath", [&](pqxx::work& txn) {
-        pqxx::params p{vaultId, relPath.string()};
-        if (txn.exec_prepared("delete_directory_by_vault_and_path", p).affected_rows() == 0)
-            throw std::runtime_error("No directory found for vault ID: " + std::to_string(vaultId) + " and path: " + relPath.string());
-    });
-}
-
-
-std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectory(const unsigned int directoryId) {
-    return Transactions::exec("DirectoryQueries::getDirectory", [&](pqxx::work& txn) -> std::shared_ptr<types::Directory> {
-        const auto row = txn.exec("SELECT * FROM directories WHERE id = " + txn.quote(directoryId)).one_row();
-        return std::make_shared<types::Directory>(row);
-    });
-}
-
-std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByPath(const unsigned int vaultId, const std::filesystem::path& path) {
-    return Transactions::exec("DirectoryQueries::getDirectoryByPath", [&](pqxx::work& txn) -> std::shared_ptr<types::Directory> {
-        const auto row = txn.exec_prepared("get_dir_by_path", pqxx::params{vaultId, path.string()}).one_row();
-        return std::make_shared<types::Directory>(row);
+        txn.exec_prepared("delete_fs_entry_by_path", pqxx::params{vaultId, relPath.string()});
     });
 }
 
 std::optional<unsigned int> DirectoryQueries::getDirectoryIdByPath(const unsigned int vaultId, const std::filesystem::path& path) {
     return Transactions::exec("DirectoryQueries::getDirectoryIdByPath", [&](pqxx::work& txn) -> std::optional<unsigned int> {
         pqxx::params p{vaultId, path.string()};
-        const auto res = txn.exec_prepared("get_directory_id_by_path", p);
+        const auto res = txn.exec_prepared("get_fs_entry_id_by_path", p);
         if (res.empty()) return std::nullopt;
         return res.one_row()["id"].as<unsigned int>();
     });
@@ -127,7 +53,7 @@ std::optional<unsigned int> DirectoryQueries::getDirectoryIdByPath(const unsigne
 unsigned int DirectoryQueries::getRootDirectoryId(const unsigned int vaultId) {
     return Transactions::exec("DirectoryQueries::getRootDirectoryId", [&](pqxx::work& txn) -> unsigned int {
         pqxx::params p{vaultId, "/"};
-        return txn.exec_prepared("get_directory_id_by_path", p).one_row()["id"].as<unsigned int>();
+        return txn.exec_prepared("get_fs_entry_id_by_path", p).one_row()["id"].as<unsigned int>();
     });
 }
 
@@ -138,7 +64,7 @@ bool DirectoryQueries::isDirectory(const unsigned int vaultId, const std::filesy
     });
 }
 
-bool DirectoryQueries::directoryExists(unsigned int vaultId, const std::filesystem::path& relPath) {
+bool DirectoryQueries::directoryExists(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return isDirectory(vaultId, relPath);
 }
 
@@ -171,18 +97,5 @@ std::vector<std::shared_ptr<vh::types::FSEntry>> DirectoryQueries::listDir(const
         );
 
         return types::merge_entries(files, directories);
-    });
-}
-
-std::vector<std::shared_ptr<vh::types::Directory>> DirectoryQueries::listTrashedDirs(const unsigned int vaultId) {
-    return Transactions::exec("DirectoryQueries::listTrashedDirs", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_trashed_dirs", vaultId);
-        return types::directories_from_pq_res(res);
-    });
-}
-
-void DirectoryQueries::markDirAsTrashed(const unsigned int userId, const unsigned int vaultId, const std::filesystem::path& relPath) {
-    Transactions::exec("DirectoryQueries::markDirAsTrashed", [&](pqxx::work& txn) {
-        txn.exec_prepared("mark_dir_trashed", pqxx::params{vaultId, relPath.string(), userId});
     });
 }

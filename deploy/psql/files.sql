@@ -201,6 +201,7 @@ CREATE TABLE file_search_index
 -- ===============================
 -- 🔧 FS Entry Optimization
 -- ===============================
+
 -- Fast lookup by vault and full path (e.g. for resolving UI paths)
 CREATE INDEX idx_fs_entry_vault_path
     ON fs_entry (vault_id, path text_pattern_ops);
@@ -209,49 +210,69 @@ CREATE INDEX idx_fs_entry_vault_path
 CREATE INDEX idx_fs_entry_parent
     ON fs_entry (parent_id);
 
+-- Optional: Deep LIKE (e.g. recursive trash listings)
+-- CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- CREATE INDEX idx_fs_entry_path_trgm ON fs_entry USING gin (path gin_trgm_ops);
+
+
 -- ===============================
 -- 🗑️ Trashed Files Optimization
 -- ===============================
--- Index to efficiently fetch trashed files by vault
-CREATE INDEX idx_files_trashed_vault
-    ON files (fs_entry_id) WHERE is_trashed = TRUE;
 
--- If you commonly JOIN to fs_entry to get vault_id, consider:
--- CREATE INDEX idx_files_trashed_including_fs_entry ON files (is_trashed) INCLUDE (fs_entry_id);
+-- Primary access for listing trashed files and status checks
+CREATE INDEX idx_files_trashed_vault_path_not_deleted
+    ON files_trashed (vault_id, path)
+    WHERE deleted_at IS NULL;
+
+-- Lookup by entry ID for trash checks, soft delete
+CREATE INDEX idx_files_trashed_entry_not_deleted
+    ON files_trashed (fs_entry_id)
+    WHERE deleted_at IS NULL;
+
+-- Optional: fast purging / retention enforcement
+CREATE INDEX idx_files_trashed_deleted_at
+    ON files_trashed (deleted_at);
+
+-- Optional: support sorted trash listings or dashboards
+CREATE INDEX idx_files_trashed_vault_trashed_at
+    ON files_trashed (vault_id, trashed_at DESC)
+    WHERE deleted_at IS NULL;
+
 
 -- ===============================
 -- ⚡ Cache Indexes
 -- ===============================
+
 CREATE INDEX idx_cache_index_size
     ON cache_index (size DESC);
 
 CREATE INDEX idx_cache_index_vault_type_size
     ON cache_index (vault_id, type, size DESC);
 
+
 -- ===============================
 -- 🧠 Full-text Search
 -- ===============================
+
 CREATE INDEX file_search_vector_idx
     ON file_search_index
     USING GIN (search_vector);
 
+
 -- ===============================
 -- 🧬 XAttr Lookups
 -- ===============================
+
 CREATE INDEX idx_file_xattrs_file_id
     ON file_xattrs (file_id);
 
 CREATE INDEX idx_file_xattrs_key
     ON file_xattrs (key);
 
+
 -- ===============================
 -- 📁 Metadata Lookups
 -- ===============================
+
 CREATE INDEX idx_file_metadata_key
     ON file_metadata (key);
-
--- ===============================
--- 🔍 Optional: Deep LIKE (pg_trgm)
--- ===============================
--- CREATE EXTENSION IF NOT EXISTS pg_trgm;
--- CREATE INDEX idx_fs_entry_path_trgm ON fs_entry USING gin (path gin_trgm_ops);

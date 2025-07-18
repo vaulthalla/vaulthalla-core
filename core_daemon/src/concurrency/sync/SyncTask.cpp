@@ -69,6 +69,12 @@ void SyncTask::operator()() {
         next_run = system_clock::now() + seconds(engine_->sync->interval.count());
 
         handleInterrupt();
+
+        localFiles_.clear();
+        s3Files_.clear();
+        s3Map_.clear();
+        localMap_.clear();
+
         controller_->requeue(shared_from_this());
         isRunning_ = false;
     } catch (const std::exception& e) {

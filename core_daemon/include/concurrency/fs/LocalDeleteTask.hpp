@@ -25,8 +25,16 @@ struct LocalDeleteTask : PromisedTask {
 
     void operator()() override {
         try {
-            const auto absPath = engine->getAbsolutePath(file->path);
+            const auto mount = engine->getAbsolutePath({});
+            auto absPath = engine->getAbsolutePath(file->path);
             if (fs::exists(absPath)) fs::remove(absPath);
+
+            while (absPath.has_parent_path()) {
+                const auto p = absPath.parent_path();
+                if (!fs::exists(p) || !fs::is_empty(p) || p == mount) break;
+                fs::remove(absPath.parent_path());
+                absPath = absPath.parent_path();
+            }
 
             for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
                 const auto thumbPath = engine->getAbsoluteCachePath(file->path, fs::path("thumbnails") / std::to_string(size));

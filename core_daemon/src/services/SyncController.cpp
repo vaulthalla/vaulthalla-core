@@ -1,7 +1,8 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
-#include "concurrency/sync/SyncTask.hpp"
+#include "concurrency/FSTask.hpp"
+#include "concurrency/fs/LocalFSTask.hpp"
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/sync/SafeSyncTask.hpp"
 #include "concurrency/sync/MirrorSyncTask.hpp"
@@ -9,6 +10,8 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "types/Sync.hpp"
+#include "types/FSync.hpp"
+#include "types/RSync.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <iostream>
@@ -18,7 +21,7 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::concurrency;
 
-bool SyncTaskCompare::operator()(const std::shared_ptr<SyncTask>& a, const std::shared_ptr<SyncTask>& b) const {
+bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shared_ptr<FSTask>& b) const {
     return a->next_run > b->next_run; // Min-heap based on next_run time
 }
 
@@ -47,7 +50,7 @@ void SyncController::stop() {
     std::cout << "[SyncController] Stopped." << std::endl;
 }
 
-void SyncController::requeue(const std::shared_ptr<SyncTask>& task) {
+void SyncController::requeue(const std::shared_ptr<FSTask>& task) {
     std::scoped_lock lock(pqMutex_);
     pq.push(task);
     std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
@@ -97,7 +100,7 @@ void SyncController::run() {
         }
 
         refreshTries = 0;
-        std::shared_ptr<SyncTask> task;
+        std::shared_ptr<FSTask> task;
 
         {
             std::scoped_lock lock(pqMutex_);
@@ -118,7 +121,7 @@ void SyncController::run() {
 void SyncController::runNow(const unsigned int vaultId) {
     std::cout << "[SyncController] Running sync task immediately for vault ID: " << vaultId << std::endl;
 
-    std::shared_ptr<SyncTask> task;
+    std::shared_ptr<FSTask> task;
 
     {
         std::scoped_lock lock(taskMapMutex_);
@@ -142,14 +145,14 @@ void SyncController::runNow(const unsigned int vaultId) {
 
 void SyncController::refreshEngines() {
     if (const auto s = storage_.lock()) {
-        const auto latestEngines = s->getEngines<CloudStorageEngine>();
+        const auto latestEngines = s->getEngines();
         pruneStaleTasks(latestEngines);
         for (const auto& engine : latestEngines) processTask(engine);
     }
 }
 
 
-void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<CloudStorageEngine> >& engines) {
+void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<StorageEngine> >& engines) {
     boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
     for (const auto& engine : engines) latestBitset.set(engine->vaultId());
 
@@ -167,7 +170,7 @@ void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<CloudStor
 }
 
 
-void SyncController::processTask(const std::shared_ptr<CloudStorageEngine>& engine) {
+void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
     std::scoped_lock lock(taskMapMutex_, pqMutex_);
 
     if (!taskMap_.contains(engine->getVault()->id)) {
@@ -177,12 +180,15 @@ void SyncController::processTask(const std::shared_ptr<CloudStorageEngine>& engi
     }
 }
 
-std::shared_ptr<SyncTask> SyncController::createTask(const std::shared_ptr<CloudStorageEngine>& engine) {
-    std::shared_ptr<SyncTask> task;
-    if (engine->sync->strategy == types::Sync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
-    else if (engine->sync->strategy == types::Sync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
-    else if (engine->sync->strategy == types::Sync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
-    else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
+std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
+    std::shared_ptr<FSTask> task;
+    if (engine->type() == StorageType::Local) task = createTask<LocalFSTask>(engine);
+    else if (engine->type() == StorageType::Cloud) {
+        const auto sync = std::static_pointer_cast<types::RSync>(engine->sync_);
+        if (sync->strategy == types::RSync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
+        else if (sync->strategy == types::RSync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
+        else if (sync->strategy == types::RSync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
+    } else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vaultId() << std::endl;
     return task;
 }
 

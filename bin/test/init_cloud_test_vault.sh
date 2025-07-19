@@ -28,10 +28,15 @@ VALUES (
 ON CONFLICT (name) DO NOTHING;
 
 -- Create sync entry for R2 Test Vault
-INSERT INTO sync (vault_id, interval, conflict_policy, strategy)
-SELECT v.id, 600, 'keep_local', 'sync'
-FROM vault v
-WHERE v.name = 'R2 Test Vault';
+WITH ins AS (
+    INSERT INTO sync (vault_id, interval)
+    VALUES(
+        (SELECT id FROM vault WHERE name = 'R2 Test Vault'),
+        600
+    ) RETURNING id
+)
+INSERT INTO rsync (sync_id, conflict_policy, strategy)
+SELECT id, 'keep_local', 'sync' FROM ins;
 
 -- Create test bucket for R2
 INSERT INTO s3_buckets (name, api_key_id)

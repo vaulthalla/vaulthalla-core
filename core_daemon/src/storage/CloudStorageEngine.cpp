@@ -4,9 +4,11 @@
 #include "types/Directory.hpp"
 #include "types/S3Vault.hpp"
 #include "types/Sync.hpp"
+#include "types/Operation.hpp"
 #include "types/CacheIndex.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/OperationQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
 
@@ -23,9 +25,9 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<concurrency::Thumbn
                                        const std::shared_ptr<S3Vault>& vault,
                                        const std::shared_ptr<api::APIKey>& key,
                                        const std::shared_ptr<Sync>& sync)
-    : StorageEngine(vault, thumbnailWorker),
-      key_(key), sync(sync) {
-    const auto conf = config::ConfigRegistry::get();
+    : StorageEngine(vault, sync, thumbnailWorker),
+      key_(key) {
+    const auto& conf = config::ConfigRegistry::get();
     root_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id) / "files";
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
     if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
@@ -55,22 +57,6 @@ std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::fil
     return std::nullopt;
 }
 
-void CloudStorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) {
-    std::cout << "[CloudStorageEngine] remove called for: " << rel_path << std::endl;
-    if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
-    else if (isFile(rel_path)) removeFile(rel_path, userId);
-    else throw std::runtime_error("[CloudStorageEngine] Path does not exist: " + rel_path.string());
-}
-
-void CloudStorageEngine::removeFile(const fs::path& rel_path, const unsigned int userId) {
-    FileQueries::markFileAsTrashed(userId, vault_->id, rel_path);
-}
-
-void CloudStorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) {
-    for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
-        FileQueries::markFileAsTrashed(userId, file->id);
-}
-
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);
     removeRemotely(rel_path, false);
@@ -94,14 +80,6 @@ bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const
     std::cout << "[CloudStorageEngine] fileExists called: " << rel_path << std::endl;
     // TODO: Implement S3/R2 fileExists logic
     return false;
-}
-
-bool CloudStorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
-    return DirectoryQueries::isDirectory(vault_->id, rel_path);
-}
-
-bool CloudStorageEngine::isFile(const std::filesystem::path& rel_path) const {
-    return FileQueries::isFile(vault_->id, rel_path);
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {

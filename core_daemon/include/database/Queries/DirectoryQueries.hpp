@@ -28,6 +28,10 @@ public:
 
     [[nodiscard]] static bool directoryExists(unsigned int vaultId, const std::filesystem::path& relPath);
 
+    static void moveDirectory(const std::shared_ptr<types::Directory>& directory, const std::filesystem::path& newPath, unsigned int userId);
+
+    static std::shared_ptr<types::Directory> getDirectoryByPath(unsigned int vaultId, const std::filesystem::path& relPath);
+
     [[nodiscard]] static std::optional<unsigned int> getDirectoryIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);

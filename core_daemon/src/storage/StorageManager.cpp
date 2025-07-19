@@ -33,15 +33,15 @@ void StorageManager::initStorageEngines() {
     std::lock_guard lock(mountsMutex_);
     try {
         for (auto& vault : VaultQueries::listVaults()) {
+            const auto sync = SyncQueries::getSync(vault->id);
             if (vault->type == VaultType::Local) {
                 auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
                 if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
-                engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, localVault);
+                engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, sync, localVault);
             } else if (vault->type == VaultType::S3) {
                 auto vaultS3 = std::static_pointer_cast<S3Vault>(vault);
                 if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
                 const auto key = APIKeyQueries::getAPIKey(vaultS3->api_key_id);
-                const auto sync = SyncQueries::getSync(vaultS3->id);
                 engines_[vault->id] = std::make_shared<CloudStorageEngine>(thumbnailWorker_, vaultS3, key, sync);
             }
         }
@@ -76,6 +76,7 @@ void StorageManager::initUserStorage(const std::shared_ptr<User>& user) {
 
         engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(
             thumbnailWorker_,
+            SyncQueries::getSync(vault->id),
             std::static_pointer_cast<LocalDiskVault>(vault));
 
         std::cout << "[StorageManager] Initialized storage for user: " << user->name << std::endl;
@@ -96,7 +97,7 @@ std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
         if (vault->type == VaultType::Local) {
             auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
             if (!localVault) throw std::runtime_error("Failed to cast vault to LocalDiskVault");
-            engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, localVault);
+            engines_[vault->id] = std::make_shared<LocalDiskStorageEngine>(thumbnailWorker_, sync, localVault);
         } else if (vault->type == VaultType::S3) {
             auto vaultS3 = std::static_pointer_cast<S3Vault>(vault);
             if (!vaultS3) throw std::runtime_error("Failed to cast vault to S3Vault");
@@ -143,7 +144,7 @@ void StorageManager::removeEntry(const unsigned int userId, const unsigned int v
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
     engine->remove(relPath, userId);
-    if (engine->type() == StorageType::Cloud) syncNow(vaultId);
+    syncNow(vaultId);
 }
 
 void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,
@@ -182,13 +183,17 @@ std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned in
 }
 
 void StorageManager::syncNow(const unsigned int vaultId) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-
-    if (engine->type() != StorageType::Cloud)
-        throw std::runtime_error("Sync operation is only supported for cloud storage engines");
-
     syncController_->runNow(vaultId);
+}
+
+std::vector<std::shared_ptr<StorageEngine> > StorageManager::getEngines() const {
+    std::lock_guard lock(mountsMutex_);
+    std::vector<std::shared_ptr<StorageEngine>> result;
+    result.reserve(engines_.size());
+    std::ranges::transform(engines_.begin(), engines_.end(),
+                           std::back_inserter(result),
+                           [](const auto& pair) { return pair.second; });
+    return result;
 }
 
 

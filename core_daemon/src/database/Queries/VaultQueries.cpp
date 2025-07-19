@@ -3,27 +3,34 @@
 #include "types/Vault.hpp"
 #include "types/LocalDiskVault.hpp"
 #include "types/S3Vault.hpp"
-#include "types/Sync.hpp"
+#include "types/FSync.hpp"
+#include "types/RSync.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
 
 unsigned int VaultQueries::addVault(const std::shared_ptr<Vault>& vault,
-                                    const std::shared_ptr<Sync>& proxySync) {
+                                    const std::shared_ptr<Sync>& sync) {
+    if (!sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
+
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
         pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
         const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();
 
         if (vault->type == VaultType::Local) {
+            const auto fSync = std::static_pointer_cast<FSync>(sync);
+            pqxx::params sync_params{vaultId, fSync->interval.count(), to_string(fSync->conflict_policy)};
+            txn.exec_prepared("insert_sync_and_fsync", sync_params);
+
             const auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
             txn.exec_prepared("insert_local_vault", pqxx::params{vaultId, localVault->mount_point.string()});
         } else if (vault->type == VaultType::S3) {
-            if (!proxySync) throw std::runtime_error("ProxySync must be provided for S3 vaults");
             const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
             txn.exec_prepared("insert_s3_bucket", pqxx::params{s3Vault->bucket, s3Vault->api_key_id});
 
-            pqxx::params sync_params{vaultId, proxySync->interval.count(), to_string(proxySync->conflict_policy), to_string(proxySync->strategy)};
-            txn.exec_prepared("insert_sync", sync_params).one_row()["id"].as<unsigned int>();
+            const auto rSync = std::static_pointer_cast<RSync>(sync);
+            pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy), to_string(rSync->strategy)};
+            txn.exec_prepared("insert_sync_and_rsync", sync_params).one_row()["id"].as<unsigned int>();
 
             txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
         }

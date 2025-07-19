@@ -5,21 +5,20 @@
 #include "util/imageUtil.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
 #include "types/File.hpp"
 
 #include <fstream>
 #include <iostream>
 
 using namespace vh::types;
+using namespace vh::database;
 
 namespace vh::storage {
 
 LocalDiskStorageEngine::LocalDiskStorageEngine(const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
+                                               const std::shared_ptr<Sync>& sync,
                                                const std::shared_ptr<LocalDiskVault>& vault)
-    : StorageEngine(vault, thumbnailWorker, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {
-    if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
-}
+    : StorageEngine(vault, sync, thumbnailWorker, config::ConfigRegistry::get().fuse.root_mount_path / vault->mount_point) {}
 
 void LocalDiskStorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
     try {
@@ -88,47 +87,8 @@ std::optional<std::vector<uint8_t> > LocalDiskStorageEngine::readFile(const std:
     return buffer;
 }
 
-void LocalDiskStorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) {
-    if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
-    else if (isFile(rel_path)) removeFile(rel_path, userId);
-    else throw std::runtime_error("Path does not exist: " + rel_path.string());
-}
-
-void LocalDiskStorageEngine::removeFile(const std::filesystem::path& rel_path, const unsigned int userId) {
-    const auto absPath = getAbsolutePath(rel_path);
-
-    if (std::filesystem::exists(absPath)) {
-        std::filesystem::remove(absPath);
-        purgeThumbnails(rel_path);
-        database::FileQueries::deleteFile(userId, vault_->id, rel_path);
-    }
-}
-
-void LocalDiskStorageEngine::removeDirectory(const std::filesystem::path& rel_path, const unsigned int userId) {
-    const auto absPath = getAbsolutePath(rel_path);
-
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(absPath, std::filesystem::directory_options::skip_permission_denied)) {
-        if (std::filesystem::is_regular_file(absPath)) {
-            std::filesystem::remove(absPath);
-            purgeThumbnails(entry.path());
-            database::FileQueries::deleteFile(userId, vault_->id, rel_path);
-        }
-    }
-
-    std::filesystem::remove_all(absPath);
-    database::DirectoryQueries::deleteDirectory(vault_->id, rel_path);
-}
-
 bool LocalDiskStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
     return std::filesystem::exists(root_ / rel_path);
-}
-
-bool LocalDiskStorageEngine::isDirectory(const fs::path& rel_path) const {
-    return std::filesystem::is_directory(getAbsolutePath(rel_path));
-}
-
-bool LocalDiskStorageEngine::isFile(const fs::path& rel_path) const {
-    return std::filesystem::is_regular_file(getAbsolutePath(rel_path));
 }
 
 std::filesystem::path LocalDiskStorageEngine::resolvePath(const std::string& id) const {

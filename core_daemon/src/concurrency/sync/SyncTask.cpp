@@ -1,6 +1,4 @@
 #include "concurrency/sync/SyncTask.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
-#include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/sync/UploadTask.hpp"
@@ -12,7 +10,6 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
-#include "shared_util/u8.hpp"
 
 #include <iostream>
 #include <utility>
@@ -21,17 +18,9 @@ using namespace vh::concurrency;
 using namespace vh::types;
 using namespace std::chrono;
 
-SyncTask::SyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine,
-                   const std::shared_ptr<services::SyncController>& controller)
-    : next_run(system_clock::from_time_t(engine->sync->last_sync_at)
-               + seconds(engine->sync->interval.count())),
-      engine_(engine),
-      controller_(controller) {
-}
-
 void SyncTask::operator()() {
     std::cout << "[SyncWorker] Started sync for vault: " << engine_->vault_->name << std::endl;
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
 
     try {
         handleInterrupt();
@@ -42,7 +31,7 @@ void SyncTask::operator()() {
         }
 
         isRunning_ = true;
-        database::SyncQueries::reportSyncStarted(engine_->sync->id);
+        database::SyncQueries::reportSyncStarted(engine_->sync_->id);
 
         if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
             const auto dir = std::make_shared<Directory>();
@@ -57,13 +46,13 @@ void SyncTask::operator()() {
         removeTrashedFiles();
         handleInterrupt();
 
-        s3Map_ = engine_->getGroupedFilesFromS3();
+        s3Map_ = cloudEngine()->getGroupedFilesFromS3();
         s3Files_ = uMap2Vector(s3Map_);
         localFiles_ = database::FileQueries::listFilesInDir(engine_->vaultId());
         localMap_ = groupEntriesByPath(localFiles_);
 
         for (const auto& [path, entry] : intersect(s3Map_, localMap_))
-            remoteHashMap_.insert({entry->path.u8string(), engine_->getRemoteContentHash(entry->path)});
+            remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
 
 
         futures_.clear();
@@ -71,8 +60,8 @@ void SyncTask::operator()() {
         sync();
 
         std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault_->name << std::endl;
-        database::SyncQueries::reportSyncSuccess(engine_->sync->id);
-        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
+        database::SyncQueries::reportSyncSuccess(engine_->sync_->id);
+        next_run = system_clock::now() + seconds(engine_->sync_->interval.count());
 
         handleInterrupt();
 
@@ -82,7 +71,7 @@ void SyncTask::operator()() {
         localMap_.clear();
         remoteHashMap_.clear();
 
-        controller_->requeue(shared_from_this());
+        requeue();
         isRunning_ = false;
     } catch (const std::exception& e) {
         isRunning_ = false;
@@ -108,29 +97,16 @@ void SyncTask::removeTrashedFiles() {
     processFutures();
 }
 
-void SyncTask::processFutures() {
-    for (auto& f : futures_)
-        if (std::get<bool>(f.get()) == false)
-            std::cerr << "[SafeSyncTask] A file sync task failed." << std::endl;
-    futures_.clear();
-}
-
-
-void SyncTask::push(const std::shared_ptr<Task>& task) {
-    futures_.push_back(task->getFuture().value());
-    ThreadPoolRegistry::instance().syncPool()->submit(task);
-}
-
 void SyncTask::upload(const std::shared_ptr<File>& file) {
-    push(std::make_shared<UploadTask>(engine_, file));
+    push(std::make_shared<UploadTask>(cloudEngine(), file));
 }
 
 void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterDownload) {
-    push(std::make_shared<DownloadTask>(engine_, file, freeAfterDownload));
+    push(std::make_shared<DownloadTask>(cloudEngine(), file, freeAfterDownload));
 }
 
 void SyncTask::remove(const std::shared_ptr<File>& file, const DeleteTask::Type& type) {
-    push(std::make_shared<DeleteTask>(engine_, file, type));
+    push(std::make_shared<DeleteTask>(cloudEngine(), file, type));
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {
@@ -139,9 +115,7 @@ uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared
     return totalSize;
 }
 
-unsigned int SyncTask::vaultId() const { return engine_->vault_->id; }
-
-bool SyncTask::operator<(const SyncTask& other) const { return next_run > other.next_run; }
+std::shared_ptr<vh::storage::CloudStorageEngine> SyncTask::cloudEngine() const { return std::static_pointer_cast<storage::CloudStorageEngine>(engine_); }
 
 std::vector<std::shared_ptr<File> > SyncTask::uMap2Vector(
     std::unordered_map<std::u8string, std::shared_ptr<File> >& map) {
@@ -178,7 +152,3 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::intersect(
 
     return result;
 }
-
-void SyncTask::interrupt() { interruptFlag_.store(true); }
-bool SyncTask::isInterrupted() const { return interruptFlag_.load(); }
-void SyncTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }

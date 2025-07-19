@@ -25,6 +25,7 @@ void DBConnection::initPrepared() const {
     initPreparedFsEntries();
     initPreparedFiles();
     initPreparedDirectories();
+    initPreparedOperations();
     initPreparedRoles();
     initPreparedUserRoles();
     initPreparedVaultRoles();
@@ -153,6 +154,8 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("get_fs_entry_parent_id", "SELECT parent_id FROM fs_entry WHERE id = $1");
 
+    conn_->prepare("get_fs_entry_parent_id_and_path", "SELECT parent_id, path FROM fs_entry WHERE id = $1");
+
     conn_->prepare("get_fs_entry_id_by_path", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = $2");
 }
 
@@ -236,15 +239,15 @@ void DBConnection::initPreparedFiles() const {
         );
 
     conn_->prepare("list_trashed_files",
-        "SELECT *, fs_entry_id as id FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
+                   "SELECT *, fs_entry_id as id FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
 
     conn_->prepare("mark_trashed_file_deleted",
                    "UPDATE files_trashed SET deleted_at = NOW() "
                    "WHERE fs_entry_id = $1 AND deleted_at IS NULL");
 
     conn_->prepare("mark_trashed_file_deleted_by_path",
-        "UPDATE files_trashed SET deleted_at = NOW() "
-        "WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL");
+                   "UPDATE files_trashed SET deleted_at = NOW() "
+                   "WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL");
 
     conn_->prepare("list_files_in_dir",
                    "SELECT f.*, fs.* "
@@ -257,6 +260,12 @@ void DBConnection::initPreparedFiles() const {
                    "FROM fs_entry fs "
                    "JOIN files f ON fs.id = f.fs_entry_id "
                    "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
+
+    conn_->prepare("get_file_by_path",
+                   "SELECT f.*, fs.* "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 
     conn_->prepare("get_file_id_by_path",
                    "SELECT fs.id "
@@ -284,10 +293,10 @@ void DBConnection::initPreparedFiles() const {
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
 
     conn_->prepare("is_file_trashed",
-        "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE fs_entry_id = $1 AND deleted_at IS NULL)");
+                   "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE fs_entry_id = $1 AND deleted_at IS NULL)");
 
     conn_->prepare("is_file_trashed_by_path",
-        "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL)");
+                   "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL)");
 }
 
 void DBConnection::initPreparedDirectories() const {
@@ -351,6 +360,24 @@ void DBConnection::initPreparedDirectories() const {
                    "SELECT EXISTS (SELECT 1 FROM directories d "
                    "JOIN fs_entry fs ON d.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
+}
+
+void DBConnection::initPreparedOperations() const {
+    conn_->prepare("insert_operation",
+                   "INSERT INTO operations (fs_entry_id, executed_by, operation, target, status, source_path) "
+                   "VALUES ($1, $2, $3, $4, $5, $6) ");
+
+    conn_->prepare("get_pending_operations",
+                   "SELECT * FROM operations WHERE status = 'pending' AND fs_entry_id = $1");
+
+    conn_->prepare("list_pending_operations_by_vault",
+                   "SELECT * FROM operations WHERE status = 'pending' AND fs_entry_id IN "
+                   "(SELECT id FROM fs_entry WHERE vault_id = $1)");
+
+    conn_->prepare("mark_operation_completed_and_update",
+                   "UPDATE operations SET status = $2, completed_at = NOW(), error = $3 WHERE id = $1");
+
+    conn_->prepare("delete_operation", "DELETE FROM operations WHERE id = $1");
 }
 
 void DBConnection::initPreparedRoles() const {
@@ -469,20 +496,55 @@ void DBConnection::initPreparedPermOverrides() const {
 
 void DBConnection::initPreparedSync() const {
     conn_->prepare("insert_sync",
-                   "INSERT INTO sync (vault_id, interval, conflict_policy, strategy) "
-                   "VALUES ($1, $2, $3, $4) RETURNING id");
+                   "INSERT INTO sync (vault_id, interval) "
+                   "VALUES ($1, $2) RETURNING id");
 
-    conn_->prepare("update_sync",
-                   "UPDATE sync SET interval = $2, conflict_policy = $3, strategy = $4, "
-                   "enabled = $5, last_sync_at = $6, last_success_at = $7, updated_at = NOW() "
-                   "WHERE id = $1");
+    conn_->prepare("insert_sync_and_fsync",
+                   "WITH ins AS ("
+                   "  INSERT INTO sync (vault_id, interval) "
+                   "  VALUES ($1, $2) RETURNING id"
+                   ") "
+                   "INSERT INTO fsync (sync_id, conflict_policy) "
+                   "SELECT id, $3 FROM ins "
+                   "RETURNING sync_id");
+
+    conn_->prepare("insert_sync_and_rsync",
+                   "WITH ins AS ("
+                   "  INSERT INTO sync (vault_id, interval) "
+                   "  VALUES ($1, $2) RETURNING id"
+                   ") "
+                   "INSERT INTO rsync (sync_id, conflict_policy, strategy) "
+                   "SELECT id, $3, $4 FROM ins "
+                   "RETURNING sync_id");
+
+    conn_->prepare("update_sync_and_fsync",
+                   "WITH updated_sync AS ("
+                   "  UPDATE sync SET interval = $2, enabled = $3, "
+                   "      last_sync_at = $4, last_success_at = $5, updated_at = NOW() "
+                   "  WHERE id = $1 RETURNING id"
+                   ") "
+                   "UPDATE fsync SET conflict_policy = $6 "
+                   "WHERE sync_id = (SELECT id FROM updated_sync)");
+
+    conn_->prepare("update_sync_and_rsync",
+                   "WITH updated_sync AS ("
+                   "  UPDATE sync SET interval = $2, enabled = $3, "
+                   "      last_sync_at = $4, last_success_at = $5, updated_at = NOW() "
+                   "  WHERE id = $1 RETURNING id"
+                   ") "
+                   "UPDATE rsync SET strategy = $6, conflict_policy = $7 "
+                   "WHERE sync_id = (SELECT id FROM updated_sync)");
 
     conn_->prepare("report_sync_started", "UPDATE sync SET last_sync_at = NOW() WHERE id = $1");
 
     conn_->prepare("report_sync_success",
                    "UPDATE sync SET last_success_at = NOW(), last_sync_at = NOW() WHERE id = $1");
 
-    conn_->prepare("get_sync_config", "SELECT * FROM sync WHERE vault_id = $1");
+    conn_->prepare("get_fsync_config",
+                   "SELECT fs.*, s.* FROM fsync fs JOIN sync s ON s.id = fs.sync_id WHERE vault_id = $1");
+
+    conn_->prepare("get_rsync_config",
+                   "SELECT rs.*, s.* FROM rsync rs JOIN sync s ON s.id = rs.sync_id WHERE vault_id = $1");
 }
 
 void DBConnection::initPreparedCache() const {

@@ -32,9 +32,9 @@ CREATE TABLE files
 
 CREATE TABLE files_trashed
 (
-    fs_entry_id      INTEGER, -- from fs_entry.id, no FK
-    vault_id         INTEGER, -- from fs_entry.vault_id, no FK
-    parent_id        INTEGER, -- from fs_entry.parent_id, no FK
+    fs_entry_id      INTEGER,  -- from fs_entry.id, no FK
+    vault_id         INTEGER,  -- from fs_entry.vault_id, no FK
+    parent_id        INTEGER,  -- from fs_entry.parent_id, no FK
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP,
@@ -63,6 +63,21 @@ CREATE TABLE cache_index
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (vault_id, path, type)       -- Ensure no duplicate entries for same vault, path, and type
+);
+
+CREATE TABLE operations
+(
+    id               SERIAL PRIMARY KEY,
+    operation        VARCHAR(12) NOT NULL CHECK (operation IN ('move', 'copy', 'rename')),
+    target           VARCHAR(12) NOT NULL CHECK (target IN ('file', 'directory')),
+    fs_entry_id      INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE, -- fs_entry.vault_id used for vault batching
+    source_path      TEXT        NOT NULL CHECK (source_path LIKE '/%'),
+    destination_path TEXT        NOT NULL CHECK (destination_path LIKE '/%'),
+    executed_by      INTEGER REFERENCES users (id),
+    created_at       TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+    status           VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'success', 'error', 'cancelled')),
+    completed_at     TIMESTAMP            DEFAULT NULL,
+    error            TEXT
 );
 
 CREATE TABLE file_xattrs
@@ -221,13 +236,11 @@ CREATE INDEX idx_fs_entry_parent
 
 -- Primary access for listing trashed files and status checks
 CREATE INDEX idx_files_trashed_vault_path_not_deleted
-    ON files_trashed (vault_id, path)
-    WHERE deleted_at IS NULL;
+    ON files_trashed (vault_id, path) WHERE deleted_at IS NULL;
 
 -- Lookup by entry ID for trash checks, soft delete
 CREATE INDEX idx_files_trashed_entry_not_deleted
-    ON files_trashed (fs_entry_id)
-    WHERE deleted_at IS NULL;
+    ON files_trashed (fs_entry_id) WHERE deleted_at IS NULL;
 
 -- Optional: fast purging / retention enforcement
 CREATE INDEX idx_files_trashed_deleted_at
@@ -235,8 +248,7 @@ CREATE INDEX idx_files_trashed_deleted_at
 
 -- Optional: support sorted trash listings or dashboards
 CREATE INDEX idx_files_trashed_vault_trashed_at
-    ON files_trashed (vault_id, trashed_at DESC)
-    WHERE deleted_at IS NULL;
+    ON files_trashed (vault_id, trashed_at DESC) WHERE deleted_at IS NULL;
 
 
 -- ===============================

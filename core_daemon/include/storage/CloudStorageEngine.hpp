@@ -8,7 +8,6 @@ namespace vh::types {
 struct File;
 struct Directory;
 struct S3Vault;
-struct Sync;
 struct CacheIndex;
 
 namespace api {
@@ -27,8 +26,6 @@ namespace vh::storage {
 
 class CloudStorageEngine : public StorageEngine {
 public:
-    std::shared_ptr<types::Sync> sync;
-
     CloudStorageEngine() = default;
 
     ~CloudStorageEngine() override = default;
@@ -46,8 +43,6 @@ public:
 
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
 
-    void remove(const std::filesystem::path& rel_path, unsigned int userId) override;
-
     void purge(const std::filesystem::path& rel_path) const;
 
     void removeLocally(const std::filesystem::path& rel_path) const;
@@ -55,10 +50,6 @@ public:
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
 
     [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
-
-    [[nodiscard]] bool isDirectory(const fs::path& rel_path) const override;
-
-    [[nodiscard]] bool isFile(const fs::path& rel_path) const override;
 
     void uploadFile(const std::filesystem::path& rel_path) const;
     std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
@@ -69,10 +60,6 @@ public:
     [[nodiscard]] std::unordered_map<std::u8string, std::shared_ptr<types::File>> getGroupedFilesFromS3(const std::filesystem::path& prefix = {}) const;
 
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
-
-protected:
-    void removeFile(const fs::path& rel_path, unsigned int userId) override;
-    void removeDirectory(const fs::path& rel_path, unsigned int userId) override;
 
 private:
     std::shared_ptr<types::api::APIKey> key_;

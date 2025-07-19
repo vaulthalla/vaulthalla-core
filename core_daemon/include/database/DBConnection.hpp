@@ -20,6 +20,7 @@ class DBConnection {
     void initPreparedFsEntries() const;
     void initPreparedFiles() const;
     void initPreparedDirectories() const;
+    void initPreparedOperations() const;
     void initPreparedRoles() const;
     void initPreparedPermissions() const;
     void initPreparedUserRoles() const;

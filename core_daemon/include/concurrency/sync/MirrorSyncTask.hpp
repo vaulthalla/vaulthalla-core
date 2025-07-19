@@ -10,7 +10,10 @@ public:
 
     ~MirrorSyncTask() override = default;
 
-    void sync();
+    MirrorSyncTask(const std::shared_ptr<storage::StorageEngine>& engine,
+             const std::shared_ptr<services::SyncController>& controller) : SyncTask(engine, controller) {}
+
+    void sync() override;
 
 private:
     void syncKeepLocal();

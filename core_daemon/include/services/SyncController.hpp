@@ -1,6 +1,6 @@
 #pragma once
 
-#include "concurrency/sync/SyncTask.hpp"
+#include "concurrency/FSTask.hpp"
 
 #include <memory>
 #include <queue>
@@ -17,13 +17,12 @@ class SyncTask;
 
 namespace vh::storage {
 class StorageManager;
-class CloudStorageEngine;
 }
 
 namespace vh::services {
 
-struct SyncTaskCompare {
-    bool operator()(const std::shared_ptr<concurrency::SyncTask>& a, const std::shared_ptr<concurrency::SyncTask>& b) const;
+struct FSTaskCompare {
+    bool operator()(const std::shared_ptr<concurrency::FSTask>& a, const std::shared_ptr<concurrency::FSTask>& b) const;
 };
 
 class SyncController : public std::enable_shared_from_this<SyncController> {
@@ -34,18 +33,19 @@ public:
     void start();
     void stop();
 
-    void requeue(const std::shared_ptr<concurrency::SyncTask>& task);
+    void requeue(const std::shared_ptr<concurrency::FSTask>& task);
 
     void interruptTask(unsigned int vaultId);
 
     void runNow(unsigned int vaultId);
 
 private:
+    friend class concurrency::FSTask;
     friend class concurrency::SyncTask;
 
-    std::priority_queue<std::shared_ptr<concurrency::SyncTask>,
-                    std::vector<std::shared_ptr<concurrency::SyncTask>>,
-                    SyncTaskCompare> pq;
+    std::priority_queue<std::shared_ptr<concurrency::FSTask>,
+                    std::vector<std::shared_ptr<concurrency::FSTask>>,
+                    FSTaskCompare> pq;
 
     std::weak_ptr<storage::StorageManager> storage_;
     std::shared_ptr<concurrency::ThreadPool> pool_;
@@ -55,20 +55,20 @@ private:
     mutable std::mutex pqMutex_;
     mutable std::shared_mutex taskMapMutex_;
 
-    std::unordered_map<unsigned int, std::shared_ptr<concurrency::SyncTask>> taskMap_{};
+    std::unordered_map<unsigned int, std::shared_ptr<concurrency::FSTask>> taskMap_{};
 
     void run();
 
     void refreshEngines();
 
-    void pruneStaleTasks(const std::vector<std::shared_ptr<storage::CloudStorageEngine>>& engines);
+    void pruneStaleTasks(const std::vector<std::shared_ptr<storage::StorageEngine>>& engines);
 
-    void processTask(const std::shared_ptr<storage::CloudStorageEngine>& engine);
+    void processTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
-    std::shared_ptr<concurrency::SyncTask> createTask(const std::shared_ptr<storage::CloudStorageEngine>& engine);
+    std::shared_ptr<concurrency::FSTask> createTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
     template <typename T>
-    std::shared_ptr<T> createTask(const std::shared_ptr<storage::CloudStorageEngine>& engine) {
+    std::shared_ptr<T> createTask(const std::shared_ptr<storage::StorageEngine>& engine) {
         auto task = std::make_shared<T>(engine, shared_from_this());
         return task;
     }

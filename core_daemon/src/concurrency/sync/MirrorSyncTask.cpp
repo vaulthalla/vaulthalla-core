@@ -7,7 +7,7 @@
 #include "storage/StorageManager.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
-#include "types/Sync.hpp"
+#include "types/RSync.hpp"
 
 #include <filesystem>
 
@@ -17,9 +17,10 @@ using namespace vh::types;
 using namespace vh::database;
 
 void MirrorSyncTask::sync() {
-    if (engine_->sync->conflict_policy == Sync::ConflictPolicy::KeepLocal) syncKeepLocal();
-    else if (engine_->sync->conflict_policy == Sync::ConflictPolicy::KeepRemote) syncKeepRemote();
-    else throw std::runtime_error("[MirrorSyncTask] Conflict policy not supported: " + to_string(engine_->sync->conflict_policy));
+    const auto sync = std::static_pointer_cast<RSync>(engine_->sync_);
+    if (sync->conflict_policy == RSync::ConflictPolicy::KeepLocal) syncKeepLocal();
+    else if (sync->conflict_policy == RSync::ConflictPolicy::KeepRemote) syncKeepRemote();
+    else throw std::runtime_error("[MirrorSyncTask] Conflict policy not supported: " + to_string(sync->conflict_policy));
 }
 
 void MirrorSyncTask::syncKeepLocal() {
@@ -58,7 +59,7 @@ void MirrorSyncTask::syncKeepRemote() {
 
         const auto localFile = match->second;
 
-        if (localFile->content_hash == engine_->getRemoteContentHash(file->path)) {
+        if (localFile->content_hash == cloudEngine()->getRemoteContentHash(file->path)) {
             localMap_.erase(match);
             continue;
         }

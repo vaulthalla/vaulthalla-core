@@ -30,7 +30,7 @@ void CacheSyncTask::sync() {
         }
 
         const auto rFile = match->second;
-        const auto remoteHash = std::make_optional(engine_->getRemoteContentHash(rFile->path));
+        const auto remoteHash = std::make_optional(cloudEngine()->getRemoteContentHash(rFile->path));
 
         if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
@@ -53,7 +53,7 @@ void CacheSyncTask::sync() {
     processFutures();
 
     // Ensure all directories in the S3 map exist locally
-    for (const auto& dir : engine_->extractDirectories(uMap2Vector(s3Map_))) {
+    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());

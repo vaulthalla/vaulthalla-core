@@ -3,6 +3,7 @@
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "shared_util/u8.hpp"
+#include "util/fsPath.hpp"
 
 #include <optional>
 
@@ -72,6 +73,59 @@ void FileQueries::deleteFile(const unsigned int userId, unsigned int vaultId, co
         }
 
         txn.exec_prepared("mark_trashed_file_deleted_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
+    });
+}
+
+void FileQueries::moveFile(const std::shared_ptr<types::File>& file, const std::filesystem::path& newPath, unsigned int userId) {
+    const auto commonPath = common_path_prefix(file->path, newPath);
+    Transactions::exec("FileQueries::moveFile", [&](pqxx::work& txn) {
+        // Update the file's path and parent_id up to the common path
+        std::optional<unsigned int> parentId = file->parent_id;
+        std::filesystem::path path = file->path;
+        while (parentId && path != commonPath) {
+            pqxx::params stats_params{parentId, -static_cast<int>(file->size_bytes), -1, 0};
+            txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
+            const auto row = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            parentId = row["parent_id"].as<std::optional<unsigned int>>();
+            path = row["path"].as<std::string>();
+        }
+
+        // update the file's path and parent_id
+        file->path = newPath;
+        pqxx::params search_params{userId, to_utf8_string(newPath.parent_path().u8string())};
+        file->parent_id = txn.exec_prepared("get_fs_entry_id_by_path", search_params).one_field().as<unsigned int>();
+        file->last_modified_by = userId;
+
+        pqxx::params p;
+        p.append(file->vault_id);
+        p.append(file->parent_id);
+        p.append(file->name);
+        p.append(file->created_by);
+        p.append(file->last_modified_by);
+        p.append(to_utf8_string(file->path.u8string()));
+        p.append(file->size_bytes);
+        p.append(file->mime_type);
+        p.append(file->content_hash);
+
+        txn.exec_prepared("upsert_file_full", p).one_row()["fs_entry_id"].as<unsigned int>();
+
+        // Update parent directories stats
+        parentId = file->parent_id;
+        path = file->path;
+        while (parentId && path != commonPath) {
+            pqxx::params stats_params{parentId, file->size_bytes, 1, 0}; // Increment size_bytes and file_count
+            txn.exec_prepared("update_dir_stats", stats_params);
+            const auto nextRow = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            parentId = nextRow["parent_id"].as<std::optional<unsigned int> >();
+            path = nextRow["path"].as<std::string>();
+        }
+    });
+}
+
+std::shared_ptr<vh::types::File> FileQueries::getFileByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getFileByPath", [&](pqxx::work& txn) -> std::shared_ptr<vh::types::File> {
+        const auto row = txn.exec_prepared("get_file_by_path", pqxx::params{vaultId, relPath.string()}).one_row();
+        return std::make_shared<types::File>(row);
     });
 }
 

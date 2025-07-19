@@ -4,6 +4,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "shared_util/u8.hpp"
+#include "util/fsPath.hpp"
 
 #include <optional>
 
@@ -38,6 +39,63 @@ void DirectoryQueries::deleteDirectory(const unsigned int directoryId) {
 void DirectoryQueries::deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("DirectoryQueries::deleteDirectoryByPath", [&](pqxx::work& txn) {
         txn.exec_prepared("delete_fs_entry_by_path", pqxx::params{vaultId, relPath.string()});
+    });
+}
+
+void DirectoryQueries::moveDirectory(const std::shared_ptr<types::Directory>& directory, const std::filesystem::path& newPath, unsigned int userId) {
+    if (!directory) throw std::invalid_argument("Directory cannot be null");
+    if (!newPath.string().starts_with("/")) throw std::invalid_argument("New path must start with '/'");
+
+    const auto commonPath = common_path_prefix(directory->path, newPath);
+
+    Transactions::exec("DirectoryQueries::moveDirectory", [&](pqxx::work& txn) {
+        // update parents of the directory up to the common path
+        std::optional<unsigned int> parentId = directory->parent_id;
+        std::filesystem::path path = directory->path;
+        while (parentId && path != commonPath) {
+            pqxx::params stats_params{parentId, -static_cast<int>(directory->size_bytes), -static_cast<int>(directory->file_count), 0};
+            txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
+            const auto row = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            parentId = row["parent_id"].as<std::optional<unsigned int>>();
+            path = row["path"].as<std::string>();
+        }
+
+        // Update the directory's path and parent_id
+        directory->path = newPath;
+        pqxx::params search_params{userId, to_utf8_string(newPath.parent_path().u8string())};
+        directory->parent_id = txn.exec_prepared("get_fs_entry_id_by_path", search_params).one_field().as<unsigned int>();
+        directory->last_modified_by = userId;
+
+        pqxx::params p;
+        p.append(directory->vault_id);
+        p.append(directory->parent_id);
+        p.append(directory->name);
+        p.append(directory->created_by);
+        p.append(directory->last_modified_by);
+        p.append(to_utf8_string(directory->path.u8string()));
+        p.append(directory->size_bytes);
+        p.append(directory->file_count);
+        p.append(directory->subdirectory_count);
+
+        txn.exec_prepared("upsert_directory", p);
+
+        // Update parent directories stats
+        parentId = directory->parent_id;
+        path = directory->path;
+        while (parentId && path != commonPath) {
+            pqxx::params stats_params{parentId, directory->size_bytes, directory->file_count, 0}; // Increment size_bytes and file_count
+            txn.exec_prepared("update_dir_stats", stats_params);
+            const auto nextRow = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            parentId = nextRow["parent_id"].as<std::optional<unsigned int>>();
+            path = nextRow["path"].as<std::string>();
+        }
+    });
+}
+
+std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("DirectoryQueries::getDirectoryByPath", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_dir_by_path", pqxx::params{vaultId, relPath.string()}).one_row();
+        return std::make_shared<types::Directory>(row);
     });
 }
 

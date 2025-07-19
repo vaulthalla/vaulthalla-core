@@ -12,6 +12,7 @@ namespace fs = std::filesystem;
 namespace vh::types {
 struct Vault;
 struct File;
+struct Sync;
 }
 
 namespace vh::concurrency {
@@ -25,6 +26,7 @@ enum class StorageType { Local, Cloud };
 
 class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 public:
+    std::shared_ptr<types::Sync> sync_;
     std::shared_mutex mutex_;
 
     static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB
@@ -32,6 +34,7 @@ public:
     StorageEngine() = default;
 
     explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
+                           const std::shared_ptr<types::Sync>& sync,
                            const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                            fs::path root_mount_path = fs::path());
 
@@ -41,15 +44,21 @@ public:
 
     virtual void mkdir(const fs::path& relative_path) = 0;
 
+    void move(const fs::path& from, const fs::path& to, unsigned int userId) const;
+
+    void rename(const fs::path& from, const fs::path& to, unsigned int userId) const;
+
+    void copy(const fs::path& from, const fs::path& to, unsigned int userId) const;
+
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
-    virtual void remove(const fs::path& rel_path, unsigned int userId) = 0;
+    void remove(const fs::path& rel_path, unsigned int userId) const;
 
     [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
-    [[nodiscard]] virtual bool isDirectory(const fs::path& rel_path) const = 0;
+    [[nodiscard]] bool isDirectory(const fs::path& rel_path) const;
 
-    [[nodiscard]] virtual bool isFile(const fs::path& rel_path) const = 0;
+    [[nodiscard]] bool isFile(const fs::path& rel_path) const;
 
     [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
 
@@ -92,9 +101,8 @@ protected:
     fs::path cache_path_, root_;
     std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
 
-    virtual void removeFile(const fs::path& rel_path, unsigned int userId) = 0;
-
-    virtual void removeDirectory(const fs::path& rel_path, unsigned int userId) = 0;
+    void removeFile(const fs::path& rel_path, unsigned int userId) const;
+    void removeDirectory(const fs::path& rel_path, unsigned int userId) const;
 
     friend class concurrency::SyncTask;
 };

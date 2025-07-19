@@ -25,17 +25,28 @@ CREATE TABLE backup_targets
 CREATE TABLE sync
 (
     id              SERIAL PRIMARY KEY,
+    vault_id        INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
     interval        BIGINT NOT NULL DEFAULT 300, -- 5 minutes in seconds
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
-    vault_id                 INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    strategy                 VARCHAR(8)      DEFAULT 'cache' CHECK (strategy IN ('cache', 'sync', 'mirror')),
-    conflict_policy VARCHAR(12)      DEFAULT 'keep_local' CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask')),
-    last_sync_at    TIMESTAMP        DEFAULT NULL,
-    last_success_at TIMESTAMP        DEFAULT NULL,
-    created_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP        DEFAULT CURRENT_TIMESTAMP,
+    last_sync_at    TIMESTAMP DEFAULT NULL,
+    last_success_at TIMESTAMP DEFAULT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (vault_id)  -- Only one sync per vault
+);
+
+CREATE TABLE fsync
+(
+    sync_id         INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
+    conflict_policy VARCHAR(12) DEFAULT 'keep_both' CHECK (conflict_policy IN ('overwrite', 'keep_both', 'ask'))
+);
+
+CREATE TABLE rsync
+(
+    sync_id         INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
+    strategy                 VARCHAR(8)      DEFAULT 'cache' CHECK (strategy IN ('cache', 'sync', 'mirror')),
+    conflict_policy VARCHAR(12)      DEFAULT 'keep_local' CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask'))
 );
 
 CREATE TABLE sync_conflicts

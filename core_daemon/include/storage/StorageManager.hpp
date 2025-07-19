@@ -67,6 +67,8 @@ public:
 
     static bool hasLogicalParent(const std::filesystem::path& relPath);
 
+    std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
+
     template <typename T>
     std::vector<std::shared_ptr<T>> getEngines() const {
         std::lock_guard lock(mountsMutex_);

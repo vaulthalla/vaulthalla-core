@@ -30,6 +30,10 @@ public:
 
     [[nodiscard]] static bool isFile(unsigned int vaultId, const std::filesystem::path& relPath);
 
+    static std::shared_ptr<types::File> getFileByPath(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    static void moveFile(const std::shared_ptr<types::File>& file, const std::filesystem::path& newPath, unsigned int userId);
+
     static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path = {"/"}, bool recursive = true);
 
     static std::vector<std::shared_ptr<types::File>> listTrashedFiles(unsigned int vaultId);

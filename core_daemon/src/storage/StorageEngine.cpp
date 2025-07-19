@@ -2,8 +2,12 @@
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/File.hpp"
+#include "types/Directory.hpp"
+#include "types/Operation.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FileQueries.hpp"
+#include "database/Queries/OperationQueries.hpp"
 #include "util/Magic.hpp"
 #include "crypto/Hash.hpp"
 
@@ -12,20 +16,112 @@
 #include <fstream>
 
 using namespace vh::types;
+using namespace vh::database;
 
 namespace vh::storage {
 
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
+                             const std::shared_ptr<Sync>& sync,
                              const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                              fs::path root_mount_path)
-    : vault_(vault), thumbnailWorker_(thumbnailWorker) {
-    const auto conf = config::ConfigRegistry::get();
+    : sync_(sync), vault_(vault), thumbnailWorker_(thumbnailWorker) {
+    const auto& conf = config::ConfigRegistry::get();
     cache_path_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id);
 
     if (root_mount_path.empty()) root_ = cache_path_;
     else root_ = std::move(root_mount_path);
 
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
+}
+
+bool StorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
+    return DirectoryQueries::isDirectory(vault_->id, rel_path);
+}
+
+bool StorageEngine::isFile(const std::filesystem::path& rel_path) const {
+    return FileQueries::isFile(vault_->id, rel_path);
+}
+
+void StorageEngine::move(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+    if (from == to) return;
+
+    const bool isFile = this->isFile(from);
+
+    if (!isFile && !isDirectory(from)) throw std::runtime_error("[StorageEngine] Path does not exist: " + from.string());
+
+    std::shared_ptr<FSEntry> entry;
+    if (isFile) entry = FileQueries::getFileByPath(vaultId(), from);
+    else entry = DirectoryQueries::getDirectoryByPath(vaultId(), from);
+
+    if (isFile) FileQueries::moveFile(std::static_pointer_cast<File>(entry), to, userId);
+    else DirectoryQueries::moveDirectory(std::static_pointer_cast<Directory>(entry), to, userId);
+
+    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Move));
+}
+
+void StorageEngine::rename(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+    if (from == to) return;
+
+    const bool isFile = this->isFile(from);
+
+    if (!isFile && !isDirectory(from)) throw std::runtime_error("[StorageEngine] Path does not exist: " + from.string());
+
+    std::shared_ptr<FSEntry> entry;
+    if (isFile) entry = FileQueries::getFileByPath(vaultId(), from);
+    else entry = DirectoryQueries::getDirectoryByPath(vaultId(), from);
+
+    entry->name = to.filename().string();
+    entry->path = to;
+    entry->last_modified_by = userId;
+
+    if (isFile) FileQueries::upsertFile(std::static_pointer_cast<File>(entry));
+    else DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));
+
+    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Rename));
+}
+
+void StorageEngine::copy(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+    if (from == to) return;
+
+    const bool isFile = this->isFile(from);
+
+    if (!isFile && !isDirectory(from)) throw std::runtime_error("[StorageEngine] Path does not exist: " + from.string());
+
+    std::shared_ptr<FSEntry> entry;
+    if (isFile) entry = FileQueries::getFileByPath(vaultId(), from);
+    else entry = DirectoryQueries::getDirectoryByPath(vaultId(), from);
+
+    entry->id = 0;
+    entry->path = to;
+    entry->name = to.filename().string();
+    entry->created_at = {};
+    entry->updated_at = {};
+    entry->created_by = entry->last_modified_by = userId;
+
+    if (isFile) {
+        auto newFile = std::make_shared<File>(*std::static_pointer_cast<File>(entry));
+        newFile->id = FileQueries::upsertFile(newFile);
+        OperationQueries::addOperation(std::make_shared<Operation>(newFile, to, userId, Operation::Op::Copy));
+    } else {
+        auto newDir = std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry));
+        DirectoryQueries::upsertDirectory(newDir);
+        OperationQueries::addOperation(std::make_shared<Operation>(newDir, to, userId, Operation::Op::Copy));
+    }
+}
+
+void StorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) const {
+    if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
+    else if (isFile(rel_path)) removeFile(rel_path, userId);
+    else throw std::runtime_error("[StorageEngine] Path does not exist: " + rel_path.string());
+}
+
+void StorageEngine::removeFile(const fs::path& rel_path, const unsigned int userId) const {
+    FileQueries::markFileAsTrashed(userId, vault_->id, rel_path);
+}
+
+void StorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int userId) const {
+    for (const auto& file : FileQueries::listFilesInDir(vault_->id, rel_path, true))
+        FileQueries::markFileAsTrashed(userId, file->id);
 }
 
 std::filesystem::path StorageEngine::getRelativePath(const std::filesystem::path& abs_path) const {
@@ -62,7 +158,7 @@ std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel
     file->mime_type = util::Magic::get_mime_type(absPath);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? std::filesystem::path{"/"} / file->path.parent_path() : std::filesystem::path("/");
-    file->parent_id = database::DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
+    file->parent_id = DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
     return file;
 }

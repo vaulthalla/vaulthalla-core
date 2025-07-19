@@ -41,7 +41,7 @@ void SafeSyncTask::sync() {
     processFutures();
 
     // Create any missing directories locally based on what's in S3
-    for (const auto& dir : engine_->extractDirectories(uMap2Vector(s3Map_))) {
+    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());

@@ -139,8 +139,12 @@ void SyncController::runNow(const unsigned int vaultId) {
     const auto engine = task->engine();
     task = createTask(engine);
     task->next_run = std::chrono::system_clock::now();
-    taskMap_[vaultId] = task;
-    pq.push(task);
+
+    {
+        std::scoped_lock lock(taskMapMutex_, pqMutex_);
+        taskMap_[vaultId] = task;
+        pq.push(task);
+    }
 }
 
 void SyncController::refreshEngines() {

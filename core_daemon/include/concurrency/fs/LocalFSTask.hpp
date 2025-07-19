@@ -14,7 +14,7 @@ struct Operation;
 
 namespace vh::concurrency {
 
-class LocalFSTask : public FSTask, public std::enable_shared_from_this<LocalFSTask> {
+class LocalFSTask : public FSTask {
 public:
     ~LocalFSTask() override = default;
 

@@ -31,21 +31,23 @@ void LocalFSTask::operator()() {
 
         removeTrashedFiles();
         handleInterrupt();
-
-        processFutures();
+        processOperations();
+        handleInterrupt();
     } catch (const std::exception& e) {
         std::cerr << "[LocalFSTask] Exception: " << e.what() << std::endl;
     }
 
     isRunning_ = false;
-    auto end = steady_clock::now();
+    const auto end = steady_clock::now();
     std::cout << "[LocalFSTask] Finished sync in " << duration_cast<seconds>(end - start).count() << " seconds." << std::endl;
+    requeue();
 }
 
 void LocalFSTask::removeTrashedFiles() {
+    const auto engine = localEngine();
     const auto files = FileQueries::listTrashedFiles(engine_->vaultId());
     futures_.reserve(files.size());
-    for (const auto& file : files) push(std::make_shared<LocalDeleteTask>(localEngine(), file));
+    for (const auto& file : files) push(std::make_shared<LocalDeleteTask>(engine, file));
     processFutures();
 }
 

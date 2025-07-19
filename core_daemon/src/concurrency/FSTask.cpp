@@ -41,7 +41,7 @@ void FSTask::processFutures() {
 unsigned int FSTask::vaultId() const { return engine_->vaultId(); }
 
 void FSTask::requeue() {
-    std::cout << "[FSTask] Requeuing task for vault: " << engine_->getVault()->name << std::endl;
+    next_run = system_clock::now() + seconds(engine_->sync_->interval.count());
     if (controller_) controller_->requeue(shared_from_this());
     else throw std::runtime_error("SyncController is not set, cannot requeue task");
 }

@@ -1,139 +1,124 @@
-# ![Vaulthalla Logo](https://vaulthalla.io/_next/image?url=https%3A%2F%2Fmedia.vaulthalla.io%2FVaulthalla-logo.png&w=256&q=75)
+# ⚡️ Vaulthalla | The Final Cloud ⚡️
 
-# ⚔️ Vaulthalla
-### *The Final Cloud | Forged for Valhalla*  
-**No PHP. No Bloat. No App Store. No Bullshit.**
-
----
-
-## 🚀 The Premise
-
-> *“A high-performance, C++-powered daemon forged for speed, minimalism, and total control.  
-Just raw, encrypted file sync, engineered to crush Nextcloud and vaporize MinIO glue scripts.  
-If the gods self-hosted, they’d run this.”*
+**Military-grade encryption. Lightning-fast performance.**
+**Your files, your terms, forever.**
 
 ---
 
-## ⚔️ What Makes Vaulthalla Worthy
+**No plugins. No PHP. No compromises.**
+**Storage distilled to perfection.**
 
-### ❌ No PHP
-Say goodbye to runtime bloat, ancient language stacks, and plugin hell.  
-**Vaulthalla is compiled, lean, and fast by design.**
+## Why Vaulthalla?
 
-### 🚫 No Bloat
-No calendars. No chat apps. No half-baked office suites.  
-**Just pure file sync and storage. That’s it.**
+Vaulthalla is crafted from the ground up for security, speed, and simplicity:
 
-### 🛑 No App Store
-Stop babysitting dependencies and plugin updates.  
-**You don’t need 37 extensions to sync a file.**
+| Feature                 | Description                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| ❌ **Pure Performance**  | No PHP, no interpreters. Compiled directly to blazing-fast native code.                                    |
+| 🚫 **Zero Bloat**       | No calendars, chat widgets, or gimmicks. Pure, elegant storage.                                            |
+| 🛑 **Total Simplicity** | Forget app stores and endless extensions. Vaulthalla keeps your deployment clean, stable, and streamlined. |
+| 💀 **Radical Honesty**  | No dark patterns, no tracking, no subscription creep. True self-sovereignty.                               |
 
-### 💀 No Bullshit
-No dark patterns. No account walls. No telemetry.  
-**Just open-source, self-sovereign infrastructure.**
+## ⚙️ Engineered for Excellence
 
----
+Vaulthalla isn't assembled; it's meticulously designed:
 
-## 🔥 Built for the Worthy
+* **🧠 Pure C++ Core:** Memory-safe, runtime-free, uncompromising speed.
+* **🧰 Modern Toolchain:** Conan and Meson for modular, predictable builds.
+* **🧷 Linux-Native Integration:** True FUSE filesystem mounts.
+* **⚡ Instant WebSockets:** Async real-time sync via Boost::Beast.
+* **🖥️ Sleek Next.js UI:** Instant navigation powered by React.
+* **🛢️ Robust PostgreSQL:** ACID-compliant storage.
+* **🐳 Docker-First:** Optimized containers or bare-metal deployment.
+* **☁️ S3 Fluent:** Compatibility with AWS, MinIO, and S3 endpoints.
+* **🛡️ Secure by Design:** Encryption everywhere, zero-trust default.
 
-Designed for:
-- 🛠️ Sysadmins  
-- 👩‍💻 Developers  
-- 🧑‍🚀 Technical users who don’t need a wizard — **they need a weapon.**
+## ☁️ Intelligent Cloud Synchronization
 
----
+Vaulthalla supports three synchronization strategies:
 
-## ⚙️ Under the Hood
+* **⚡ Smart Cache:** Downloads on-demand, auto-eviction under pressure.
+* **🔄 Sync:** Two-way harmony for local/cloud files.
+* **🪞 Mirror:** One-way source of truth, ideal for backups.
 
-- **C++ Core Daemon**  
-- **Next.js Web UI**  
-- **Docker-First Deployment**  
-- **Native GPG Encryption**  
-- **S3-Compatible API**
+## 🔐 Enterprise-Grade Security
 
----
+Uncompromising security architecture that exceeds enterprise standards:
 
-## 🧭 Mission Statement
-
-**Vaulthalla was built to liberate self-hosters from:**
-- bloated web stacks  
-- fragmented toolchains  
-- slow sync speeds  
-
-Modern alternatives are fragile, sluggish, and reliant on outdated tech.  
-
-**Vaulthalla replaces it all** with a singular, optimized platform for:
-- syncing  
-- storage  
-- encrypted collaboration  
-
-**Built for:**  
-⚡️ Speed  
-🔐 Security  
-🛡️ Sovereignty
+* 🔑 Native GPG Encryption
+* 📖 Live Dictionary Filter
+* 🛑 Password Blocklist
+* 🔎 Breach Check Integration
+* 🔒 JWT Sessions
+* 💪 Enforced Password Strength
 
 ---
 
-## 🗡️ What Vaulthalla Replaces
+## 🚀 Quick Installation (Development Mode)
 
-### ❌ Nextcloud
-Bloated, plugin-ridden, slow.  
-**Designed for the early 2010s — still running PHP.**
+Vaulthalla is currently in **early active development**. Breaking changes are expected, and not all features are fully implemented. A stable v1 release is anticipated in approximately 1-2 months.
 
-### ❌ MinIO
-Just a backend.  
-**No interface. No frontend. No real UX without third-party hacks.**
+Clone the repository and enter the Vaulthalla directory:
 
-### ❌ “One-Click” SaaS Stacks
-Privacy-invasive. Cloud-locked. Corporate tethered.  
-**You’re not sovereign — you’re a subscriber.**
+```bash
+git clone https://github.com/vaulthalla/server.git
+cd server
+```
 
----
+Run the installation script via Make, enabling developer mode:
 
-## 🏆 Why Vaulthalla Wins
+```bash
+make install -- -d
+```
 
-### ⚙️ Performance
-Compiled C++, zero bloat, concurrency-aware.  
-**Built for NVMe. Tuned for scale.**
+The `-d` option (`--dev`) enables development mode, auto-configuring defaults for rapid local testing:
 
-### 🔐 Security
-Encrypted at rest & in transit.  
-**GPG-native support. Designed for auditability & zero trust.**
+* Uses debug builds
+* Default admin password (`vh!adm1n`)
+* Enables verbose logging and test vault setup
 
-### 🌩️ Deployment
-Spin up with:
-- Single Docker container  
-- Bare-metal install  
-
-No third-party accounts. No phone home.  
-**Just yours.**
+**Note:** Use caution in production environments. This development script may overwrite existing data and configurations.
 
 ---
 
-## 🕰️ Coming Soon
+## ✅ Verifying Installation
 
-### Want early access?
+Check service status:
 
-**Join the waitlist. Prepare to enter Vaulthalla.**
+```bash
+systemctl status vaulthalla-core vaulthalla-fuse
+```
 
-> *Enter your email. Join the Worthy.*
+View live logs:
 
-[Join the Waitlist →](#) *(Insert link to your waitlist)*
-
----
-
-# Skål,  
-**The Keepers of the Vault**
-
----
-
-## LICENSE
-
-*(Insert license here once decided — MIT, GPLv3, AGPLv3, etc.)*
+```bash
+journalctl -f -u vaulthalla-core
+```
 
 ---
 
-## CONTRIBUTING
+## ⚠️ Considerations
 
-> *Public development will open once the core architecture is forged and worthy of contribution.*  
-> *Follow the repo and join the waitlist to stay informed.*
+* Ensure port `443` (HTTPS) and required firewall rules are correctly set.
+* Review default configs in `/etc/vaulthalla/config.yaml` for tuning.
+* Regularly back up your database and encryption keys.
+
+---
+
+## 💡 Support & Contribution
+
+Pull requests, feature suggestions, and issue reports are warmly welcome. A contributor interest form will be available soon for those wanting to learn more and help shape the future of Vaulthalla.
+
+---
+
+## 🚧 Development Notes
+
+For detailed architecture docs and development guidelines, visit [Vaulthalla Docs](#).
+
+---
+
+### Mission Statement
+
+**Vaulthalla exists for those who refuse to settle.** It shatters the limits of bloated stacks and sluggish sync. No plugins, no gimmicks; just raw, unrelenting performance.
+
+Where others crumble under their own weight, Vaulthalla stands: **a single, battle-forged platform engineered for speed, hardened for security, and built for absolute sovereignty.**

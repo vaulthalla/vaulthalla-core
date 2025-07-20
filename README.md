@@ -45,7 +45,7 @@ Vaulthalla supports three synchronization strategies:
 
 Uncompromising security architecture that exceeds enterprise standards:
 
-* 🔑 Native GPG Encryption
+* 🔑 Native AES256 Encryption
 * 📖 Live Dictionary Filter
 * 🛑 Password Blocklist
 * 🔎 Breach Check Integration

@@ -5,7 +5,7 @@ BUILD_DIR = "build"
 
 class VaulthallaConan(ConanFile):
     name = "vaulthalla"
-    version = "0.6.0"
+    version = "0.6.1"
     license = "AGPLv3"
     url = 'https://vaulthalla.io'
     description = ("A next-gen self-hosted file platform forged for the modern age. "

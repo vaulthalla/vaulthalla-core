@@ -1,5 +1,6 @@
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "util/imageUtil.hpp"
+#include "util/files.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 
@@ -14,7 +15,10 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         const auto scale_it = params.find("scale");
         const auto size_it = params.find("size");
 
-        std::string file_path = storageManager_->getLocalEngine(vault_id)->getAbsolutePath(rel_path).string();
+        const auto engine = storageManager_->getLocalEngine(vault_id);
+        const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
+
+        std::string file_path = engine->getAbsolutePath(rel_path);
         std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
         if (const bool should_resize = (scale_it != params.end() || size_it != params.end())) {
@@ -22,7 +26,8 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
             if (scale_it != params.end()) scale = scale_it->second;
             if (size_it != params.end()) size = size_it->second;
 
-            std::vector<uint8_t> resized = util::resize_and_compress_image(file_path, scale, size);
+            std::vector<uint8_t> resized = util::resize_and_compress_image(tmpPath, scale, size);
+
             http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
             res.set(http::field::content_type, mime_type);
             res.body() = std::move(resized);
@@ -34,7 +39,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
 
         boost::beast::error_code ec;
         http::file_body::value_type body;
-        body.open(file_path.c_str(), boost::beast::file_mode::scan, ec);
+        body.open(tmpPath.c_str(), boost::beast::file_mode::scan, ec);
         if (ec) {
             http::response<http::string_body> res{http::status::not_found, req.version()};
             res.set(http::field::content_type, "text/plain");

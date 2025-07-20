@@ -45,6 +45,10 @@ public:
     static void updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
                                                std::optional<unsigned int> parentId,
                                                unsigned int sizeBytes);
+
+    [[nodiscard]] static std::string getEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
 };
 
 } // namespace vh::database

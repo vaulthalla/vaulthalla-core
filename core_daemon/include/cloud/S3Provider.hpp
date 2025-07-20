@@ -24,6 +24,11 @@ public:
 
     bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const;
 
+    bool uploadBufferWithMetadata(
+        const std::filesystem::path& key,
+        const std::vector<uint8_t>& buffer,
+        const std::unordered_map<std::string, std::string>& metadata) const;
+
     bool downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath) const;
 
     bool deleteObject(const std::filesystem::path& path) const;
@@ -48,7 +53,9 @@ public:
 
     bool setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const;
 
-    bool downloadToBuffer(const std::string& key, std::string& outBuffer) const;
+    bool setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64) const;
+
+    bool downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
 
 private:
     std::shared_ptr<types::api::S3APIKey> apiKey_;

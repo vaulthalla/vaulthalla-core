@@ -93,6 +93,42 @@ bool S3Provider::uploadObject(const std::filesystem::path& key, const std::files
     return resp.ok();
 }
 
+bool S3Provider::uploadBufferWithMetadata(
+    const std::filesystem::path& key,
+    const std::vector<uint8_t>& buffer,
+    const std::unordered_map<std::string, std::string>& metadata) const
+{
+    const std::string payloadHash = util::sha256Hex({buffer.begin(), buffer.end()});
+
+    CurlEasy tmpHandle;
+    const auto [canonical, url] = constructPaths(tmpHandle, key);
+
+    SList hdrs = makeSigHeaders("PUT", canonical, payloadHash);
+    hdrs.add("Content-Type: application/octet-stream");
+
+    // Add x-amz-meta-* headers
+    for (const auto& [k, v] : metadata)
+        hdrs.add("x-amz-meta-" + k + ": " + v);
+
+    HttpResponse resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_UPLOAD, 1L);
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
+        curl_easy_setopt(h, CURLOPT_READDATA, &buffer);
+        curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(buffer.size()));
+        curl_easy_setopt(h, CURLOPT_READFUNCTION,
+            +[](char* out, size_t size, size_t nmemb, void* userdata) -> size_t {
+                auto* src = static_cast<std::string*>(userdata);
+                size_t to_copy = std::min(size * nmemb, src->size());
+                std::memcpy(out, src->data(), to_copy);
+                src->erase(0, to_copy);  // consume
+                return to_copy;
+            });
+    });
+
+    return resp.ok();
+}
+
 bool S3Provider::downloadObject(const std::filesystem::path& key,
                                 const std::filesystem::path& outputPath) const {
     CURL* curl = curl_easy_init();
@@ -464,14 +500,50 @@ bool S3Provider::setObjectContentHash(const std::filesystem::path& key, const st
     return resp.ok();
 }
 
-bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer) const {
+bool S3Provider::setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64) const {
+    CurlEasy curl;
+    const auto [canonicalPath, url] = constructPaths(curl, key);
+    const std::string payloadHash = "UNSIGNED-PAYLOAD";
+
+    auto hdrMap = buildHeaderMap(payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "PUT", canonicalPath, hdrMap, payloadHash);
+
+    SList headers;
+    headers.add("Authorization: " + authHeader);
+    for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
+
+    std::ostringstream source;
+    source << "/" << bucket_ << "/" << util::escapeKeyPreserveSlashes(curl, key);
+
+    headers.add("x-amz-copy-source: " + source.str());
+    headers.add("x-amz-metadata-directive: REPLACE");
+
+    headers.add("x-amz-meta-vh-encrypted: true");
+    headers.add("x-amz-meta-vh-iv: " + iv_b64);
+    headers.add("x-amz-meta-vh-algo: aes256gcm");
+
+    HttpResponse resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, headers.get());
+    });
+
+    if (!resp.ok()) {
+        std::cerr << "[S3Provider] setObjectEncryptionMetadata failed for " << key
+                  << ": HTTP " << resp.http << std::endl;
+    }
+
+    return resp.ok();
+}
+
+bool S3Provider::downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
     const auto [canonicalPath, url] = constructPaths(curl, key);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
     const auto hdrMap = buildHeaderMap(payloadHash);
-    const std::string authHeader =  util::buildAuthorizationHeader(apiKey_, "GET", canonicalPath, hdrMap, payloadHash);
+    const std::string authHeader = util::buildAuthorizationHeader(apiKey_, "GET", canonicalPath, hdrMap, payloadHash);
 
     HeaderList headers;
     headers.add("Authorization: " + authHeader);
@@ -481,8 +553,8 @@ bool S3Provider::downloadToBuffer(const std::string& key, std::string& outBuffer
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.list);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* ptr, size_t size, size_t nmemb, std::string* data) {
-        data->append(ptr, size * nmemb);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* ptr, size_t size, size_t nmemb, std::vector<uint8_t>* data) {
+        data->insert(data->end(), ptr, ptr + size * nmemb);
         return size * nmemb;
     });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outBuffer);

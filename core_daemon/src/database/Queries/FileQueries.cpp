@@ -24,6 +24,7 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
+        p.append(file->encryption_iv);
 
         const auto fileId = txn.exec_prepared("upsert_file_full", p).one_row()["fs_entry_id"].as<unsigned int>();
 
@@ -59,7 +60,7 @@ void FileQueries::deleteFile(const unsigned int userId, const unsigned int fileI
 
 void FileQueries::deleteFile(const unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("FileQueries::deleteFileByPath", [&](pqxx::work& txn) {
-        const auto isTrashed = txn.exec_prepared("is_file_trashed_by_path", pqxx::params{vaultId, relPath.string()}).one_field().as<bool>();
+        const auto isTrashed = txn.exec_prepared("is_file_trashed_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_field().as<bool>();
 
         if (!isTrashed) {
             pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
@@ -124,21 +125,21 @@ void FileQueries::moveFile(const std::shared_ptr<types::File>& file, const std::
 
 std::shared_ptr<vh::types::File> FileQueries::getFileByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getFileByPath", [&](pqxx::work& txn) -> std::shared_ptr<vh::types::File> {
-        const auto row = txn.exec_prepared("get_file_by_path", pqxx::params{vaultId, relPath.string()}).one_row();
+        const auto row = txn.exec_prepared("get_file_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_row();
         return std::make_shared<types::File>(row);
     });
 }
 
 std::string FileQueries::getMimeType(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getMimeType", [&](pqxx::work& txn) -> std::string {
-        pqxx::params p{vaultId, relPath.string()};
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
         return txn.exec_prepared("get_file_mime_type", p).one_row()["mime_type"].as<std::string>();
     });
 }
 
 bool FileQueries::isFile(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::isFile", [&](pqxx::work& txn) -> bool {
-        pqxx::params p{vaultId, relPath.string()};
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
         return txn.exec_prepared("is_file", p).one_row()["exists"].as<bool>();
     });
 }
@@ -168,7 +169,7 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
     Transactions::exec("FileQueries::markFileAsTrashed", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("get_file_parent_id_and_size_by_path",
                                            pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
-        if (res.empty()) throw std::runtime_error("[markFileAsTrashed] File not found: " + relPath.string());
+        if (res.empty()) throw std::runtime_error("[markFileAsTrashed] File not found: " + to_utf8_string(relPath.u8string()));
 
         const auto row = res[0];
         const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
@@ -209,4 +210,18 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
         }
         parentId = nextParent;
     }
+}
+
+std::string FileQueries::getEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::string {
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
+        return txn.exec_prepared("get_file_encryption_iv", p).one_field().as<std::string>();
+    });
+}
+
+std::string FileQueries::getContentHash(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getContentHash", [&](pqxx::work& txn) -> std::string {
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
+        return txn.exec_prepared("get_file_content_hash", p).one_field().as<std::string>();
+    });
 }

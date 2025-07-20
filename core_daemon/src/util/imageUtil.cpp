@@ -178,19 +178,17 @@ std::vector<uint8_t> resize_and_compress_pdf_buffer(
     return jpeg_buf;
 }
 
-void generateAndStoreThumbnail(const std::string& buffer, const std::filesystem::path& outputPath,
+void generateAndStoreThumbnail(const std::vector<uint8_t>& buffer, const std::filesystem::path& outputPath,
                                const std::string& mime, const unsigned int size) {
     std::vector<uint8_t> jpeg;
 
     if (mime.starts_with("image/")) {
-        std::vector<uint8_t> raw(buffer.begin(), buffer.end());
         jpeg = resize_and_compress_image_buffer(
-            raw.data(), raw.size(), std::nullopt, std::make_optional(std::to_string(size))
+            buffer.data(), buffer.size(), std::nullopt, std::make_optional(std::to_string(size))
             );
     } else if (mime == "application/pdf") {
         jpeg = resize_and_compress_pdf_buffer(
-            reinterpret_cast<const uint8_t*>(buffer.data()),
-            buffer.size(), std::nullopt, std::make_optional(std::to_string(size))
+            buffer.data(), buffer.size(), std::nullopt, std::make_optional(std::to_string(size))
             );
     } else {
         throw std::runtime_error("Unsupported MIME type for thumbnail generation: " + mime);

@@ -61,14 +61,17 @@ public:
 
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 
+    [[nodiscard]] bool remoteFileIsEncrypted(const std::filesystem::path& rel_path) const;
+
+    std::optional<std::string> getRemoteIVBase64(const std::filesystem::path& rel_path) const;
+
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Provider> s3Provider_;
 
-    std::string downloadToBuffer(const std::filesystem::path& rel_path) const;
+    std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 };
 
-std::string getMimeType(const std::filesystem::path& path);
 std::u8string stripLeadingSlash(const std::filesystem::path& path);
 
 } // namespace vh::storage

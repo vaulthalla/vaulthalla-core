@@ -6,6 +6,7 @@
 #include "auth/AuthManager.hpp"
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
+#include "util/files.hpp"
 
 #include <iostream>
 #include <ranges>
@@ -94,18 +95,16 @@ PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, cons
         if (jpegPath.extension() != ".jpg" && jpegPath.extension() != ".jpeg") jpegPath.append(".jpg");
 
         if (std::filesystem::exists(jpegPath)) {
-            http::file_body::value_type body;
-            boost::beast::error_code ec;
-            body.open(jpegPath.c_str(), boost::beast::file_mode::scan, ec);
-            if (ec) throw std::runtime_error("[PdfPreviewHandler] Error opening JPEG file: " + ec.message());
+            const auto encrypted_data = util::readFileToVector(jpegPath);
+            auto decrypted_data = engine->decrypt(vaultId, rel_path, encrypted_data);
 
-            http::response<http::file_body> res{
-                std::piecewise_construct,
-                std::make_tuple(std::move(body)),
-                std::make_tuple(http::status::ok, req.version())
+            // Return decrypted image in memory
+            http::response<http::string_body> res{
+                http::status::ok, req.version()
             };
             res.set(http::field::content_type, "image/jpeg");
-            res.content_length(body.size());
+            res.body() = std::string(decrypted_data.begin(), decrypted_data.end());
+            res.prepare_payload();
             res.keep_alive(req.keep_alive());
             return res;
         }
@@ -114,7 +113,6 @@ PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, cons
     }
     return makeErrorResponse(req, "Unsupported preview type: " + mime_type);
 }
-
 
 http::response<http::string_body> HttpRouter::makeErrorResponse(const http::request<http::string_body>& req,
                                                                 const std::string& msg) {

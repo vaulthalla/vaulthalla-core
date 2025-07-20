@@ -2,7 +2,6 @@
 #include "shared_util/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
-#include <pqxx/row>
 #include <pqxx/result>
 #include <format>
 #include <regex>
@@ -21,6 +20,7 @@ inline std::string hexMode(const unsigned long long mode) {
 
 File::File(const pqxx::row& row)
     : FSEntry(row), size_bytes(row.at("size_bytes").as<unsigned long long>()),
+      encryption_iv(row.at("encryption_iv").as<std::string>()),
       mime_type(row.at("mime_type").as<std::optional<std::string>>()),
       content_hash(row.at("content_hash").as<std::optional<std::string>>()) {}
 

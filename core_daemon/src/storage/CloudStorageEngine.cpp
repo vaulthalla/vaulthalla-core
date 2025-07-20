@@ -4,18 +4,16 @@
 #include "types/Directory.hpp"
 #include "types/S3Vault.hpp"
 #include "types/Sync.hpp"
-#include "types/Operation.hpp"
-#include "types/CacheIndex.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/OperationQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
+#include "protocols/websocket/handlers/UploadHandler.hpp"
+#include "storage/VaultEncryptionManager.hpp"
+#include "util/files.hpp"
 
 #include <iostream>
 #include <fstream>
-
-#include "protocols/websocket/handlers/UploadHandler.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -25,13 +23,9 @@ CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<concurrency::Thumbn
                                        const std::shared_ptr<S3Vault>& vault,
                                        const std::shared_ptr<api::APIKey>& key,
                                        const std::shared_ptr<Sync>& sync)
-    : StorageEngine(vault, sync, thumbnailWorker),
+    : StorageEngine(vault, sync, thumbnailWorker,
+        config::ConfigRegistry::get().fuse.root_mount_path / config::ConfigRegistry::get().caching.path / std::to_string(vault->id) / "files"),
       key_(key) {
-    const auto& conf = config::ConfigRegistry::get();
-    root_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id) / "files";
-    if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
-    if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
-
     const auto s3Key = std::static_pointer_cast<api::S3APIKey>(key_);
     s3Provider_ = std::make_shared<cloud::S3Provider>(s3Key, vault->bucket);
 }
@@ -42,9 +36,18 @@ void CloudStorageEngine::finishUpload(const unsigned int userId, const std::file
     if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
     if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
 
+    const auto buffer = util::readFileToVector(absPath);
+
+    std::string iv_b64;
+    const auto ciphertext = encryptionManager_->encrypt(buffer, iv_b64);
+    util::writeFile(absPath, ciphertext);
+
     const auto f = createFile(relPath);
     f->created_by = f->last_modified_by = userId;
-    FileQueries::upsertFile(f);
+    f->encryption_iv = iv_b64;
+    f->id = FileQueries::upsertFile(f);
+
+    thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
 }
 
 void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
@@ -87,35 +90,73 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const
     if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
 
-    const auto s3Key = rel_path.string().starts_with("/") ? rel_path.string().substr(1) : rel_path.string();
+    const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
 
     if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
     else s3Provider_->uploadLargeObject(stripLeadingSlash(rel_path), absPath);
 
-    std::string buffer;
+    std::vector<uint8_t> buffer;
     if (!s3Provider_->downloadToBuffer(s3Key, buffer))
-        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key);
+        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key.string());
+
+    s3Provider_->setObjectContentHash(s3Key, FileQueries::getContentHash(vaultId(), rel_path));
+    s3Provider_->setObjectEncryptionMetadata(s3Key, FileQueries::getEncryptionIV(vaultId(), rel_path));
 }
 
-std::string CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
-    std::string buffer;
-    if (!s3Provider_->downloadToBuffer(rel_path, buffer))
+std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
+    std::vector<uint8_t> buffer;
+    if (!s3Provider_->downloadToBuffer(stripLeadingSlash(rel_path), buffer))
         throw std::runtime_error("[CloudStorageEngine] Failed to download file: " + rel_path.string());
 
     return buffer;
 }
 
 std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::path& rel_path) {
-    const auto buffer = downloadToBuffer(rel_path);
+    auto buffer = downloadToBuffer(rel_path);
     const auto absPath = getAbsolutePath(rel_path);
-    writeFile(absPath, buffer);
+    const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
 
-    const auto file = createFile(rel_path, absPath);
+    std::shared_ptr<File> file;
+
+    if (remoteFileIsEncrypted(rel_path)) {
+        auto iv_b64 = getRemoteIVBase64(rel_path);
+        if (!iv_b64) {
+            try {
+                iv_b64 = FileQueries::getEncryptionIV(vault_->id, rel_path);
+            } catch (const std::exception& e) {
+                std::cerr << "[CloudStorageEngine] Failed to get IV for encrypted file: " << e.what() << std::endl;
+                throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
+            }
+        }
+        if (iv_b64) {
+            const auto decrypted = encryptionManager_->decrypt(buffer, *iv_b64);
+            file = createFile(rel_path, decrypted);
+            file->encryption_iv = *iv_b64;
+        }
+        s3Provider_->setObjectEncryptionMetadata(s3Key, *iv_b64);
+        if (file->content_hash) s3Provider_->setObjectContentHash(s3Key, *file->content_hash);
+        util::writeFile(absPath, buffer);
+    }
+    else {
+        std::string iv_b64;
+        const auto ciphertext = encryptionManager_->encrypt(buffer, iv_b64);
+        util::writeFile(absPath, ciphertext);
+
+        file = createFile(rel_path, buffer);
+        file->encryption_iv = iv_b64;
+
+        std::unordered_map<std::string, std::string> meta{
+        {"vh-encrypted", "true"},
+        {"content-hash", *file->content_hash}
+        };
+        if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
+            throw std::runtime_error("[CloudStorageEngine] Failed to upload file with metadata: " + rel_path.string());
+        buffer = downloadToBuffer(rel_path);
+    }
+
     file->id = FileQueries::upsertFile(file);
 
     thumbnailWorker_->enqueue(shared_from_this(), buffer, file);
-
-    if (file->content_hash) s3Provider_->setObjectContentHash(stripLeadingSlash(file->path), *file->content_hash);
 
     return file;
 }
@@ -133,6 +174,20 @@ std::string CloudStorageEngine::getRemoteContentHash(const std::filesystem::path
     if (const auto head = s3Provider_->getHeadObject(stripLeadingSlash(rel_path)))
         if (head->contains("x-amz-meta-content-hash")) return head->at("x-amz-meta-content-hash");
     return "";
+}
+
+bool CloudStorageEngine::remoteFileIsEncrypted(const std::filesystem::path& rel_path) const {
+    const auto s3Key = stripLeadingSlash(rel_path);
+
+    if (const auto head = s3Provider_->getHeadObject(s3Key)) {
+        const auto it = head->find("x-amz-meta-vh-encrypted");
+        if (it != head->end()) {
+            const std::string& val = it->second;
+            return val == "true" || val == "1";
+        }
+    }
+
+    return false; // assume unencrypted if metadata is missing or head request failed
 }
 
 std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(
@@ -171,6 +226,17 @@ std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(
     });
 
     return result;
+}
+
+std::optional<std::string> CloudStorageEngine::getRemoteIVBase64(const std::filesystem::path& rel_path) const {
+    const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
+
+    if (const auto head = s3Provider_->getHeadObject(s3Key)) {
+        const auto it = head->find("x-amz-meta-vh-iv");
+        if (it != head->end()) return it->second;
+    }
+
+    return std::nullopt;
 }
 
 std::u8string vh::storage::stripLeadingSlash(const std::filesystem::path& path) {

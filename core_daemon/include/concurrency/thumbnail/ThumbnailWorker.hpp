@@ -15,7 +15,7 @@ namespace vh::concurrency {
 class ThumbnailWorker {
 public:
     void enqueue(const std::shared_ptr<storage::StorageEngine>& engine,
-             const std::string& buffer,
+             const std::vector<uint8_t>& buffer,
              const std::shared_ptr<types::File>& file) const {
         try {
             const std::string& mime = file->mime_type ? *file->mime_type : "unknown";

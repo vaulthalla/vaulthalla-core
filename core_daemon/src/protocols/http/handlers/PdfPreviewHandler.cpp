@@ -2,12 +2,10 @@
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "util/imageUtil.hpp"
+#include "util/files.hpp"
 
 #include <fpdfview.h>
-#include <boost/beast/http/file_body.hpp>
 #include <iostream>
-
-#include "util/imageUtil.hpp"
 
 namespace vh::http {
 
@@ -19,11 +17,15 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         const auto scale_it = params.find("scale");
         const auto size_it = params.find("size");
 
-        std::string file_path = storageManager_->getLocalEngine(vault_id)->getAbsolutePath(rel_path).string();
+        const auto engine = storageManager_->getLocalEngine(vault_id);
+
+        std::string file_path = engine->getAbsolutePath(rel_path);
         std::string mime_type = "image/jpeg";
 
+        const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
+
         FPDF_InitLibrary();
-        FPDF_DOCUMENT doc = FPDF_LoadDocument(file_path.c_str(), nullptr);
+        FPDF_DOCUMENT doc = FPDF_LoadDocument(tmpPath.c_str(), nullptr);
         if (!doc) throw std::runtime_error("Failed to load PDF");
 
         FPDF_PAGE page = FPDF_LoadPage(doc, 0);

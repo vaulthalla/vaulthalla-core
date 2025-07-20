@@ -52,3 +52,10 @@ std::string Magic::get_mime_type_from_buffer(const std::string& buffer) {
     static Magic instance;
     return instance.mime_type_buffer(buffer);
 }
+
+std::string Magic::get_mime_type_from_buffer(const std::vector<uint8_t>& buffer) {
+    if (buffer.empty()) throw std::invalid_argument("Cannot detect MIME type from empty buffer");
+
+    static Magic instance;
+    return instance.mime_type_buffer(std::string(buffer.begin(), buffer.end()));
+}

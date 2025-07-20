@@ -179,8 +179,8 @@ void DBConnection::initPreparedFiles() const {
                    "    path = EXCLUDED.path "
                    "  RETURNING id"
                    ") "
-                   "INSERT INTO files (fs_entry_id, size_bytes, mime_type, content_hash) "
-                   "SELECT id, $7, $8, $9 FROM upsert_entry "
+                   "INSERT INTO files (fs_entry_id, size_bytes, mime_type, content_hash, encryption_iv) "
+                   "SELECT id, $7, $8, $9, $10 FROM upsert_entry "
                    "ON CONFLICT (fs_entry_id) DO UPDATE SET "
                    "  size_bytes = EXCLUDED.size_bytes, "
                    "  mime_type = EXCLUDED.mime_type, "
@@ -194,7 +194,7 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed",
                    "WITH target AS ("
-                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, "
+                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, f.encryption_iv, "
                    "         fs.vault_id, fs.parent_id, fs.name, fs.created_by, fs.created_at, "
                    "         fs.updated_at, fs.last_modified_by, fs.path "
                    "  FROM files f "
@@ -203,11 +203,11 @@ void DBConnection::initPreparedFiles() const {
                    "), moved AS ("
                    "  INSERT INTO files_trashed ("
                    "    fs_entry_id, size_bytes, mime_type, content_hash, trashed_at, trashed_by, "
-                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path"
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path, encryption_iv"
                    "  ) "
                    "  SELECT "
                    "    fs_entry_id, size_bytes, mime_type, content_hash, NOW(), $3, "
-                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path, encryption_iv "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -217,7 +217,7 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed_by_id",
                    "WITH target AS ("
-                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, "
+                   "  SELECT f.fs_entry_id, f.size_bytes, f.mime_type, f.content_hash, f.encryption_iv, "
                    "         fs.vault_id, fs.parent_id, fs.name, fs.created_by, fs.created_at, "
                    "         fs.updated_at, fs.last_modified_by, fs.path "
                    "  FROM files f "
@@ -226,11 +226,11 @@ void DBConnection::initPreparedFiles() const {
                    "), moved AS ("
                    "  INSERT INTO files_trashed ("
                    "    fs_entry_id, size_bytes, mime_type, content_hash, trashed_at, trashed_by, "
-                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path"
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path, encryption_iv"
                    "  ) "
                    "  SELECT "
                    "    fs_entry_id, size_bytes, mime_type, content_hash, NOW(), $2, "
-                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path "
+                   "    vault_id, parent_id, name, created_by, created_at, updated_at, last_modified_by, path, encryption_iv "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -297,6 +297,17 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("is_file_trashed_by_path",
                    "SELECT EXISTS (SELECT 1 FROM files_trashed WHERE vault_id = $1 AND path = $2 AND deleted_at IS NULL)");
+
+    conn_->prepare("get_file_encryption_iv",
+                   "SELECT f.encryption_iv "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
+
+    conn_->prepare("get_file_content_hash",
+                   "SELECT content_hash FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND fs.path = $2");
 }
 
 void DBConnection::initPreparedDirectories() const {

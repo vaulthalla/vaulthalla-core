@@ -9,7 +9,6 @@ constexpr std::size_t OPSLIMIT = crypto_pwhash_OPSLIMIT_MODERATE;
 constexpr std::size_t MEMLIMIT = crypto_pwhash_MEMLIMIT_MODERATE;
 
 std::string hashPassword(const std::string& password) {
-    if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
     char hashed[crypto_pwhash_STRBYTES];
 
     if (crypto_pwhash_str(hashed, password.c_str(), password.size(), OPSLIMIT, MEMLIMIT) != 0)
@@ -19,7 +18,6 @@ std::string hashPassword(const std::string& password) {
 }
 
 bool verifyPassword(const std::string& password, const std::string& hash) {
-    if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
     return crypto_pwhash_str_verify(hash.c_str(), password.c_str(), password.size()) == 0;
 }
 

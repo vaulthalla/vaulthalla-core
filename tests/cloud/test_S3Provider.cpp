@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -81,7 +82,7 @@ TEST_F(S3ProviderIntegrationTest, test_BulkUploadDownloadDeleteTestAssets) {
 
         uploadedKeys.push_back(relKey);
 
-        std::string buffer;
+        std::vector<uint8_t> buffer;
         std::cout << "Downloading file to buffer: " << relKey << std::endl;
         EXPECT_TRUE(s3Provider_->downloadToBuffer(relKey, buffer)) << "Download failed for: " << relKey;
         EXPECT_GT(buffer.size(), 10) << "Buffer too small for: " << relKey;
@@ -191,9 +192,14 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     });
     EXPECT_TRUE(match != entries.end()) << "Uploaded key not found in fromS3XML()";
 
-    std::string buffer;
+    std::vector<uint8_t> buffer;
     EXPECT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
-    EXPECT_TRUE(buffer.find("appear in listObjects") != std::string::npos);
+
+    const std::string expected = "appear in listObjects";
+    const auto it = std::search(buffer.begin(), buffer.end(),
+                                expected.begin(), expected.end());
+
+    EXPECT_TRUE(it != buffer.end());
 
     EXPECT_TRUE(s3Provider_->deleteObject(key));
 }
@@ -204,11 +210,11 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
 
-    std::string buffer;
+    std::vector<uint8_t> buffer;
     ASSERT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
 
     auto jpeg = vh::util::resize_and_compress_image_buffer(
-        reinterpret_cast<const uint8_t*>(buffer.data()),
+        buffer.data(),
         buffer.size(),
         std::nullopt,
         std::make_optional("128")
@@ -224,11 +230,11 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_TRUE(s3Provider_->uploadObject(key, srcPath.string()));
 
-    std::string buffer;
+    std::vector<uint8_t> buffer;
     ASSERT_TRUE(s3Provider_->downloadToBuffer(key, buffer));
 
     auto jpeg = vh::util::resize_and_compress_pdf_buffer(
-        reinterpret_cast<const uint8_t*>(buffer.data()),
+        buffer.data(),
         buffer.size(),
         std::nullopt,
         std::make_optional("128")

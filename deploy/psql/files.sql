@@ -24,10 +24,11 @@ CREATE TABLE directories
 
 CREATE TABLE files
 (
-    fs_entry_id  INTEGER PRIMARY KEY REFERENCES fs_entry (id) ON DELETE CASCADE,
-    size_bytes   BIGINT DEFAULT 0,
-    mime_type    VARCHAR(255),
-    content_hash VARCHAR(128)
+    fs_entry_id   INTEGER PRIMARY KEY REFERENCES fs_entry (id) ON DELETE CASCADE,
+    size_bytes    BIGINT DEFAULT 0,
+    mime_type     VARCHAR(255),
+    content_hash  VARCHAR(128),
+    encryption_iv TEXT
 );
 
 CREATE TABLE files_trashed
@@ -48,7 +49,8 @@ CREATE TABLE files_trashed
 
     trashed_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     trashed_by       INTEGER REFERENCES users (id),
-    deleted_at       TIMESTAMP -- NULL if not permanently deleted
+    deleted_at       TIMESTAMP, -- NULL if not permanently deleted
+    encryption_iv    TEXT
 );
 
 CREATE TABLE cache_index

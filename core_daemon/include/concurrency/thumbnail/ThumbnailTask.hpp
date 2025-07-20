@@ -18,7 +18,7 @@ namespace vh::concurrency {
 class ThumbnailTask : public Task {
 public:
     ThumbnailTask(const std::shared_ptr<const storage::StorageEngine>& engine,
-                  const std::string& buffer,
+                  const std::vector<uint8_t>& buffer,
                   const std::shared_ptr<types::File>& file)
         : engine_(engine), buffer_(buffer), file_(file) {}
 
@@ -56,7 +56,7 @@ public:
 
 private:
     std::shared_ptr<const storage::StorageEngine> engine_;
-    std::string buffer_;
+    std::vector<uint8_t> buffer_;
     std::shared_ptr<types::File> file_;
 };
 

@@ -10,10 +10,12 @@
 #include "database/Queries/OperationQueries.hpp"
 #include "util/Magic.hpp"
 #include "crypto/Hash.hpp"
+#include "storage/VaultEncryptionManager.hpp"
 
 #include <iostream>
 #include <algorithm>
 #include <fstream>
+#include <utility>
 
 using namespace vh::types;
 using namespace vh::database;
@@ -24,14 +26,12 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
                              const std::shared_ptr<Sync>& sync,
                              const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
                              fs::path root_mount_path)
-    : sync_(sync), vault_(vault), thumbnailWorker_(thumbnailWorker) {
+    : sync_(sync), root_(std::move(root_mount_path)), vault_(vault), thumbnailWorker_(thumbnailWorker) {
     const auto& conf = config::ConfigRegistry::get();
     cache_path_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id);
-
-    if (root_mount_path.empty()) root_ = cache_path_;
-    else root_ = std::move(root_mount_path);
-
     if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
+    if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
+    encryptionManager_ = std::make_shared<VaultEncryptionManager>(root_);
 }
 
 bool StorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
@@ -141,8 +141,8 @@ std::filesystem::path StorageEngine::getRelativeCachePath(const std::filesystem:
     return abs_path.lexically_relative(cache_path_).make_preferred();
 }
 
-std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path, const std::filesystem::path& abs_path) const {
-    const auto absPath = abs_path.empty() ? getAbsolutePath(rel_path) : abs_path;
+std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& buffer) const {
+    const auto absPath = getAbsolutePath(rel_path);
 
     if (!std::filesystem::exists(absPath))
         throw std::runtime_error("File does not exist at path: " + absPath.string());
@@ -155,21 +155,12 @@ std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel
     file->size_bytes = std::filesystem::file_size(absPath);
     file->created_by = file->last_modified_by = vault_->owner_id;
     file->path = rel_path;
-    file->mime_type = util::Magic::get_mime_type(absPath);
+    file->mime_type = buffer.empty() ? util::Magic::get_mime_type(absPath) : util::Magic::get_mime_type_from_buffer(buffer);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? std::filesystem::path{"/"} / file->path.parent_path() : std::filesystem::path("/");
     file->parent_id = DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
     return file;
-}
-
-void StorageEngine::writeFile(const std::filesystem::path& abs_path, const std::string& buffer) const {
-    if (buffer.empty()) std::cerr << "Warning: empty buffer, writing 0 bytes to: " << abs_path << std::endl;
-    if (!std::filesystem::exists(abs_path.parent_path())) std::filesystem::create_directories(abs_path.parent_path());
-    std::ofstream file(abs_path, std::ios::binary);
-    if (!file) throw std::runtime_error("Failed to open file for writing: " + abs_path.string());
-    file.write(buffer.data(), buffer.size());
-    file.close();
 }
 
 std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path,
@@ -203,6 +194,12 @@ void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
         const auto thumbnailPath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
         if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
     }
+}
+
+std::vector<uint8_t> StorageEngine::decrypt(const unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const {
+    const auto iv = FileQueries::getEncryptionIV(vaultId, relPath);
+    if (iv.empty()) throw std::runtime_error("No encryption IV found for file: " + relPath.string());
+    return encryptionManager_->decrypt(payload, iv);
 }
 
 std::string StorageEngine::getMimeType(const std::filesystem::path& path) {

@@ -3,9 +3,11 @@
 #include "types/Vault.hpp"
 #include "types/LocalDiskVault.hpp"
 #include "util/imageUtil.hpp"
+#include "util/files.hpp"
 #include "concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "types/File.hpp"
+#include "storage/VaultEncryptionManager.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -27,19 +29,19 @@ void LocalDiskStorageEngine::finishUpload(const unsigned int userId, const std::
         if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
         if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
 
-        std::string buffer;
-        std::ifstream in(absPath, std::ios::binary | std::ios::ate);
-        if (!in) throw std::runtime_error("Failed to open file: " + absPath.string());
-        std::streamsize inSize = in.tellg();
-        in.seekg(0, std::ios::beg);
-        buffer.resize(inSize);
-        if (!in.read(buffer.data(), inSize)) throw std::runtime_error("Failed to read file: " + absPath.string());
-        in.close();
+        const auto buffer = util::readFileToVector(absPath);
 
-        const auto f = createFile(relPath);
+        std::string iv_b64;
+        const auto ciphertext = encryptionManager_->encrypt(buffer, iv_b64);
+
+        util::writeFile(absPath, ciphertext);
+
+        const auto f = createFile(relPath, buffer);
         f->created_by = f->last_modified_by = userId;
+        f->encryption_iv = iv_b64;
 
-        f->id = database::FileQueries::upsertFile(f);
+        f->id = FileQueries::upsertFile(f);
+
         thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
 
     } catch (const std::exception& e) {

@@ -6,8 +6,11 @@
 #include <sstream>
 #include <ranges>
 #include <algorithm>
+#include <sodium.h>
 
 void validatePassword(const std::string& password) {
+    if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
+
     vh::auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
         {"https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
          "100k-most-used-passwords-NCSC.txt",

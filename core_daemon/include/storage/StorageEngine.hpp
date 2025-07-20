@@ -22,6 +22,8 @@ class ThumbnailWorker;
 
 namespace vh::storage {
 
+struct VaultEncryptionManager;
+
 enum class StorageType { Local, Cloud };
 
 class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
@@ -75,14 +77,12 @@ public:
     [[nodiscard]] uintmax_t freeSpace() const;
 
     [[nodiscard]] std::shared_ptr<types::File> createFile(const std::filesystem::path& rel_path,
-                                                          const std::filesystem::path& abs_path = {}) const;
+                                                          const std::vector<uint8_t>& = {}) const;
 
     [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path,
                                                              const std::filesystem::path& prefix = {}) const;
 
     [[nodiscard]] std::filesystem::path getRelativeCachePath(const std::filesystem::path& abs_path) const;
-
-    void writeFile(const std::filesystem::path& abs_path, const std::string& buffer) const;
 
     [[nodiscard]] std::shared_ptr<types::Vault> getVault() const { return vault_; }
 
@@ -94,11 +94,14 @@ public:
 
     void purgeThumbnails(const fs::path& rel_path) const;
 
+    [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const;
+
     static std::string getMimeType(const std::filesystem::path& path);
 
 protected:
-    std::shared_ptr<types::Vault> vault_;
     fs::path cache_path_, root_;
+    std::shared_ptr<types::Vault> vault_;
+    std::shared_ptr<VaultEncryptionManager> encryptionManager_;
     std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
 
     void removeFile(const fs::path& rel_path, unsigned int userId) const;

@@ -14,12 +14,14 @@
 
 #include <boost/asio/io_context.hpp>
 #include <iostream>
+#include <sodium.h>
 
 namespace vh::services {
 void Vaulthalla::start() {
     std::cout << "Starting Vaulthalla service..." << std::endl;
 
     try {
+        if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initConfig();
         concurrency::ThreadPoolRegistry::instance().init();
         database::Transactions::init();

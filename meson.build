@@ -1,6 +1,7 @@
 project('vaulthalla', 'cpp',
         version: '0.6.1',
-        default_options: ['warning_level=3', 'cpp_std=c++2b'])
+        license: 'AGPLv3',
+        default_options: ['warning_level=3', 'cpp_std=c++23'])
 
 # ╭──────────────────── DEBUG FLAGS ─────────────────────╮
 if get_option('buildtype') == 'debug'
@@ -10,24 +11,21 @@ endif
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
-nlohmann_json   = dependency('nlohmann_json', required: true)
-libpqxx         = dependency('libpqxx', required: true)
+libpqxx         = dependency('libpqxx', fallback: ['pqxx', 'pqxx_dep'], required: true)
 libsodium       = dependency('libsodium', required: true)
 libmagic        = dependency('libmagic', required: true)
-jwt_cpp         = dependency('jwt-cpp', required: true)
 libcurl         = dependency('libcurl', required: true)
 libfuse         = dependency('fuse3', required: true)
 yaml_cpp        = dependency('yaml-cpp', required: true)
-libjpeg_turbo   = dependency('libjpeg-turbo', required: true)
-stb             = dependency('stb', required: true)
-pdfium          = dependency('pdfium', required: true)
+libjpeg         = dependency('libjpeg', required: true)
+poppler         = dependency('poppler', required: true)
 pugixml         = dependency('pugixml', required: true)
 uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
-global_deps     = [boost_dep, nlohmann_json, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep]
-core_deps       = global_deps + [libsodium, jwt_cpp, libcurl, libjpeg_turbo, stb, pdfium]
+global_deps     = [boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep]
+core_deps       = global_deps + [libsodium, libcurl, libjpeg, poppler]
 fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]
 
@@ -41,8 +39,8 @@ core_main           = files(source_root + '/main.cpp')
 hash_pass_src       = files(core_src_dir + '/crypto/PasswordHash.cpp', core_src_dir + '/crypto/PasswordUtils.cpp')
 hash_pass_main      = files(source_root + '/deploy/hash_password.cpp')
 
-core_inc            = include_directories('core_daemon/include', 'shared/include')
-fuse_inc            = include_directories('fuse_daemon/include', 'shared/include')
+core_inc            = include_directories('core_daemon/include', 'shared/include', 'dependencies')
+fuse_inc            = include_directories('fuse_daemon/include', 'shared/include', 'dependencies')
 hash_pass_inc       = include_directories('core_daemon/include')
 
 # ╭──────────────────── SOURCE COLLECTION ───────────────╮

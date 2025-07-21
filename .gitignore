@@ -5,5 +5,8 @@
 config.yaml
 
 # Server
-build
-deploy/psql/hash_password
+/build/
+/deploy/psql/hash_password
+
+# Production
+/dist/

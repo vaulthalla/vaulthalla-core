@@ -27,7 +27,6 @@ class VaulthallaConan(ConanFile):
         self.requires("libmagic/5.45")
         self.requires("stb/cci.20240531")
         self.requires("libjpeg-turbo/3.1.1", override=True)
-        self.requires("pdfium/95.0.4629", options={"with_libjpeg": "libjpeg-turbo"})
         self.requires("pugixml/1.15")
 
     def layout(self):

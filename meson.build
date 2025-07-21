@@ -9,9 +9,14 @@ if get_option('buildtype') == 'debug'
     add_project_link_arguments('-fsanitize=address,undefined', language: 'cpp')
 endif
 
+add_project_link_arguments('-lcrypto', language: 'cpp')
+add_project_link_arguments('-lz', language: 'cpp')
+add_project_link_arguments('-lpoppler-cpp', language: 'cpp')
+add_project_link_arguments('-lturbojpeg', language: 'cpp')
+
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
-libpqxx         = dependency('libpqxx', fallback: ['pqxx', 'pqxx_dep'], required: true)
+libpqxx         = dependency('libpqxx', required: true)
 libsodium       = dependency('libsodium', required: true)
 libmagic        = dependency('libmagic', required: true)
 libcurl         = dependency('libcurl', required: true)
@@ -30,18 +35,27 @@ fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]
 
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮
-source_root         = '.'
-core_src_dir        = source_root + '/core_daemon/src'
-fuse_src_dir        = source_root + '/fuse_daemon/src'
-shared_src_dir      = source_root + '/shared/src'
-tests_src_dir       = source_root + '/tests'
-core_main           = files(source_root + '/main.cpp')
-hash_pass_src       = files(core_src_dir + '/crypto/PasswordHash.cpp', core_src_dir + '/crypto/PasswordUtils.cpp')
-hash_pass_main      = files(source_root + '/deploy/hash_password.cpp')
+source_root     = meson.project_source_root()
+core_src_dir    = join_paths(source_root, 'core_daemon/src')
+fuse_src_dir    = join_paths(source_root, 'fuse_daemon/src')
+shared_src_dir  = join_paths(source_root, 'shared/src')
+tests_src_dir   = join_paths(source_root, 'tests')
 
-core_inc            = include_directories('core_daemon/include', 'shared/include', 'dependencies')
-fuse_inc            = include_directories('fuse_daemon/include', 'shared/include', 'dependencies')
-hash_pass_inc       = include_directories('core_daemon/include')
+core_main       = files(join_paths(source_root, 'main.cpp'))
+
+hash_pass_src   = files(
+    join_paths(core_src_dir, 'crypto/PasswordHash.cpp'),
+    join_paths(core_src_dir, 'crypto/PasswordUtils.cpp')
+)
+hash_pass_main  = files(join_paths(source_root, 'deploy/hash_password.cpp'))
+
+# ╭──────────────────── INCLUDE DIRS ─────────────────────╮
+core_inc_paths = ['core_daemon/include', 'shared/include', 'vendor']
+fuse_inc_paths = ['fuse_daemon/include', 'shared/include', 'vendor']
+
+core_inc       = include_directories(core_inc_paths)
+fuse_inc       = include_directories(fuse_inc_paths)
+hash_pass_inc  = include_directories('core_daemon/include')
 
 # ╭──────────────────── SOURCE COLLECTION ───────────────╮
 shared_sources = []

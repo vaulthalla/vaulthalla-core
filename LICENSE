@@ -16,7 +16,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see [https://www.gnu.org/licenses/](https://www.gnu.org/licenses/).
 
-
 ########################################################
 #########   🚨  NOTE TO DEBIAN SPONSORS   🚨  ##########
 ########################################################
@@ -31,12 +30,12 @@ Debian sponsorship, remain solely at the discretion of the above.
 
 If you're interested in seeing Vaulthalla in Debian,
 you may:
-  - use it via apt.vaulthalla.sh
-  - submit a request via GitHub Discussions
-  - wait until the tides turn in your favor
-  - or petition the Debian Technical Committee to allow
-    redistribution of this package to mentors.debian.net or for sponsorship.
 
+* use it via apt.vaulthalla.sh
+* submit a request via GitHub Discussions
+* wait until the tides turn in your favor
+* or petition the Debian Technical Committee to allow
+  redistribution of this package to mentors.debian.net or for sponsorship.
 
 ADDITIONAL TERMS:
 
@@ -54,5 +53,21 @@ Pursuant to Section 13 of the GNU Affero General Public License, if you modify V
 All modified versions of this program must prominently mark the software
 as modified, include the date of modification, and clearly indicate that it
 differs from the official Vaulthalla distribution.
+
+The following additional restrictions apply explicitly to Debian packaging and redistribution:
+
+1. Redistribution of this software under a new package name, or via repackaging by third parties for official Debian inclusion without the express written permission of Valkyrian Labs is strictly prohibited. Forking the package under a new name for the sole purpose of bypassing distribution restrictions constitutes bad-faith action and will be publicly documented and legally challenged.
+
+2. Contributors to Vaulthalla do not acquire the right to independently distribute, relicense, or submit this software to third-party archives, package repositories, or distributions without the written approval of Valkyrian Labs.
+
+3. Violations of these terms—including unauthorized Debian packaging or distribution under deceptive pretenses—may result in public disclosure, takedown requests, and legal escalation.
+
+4. Any derivative Debian source package (i.e., containing `debian/`) must clearly and prominently document:
+
+   * The original upstream source ([https://github.com/valkyrianlabs/vaulthalla](https://github.com/valkyrianlabs/vaulthalla))
+   * The reason for deviation or fork
+   * The identity of the responsible packager
+
+Failure to adhere to the above constitutes misrepresentation and breach of these Additional Terms.
 
 END OF TERMS AND CONDITIONS

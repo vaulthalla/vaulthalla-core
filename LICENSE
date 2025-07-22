@@ -46,9 +46,13 @@ granted to use these trademarks in a commercial context or to endorse or
 promote derivative works without explicit prior written consent from
 Valkyrian Labs.
 
-Use of the trademark "Vaulthalla," associated logos, and branding in forks or derivative works is prohibited without explicit written permission from Valkyrian Labs. See \[Trademark Policy URL] for detailed guidelines.
+Use of the trademark "Vaulthalla," associated logos, and branding in forks or
+derivative works is prohibited without explicit written permission from Valkyrian Labs.
+See \[Trademark Policy URL] for detailed guidelines.
 
-Pursuant to Section 13 of the GNU Affero General Public License, if you modify Vaulthalla and provide network access to users interacting remotely, you must prominently provide access to the corresponding source of your modifications.
+Pursuant to Section 13 of the GNU Affero General Public License,
+if you modify Vaulthalla and provide network access to users interacting remotely,
+you must prominently provide access to the corresponding source of your modifications.
 
 All modified versions of this program must prominently mark the software
 as modified, include the date of modification, and clearly indicate that it
@@ -56,11 +60,16 @@ differs from the official Vaulthalla distribution.
 
 The following additional restrictions apply explicitly to Debian packaging and redistribution:
 
-1. Redistribution of this software under a new package name, or via repackaging by third parties for official Debian inclusion without the express written permission of Valkyrian Labs is strictly prohibited. Forking the package under a new name for the sole purpose of bypassing distribution restrictions constitutes bad-faith action and will be publicly documented and legally challenged.
+1. Redistribution of this software under a new package name, or via repackaging by third parties
+   for official Debian inclusion without the express written permission of Valkyrian Labs is strictly prohibited.
+   Forking the package under a new name for the sole purpose of bypassing distribution restrictions constitutes
+   bad-faith action and will be publicly documented and legally challenged.
 
-2. Contributors to Vaulthalla do not acquire the right to independently distribute, relicense, or submit this software to third-party archives, package repositories, or distributions without the written approval of Valkyrian Labs.
+2. Contributors to Vaulthalla do not acquire the right to independently distribute, relicense, or submit this
+   software to third-party archives, package repositories, or distributions without the written approval of Valkyrian Labs.
 
-3. Violations of these terms—including unauthorized Debian packaging or distribution under deceptive pretenses—may result in public disclosure, takedown requests, and legal escalation.
+3. Violations of these terms—including unauthorized Debian packaging or distribution under deceptive pretenses—may
+   result in public disclosure, takedown requests, and legal escalation.
 
 4. Any derivative Debian source package (i.e., containing `debian/`) must clearly and prominently document:
 

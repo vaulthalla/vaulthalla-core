@@ -16,7 +16,7 @@
 
 
 %:
-	dh $@
+	dh $@ --buildsystem=meson
 
 
 # dh_make generated override targets.

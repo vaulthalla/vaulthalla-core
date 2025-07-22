@@ -1,19 +1,45 @@
 Source: vaulthalla
-Section: unknown
+Section: utils
 Priority: optional
-Maintainer: Cooper <coop@unknown>
+Maintainer: Cooper Larson <cooper@valkyrianlabs.com>
 Rules-Requires-Root: no
 Build-Depends:
  debhelper-compat (= 13),
+ cmake,
+ libmagic-dev,
+ libpqxx-dev,
+ libsodium-dev,
+ libcurl4-openssl-dev,
+ uuid-dev,
+ libfuse3-dev,
+ libyaml-cpp-dev,
+ libpugixml-dev,
+ libgtest-dev,
+ libboost-filesystem-dev,
+ libboost-system-dev,
 Standards-Version: 4.6.2
-Homepage: <insert the upstream URL, if relevant>
+Homepage: https://github.com/vaulthalla/server
 #Vcs-Browser: https://salsa.debian.org/debian/vaulthalla
 #Vcs-Git: https://salsa.debian.org/debian/vaulthalla.git
 
 Package: vaulthalla
-Architecture: all
+Architecture: any
 Multi-Arch: foreign
 Depends:
  ${misc:Depends},
-Description: <insert up to 60 chars description>
- <Insert long description, indented with spaces.>
+ libmagic1,
+ libpqxx-7.10,
+ libsodium23,
+ libcurl4,
+ libuuid1,
+ libfuse3-3,
+ libyaml-cpp0.7,
+ libpugixml1v5,
+ libboost-filesystem1.83.0,
+ libboost-system1.83.0
+Description: Self-hosted cloud platform with native FUSE and S3 sync
+ Vaulthalla is a modern self-hosted cloud storage platform designed as
+ a high-performance alternative to Nextcloud. It features a C++ core
+ daemon, native Linux filesystem via FUSE, S3-compatible object storage,
+ PostgreSQL indexing, and a secure web frontend. Vaulthalla emphasizes
+ speed, sovereignty, and deep system integration for power users.

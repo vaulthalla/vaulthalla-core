@@ -11,8 +11,27 @@ endif
 
 add_project_link_arguments('-lcrypto', language: 'cpp')
 add_project_link_arguments('-lz', language: 'cpp')
-add_project_link_arguments('-lpoppler-cpp', language: 'cpp')
 add_project_link_arguments('-lturbojpeg', language: 'cpp')
+
+# ╭──────────────────── Vendor pdfium ─────────────────────╮
+pdfium_root  = join_paths(meson.project_source_root(), 'vendor', 'pdfium')
+pdfium_inc   = include_directories('vendor/pdfium/include')
+pdfium_lib   = meson.get_compiler('cpp').find_library('pdfium',
+                               dirs    : [join_paths(pdfium_root, 'lib')],
+                               required: true)     # <- points at libpdfium.so
+
+pdfium = declare_dependency(
+    include_directories : pdfium_inc,
+    dependencies        : [pdfium_lib],
+    link_args           : [
+        '-Wl,-rpath,' + join_paths(pdfium_root, 'lib')  # run from build tree
+    ],
+)
+
+meson.override_dependency('libpdfium', pdfium)  # Ensure pdfium is available as 'libpdfium'
+
+install_data(join_paths(pdfium_root, 'lib', 'libpdfium.so'),
+             install_dir: get_option('libdir'))
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
@@ -23,19 +42,18 @@ libcurl         = dependency('libcurl', required: true)
 libfuse         = dependency('fuse3', required: true)
 yaml_cpp        = dependency('yaml-cpp', required: true)
 libjpeg         = dependency('libjpeg', required: true)
-poppler         = dependency('poppler', required: true)
 pugixml         = dependency('pugixml', required: true)
 uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
 global_deps     = [boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep]
-core_deps       = global_deps + [libsodium, libcurl, libjpeg, poppler]
+core_deps       = global_deps + [libsodium, libcurl, libjpeg, pdfium]
 fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]
 
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮
-source_root     = meson.project_source_root()
+source_root = meson.project_source_root()
 core_src_dir    = join_paths(source_root, 'core_daemon/src')
 fuse_src_dir    = join_paths(source_root, 'fuse_daemon/src')
 shared_src_dir  = join_paths(source_root, 'shared/src')
@@ -50,9 +68,10 @@ hash_pass_src   = files(
 hash_pass_main  = files(join_paths(source_root, 'deploy/hash_password.cpp'))
 
 # ╭──────────────────── INCLUDE DIRS ─────────────────────╮
-core_inc_paths = ['core_daemon/include', 'shared/include', 'vendor']
+core_inc_paths = ['core_daemon/include', 'shared/include', 'vendor', 'vendor/stb']
 fuse_inc_paths = ['fuse_daemon/include', 'shared/include', 'vendor']
 
+# Add the MuPDF include directory
 core_inc       = include_directories(core_inc_paths)
 fuse_inc       = include_directories(fuse_inc_paths)
 hash_pass_inc  = include_directories('core_daemon/include')

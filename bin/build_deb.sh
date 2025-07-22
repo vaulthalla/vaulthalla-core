@@ -30,7 +30,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCHITECTURE}
-Maintainer: Cooper Larson <you@example.com>
+Maintainer: Cooper Larson <cooper@valkyrianlabs.com>
 Description: Vaulthalla self-hosted cloud platform
  Long description can go here.
 EOF

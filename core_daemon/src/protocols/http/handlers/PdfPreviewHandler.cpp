@@ -4,9 +4,7 @@
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
 
-#include <poppler/cpp/poppler-document.h>
-#include <poppler/cpp/poppler-page.h>
-#include <poppler/cpp/poppler-page-renderer.h>
+#include <fpdfview.h>
 #include <iostream>
 
 namespace vh::http {
@@ -20,60 +18,60 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         const auto size_it = params.find("size");
 
         const auto engine = storageManager_->getLocalEngine(vault_id);
-        const std::string tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
-        const std::string mime_type = "image/jpeg";
 
-        std::ifstream in(tmpPath, std::ios::binary | std::ios::ate);
-        if (!in) throw std::runtime_error("Failed to open PDF for reading");
-        const std::streamsize size = in.tellg();
-        in.seekg(0);
-        std::string buffer(size, '\0');
-        if (!in.read(buffer.data(), size)) throw std::runtime_error("Failed to read decrypted PDF");
+        std::string file_path = engine->getAbsolutePath(rel_path);
+        std::string mime_type = "image/jpeg";
 
-        auto doc = poppler::document::load_from_raw_data(buffer.data(), buffer.size());
-        if (!doc || doc->is_locked()) throw std::runtime_error("Failed to load or unlock PDF");
+        const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
 
-        auto page = doc->create_page(0);
-        if (!page) throw std::runtime_error("Failed to load first page");
+        FPDF_InitLibrary();
+        FPDF_DOCUMENT doc = FPDF_LoadDocument(tmpPath.c_str(), nullptr);
+        if (!doc) throw std::runtime_error("Failed to load PDF");
 
-        const double width = page->page_rect().width();
-        const double height = page->page_rect().height();
-
-        double scale = 1.0;
-        if (scale_it != params.end()) {
-            scale = std::stof(scale_it->second);
-        } else if (size_it != params.end()) {
-            const int max_dim = std::stoi(size_it->second);
-            const double ratio = std::min(max_dim / width, max_dim / height);
-            scale = ratio;
+        FPDF_PAGE page = FPDF_LoadPage(doc, 0);
+        if (!page) {
+            FPDF_CloseDocument(doc);
+            throw std::runtime_error("Failed to load first page");
         }
 
-        poppler::page_renderer renderer;
-        renderer.set_render_hint(poppler::page_renderer::antialiasing, true);
-        renderer.set_render_hint(poppler::page_renderer::text_antialiasing, true);
-        poppler::image img = renderer.render_page(page, scale * 72.0, scale * 72.0);
+        int width = static_cast<int>(FPDF_GetPageWidth(page));
+        int height = static_cast<int>(FPDF_GetPageHeight(page));
 
-        if (!img.is_valid()) throw std::runtime_error("Poppler failed to render the page");
+        int new_w = width, new_h = height;
+        if (scale_it != params.end()) {
+            float scale = std::stof(scale_it->second);
+            new_w = static_cast<int>(width * scale);
+            new_h = static_cast<int>(height * scale);
+        } else if (size_it != params.end()) {
+            int max_dim = std::stoi(size_it->second);
+            float ratio = std::min(max_dim / static_cast<float>(width), max_dim / static_cast<float>(height));
+            new_w = static_cast<int>(width * ratio);
+            new_h = static_cast<int>(height * ratio);
+        }
 
-        const int w = img.width();
-        const int h = img.height();
-        const int row_stride = img.bytes_per_row();
-        const char* raw = img.data();
+        FPDF_BITMAP bitmap = FPDFBitmap_Create(new_w, new_h, 0);
+        FPDFBitmap_FillRect(bitmap, 0, 0, new_w, new_h, 0xFFFFFFFF);
+        FPDF_RenderPageBitmap(bitmap, page, 0, 0, new_w, new_h, 0, 0);
 
-        std::vector<uint8_t> rgb(w * h * 3);
+        uint8_t* buffer = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
+        std::vector<uint8_t> rgb_data(new_w * new_h * 3);
 
-        for (int y = 0; y < h; ++y) {
-            for (int x = 0; x < w; ++x) {
-                const int pixel_offset = y * row_stride + x * 4;
-
-                rgb[(y * w + x) * 3 + 0] = raw[pixel_offset + 0]; // R
-                rgb[(y * w + x) * 3 + 1] = raw[pixel_offset + 1]; // G
-                rgb[(y * w + x) * 3 + 2] = raw[pixel_offset + 2]; // B
+        for (int y = 0; y < new_h; ++y) {
+            for (int x = 0; x < new_w; ++x) {
+                int idx = y * new_w + x;
+                rgb_data[idx * 3 + 0] = buffer[idx * 4 + 2]; // R
+                rgb_data[idx * 3 + 1] = buffer[idx * 4 + 1]; // G
+                rgb_data[idx * 3 + 2] = buffer[idx * 4 + 0]; // B
             }
         }
 
         std::vector<uint8_t> jpeg_buf;
-        util::compress_to_jpeg(rgb.data(), w, h, jpeg_buf);
+        util::compress_to_jpeg(rgb_data.data(), new_w, new_h, jpeg_buf);
+
+        FPDFBitmap_Destroy(bitmap);
+        FPDF_ClosePage(page);
+        FPDF_CloseDocument(doc);
+        FPDF_DestroyLibrary();
 
         http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
         res.set(http::field::content_type, mime_type);

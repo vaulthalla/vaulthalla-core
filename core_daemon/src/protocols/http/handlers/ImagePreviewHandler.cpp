@@ -7,6 +7,8 @@
 #include <boost/beast/http/file_body.hpp>
 #include <iostream>
 
+using namespace vh::storage;
+
 namespace vh::http {
 
 PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& req, int vault_id, const std::string& rel_path,
@@ -15,7 +17,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         const auto scale_it = params.find("scale");
         const auto size_it = params.find("size");
 
-        const auto engine = storageManager_->getLocalEngine(vault_id);
+        const auto engine = storageManager_->getEngine(vault_id);
         const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
 
         std::string file_path = engine->getAbsolutePath(rel_path);

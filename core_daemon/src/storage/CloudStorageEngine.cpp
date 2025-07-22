@@ -50,10 +50,6 @@ void CloudStorageEngine::finishUpload(const unsigned int userId, const std::file
     thumbnailWorker_->enqueue(shared_from_this(), buffer, f);
 }
 
-void CloudStorageEngine::mkdir(const std::filesystem::path& relative_path) {
-    std::cout << "[CloudStorageEngine] mkdir called: " << relative_path << std::endl;
-}
-
 std::optional<std::vector<uint8_t> > CloudStorageEngine::readFile(const std::filesystem::path& rel_path) const {
     std::cout << "[CloudStorageEngine] readFile called: " << rel_path << std::endl;
     // TODO: Implement S3/R2 read logic
@@ -77,12 +73,6 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
     if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
     if (rmThumbnails) purgeThumbnails(rel_path);
-}
-
-bool CloudStorageEngine::fileExists(const std::filesystem::path& rel_path) const {
-    std::cout << "[CloudStorageEngine] fileExists called: " << rel_path << std::endl;
-    // TODO: Implement S3/R2 fileExists logic
-    return false;
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {

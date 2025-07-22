@@ -23,21 +23,11 @@ public:
 
     void finishUpload(unsigned int userId, const std::filesystem::path& relPath) override;
 
-    void mkdir(const fs::path& relative_path) override;
-
-    bool writeFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& data, bool overwrite);
-
     [[nodiscard]] std::optional<std::vector<uint8_t> > readFile(const std::filesystem::path& rel_path) const override;
-
-    [[nodiscard]] bool fileExists(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const override;
 
     [[nodiscard]] std::filesystem::path getRootPath() const;
-
-    [[nodiscard]] fs::path resolvePath(const std::string& id) const;
-
-    [[nodiscard]] fs::path getRelativePath(const fs::path& absolute_path) const;
 };
 
 } // namespace vh::storage

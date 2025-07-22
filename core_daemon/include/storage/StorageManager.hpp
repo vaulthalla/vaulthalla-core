@@ -3,6 +3,7 @@
 #include "types/Vault.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
+
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -55,10 +56,6 @@ public:
 
     void syncNow(unsigned int vaultId) const;
 
-    std::shared_ptr<LocalDiskStorageEngine> getLocalEngine(unsigned int id) const;
-
-    std::shared_ptr<CloudStorageEngine> getCloudEngine(unsigned int id) const;
-
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
 
     std::shared_ptr<concurrency::ThumbnailWorker> getThumbnailWorker() const { return thumbnailWorker_; }
@@ -68,6 +65,14 @@ public:
     static bool hasLogicalParent(const std::filesystem::path& relPath);
 
     std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
+
+    template <typename T>
+    std::shared_ptr<T> getEngine(unsigned int id) const {
+        std::lock_guard lock(mountsMutex_);
+        auto it = engines_.find(id);
+        if (it != engines_.end()) return std::dynamic_pointer_cast<T>(it->second);
+        return nullptr;
+    }
 
     template <typename T>
     std::vector<std::shared_ptr<T>> getEngines() const {

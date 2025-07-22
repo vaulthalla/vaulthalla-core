@@ -151,28 +151,7 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
                            const std::shared_ptr<User>& user) const {
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-
-    if (engine->type() == StorageType::Local) {
-        const auto localEngine = std::static_pointer_cast<LocalDiskStorageEngine>(engine);
-        const auto absPath = localEngine->getAbsolutePath(std::filesystem::path(relPath));
-        localEngine->mkdir(relPath);
-
-        const auto d = std::make_shared<Directory>();
-
-        d->vault_id = vaultId;
-        d->name = std::filesystem::path(relPath).filename().string();
-        d->created_by = d->last_modified_by = user->id;
-        d->path = relPath;
-        if (!hasLogicalParent(relPath)) d->parent_id = std::nullopt;
-        else
-            d->parent_id = DirectoryQueries::getDirectoryIdByPath(
-                vaultId, std::filesystem::path(relPath).parent_path());
-
-        std::lock_guard lock(mountsMutex_);
-        DirectoryQueries::upsertDirectory(d);
-    } else {
-        throw std::runtime_error("Unsupported storage engine type for mkdir operation");
-    }
+    engine->mkdir(relPath, user->id);
 }
 
 std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned int vaultId,
@@ -196,25 +175,10 @@ std::vector<std::shared_ptr<StorageEngine> > StorageManager::getEngines() const 
     return result;
 }
 
-
-std::shared_ptr<LocalDiskStorageEngine> StorageManager::getLocalEngine(const unsigned int id) const {
-    std::lock_guard lock(mountsMutex_);
-    const auto it = engines_.find(id);
-    if (it != engines_.end()) return std::static_pointer_cast<LocalDiskStorageEngine>(it->second);
-    return nullptr;
-}
-
-std::shared_ptr<CloudStorageEngine> StorageManager::getCloudEngine(const unsigned int id) const {
-    std::lock_guard lock(mountsMutex_);
-    const auto it = engines_.find(id);
-    if (it != engines_.end()) return std::static_pointer_cast<CloudStorageEngine>(it->second);
-    return nullptr;
-}
-
 std::shared_ptr<StorageEngine> StorageManager::getEngine(const unsigned int id) const {
-    if (auto localEngine = getLocalEngine(id)) return localEngine;
-    if (auto cloudEngine = getCloudEngine(id)) return cloudEngine;
-    return nullptr; // No engine found for the given ID
+    if (auto localEngine = getEngine<LocalDiskStorageEngine>(id)) return localEngine;
+    if (auto cloudEngine = getEngine<CloudStorageEngine>(id)) return cloudEngine;
+    return nullptr;
 }
 
 bool StorageManager::pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2) {

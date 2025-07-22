@@ -44,7 +44,7 @@ public:
 
     virtual void finishUpload(unsigned int userId, const std::filesystem::path& relPath) = 0;
 
-    virtual void mkdir(const fs::path& relative_path) = 0;
+    void mkdir(const fs::path& relPath, unsigned int userId);
 
     void move(const fs::path& from, const fs::path& to, unsigned int userId) const;
 
@@ -55,8 +55,6 @@ public:
     [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
 
     void remove(const fs::path& rel_path, unsigned int userId) const;
-
-    [[nodiscard]] virtual bool fileExists(const fs::path& relative_path) const = 0;
 
     [[nodiscard]] bool isDirectory(const fs::path& rel_path) const;
 

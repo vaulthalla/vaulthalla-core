@@ -19,6 +19,7 @@
 
 using namespace vh::types;
 using namespace vh::database;
+namespace fs = std::filesystem;
 
 namespace vh::storage {
 
@@ -29,20 +30,35 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
     : sync_(sync), root_(std::move(root_mount_path)), vault_(vault), thumbnailWorker_(thumbnailWorker) {
     const auto& conf = config::ConfigRegistry::get();
     cache_path_ = conf.fuse.root_mount_path / conf.caching.path / std::to_string(vault->id);
-    if (!std::filesystem::exists(root_)) std::filesystem::create_directories(root_);
-    if (!std::filesystem::exists(cache_path_)) std::filesystem::create_directories(cache_path_);
+    if (!fs::exists(root_)) fs::create_directories(root_);
+    if (!fs::exists(cache_path_)) fs::create_directories(cache_path_);
     encryptionManager_ = std::make_shared<VaultEncryptionManager>(root_);
 }
 
-bool StorageEngine::isDirectory(const std::filesystem::path& rel_path) const {
+bool StorageEngine::isDirectory(const fs::path& rel_path) const {
     return DirectoryQueries::isDirectory(vault_->id, rel_path);
 }
 
-bool StorageEngine::isFile(const std::filesystem::path& rel_path) const {
+bool StorageEngine::isFile(const fs::path& rel_path) const {
     return FileQueries::isFile(vault_->id, rel_path);
 }
 
-void StorageEngine::move(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) {
+    const auto absPath = getAbsolutePath(relPath);
+    if (!fs::exists(absPath)) fs::create_directories(absPath);
+
+    const auto d = std::make_shared<Directory>();
+
+    d->vault_id = vaultId();
+    d->name = fs::path(relPath).filename().string();
+    d->created_by = d->last_modified_by = userId;
+    d->path = relPath;
+    d->parent_id = DirectoryQueries::getDirectoryIdByPath(vaultId(), fs::path(relPath).parent_path());
+
+    DirectoryQueries::upsertDirectory(d);
+}
+
+void StorageEngine::move(const fs::path& from, const fs::path& to, const unsigned int userId) const {
     if (from == to) return;
 
     const bool isFile = this->isFile(from);
@@ -59,7 +75,7 @@ void StorageEngine::move(const std::filesystem::path& from, const std::filesyste
     OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Move));
 }
 
-void StorageEngine::rename(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsigned int userId) const {
     if (from == to) return;
 
     const bool isFile = this->isFile(from);
@@ -80,7 +96,7 @@ void StorageEngine::rename(const std::filesystem::path& from, const std::filesys
     OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Rename));
 }
 
-void StorageEngine::copy(const std::filesystem::path& from, const std::filesystem::path& to, const unsigned int userId) const {
+void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigned int userId) const {
     if (from == to) return;
 
     const bool isFile = this->isFile(from);
@@ -109,7 +125,7 @@ void StorageEngine::copy(const std::filesystem::path& from, const std::filesyste
     }
 }
 
-void StorageEngine::remove(const std::filesystem::path& rel_path, const unsigned int userId) const {
+void StorageEngine::remove(const fs::path& rel_path, const unsigned int userId) const {
     if (isDirectory(rel_path)) removeDirectory(rel_path, userId);
     else if (isFile(rel_path)) removeFile(rel_path, userId);
     else throw std::runtime_error("[StorageEngine] Path does not exist: " + rel_path.string());
@@ -124,47 +140,47 @@ void StorageEngine::removeDirectory(const fs::path& rel_path, const unsigned int
         FileQueries::markFileAsTrashed(userId, file->id);
 }
 
-std::filesystem::path StorageEngine::getRelativePath(const std::filesystem::path& abs_path) const {
+fs::path StorageEngine::getRelativePath(const fs::path& abs_path) const {
     return abs_path.lexically_relative(root_).make_preferred();
 }
 
-std::filesystem::path StorageEngine::getAbsolutePath(const std::filesystem::path& rel_path) const {
+fs::path StorageEngine::getAbsolutePath(const fs::path& rel_path) const {
     if (rel_path.empty()) return root_;
 
-    std::filesystem::path safe_rel = rel_path;
+    fs::path safe_rel = rel_path;
     if (safe_rel.is_absolute()) safe_rel = safe_rel.lexically_relative("/");
 
     return root_ / safe_rel;
 }
 
-std::filesystem::path StorageEngine::getRelativeCachePath(const std::filesystem::path& abs_path) const {
+fs::path StorageEngine::getRelativeCachePath(const fs::path& abs_path) const {
     return abs_path.lexically_relative(cache_path_).make_preferred();
 }
 
-std::shared_ptr<File> StorageEngine::createFile(const std::filesystem::path& rel_path, const std::vector<uint8_t>& buffer) const {
+std::shared_ptr<File> StorageEngine::createFile(const fs::path& rel_path, const std::vector<uint8_t>& buffer) const {
     const auto absPath = getAbsolutePath(rel_path);
 
-    if (!std::filesystem::exists(absPath))
+    if (!fs::exists(absPath))
         throw std::runtime_error("File does not exist at path: " + absPath.string());
-    if (!std::filesystem::is_regular_file(absPath))
+    if (!fs::is_regular_file(absPath))
         throw std::runtime_error("Path is not a regular file: " + absPath.string());
 
     auto file = std::make_shared<File>();
     file->vault_id = vault_->id;
     file->name = absPath.filename().string();
-    file->size_bytes = std::filesystem::file_size(absPath);
+    file->size_bytes = fs::file_size(absPath);
     file->created_by = file->last_modified_by = vault_->owner_id;
     file->path = rel_path;
     file->mime_type = buffer.empty() ? util::Magic::get_mime_type(absPath) : util::Magic::get_mime_type_from_buffer(buffer);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
-    const auto parentPath = file->path.has_parent_path() ? std::filesystem::path{"/"} / file->path.parent_path() : std::filesystem::path("/");
+    const auto parentPath = file->path.has_parent_path() ? fs::path{"/"} / file->path.parent_path() : fs::path("/");
     file->parent_id = DirectoryQueries::getDirectoryIdByPath(vault_->id, parentPath);
 
     return file;
 }
 
-std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem::path& rel_path,
-                                                          const std::filesystem::path& prefix) const {
+fs::path StorageEngine::getAbsoluteCachePath(const fs::path& rel_path,
+                                                          const fs::path& prefix) const {
     const auto relPath = rel_path.string().starts_with("/") ? fs::path(rel_path.string().substr(1)) : rel_path;
     if (prefix.empty()) return cache_path_ / relPath;
 
@@ -172,10 +188,10 @@ std::filesystem::path StorageEngine::getAbsoluteCachePath(const std::filesystem:
     return cache_path_ / prefixPath / relPath;
 }
 
-uintmax_t StorageEngine::getDirectorySize(const std::filesystem::path& path) {
+uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {
     uintmax_t total = 0;
-    for (auto& p : std::filesystem::recursive_directory_iterator(path, std::filesystem::directory_options::skip_permission_denied))
-        if (std::filesystem::is_regular_file(p.status())) total += std::filesystem::file_size(p);
+    for (auto& p : fs::recursive_directory_iterator(path, fs::directory_options::skip_permission_denied))
+        if (fs::is_regular_file(p.status())) total += fs::file_size(p);
     return total;
 }
 
@@ -192,17 +208,17 @@ uintmax_t StorageEngine::freeSpace() const {
 void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
     for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
         const auto thumbnailPath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
-        if (std::filesystem::exists(thumbnailPath)) std::filesystem::remove(thumbnailPath);
+        if (fs::exists(thumbnailPath)) fs::remove(thumbnailPath);
     }
 }
 
-std::vector<uint8_t> StorageEngine::decrypt(const unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const {
+std::vector<uint8_t> StorageEngine::decrypt(const unsigned int vaultId, const fs::path& relPath, const std::vector<uint8_t>& payload) const {
     const auto iv = FileQueries::getEncryptionIV(vaultId, relPath);
     if (iv.empty()) throw std::runtime_error("No encryption IV found for file: " + relPath.string());
     return encryptionManager_->decrypt(payload, iv);
 }
 
-std::string StorageEngine::getMimeType(const std::filesystem::path& path) {
+std::string StorageEngine::getMimeType(const fs::path& path) {
     static const std::unordered_map<std::string, std::string> mimeMap = {
         {".jpg", "image/jpeg"}, {".jpeg", "image/jpeg"}, {".png", "image/png"},
         {".pdf", "application/pdf"}, {".txt", "text/plain"}, {".html", "text/html"},

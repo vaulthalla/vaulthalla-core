@@ -17,7 +17,7 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         const auto scale_it = params.find("scale");
         const auto size_it = params.find("size");
 
-        const auto engine = storageManager_->getLocalEngine(vault_id);
+        const auto engine = storageManager_->getEngine(vault_id);
 
         std::string file_path = engine->getAbsolutePath(rel_path);
         std::string mime_type = "image/jpeg";

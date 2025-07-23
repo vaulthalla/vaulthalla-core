@@ -10,3 +10,9 @@ config.yaml
 
 # Production
 /dist/
+
+# Debian
+/debian/**/*debhelper*
+/debian/vaulthalla
+/debian/vaulthalla.substvars
+/debian/files

@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        deluser --system --quiet vaulthalla || true
+        rm -rf /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthalla
+        ;;
+esac
+
+exit 0

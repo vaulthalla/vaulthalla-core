@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Create system user and group if they don't exist
+        if ! id vaulthalla >/dev/null 2>&1; then
+            echo "👤 Creating system user 'vaulthalla'..."
+            adduser --system --group --no-create-home --shell /usr/sbin/nologin vaulthalla
+        fi
+
+        # Create runtime directories
+        echo "📁 Creating runtime directories..."
+        for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthalla; do
+            install -d -o vaulthalla -g vaulthalla -m 755 "$dir"
+        done
+        chmod 750 /var/log/vaulthalla
+
+        # Ensure /etc/vaulthalla exists
+        install -d -m 755 /etc/vaulthalla
+
+        # Copy example config only if real config doesn't exist
+        if [ ! -f /etc/vaulthalla/config.yaml ]; then
+            cp /etc/vaulthalla/config.example.yaml /etc/vaulthalla/config.yaml
+            echo "📄 Installed example config to /etc/vaulthalla/config.yaml"
+        fi
+        ;;
+esac
+
+exit 0

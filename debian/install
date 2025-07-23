@@ -1,0 +1,4 @@
+build/core_daemon     usr/bin/vaulthalla/
+build/fuse_daemon     usr/bin/vaulthalla/
+deploy/config/config.example.yaml   etc/vaulthalla/config.example.yaml
+deploy/config/config_template.yaml.in  etc/vaulthalla/

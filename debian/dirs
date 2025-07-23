@@ -1,0 +1,5 @@
+usr/local/bin/vaulthalla
+mnt/vaulthalla
+var/lib/vaulthalla
+var/log/vaulthalla
+run/vaulthalla

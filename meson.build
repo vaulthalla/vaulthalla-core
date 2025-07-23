@@ -13,29 +13,10 @@ add_project_link_arguments('-lcrypto', language: 'cpp')
 add_project_link_arguments('-lz', language: 'cpp')
 add_project_link_arguments('-lturbojpeg', language: 'cpp')
 
-# ╭──────────────────── Vendor pdfium ─────────────────────╮
-pdfium_root  = join_paths(meson.project_source_root(), 'vendor', 'pdfium')
-pdfium_inc   = include_directories('vendor/pdfium/include')
-pdfium_lib   = meson.get_compiler('cpp').find_library('pdfium',
-                               dirs    : [join_paths(pdfium_root, 'lib')],
-                               required: true)     # <- points at libpdfium.so
-
-pdfium = declare_dependency(
-    include_directories : pdfium_inc,
-    dependencies        : [pdfium_lib],
-    link_args           : [
-        '-Wl,-rpath,' + join_paths(pdfium_root, 'lib')  # run from build tree
-    ],
-)
-
-meson.override_dependency('libpdfium', pdfium)  # Ensure pdfium is available as 'libpdfium'
-
-install_data(join_paths(pdfium_root, 'lib', 'libpdfium.so'),
-             install_dir: get_option('libdir'))
-
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
 libpqxx         = dependency('libpqxx', required: true)
+pdfium          = dependency('libpdfium', required: true)
 libsodium       = dependency('libsodium', required: true)
 libmagic        = dependency('libmagic', required: true)
 libcurl         = dependency('libcurl', required: true)

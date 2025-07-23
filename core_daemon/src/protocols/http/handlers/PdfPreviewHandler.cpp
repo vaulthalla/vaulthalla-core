@@ -4,7 +4,7 @@
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
 
-#include <fpdfview.h>
+#include <pdfium/fpdfview.h>
 #include <iostream>
 
 namespace vh::http {

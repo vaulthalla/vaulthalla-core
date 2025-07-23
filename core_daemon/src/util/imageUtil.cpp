@@ -7,7 +7,7 @@
 #include <stb_image_resize.h>
 #include <turbojpeg.h>
 #include <stdexcept>
-#include <fpdfview.h>
+#include <pdfium/fpdfview.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>

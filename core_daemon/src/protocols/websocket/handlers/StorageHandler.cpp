@@ -6,7 +6,7 @@
 #include "types/LocalDiskVault.hpp"
 #include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "keys/APIKeyManager.hpp"
+#include "../../../../include/storage/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 

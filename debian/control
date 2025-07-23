@@ -8,6 +8,7 @@ Build-Depends:
  cmake,
  libmagic-dev,
  libpqxx-dev,
+ libpdfium-dev,
  libsodium-dev,
  libcurl4-openssl-dev,
  uuid-dev,
@@ -26,9 +27,9 @@ Package: vaulthalla
 Architecture: any
 Multi-Arch: foreign
 Depends:
- ${misc:Depends},
  libmagic1,
  libpqxx-7.10,
+ libpdfium-dev20250629,
  libsodium23,
  libcurl4,
  libuuid1,

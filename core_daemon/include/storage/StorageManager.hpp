@@ -54,6 +54,12 @@ public:
 
     void mkdir(unsigned int vaultId, const std::string& relPath, const std::shared_ptr<types::User>& user) const;
 
+    void move(unsigned int vaultId, unsigned int userId, const std::filesystem::path& from, const std::filesystem::path& to) const;
+
+    void rename(unsigned int vaultId, unsigned int userId, const std::string& from, const std::string& to) const;
+
+    void copy(unsigned int vaultId, unsigned int userId, const std::filesystem::path& from, const std::filesystem::path& to) const;
+
     void syncNow(unsigned int vaultId) const;
 
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;

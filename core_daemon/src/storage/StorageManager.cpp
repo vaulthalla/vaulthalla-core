@@ -154,6 +154,27 @@ void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPat
     engine->mkdir(relPath, user->id);
 }
 
+void StorageManager::move(const unsigned int vaultId, const unsigned int userId,
+                          const std::filesystem::path& from, const std::filesystem::path& to) const {
+    const auto engine = getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+    engine->move(from, to, userId);
+}
+
+void StorageManager::rename(const unsigned int vaultId, const unsigned int userId,
+                            const std::string& from, const std::string& to) const {
+    const auto engine = getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+    engine->rename(from, to, userId);
+}
+
+void StorageManager::copy(const unsigned int vaultId, const unsigned int userId,
+                          const std::filesystem::path& from, const std::filesystem::path& to) const {
+    const auto engine = getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+    engine->copy(from, to, userId);
+}
+
 std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned int vaultId,
                                                                const std::string& relPath,
                                                                const bool recursive) const {

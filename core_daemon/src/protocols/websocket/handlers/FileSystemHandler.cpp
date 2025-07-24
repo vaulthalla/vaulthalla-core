@@ -121,6 +121,102 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
     }
 }
 
+void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
+    try {
+        const auto& payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto fromPath = payload.at("from").get<std::string>();
+        const auto toPath = payload.at("to").get<std::string>();
+
+        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canMove);
+        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+
+        storageManager_->move(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+
+        const json data = {{"from", fromPath}, {"to", toPath}};
+
+        const json response = {{"command", "fs.entry.move.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
+
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] Move on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleMove error: " << e.what() << std::endl;
+
+        const json response = {{"command", "fs.entry.move.response"}, {"status", "error"}, {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
+void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session) {
+    try {
+        const auto& payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto fromPath = payload.at("from").get<std::string>();
+        const auto toPath = payload.at("to").get<std::string>();
+
+        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canRename);
+        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+
+        storageManager_->rename(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+
+        const json data = {{"from", fromPath}, {"to", toPath}};
+
+        const json response = {{"command", "fs.entry.rename.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
+
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] Rename on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleRename error: " << e.what() << std::endl;
+
+        const json response = {{"command", "fs.entry.rename.response"}, {"status", "error"}, {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
+void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
+    try {
+        const auto& payload = msg.at("payload");
+        const auto vaultId = payload.at("vault_id").get<unsigned int>();
+        const auto fromPath = payload.at("from").get<std::string>();
+        const auto toPath = payload.at("to").get<std::string>();
+
+        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canMove);
+        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+
+        storageManager_->copy(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+
+        const json data = {{"from", fromPath}, {"to", toPath}};
+
+        const json response = {{"command", "fs.entry.copy.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
+
+        session.send(response);
+
+        std::cout << "[FileSystemHandler] Copy on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[FileSystemHandler] handleCopy error: " << e.what() << std::endl;
+
+        const json response = {{"command", "fs.entry.copy.response"}, {"status", "error"}, {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
         const auto& payload = msg.at("payload");

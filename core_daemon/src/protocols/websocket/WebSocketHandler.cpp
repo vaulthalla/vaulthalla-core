@@ -92,6 +92,18 @@ void WebSocketHandler::registerFileSystemHandlers() const {
     router_->registerHandler("fs.entry.delete", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleDelete(msg, session);
     });
+
+    router_->registerHandler("fs.entry.move", [this](const json& msg, WebSocketSession& session) {
+        fsHandler_->handleMove(msg, session);
+    });
+
+    router_->registerHandler("fs.entry.rename", [this](const json& msg, WebSocketSession& session) {
+        fsHandler_->handleRename(msg, session);
+    });
+
+    router_->registerHandler("fs.entry.copy", [this](const json& msg, WebSocketSession& session) {
+        fsHandler_->handleCopy(msg, session);
+    });
 }
 
 void WebSocketHandler::registerStorageHandlers() const {

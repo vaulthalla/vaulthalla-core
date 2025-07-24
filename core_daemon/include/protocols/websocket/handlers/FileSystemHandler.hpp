@@ -21,6 +21,12 @@ public:
 
     void handleMkdir(const json& msg, WebSocketSession& session);
 
+    void handleMove(const json& msg, WebSocketSession& session);
+
+    void handleRename(const json& msg, WebSocketSession& session);
+
+    void handleCopy(const json& msg, WebSocketSession& session);
+
     void handleListDir(const json& msg, WebSocketSession& session);
 
     void handleReadFile(const json& msg, WebSocketSession& session);

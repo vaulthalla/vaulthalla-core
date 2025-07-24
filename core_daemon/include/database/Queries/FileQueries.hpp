@@ -48,6 +48,8 @@ public:
 
     [[nodiscard]] static std::string getEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath);
 
+    static void setEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv);
+
     [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
 };
 

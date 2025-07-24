@@ -219,6 +219,13 @@ std::string FileQueries::getEncryptionIV(const unsigned int vaultId, const std::
     });
 }
 
+void FileQueries::setEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv) {
+    Transactions::exec("FileQueries::setEncryptionIV", [&](pqxx::work& txn) {
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string()), iv};
+        txn.exec_prepared("set_file_encryption_iv", p);
+    });
+}
+
 std::string FileQueries::getContentHash(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getContentHash", [&](pqxx::work& txn) -> std::string {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};

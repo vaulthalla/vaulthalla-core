@@ -12,8 +12,7 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<services::ServiceManage
     authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());
     storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager());
     fsHandler_ = std::make_shared<FileSystemHandler>(serviceManager_);
-    shareHandler_ = std::make_shared<ShareHandler>(serviceManager_->linkResolver());
-    searchHandler_ = std::make_shared<SearchHandler>(serviceManager_->searchIndex());
+    shareHandler_ = std::make_shared<ShareHandler>();
     notificationHandler_ = std::make_shared<NotificationHandler>();
     registerAllHandlers();
 }

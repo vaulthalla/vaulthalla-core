@@ -14,6 +14,7 @@ void OperationQueries::addOperation(const std::shared_ptr<Operation>& op) {
         p.append(to_string(op->target));
         p.append(to_string(op->status));
         p.append(op->source_path);
+        p.append(op->destination_path);
 
         txn.exec_prepared("insert_operation", p);
     });

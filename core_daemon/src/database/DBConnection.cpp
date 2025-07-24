@@ -308,6 +308,14 @@ void DBConnection::initPreparedFiles() const {
                    "SELECT content_hash FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
+
+    conn_->prepare("set_file_encryption_iv",
+                   R"(UPDATE files f
+       SET encryption_iv = $3
+       FROM fs_entry fs
+       WHERE f.fs_entry_id = fs.id
+         AND fs.vault_id = $1
+         AND fs.path = $2)");
 }
 
 void DBConnection::initPreparedDirectories() const {
@@ -375,8 +383,9 @@ void DBConnection::initPreparedDirectories() const {
 
 void DBConnection::initPreparedOperations() const {
     conn_->prepare("insert_operation",
-                   "INSERT INTO operations (fs_entry_id, executed_by, operation, target, status, source_path) "
-                   "VALUES ($1, $2, $3, $4, $5, $6) ");
+                   "INSERT INTO operations (fs_entry_id, executed_by, operation, target, status, "
+                   "source_path, destination_path) "
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7) ");
 
     conn_->prepare("get_pending_operations",
                    "SELECT * FROM operations WHERE status = 'pending' AND fs_entry_id = $1");

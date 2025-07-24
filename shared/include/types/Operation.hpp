@@ -31,7 +31,7 @@ struct Operation {
 
     Operation() = default;
     explicit Operation(const pqxx::row& row);
-    explicit Operation(const std::shared_ptr<FSEntry>& entry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
+    explicit Operation(const std::shared_ptr<FSEntry>& origEntry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
 };
 
 std::string to_string(const Operation::Op& op);

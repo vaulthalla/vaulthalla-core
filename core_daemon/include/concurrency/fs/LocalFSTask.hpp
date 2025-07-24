@@ -26,8 +26,6 @@ public:
 protected:
     void removeTrashedFiles() override;
 
-    void processOperations() const;
-
     std::shared_ptr<storage::LocalDiskStorageEngine> localEngine() const;
 };
 

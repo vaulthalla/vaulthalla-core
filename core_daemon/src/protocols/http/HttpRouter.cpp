@@ -95,15 +95,14 @@ PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, cons
         if (jpegPath.extension() != ".jpg" && jpegPath.extension() != ".jpeg") jpegPath.append(".jpg");
 
         if (std::filesystem::exists(jpegPath)) {
-            const auto encrypted_data = util::readFileToVector(jpegPath);
-            auto decrypted_data = engine->decrypt(vaultId, rel_path, encrypted_data);
+            const auto data = util::readFileToVector(jpegPath);
 
             // Return decrypted image in memory
             http::response<http::string_body> res{
                 http::status::ok, req.version()
             };
             res.set(http::field::content_type, "image/jpeg");
-            res.body() = std::string(decrypted_data.begin(), decrypted_data.end());
+            res.body() = std::string(data.begin(), data.end());
             res.prepare_payload();
             res.keep_alive(req.keep_alive());
             return res;

@@ -4,14 +4,22 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
+#include "types/Operation.hpp"
 #include "types/Vault.hpp"
+#include "util/files.hpp"
+#include "database/Queries/OperationQueries.hpp"
+#include "database/Queries/FileQueries.hpp"
+#include "storage/VaultEncryptionManager.hpp"
 
 #include <iostream>
 
 using namespace vh::concurrency;
+using namespace vh::storage;
+using namespace vh::database;
+using namespace vh::services;
 using namespace std::chrono;
 
-FSTask::FSTask(const std::shared_ptr<storage::StorageEngine>& engine, const std::shared_ptr<services::SyncController>& controller)
+FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine, const std::shared_ptr<SyncController>& controller)
 : next_run(system_clock::from_time_t(engine->sync_->last_sync_at)
            + seconds(engine->sync_->interval.count())),
     engine_(engine), controller_(controller) {
@@ -26,7 +34,7 @@ void FSTask::interrupt() { interruptFlag_.store(true); }
 
 bool FSTask::isInterrupted() const { return interruptFlag_.load(); }
 
-std::shared_ptr<vh::storage::StorageEngine> FSTask::engine() const {
+std::shared_ptr<StorageEngine> FSTask::engine() const {
     if (!engine_) throw std::runtime_error("Storage engine is not set");
     return engine_;
 }
@@ -50,3 +58,32 @@ void FSTask::push(const std::shared_ptr<Task>& task) {
     futures_.push_back(task->getFuture().value());
     ThreadPoolRegistry::instance().syncPool()->submit(task);
 }
+
+void FSTask::processOperations() const {
+    for (const auto& op : OperationQueries::listOperationsByVault(engine_->vaultId())) {
+        const auto absSrc = engine_->getAbsolutePath(op->source_path);
+        const auto absDest = engine_->getAbsolutePath(op->destination_path);
+        if (absDest.has_parent_path()) fs::create_directories(absDest.parent_path());
+
+        {
+            const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
+            const auto buffer = util::readFileToVector(tmpPath);
+
+            std::string iv_b64;
+            const auto ciphertext = engine_->encryptionManager_->encrypt(buffer, iv_b64);
+
+            util::writeFile(absDest, ciphertext);
+            FileQueries::setEncryptionIV(vaultId(), op->destination_path, iv_b64);
+        }
+
+        const auto& move = [&]() {
+            if (fs::exists(absSrc)) fs::remove(absSrc);
+            engine_->moveThumbnails(op->source_path, op->destination_path);
+        };
+
+        if (op->operation == Operation::Op::Copy) engine_->copyThumbnails(op->source_path, op->destination_path);
+        else if (op->operation == Operation::Op::Move || op->operation == Operation::Op::Rename) move();
+        else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
+    }
+}
+

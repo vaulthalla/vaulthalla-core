@@ -16,6 +16,7 @@
 
 using namespace vh::concurrency;
 using namespace vh::types;
+using namespace vh::database;
 using namespace std::chrono;
 
 void SyncTask::operator()() {
@@ -31,24 +32,26 @@ void SyncTask::operator()() {
         }
 
         isRunning_ = true;
-        database::SyncQueries::reportSyncStarted(engine_->sync_->id);
+        SyncQueries::reportSyncStarted(engine_->sync_->id);
 
-        if (!database::DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
+        if (!DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
             const auto dir = std::make_shared<Directory>();
             dir->vault_id = engine_->vault_->id;
             dir->name = "/";
             dir->path = "/";
             dir->created_by = dir->last_modified_by = engine_->vault_->owner_id;
             dir->parent_id = std::nullopt;
-            database::DirectoryQueries::upsertDirectory(dir);
+            DirectoryQueries::upsertDirectory(dir);
         }
 
+        processOperations();
+        handleInterrupt();
         removeTrashedFiles();
         handleInterrupt();
 
         s3Map_ = cloudEngine()->getGroupedFilesFromS3();
         s3Files_ = uMap2Vector(s3Map_);
-        localFiles_ = database::FileQueries::listFilesInDir(engine_->vaultId());
+        localFiles_ = FileQueries::listFilesInDir(engine_->vaultId());
         localMap_ = groupEntriesByPath(localFiles_);
 
         for (const auto& [path, entry] : intersect(s3Map_, localMap_))
@@ -60,7 +63,7 @@ void SyncTask::operator()() {
         sync();
 
         std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault_->name << std::endl;
-        database::SyncQueries::reportSyncSuccess(engine_->sync_->id);
+        SyncQueries::reportSyncSuccess(engine_->sync_->id);
         next_run = system_clock::now() + seconds(engine_->sync_->interval.count());
 
         handleInterrupt();
@@ -91,7 +94,7 @@ void SyncTask::operator()() {
 }
 
 void SyncTask::removeTrashedFiles() {
-    const auto files = database::FileQueries::listTrashedFiles(vaultId());
+    const auto files = FileQueries::listTrashedFiles(vaultId());
     futures_.reserve(files.size());
     for (const auto& file : files) remove(file);
     processFutures();

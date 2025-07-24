@@ -5,7 +5,6 @@
 #include "protocols/websocket/handlers/AuthHandler.hpp"
 #include "protocols/websocket/handlers/FileSystemHandler.hpp"
 #include "protocols/websocket/handlers/NotificationHandler.hpp"
-#include "protocols/websocket/handlers/SearchHandler.hpp"
 #include "protocols/websocket/handlers/ShareHandler.hpp"
 #include "protocols/websocket/handlers/StorageHandler.hpp"
 #include <memory>
@@ -27,7 +26,6 @@ class WebSocketHandler {
     std::shared_ptr<FileSystemHandler> fsHandler_;
     std::shared_ptr<StorageHandler> storageHandler_;
     std::shared_ptr<ShareHandler> shareHandler_;
-    std::shared_ptr<SearchHandler> searchHandler_;
     std::shared_ptr<NotificationHandler> notificationHandler_;
 
     void registerAuthHandlers() const;

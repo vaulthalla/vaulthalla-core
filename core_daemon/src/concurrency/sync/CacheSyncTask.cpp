@@ -1,5 +1,3 @@
-#pragma once
-
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/ThreadPool.hpp"

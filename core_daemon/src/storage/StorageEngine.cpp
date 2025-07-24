@@ -9,6 +9,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "util/Magic.hpp"
+#include "util/files.hpp"
 #include "crypto/Hash.hpp"
 #include "storage/VaultEncryptionManager.hpp"
 
@@ -86,14 +87,14 @@ void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsig
     if (isFile) entry = FileQueries::getFileByPath(vaultId(), from);
     else entry = DirectoryQueries::getDirectoryByPath(vaultId(), from);
 
+    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Rename));
+
     entry->name = to.filename().string();
     entry->path = to;
     entry->last_modified_by = userId;
 
     if (isFile) FileQueries::upsertFile(std::static_pointer_cast<File>(entry));
     else DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));
-
-    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Rename));
 }
 
 void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigned int userId) const {
@@ -107,22 +108,18 @@ void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigne
     if (isFile) entry = FileQueries::getFileByPath(vaultId(), from);
     else entry = DirectoryQueries::getDirectoryByPath(vaultId(), from);
 
+    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Copy));
+
     entry->id = 0;
     entry->path = to;
     entry->name = to.filename().string();
     entry->created_at = {};
     entry->updated_at = {};
     entry->created_by = entry->last_modified_by = userId;
+    entry->parent_id = DirectoryQueries::getDirectoryIdByPath(vaultId(), to.parent_path());
 
-    if (isFile) {
-        auto newFile = std::make_shared<File>(*std::static_pointer_cast<File>(entry));
-        newFile->id = FileQueries::upsertFile(newFile);
-        OperationQueries::addOperation(std::make_shared<Operation>(newFile, to, userId, Operation::Op::Copy));
-    } else {
-        auto newDir = std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry));
-        DirectoryQueries::upsertDirectory(newDir);
-        OperationQueries::addOperation(std::make_shared<Operation>(newDir, to, userId, Operation::Op::Copy));
-    }
+    if (isFile) FileQueries::upsertFile(std::make_shared<File>(*std::static_pointer_cast<File>(entry)));
+    else DirectoryQueries::upsertDirectory(std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry)));
 }
 
 void StorageEngine::remove(const fs::path& rel_path, const unsigned int userId) const {
@@ -229,6 +226,46 @@ std::string StorageEngine::getMimeType(const fs::path& path) {
 
     const auto it = mimeMap.find(ext);
     return it != mimeMap.end() ? it->second : "application/octet-stream";
+}
+
+void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
+    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+        auto fromPath = getAbsoluteCachePath(from, fs::path("thumbnails") / std::to_string(size));
+        auto toPath = getAbsoluteCachePath(to, fs::path("thumbnails") / std::to_string(size));
+
+        if (fromPath.extension() != ".jpg" && fromPath.extension() != ".jpeg") {
+            fromPath += ".jpg";
+            toPath += ".jpg";
+        }
+
+        if (!fs::exists(fromPath)) {
+            std::cerr << "[StorageEngine] Thumbnail does not exist: " << fromPath.string() << std::endl;
+            continue;
+        }
+
+        fs::create_directories(toPath.parent_path());
+        fs::rename(fromPath, toPath);
+    }
+}
+
+void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
+    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
+        auto fromPath = getAbsoluteCachePath(from, fs::path("thumbnails") / std::to_string(size));
+        auto toPath = getAbsoluteCachePath(to, fs::path("thumbnails") / std::to_string(size));
+
+        if (fromPath.extension() != ".jpg" && fromPath.extension() != ".jpeg") {
+            fromPath += ".jpg";
+            toPath += ".jpg";
+        }
+
+        if (!fs::exists(fromPath)) {
+            std::cerr << "[StorageEngine] Thumbnail does not exist: " << fromPath.string() << std::endl;
+            continue;
+        }
+
+        fs::create_directories(toPath.parent_path());
+        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
+    }
 }
 
 }

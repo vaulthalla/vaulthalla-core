@@ -1,11 +1,10 @@
 #include "concurrency/fs/LocalFSTask.hpp"
 #include "concurrency/fs/LocalDeleteTask.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/OperationQueries.hpp"
 #include "storage/LocalDiskStorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Vault.hpp"
-#include "types/Operation.hpp"
+#include "util/files.hpp"
 
 #include <iostream>
 
@@ -29,9 +28,9 @@ void LocalFSTask::operator()() {
 
         isRunning_ = true;
 
-        removeTrashedFiles();
-        handleInterrupt();
         processOperations();
+        handleInterrupt();
+        removeTrashedFiles();
         handleInterrupt();
     } catch (const std::exception& e) {
         std::cerr << "[LocalFSTask] Exception: " << e.what() << std::endl;
@@ -49,16 +48,6 @@ void LocalFSTask::removeTrashedFiles() {
     futures_.reserve(files.size());
     for (const auto& file : files) push(std::make_shared<LocalDeleteTask>(engine, file));
     processFutures();
-}
-
-void LocalFSTask::processOperations() const {
-    const auto operations = OperationQueries::listOperationsByVault(engine_->vaultId());
-    for (const auto& op : operations) {
-        if (op->operation == Operation::Op::Copy) fs::copy(op->source_path, op->destination_path);
-        else if (op->operation == Operation::Op::Move) fs::rename(op->source_path, op->destination_path);
-        else if (op->operation == Operation::Op::Rename) fs::rename(op->source_path, op->destination_path);
-        else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
-    }
 }
 
 std::shared_ptr<LocalDiskStorageEngine> LocalFSTask::localEngine() const {

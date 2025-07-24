@@ -18,15 +18,16 @@ Operation::Operation(const pqxx::row& row)
       source_path(row["source_path"].as<std::string>()),
       destination_path(row["destination_path"].as<std::string>()),
       created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      completed_at(parsePostgresTimestamp(row["completed_at"].as<std::string>())),
-      error(row["error"].as<std::optional<std::string>>()) {}
+      error(row["error"].as<std::optional<std::string>>()) {
+    if (!row["completed_at"].is_null()) completed_at = parsePostgresTimestamp(row["completed_at"].as<std::string>());
+}
 
-Operation::Operation(const std::shared_ptr<FSEntry>& entry, const std::filesystem::path& dest, const unsigned int userId, const Op& op)
-    : fs_entry_id(entry->id),
+Operation::Operation(const std::shared_ptr<FSEntry>& origEntry, const std::filesystem::path& dest, const unsigned int userId, const Op& op)
+    : fs_entry_id(origEntry->id),
       executed_by(userId),
       operation(op),
-      target(entry->isDirectory() ? Target::Directory : Target::File),
-      source_path(entry->path),
+      target(origEntry->isDirectory() ? Target::Directory : Target::File),
+      source_path(origEntry->path),
       destination_path(dest) {}
 
 std::string vh::types::to_string(const Operation::Op& op) {

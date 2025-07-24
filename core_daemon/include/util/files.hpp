@@ -71,17 +71,14 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
 
     // Read encrypted file into memory
     std::ifstream in(abs_path, std::ios::binary | std::ios::ate);
-    if (!in) {
-        throw std::runtime_error("Failed to open encrypted file: " + abs_path.string());
-    }
+    if (!in) throw std::runtime_error("Failed to open encrypted file: " + abs_path.string());
 
     std::streamsize size = in.tellg();
     in.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> ciphertext(size);
-    if (!in.read(reinterpret_cast<char*>(ciphertext.data()), size)) {
+    if (!in.read(reinterpret_cast<char*>(ciphertext.data()), size))
         throw std::runtime_error("Failed to read encrypted file: " + abs_path.string());
-    }
 
     // Decrypt
     auto plaintext = engine->decrypt(vault_id, rel_path, ciphertext);

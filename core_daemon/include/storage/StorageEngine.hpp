@@ -17,6 +17,7 @@ struct Sync;
 
 namespace vh::concurrency {
 class SyncTask;
+class FSTask;
 class ThumbnailWorker;
 }
 
@@ -92,6 +93,10 @@ public:
 
     void purgeThumbnails(const fs::path& rel_path) const;
 
+    void moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const;
+
+    void copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const;
+
     [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const;
 
     static std::string getMimeType(const std::filesystem::path& path);
@@ -106,6 +111,7 @@ protected:
     void removeDirectory(const fs::path& rel_path, unsigned int userId) const;
 
     friend class concurrency::SyncTask;
+    friend class concurrency::FSTask;
 };
 
 } // namespace vh::storage

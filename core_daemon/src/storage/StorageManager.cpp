@@ -159,6 +159,7 @@ void StorageManager::move(const unsigned int vaultId, const unsigned int userId,
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
     engine->move(from, to, userId);
+    syncNow(engine->vaultId());
 }
 
 void StorageManager::rename(const unsigned int vaultId, const unsigned int userId,
@@ -166,6 +167,7 @@ void StorageManager::rename(const unsigned int vaultId, const unsigned int userI
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
     engine->rename(from, to, userId);
+    syncNow(engine->vaultId());
 }
 
 void StorageManager::copy(const unsigned int vaultId, const unsigned int userId,
@@ -173,6 +175,7 @@ void StorageManager::copy(const unsigned int vaultId, const unsigned int userId,
     const auto engine = getEngine(vaultId);
     if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
     engine->copy(from, to, userId);
+    syncNow(engine->vaultId());
 }
 
 std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned int vaultId,

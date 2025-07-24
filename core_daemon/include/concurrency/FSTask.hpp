@@ -54,6 +54,8 @@ protected:
 
     virtual void removeTrashedFiles() = 0;
 
+    void processOperations() const;
+
     virtual void processFutures();
 };
 

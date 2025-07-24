@@ -5,7 +5,7 @@
 #include "types/S3Vault.hpp"
 #include "types/LocalDiskVault.hpp"
 #include "types/Sync.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "../../../../../shared/include/database/Queries/VaultQueries.hpp"
 #include "../../../../include/storage/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"

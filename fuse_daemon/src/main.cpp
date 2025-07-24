@@ -8,9 +8,11 @@
 #include <iostream>
 #include <thread>
 
-int main(int argc, char* argv[]) {
+using namespace vh::fuse;
+
+int main(const int argc, char* argv[]) {
     const std::string mountPath = "/mnt/vaulthalla";
-    vh::fuse::FUSEMountManager mountManager(mountPath);
+    FUSEMountManager mountManager(mountPath);
 
     if (!mountManager.mount()) {
         std::cerr << "[-] Could not prepare mountpoint.\n";
@@ -19,9 +21,9 @@ int main(int argc, char* argv[]) {
 
     auto storage = std::make_shared<vh::shared::bridge::UnifiedStorage>();
     auto proxy = std::make_shared<vh::shared::bridge::RemoteFSProxy>(storage);
-    vh::fuse::bind(proxy); // Set it for FUSE ops
+    bind(proxy); // Set it for FUSE ops
 
-    const auto router = std::make_unique<vh::fuse::ipc::CommandRouter>("/tmp/vaulthalla.sock");
+    const auto router = std::make_unique<ipc::CommandRouter>("/tmp/vaulthalla.sock");
 
     router->setCommandHandler([proxy](const vh::types::fuse::Command& cmd) {
         using vh::types::fuse::CommandType;
@@ -115,12 +117,25 @@ int main(int argc, char* argv[]) {
 
     std::thread listener([&]() { router->start(); });
 
-    auto permissions = std::make_unique<vh::fuse::FUSEPermissions>();
-    vh::fuse::bindPermissions(std::move(permissions));
+    auto permissions = std::make_unique<FUSEPermissions>();
+    bindPermissions(std::move(permissions));
 
-    struct fuse_operations ops = vh::fuse::getOperations();
-    std::vector<char*> args(argv, argv + argc);
-    args.push_back(const_cast<char*>(mountPath.c_str()));
+    std::vector<std::string> fuseArgsStr = {
+        argv[0], // program name
+        "-f",    // foreground mode
+        "-o",
+        "big_writes,max_readahead=1048576,auto_cache,attr_timeout=60,entry_timeout=60,negative_timeout=10"
+    };
 
-    return fuse_main(static_cast<int>(args.size()), args.data(), &ops, nullptr);
+    // Add the mountpoint last
+    fuseArgsStr.push_back(mountPath);
+
+    // Convert to `char*` array
+    std::vector<char*> fuseArgs;
+    for (auto& s : fuseArgsStr)
+        fuseArgs.push_back(s.data());
+
+    const fuse_operations ops = getOperations();
+
+    return fuse_main(static_cast<int>(fuseArgs.size()), fuseArgs.data(), &ops, nullptr);
 }

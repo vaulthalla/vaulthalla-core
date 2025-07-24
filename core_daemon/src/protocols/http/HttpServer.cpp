@@ -2,9 +2,9 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
 #include "services/ServiceManager.hpp"
-#include "concurrency/protocol/HttpSessionTask.hpp"
+#include "../../../../shared/include/concurrency/protocol/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "../../../../shared/include/concurrency/ThreadPoolRegistry.hpp"
 
 #include <iostream>
 

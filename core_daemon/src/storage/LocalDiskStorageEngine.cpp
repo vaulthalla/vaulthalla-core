@@ -4,7 +4,7 @@
 #include "types/LocalDiskVault.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
-#include "concurrency/thumbnail/ThumbnailWorker.hpp"
+#include "../../../shared/include/concurrency/thumbnail/ThumbnailWorker.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "types/File.hpp"
 #include "storage/VaultEncryptionManager.hpp"

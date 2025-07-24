@@ -1,7 +1,6 @@
 #include "FUSEOperations.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "types/File.hpp"
-#include "FUSEPermissions.hpp"
-#include "fuse/StorageBridge/RemoteFSProxy.hpp"
 #include "types/FileMetadata.hpp"
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
@@ -9,7 +8,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
-static vh::shared::bridge::RemoteFSProxy* proxy = nullptr;
+using namespace vh::database;
 
 namespace vh::fuse {
 
@@ -43,21 +42,43 @@ int getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi) {
     return 0;
 }
 
-int readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi,
-            enum fuse_readdir_flags flags) {
-    (void)offset;
+void readdir(const fuse_req_t& req, fuse_ino_t ino, const size_t size, const off_t off, const fuse_file_info* fi) {
     (void)fi;
-    (void)flags;
 
-    filler(buf, ".", nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
-    filler(buf, "..", nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
+    std::string path = resolvePathFromInode(ino); // implement this to map inode → path
+    auto entries = DirectoryQueries::listDir()
 
-    auto entries = proxy->listDir(path);
-    for (const auto& entry : entries) {
-        filler(buf, entry.name.c_str(), nullptr, 0, static_cast<fuse_fill_dir_flags>(0));
+    std::vector<char> buf(size);
+    size_t buf_used = 0;
+
+    auto add_entry = [&](const std::string& name, const struct stat& st) {
+        size_t entry_size = fuse_add_direntry(req, nullptr, 0, name.c_str(), &st, 0);
+        if (buf_used + entry_size > size) return false;
+
+        fuse_add_direntry(req, buf.data() + buf_used, entry_size, name.c_str(), &st, buf_used);
+        buf_used += entry_size;
+        return true;
+    };
+
+    // Always include "." and ".."
+    struct stat dot = { .st_mode = S_IFDIR };
+    struct stat dotdot = { .st_mode = S_IFDIR };
+    if (!add_entry(".", dot) || !add_entry("..", dotdot)) {
+        fuse_reply_buf(req, buf.data(), buf_used);
+        return;
     }
 
-    return 0;
+    for (const auto& entry : *entries) {
+        struct stat st = {};
+        st.st_ino = entry.inode;
+        st.st_mode = entry.is_dir ? S_IFDIR | 0755 : S_IFREG | 0644;
+        st.st_size = entry.size;
+        st.st_mtim.tv_sec = entry.mtime;
+
+        if (!add_entry(entry.name, st)) break;
+    }
+
+    fuse_reply_buf(req, buf.data(), buf_used);
 }
 
 int open(const char* path, struct fuse_file_info* fi) {
@@ -175,7 +196,7 @@ int statfs(const char* path, struct statvfs* stbuf) {
 }
 
 struct fuse_operations getOperations() {
-    struct fuse_operations ops = {};
+    struct fuse_low ops = {};
     ops.getattr = getattr;
     ops.readdir = readdir;
     ops.open = open;

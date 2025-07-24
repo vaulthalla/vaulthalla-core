@@ -1,6 +1,6 @@
 #pragma once
 
-#include "concurrency/FSTask.hpp"
+#include "../../../shared/include/concurrency/FSTask.hpp"
 
 #include <memory>
 #include <queue>

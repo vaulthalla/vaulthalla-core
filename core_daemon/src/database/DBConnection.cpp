@@ -97,9 +97,16 @@ void DBConnection::initPreparedUserRoles() const {
 }
 
 void DBConnection::initPreparedVaults() const {
-    conn_->prepare("insert_vault",
-                   "INSERT INTO vault (name, type, description, owner_id) "
-                   "VALUES ($1, $2, $3, $4) RETURNING id");
+    conn_->prepare("upsert_vault",
+                   R"(INSERT INTO vault (name, type, description, owner_id, quota, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (name, owner_id)
+       DO UPDATE SET
+           type = EXCLUDED.type,
+           description = EXCLUDED.description,
+           quota = EXCLUDED.quota,
+           is_active = EXCLUDED.is_active
+       RETURNING id)");
 
     conn_->prepare("insert_local_vault", "INSERT INTO local (vault_id, mount_point) VALUES ($1, $2)");
 

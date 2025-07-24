@@ -39,7 +39,9 @@ CREATE TABLE vault
     owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
     is_active   BOOLEAN   DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (name, owner_id)  -- Ensure unique vault names per user
 );
 
 CREATE TABLE local

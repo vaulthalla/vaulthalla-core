@@ -23,7 +23,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         std::string file_path = engine->getAbsolutePath(rel_path);
         std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
-        if (const bool should_resize = (scale_it != params.end() || size_it != params.end())) {
+        if (scale_it != params.end() || size_it != params.end()) {
             std::optional<std::string> scale, size;
             if (scale_it != params.end()) scale = scale_it->second;
             if (size_it != params.end()) size = size_it->second;

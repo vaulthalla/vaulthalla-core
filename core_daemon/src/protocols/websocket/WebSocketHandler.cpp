@@ -114,6 +114,10 @@ void WebSocketHandler::registerStorageHandlers() const {
         storageHandler_->handleAddVault(msg, session);
     });
 
+    router_->registerHandler("storage.vault.update", [this](const json& msg, WebSocketSession& session) {
+        storageHandler_->handleUpdateVault(msg, session);
+    });
+
     router_->registerHandler("storage.vault.remove", [this](const json& msg, WebSocketSession& session) {
         storageHandler_->handleRemoveVault(msg, session);
     });

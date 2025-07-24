@@ -13,8 +13,8 @@ namespace vh::database {
 struct VaultQueries {
     VaultQueries() = default;
 
-    static unsigned int addVault(const std::shared_ptr<types::Vault>& vault,
-                                 const std::shared_ptr<types::Sync>& proxySync = nullptr);
+    static unsigned int upsertVault(const std::shared_ptr<types::Vault>& vault,
+                                 const std::shared_ptr<types::Sync>& sync = nullptr);
     static void removeVault(unsigned int vaultId);
     static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
     static std::vector<std::shared_ptr<types::Vault>> listVaults();

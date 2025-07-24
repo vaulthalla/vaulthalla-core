@@ -97,6 +97,8 @@ public:
 
     void copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const;
 
+    void setVault(const std::shared_ptr<types::Vault>& vault) { vault_ = vault; }
+
     [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const;
 
     static std::string getMimeType(const std::filesystem::path& path);

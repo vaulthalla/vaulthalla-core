@@ -220,6 +220,35 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
     }
 }
 
+void StorageHandler::handleUpdateVault(const json& msg, WebSocketSession& session) const {
+    try {
+        const json& payload = msg.at("payload");
+        const auto vault = std::make_shared<types::Vault>(payload);
+
+        storageManager_->updateVault(vault);
+
+        const json data = {{"vault", *vault}};
+
+        const json response = {{"command", "storage.vault.update.response"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"status", "ok"},
+                               {"data", data}};
+
+        session.send(response);
+
+        std::cout << "[StorageHandler] Updated vault with ID: " << vault->id << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[StorageHandler] handleUpdateVault error: " << e.what() << std::endl;
+
+        const json response = {{"command", "storage.vault.update.response"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"status", "error"},
+                               {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
 void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& session) const {
     try {
         const auto user = session.getAuthenticatedUser();

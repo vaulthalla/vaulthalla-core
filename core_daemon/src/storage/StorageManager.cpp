@@ -68,7 +68,7 @@ void StorageManager::initUserStorage(const std::shared_ptr<User>& user) {
                                                  config::ConfigRegistry::get().fuse.root_mount_path) /
                                              "users" / user->name); {
             std::lock_guard lock(mountsMutex_);
-            vault->id = VaultQueries::addVault(vault);
+            vault->id = VaultQueries::upsertVault(vault);
             vault = VaultQueries::getVault(vault->id);
         }
 
@@ -92,7 +92,7 @@ std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
     std::lock_guard lock(mountsMutex_);
 
     try {
-        vault->id = VaultQueries::addVault(vault, sync);
+        vault->id = VaultQueries::upsertVault(vault, sync);
         vault = VaultQueries::getVault(vault->id);
         if (vault->type == VaultType::Local) {
             auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
@@ -111,6 +111,14 @@ std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
         std::cerr << "[StorageManager] Error adding vault: " << e.what() << std::endl;
         throw;
     }
+}
+
+void StorageManager::updateVault(std::shared_ptr<types::Vault> vault) {
+    if (!vault) throw std::invalid_argument("Vault cannot be null");
+    if (vault->id == 0) throw std::invalid_argument("Vault ID cannot be zero");
+    std::lock_guard lock(mountsMutex_);
+    VaultQueries::upsertVault(vault);
+    engines_[vault->id]->setVault(vault);
 }
 
 void StorageManager::removeVault(const unsigned int vaultId) {

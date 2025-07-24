@@ -9,37 +9,41 @@
 using namespace vh::database;
 using namespace vh::types;
 
-unsigned int VaultQueries::addVault(const std::shared_ptr<Vault>& vault,
-                                    const std::shared_ptr<Sync>& sync) {
+unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
+                                       const std::shared_ptr<Sync>& sync) {
     if (!sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
         pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
+        const auto exists = vault->id != 0;
         const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();
 
-        if (vault->type == VaultType::Local) {
-            const auto fSync = std::static_pointer_cast<FSync>(sync);
-            pqxx::params sync_params{vaultId, fSync->interval.count(), to_string(fSync->conflict_policy)};
-            txn.exec_prepared("insert_sync_and_fsync", sync_params);
+        if (!exists) {
+            if (vault->type == VaultType::Local) {
+                const auto fSync = std::static_pointer_cast<FSync>(sync);
+                pqxx::params sync_params{vaultId, fSync->interval.count(), to_string(fSync->conflict_policy)};
+                txn.exec_prepared("insert_sync_and_fsync", sync_params);
 
-            const auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
-            txn.exec_prepared("insert_local_vault", pqxx::params{vaultId, localVault->mount_point.string()});
-        } else if (vault->type == VaultType::S3) {
-            const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-            txn.exec_prepared("insert_s3_bucket", pqxx::params{s3Vault->bucket, s3Vault->api_key_id});
+                const auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
+                txn.exec_prepared("insert_local_vault", pqxx::params{vaultId, localVault->mount_point.string()});
+            } else if (vault->type == VaultType::S3) {
+                const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+                txn.exec_prepared("insert_s3_bucket", pqxx::params{s3Vault->bucket, s3Vault->api_key_id});
 
-            const auto rSync = std::static_pointer_cast<RSync>(sync);
-            pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy), to_string(rSync->strategy)};
-            txn.exec_prepared("insert_sync_and_rsync", sync_params).one_row()["id"].as<unsigned int>();
+                const auto rSync = std::static_pointer_cast<RSync>(sync);
+                pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
+                                         to_string(rSync->strategy)};
+                txn.exec_prepared("insert_sync_and_rsync", sync_params).one_row()["id"].as<unsigned int>();
 
-            txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
+                txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
+            }
+
+            pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};
+            const auto dirId = txn.exec_prepared("insert_directory", dir_params).one_row()["id"].as<unsigned int>();
+
+            pqxx::params dir_stats_params{dirId, 0, 0, 0}; // Initialize stats with zero values
+            txn.exec_prepared("insert_dir_stats", dir_stats_params);
         }
-
-        pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};
-        const auto dirId = txn.exec_prepared("insert_directory", dir_params).one_row()["id"].as<unsigned int>();
-
-        pqxx::params dir_stats_params{dirId, 0, 0, 0}; // Initialize stats with zero values
-        txn.exec_prepared("insert_dir_stats", dir_stats_params);
 
         txn.commit();
 
@@ -72,7 +76,7 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("list_vaults");
 
-        std::vector<std::shared_ptr<Vault>> vaults;
+        std::vector<std::shared_ptr<Vault> > vaults;
 
         for (const auto& row : res) {
             switch (from_string(row["type"].as<std::string>())) {

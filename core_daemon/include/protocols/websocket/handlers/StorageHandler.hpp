@@ -31,6 +31,7 @@ class StorageHandler {
     // All Vault commands
     void handleListVaults(const json& msg, WebSocketSession& session) const;
     void handleAddVault(const json& msg, WebSocketSession& session) const;
+    void handleUpdateVault(const json& msg, WebSocketSession& session) const;
     void handleRemoveVault(const json& msg, WebSocketSession& session) const;
     void handleGetVault(const json& msg, WebSocketSession& session) const;
     void handleSyncVault(const json& msg, WebSocketSession& session) const;

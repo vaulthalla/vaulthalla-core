@@ -38,6 +38,8 @@ public:
     std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
                                            const std::shared_ptr<types::Sync>& sync = nullptr);
 
+    void updateVault(std::shared_ptr<types::Vault> vault);
+
     void removeVault(unsigned int vaultId);
 
     std::vector<std::shared_ptr<types::Vault>> listVaults(const std::shared_ptr<types::User>& user) const;

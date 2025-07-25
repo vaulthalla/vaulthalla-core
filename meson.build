@@ -13,7 +13,7 @@ add_project_link_arguments('-lcrypto', language: 'cpp')
 add_project_link_arguments('-lz', language: 'cpp')
 add_project_link_arguments('-lturbojpeg', language: 'cpp')
 
-# ╭──────────────────── DEPENDENCIES ────────────────────╮
+# ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
 boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
 libpqxx         = dependency('libpqxx', required: true)
 pdfium          = dependency('libpdfium', required: true)
@@ -84,18 +84,30 @@ fuse_lib = static_library('fuse', fuse_sources,
                           include_directories: fuse_inc,
                           dependencies: fuse_deps)
 
+# ╭──────────────────── DEPENDENCIES ────────────────────╮
+core_dep = declare_dependency(
+    include_directories: core_inc,
+    link_with: core_lib,
+    dependencies: core_deps
+)
+
+fuse_dep = declare_dependency(
+    include_directories: fuse_inc,
+    link_with: fuse_lib,
+    dependencies: fuse_deps
+)
 
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
 executable('core_daemon', core_main,
            link_with: core_lib,
            include_directories: core_inc,
-           dependencies: core_deps)
+           dependencies: core_dep)
 
 executable('fuse_daemon', fuse_main,
            link_with: fuse_lib,
            include_directories: fuse_inc,
-           dependencies: fuse_deps)
+           dependencies: fuse_dep)
 
 executable('hash_password',
            [hash_pass_src, hash_pass_main],

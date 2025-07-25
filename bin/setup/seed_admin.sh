@@ -29,8 +29,8 @@ AND NOT EXISTS (
 );
 
 -- Create Admin Default Vault if not exists
-INSERT INTO vault (type, name, is_active, created_at, owner_id, description)
-VALUES ('local', 'Default', TRUE, NOW(), (SELECT id FROM users WHERE name = 'admin'), 'Default vault for admin user')
+INSERT INTO vault (type, name, mount_point, is_active, created_at, owner_id, description)
+VALUES ('local', 'Default', 'users/admin', TRUE, NOW(), (SELECT id FROM users WHERE name = 'admin'), 'Default vault for admin user')
 ON CONFLICT (name) DO NOTHING;
 
 -- Create sync entry for Default Vault
@@ -43,15 +43,6 @@ WITH ins AS (
 )
 INSERT INTO fsync (sync_id, conflict_policy)
 SELECT id, 'keep_both' FROM ins;
-
--- Insert local mount point if not exists
-INSERT INTO local (vault_id, mount_point)
-SELECT v.id, 'users/admin'
-FROM vault v
-WHERE v.name = 'Default'
-AND NOT EXISTS (
-  SELECT 1 FROM local WHERE vault_id = v.id
-);
 
 -- Seed root directory for admin vault, including directories table
 WITH inserted_fs_entry AS (

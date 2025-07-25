@@ -37,7 +37,7 @@ CREATE TABLE vault
     description TEXT      DEFAULT NULL,
     quota       BIGINT NOT NULL DEFAULT (0), -- 0 means no quota
     owner_id    INTEGER             REFERENCES users (id) ON DELETE SET NULL,
-    mount_point TEXT NOT NULL
+    mount_point TEXT NOT NULL,
     is_active   BOOLEAN   DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

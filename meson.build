@@ -133,8 +133,6 @@ foreach asset : test_assets
     )
 endforeach
 
-
-# === 🧪 Cloud-Side Tests ===
 test_sources = fuse_sources
 foreach f : run_command('find', tests_src_dir + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
     test_sources += files(f)

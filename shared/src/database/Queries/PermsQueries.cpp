@@ -1,5 +1,5 @@
-#include "../../../../shared/include/database/Queries/PermsQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/PermsQueries.hpp"
+#include "database/Transactions.hpp"
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"

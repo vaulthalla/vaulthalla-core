@@ -1,5 +1,5 @@
-#include "../../../../shared/include/database/Queries/SyncQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/SyncQueries.hpp"
+#include "database/Transactions.hpp"
 #include "types/RSync.hpp"
 #include "types/FSync.hpp"
 

@@ -1,8 +1,8 @@
 #include "database/Queries/FileQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Transactions.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
-#include "shared_util/u8.hpp"
+#include "util/u8.hpp"
 #include "util/fsPath.hpp"
 
 #include <optional>

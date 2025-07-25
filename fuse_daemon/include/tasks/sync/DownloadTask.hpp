@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Task.hpp"
-#include "shared/include/engine/CloudStorageEngine.hpp"
-#include "shared/include/engine/StorageEngine.hpp"
+#include "concurrency/Task.hpp"
+#include "storage/CloudStorageEngine.hpp"
+#include "storage/StorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/CacheIndex.hpp"
 

@@ -3,6 +3,8 @@
 #include "FUSECmdRouter.hpp"
 #include "types/FUSECommand.hpp"
 #include "services/SyncController.hpp"
+#include "services/ThreadPoolRegistry.hpp"
+#include "concurrency/SharedThreadPoolRegistry.hpp"
 #include "storage/StorageManager.hpp"
 
 #include <iostream>
@@ -19,6 +21,9 @@ int main(int argc, char* argv[]) {
     ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
     const auto mountPath = ConfigRegistry::get().fuse.root_mount_path;
     if (!std::filesystem::exists(mountPath)) std::filesystem::create_directories(mountPath);
+
+    ThreadPoolRegistry::instance().init();
+    SharedThreadPoolRegistry::instance().init();
 
     const auto storageManager = std::make_shared<StorageManager>();
     const auto syncController = std::make_shared<SyncController>(storageManager);

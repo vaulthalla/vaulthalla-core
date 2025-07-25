@@ -1,5 +1,7 @@
 #pragma once
 
+#define FUSE_USE_VERSION 35
+
 #include <mutex>
 #include <shared_mutex>
 #include <vector>
@@ -41,7 +43,7 @@ private:
     fuse_ino_t nextInode_ = 2;
     std::unordered_map<fuse_ino_t, fs::path> inodeToPath_;
     std::unordered_map<fs::path, fuse_ino_t> pathToInode_;
-    std::shared_mutex inodeMutex_;
+    mutable std::shared_mutex inodeMutex_;
 
     std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
 };

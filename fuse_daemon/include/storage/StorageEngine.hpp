@@ -30,7 +30,7 @@ struct StorageEngine : engine::StorageEngineBase {
 
     [[nodiscard]] uintmax_t freeSpace() const;
 
-    [[nodiscard]] engine::StorageType type() const override { return engine::StorageType::Local; }
+    [[nodiscard]] virtual engine::StorageType type() const { return engine::StorageType::Local; }
 
     void purgeThumbnails(const fs::path& rel_path) const;
 

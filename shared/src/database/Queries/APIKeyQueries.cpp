@@ -1,5 +1,5 @@
-#include "../../../../shared/include/database/Queries/APIKeyQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/APIKeyQueries.hpp"
+#include "database/Transactions.hpp"
 
 namespace vh::database {
 unsigned int APIKeyQueries::addAPIKey(const std::shared_ptr<types::api::APIKey>& key) {

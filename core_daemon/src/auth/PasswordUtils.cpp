@@ -1,4 +1,4 @@
-#include "../../include/auth/PasswordUtils.hpp"
+#include "auth/PasswordUtils.hpp"
 #include "crypto/SHA1.hpp"
 #include <algorithm>
 #include <cctype>

@@ -1,7 +1,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "types/User.hpp"
 #include "types/UserRole.hpp"
-#include "auth/RefreshToken.hpp"
+#include "types/RefreshToken.hpp"
 #include "database/Transactions.hpp"
 #include "types/VaultRole.hpp"
 #include <pqxx/pqxx>

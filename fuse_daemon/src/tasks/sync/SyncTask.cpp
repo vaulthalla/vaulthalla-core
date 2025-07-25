@@ -1,7 +1,7 @@
-#include "../../../../shared/include/concurrency/sync/SyncTask.hpp"
+#include "tasks/sync/SyncTask.hpp"
 #include "storage/CloudStorageEngine.hpp"
-#include "concurrency/sync/DownloadTask.hpp"
-#include "../../../../shared/include/concurrency/sync/UploadTask.hpp"
+#include "tasks/sync/DownloadTask.hpp"
+#include "tasks/sync/UploadTask.hpp"
 #include "types/Vault.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
@@ -20,7 +20,7 @@ using namespace vh::database;
 using namespace std::chrono;
 
 void SyncTask::operator()() {
-    std::cout << "[SyncWorker] Started sync for vault: " << engine_->vault_->name << std::endl;
+    std::cout << "[SyncWorker] Started sync for vault: " << engine_->vault->name << std::endl;
     const auto start = steady_clock::now();
 
     try {
@@ -32,14 +32,14 @@ void SyncTask::operator()() {
         }
 
         isRunning_ = true;
-        SyncQueries::reportSyncStarted(engine_->sync_->id);
+        SyncQueries::reportSyncStarted(engine_->sync->id);
 
-        if (!DirectoryQueries::directoryExists(engine_->vault_->id, "/")) {
+        if (!DirectoryQueries::directoryExists(engine_->vault->id, "/")) {
             const auto dir = std::make_shared<Directory>();
-            dir->vault_id = engine_->vault_->id;
+            dir->vault_id = engine_->vault->id;
             dir->name = "/";
             dir->path = "/";
-            dir->created_by = dir->last_modified_by = engine_->vault_->owner_id;
+            dir->created_by = dir->last_modified_by = engine_->vault->owner_id;
             dir->parent_id = std::nullopt;
             DirectoryQueries::upsertDirectory(dir);
         }
@@ -51,7 +51,7 @@ void SyncTask::operator()() {
 
         s3Map_ = cloudEngine()->getGroupedFilesFromS3();
         s3Files_ = uMap2Vector(s3Map_);
-        localFiles_ = FileQueries::listFilesInDir(engine_->vaultId());
+        localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
         localMap_ = groupEntriesByPath(localFiles_);
 
         for (const auto& [path, entry] : intersect(s3Map_, localMap_))
@@ -62,9 +62,9 @@ void SyncTask::operator()() {
 
         sync();
 
-        std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault_->name << std::endl;
-        SyncQueries::reportSyncSuccess(engine_->sync_->id);
-        next_run = system_clock::now() + seconds(engine_->sync_->interval.count());
+        std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault->name << std::endl;
+        SyncQueries::reportSyncSuccess(engine_->sync->id);
+        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
 
         handleInterrupt();
 
@@ -79,7 +79,7 @@ void SyncTask::operator()() {
     } catch (const std::exception& e) {
         isRunning_ = false;
         if (std::string(e.what()).contains("Sync task interrupted")) {
-            std::cout << "[SyncWorker] Sync task interrupted for vault: " << engine_->vault_-> name << std::endl;
+            std::cout << "[SyncWorker] Sync task interrupted for vault: " << engine_->vault-> name << std::endl;
             return;
         }
         std::cerr << "[SyncWorker] Error during sync: " << e.what() << std::endl;
@@ -88,7 +88,7 @@ void SyncTask::operator()() {
         isRunning_ = false;
     }
 
-    std::cout << "[SyncWorker] Sync task completed for vault: " << engine_->vault_->name
+    std::cout << "[SyncWorker] Sync task completed for vault: " << engine_->vault->name
               << " in " << duration_cast<milliseconds>(steady_clock::now() - start).count()
               << " ms" << std::endl;
 }
@@ -131,7 +131,7 @@ std::vector<std::shared_ptr<File> > SyncTask::uMap2Vector(
 }
 
 void SyncTask::ensureFreeSpace(const uintmax_t size) const {
-    if (engine_->getVault()->quota != 0 && engine_->freeSpace() < size) throw std::runtime_error(
+    if (engine_->vault->quota != 0 && engine_->freeSpace() < size) throw std::runtime_error(
         "Not enough space to cache file");
 }
 

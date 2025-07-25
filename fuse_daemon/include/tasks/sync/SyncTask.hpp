@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../FSTask.hpp"
+#include "tasks/FSTask.hpp"
 #include "DeleteTask.hpp"
 
 #include <memory>

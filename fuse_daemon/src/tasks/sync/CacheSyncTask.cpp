@@ -1,6 +1,6 @@
-#include "concurrency/sync/CacheSyncTask.hpp"
-#include "../../../../shared/include/concurrency/sync/DownloadTask.hpp"
-#include "../../../../shared/include/concurrency/ThreadPool.hpp"
+#include "tasks/sync/CacheSyncTask.hpp"
+#include "tasks/sync/DownloadTask.hpp"
+#include "concurrency/ThreadPool.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
@@ -8,6 +8,7 @@
 #include "storage/StorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
+#include "types/Vault.hpp"
 
 #include <optional>
 
@@ -52,9 +53,9 @@ void CacheSyncTask::sync() {
 
     // Ensure all directories in the S3 map exist locally
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
-        if (!DirectoryQueries::directoryExists(engine_->vaultId(), dir->path)) {
+        if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
-            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vaultId(), dir->path.parent_path());
+            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
             DirectoryQueries::upsertDirectory(dir);
         }
     }
@@ -86,7 +87,7 @@ std::pair<uintmax_t, uintmax_t> CacheSyncTask::computeIndicesSizeAndMaxSize(cons
 
 void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
     auto free = engine_->freeSpace();
-    if (engine_->getVault()->quota != 0 && free < size) {
+    if (engine_->vault->quota != 0 && free < size) {
         const auto numFileIndices = CacheQueries::countCacheIndices(
             vaultId(), std::make_optional(CacheIndex::Type::File));
 

@@ -1,7 +1,7 @@
-#include "../../../../shared/include/concurrency/fs/LocalFSTask.hpp"
-#include "../../../../shared/include/concurrency/fs/LocalDeleteTask.hpp"
+#include "tasks/fs/LocalFSTask.hpp"
+#include "tasks/fs/LocalDeleteTask.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/LocalDiskStorageEngine.hpp"
+#include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Vault.hpp"
 #include "util/files.hpp"
@@ -15,7 +15,7 @@ using namespace vh::types;
 using namespace std::chrono;
 
 void LocalFSTask::operator()() {
-    std::cout << "[LocalFSTask] Started sync for vault: " << engine_->getVault()->name << std::endl;
+    std::cout << "[LocalFSTask] Started sync for vault: " << engine_->vault->name << std::endl;
     const auto start = steady_clock::now();
 
     try {
@@ -44,12 +44,12 @@ void LocalFSTask::operator()() {
 
 void LocalFSTask::removeTrashedFiles() {
     const auto engine = localEngine();
-    const auto files = FileQueries::listTrashedFiles(engine_->vaultId());
+    const auto files = FileQueries::listTrashedFiles(engine_->vault->id);
     futures_.reserve(files.size());
     for (const auto& file : files) push(std::make_shared<LocalDeleteTask>(engine, file));
     processFutures();
 }
 
-std::shared_ptr<LocalDiskStorageEngine> LocalFSTask::localEngine() const {
-    return std::static_pointer_cast<LocalDiskStorageEngine>(engine_);
+std::shared_ptr<StorageEngine> LocalFSTask::localEngine() const {
+    return std::static_pointer_cast<StorageEngine>(engine_);
 }

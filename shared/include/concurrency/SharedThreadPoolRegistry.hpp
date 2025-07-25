@@ -28,7 +28,7 @@ public:
         }
     }
 
-    std::shared_ptr<ThreadPool>& SharedThreadPoolRegistry::thumbPool() { return thumb_; }
+    std::shared_ptr<ThreadPool>& thumbPool() { return thumb_; }
 
 private:
     std::shared_ptr<ThreadPool> thumb_;

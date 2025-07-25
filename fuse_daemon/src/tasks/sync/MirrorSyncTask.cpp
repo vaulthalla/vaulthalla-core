@@ -1,6 +1,6 @@
-#include "concurrency/sync/MirrorSyncTask.hpp"
-#include "../../../../shared/include/concurrency/sync/DownloadTask.hpp"
-#include "../../../../shared/include/concurrency/ThreadPool.hpp"
+#include "tasks/sync/MirrorSyncTask.hpp"
+#include "tasks/sync/DownloadTask.hpp"
+#include "concurrency/ThreadPool.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "types/File.hpp"
@@ -15,7 +15,7 @@ using namespace vh::types;
 using namespace vh::database;
 
 void MirrorSyncTask::sync() {
-    const auto sync = std::static_pointer_cast<RSync>(engine_->sync_);
+    const auto sync = std::static_pointer_cast<RSync>(engine_->sync);
     if (sync->conflict_policy == RSync::ConflictPolicy::KeepLocal) syncKeepLocal();
     else if (sync->conflict_policy == RSync::ConflictPolicy::KeepRemote) syncKeepRemote();
     else throw std::runtime_error("[MirrorSyncTask] Conflict policy not supported: " + to_string(sync->conflict_policy));

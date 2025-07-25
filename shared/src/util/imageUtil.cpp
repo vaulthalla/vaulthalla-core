@@ -1,10 +1,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 
-#include "../../../shared/include/util/imageUtil.hpp"
+#include "util/imageUtil.hpp"
 
-#include <stb_image.h>
-#include <stb_image_resize.h>
+#include <stb/stb_image.h>
+#include <stb/stb_image_resize.h>
 #include <turbojpeg.h>
 #include <stdexcept>
 #include <pdfium/fpdfview.h>

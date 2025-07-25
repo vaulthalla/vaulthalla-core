@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../engine/StorageEngine.hpp"
+#include "engine/StorageEngineBase.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -64,7 +64,7 @@ inline std::string generate_random_suffix(size_t length = 8) {
 
 inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
                                                   const std::filesystem::path& rel_path,
-                                                  const std::shared_ptr<storage::StorageEngine>& engine) {
+                                                  const std::shared_ptr<engine::StorageEngineBase>& engine) {
     namespace fs = std::filesystem;
 
     const auto abs_path = engine->getAbsolutePath(rel_path);

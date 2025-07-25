@@ -1,7 +1,6 @@
-#include "../../../../shared/include/database/Queries/VaultQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/VaultQueries.hpp"
+#include "database/Transactions.hpp"
 #include "types/Vault.hpp"
-#include "types/LocalDiskVault.hpp"
 #include "types/S3Vault.hpp"
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
@@ -23,9 +22,6 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 const auto fSync = std::static_pointer_cast<FSync>(sync);
                 pqxx::params sync_params{vaultId, fSync->interval.count(), to_string(fSync->conflict_policy)};
                 txn.exec_prepared("insert_sync_and_fsync", sync_params);
-
-                const auto localVault = std::static_pointer_cast<LocalDiskVault>(vault);
-                txn.exec_prepared("insert_local_vault", pqxx::params{vaultId, localVault->mount_point.string()});
             } else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
                 txn.exec_prepared("insert_s3_bucket", pqxx::params{s3Vault->bucket, s3Vault->api_key_id});
@@ -65,7 +61,7 @@ std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
                                   const auto typeStr = row["type"].as<std::string>();
 
                                   switch (from_string(typeStr)) {
-                                  case VaultType::Local: return std::make_shared<LocalDiskVault>(row);
+                                  case VaultType::Local: return std::make_shared<Vault>(row);
                                   case VaultType::S3: return std::make_shared<S3Vault>(row);
                                   default: throw std::runtime_error("Unsupported VaultType: " + typeStr);
                                   }
@@ -81,7 +77,7 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
         for (const auto& row : res) {
             switch (from_string(row["type"].as<std::string>())) {
             case VaultType::Local: {
-                vaults.push_back(std::make_shared<LocalDiskVault>(row));
+                vaults.push_back(std::make_shared<Vault>(row));
                 break;
             }
             case VaultType::S3: {
@@ -104,7 +100,7 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned
         for (const auto& row : res) {
             const auto typeStr = row["type"].as<std::string>();
             switch (from_string(typeStr)) {
-            case VaultType::Local: vaults.push_back(std::make_shared<LocalDiskVault>(row));
+            case VaultType::Local: vaults.push_back(std::make_shared<Vault>(row));
                 break;
             case VaultType::S3: vaults.push_back(std::make_shared<S3Vault>(row));
                 break;

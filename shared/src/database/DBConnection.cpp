@@ -108,31 +108,26 @@ void DBConnection::initPreparedVaults() const {
            is_active = EXCLUDED.is_active
        RETURNING id)");
 
-    conn_->prepare("insert_local_vault", "INSERT INTO local (vault_id, mount_point) VALUES ($1, $2)");
-
     conn_->prepare("insert_s3_bucket", "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) RETURNING id");
 
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
 
     conn_->prepare("get_vault",
-                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
                    "FROM vault v "
-                   "LEFT JOIN local l ON v.id = l.vault_id "
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
                    "WHERE v.id = $1");
 
     conn_->prepare("list_vaults",
-                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
                    "FROM vault v "
-                   "LEFT JOIN local l ON v.id = l.vault_id "
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id");
 
     conn_->prepare("list_user_vaults",
-                   "SELECT v.*, l.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
                    "FROM vault v "
-                   "LEFT JOIN local l ON v.id = l.vault_id "
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
                    "WHERE v.owner_id = $1");

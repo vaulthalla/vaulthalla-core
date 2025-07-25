@@ -1,4 +1,4 @@
-#include "../../../../shared/include/database/Queries/ShareQueries.hpp"
+#include "database/Queries/ShareQueries.hpp"
 
 namespace vh::database {
 

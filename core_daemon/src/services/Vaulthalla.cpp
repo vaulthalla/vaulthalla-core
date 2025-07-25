@@ -9,7 +9,8 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
-#include "../../../fuse_daemon/include/services/SharedThreadPoolRegistry.hpp"
+#include "services/ThreadPoolRegistry.hpp"
+#include "concurrency/SharedThreadPoolRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <iostream>
@@ -22,7 +23,8 @@ void Vaulthalla::start() {
     try {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initConfig();
-        concurrency::ThreadPoolRegistry::instance().init();
+        ThreadPoolRegistry::instance().init();
+        SharedThreadPoolRegistry::instance().init();
         database::Transactions::init();
         serviceManager_ = std::make_shared<ServiceManager>();
         initServices();

@@ -22,11 +22,10 @@ namespace fs = std::filesystem;
 
 namespace vh::storage {
 
-StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault,
-                             const std::shared_ptr<services::ThumbnailWorker>& thumbWorker)
+StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     : StorageEngineBase(vault) {}
 
-void StorageEngine::finishUpload(unsigned int userId, const std::filesystem::path& relPath) {
+void StorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
     const auto absPath = getAbsolutePath(relPath);
 
     if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
@@ -45,7 +44,6 @@ void StorageEngine::finishUpload(unsigned int userId, const std::filesystem::pat
 
     ThumbnailWorker::enqueue(shared_from_this(), buffer, f);
 }
-
 
 void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) const {
     const auto absPath = getAbsolutePath(relPath);

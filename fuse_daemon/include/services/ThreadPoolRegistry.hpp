@@ -17,11 +17,10 @@ public:
     }
 
     void init() {
-        if (sync_ && fuse_ && thumb_) return; // already initialized
+        if (sync_ && fuse_) return; // already initialized
 
         sync_ = std::make_shared<ThreadPool>();
         fuse_ = std::make_shared<ThreadPool>();
-        thumb_ = std::make_shared<ThreadPool>();
         stopFlag_.store(false);
     }
 
@@ -29,17 +28,15 @@ public:
         if (!stopFlag_.load()) {
             sync_->stop();
             fuse_->stop();
-            thumb_->stop();
             stopFlag_.store(true);
         }
     }
 
-    std::shared_ptr<ThreadPool>& ThreadPoolRegistry::syncPool() { return sync_; }
-    std::shared_ptr<ThreadPool>& ThreadPoolRegistry::fusePool() { return fuse_; }
-    std::shared_ptr<ThreadPool>& ThreadPoolRegistry::thumbPool() { return thumb_; }
+    std::shared_ptr<ThreadPool>& syncPool() { return sync_; }
+    std::shared_ptr<ThreadPool>& fusePool() { return fuse_; }
 
 private:
-    std::shared_ptr<ThreadPool> sync_, fuse_, thumb_;
+    std::shared_ptr<ThreadPool> sync_, fuse_;
     std::atomic<bool> stopFlag_{false};
 };
 

@@ -1,7 +1,7 @@
 #include "database/Queries/CacheQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Transactions.hpp"
 #include "types/CacheIndex.hpp"
-#include "shared_util/u8.hpp"
+#include "util/u8.hpp"
 
 using namespace vh::database;
 using namespace vh::types;

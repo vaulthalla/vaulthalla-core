@@ -1,5 +1,7 @@
 #pragma once
 
+#define FUSE_USE_VERSION 35
+
 #include <memory>
 #include <fuse_lowlevel.h>
 

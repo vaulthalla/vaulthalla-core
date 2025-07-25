@@ -1,7 +1,7 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
 #include "auth/AuthManager.hpp"
-#include "shared/include/engine/StorageManager.hpp"
+#include "storage/StorageManager.hpp"
 #include "protocols/http/PreviewResponse.hpp"
 
 #include <iostream>

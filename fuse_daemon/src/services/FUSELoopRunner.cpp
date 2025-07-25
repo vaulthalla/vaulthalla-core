@@ -5,7 +5,6 @@
 #include "services/ThreadPoolRegistry.hpp"
 #include "FUSERequestTask.hpp"
 
-#include <fuse3/fuse_lowlevel.h>
 #include <iostream>
 
 using namespace vh::concurrency;

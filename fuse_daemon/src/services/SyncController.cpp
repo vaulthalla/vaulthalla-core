@@ -1,11 +1,11 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
-#include "../../include/services/SharedThreadPoolRegistry.hpp"
-#include "../../include/tasks/FSTask.hpp"
-#include "concurrency/fs/LocalFSTask.hpp"
-#include "concurrency/sync/CacheSyncTask.hpp"
-#include "concurrency/sync/SafeSyncTask.hpp"
-#include "concurrency/sync/MirrorSyncTask.hpp"
+#include "services/ThreadPoolRegistry.hpp"
+#include "tasks/FSTask.hpp"
+#include "tasks/fs/LocalFSTask.hpp"
+#include "tasks/sync/CacheSyncTask.hpp"
+#include "tasks/sync/SafeSyncTask.hpp"
+#include "tasks/sync/MirrorSyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -28,7 +28,7 @@ bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shar
 
 SyncController::SyncController(const std::weak_ptr<StorageManager>& storage_manager)
     : storage_(storage_manager),
-      pool_(SharedThreadPoolRegistry::instance().syncPool()) {}
+      pool_(ThreadPoolRegistry::instance().syncPool()) {}
 
 SyncController::~SyncController() {
     stop();

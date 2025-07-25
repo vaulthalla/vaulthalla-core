@@ -40,7 +40,7 @@ struct StorageEngineBase : public std::enable_shared_from_this<StorageEngineBase
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const;
 
-    [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
+    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] std::filesystem::path getRelativePath(const std::filesystem::path& abs_path) const;
 
@@ -48,8 +48,6 @@ struct StorageEngineBase : public std::enable_shared_from_this<StorageEngineBase
                                                              const std::filesystem::path& prefix = {}) const;
 
     [[nodiscard]] std::filesystem::path getRelativeCachePath(const std::filesystem::path& abs_path) const;
-
-    [[nodiscard]] virtual StorageType type() const = 0;
 
     [[nodiscard]] std::shared_ptr<types::File> createFile(const fs::path& rel_path,
                                                           const std::vector<uint8_t>& = {}) const;

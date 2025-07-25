@@ -1,4 +1,4 @@
-#include "../../include/protocols/FUSECmdClient.hpp"
+#include "protocols/FUSECmdClient.hpp"
 #include "types/FUSECommand.hpp"
 #include "config/ConfigRegistry.hpp"
 #include <iostream>
@@ -28,10 +28,7 @@ bool sendCommand(const types::fuse::FUSECommand& cmd) {
     }
 
     const nlohmann::json jsonCmd = {{"op", types::fuse::to_string(cmd.type)},
-                              {"path", cmd.path},
-                              {"uid", cmd.uid},
-                              {"gid", cmd.gid},
-                              {"mode", cmd.mode}};
+                                    {"vaultId", cmd.vaultId}};
 
     const std::string payload = jsonCmd.dump();
     if (write(sock, payload.c_str(), payload.size()) == -1) {

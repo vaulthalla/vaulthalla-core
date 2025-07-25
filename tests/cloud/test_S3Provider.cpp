@@ -1,6 +1,6 @@
 #include "types/APIKey.hpp"
 #include "cloud/S3Provider.hpp"
-#include "../../shared/include/util/imageUtil.hpp"
+#include "util/imageUtil.hpp"
 #include "types/FSEntry.hpp"
 #include "util/u8.hpp"
 

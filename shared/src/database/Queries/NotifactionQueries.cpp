@@ -1,4 +1,4 @@
-#include "../../../../shared/include/database/Queries/NotifactionQueries.hpp"
+#include "database/Queries/NotifactionQueries.hpp"
 
 namespace vh::database {
 

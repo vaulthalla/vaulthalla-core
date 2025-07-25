@@ -1,5 +1,5 @@
-#include "../../../../shared/include/database/Queries/OperationQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/OperationQueries.hpp"
+#include "database/Transactions.hpp"
 #include "types/Operation.hpp"
 
 using namespace vh::database;

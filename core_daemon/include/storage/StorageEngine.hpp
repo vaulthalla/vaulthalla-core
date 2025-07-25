@@ -3,9 +3,7 @@
 #include "engine/StorageEngineBase.hpp"
 
 #include <filesystem>
-#include <optional>
 #include <utility>
-#include <vector>
 #include <memory>
 
 namespace fs = std::filesystem;
@@ -26,8 +24,7 @@ public:
     StorageEngine() = default;
     ~StorageEngine() override = default;
 
-    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
-                           const std::shared_ptr<services::ThumbnailWorker>& thumbWorker);
+    explicit StorageEngine(const std::shared_ptr<types::Vault>& vault);
 
     void finishUpload(unsigned int userId, const fs::path& relPath);
 
@@ -39,11 +36,7 @@ public:
 
     void copy(const fs::path& from, const fs::path& to, unsigned int userId) const;
 
-    [[nodiscard]] virtual std::optional<std::vector<uint8_t> > readFile(const fs::path& relative_path) const = 0;
-
     void remove(const fs::path& rel_path, unsigned int userId) const;
-
-    [[nodiscard]] engine::StorageType type() const override = 0;
 
 protected:
     void removeFile(const fs::path& rel_path, unsigned int userId) const;

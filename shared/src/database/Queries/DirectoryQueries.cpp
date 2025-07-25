@@ -1,9 +1,9 @@
-#include "../../../../shared/include/database/Queries/DirectoryQueries.hpp"
-#include "../../../../shared/include/database/Transactions.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
+#include "database/Transactions.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
-#include "shared_util/u8.hpp"
+#include "util/u8.hpp"
 #include "util/fsPath.hpp"
 
 #include <optional>

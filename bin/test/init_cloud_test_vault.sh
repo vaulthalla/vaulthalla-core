@@ -19,9 +19,9 @@ WHERE NOT EXISTS (
 );
 
 -- Create test vault for R2
-INSERT INTO vault (type, name, is_active, created_at, owner_id, description)
+INSERT INTO vault (type, name, mount_point, is_active, created_at, owner_id, description)
 VALUES (
-    's3', 'R2 Test Vault', TRUE, NOW(),
+    's3', 'R2 Test Vault', 'cloud/r2_test_vault', TRUE, NOW(),
     (SELECT id FROM users WHERE name = 'admin'),
     'Test vault for Cloudflare R2 integration'
 )

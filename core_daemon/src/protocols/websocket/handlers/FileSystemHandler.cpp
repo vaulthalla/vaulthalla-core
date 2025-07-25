@@ -2,8 +2,9 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "types/File.hpp"
 #include "types/VaultRole.hpp"
+#include "types/Vault.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
-#include "storage/LocalDiskStorageEngine.hpp"
+#include "storage/StorageEngine.hpp"
 #include <iostream>
 
 namespace vh::websocket {
@@ -250,40 +251,6 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << std::endl;
 
         const json response = {{"command", "fs.listDir.response"}, {"status", "error"}, {"error", e.what()}};
-
-        session.send(response);
-    }
-}
-
-void FileSystemHandler::handleReadFile(const json& msg, WebSocketSession& session) {
-    try {
-        const auto& payload = msg.at("payload");
-        const auto mountName = payload.at("mountName").get<std::string>();
-        const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto path = payload.at("path").get<std::string>();
-
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canDownload);
-
-        const auto engine = storageManager_->getEngine(vaultId);
-        if (!engine) throw std::runtime_error("Unknown storage engine: " + mountName);
-        auto data = engine->readFile(path);
-        if (!data.has_value()) throw std::runtime_error("File not found: " + path);
-        auto fileContent = std::string(data->begin(), data->end());
-
-        json response = {{"command", "fs.readFile.response"},
-                         {"status", "ok"},
-                         {"mountName", mountName},
-                         {"path", path},
-                         {"data", fileContent}};
-
-        session.send(response);
-
-        std::cout << "[FileSystemHandler] ReadFile on mount '" << mountName << "' path '" << path << std::endl;
-
-    } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleReadFile error: " << e.what() << std::endl;
-
-        json response = {{"command", "fs.readFile.response"}, {"status", "error"}, {"error", e.what()}};
 
         session.send(response);
     }

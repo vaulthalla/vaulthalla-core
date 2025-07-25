@@ -1,6 +1,7 @@
 #include "protocols/http/HttpRouter.hpp"
 #include "util/parse.hpp"
 #include "storage/StorageManager.hpp"
+#include "storage/StorageEngine.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"

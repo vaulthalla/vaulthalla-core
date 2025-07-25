@@ -5,7 +5,7 @@
 #include <thread>
 
 namespace vh::types::fuse {
-struct Command;
+struct FUSECommand;
 }
 
 namespace vh::fuse::ipc {
@@ -20,14 +20,14 @@ class CommandRouter {
 
     void stop();
 
-    void setCommandHandler(std::function<void(const types::fuse::Command&)> handler);
+    void setCommandHandler(std::function<void(const types::fuse::FUSECommand&)> handler);
 
   private:
     std::string socketPath_;
     int serverFd_ = -1;
     bool running_ = false;
     std::thread listenerThread_;
-    std::function<void(const types::fuse::Command&)> handler_;
+    std::function<void(const types::fuse::FUSECommand&)> handler_;
 
     void listenLoop();
 };

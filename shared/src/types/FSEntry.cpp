@@ -1,5 +1,5 @@
 #include "types/FSEntry.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 #include "types/Directory.hpp"
 #include "types/File.hpp"
 
@@ -19,6 +19,7 @@ FSEntry::FSEntry(const pqxx::row& row)
       created_by(row["created_by"].as<unsigned int>()),
       last_modified_by(row["last_modified_by"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
+      size_bytes(row["size_bytes"].as<uintmax_t>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
       path(std::filesystem::path(row["path"].as<std::string>())) {
@@ -39,6 +40,8 @@ void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
         {"created_by", entry.created_by},
         {"last_modified_by", entry.last_modified_by},
         {"name", entry.name},
+        {"parent_id", entry.parent_id.has_value() ? entry.parent_id.value() : 0},
+        {"size_bytes", entry.size_bytes},
         {"created_at", util::timestampToString(entry.created_at)},
         {"updated_at", util::timestampToString(entry.updated_at)},
         {"path", entry.path.string()}
@@ -51,6 +54,7 @@ void vh::types::from_json(const nlohmann::json& j, FSEntry& entry) {
     entry.created_by = j.at("created_by").get<unsigned int>();
     entry.last_modified_by = j.at("last_modified_by").get<unsigned int>();
     entry.name = j.at("name").get<std::string>();
+    entry.size_bytes = j.at("size_bytes").get<uintmax_t>();
     entry.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
     entry.updated_at = util::parsePostgresTimestamp(j.at("updated_at").get<std::string>());
     entry.path = std::filesystem::path(j.at("path").get<std::string>());

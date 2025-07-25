@@ -5,7 +5,6 @@
 namespace vh::types {
 
 struct File : FSEntry {
-    unsigned long long size_bytes{};
     std::string encryption_iv;
     std::optional<std::string> mime_type, content_hash;
 

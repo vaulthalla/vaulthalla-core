@@ -2,7 +2,7 @@
 #include "cloud/S3Provider.hpp"
 #include "util/imageUtil.hpp"
 #include "types/FSEntry.hpp"
-#include "shared_util/u8.hpp"
+#include "util/u8.hpp"
 
 #include <filesystem>
 #include <fstream>

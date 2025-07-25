@@ -2,7 +2,7 @@
 
 #include "types/User.hpp"
 #include "Token.hpp"
-#include "auth/RefreshToken.hpp"
+#include "types/RefreshToken.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include <memory>
@@ -52,7 +52,7 @@ class Client {
     std::shared_ptr<RefreshToken> refreshToken_;
     const std::string jwt_secret_ = config::ConfigRegistry::get().auth.jwt_secret;
 
-    std::string generateToken(const std::string& name) const;
+    [[nodiscard]] std::string generateToken(const std::string& name) const;
 };
 
 } // namespace vh::auth

@@ -1,6 +1,5 @@
 #include "services/Vaulthalla.hpp"
-#include "services/SyncController.hpp"
-#include "crypto/PasswordUtils.hpp"
+#include "auth/PasswordUtils.hpp"
 #include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
@@ -10,7 +9,8 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "services/ThreadPoolRegistry.hpp"
+#include "concurrency/SharedThreadPoolRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <iostream>
@@ -23,7 +23,8 @@ void Vaulthalla::start() {
     try {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initConfig();
-        concurrency::ThreadPoolRegistry::instance().init();
+        ThreadPoolRegistry::instance().init();
+        SharedThreadPoolRegistry::instance().init();
         database::Transactions::init();
         serviceManager_ = std::make_shared<ServiceManager>();
         initServices();
@@ -87,7 +88,6 @@ void Vaulthalla::initServices() {
     // TODO: fix segfaults in ConnectionLifecycleManager
     // lifecycleManager_ = std::make_shared<ConnectionLifecycleManager>(serviceManager_->authManager()->sessionManager());
     // lifecycleManager_->start();
-    serviceManager_->storageManager()->initializeControllers();
 }
 
 void Vaulthalla::initThreatIntelligence() {

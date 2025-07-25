@@ -1,22 +1,16 @@
 #pragma once
 
-#include "types/Vault.hpp"
-#include "storage/CloudStorageEngine.hpp"
-#include "storage/LocalDiskStorageEngine.hpp"
-
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace vh::types {
 struct User;
 struct FSEntry;
 struct Sync;
-}
-
-namespace vh::concurrency {
-class ThumbnailWorker;
+struct Vault;
 }
 
 namespace vh::services {
@@ -25,20 +19,20 @@ class SyncController;
 
 namespace vh::storage {
 
+struct StorageEngine;
+
 class StorageManager : public std::enable_shared_from_this<StorageManager> {
 public:
     StorageManager();
 
     void initStorageEngines();
 
-    void initializeControllers();
-
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
     std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
                                            const std::shared_ptr<types::Sync>& sync = nullptr);
 
-    void updateVault(std::shared_ptr<types::Vault> vault);
+    void updateVault(const std::shared_ptr<types::Vault>& vault);
 
     void removeVault(unsigned int vaultId);
 
@@ -62,41 +56,13 @@ public:
 
     void copy(unsigned int vaultId, unsigned int userId, const std::filesystem::path& from, const std::filesystem::path& to) const;
 
-    void syncNow(unsigned int vaultId) const;
+    static void syncNow(unsigned int vaultId) ;
 
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
 
-    std::shared_ptr<concurrency::ThumbnailWorker> getThumbnailWorker() const { return thumbnailWorker_; }
-
-    static bool pathsAreConflicting(const std::filesystem::path& path1, const std::filesystem::path& path2);
-
-    static bool hasLogicalParent(const std::filesystem::path& relPath);
-
-    std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
-
-    template <typename T>
-    std::shared_ptr<T> getEngine(unsigned int id) const {
-        std::lock_guard lock(mountsMutex_);
-        auto it = engines_.find(id);
-        if (it != engines_.end()) return std::dynamic_pointer_cast<T>(it->second);
-        return nullptr;
-    }
-
-    template <typename T>
-    std::vector<std::shared_ptr<T>> getEngines() const {
-        std::lock_guard lock(mountsMutex_);
-        std::vector<std::shared_ptr<T>> result;
-        for (const auto& [id, engine] : engines_)
-            if (auto specificEngine = std::dynamic_pointer_cast<T>(engine))
-                result.push_back(specificEngine);
-        return result;
-    }
-
 private:
     mutable std::mutex mountsMutex_;
-    std::unordered_map<unsigned int, std::shared_ptr<StorageEngine> > engines_;
-    std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
-    std::shared_ptr<services::SyncController> syncController_;
+    std::unordered_map<unsigned int, std::shared_ptr<StorageEngine>> engines_;
 };
 
 } // namespace vh::storage

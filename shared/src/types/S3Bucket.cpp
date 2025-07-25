@@ -1,6 +1,6 @@
 #include "types/S3Bucket.hpp"
 #include "types/APIKey.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>

@@ -3,10 +3,9 @@
 #include "types/User.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
-#include "types/LocalDiskVault.hpp"
 #include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "../../../../include/storage/APIKeyManager.hpp"
+#include "storage/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 
@@ -180,20 +179,20 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
         const std::string name = payload.at("name").get<std::string>();
         const std::string type = payload.at("type").get<std::string>();
         const std::string typeLower = boost::algorithm::to_lower_copy(type);
+        const std::string mountPoint = payload.at("mount_point").get<std::string>();
 
         std::shared_ptr<types::Vault> vault;
         std::shared_ptr<types::Sync> sync = nullptr;
 
-        if (typeLower == "local") {
-            const std::string mountPoint = payload.at("mount_point").get<std::string>();
-            vault = std::make_shared<types::LocalDiskVault>(name, mountPoint);
-        } else if (typeLower == "s3") {
+        if (typeLower == "s3") {
             const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
             const std::string bucket = payload.at("bucket").get<std::string>();
             vault = std::make_shared<types::S3Vault>(name, apiKeyID, bucket);
             sync = std::make_shared<types::Sync>(payload);
-        } else throw std::runtime_error("Unsupported vault type: " + typeLower);
+        }
 
+        vault->name = name;
+        vault->mount_point = mountPoint;
         vault->owner_id = session.getAuthenticatedUser()->id;
 
         vault = storageManager_->addVault(vault, sync);
@@ -289,13 +288,10 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         json data = {};
 
-        if (vault->type == types::VaultType::Local) {
-            const auto localVault = std::static_pointer_cast<types::LocalDiskVault>(vault);
-            data["vault"] = *localVault;
-        } else if (vault->type == types::VaultType::S3) {
+        if (vault->type == types::VaultType::S3) {
             const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault);
             data["vault"] = *s3Vault;
-        } else throw std::runtime_error("Unsupported vault type: " + to_string(vault->type));
+        } else data["vault"] = *vault;
 
         if (vault->owner_id == user->id) data["vault"]["owner"] = user->name;
         else data["vault"]["owner"] = database::VaultQueries::getVaultOwnersName(vaultId);

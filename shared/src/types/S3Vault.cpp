@@ -1,5 +1,5 @@
 #include "types/S3Vault.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>

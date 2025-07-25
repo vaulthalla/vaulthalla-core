@@ -84,10 +84,6 @@ void WebSocketHandler::registerFileSystemHandlers() const {
         fsHandler_->handleListDir(msg, session);
     });
 
-    router_->registerHandler("fs.file.read", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleReadFile(msg, session);
-    });
-
     router_->registerHandler("fs.entry.delete", [this](const json& msg, WebSocketSession& session) {
         fsHandler_->handleDelete(msg, session);
     });

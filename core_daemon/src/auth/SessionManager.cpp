@@ -1,5 +1,5 @@
 #include "auth/SessionManager.hpp"
-#include "auth/RefreshToken.hpp"
+#include "../../../shared/include/types/RefreshToken.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include <iostream>
 

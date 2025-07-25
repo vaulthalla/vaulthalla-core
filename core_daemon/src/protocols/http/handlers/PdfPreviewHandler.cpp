@@ -1,6 +1,7 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
+#include "storage/StorageEngine.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
 

@@ -24,6 +24,7 @@ struct FSEntry {
     unsigned int vault_id{}, created_by{}, last_modified_by{};
     std::optional<unsigned int> parent_id;
     std::string name{};
+    uintmax_t size_bytes{0};
     std::time_t created_at{}, updated_at{};
     std::filesystem::path path{};
 

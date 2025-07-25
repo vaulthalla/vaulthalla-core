@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 #include <boost/describe.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>

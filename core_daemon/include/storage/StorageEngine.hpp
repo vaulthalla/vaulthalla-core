@@ -1,51 +1,37 @@
 #pragma once
 
+#include "engine/StorageEngineBase.hpp"
+
 #include <filesystem>
 #include <optional>
 #include <utility>
 #include <vector>
 #include <memory>
-#include <shared_mutex>
 
 namespace fs = std::filesystem;
 
 namespace vh::types {
 struct Vault;
 struct File;
-struct Sync;
 }
 
-namespace vh::concurrency {
-class SyncTask;
-class FSTask;
+namespace vh::services {
 class ThumbnailWorker;
 }
 
 namespace vh::storage {
 
-struct VaultEncryptionManager;
-
-enum class StorageType { Local, Cloud };
-
-class StorageEngine : public std::enable_shared_from_this<StorageEngine> {
+class StorageEngine : public engine::StorageEngineBase {
 public:
-    std::shared_ptr<types::Sync> sync_;
-    std::shared_mutex mutex_;
-
-    static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB
-
     StorageEngine() = default;
+    ~StorageEngine() override = default;
 
     explicit StorageEngine(const std::shared_ptr<types::Vault>& vault,
-                           const std::shared_ptr<types::Sync>& sync,
-                           const std::shared_ptr<concurrency::ThumbnailWorker>& thumbnailWorker,
-                           fs::path root_mount_path = fs::path());
+                           const std::shared_ptr<services::ThumbnailWorker>& thumbWorker);
 
-    virtual ~StorageEngine() = default;
+    void finishUpload(unsigned int userId, const fs::path& relPath);
 
-    virtual void finishUpload(unsigned int userId, const std::filesystem::path& relPath) = 0;
-
-    void mkdir(const fs::path& relPath, unsigned int userId);
+    void mkdir(const fs::path& relPath, unsigned int userId) const;
 
     void move(const fs::path& from, const fs::path& to, unsigned int userId) const;
 
@@ -57,63 +43,11 @@ public:
 
     void remove(const fs::path& rel_path, unsigned int userId) const;
 
-    [[nodiscard]] bool isDirectory(const fs::path& rel_path) const;
-
-    [[nodiscard]] bool isFile(const fs::path& rel_path) const;
-
-    [[nodiscard]] virtual std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
-
-    [[nodiscard]] std::filesystem::path getRelativePath(const std::filesystem::path& abs_path) const;
-
-    [[nodiscard]] static uintmax_t getDirectorySize(const std::filesystem::path& path);
-
-    [[nodiscard]] uintmax_t getVaultSize() const;
-
-    [[nodiscard]] uintmax_t getCacheSize() const;
-
-    [[nodiscard]] uintmax_t getVaultAndCacheTotalSize() const;
-
-    [[nodiscard]] uintmax_t freeSpace() const;
-
-    [[nodiscard]] std::shared_ptr<types::File> createFile(const std::filesystem::path& rel_path,
-                                                          const std::vector<uint8_t>& = {}) const;
-
-    [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path,
-                                                             const std::filesystem::path& prefix = {}) const;
-
-    [[nodiscard]] std::filesystem::path getRelativeCachePath(const std::filesystem::path& abs_path) const;
-
-    [[nodiscard]] std::shared_ptr<types::Vault> getVault() const { return vault_; }
-
-    [[nodiscard]] unsigned int vaultId() const;
-
-    [[nodiscard]] fs::path root_directory() const { return root_; }
-
-    [[nodiscard]] virtual StorageType type() const = 0;
-
-    void purgeThumbnails(const fs::path& rel_path) const;
-
-    void moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const;
-
-    void copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const;
-
-    void setVault(const std::shared_ptr<types::Vault>& vault) { vault_ = vault; }
-
-    [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath, const std::vector<uint8_t>& payload) const;
-
-    static std::string getMimeType(const std::filesystem::path& path);
+    [[nodiscard]] engine::StorageType type() const override = 0;
 
 protected:
-    fs::path cache_path_, root_;
-    std::shared_ptr<types::Vault> vault_;
-    std::shared_ptr<VaultEncryptionManager> encryptionManager_;
-    std::shared_ptr<concurrency::ThumbnailWorker> thumbnailWorker_;
-
     void removeFile(const fs::path& rel_path, unsigned int userId) const;
     void removeDirectory(const fs::path& rel_path, unsigned int userId) const;
-
-    friend class concurrency::SyncTask;
-    friend class concurrency::FSTask;
 };
 
 } // namespace vh::storage

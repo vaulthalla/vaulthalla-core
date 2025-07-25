@@ -1,4 +1,4 @@
-#include "crypto/PasswordHash.hpp"
+#include "../core_daemon/include/auth/PasswordHash.hpp"
 #include "crypto/PasswordUtils.hpp"
 
 #include <iostream>

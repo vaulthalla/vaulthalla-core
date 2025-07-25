@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
+#include <filesystem>
 
 namespace pqxx {
 class row;
@@ -23,6 +24,7 @@ struct Vault {
     std::string name, description{};
     unsigned long long quota{};
     VaultType type{VaultType::Local};
+    std::filesystem::path mount_point;
     bool is_active{true};
     std::time_t created_at{};
 

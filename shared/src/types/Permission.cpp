@@ -1,5 +1,5 @@
 #include "types/Permission.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
 
 namespace vh::types {

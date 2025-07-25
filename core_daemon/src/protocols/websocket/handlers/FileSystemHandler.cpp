@@ -3,7 +3,7 @@
 #include "types/File.hpp"
 #include "types/VaultRole.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
-#include "storage/LocalDiskStorageEngine.hpp"
+#include "shared/include/engine/LocalDiskStorageEngine.hpp"
 #include <iostream>
 
 namespace vh::websocket {

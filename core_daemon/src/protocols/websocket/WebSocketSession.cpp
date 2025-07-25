@@ -5,7 +5,7 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
-#include "util/parse.hpp"
+#include "../../../../shared/include/util/parse.hpp"
 
 #include <boost/beast/http.hpp>
 #include <iostream>

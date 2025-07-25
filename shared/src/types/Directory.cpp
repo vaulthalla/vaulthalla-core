@@ -1,5 +1,5 @@
 #include "types/Directory.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -8,7 +8,6 @@ using namespace vh::types;
 
 Directory::Directory(const pqxx::row& row)
     : FSEntry(row),
-      size_bytes(row["size_bytes"].as<unsigned long long>()),
       file_count(row["file_count"].as<unsigned int>()),
       subdirectory_count(row["subdirectory_count"].as<unsigned int>()),
       last_modified(util::parsePostgresTimestamp(row["last_modified"].as<std::string>())) {}
@@ -16,7 +15,6 @@ Directory::Directory(const pqxx::row& row)
 void vh::types::to_json(nlohmann::json& j, const Directory& d) {
     to_json(j, static_cast<const FSEntry&>(d));
     j["type"] = "directory"; // Helpful for client
-    j["size_bytes"] = d.size_bytes;
     j["file_count"] = d.file_count;
     j["subdirectory_count"] = d.subdirectory_count;
     j["last_modified"] = util::timestampToString(d.last_modified);
@@ -24,7 +22,6 @@ void vh::types::to_json(nlohmann::json& j, const Directory& d) {
 
 void vh::types::from_json(const nlohmann::json& j, Directory& d) {
     from_json(j, static_cast<FSEntry&>(d));
-    d.size_bytes = j.at("size_bytes").get<unsigned long long>();
     d.file_count = j.at("file_count").get<unsigned int>();
     d.subdirectory_count = j.at("subdirectory_count").get<unsigned int>();
     d.last_modified = util::parsePostgresTimestamp(j.at("last_modified").get<std::string>());

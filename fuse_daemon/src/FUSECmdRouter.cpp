@@ -1,5 +1,5 @@
 #include "FUSECmdRouter.hpp"
-#include "fuse/Command.hpp"
+#include "types/FUSECommand.hpp"
 #include <fcntl.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -53,7 +53,7 @@ void CommandRouter::stop() {
     if (listenerThread_.joinable()) listenerThread_.join();
 }
 
-void CommandRouter::setCommandHandler(std::function<void(const types::fuse::Command&)> handler) {
+void CommandRouter::setCommandHandler(std::function<void(const types::fuse::FUSECommand&)> handler) {
     handler_ = std::move(handler);
 }
 
@@ -69,7 +69,7 @@ void CommandRouter::listenLoop() {
         ssize_t bytesRead = read(clientFd, buffer, sizeof(buffer) - 1);
         if (bytesRead > 0) {
             std::string jsonStr(buffer);
-            if (auto cmd = std::make_unique<types::fuse::Command>(types::fuse::Command::fromJson(jsonStr))) {
+            if (auto cmd = std::make_unique<types::fuse::FUSECommand>(types::fuse::FUSECommand::fromJson(jsonStr))) {
                 if (handler_) handler_(*cmd);
             } else {
                 std::cerr << "[FUSE-IPC] Failed to parse command: " << jsonStr << std::endl;

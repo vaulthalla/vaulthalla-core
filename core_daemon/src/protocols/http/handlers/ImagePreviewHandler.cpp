@@ -1,8 +1,8 @@
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "util/imageUtil.hpp"
-#include "util/files.hpp"
+#include "../../../../../shared/include/util/files.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "shared/include/engine/StorageManager.hpp"
 
 #include <boost/beast/http/file_body.hpp>
 #include <iostream>

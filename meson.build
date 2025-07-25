@@ -28,8 +28,8 @@ uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
-global_deps     = [boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep]
-core_deps       = global_deps + [libsodium, libcurl, libjpeg, pdfium]
+global_deps     = [boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium]
+core_deps       = global_deps
 fuse_deps       = global_deps + [libfuse]
 test_deps       = core_deps + [gtest]
 
@@ -43,16 +43,16 @@ tests_src_dir   = join_paths(source_root, 'tests')
 core_main       = files(join_paths(source_root, 'main.cpp'))
 
 hash_pass_src   = files(
-    join_paths(core_src_dir, 'crypto/PasswordHash.cpp'),
-    join_paths(core_src_dir, 'crypto/PasswordUtils.cpp')
+    join_paths(core_src_dir, 'auth/PasswordHash.cpp'),
+    join_paths(core_src_dir, 'auth/PasswordUtils.cpp')
 )
 hash_pass_main  = files(join_paths(source_root, 'deploy/hash_password.cpp'))
 
 # ╭──────────────────── INCLUDE DIRS ─────────────────────╮
-core_inc_paths = ['core_daemon/include', 'shared/include', 'vendor', 'vendor/stb']
-fuse_inc_paths = ['fuse_daemon/include', 'shared/include', 'vendor']
+shared_inc_paths = ['shared/include', 'vendor']
+core_inc_paths = shared_inc_paths + ['core_daemon/include']
+fuse_inc_paths = shared_inc_paths + ['fuse_daemon/include']
 
-# Add the MuPDF include directory
 core_inc       = include_directories(core_inc_paths)
 fuse_inc       = include_directories(fuse_inc_paths)
 hash_pass_inc  = include_directories('core_daemon/include')

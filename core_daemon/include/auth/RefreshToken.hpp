@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../shared/include/shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 #include <ctime>
 #include <iomanip>
 #include <pqxx/row>

@@ -1,5 +1,5 @@
 #include "types/File.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -19,19 +19,18 @@ inline std::string hexMode(const unsigned long long mode) {
 }
 
 File::File(const pqxx::row& row)
-    : FSEntry(row), size_bytes(row.at("size_bytes").as<unsigned long long>()),
+    : FSEntry(row),
       encryption_iv(row.at("encryption_iv").as<std::string>()),
       mime_type(row.at("mime_type").as<std::optional<std::string>>()),
       content_hash(row.at("content_hash").as<std::optional<std::string>>()) {}
 
 File::File(const std::string& s3_key, const uint64_t size, const std::optional<std::time_t>& updated)
-    : FSEntry(s3_key), size_bytes(size) {
+    : FSEntry(s3_key) {
     if (updated) updated_at = *updated;
 }
 
 void vh::types::to_json(nlohmann::json& j, const File& f) {
     to_json(j, static_cast<const FSEntry&>(f));
-    j["size_bytes"] = f.size_bytes;
     j["type"] = "file"; // Helpful for client
 
     if (f.mime_type) j["mime_type"] = f.mime_type.value();
@@ -40,7 +39,6 @@ void vh::types::to_json(nlohmann::json& j, const File& f) {
 
 void vh::types::from_json(const nlohmann::json& j, File& f) {
     from_json(j, static_cast<FSEntry&>(f));
-    f.size_bytes = j.at("size_bytes").get<unsigned long long>();
 
     if (j.contains("mime_type")) f.mime_type = j.at("mime_type").get<std::string>();
     else f.mime_type = std::nullopt;

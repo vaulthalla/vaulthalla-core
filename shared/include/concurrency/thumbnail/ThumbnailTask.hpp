@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../Task.hpp"
+#include "concurrency/Task.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "util/imageUtil.hpp"
-#include "storage/StorageEngine.hpp"
+#include "engine/StorageEngineBase.hpp"
 #include "types/CacheIndex.hpp"
-#include "../../database/Queries/CacheQueries.hpp"
+#include "database/Queries/CacheQueries.hpp"
 #include "types/File.hpp"
+#include "types/Vault.hpp"
 
 #include <memory>
 #include <string>
@@ -17,7 +18,7 @@ namespace vh::concurrency {
 
 class ThumbnailTask : public Task {
 public:
-    ThumbnailTask(const std::shared_ptr<const storage::StorageEngine>& engine,
+    ThumbnailTask(const std::shared_ptr<const engine::StorageEngineBase>& engine,
                   const std::vector<uint8_t>& buffer,
                   const std::shared_ptr<types::File>& file)
         : engine_(engine), buffer_(buffer), file_(file) {}
@@ -41,7 +42,7 @@ public:
                 util::generateAndStoreThumbnail(buffer_, cachePath, *file_->mime_type, size);
 
                 auto index = std::make_shared<types::CacheIndex>();
-                index->vault_id = engine_->vaultId();
+                index->vault_id = engine_->vault->id;
                 index->file_id = file_->id;
                 index->path = engine_->getRelativeCachePath(cachePath);
                 index->type = types::CacheIndex::Type::Thumbnail;
@@ -55,7 +56,7 @@ public:
     }
 
 private:
-    std::shared_ptr<const storage::StorageEngine> engine_;
+    std::shared_ptr<const engine::StorageEngineBase> engine_;
     std::vector<uint8_t> buffer_;
     std::shared_ptr<types::File> file_;
 };

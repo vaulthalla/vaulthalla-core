@@ -1,8 +1,8 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "../../../../../shared/include/engine/StorageManager.hpp"
 #include "util/imageUtil.hpp"
-#include "util/files.hpp"
+#include "../../../../../shared/include/util/files.hpp"
 
 #include <pdfium/fpdfview.h>
 #include <iostream>

@@ -2,18 +2,19 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
 #include "services/ServiceManager.hpp"
-#include "../../../../shared/include/concurrency/protocol/HttpSessionTask.hpp"
+#include "protocols/http/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "../../../../shared/include/concurrency/ThreadPoolRegistry.hpp"
+#include "services/ThreadPoolRegistry.hpp"
 
 #include <iostream>
 
 using namespace vh::concurrency;
+using namespace vh::services;
 
 namespace vh::http {
 
 HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint,
-                                     const std::shared_ptr<services::ServiceManager>& serviceManager)
+                                     const std::shared_ptr<ServiceManager>& serviceManager)
     : acceptor_(ioc), socket_(ioc),
       router_(std::make_shared<HttpRouter>(serviceManager->authManager(), serviceManager->storageManager())),
       authManager_(serviceManager->authManager()),

@@ -6,7 +6,6 @@
 namespace vh::types {
 
 struct Directory : FSEntry {
-    unsigned long long size_bytes{0};
     unsigned int file_count{0};
     unsigned int subdirectory_count{0};
     std::time_t last_modified{0};

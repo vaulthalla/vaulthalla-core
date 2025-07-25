@@ -1,12 +1,12 @@
 #include "protocols/http/HttpRouter.hpp"
-#include "util/parse.hpp"
-#include "storage/StorageManager.hpp"
+#include "../../../../shared/include/util/parse.hpp"
+#include "shared/include/engine/StorageManager.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
-#include "util/files.hpp"
+#include "../../../../shared/include/util/files.hpp"
 
 #include <iostream>
 #include <ranges>

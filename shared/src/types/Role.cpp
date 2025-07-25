@@ -1,6 +1,6 @@
 #include "types/Role.hpp"
 #include "types/PermissionOverride.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>

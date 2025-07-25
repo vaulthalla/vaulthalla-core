@@ -1,5 +1,5 @@
 #include "types/Group.hpp"
-#include "shared_util/timestamp.hpp"
+#include "util/timestamp.hpp"
 #include "types/User.hpp"
 
 #include <pqxx/row>

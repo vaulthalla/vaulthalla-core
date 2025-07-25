@@ -1,6 +1,6 @@
 #include "types/Sync.hpp"
-#include "shared_util/timestamp.hpp"
-#include "shared_util/interval.hpp"
+#include "util/timestamp.hpp"
+#include "util/interval.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>

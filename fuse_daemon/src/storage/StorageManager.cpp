@@ -5,8 +5,11 @@
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
 #include "types/FSEntry.hpp"
+#include "types/File.hpp"
+#include "types/Directory.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FileQueries.hpp"
 
 #include <iostream>
 
@@ -16,6 +19,8 @@ using namespace vh::database;
 
 StorageManager::StorageManager() {
     initStorageEngines();
+    inodeToPath_[FUSE_ROOT_ID] = "/";
+    pathToInode_["/"] = FUSE_ROOT_ID;
 }
 
 void StorageManager::initStorageEngines() {
@@ -41,6 +46,10 @@ void StorageManager::initStorageEngines() {
 
 std::vector<std::shared_ptr<FSEntry>> StorageManager::listDir(const fs::path& absPath, const bool recursive) const {
     const auto engine = resolveStorageEngine(absPath);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+        return {};
+    }
     const auto relPath = absPath.lexically_relative(engine->root);
     return DirectoryQueries::listDir(engine->vault->id, relPath, recursive);
 }
@@ -94,9 +103,24 @@ fuse_ino_t StorageManager::getOrAssignInode(const fs::path& path) {
 fs::path StorageManager::resolvePathFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(inodeMutex_);
     const auto it = inodeToPath_.find(ino);
-    if (it == inodeToPath_.end())
-        throw std::runtime_error("resolvePathFromInode: Unknown inode: " + std::to_string(ino));
+    if (it == inodeToPath_.end()) std::nullopt;
     return it->second;
+}
+
+void StorageManager::decrementInodeRef(const fuse_ino_t ino, const uint64_t nlookup) {
+    std::unique_lock lock(inodeMutex_);
+    auto it = inodeToPath_.find(ino);
+    if (it == inodeToPath_.end()) return; // No such inode
+
+    if (nlookup > 1) {
+        // Decrement the reference count
+        // This is a no-op, but could be extended
+        return;
+    }
+
+    // If nlookup is 1, we can remove the inode
+    pathToInode_.erase(it->second);
+    inodeToPath_.erase(it);
 }
 
 std::vector<std::shared_ptr<StorageEngine>> StorageManager::getEngines() const {
@@ -105,4 +129,55 @@ std::vector<std::shared_ptr<StorageEngine>> StorageManager::getEngines() const {
     engines.reserve(engines_.size());
     for (const auto& [_, engine] : engines_) engines.push_back(engine);
     return engines;
+}
+
+char StorageManager::getPathType(const fs::path& absPath) const {
+    if (absPath.empty()) return 'd';
+    const auto engine = resolveStorageEngine(absPath);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+        return 'u'; // unknown type
+    }
+
+    if (engine->isFile(engine->getRelativePath(absPath))) return 'f';
+    if (engine->isDirectory(engine->getRelativePath(absPath))) return 'd';
+    return 'u'; // unknown type
+}
+
+std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) const {
+    const auto engine = resolveStorageEngine(absPath);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+        return nullptr;
+    }
+
+    const auto relPath = engine->getRelativePath(absPath);
+
+    if (engine->isFile(relPath)) return FileQueries::getFileByPath(engine->vault->id, relPath);
+    if (engine->isDirectory(relPath)) return DirectoryQueries::getDirectoryByPath(engine->vault->id, relPath);
+    return nullptr; // not found
+}
+
+bool StorageManager::fileExists(const fs::path& absPath) const {
+    const auto engine = resolveStorageEngine(absPath);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+        return false;
+    }
+
+    return engine->isFile(engine->getRelativePath(absPath));
+}
+
+bool StorageManager::directoryExists(const fs::path& absPath) const {
+    const auto engine = resolveStorageEngine(absPath);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+        return false;
+    }
+
+    return engine->isDirectory(engine->getRelativePath(absPath));
+}
+
+std::shared_ptr<StorageEngine> StorageManager::getEngineForPath(const fs::path& absPath) const {
+    return resolveStorageEngine(absPath);
 }

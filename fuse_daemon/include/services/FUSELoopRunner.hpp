@@ -19,6 +19,8 @@ public:
 
     bool run();
 
+    [[nodiscard]] fuse_session* session() const noexcept { return session_; }
+
 private:
     std::shared_ptr<FUSEBridge> bridge_;
     fuse_session* session_{nullptr};

@@ -34,7 +34,19 @@ public:
 
     fs::path resolvePathFromInode(fuse_ino_t ino) const;
 
+    void decrementInodeRef(fuse_ino_t ino, uint64_t nlookup);
+
     std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
+
+    [[nodiscard]] char getPathType(const fs::path& absPath) const;
+
+    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath) const;
+
+    [[nodiscard]] bool fileExists(const fs::path& absPath) const;
+
+    [[nodiscard]] bool directoryExists(const fs::path& absPath) const;
+
+    [[nodiscard]] std::shared_ptr<StorageEngine> getEngineForPath(const fs::path& absPath) const;
 
 private:
     mutable std::mutex mutex_;

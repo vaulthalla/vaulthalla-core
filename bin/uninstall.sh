@@ -18,6 +18,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if mountpoint -q /mnt/vaulthalla; then
+  echo "Unmounting stale FUSE mount..."
+  sudo umount -l /mnt/vaulthalla || sudo fusermount3 -u /mnt/vaulthalla
+fi
+
 # === 1) Stop and disable systemd service (if exists) ===
 echo "🗑️  Removing systemd services..."
 
@@ -44,6 +49,7 @@ sudo rm -rf /usr/local/bin/vaulthalla
 
 # === 3) Remove runtime and config dirs ===
 echo "🗑️  Cleaning directories..."
+
 sudo rm -rf /mnt/vaulthalla
 sudo rm -rf /var/lib/vaulthalla
 sudo rm -rf /var/log/vaulthalla

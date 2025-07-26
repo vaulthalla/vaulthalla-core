@@ -1,9 +1,9 @@
 #include "services/FUSELoopRunner.hpp"
-#include "FUSEBridge.hpp"
+#include "control/FUSEBridge.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "services/ThreadPoolRegistry.hpp"
-#include "FUSERequestTask.hpp"
+#include "tasks/FUSERequestTask.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -56,7 +56,7 @@ bool FUSELoopRunner::run() {
         return false;
     }
 
-    fuse_cmdline_opts opts;
+    fuse_cmdline_opts opts{};
     if (fuse_parse_cmdline(&args, &opts) != 0) {
         std::cerr << "[-] Failed to parse FUSE options\n";
         return false;
@@ -94,7 +94,7 @@ bool FUSELoopRunner::run() {
 
     while (!fuse_session_exited(session_)) {
         fuse_buf buf{};
-        int res = fuse_session_receive_buf(session_, &buf);
+        const int res = fuse_session_receive_buf(session_, &buf);
         if (res == -EINTR) continue;
         if (res <= 0) break;
 

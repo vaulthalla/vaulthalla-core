@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <string>
 #include <thread>
@@ -11,25 +12,24 @@ struct FUSECommand;
 namespace vh::fuse::ipc {
 
 class CommandRouter {
-  public:
+public:
     explicit CommandRouter(const std::string& socketPath);
-
     ~CommandRouter();
 
     void start();
-
     void stop();
 
     void setCommandHandler(std::function<void(const types::fuse::FUSECommand&)> handler);
 
-  private:
+private:
     std::string socketPath_;
     int serverFd_ = -1;
-    bool running_ = false;
+    std::atomic<bool> running_{false};
     std::thread listenerThread_;
     std::function<void(const types::fuse::FUSECommand&)> handler_;
 
     void listenLoop();
+    void unblockAccept();
 };
 
 } // namespace vh::fuse::ipc

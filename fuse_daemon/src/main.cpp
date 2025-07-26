@@ -1,6 +1,6 @@
 #include "services/FUSELoopRunner.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "FUSECmdRouter.hpp"
+#include "control/FUSECmdRouter.hpp"
 #include "types/FUSECommand.hpp"
 #include "services/SyncController.hpp"
 #include "services/ThreadPoolRegistry.hpp"
@@ -51,6 +51,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    router->stop();
     listener.join();
+
+    ThreadPoolRegistry::instance().shutdown();
+    SharedThreadPoolRegistry::instance().shutdown();
+
     return 0;
 }

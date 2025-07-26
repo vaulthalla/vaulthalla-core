@@ -38,6 +38,8 @@ struct StorageEngine : engine::StorageEngineBase {
 
     void copyThumbnails(const fs::path& from, const fs::path& to) const;
 
+    fs::path resolveAbsolutePathToVaultPath(const fs::path& path) const;
+
     static std::string getMimeType(const fs::path& path);
 };
 

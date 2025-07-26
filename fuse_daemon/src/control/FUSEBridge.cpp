@@ -2,6 +2,8 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
+#include "storage/StorageEngine.hpp"
+#include "types/Vault.hpp"
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
@@ -28,6 +30,21 @@ FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
 
 void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
     try {
+        if (ino == FUSE_ROOT_ID) {
+            const auto entry = storageManager_->getEntry("/");
+            if (!entry) {
+                fuse_reply_err(req, ENOENT);
+                return;
+            }
+
+            struct stat st = statFromEntry(entry, ino);
+            st.st_uid = getuid();  // explicitly set ownership
+            st.st_gid = getgid();
+
+            fuse_reply_attr(req, &st, 60.0);
+            return;
+        }
+
         fs::path path = storageManager_->resolvePathFromInode(ino);
         const auto entry = storageManager_->getEntry(path);
 
@@ -84,6 +101,21 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
     const auto path = parentPath / name;
     const fuse_ino_t ino = storageManager_->getOrAssignInode(path);
 
+    if (ino == FUSE_ROOT_ID) {
+        const auto entry = storageManager_->getEntry("/");
+        if (!entry) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        struct stat st = statFromEntry(entry, ino);
+        st.st_uid = getuid();  // explicitly set ownership
+        st.st_gid = getgid();
+
+        fuse_reply_attr(req, &st, 60.0);
+        return;
+    }
+
     const auto entry = storageManager_->getEntry(path);
     if (!entry) {
         fuse_reply_err(req, ENOENT);
@@ -104,7 +136,7 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
     try {
         fs::path path = storageManager_->resolvePathFromInode(ino);
-        if (!storageManager_->fileExists(path)) fuse_reply_err(req, ENOENT);
+        if (!storageManager_->entryExists(path)) fuse_reply_err(req, ENOENT);
         fuse_reply_open(req, fi);
     } catch (...) {
         fuse_reply_err(req, EIO);
@@ -134,6 +166,87 @@ void FUSEBridge::read(const fuse_req_t& req, const fuse_ino_t& ino, const size_t
     }
 }
 
+void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
+    try {
+        if (std::string_view(name).find('/') != std::string::npos) {
+            fuse_reply_err(req, EINVAL);
+            return;
+        }
+
+        const auto parentPath = storageManager_->resolvePathFromInode(parent);
+        if (parentPath.empty()) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        const std::filesystem::path fullPath = parentPath / name;
+
+        // ---------------------------
+        // Recursive directory creation
+        // ---------------------------
+        std::vector<std::filesystem::path> toCreate;
+        std::filesystem::path cur = fullPath;
+
+        // Traverse upwards until we find an existing entry
+        while (!cur.empty() && !storageManager_->entryExists(cur)) {
+            toCreate.push_back(cur);
+            cur = cur.parent_path();
+        }
+
+        // Now create from top-down (reverse order)
+        std::ranges::reverse(toCreate.begin(), toCreate.end());
+
+        for (const auto& path : toCreate) {
+            auto dir = std::make_shared<Directory>();
+
+            if (const auto engine = storageManager_->resolveStorageEngine(path)) {
+                dir->vault_id = engine->vault->id;
+                dir->path = engine->resolveAbsolutePathToVaultPath(path);
+            }
+
+            if (auto parentEntry = storageManager_->getEntry(path.parent_path()))
+                dir->parent_id = parentEntry->id;
+
+            dir->abs_path = path;
+            dir->name = path.filename();
+            dir->created_at = dir->updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            dir->mode = mode;
+            dir->owner_uid = getuid();
+            dir->group_gid = getgid();
+            dir->inode = storageManager_->assignInode(path);
+            dir->is_hidden = false;
+            dir->is_system = false;
+
+            storageManager_->cacheEntry(dir->inode, dir);
+            DirectoryQueries::upsertDirectory(dir);
+
+            try {
+                std::filesystem::create_directory(path); // Make just this one level
+            } catch (const std::filesystem::filesystem_error& fsErr) {
+                std::cerr << "[mkdir] Filesystem error: " << fsErr.what() << " for path: " << path << std::endl;
+                fuse_reply_err(req, EIO);
+                return;
+            }
+        }
+
+        // Final directory (last one created) = fullPath
+        const auto finalInode = storageManager_->resolveInode(fullPath);
+        const auto finalEntry = storageManager_->getEntry(fullPath);
+
+        fuse_entry_param e{};
+        e.ino = finalInode;
+        e.attr_timeout = 1.0;
+        e.entry_timeout = 1.0;
+        e.attr = statFromEntry(finalEntry, finalInode);
+
+        fuse_reply_entry(req, &e);
+
+    } catch (const std::exception& ex) {
+        std::cerr << "[mkdir] Exception: " << ex.what() << "\n";
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
     storageManager_->decrementInodeRef(ino, nlookup); // build this
     fuse_reply_none(req); // no return value
@@ -148,6 +261,7 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.getattr = FUSE_DISPATCH(getattr);
     ops.readdir = FUSE_DISPATCH(readdir);
     ops.lookup = FUSE_DISPATCH(lookup);
+    ops.mkdir = FUSE_DISPATCH(mkdir);
     ops.open = FUSE_DISPATCH(open);
     ops.read = FUSE_DISPATCH(read);
     ops.forget = FUSE_DISPATCH(forget);

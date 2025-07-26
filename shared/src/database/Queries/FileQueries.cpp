@@ -21,6 +21,13 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
         p.append(file->created_by);
         p.append(file->last_modified_by);
         p.append(to_utf8_string(file->path.u8string()));
+        p.append(to_utf8_string(file->abs_path.u8string()));
+        p.append(file->inode);
+        p.append(file->mode);
+        p.append(file->owner_uid);
+        p.append(file->group_gid);
+        p.append(file->is_hidden);
+        p.append(file->is_system);
         p.append(file->size_bytes);
         p.append(file->mime_type);
         p.append(file->content_hash);
@@ -230,5 +237,33 @@ std::string FileQueries::getContentHash(const unsigned int vaultId, const std::f
     return Transactions::exec("FileQueries::getContentHash", [&](pqxx::work& txn) -> std::string {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
         return txn.exec_prepared("get_file_content_hash", p).one_field().as<std::string>();
+    });
+}
+
+
+// FUSE
+
+std::shared_ptr<vh::types::File> FileQueries::getFileByAbsPath(const std::filesystem::path& absPath) {
+    return Transactions::exec("FileQueries::getFileByAbsPath", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_file_by_abs_path", absPath.string()).one_row();
+        return std::make_shared<types::File>(row);
+    });
+}
+
+std::shared_ptr<vh::types::File> FileQueries::getFileByInode(ino_t inode) {
+    return Transactions::exec("FileQueries::getFileByInode", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_file_by_inode", inode).one_row();
+        return std::make_shared<types::File>(row);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesAbsPath(const std::filesystem::path& absPath, bool recursive) {
+    return Transactions::exec("FileQueries::listFilesAbsPath", [&](pqxx::work& txn) {
+        const auto patterns = computePatterns(absPath.string(), recursive);
+        const auto res = recursive
+                             ? txn.exec_prepared("list_files_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
+                             : txn.exec_prepared("list_files_in_dir_by_abs_path", pqxx::params{patterns.like, patterns.not_like});
+
+        return types::files_from_pq_res(res);
     });
 }

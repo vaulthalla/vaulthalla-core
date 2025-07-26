@@ -10,6 +10,7 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 
 #include <iostream>
 
@@ -45,13 +46,7 @@ void StorageManager::initStorageEngines() {
 }
 
 std::vector<std::shared_ptr<FSEntry>> StorageManager::listDir(const fs::path& absPath, const bool recursive) const {
-    const auto engine = resolveStorageEngine(absPath);
-    if (!engine) {
-        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
-        return {};
-    }
-    const auto relPath = absPath.lexically_relative(engine->root);
-    return DirectoryQueries::listDir(engine->vault->id, relPath, recursive);
+    return FSEntryQueries::listDir(absPath, recursive);
 }
 
 std::shared_ptr<StorageEngine> StorageManager::resolveStorageEngine(const fs::path& absPath) const {
@@ -78,6 +73,28 @@ std::shared_ptr<StorageEngine> StorageManager::resolveStorageEngine(const fs::pa
     return bestMatch;
 }
 
+fuse_ino_t StorageManager::resolveInode(const fs::path& absPath) {
+    std::shared_lock lock(inodeMutex_);
+    auto it = pathToInode_.find(absPath);
+    if (it != pathToInode_.end()) return it->second;
+
+    const auto entry = FSEntryQueries::getFSEntry(absPath);
+    if (!entry) {
+        std::cerr << "[StorageManager] Entry not found for path: " << absPath << std::endl;
+        return FUSE_ROOT_ID; // or some error code
+    }
+
+    fuse_ino_t ino = entry ? entry->inode : getOrAssignInode(absPath);
+    if (ino == FUSE_ROOT_ID) {
+        std::cerr << "[StorageManager] Failed to resolve inode for path: " << absPath << std::endl;
+        return FUSE_ROOT_ID; // or some error code
+    }
+
+    // Cache the resolved inode
+    linkPath(absPath, ino);
+    return ino;
+}
+
 fuse_ino_t StorageManager::assignInode(const fs::path& path) {
     std::unique_lock lock(inodeMutex_);
     const auto it = pathToInode_.find(path);
@@ -100,10 +117,20 @@ fuse_ino_t StorageManager::getOrAssignInode(const fs::path& path) {
     return new_ino;
 }
 
+void StorageManager::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
+    std::unique_lock lock(inodeMutex_);
+    if (pathToInode_.find(absPath) != pathToInode_.end()) {
+        std::cerr << "[StorageManager] Path already linked: " << absPath << std::endl;
+        return; // Path already exists
+    }
+    pathToInode_[absPath] = ino;
+    inodeToPath_[ino] = absPath;
+}
+
 fs::path StorageManager::resolvePathFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(inodeMutex_);
     const auto it = inodeToPath_.find(ino);
-    if (it == inodeToPath_.end()) std::nullopt;
+    if (it == inodeToPath_.end()) fs::path();
     return it->second;
 }
 
@@ -144,40 +171,75 @@ char StorageManager::getPathType(const fs::path& absPath) const {
     return 'u'; // unknown type
 }
 
-std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) const {
-    const auto engine = resolveStorageEngine(absPath);
-    if (!engine) {
-        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
+std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) {
+    const auto it = pathToEntry_.find(absPath);
+    if (it != pathToEntry_.end()) return it->second;
+
+    try {
+        auto entry = FSEntryQueries::getFSEntry(absPath);
+        if (!entry) {
+            std::cerr << "[StorageManager] Entry not found for path: " << absPath << std::endl;
+            return nullptr;
+        }
+
+        cacheEntry(entry->inode, entry);
+        return entry;
+    } catch (const std::exception& e) {
+        std::cerr << "[StorageManager] Error retrieving entry for path " << absPath << ": " << e.what() << std::endl;
         return nullptr;
     }
-
-    const auto relPath = engine->getRelativePath(absPath);
-
-    if (engine->isFile(relPath)) return FileQueries::getFileByPath(engine->vault->id, relPath);
-    if (engine->isDirectory(relPath)) return DirectoryQueries::getDirectoryByPath(engine->vault->id, relPath);
-    return nullptr; // not found
 }
 
-bool StorageManager::fileExists(const fs::path& absPath) const {
-    const auto engine = resolveStorageEngine(absPath);
-    if (!engine) {
-        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
-        return false;
+void StorageManager::cacheEntry(fuse_ino_t ino, std::shared_ptr<FSEntry> entry) {
+    std::unique_lock lock(inodeMutex_);
+    inodeToEntry_[ino] = std::move(entry);
+    inodeToPath_[ino] = entry->abs_path;
+    pathToInode_[entry->abs_path] = ino;
+    pathToEntry_[entry->abs_path] = entry;
+}
+
+bool StorageManager::entryExists(const fs::path& absPath) const {
+    std::shared_lock lock(inodeMutex_);
+    return pathToEntry_.contains(absPath) || pathToInode_.contains(absPath) || FSEntryQueries::exists(absPath);
+}
+
+std::shared_ptr<FSEntry> StorageManager::getEntryFromInode(fuse_ino_t ino) const {
+    std::shared_lock lock(inodeMutex_);
+    auto it = inodeToEntry_.find(ino);
+    if (it != inodeToEntry_.end()) return it->second;
+    return nullptr;
+}
+
+void StorageManager::evictEntry(fuse_ino_t ino) {
+    std::unique_lock lock(inodeMutex_);
+    inodeToEntry_.erase(ino);
+}
+
+void StorageManager::evictPath(const fs::path& path) {
+    std::unique_lock lock(inodeMutex_);
+    auto it = pathToInode_.find(path);
+    if (it != pathToInode_.end()) {
+        fuse_ino_t ino = it->second;
+        inodeToPath_.erase(ino);
+        inodeToEntry_.erase(ino);
+        pathToInode_.erase(path);
     }
-
-    return engine->isFile(engine->getRelativePath(absPath));
 }
 
-bool StorageManager::directoryExists(const fs::path& absPath) const {
-    const auto engine = resolveStorageEngine(absPath);
-    if (!engine) {
-        std::cerr << "[StorageManager] No storage engine found for path: " << absPath << std::endl;
-        return false;
+void StorageManager::registerInode(fuse_ino_t ino, const fs::path& path, std::shared_ptr<FSEntry> entry) {
+    std::unique_lock lock(inodeMutex_);
+    inodeToPath_[ino] = path;
+    pathToInode_[path] = ino;
+    inodeToEntry_[ino] = std::move(entry);
+}
+
+void StorageManager::updateCachedEntry(const std::shared_ptr<FSEntry>& entry) {
+    if (!entry) return;
+    std::unique_lock lock(inodeMutex_);
+    for (auto& [ino, cached] : inodeToEntry_) {
+        if (cached && cached->id == entry->id) {
+            inodeToEntry_[ino] = entry;
+            break;
+        }
     }
-
-    return engine->isDirectory(engine->getRelativePath(absPath));
-}
-
-std::shared_ptr<StorageEngine> StorageManager::getEngineForPath(const fs::path& absPath) const {
-    return resolveStorageEngine(absPath);
 }

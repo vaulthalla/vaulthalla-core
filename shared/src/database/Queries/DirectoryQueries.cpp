@@ -22,6 +22,13 @@ void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& 
         p.append(directory->created_by);
         p.append(directory->last_modified_by);
         p.append(to_utf8_string(directory->path.u8string()));
+        p.append(to_utf8_string(directory->abs_path.u8string()));
+        p.append(directory->inode);
+        p.append(directory->mode);
+        p.append(directory->owner_uid);
+        p.append(directory->group_gid);
+        p.append(directory->is_hidden);
+        p.append(directory->is_system);
         p.append(directory->size_bytes);
         p.append(directory->file_count);
         p.append(directory->subdirectory_count);
@@ -155,5 +162,33 @@ std::vector<std::shared_ptr<vh::types::FSEntry>> DirectoryQueries::listDir(const
         );
 
         return types::merge_entries(files, directories);
+    });
+}
+
+
+// FUSE
+
+std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByInode(ino_t inode) {
+    return Transactions::exec("DirectoryQueries::getDirectoryByInode", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_dir_by_inode", inode).one_row();
+        return std::make_shared<types::Directory>(row);
+    });
+}
+
+std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByAbsPath(const std::filesystem::path& absPath) {
+    return Transactions::exec("DirectoryQueries::getDirectoryByAbsPath", [&](pqxx::work& txn) {
+        const auto row = txn.exec_prepared("get_dir_by_abs_path", absPath.string()).one_row();
+        return std::make_shared<types::Directory>(row);
+    });
+}
+
+std::vector<std::shared_ptr<vh::types::Directory>> DirectoryQueries::listDirectoriesAbsPath(const std::filesystem::path& absPath, const bool recursive) {
+    return Transactions::exec("DirectoryQueries::listDirectoriesAbsPath", [&](pqxx::work& txn) {
+        const auto patterns = computePatterns(absPath.string(), recursive);
+        const auto res = recursive
+            ? txn.exec_prepared("list_directories_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
+            : txn.exec_prepared("list_directories_in_dir_by_abs_path", pqxx::params{patterns.like, patterns.not_like});
+
+        return types::directories_from_pq_res(res);
     });
 }

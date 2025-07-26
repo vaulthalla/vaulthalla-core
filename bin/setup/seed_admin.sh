@@ -46,10 +46,10 @@ SELECT id, 'keep_both' FROM ins;
 
 -- Seed root directory for admin vault, including directories table
 WITH inserted_fs_entry AS (
-    INSERT INTO fs_entry (vault_id, name, path, parent_id, created_by, last_modified_by)
+    INSERT INTO fs_entry (vault_id, name, path, abs_path, parent_id, created_by, last_modified_by)
     VALUES (
         (SELECT id FROM vault WHERE name = 'Default'),
-        '/', '/', NULL,
+        '/', '/', '/', NULL,
         (SELECT id FROM users WHERE name = 'admin'),
         (SELECT id FROM users WHERE name = 'admin')
     )

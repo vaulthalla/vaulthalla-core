@@ -15,6 +15,7 @@ GroupMember::GroupMember(const pqxx::row& row)
 
 Group::Group(const pqxx::row& gr, const pqxx::result& members)
     : id(gr["id"].as<unsigned int>()),
+      linux_gid(gr["gid"].as<unsigned int>()),
       name(gr["name"].as<std::string>()),
       description(gr["description"].is_null() ? std::nullopt : std::make_optional(gr["description"].as<std::string>())),
       created_at(util::parsePostgresTimestamp(gr["created_at"].as<std::string>())),
@@ -26,6 +27,7 @@ Group::Group(const pqxx::row& gr, const pqxx::result& members)
 
 Group::Group(const nlohmann::json& j)
     : id(j.at("id").get<unsigned int>()),
+      linux_gid(j.contains("gid") ? j.at("gid").get<unsigned int>() : 0),
       name(j.at("name").get<std::string>()),
       description(j.contains("description")
                       ? std::make_optional(j.at("description").get<std::string>())
@@ -49,6 +51,7 @@ void vh::types::to_json(nlohmann::json& j, const Group& g) {
 
     j = {
         {"id", g.id},
+        {"gid", g.linux_gid},
         {"name", g.name},
         {"description", g.description},
         {"created_at", util::timestampToString(g.created_at)},
@@ -60,6 +63,7 @@ void vh::types::to_json(nlohmann::json& j, const Group& g) {
 
 void vh::types::from_json(const nlohmann::json& j, Group& g) {
     g.id = j.at("id").get<unsigned int>();
+    g.linux_gid = j.contains("gid") ? j.at("gid").get<unsigned int>() : 0;
     g.name = j.at("name").get<std::string>();
     g.description = j.contains("description")
                         ? std::make_optional(j.at("description").get<std::string>())

@@ -51,6 +51,14 @@ public:
     static void setEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv);
 
     [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    // FUSE
+    static std::shared_ptr<types::File> getFileByAbsPath(const std::filesystem::path& absPath);
+
+    static std::shared_ptr<types::File> getFileByInode(ino_t inode);
+
+    static std::vector<std::shared_ptr<types::File>> listFilesAbsPath(const std::filesystem::path& absPath, bool recursive = false);
+
 };
 
 } // namespace vh::database

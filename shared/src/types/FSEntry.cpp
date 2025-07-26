@@ -15,6 +15,10 @@ using namespace vh::types;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
+        inode(row["inode"].as<ino_t>()),
+        mode(row["mode"].as<mode_t>()),
+        owner_uid(row["owner_uid"].as<unsigned int>()),
+        group_gid(row["group_gid"].as<unsigned int>()),
       vault_id(row["vault_id"].as<unsigned int>()),
       created_by(row["created_by"].as<unsigned int>()),
       last_modified_by(row["last_modified_by"].as<unsigned int>()),
@@ -22,7 +26,10 @@ FSEntry::FSEntry(const pqxx::row& row)
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
-      path(std::filesystem::path(row["path"].as<std::string>())) {
+      path(std::filesystem::path(row["path"].as<std::string>())),
+      abs_path(std::filesystem::path(row["abs_path"].as<std::string>())),
+      is_hidden(row["is_hidden"].as<bool>()),
+      is_system(row["is_system"].as<bool>()) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
     else parent_id = row["parent_id"].as<unsigned int>();
 }
@@ -36,6 +43,12 @@ FSEntry::FSEntry(const std::string& s3_key) {
 void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
     j = {
         {"id", entry.id},
+        {"inode", entry.inode},
+        {"mode", entry.mode},
+        {"owner_uid", entry.owner_uid},
+        {"group_gid", entry.group_gid},
+        {"is_hidden", entry.is_hidden},
+        {"is_system", entry.is_system},
         {"vault_id", entry.vault_id},
         {"created_by", entry.created_by},
         {"last_modified_by", entry.last_modified_by},
@@ -44,7 +57,8 @@ void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
         {"size_bytes", entry.size_bytes},
         {"created_at", util::timestampToString(entry.created_at)},
         {"updated_at", util::timestampToString(entry.updated_at)},
-        {"path", entry.path.string()}
+        {"path", entry.path.string()},
+        {"abs_path", entry.abs_path.string()}
     };
 }
 

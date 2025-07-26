@@ -46,7 +46,7 @@ public:
 
     void rename(const char* from, const char* to, unsigned int flags) const;
 
-    void mkdir(fuse_req_t req, fuse_ino_t parent, const char* name, mode_t mode) const;
+    void mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const;
 
     void rmdir(const char* path) const;
 

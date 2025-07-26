@@ -20,13 +20,15 @@ struct File;
 struct Directory;
 
 struct FSEntry {
-    unsigned int id{};
-    unsigned int vault_id{}, created_by{}, last_modified_by{};
+    uintmax_t size_bytes{0};
+    unsigned int id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
+    bool is_hidden{}, is_system{};
+    ino_t inode{};
+    mode_t mode{};
     std::optional<unsigned int> parent_id;
     std::string name{};
-    uintmax_t size_bytes{0};
     std::time_t created_at{}, updated_at{};
-    std::filesystem::path path{};
+    std::filesystem::path path{}, abs_path{};
 
     FSEntry() = default;
     virtual ~FSEntry() = default;

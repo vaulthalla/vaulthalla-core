@@ -24,6 +24,7 @@ User::User(std::string name, std::string email, const bool isActive)
 
 User::User(const pqxx::row& row)
     : id(row["id"].as<unsigned short>()),
+      linux_uid(row["uid"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
@@ -62,6 +63,7 @@ void User::updateUser(const nlohmann::json& j) {
 void to_json(nlohmann::json& j, const User& u) {
     j = {
         {"id", u.id},
+        {"uid", u.linux_uid},
         {"name", u.name},
         {"email", u.email},
         {"last_login", u.last_login.has_value() ? util::timestampToString(u.last_login.value()) : ""},
@@ -75,6 +77,7 @@ void to_json(nlohmann::json& j, const User& u) {
 
 void from_json(const nlohmann::json& j, User& u) {
     u.id = j.at("id").get<unsigned short>();
+    u.linux_uid = j.at("uid").get<unsigned int>();
     u.name = j.at("name").get<std::string>();
     u.email = j.at("email").get<std::string>();
     u.is_active = j.at("is_active").get<bool>();

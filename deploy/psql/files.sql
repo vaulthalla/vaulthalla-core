@@ -1,14 +1,23 @@
 CREATE TABLE fs_entry
 (
     id               SERIAL PRIMARY KEY,
-    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
+    vault_id         INTEGER,
     parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
-    path             TEXT         NOT NULL, -- Full path for easy access
+    path             TEXT         NOT NULL,   -- Full path for easy access
+
+    -- FUSE compatibility
+    inode            BIGINT UNIQUE,           -- bidirectional lookup and faster indexing
+    abs_path         TEXT         NOT NULL,   -- true filesystem path (e.g. /mnt/vaulthalla/cloud/test_vault_r2)
+    mode             INTEGER   DEFAULT 0755,  -- Emulate POSIX permissions
+    owner_uid        INTEGER,                 -- Linux UID for access checks
+    group_gid        INTEGER,                 -- Linux GID for group access checks
+    is_hidden        BOOLEAN   DEFAULT FALSE,
+    is_system        BOOLEAN   DEFAULT FALSE, -- Mark internal-only entries (e.g. keys)
 
     UNIQUE (vault_id, parent_id, name)
 );
@@ -33,9 +42,9 @@ CREATE TABLE files
 
 CREATE TABLE files_trashed
 (
-    fs_entry_id      INTEGER,  -- from fs_entry.id, no FK
-    vault_id         INTEGER,  -- from fs_entry.vault_id, no FK
-    parent_id        INTEGER,  -- from fs_entry.parent_id, no FK
+    fs_entry_id      INTEGER,   -- from fs_entry.id, no FK
+    vault_id         INTEGER,   -- from fs_entry.vault_id, no FK
+    parent_id        INTEGER,   -- from fs_entry.parent_id, no FK
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP,
@@ -120,6 +129,16 @@ CREATE TABLE file_metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (file_id, key)
+);
+
+CREATE TABLE fs_mutation_log
+(
+    id          SERIAL PRIMARY KEY,
+    fs_entry_id INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
+    action      VARCHAR(32) NOT NULL, -- create, modify, chmod, move, delete
+    actor_uid   INTEGER,              -- calling Linux UID
+    timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    note        TEXT
 );
 
 CREATE TABLE file_metadata_string

@@ -93,3 +93,7 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
         fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
     }
 }
+
+fs::path StorageEngine::resolveAbsolutePathToVaultPath(const fs::path& path) const {
+    return path.lexically_relative(root);
+}

@@ -34,19 +34,33 @@ public:
 
     fs::path resolvePathFromInode(fuse_ino_t ino) const;
 
+    fuse_ino_t resolveInode(const fs::path& absPath);
+
+    void linkPath(const fs::path& absPath, fuse_ino_t ino);
+
     void decrementInodeRef(fuse_ino_t ino, uint64_t nlookup);
 
     std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
 
     [[nodiscard]] char getPathType(const fs::path& absPath) const;
 
-    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath) const;
+    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath);
 
-    [[nodiscard]] bool fileExists(const fs::path& absPath) const;
+    std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
 
-    [[nodiscard]] bool directoryExists(const fs::path& absPath) const;
+    // -- Entry Cache Management --
+    void cacheEntry(fuse_ino_t ino, std::shared_ptr<types::FSEntry> entry);
+    [[nodiscard]] bool entryExists(const fs::path& absPath) const;
+    std::shared_ptr<types::FSEntry> getEntryFromInode(fuse_ino_t ino) const;
+    void evictEntry(fuse_ino_t ino);
+    void evictPath(const std::filesystem::path& path);
 
-    [[nodiscard]] std::shared_ptr<StorageEngine> getEngineForPath(const fs::path& absPath) const;
+    // -- Bidirectional Maintenance --
+    void registerInode(fuse_ino_t ino, const std::filesystem::path& path, std::shared_ptr<types::FSEntry> entry);
+
+    // -- Optional future UX --
+    void updateCachedEntry(const std::shared_ptr<types::FSEntry>& entry);
+
 
 private:
     mutable std::mutex mutex_;
@@ -55,9 +69,9 @@ private:
     fuse_ino_t nextInode_ = 2;
     std::unordered_map<fuse_ino_t, fs::path> inodeToPath_;
     std::unordered_map<fs::path, fuse_ino_t> pathToInode_;
+    std::unordered_map<fuse_ino_t, std::shared_ptr<types::FSEntry>> inodeToEntry_;
+    std::pmr::unordered_map<fs::path, std::shared_ptr<types::FSEntry>> pathToEntry_;
     mutable std::shared_mutex inodeMutex_;
-
-    std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
 };
 
 }

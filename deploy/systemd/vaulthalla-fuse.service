@@ -1,4 +1,3 @@
-# /etc/systemd/system/vaulthalla-fuse.service
 [Unit]
 Description=Vaulthalla FUSE Filesystem
 Requires=vaulthalla-core.service

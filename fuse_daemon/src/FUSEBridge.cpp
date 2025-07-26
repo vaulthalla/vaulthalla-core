@@ -9,6 +9,7 @@
 #include <cstring>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#include <iostream>
 
 #define FUSE_DISPATCH(op) \
 [](fuse_req_t req, auto... args) { \

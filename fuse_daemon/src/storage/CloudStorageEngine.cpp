@@ -22,7 +22,7 @@ using namespace vh::concurrency;
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
-      key_(APIKeyQueries::getAPIKey(vault->id)),
+      key_(APIKeyQueries::getAPIKey(vault->api_key_id)),
       s3Provider_(std::make_shared<cloud::S3Provider>(std::static_pointer_cast<api::S3APIKey>(key_), vault->bucket)) {}
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {

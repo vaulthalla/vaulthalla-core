@@ -1,4 +1,3 @@
-# /etc/systemd/system/vaulthalla-core.service
 [Unit]
 Description=Vaulthalla Core Daemon
 After=network.target

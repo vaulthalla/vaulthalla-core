@@ -6,7 +6,8 @@ namespace vh::types::fuse {
 
 CommandType FUSECommand::commandTypeFromString(const std::string& s) {
     static const std::unordered_map<std::string, CommandType> map = {
-        {"sync", CommandType::SYNC}
+        {"sync", CommandType::SYNC},
+        {"register", CommandType::REGISTER}
     };
 
     const auto it = map.find(s);
@@ -14,8 +15,11 @@ CommandType FUSECommand::commandTypeFromString(const std::string& s) {
 }
 
 std::string to_string(const CommandType& type) {
-    if (type != CommandType::SYNC) throw std::invalid_argument("Unsupported command type");
-    return "sync";
+    switch (type) {
+        case CommandType::SYNC: return "sync";
+        case CommandType::REGISTER: return "register";
+        default: return "unknown";
+    }
 }
 
 FUSECommand FUSECommand::fromJson(const std::string& jsonStr) {
@@ -24,10 +28,11 @@ FUSECommand FUSECommand::fromJson(const std::string& jsonStr) {
 
 FUSECommand FUSECommand::fromJson(const nlohmann::json& j) {
     FUSECommand cmd;
-    if (!j.contains("op")) throw std::invalid_argument("Missing required command fields");
+    if (!j.contains("op")) throw std::invalid_argument("Missing op field");
 
     cmd.type = commandTypeFromString(j.at("op").get<std::string>());
     cmd.vaultId = j.value("vaultId", 0);
+    if (j.contains("fsEntryId")) cmd.fsEntryId = j.at("fsEntryId").get<unsigned int>();
 
     return cmd;
 }

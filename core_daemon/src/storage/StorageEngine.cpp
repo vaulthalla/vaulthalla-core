@@ -10,6 +10,7 @@
 #include "util/Magic.hpp"
 #include "util/files.hpp"
 #include "engine/VaultEncryptionManager.hpp"
+#include "protocols/FUSECmdClient.hpp"
 
 #include <fstream>
 #include <utility>
@@ -43,6 +44,8 @@ void StorageEngine::finishUpload(const unsigned int userId, const std::filesyste
     f->id = FileQueries::upsertFile(f);
 
     ThumbnailWorker::enqueue(shared_from_this(), buffer, f);
+
+    sendRegisterCommand(vault->id, f->id);
 }
 
 void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) const {

@@ -163,6 +163,8 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("get_fs_entry_by_abs_path", "SELECT * FROM fs_entry WHERE abs_path = $1");
 
+    conn_->prepare("get_fs_entry_by_id", "SELECT * FROM fs_entry WHERE id = $1");
+
     conn_->prepare("get_fs_entry_parent_id", "SELECT parent_id FROM fs_entry WHERE id = $1");
 
     conn_->prepare("get_fs_entry_parent_id_and_path", "SELECT parent_id, path FROM fs_entry WHERE id = $1");
@@ -278,6 +280,12 @@ void DBConnection::initPreparedFiles() const {
                    "FROM fs_entry fs "
                    "JOIN files f ON fs.id = f.fs_entry_id "
                    "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
+
+    conn_->prepare("get_file_by_id",
+                   "SELECT f.*, fs.* "
+                   "FROM fs_entry fs "
+                   "JOIN files f ON fs.id = f.fs_entry_id "
+                   "WHERE fs.id = $1");
 
     conn_->prepare("get_file_by_path",
                    "SELECT f.*, fs.* "
@@ -424,6 +432,12 @@ void DBConnection::initPreparedDirectories() const {
                    "FROM fs_entry fs "
                    "JOIN directories d ON fs.id = d.fs_entry_id "
                    "WHERE fs.abs_path LIKE $1 AND fs.abs_path != '/'");
+
+    conn_->prepare("get_dir_by_id",
+                   "SELECT fs.*, d.* "
+                   "FROM fs_entry fs "
+                   "JOIN directories d ON fs.id = d.fs_entry_id "
+                   "WHERE fs.id = $1");
 
     conn_->prepare("get_dir_by_path",
                    "SELECT fs.*, d.* "

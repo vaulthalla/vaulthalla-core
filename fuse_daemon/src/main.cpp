@@ -22,12 +22,12 @@ using namespace vh::types::fuse;
 using namespace vh::fuse::ipc;
 
 namespace {
-    std::atomic shouldExit = false;
+std::atomic shouldExit = false;
 
-    void signalHandler(int signum) {
-        std::cout << "\n[!] Signal " << signum << " received. Shutting down gracefully..." << std::endl;
-        shouldExit = true;
-    }
+void signalHandler(int signum) {
+    std::cout << "\n[!] Signal " << signum << " received. Shutting down gracefully..." << std::endl;
+    shouldExit = true;
+}
 }
 
 int main(int argc, char* argv[]) {
@@ -45,8 +45,7 @@ int main(int argc, char* argv[]) {
     const auto fuseLoop = std::make_shared<FUSELoopRunner>(storageManager);
     Filesystem::init(storageManager);
 
-    try { fuseLoop->run(); }
-    catch (const std::exception& e) {
+    try { fuseLoop->run(); } catch (const std::exception& e) {
         std::cerr << "[-] Failed to start FUSE loop: " << e.what() << std::endl;
         return 1;
     }
@@ -61,15 +60,18 @@ int main(int argc, char* argv[]) {
 
     const auto router = std::make_unique<CommandRouter>("/tmp/vaulthalla.sock");
 
-    router->setCommandHandler([&syncController](const FUSECommand& cmd) {
+    router->setCommandHandler([&syncController, &storageManager](const FUSECommand& cmd) {
         switch (cmd.type) {
-            case CommandType::SYNC:
-                std::cout << "[+] SYNC command received for vault: " << cmd.vaultId << std::endl;
-                syncController->runNow(cmd.vaultId);
-                break;
-            default:
-                std::cerr << "[-] Unsupported command type: " << static_cast<int>(cmd.type) << std::endl;
-                break;
+        case CommandType::SYNC: syncController->runNow(cmd.vaultId);
+            break;
+        case CommandType::REGISTER: if (!cmd.fsEntryId) {
+                std::cerr << "[-] REGISTER command missing fsEntryId" << std::endl;
+                return;
+            }
+            storageManager->registerEntry(*cmd.fsEntryId);
+            break;
+        default: std::cerr << "[-] Unsupported command type: " << static_cast<int>(cmd.type) << std::endl;
+            break;
         }
     });
 

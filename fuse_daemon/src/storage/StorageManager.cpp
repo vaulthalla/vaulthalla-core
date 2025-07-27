@@ -45,6 +45,21 @@ void StorageManager::initStorageEngines() {
     }
 }
 
+void StorageManager::registerEntry(const unsigned int entryId) {
+    const auto entry = FSEntryQueries::getFSEntryById(entryId);
+    if (!entry) {
+        std::cerr << "[StorageManager] Entry not found for ID: " << entryId << std::endl;
+        return;
+    }
+
+    if (entry->inode) cacheEntry(*entry->inode, entry);
+    else {
+        fuse_ino_t ino = assignInode(entry->path);
+        entry->inode = ino;
+        cacheEntry(ino, entry);
+    }
+}
+
 std::vector<std::shared_ptr<FSEntry>> StorageManager::listDir(const fs::path& absPath, const bool recursive) const {
     return FSEntryQueries::listDir(absPath, recursive);
 }

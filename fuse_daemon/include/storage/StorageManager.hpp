@@ -28,6 +28,8 @@ public:
 
     std::vector<std::shared_ptr<types::FSEntry>> listDir(const fs::path& absPath, bool recursive = false) const;
 
+    void registerEntry(unsigned int entryId);
+
     fuse_ino_t assignInode(const fs::path& path);
 
     fuse_ino_t getOrAssignInode(const fs::path& path);

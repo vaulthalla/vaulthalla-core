@@ -27,8 +27,10 @@ bool sendCommand(const types::fuse::FUSECommand& cmd) {
         return false;
     }
 
-    const nlohmann::json jsonCmd = {{"op", types::fuse::to_string(cmd.type)},
+    nlohmann::json jsonCmd = {{"op", types::fuse::to_string(cmd.type)},
                                     {"vaultId", cmd.vaultId}};
+
+    if (cmd.fsEntryId) jsonCmd["fsEntryId"] = cmd.fsEntryId;
 
     const std::string payload = jsonCmd.dump();
     if (write(sock, payload.c_str(), payload.size()) == -1) {
@@ -41,13 +43,21 @@ bool sendCommand(const types::fuse::FUSECommand& cmd) {
     return true;
 }
 
-void sendSyncCommand(unsigned int vaultId) {
+void sendSyncCommand(const unsigned int vaultId) {
     types::fuse::FUSECommand cmd;
     cmd.type = types::fuse::CommandType::SYNC;
     cmd.vaultId = vaultId;
 
-    if (!sendCommand(cmd)) std::cerr << "[-] Failed to send sync command for vault " << vaultId << "\n";
-    else std::cout << "[+] Sync command sent for vault " << vaultId << "\n";
+    if (!sendCommand(cmd)) std::cerr << "[-] Failed to send sync command for vault " << vaultId << std::endl;
+}
+
+void sendRegisterCommand(const unsigned int vaultId, const unsigned int fsEntryId) {
+    types::fuse::FUSECommand cmd;
+    cmd.type = types::fuse::CommandType::REGISTER;
+    cmd.vaultId = vaultId;
+    cmd.fsEntryId = std::make_optional(fsEntryId);
+
+    if (!sendCommand(cmd)) std::cerr << "[-] Failed to send register command for entry " << fsEntryId << std::endl;
 }
 
 } // namespace vh::storage

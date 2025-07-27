@@ -22,6 +22,21 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const fs::path& absPath) {
     });
 }
 
+std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
+    return Transactions::exec("FSEntryQueries::getFSEntryById", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+        const auto res = txn.exec_prepared("get_fs_entry_by_id", entryId);
+        if (res.empty()) return nullptr;
+
+        const auto fileRes = txn.exec_prepared("get_file_by_id", entryId);
+        if (!fileRes.empty()) return std::make_shared<File>(fileRes[0]);
+
+        const auto dirRes = txn.exec_prepared("get_dir_by_id", entryId);
+        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes[0]);
+
+        return nullptr;
+    });
+}
+
 std::vector<std::shared_ptr<FSEntry>> FSEntryQueries::listDir(const fs::path& absPath, bool recursive) {
     return Transactions::exec("FSEntryQueries::listDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(to_utf8_string(absPath.u8string()), recursive);

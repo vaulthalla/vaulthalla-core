@@ -1,7 +1,5 @@
 [Unit]
 Description=Vaulthalla FUSE Filesystem
-Requires=vaulthalla-core.service
-After=vaulthalla-core.service
 
 [Service]
 User=vaulthalla

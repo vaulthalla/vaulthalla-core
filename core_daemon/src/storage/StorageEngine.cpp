@@ -55,6 +55,7 @@ void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) co
     d->name = fs::path(relPath).filename().string();
     d->created_by = d->last_modified_by = userId;
     d->path = relPath;
+    d->abs_path = absPath;
     d->parent_id = DirectoryQueries::getDirectoryIdByPath(vault->id, fs::path(relPath).parent_path());
 
     DirectoryQueries::upsertDirectory(d);
@@ -92,6 +93,7 @@ void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsig
 
     entry->name = to.filename().string();
     entry->path = to;
+    entry->abs_path = getAbsolutePath(to);
     entry->last_modified_by = userId;
 
     if (isFile) FileQueries::upsertFile(std::static_pointer_cast<File>(entry));
@@ -113,6 +115,7 @@ void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigne
 
     entry->id = 0;
     entry->path = to;
+    entry->abs_path = getAbsolutePath(to);
     entry->name = to.filename().string();
     entry->created_at = {};
     entry->updated_at = {};

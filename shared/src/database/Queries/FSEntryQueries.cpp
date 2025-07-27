@@ -24,21 +24,19 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const fs::path& absPath) {
 
 std::vector<std::shared_ptr<FSEntry>> FSEntryQueries::listDir(const fs::path& absPath, bool recursive) {
     return Transactions::exec("FSEntryQueries::listDir", [&](pqxx::work& txn) {
-        const auto patterns = computePatterns(absPath, recursive);
-
-        const auto path = to_utf8_string(absPath.u8string());
-        pqxx::params p{path, patterns.like, patterns.not_like};
+        const auto patterns = computePatterns(to_utf8_string(absPath.u8string()), recursive);
+        pqxx::params p{patterns.like, patterns.not_like};
 
         const auto files = types::files_from_pq_res(
             recursive
-            ? txn.exec_prepared("list_files_in_dir_recursive", pqxx::params{path, patterns.like})
-            : txn.exec_prepared("list_files_in_dir", p)
+            ? txn.exec_prepared("list_files_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
+            : txn.exec_prepared("list_files_in_dir_by_abs_path", p)
         );
 
         const auto directories = types::directories_from_pq_res(
             recursive
-            ? txn.exec_prepared("list_directories_in_dir_recursive", pqxx::params{path, patterns.like})
-            : txn.exec_prepared("list_directories_in_dir", p)
+            ? txn.exec_prepared("list_directories_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
+            : txn.exec_prepared("list_directories_in_dir_by_abs_path", p)
         );
 
         return merge_entries(files, directories);

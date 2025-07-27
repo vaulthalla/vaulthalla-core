@@ -7,6 +7,8 @@
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
+#include "util/fsPath.hpp"
+
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
 #include <cstring>
@@ -33,6 +35,8 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
         if (ino == FUSE_ROOT_ID) {
             const auto entry = storageManager_->getEntry("/");
             if (!entry) {
+                std::cerr << "[getattr] No entry found for inode " << ino
+                          << ", resolved path: " << "/" << std::endl;
                 fuse_reply_err(req, ENOENT);
                 return;
             }
@@ -45,8 +49,21 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
             return;
         }
 
-        fs::path path = storageManager_->resolvePathFromInode(ino);
+        const auto path = storageManager_->resolvePathFromInode(ino);
+        if (path.empty()) {
+            std::cerr << "[getattr] No path found for inode " << ino << std::endl;
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
         const auto entry = storageManager_->getEntry(path);
+
+        if (!entry) {
+            std::cerr << "[getattr] No entry found for inode " << ino
+                      << ", resolved path: " << path << std::endl;
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
 
         struct stat st = {};
         st.st_ino = ino;
@@ -65,59 +82,59 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
 void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
     (void)fi;
 
-    const auto path = storageManager_->resolvePathFromInode(ino); // implement this to map inode → path
-    auto entries = storageManager_->listDir(path);
+    const auto path = storageManager_->resolvePathFromInode(ino);
+    auto entries = storageManager_->listDir(path, false);
 
     std::vector<char> buf(size);
     size_t buf_used = 0;
 
-    auto add_entry = [&](const std::string& name, const struct stat& st) {
-        size_t entry_size = fuse_add_direntry(req, nullptr, 0, name.c_str(), &st, 0);
+    auto add_entry = [&](const std::string& name, const struct stat& st, off_t next_off) {
+        size_t entry_size = fuse_add_direntry(req, nullptr, 0, name.c_str(), &st, next_off);
         if (buf_used + entry_size > size) return false;
 
-        fuse_add_direntry(req, buf.data() + buf_used, entry_size, name.c_str(), &st, static_cast<off_t>(buf_used));
+        fuse_add_direntry(req, buf.data() + buf_used, entry_size, name.c_str(), &st, next_off);
         buf_used += entry_size;
         return true;
     };
 
-    // Always include "." and ".."
-    struct stat dot = { .st_mode = S_IFDIR };
-    struct stat dotdot = { .st_mode = S_IFDIR };
-    if (!add_entry(".", dot) || !add_entry("..", dotdot)) {
-        fuse_reply_buf(req, buf.data(), buf_used);
-        return;
+    off_t current_off = 0;
+
+    if (off <= current_off++) {
+        struct stat dot = { .st_mode = S_IFDIR };
+        if (!add_entry(".", dot, current_off)) goto reply;
     }
 
-    for (const auto& entry : entries) {
+    if (off <= current_off++) {
+        struct stat dotdot = { .st_mode = S_IFDIR };
+        if (!add_entry("..", dotdot, current_off)) goto reply;
+    }
+
+    for (size_t i = 0; i < entries.size(); ++i, ++current_off) {
+        if (off > current_off) continue;
+
+        const auto& entry = entries[i];
         const auto st = statFromEntry(entry, ino);
-        if (!add_entry(entry->name, st)) break;
+
+        if (!add_entry(entry->name, st, current_off + 1)) break;
     }
 
-    fuse_reply_buf(req, buf.data(), buf_used);
+    reply:
+        fuse_reply_buf(req, buf.data(), buf_used);
 }
 
 void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const {
+    if (!name || strlen(name) == 0) {
+        fuse_reply_err(req, EINVAL);
+        return;
+    }
+
     const auto parentPath = storageManager_->resolvePathFromInode(parent);
     const auto path = parentPath / name;
     const fuse_ino_t ino = storageManager_->getOrAssignInode(path);
 
-    if (ino == FUSE_ROOT_ID) {
-        const auto entry = storageManager_->getEntry("/");
-        if (!entry) {
-            fuse_reply_err(req, ENOENT);
-            return;
-        }
-
-        struct stat st = statFromEntry(entry, ino);
-        st.st_uid = getuid();  // explicitly set ownership
-        st.st_gid = getgid();
-
-        fuse_reply_attr(req, &st, 60.0);
-        return;
-    }
-
     const auto entry = storageManager_->getEntry(path);
     if (!entry) {
+        std::cerr << "[FUSE] lookup failed: entry not found at path: " << path << "\n";
         fuse_reply_err(req, ENOENT);
         return;
     }
@@ -134,6 +151,7 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 }
 
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
+    std::cout << "[FUSE] open called for inode: " << ino << std::endl;
     try {
         fs::path path = storageManager_->resolvePathFromInode(ino);
         if (!storageManager_->entryExists(path)) fuse_reply_err(req, ENOENT);
@@ -144,6 +162,7 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
 }
 
 void FUSEBridge::read(const fuse_req_t& req, const fuse_ino_t& ino, const size_t size, const off_t off, fuse_file_info* fi) const {
+    std::cout << "[FUSE] read called for inode: " << ino << ", size: " << size << ", offset: " << off << std::endl;
     try {
         fs::path path = storageManager_->resolvePathFromInode(ino);
         int fd = ::open(path.c_str(), O_RDONLY);
@@ -167,6 +186,7 @@ void FUSEBridge::read(const fuse_req_t& req, const fuse_ino_t& ino, const size_t
 }
 
 void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
+    std::cout << "[FUSE] mkdir called for parent inode: " << parent << std::endl;
     try {
         if (std::string_view(name).find('/') != std::string::npos) {
             fuse_reply_err(req, EINVAL);
@@ -204,10 +224,10 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
                 dir->path = engine->resolveAbsolutePathToVaultPath(path);
             }
 
-            if (auto parentEntry = storageManager_->getEntry(path.parent_path()))
+            if (auto parentEntry = storageManager_->getEntry(resolveParent(path)))
                 dir->parent_id = parentEntry->id;
 
-            dir->abs_path = path;
+            dir->abs_path = makeAbsolute(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             dir->mode = mode;
@@ -217,7 +237,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(dir->inode, dir);
+            storageManager_->cacheEntry(*dir->inode, dir);
             DirectoryQueries::upsertDirectory(dir);
 
             try {

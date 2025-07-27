@@ -17,9 +17,9 @@
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::config;
 
 StorageManager::StorageManager() {
-    initStorageEngines();
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
 }
@@ -84,7 +84,7 @@ fuse_ino_t StorageManager::resolveInode(const fs::path& absPath) {
         return FUSE_ROOT_ID; // or some error code
     }
 
-    fuse_ino_t ino = entry ? entry->inode : getOrAssignInode(absPath);
+    fuse_ino_t ino = entry && entry->inode ? *entry->inode : getOrAssignInode(absPath);
     if (ino == FUSE_ROOT_ID) {
         std::cerr << "[StorageManager] Failed to resolve inode for path: " << absPath << std::endl;
         return FUSE_ROOT_ID; // or some error code
@@ -182,7 +182,11 @@ std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) {
             return nullptr;
         }
 
-        cacheEntry(entry->inode, entry);
+        if (entry->inode) cacheEntry(*entry->inode, entry);
+        else {
+            entry->inode = std::make_optional(getOrAssignInode(absPath));
+            cacheEntry(*entry->inode, entry);
+        }
         return entry;
     } catch (const std::exception& e) {
         std::cerr << "[StorageManager] Error retrieving entry for path " << absPath << ": " << e.what() << std::endl;
@@ -191,11 +195,16 @@ std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) {
 }
 
 void StorageManager::cacheEntry(fuse_ino_t ino, std::shared_ptr<FSEntry> entry) {
+    if (!entry) {
+        std::cerr << "[StorageManager] Attempted to cache a null entry for inode " << ino << std::endl;
+        return;
+    }
+
     std::unique_lock lock(inodeMutex_);
-    inodeToEntry_[ino] = std::move(entry);
     inodeToPath_[ino] = entry->abs_path;
     pathToInode_[entry->abs_path] = ino;
     pathToEntry_[entry->abs_path] = entry;
+    inodeToEntry_[ino] = std::move(entry);
 }
 
 bool StorageManager::entryExists(const fs::path& absPath) const {
@@ -223,6 +232,7 @@ void StorageManager::evictPath(const fs::path& path) {
         inodeToPath_.erase(ino);
         inodeToEntry_.erase(ino);
         pathToInode_.erase(path);
+        pathToEntry_.erase(path);
     }
 }
 

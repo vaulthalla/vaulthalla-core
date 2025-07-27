@@ -15,23 +15,39 @@ using namespace vh::types;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
-        inode(row["inode"].as<ino_t>()),
-        mode(row["mode"].as<mode_t>()),
-        owner_uid(row["owner_uid"].as<unsigned int>()),
-        group_gid(row["group_gid"].as<unsigned int>()),
-      vault_id(row["vault_id"].as<unsigned int>()),
-      created_by(row["created_by"].as<unsigned int>()),
-      last_modified_by(row["last_modified_by"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
       size_bytes(row["size_bytes"].as<uintmax_t>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
       path(std::filesystem::path(row["path"].as<std::string>())),
       abs_path(std::filesystem::path(row["abs_path"].as<std::string>())),
       is_hidden(row["is_hidden"].as<bool>()),
-      is_system(row["is_system"].as<bool>()) {
+      is_system(row["is_system"].as<bool>()),
+      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
     else parent_id = row["parent_id"].as<unsigned int>();
+
+    if (row["owner_uid"].is_null()) owner_uid = std::nullopt;
+    else owner_uid = row["owner_uid"].as<unsigned int>();
+
+    if (row["group_gid"].is_null()) group_gid = std::nullopt;
+    else group_gid = row["group_gid"].as<unsigned int>();
+
+    if (row["vault_id"].is_null()) vault_id = std::nullopt;
+    else vault_id = row["vault_id"].as<unsigned int>();
+
+    if (row["created_by"].is_null()) created_by = std::nullopt;
+    else created_by = row["created_by"].as<unsigned int>();
+
+    if (row["last_modified_by"].is_null()) last_modified_by = std::nullopt;
+    else last_modified_by = row["last_modified_by"].as<unsigned int>();
+
+    if (row["inode"].is_null()) inode = std::nullopt;
+    else inode = row["inode"].as<ino_t>();
+
+    if (row["mode"].is_null()) mode = std::nullopt;
+    else mode = row["mode"].as<mode_t>();
+
+    if (abs_path.empty()) throw std::runtime_error("FSEntry must have a non-empty abs_path");
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {
@@ -43,23 +59,24 @@ FSEntry::FSEntry(const std::string& s3_key) {
 void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
     j = {
         {"id", entry.id},
-        {"inode", entry.inode},
-        {"mode", entry.mode},
-        {"owner_uid", entry.owner_uid},
-        {"group_gid", entry.group_gid},
         {"is_hidden", entry.is_hidden},
         {"is_system", entry.is_system},
-        {"vault_id", entry.vault_id},
-        {"created_by", entry.created_by},
-        {"last_modified_by", entry.last_modified_by},
         {"name", entry.name},
-        {"parent_id", entry.parent_id.has_value() ? entry.parent_id.value() : 0},
         {"size_bytes", entry.size_bytes},
         {"created_at", util::timestampToString(entry.created_at)},
         {"updated_at", util::timestampToString(entry.updated_at)},
         {"path", entry.path.string()},
         {"abs_path", entry.abs_path.string()}
     };
+
+    if (entry.parent_id) j["parent_id"] = entry.parent_id;
+    if (entry.vault_id) j["vault_id"] = entry.vault_id;
+    if (entry.created_by) j["created_by"] = entry.created_by;
+    if (entry.last_modified_by) j["last_modified_by"] = entry.last_modified_by;
+    if (entry.owner_uid) j["owner_uid"] = entry.owner_uid;
+    if (entry.group_gid) j["group_gid"] = entry.group_gid;
+    if (entry.inode) j["inode"] = entry.inode;
+    if (entry.mode) j["mode"] = entry.mode;
 }
 
 void vh::types::from_json(const nlohmann::json& j, FSEntry& entry) {
@@ -184,3 +201,25 @@ std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntr
 
     return grouped;
 }
+
+void FSEntry::print() const {
+    std::cout << "[FSEntry]" << std::endl;
+    std::cout << "  ID: " << id << std::endl;
+    std::cout << "  Name: " << name << std::endl;
+    std::cout << "  Size: " << size_bytes << " bytes" << std::endl;
+    std::cout << "  Path: " << path.string() << std::endl;
+    std::cout << "  Absolute Path: " << abs_path.string() << std::endl;
+    std::cout << "  Hidden: " << (is_hidden ? "Yes" : "No") << std::endl;
+    std::cout << "  System: " << (is_system ? "Yes" : "No") << std::endl;
+    std::cout << "  Created At: " << util::timestampToString(created_at) << std::endl;
+    std::cout << "  Updated At: " << util::timestampToString(updated_at) << std::endl;
+    if (parent_id) std::cout << "  Parent ID: " << *parent_id << std::endl;
+    if (vault_id) std::cout << "  Vault ID: " << *vault_id << std::endl;
+    if (created_by) std::cout << "  Created By: " << *created_by << std::endl;
+    if (last_modified_by) std::cout << "  Last Modified By: " << *last_modified_by << std::endl;
+    if (owner_uid) std::cout << "  Owner UID: " << *owner_uid << std::endl;
+    if (group_gid) std::cout << "  Group GID: " << *group_gid << std::endl;
+    if (inode) std::cout << "  Inode: " << *inode << std::endl;
+    if (mode) std::cout << "  Mode: " << std::oct << *mode << std::endl;
+}
+

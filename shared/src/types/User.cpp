@@ -24,7 +24,7 @@ User::User(std::string name, std::string email, const bool isActive)
 
 User::User(const pqxx::row& row)
     : id(row["id"].as<unsigned short>()),
-      linux_uid(row["uid"].as<unsigned int>()),
+      linux_uid(row["linux_uid"].as<std::optional<unsigned int>>()),
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
@@ -63,7 +63,6 @@ void User::updateUser(const nlohmann::json& j) {
 void to_json(nlohmann::json& j, const User& u) {
     j = {
         {"id", u.id},
-        {"uid", u.linux_uid},
         {"name", u.name},
         {"email", u.email},
         {"last_login", u.last_login.has_value() ? util::timestampToString(u.last_login.value()) : ""},
@@ -72,12 +71,14 @@ void to_json(nlohmann::json& j, const User& u) {
         {"role", *u.role}
     };
 
+    if (u.linux_uid) j["uid"] = *u.linux_uid;
+
     if (!u.roles.empty()) j["roles"] = u.roles;
 }
 
 void from_json(const nlohmann::json& j, User& u) {
     u.id = j.at("id").get<unsigned short>();
-    u.linux_uid = j.at("uid").get<unsigned int>();
+    u.linux_uid = j.at("uid").get<std::optional<unsigned int>>();
     u.name = j.at("name").get<std::string>();
     u.email = j.at("email").get<std::string>();
     u.is_active = j.at("is_active").get<bool>();
@@ -90,7 +91,7 @@ nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users) {
     return j;
 }
 
-nlohmann::json to_json(const std::shared_ptr<User>& user) { return nlohmann::json(*user); }
+nlohmann::json to_json(const std::shared_ptr<User>& user) { return {*user}; }
 
 
 // --- User role checks ---

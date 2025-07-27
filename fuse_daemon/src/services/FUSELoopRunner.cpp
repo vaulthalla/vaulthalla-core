@@ -59,6 +59,7 @@ void FUSELoopRunner::fuseLoop() {
     std::vector<std::string> argsStr = {
         "vaulthalla-fuse",
         "-f",
+        "-o", "allow_other",
         config::ConfigRegistry::get().fuse.root_mount_path.string()
     };
 

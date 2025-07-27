@@ -9,6 +9,8 @@
 #include "database/Queries/SyncQueries.hpp"
 #include "engine/VaultEncryptionManager.hpp"
 
+#include <iostream>
+
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::encryption;
@@ -20,8 +22,8 @@ namespace vh::engine {
 StorageEngineBase::StorageEngineBase(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
-      cacheRoot(ConfigRegistry::get().fuse.root_mount_path / ConfigRegistry::get().caching.path / std::to_string(vault->id)),
-      root(ConfigRegistry::get().fuse.root_mount_path / vault->mount_point),
+      cacheRoot(ConfigRegistry::get().caching.path / std::to_string(vault->id)),
+      root(vault->mount_point),
       encryptionManager(std::make_shared<VaultEncryptionManager>(root)) {}
 
 bool StorageEngineBase::isDirectory(const fs::path& rel_path) const {
@@ -72,6 +74,7 @@ std::shared_ptr<File> StorageEngineBase::createFile(const fs::path& rel_path, co
     file->size_bytes = fs::file_size(absPath);
     file->created_by = file->last_modified_by = vault->owner_id;
     file->path = rel_path;
+    file->abs_path = absPath;
     file->mime_type = buffer.empty() ? util::Magic::get_mime_type(absPath) : util::Magic::get_mime_type_from_buffer(buffer);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? fs::path{"/"} / file->path.parent_path() : fs::path("/");

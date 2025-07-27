@@ -4,11 +4,13 @@
 #include "database/Queries/FileQueries.hpp"
 #include "util/Magic.hpp"
 #include "util/files.hpp"
+#include "storage/Filesystem.hpp"
 
 #include <iostream>
 #include <algorithm>
 #include <fstream>
 #include <utility>
+#include <thread>
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -17,7 +19,10 @@ using namespace vh::encryption;
 namespace fs = std::filesystem;
 
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
-    : StorageEngineBase(vault) {}
+    : StorageEngineBase(vault) {
+    if (!Filesystem::exists(root)) Filesystem::mkVault(root, vault->id);
+    if (!Filesystem::exists(cacheRoot)) Filesystem::mkCache(cacheRoot, vault->id);
+}
 
 uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {
     uintmax_t total = 0;
@@ -69,8 +74,8 @@ void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std:
             continue;
         }
 
-        fs::create_directories(toPath.parent_path());
-        fs::rename(fromPath, toPath);
+        Filesystem::mkdir(toPath.parent_path());
+        fs::rename(fromPath, toPath); // TODO: Handle rename properly
     }
 }
 
@@ -89,8 +94,8 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
             continue;
         }
 
-        fs::create_directories(toPath.parent_path());
-        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
+        Filesystem::mkdir(toPath.parent_path());
+        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);  // TODO: Handle copy properly
     }
 }
 

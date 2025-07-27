@@ -44,12 +44,11 @@ WITH ins AS (
 INSERT INTO fsync (sync_id, conflict_policy)
 SELECT id, 'keep_both' FROM ins;
 
--- Seed root directory for admin vault, including directories table
+-- Seed root directory
 WITH inserted_fs_entry AS (
-    INSERT INTO fs_entry (vault_id, name, path, abs_path, parent_id, created_by, last_modified_by)
+    INSERT INTO fs_entry (name, path, abs_path, inode, mode, parent_id, created_by, last_modified_by)
     VALUES (
-        (SELECT id FROM vault WHERE name = 'Default'),
-        '/', '/', '/', NULL,
+        '/', '/', '/', 1, 0755, NULL,
         (SELECT id FROM users WHERE name = 'admin'),
         (SELECT id FROM users WHERE name = 'admin')
     )

@@ -1,5 +1,6 @@
 #include "types/FUSECommand.hpp"
 #include <unordered_map>
+#include <iostream>
 
 namespace vh::types::fuse {
 
@@ -17,11 +18,13 @@ std::string to_string(const CommandType& type) {
     return "sync";
 }
 
+FUSECommand FUSECommand::fromJson(const std::string& jsonStr) {
+    return fromJson(nlohmann::json::parse(jsonStr));
+}
+
 FUSECommand FUSECommand::fromJson(const nlohmann::json& j) {
     FUSECommand cmd;
-    if (!j.contains("op") || !j.contains("path")) {
-        throw std::invalid_argument("Missing required command fields");
-    }
+    if (!j.contains("op")) throw std::invalid_argument("Missing required command fields");
 
     cmd.type = commandTypeFromString(j.at("op").get<std::string>());
     cmd.vaultId = j.value("vaultId", 0);

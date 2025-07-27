@@ -20,15 +20,15 @@ struct File;
 struct Directory;
 
 struct FSEntry {
-    uintmax_t size_bytes{0};
-    unsigned int id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
-    bool is_hidden{}, is_system{};
-    ino_t inode{};
-    mode_t mode{};
-    std::optional<unsigned int> parent_id;
+    unsigned int id{};
     std::string name{};
-    std::time_t created_at{}, updated_at{};
+    uintmax_t size_bytes{0};
+    std::optional<unsigned int> parent_id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
+    std::optional<ino_t> inode{};
+    std::optional<mode_t> mode{};
     std::filesystem::path path{}, abs_path{};
+    bool is_hidden{}, is_system{};
+    std::time_t created_at{}, updated_at{};
 
     FSEntry() = default;
     virtual ~FSEntry() = default;
@@ -38,6 +38,8 @@ struct FSEntry {
     [[nodiscard]] virtual bool isDirectory() const = 0;
 
     void setPath(const std::filesystem::path& path) { this->path = path; }
+
+    void print() const;
 };
 
 void to_json(nlohmann::json& j, const FSEntry& entry);

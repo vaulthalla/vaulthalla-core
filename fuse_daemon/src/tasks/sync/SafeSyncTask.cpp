@@ -44,6 +44,7 @@ void SafeSyncTask::sync() {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
+            if (dir->abs_path.empty()) dir->abs_path = engine_->getAbsolutePath(dir->path);
             DirectoryQueries::upsertDirectory(dir);
         }
     }

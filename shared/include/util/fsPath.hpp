@@ -2,7 +2,9 @@
 
 #include <filesystem>
 
-inline std::filesystem::path common_path_prefix(const std::filesystem::path& a, const std::filesystem::path& b) {
+namespace fs = std::filesystem;
+
+inline fs::path common_path_prefix(const fs::path& a, const fs::path& b) {
     std::filesystem::path result;
     auto ait = a.begin();
     auto bit = b.begin();
@@ -14,4 +16,14 @@ inline std::filesystem::path common_path_prefix(const std::filesystem::path& a, 
     }
 
     return result;
+}
+
+inline fs::path makeAbsolute(const fs::path& absPath) {
+    if (absPath.empty() || absPath.string().front() == '/') return absPath;
+    return fs::path("/") / absPath;
+}
+
+inline fs::path resolveParent(const fs::path& absPath) {
+    if (absPath.empty()) return {"/"};
+    return absPath.has_parent_path() ? absPath.parent_path() : fs::path("/");
 }

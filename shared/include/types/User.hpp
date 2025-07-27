@@ -25,7 +25,8 @@ struct VaultRole;
 struct User {
     static constexpr uint16_t ADMIN_MASK = 0xFFFE;
 
-    unsigned int id{}, linux_uid{};
+    unsigned int id{};
+    std::optional<unsigned int> linux_uid{std::nullopt};
     std::string name, password_hash;
     std::optional<std::string> email{std::nullopt};
     std::time_t created_at{};

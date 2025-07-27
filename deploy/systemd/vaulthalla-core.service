@@ -2,6 +2,8 @@
 Description=Vaulthalla Core Daemon
 After=network.target
 Requires=postgresql.service
+Requires=vaulthalla-fuse.service
+After=vaulthalla-fuse.service
 
 [Service]
 User=vaulthalla

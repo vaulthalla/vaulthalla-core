@@ -15,7 +15,9 @@ struct FUSECommand {
 
     static FUSECommand fromJson(const nlohmann::json& j);
     static CommandType commandTypeFromString(const std::string& s);
+    static FUSECommand fromJson(const std::string& jsonStr);
 };
 
 std::string to_string(const CommandType& type);
+
 }

@@ -153,12 +153,12 @@ fi
 
 # === 10) Install systemd services ===
 echo "🛠️  Installing systemd services..."
-sudo install -m 644 deploy/systemd/vaulthalla-core.service /etc/systemd/system/
 sudo install -m 644 deploy/systemd/vaulthalla-fuse.service /etc/systemd/system/
+sudo install -m 644 deploy/systemd/vaulthalla-core.service /etc/systemd/system/
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now vaulthalla-core.service
 sudo systemctl enable --now vaulthalla-fuse.service
+sudo systemctl enable --now vaulthalla-core.service
 
 echo ""
 echo "🏁 Vaulthalla installed successfully!"

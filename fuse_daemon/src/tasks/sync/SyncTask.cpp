@@ -32,19 +32,7 @@ void SyncTask::operator()() {
         }
 
         isRunning_ = true;
-        if (!std::filesystem::exists(engine_->root)) std::filesystem::create_directories(engine_->root);
         SyncQueries::reportSyncStarted(engine_->sync->id);
-
-        if (!DirectoryQueries::directoryExists(engine_->vault->id, "/")) {
-            const auto dir = std::make_shared<Directory>();
-            dir->vault_id = engine_->vault->id;
-            dir->name = "/";
-            dir->path = "/";
-            dir->abs_path = engine_->root;
-            dir->created_by = dir->last_modified_by = engine_->vault->owner_id;
-            dir->parent_id = std::nullopt;
-            DirectoryQueries::upsertDirectory(dir);
-        }
 
         processOperations();
         handleInterrupt();

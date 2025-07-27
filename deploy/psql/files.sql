@@ -1,8 +1,8 @@
 CREATE TABLE fs_entry
 (
     id               SERIAL PRIMARY KEY,
-    vault_id         INTEGER,
-    parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
+    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE DEFAULT NULL,
+    parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE DEFAULT NULL,
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

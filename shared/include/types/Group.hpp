@@ -26,7 +26,8 @@ struct GroupMember {
 };
 
 struct Group {
-    unsigned int id{}, linux_gid{};
+    unsigned int id{};
+    std::optional<unsigned int> linux_gid{std::nullopt};
     std::string name;
     std::optional<std::string> description;
     std::time_t created_at{};

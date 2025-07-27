@@ -170,7 +170,6 @@ void DBConnection::initPreparedFsEntries() const {
     conn_->prepare("get_fs_entry_id_by_path", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = $2");
 }
 
-
 void DBConnection::initPreparedFiles() const {
     conn_->prepare("upsert_file_by_entry_id",
                    "INSERT INTO files (fs_entry_id, size_bytes, mime_type, content_hash) "
@@ -302,13 +301,13 @@ void DBConnection::initPreparedFiles() const {
                    "SELECT f.*, fs.* "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path NOT LIKE $2");
+                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path NOT LIKE $2 AND fs.abs_path != '/'");
 
     conn_->prepare("list_files_in_dir_by_abs_path_recursive",
                    "SELECT f.*, fs.* "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.abs_path LIKE $1");
+                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path != '/'");
 
     conn_->prepare("get_file_id_by_path",
                    "SELECT fs.id "
@@ -418,13 +417,13 @@ void DBConnection::initPreparedDirectories() const {
                    "SELECT fs.*, d.* "
                    "FROM fs_entry fs "
                    "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path NOT LIKE $2");
+                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path NOT LIKE $2 AND fs.abs_path != '/'");
 
     conn_->prepare("list_directories_in_dir_by_abs_path_recursive",
                    "SELECT fs.*, d.* "
                    "FROM fs_entry fs "
                    "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.abs_path LIKE $1");
+                   "WHERE fs.abs_path LIKE $1 AND fs.abs_path != '/'");
 
     conn_->prepare("get_dir_by_path",
                    "SELECT fs.*, d.* "

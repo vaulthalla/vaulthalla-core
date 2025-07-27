@@ -10,6 +10,7 @@
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "engine/VaultEncryptionManager.hpp"
+#include "storage/Filesystem.hpp"
 
 #include <iostream>
 
@@ -63,7 +64,7 @@ void FSTask::processOperations() const {
     for (const auto& op : OperationQueries::listOperationsByVault(engine_->vault->id)) {
         const auto absSrc = engine_->getAbsolutePath(op->source_path);
         const auto absDest = engine_->getAbsolutePath(op->destination_path);
-        if (absDest.has_parent_path()) fs::create_directories(absDest.parent_path());
+        if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
         {
             const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());

@@ -38,13 +38,19 @@ public:
 
     void write(const char* path, const char* buf, size_t size, off_t offset, fuse_file_info* fi) const;
 
-    void create(const char* path, mode_t mode, fuse_file_info* fi) const;
+    void create(const fuse_req_t& req, fuse_ino_t parent, const char* name,
+                        mode_t mode, struct fuse_file_info* fi);
 
     void unlink(const char* path) const;
 
     void truncate(const char* path, off_t size, fuse_file_info* fi) const;
 
-    void rename(const char* from, const char* to, unsigned int flags) const;
+    void rename(const fuse_req_t& req,
+                        fuse_ino_t parent,
+                        const char* name,
+                        fuse_ino_t newparent,
+                        const char* newname,
+                        unsigned int flags) const;
 
     void mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const;
 

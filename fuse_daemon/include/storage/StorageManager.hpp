@@ -57,12 +57,12 @@ public:
     void evictEntry(fuse_ino_t ino);
     void evictPath(const std::filesystem::path& path);
 
-    // -- Bidirectional Maintenance --
-    void registerInode(fuse_ino_t ino, const std::filesystem::path& path, std::shared_ptr<types::FSEntry> entry);
-
     // -- Optional future UX --
     void updateCachedEntry(const std::shared_ptr<types::FSEntry>& entry);
 
+    std::shared_ptr<types::FSEntry> createFile(const fs::path& path, mode_t mode, uid_t uid, gid_t gid);
+
+    void renamePath(const fs::path& oldPath, const fs::path& newPath);
 
 private:
     mutable std::mutex mutex_;

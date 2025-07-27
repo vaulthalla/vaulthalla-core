@@ -11,8 +11,10 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
+#include "util/fsPath.hpp"
 
 #include <iostream>
+#include <fstream>
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -37,7 +39,7 @@ void StorageManager::initStorageEngines() {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
                 engine = std::make_shared<CloudStorageEngine>(s3Vault);
             }
-            engines_[engine->root] = engine;
+            engines_[makeAbsolute(engine->root)] = engine;
         }
     } catch (const std::exception& e) {
         std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << std::endl;
@@ -67,25 +69,22 @@ std::vector<std::shared_ptr<FSEntry>> StorageManager::listDir(const fs::path& ab
 std::shared_ptr<StorageEngine> StorageManager::resolveStorageEngine(const fs::path& absPath) const {
     std::scoped_lock lock(mutex_);
 
-    std::shared_ptr<StorageEngine> bestMatch = nullptr;
-    size_t bestMatchLen = 0;
+    fs::path current;
+    for (const auto& part : absPath.lexically_normal()) {
+        current /= part;
 
-    for (const auto& [rootStr, engine] : engines_) {
-        const fs::path& root = engine->root;
+        // Remove trailing slash by converting to generic form and trimming
+        std::string currentStr = current.generic_string();
+        if (!currentStr.empty() && currentStr.back() == '/')
+            currentStr.pop_back();
 
-        // Must be a prefix of absPath (and a path boundary, not just a substring)
-        if (absPath == root || (absPath.native().starts_with(root.native()) &&
-            (absPath.native().size() == root.native().size() || absPath.native()[root.native().size()] == fs::path::preferred_separator))) {
-
-            size_t matchLen = root.native().size();
-            if (matchLen > bestMatchLen) {
-                bestMatchLen = matchLen;
-                bestMatch = engine;
-            }
-            }
+        auto it = engines_.find(currentStr);
+        if (it != engines_.end()) {
+            return it->second;
+        }
     }
 
-    return bestMatch;
+    return nullptr;
 }
 
 fuse_ino_t StorageManager::resolveInode(const fs::path& absPath) {
@@ -224,7 +223,7 @@ void StorageManager::cacheEntry(fuse_ino_t ino, std::shared_ptr<FSEntry> entry) 
 
 bool StorageManager::entryExists(const fs::path& absPath) const {
     std::shared_lock lock(inodeMutex_);
-    return pathToEntry_.contains(absPath) || pathToInode_.contains(absPath) || FSEntryQueries::exists(absPath);
+    return pathToEntry_.contains(absPath);
 }
 
 std::shared_ptr<FSEntry> StorageManager::getEntryFromInode(fuse_ino_t ino) const {
@@ -251,13 +250,6 @@ void StorageManager::evictPath(const fs::path& path) {
     }
 }
 
-void StorageManager::registerInode(fuse_ino_t ino, const fs::path& path, std::shared_ptr<FSEntry> entry) {
-    std::unique_lock lock(inodeMutex_);
-    inodeToPath_[ino] = path;
-    pathToInode_[path] = ino;
-    inodeToEntry_[ino] = std::move(entry);
-}
-
 void StorageManager::updateCachedEntry(const std::shared_ptr<FSEntry>& entry) {
     if (!entry) return;
     std::unique_lock lock(inodeMutex_);
@@ -267,4 +259,103 @@ void StorageManager::updateCachedEntry(const std::shared_ptr<FSEntry>& entry) {
             break;
         }
     }
+}
+
+std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t mode, uid_t uid, gid_t gid) {
+    const auto engine = resolveStorageEngine(path);
+    if (!engine) {
+        std::cerr << "[StorageManager] No storage engine found for path: " << path << std::endl;
+        return nullptr;
+    }
+
+    std::cout << "[StorageManager] Creating file at path: " << path << std::endl;
+
+    const auto file = std::make_shared<File>();
+    file->name = path.filename();
+    file->path = engine->resolveAbsolutePathToVaultPath(path);
+    file->abs_path = path;
+    file->mode = mode;
+    file->owner_uid = uid;
+    file->group_gid = gid;
+    file->is_hidden = path.filename().string().starts_with('.');
+    file->created_at = std::time(nullptr);
+    file->updated_at = file->created_at;
+    file->inode = std::make_optional(assignInode(path));
+
+    const fs::path fullDiskPath = ConfigRegistry::get().fuse.root_mount_path / file->path;
+
+    std::error_code ec;
+    std::filesystem::create_directories(fullDiskPath.parent_path(), ec); // ensure dirs exist
+    std::ofstream(fullDiskPath).close(); // create empty file
+    if (!std::filesystem::exists(fullDiskPath))
+        std::cerr << "[StorageManager] Failed to create real file at: " << fullDiskPath << std::endl;
+
+    FileQueries::upsertFile(file);
+    cacheEntry(*file->inode, file);
+
+    std::cout << "[StorageManager] File created successfully at: " << path << std::endl;
+    return file;
+}
+
+void StorageManager::renamePath(const fs::path& oldPath, const fs::path& newPath) {
+    std::cout << "[StorageManager] Renaming path from " << oldPath << " to " << newPath << std::endl;
+
+    auto entry = getEntry(oldPath);
+
+    // Case: Not in DB, fallback to pure FS rename
+    if (!entry) {
+        if (!std::filesystem::exists(oldPath)) {
+            throw std::filesystem::filesystem_error(
+                "[StorageManager] Path does not exist in DB or on disk",
+                oldPath,
+                std::make_error_code(std::errc::no_such_file_or_directory));
+        }
+
+        std::error_code ec;
+        std::filesystem::rename(oldPath, newPath, ec);
+        if (ec) {
+            throw std::filesystem::filesystem_error(
+                "[StorageManager] Filesystem-only rename failed",
+                oldPath, newPath, ec);
+        }
+
+        std::cout << "[StorageManager] Filesystem-only rename succeeded from " << oldPath << " to " << newPath << std::endl;
+        return;
+    }
+
+    const auto engine = resolveStorageEngine(oldPath);
+    if (!engine) {
+        throw std::filesystem::filesystem_error(
+            "[StorageManager] No storage engine found for DB-backed rename",
+            oldPath,
+            std::make_error_code(std::errc::no_such_file_or_directory));
+    }
+
+    if (entry->isDirectory()) {
+        // Future enhancement: update paths for all nested entries
+        auto children = listDir(oldPath, true);
+        if (!children.empty()) {
+            std::cerr << "[StorageManager] WARN: Directory rename does not update children entries yet" << std::endl;
+        }
+    }
+
+    // Update DB
+    entry->name = newPath.filename();
+    entry->path = engine->resolveAbsolutePathToVaultPath(newPath);
+    entry->abs_path = newPath;
+
+    FSEntryQueries::renameEntry(entry);
+    entry = FSEntryQueries::getFSEntry(newPath);
+
+    // Update Cache
+    std::unique_lock lock(inodeMutex_);
+    pathToEntry_.erase(oldPath);
+    pathToEntry_[newPath] = entry;
+
+    pathToInode_.erase(oldPath);
+    pathToInode_[newPath] = *entry->inode;
+
+    inodeToPath_[*entry->inode] = newPath;
+
+    std::cout << "[StorageManager] DB-aware rename successful from " << oldPath << " to " << newPath << std::endl;
 }

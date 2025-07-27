@@ -165,6 +165,9 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("get_fs_entry_by_id", "SELECT * FROM fs_entry WHERE id = $1");
 
+    conn_->prepare("rename_fs_entry",
+        "UPDATE fs_entry SET name = $2, path = $3, abs_path = $4, updated_at = NOW() WHERE id = $1");
+
     conn_->prepare("get_fs_entry_parent_id", "SELECT parent_id FROM fs_entry WHERE id = $1");
 
     conn_->prepare("get_fs_entry_parent_id_and_path", "SELECT parent_id, path FROM fs_entry WHERE id = $1");

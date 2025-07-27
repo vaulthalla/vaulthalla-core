@@ -100,5 +100,13 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
 }
 
 fs::path StorageEngine::resolveAbsolutePathToVaultPath(const fs::path& path) const {
-    return path.lexically_relative(root);
+    auto normPath = fs::weakly_canonical(path);
+    auto normRoot = fs::weakly_canonical(root);
+
+    if (normPath.string().starts_with(normRoot.string())) {
+        return fs::relative(normPath, normRoot);
+    } else {
+        std::cerr << "[StorageEngine] Path " << normPath << " is not under root " << normRoot << std::endl;
+        return normPath.filename(); // fallback: just use the file name
+    }
 }

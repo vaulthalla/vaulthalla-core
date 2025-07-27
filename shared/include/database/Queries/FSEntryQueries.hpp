@@ -20,6 +20,8 @@ struct FSEntryQueries {
     static std::vector<std::shared_ptr<types::FSEntry>> listDir(const fs::path& absPath, bool recursive = false);
 
     [[nodiscard]] static bool exists(const fs::path& absPath);
+
+    static void renameEntry(const std::shared_ptr<types::FSEntry>& entry);
 };
 
 }

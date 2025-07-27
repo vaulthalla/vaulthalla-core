@@ -150,6 +150,52 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
     fuse_reply_entry(req, &e);
 }
 
+void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent, const char* name, mode_t mode, struct fuse_file_info* fi) {
+    std::cout << "[FUSE] create called. parent: " << parent << ", name: " << name << ", mode: " << std::oct << mode << std::endl;
+
+    if (!name || strlen(name) == 0) {
+        fuse_reply_err(req, EINVAL);
+        return;
+    }
+
+    try {
+        std::cout << "[FUSE] Resolving parent path" << std::endl;
+        const fs::path parentPath = storageManager_->resolvePathFromInode(parent);
+        const fs::path fullPath = parentPath / name;
+
+        std::cout << "[FUSE] Full path for new file: " << fullPath << std::endl;
+
+        // Check if file already exists
+        if (storageManager_->entryExists(fullPath)) {
+            std::cout << "[FUSE] File already exists" << std::endl;
+            fuse_reply_err(req, EEXIST);
+            return;
+        }
+
+        std::cout << "[FUSE] Creating file at path: " << fullPath << std::endl;
+
+        // Create the entry in the storage (this may involve inserting into DB or filesystem layer)
+        const auto newEntry = storageManager_->createFile(fullPath, mode, getuid(), getgid());
+        const auto st = statFromEntry(newEntry, *newEntry->inode);
+
+        // Fill response
+        fuse_entry_param e{};
+        e.ino = *newEntry->inode;
+        e.attr = st;
+        e.attr_timeout = 60.0;
+        e.entry_timeout = 60.0;
+
+        fi->fh = static_cast<uint64_t>(*newEntry->inode); // Optional: set file handle to inode
+        fi->direct_io = 0;  // You can change this if you want to bypass kernel caching
+        fi->keep_cache = 0;
+
+        fuse_reply_create(req, &e, fi);
+    } catch (const std::exception& ex) {
+        std::cerr << "[FUSE] create failed: " << ex.what() << "\n";
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
     std::cout << "[FUSE] open called for inode: " << ino << std::endl;
     try {
@@ -267,6 +313,45 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
     }
 }
 
+void FUSEBridge::rename(const fuse_req_t& req,
+                        fuse_ino_t parent,
+                        const char* name,
+                        fuse_ino_t newparent,
+                        const char* newname,
+                        unsigned int flags) const {
+    std::cout << "[FUSE] rename called: " << name << " → " << newname << std::endl;
+
+    try {
+        fs::path fromPath = storageManager_->resolvePathFromInode(parent) / name;
+        fs::path toPath = storageManager_->resolvePathFromInode(newparent) / newname;
+
+        // Flags handling (RENAME_NOREPLACE = 1, RENAME_EXCHANGE = 2)
+        if ((flags & RENAME_NOREPLACE) && storageManager_->entryExists(toPath)) {
+            fuse_reply_err(req, EEXIST);
+            return;
+        }
+
+        // Confirm source exists
+        if (!storageManager_->entryExists(fromPath)) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        try {
+            storageManager_->renamePath(fromPath, toPath);
+        } catch (const std::filesystem::filesystem_error& fsErr) {
+            std::cerr << "[FUSE] rename failed: " << fsErr.what() << " for path: " << fromPath << " → " << toPath << std::endl;
+            fuse_reply_err(req, EIO);
+            return;
+        }
+
+        fuse_reply_err(req, 0);  // Success
+    } catch (const std::exception& ex) {
+        std::cerr << "[FUSE] rename failed: " << ex.what() << std::endl;
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
     storageManager_->decrementInodeRef(ino, nlookup); // build this
     fuse_reply_none(req); // no return value
@@ -282,6 +367,8 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.readdir = FUSE_DISPATCH(readdir);
     ops.lookup = FUSE_DISPATCH(lookup);
     ops.mkdir = FUSE_DISPATCH(mkdir);
+    ops.create = FUSE_DISPATCH(create);
+    ops.rename = FUSE_DISPATCH(rename);
     ops.open = FUSE_DISPATCH(open);
     ops.read = FUSE_DISPATCH(read);
     ops.forget = FUSE_DISPATCH(forget);

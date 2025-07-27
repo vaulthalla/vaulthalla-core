@@ -37,6 +37,15 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
     });
 }
 
+void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
+    Transactions::exec("FSEntryQueries::renameEntry", [&](pqxx::work& txn) {
+        pqxx::params p{entry->id, entry->name,
+                       to_utf8_string(entry->path.u8string()),
+                       to_utf8_string(entry->abs_path.u8string())};
+        txn.exec_prepared("rename_fs_entry", p);
+    });
+}
+
 std::vector<std::shared_ptr<FSEntry>> FSEntryQueries::listDir(const fs::path& absPath, bool recursive) {
     return Transactions::exec("FSEntryQueries::listDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(to_utf8_string(absPath.u8string()), recursive);

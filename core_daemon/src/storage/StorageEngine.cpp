@@ -11,6 +11,7 @@
 #include "util/files.hpp"
 #include "engine/VaultEncryptionManager.hpp"
 #include "protocols/FUSECmdClient.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <fstream>
 #include <utility>
@@ -19,12 +20,16 @@ using namespace vh::types;
 using namespace vh::database;
 using namespace vh::encryption;
 using namespace vh::concurrency;
+using namespace vh::config;
 namespace fs = std::filesystem;
 
 namespace vh::storage {
 
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
-    : StorageEngineBase(vault) {}
+    : StorageEngineBase(vault) {
+    root = ConfigRegistry::get().fuse.root_mount_path / root;
+    cacheRoot = ConfigRegistry::get().fuse.root_mount_path / cacheRoot;
+}
 
 void StorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
     const auto absPath = getAbsolutePath(relPath);

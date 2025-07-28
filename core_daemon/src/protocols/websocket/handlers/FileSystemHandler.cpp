@@ -62,11 +62,11 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
 
-        session.getUploadHandler()->finishUpload();
+        session.getUploadHandler()->finishUpload(vaultId);
 
         UploadContext context;
 
-        storageManager_->finishUpload(vaultId, session.getAuthenticatedUser()->id, path);
+        // storageManager_->finishUpload(vaultId, session.getAuthenticatedUser()->id, path);
 
         const json data = {{"path", path}};
 

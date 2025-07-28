@@ -18,6 +18,7 @@ public:
     static void mkVault(const fs::path& absPath, unsigned int vaultId, mode_t mode = 0755);
     static void mkCache(const fs::path& absPath, mode_t mode = 0755);
     static bool exists(const fs::path& absPath);
+    static void rename(const fs::path& oldPath, const fs::path& newPath);
 
 private:
     inline static std::mutex mutex_;

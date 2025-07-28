@@ -3,6 +3,8 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "types/User.hpp"
 #include "types/Directory.hpp"
+#include "util/files.hpp"
+#include "protocols/FUSECmdClient.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -80,11 +82,10 @@ void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {
     buffer.consume(size);
 }
 
-void UploadHandler::finishUpload() {
+void UploadHandler::finishUpload(const unsigned int vaultId) {
     if (!currentUpload_) throw std::runtime_error("No upload in progress");
 
     auto& upload = *currentUpload_;
-    upload.file.close();
 
     if (upload.bytesReceived != upload.expectedSize) {
         std::filesystem::remove(upload.tmpPath);
@@ -92,6 +93,9 @@ void UploadHandler::finishUpload() {
     }
 
     std::filesystem::rename(upload.tmpPath, upload.finalPath);
+
+    upload.file.close();
+
     currentUpload_.reset();
 }
 

@@ -14,6 +14,8 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
     if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
 
     return Transactions::exec("FileQueries::addFile", [&](pqxx::work& txn) {
+        if (file->inode) txn.exec_prepared("delete_fs_entry_by_inode", file->inode);
+
         pqxx::params p;
         p.append(file->vault_id);
         p.append(file->parent_id);

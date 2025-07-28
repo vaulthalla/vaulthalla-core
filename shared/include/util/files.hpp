@@ -21,6 +21,7 @@ inline std::vector<uint8_t> readFileToVector(const std::filesystem::path& path) 
     std::vector<uint8_t> buffer(size);
     if (!in.read(reinterpret_cast<char*>(buffer.data()), size))
         throw std::runtime_error("Failed to read file: " + path.string());
+    in.close();
 
     return buffer;
 }
@@ -35,6 +36,7 @@ inline std::string readFileToString(const std::filesystem::path& path) {
     std::string buffer(size, '\0');
     if (!in.read(buffer.data(), size))
         throw std::runtime_error("Failed to read file: " + path.string());
+    in.close();
 
     return buffer;
 }

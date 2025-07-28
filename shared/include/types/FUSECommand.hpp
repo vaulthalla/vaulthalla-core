@@ -8,13 +8,15 @@ namespace vh::types::fuse {
 
 enum class CommandType {
     SYNC,
-    REGISTER
+    REGISTER,
+    RENAME
 };
 
 struct FUSECommand {
     CommandType type = CommandType::SYNC;
     unsigned int vaultId;
     std::optional<unsigned int> fsEntryId;
+    std::optional<std::filesystem::path> from, to;
 
     static FUSECommand fromJson(const nlohmann::json& j);
     static CommandType commandTypeFromString(const std::string& s);

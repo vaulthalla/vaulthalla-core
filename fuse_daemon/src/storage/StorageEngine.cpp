@@ -5,6 +5,7 @@
 #include "util/Magic.hpp"
 #include "util/files.hpp"
 #include "storage/Filesystem.hpp"
+#include "util/fsPath.hpp"
 
 #include <iostream>
 #include <algorithm>
@@ -100,13 +101,24 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
 }
 
 fs::path StorageEngine::resolveAbsolutePathToVaultPath(const fs::path& path) const {
-    auto normPath = fs::weakly_canonical(path);
-    auto normRoot = fs::weakly_canonical(root);
+    try {
+        auto normRoot = fs::weakly_canonical(config::ConfigRegistry::get().fuse.root_mount_path / root);
 
-    if (normPath.string().starts_with(normRoot.string())) {
-        return fs::relative(normPath, normRoot);
-    } else {
+        // If it's already relative to vault root (e.g., starts with /users/)
+        if (path.string().starts_with(makeAbsolute(root).string())) {
+            return makeAbsolute(fs::relative(path, makeAbsolute(root).string()));
+        }
+
+        auto normPath = fs::weakly_canonical(path);
+        auto mismatch = std::mismatch(normRoot.begin(), normRoot.end(), normPath.begin());
+        if (mismatch.first == normRoot.end()) {
+            return makeAbsolute(fs::relative(normPath, normRoot));
+        }
+
         std::cerr << "[StorageEngine] Path " << normPath << " is not under root " << normRoot << std::endl;
-        return normPath.filename(); // fallback: just use the file name
+        return normPath.filename();
+    } catch (...) {
+        std::cerr << "[StorageEngine] Exception in resolveAbsolutePathToVaultPath" << std::endl;
+        return path.filename();
     }
 }

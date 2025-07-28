@@ -15,6 +15,8 @@ void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& 
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
 
     Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
+        if (directory->inode) txn.exec_prepared("delete_fs_entry_by_inode", directory->inode);
+
         pqxx::params p;
         p.append(directory->vault_id);
         p.append(directory->parent_id);

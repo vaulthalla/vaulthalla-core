@@ -8,6 +8,9 @@
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
 #include "util/fsPath.hpp"
+#include "util/files.hpp"
+#include "config/ConfigRegistry.hpp"
+#include "engine/VaultEncryptionManager.hpp"
 
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
@@ -26,11 +29,13 @@ using namespace vh::database;
 using namespace vh::fuse;
 using namespace vh::types;
 using namespace vh::storage;
+using namespace vh::config;
 
 FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager) {}
 
 void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
+    std::cout << "[getattr] Called for inode: " << ino << std::endl;
     try {
         if (ino == FUSE_ROOT_ID) {
             const auto entry = storageManager_->getEntry("/");
@@ -80,10 +85,15 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
 }
 
 void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
+    std::cout << "[FUSE] readdir called for inode: " << ino << ", size: " << size << ", offset: " << off << std::endl;
     (void)fi;
 
     const auto path = storageManager_->resolvePathFromInode(ino);
     auto entries = storageManager_->listDir(path, false);
+
+    for (const auto& entry : entries) {
+        std::cout << "[FUSE] Entry: " << entry->name << ", inode: " << *entry->inode << std::endl;
+    }
 
     std::vector<char> buf(size);
     size_t buf_used = 0;
@@ -123,6 +133,7 @@ void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off
 }
 
 void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const {
+    std::cout << "[FUSE] lookup called for parent: " << parent << ", name: " << name << std::endl;
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
         return;
@@ -196,13 +207,32 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent, const char* na
     }
 }
 
-void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
+void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) {
     std::cout << "[FUSE] open called for inode: " << ino << std::endl;
+
+    {
+        std::scoped_lock lock(openHandleMutex_);
+        openHandleCounts_[ino]++;
+    }
+
     try {
         fs::path path = storageManager_->resolvePathFromInode(ino);
-        if (!storageManager_->entryExists(path)) fuse_reply_err(req, ENOENT);
-        fuse_reply_open(req, fi);
+        const auto diskPath = ConfigRegistry::get().fuse.root_mount_path / stripLeadingSlash(path);
+
+        int fd = ::open(diskPath.c_str(), O_RDWR);
+        if (fd < 0) {
+            std::cerr << "Failed to open file: " << path << " (" << strerror(errno) << ")" << std::endl;
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        std::cout << "[FUSE] open() got fd: " << fd << std::endl;
+
+        fi->fh = static_cast<uint64_t>(fd);  // REQUIRED: set the file handle
+        fuse_reply_open(req, fi);            // Only call this if fi is valid
+
     } catch (...) {
+        std::cerr << "Unhandled exception in open()" << std::endl;
         fuse_reply_err(req, EIO);
     }
 }
@@ -228,6 +258,18 @@ void FUSEBridge::read(const fuse_req_t& req, const fuse_ino_t& ino, const size_t
         }
     } catch (...) {
         fuse_reply_err(req, EIO);
+    }
+}
+
+void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf, size_t size,
+                       off_t off, struct fuse_file_info* fi) {
+    std::cout << "[FUSE] write called for inode: " << ino << " offset: " << off << " size: " << size << std::endl;
+
+    ssize_t res = pwrite(fi->fh, buf, size, off);
+    if (res == -1) {
+        fuse_reply_err(req, errno);
+    } else {
+        fuse_reply_write(req, res);
     }
 }
 
@@ -283,7 +325,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(*dir->inode, dir);
+            storageManager_->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
 
             try {
@@ -322,8 +364,8 @@ void FUSEBridge::rename(const fuse_req_t& req,
     std::cout << "[FUSE] rename called: " << name << " → " << newname << std::endl;
 
     try {
-        fs::path fromPath = storageManager_->resolvePathFromInode(parent) / name;
-        fs::path toPath = storageManager_->resolvePathFromInode(newparent) / newname;
+        const auto fromPath = storageManager_->resolvePathFromInode(parent) / name;
+        const auto toPath = storageManager_->resolvePathFromInode(newparent) / newname;
 
         // Flags handling (RENAME_NOREPLACE = 1, RENAME_EXCHANGE = 2)
         if ((flags & RENAME_NOREPLACE) && storageManager_->entryExists(toPath)) {
@@ -353,12 +395,92 @@ void FUSEBridge::rename(const fuse_req_t& req,
 }
 
 void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
-    storageManager_->decrementInodeRef(ino, nlookup); // build this
+    storageManager_->decrementInodeRef(ino, nlookup);
     fuse_reply_none(req); // no return value
 }
 
 void FUSEBridge::access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const {
     fuse_reply_err(req, 0); // Access checks are not implemented, always allow
+}
+
+void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const {
+    std::cout << "[FUSE] flush called for inode: " << ino << std::endl;
+
+    // This can be a no-op unless you want to sync(2) or call fsync(fd)
+    // You usually don’t finalize here since flush may be called multiple times per FD
+
+    fuse_reply_err(req, 0);
+}
+
+void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) {
+    std::cout << "[FUSE] release called for inode: " << ino << std::endl;
+
+    int fd = static_cast<int>(fi->fh);
+    if (fd < 0) {
+        std::cerr << "[release] Invalid file handle: " << fd << std::endl;
+        fuse_reply_err(req, EBADF);
+        return;
+    }
+
+    if (const auto rename = storageManager_->getPendingRename(ino)) {
+        std::optional<std::string> iv_b64;
+        const auto oldAbsPath = ConfigRegistry::get().fuse.root_mount_path / stripLeadingSlash(rename->oldPath);
+        const auto newAbsPath = ConfigRegistry::get().fuse.root_mount_path / stripLeadingSlash(rename->newPath);
+        std::cout << "[StorageManager] Processing pending rename: " << oldAbsPath << " → " << newAbsPath << std::endl;
+
+        if (const auto engine = storageManager_->resolveStorageEngine(rename->oldPath)) {
+            std::cout << "[StorageManager] Renaming on disk with encryption: " << oldAbsPath << " → " << newAbsPath << std::endl;
+
+            struct stat st{};
+            if (fstat(fd, &st) == -1) {
+                std::cerr << "[release] fstat failed: " << strerror(errno) << std::endl;
+                ::close(fd);
+                fuse_reply_err(req, errno);
+                return;
+            }
+
+            std::vector<uint8_t> buffer(st.st_size);
+            if (pread(fd, buffer.data(), buffer.size(), 0) != static_cast<ssize_t>(buffer.size())) {
+                std::cerr << "[release] Failed to read file via fd" << std::endl;
+                ::close(fd);
+                fuse_reply_err(req, EIO);
+                return;
+            }
+
+            std::string iv;
+            const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv);
+            iv_b64 = iv;
+
+            util::writeFile(newAbsPath, ciphertext);
+            std::filesystem::remove(oldAbsPath);
+        } else {
+            std::cout << "[StorageManager] Renaming on disk (no encryption): " << oldAbsPath << " → " << newAbsPath << std::endl;
+            std::error_code ec;
+            std::filesystem::rename(oldAbsPath, newAbsPath, ec);
+            if (ec) {
+                std::cerr << "[StorageManager] Failed to rename on disk: " << ec.message() << std::endl;
+                ::close(fd);
+                fuse_reply_err(req, ec.value());
+                return;
+            }
+        }
+
+        storageManager_->updatePaths(rename->oldPath, rename->newPath, iv_b64);
+    }
+
+    // Always close fd after finished with it
+    if (::close(fd) < 0) {
+        std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;
+    }
+
+    {
+        std::scoped_lock lock(openHandleMutex_);
+        if (--openHandleCounts_[ino] == 0) {
+            openHandleCounts_.erase(ino);
+        }
+    }
+
+    fuse_reply_err(req, 0);
 }
 
 fuse_lowlevel_ops FUSEBridge::getOperations() const {
@@ -373,6 +495,8 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.read = FUSE_DISPATCH(read);
     ops.forget = FUSE_DISPATCH(forget);
     ops.access = FUSE_DISPATCH(access);
+    ops.flush = FUSE_DISPATCH(flush);
+    ops.release = FUSE_DISPATCH(release);
     return ops;
 }
 

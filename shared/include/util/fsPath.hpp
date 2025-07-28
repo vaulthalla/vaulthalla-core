@@ -18,12 +18,23 @@ inline fs::path common_path_prefix(const fs::path& a, const fs::path& b) {
     return result;
 }
 
-inline fs::path makeAbsolute(const fs::path& absPath) {
-    if (absPath.empty() || absPath.string().front() == '/') return absPath;
-    return fs::path("/") / absPath;
+inline fs::path makeAbsolute(const fs::path& path) {
+    if (path.empty()) return "/";
+    if (path.is_absolute()) return path.lexically_normal();
+    return fs::path("/") / path.lexically_normal();
 }
 
-inline fs::path resolveParent(const fs::path& absPath) {
-    if (absPath.empty()) return {"/"};
-    return absPath.has_parent_path() ? absPath.parent_path() : fs::path("/");
+inline fs::path resolveParent(const fs::path& path) {
+    if (path.empty()) return "/";
+    auto norm = path.lexically_normal();
+    if (norm == "/") return "/";
+    return norm.parent_path().empty() ? "/" : norm.parent_path();
+}
+
+inline fs::path stripLeadingSlash(const fs::path& path) {
+    if (path.empty()) return "/";
+    auto norm = path.lexically_normal();
+    if (norm.empty() || norm == "/") return "/";
+    if (norm.string().front() == '/') return { norm.string().substr(1) };
+    return norm;
 }

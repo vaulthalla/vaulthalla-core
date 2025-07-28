@@ -12,14 +12,12 @@ CREATE TABLE fs_entry
 
     -- FUSE compatibility
     inode            BIGINT UNIQUE,           -- bidirectional lookup and faster indexing
-    abs_path         TEXT         NOT NULL,   -- true filesystem path (e.g. /mnt/vaulthalla/cloud/test_vault_r2)
+    abs_path         TEXT   UNIQUE NOT NULL,   -- true filesystem path (e.g. /mnt/vaulthalla/cloud/test_vault_r2)
     mode             INTEGER   DEFAULT 0755,  -- Emulate POSIX permissions
     owner_uid        INTEGER,                 -- Linux UID for access checks
     group_gid        INTEGER,                 -- Linux GID for group access checks
     is_hidden        BOOLEAN   DEFAULT FALSE,
-    is_system        BOOLEAN   DEFAULT FALSE, -- Mark internal-only entries (e.g. keys)
-
-    UNIQUE (vault_id, parent_id, name)
+    is_system        BOOLEAN   DEFAULT FALSE -- Mark internal-only entries (e.g. keys)
 );
 
 CREATE TABLE directories

@@ -20,6 +20,11 @@ namespace vh::storage {
 
 struct StorageEngine;
 
+struct PendingRename {
+    std::filesystem::path oldPath;
+    std::filesystem::path newPath;
+};
+
 class StorageManager {
 public:
     StorageManager();
@@ -33,8 +38,6 @@ public:
     fuse_ino_t assignInode(const fs::path& path);
 
     fuse_ino_t getOrAssignInode(const fs::path& path);
-
-    fs::path resolvePathFromInode(fuse_ino_t ino) const;
 
     fuse_ino_t resolveInode(const fs::path& absPath);
 
@@ -51,7 +54,7 @@ public:
     std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
 
     // -- Entry Cache Management --
-    void cacheEntry(fuse_ino_t ino, std::shared_ptr<types::FSEntry> entry);
+    void cacheEntry(const std::shared_ptr<types::FSEntry>& entry);
     [[nodiscard]] bool entryExists(const fs::path& absPath) const;
     std::shared_ptr<types::FSEntry> getEntryFromInode(fuse_ino_t ino) const;
     void evictEntry(fuse_ino_t ino);
@@ -64,6 +67,14 @@ public:
 
     void renamePath(const fs::path& oldPath, const fs::path& newPath);
 
+    void queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath);
+
+    std::optional<PendingRename> getPendingRename(fuse_ino_t ino) const;
+
+    void updatePaths(const fs::path& oldPath, const fs::path& newPath, const std::optional<std::string>& iv_b64 = std::nullopt);
+
+    fs::path resolvePathFromInode(fuse_ino_t ino);
+
 private:
     mutable std::mutex mutex_;
     std::pmr::unordered_map<std::string, std::shared_ptr<StorageEngine>> engines_;
@@ -74,6 +85,9 @@ private:
     std::unordered_map<fuse_ino_t, std::shared_ptr<types::FSEntry>> inodeToEntry_;
     std::pmr::unordered_map<fs::path, std::shared_ptr<types::FSEntry>> pathToEntry_;
     mutable std::shared_mutex inodeMutex_;
+
+    mutable std::mutex renameQueueMutex_;
+    std::unordered_map<fuse_ino_t, PendingRename> renameRequests_;
 };
 
 }

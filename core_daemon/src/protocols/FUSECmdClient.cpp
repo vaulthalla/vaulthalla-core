@@ -31,6 +31,8 @@ bool sendCommand(const types::fuse::FUSECommand& cmd) {
                                     {"vaultId", cmd.vaultId}};
 
     if (cmd.fsEntryId) jsonCmd["fsEntryId"] = cmd.fsEntryId;
+    if (cmd.from) jsonCmd["from"] = *cmd.from;
+    if (cmd.to) jsonCmd["to"] = *cmd.to;
 
     const std::string payload = jsonCmd.dump();
     if (write(sock, payload.c_str(), payload.size()) == -1) {
@@ -58,6 +60,16 @@ void sendRegisterCommand(const unsigned int vaultId, const unsigned int fsEntryI
     cmd.fsEntryId = std::make_optional(fsEntryId);
 
     if (!sendCommand(cmd)) std::cerr << "[-] Failed to send register command for entry " << fsEntryId << std::endl;
+}
+
+void sendRenameCommand(const unsigned int vaultId, const std::filesystem::path& from, const std::filesystem::path& to) {
+    types::fuse::FUSECommand cmd;
+    cmd.type = types::fuse::CommandType::RENAME;
+    cmd.vaultId = vaultId;
+    cmd.from = from;
+    cmd.to = to;
+
+    if (!sendCommand(cmd)) std::cerr << "[-] Failed to send rename command from " << from << " to " << to << std::endl;
 }
 
 } // namespace vh::storage

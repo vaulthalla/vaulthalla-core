@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <fuse3/fuse_lowlevel.h>
 #include <memory>
+#include <mutex>
+#include <unordered_map>
 
 namespace vh::types {
 struct FSEntry;
@@ -12,10 +14,6 @@ struct FSEntry;
 
 namespace vh::storage {
 class StorageManager;
-}
-
-namespace vh::shared::bridge {
-class RemoteFSProxy;
 }
 
 namespace vh::fuse {
@@ -30,13 +28,14 @@ public:
 
     void lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const;
 
-    void open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const;
+    void open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi);
 
     void read(const fuse_req_t& req, const fuse_ino_t& ino, size_t size, off_t off, fuse_file_info* fi) const;
 
     void forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const;
 
-    void write(const char* path, const char* buf, size_t size, off_t offset, fuse_file_info* fi) const;
+    void write(fuse_req_t req, fuse_ino_t ino, const char* buf, size_t size,
+                       off_t off, struct fuse_file_info* fi);
 
     void create(const fuse_req_t& req, fuse_ino_t parent, const char* name,
                         mode_t mode, struct fuse_file_info* fi);
@@ -62,11 +61,11 @@ public:
 
     void chown(const char* path, uid_t uid, gid_t gid, fuse_file_info* fi) const;
 
-    void flush(const char* path, fuse_file_info* fi) const;
+    void flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const;
 
     void fsync(const char* path, int isdatasync, fuse_file_info* fi) const;
 
-    void release(const char* path, fuse_file_info* fi) const;
+    void release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi);
 
     void access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const;
 
@@ -76,6 +75,9 @@ public:
 
 private:
     std::shared_ptr<storage::StorageManager> storageManager_;
+    std::unordered_map<fuse_ino_t, int> openHandleCounts_;
+    std::mutex openHandleMutex_;
+
 
     struct stat statFromEntry(const std::shared_ptr<types::FSEntry>& entry, const fuse_ino_t& ino) const;
 };

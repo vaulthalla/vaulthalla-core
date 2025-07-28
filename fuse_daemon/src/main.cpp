@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
 
     router->setCommandHandler([&syncController, &storageManager](const FUSECommand& cmd) {
         switch (cmd.type) {
-        case CommandType::SYNC: syncController->runNow(cmd.vaultId);
+        case CommandType::SYNC: // syncController->runNow(cmd.vaultId);
             break;
         case CommandType::REGISTER: if (!cmd.fsEntryId) {
                 std::cerr << "[-] REGISTER command missing fsEntryId" << std::endl;
@@ -70,6 +70,14 @@ int main(int argc, char* argv[]) {
             }
             storageManager->registerEntry(*cmd.fsEntryId);
             break;
+        case CommandType::RENAME: {
+            if (!cmd.from || !cmd.to) {
+                std::cerr << "[-] RENAME command missing from/to paths" << std::endl;
+                return;
+            }
+            Filesystem::rename(*cmd.from, *cmd.to);
+            break;
+        }
         default: std::cerr << "[-] Unsupported command type: " << static_cast<int>(cmd.type) << std::endl;
             break;
         }

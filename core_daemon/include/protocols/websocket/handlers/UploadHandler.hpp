@@ -34,7 +34,7 @@ public:
 
     void handleBinaryFrame(boost::beast::flat_buffer& buffer);
 
-    void finishUpload();
+    void finishUpload(unsigned int vaultId);
 
     bool uploadInProgress() const { return currentUpload_.has_value(); }
 

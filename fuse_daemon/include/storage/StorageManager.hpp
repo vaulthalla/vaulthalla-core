@@ -71,7 +71,7 @@ public:
 
     std::optional<PendingRename> getPendingRename(fuse_ino_t ino) const;
 
-    void updatePaths(const fs::path& oldPath, const fs::path& newPath, const std::optional<std::string>& iv_b64 = std::nullopt);
+    void updatePaths(const fs::path& oldPath, const fs::path& newPath);
 
     fs::path resolvePathFromInode(fuse_ino_t ino);
 

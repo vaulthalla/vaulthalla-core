@@ -1,4 +1,4 @@
-#include "../../include/engine/VaultEncryptionManager.hpp"
+#include "engine/VaultEncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
 
 #include <sodium.h>

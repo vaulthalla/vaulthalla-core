@@ -11,8 +11,10 @@ CREATE TABLE fs_entry
     path             TEXT         NOT NULL,   -- Full path for easy access
 
     -- FUSE compatibility
+    uuid             UUID DEFAULT gen_random_uuid(), -- Unique identifier for FUSE operations
     inode            BIGINT UNIQUE,           -- bidirectional lookup and faster indexing
     abs_path         TEXT   UNIQUE NOT NULL,   -- true filesystem path (e.g. /mnt/vaulthalla/cloud/test_vault_r2)
+    backing_path     TEXT   UNIQUE NOT NULL,   -- path to the backing store (e.g. /var/lib/vaulthalla/cloud/test_vault_r2/backing_store)
     mode             INTEGER   DEFAULT 0755,  -- Emulate POSIX permissions
     owner_uid        INTEGER,                 -- Linux UID for access checks
     group_gid        INTEGER,                 -- Linux GID for group access checks

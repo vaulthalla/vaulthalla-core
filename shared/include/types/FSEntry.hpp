@@ -26,7 +26,7 @@ struct FSEntry {
     std::optional<unsigned int> parent_id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
     std::optional<ino_t> inode{};
     std::optional<mode_t> mode{};
-    std::filesystem::path path{}, abs_path{};
+    std::filesystem::path path{}, abs_path{}, backing_path{};
     bool is_hidden{}, is_system{};
     std::time_t created_at{}, updated_at{};
 

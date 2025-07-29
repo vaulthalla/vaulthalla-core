@@ -25,6 +25,7 @@ void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& 
         p.append(directory->last_modified_by);
         p.append(to_utf8_string(directory->path.u8string()));
         p.append(to_utf8_string(directory->abs_path.u8string()));
+        p.append(to_utf8_string(directory->backing_path.u8string()));
         p.append(directory->inode);
         p.append(directory->mode);
         p.append(directory->owner_uid);

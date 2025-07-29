@@ -30,7 +30,7 @@ public:
 
     void open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi);
 
-    void read(const fuse_req_t& req, const fuse_ino_t& ino, size_t size, off_t off, fuse_file_info* fi) const;
+    void read(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const;
 
     void forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const;
 

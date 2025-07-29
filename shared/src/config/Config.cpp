@@ -99,6 +99,7 @@ void to_json(nlohmann::json& j, const Config& c) {
         {"fuse", {
              {"enabled", c.fuse.enabled},
              {"root_mount_path", c.fuse.root_mount_path},
+            {"backing_path", c.fuse.backing_path},
              {"mount_per_user", c.fuse.mount_per_user},
              {"fuse_timeout_seconds", c.fuse.fuse_timeout_seconds},
              {"allow_other", c.fuse.allow_other}
@@ -185,6 +186,7 @@ void from_json(const nlohmann::json& j, Config& c) {
 
     c.fuse.enabled = j.at("fuse").at("enabled").get<bool>();
     c.fuse.root_mount_path = j.at("fuse").at("root_mount_path").get<std::string>();
+    c.fuse.backing_path = j.at("fuse").at("backing_path").get<std::string>();
     c.fuse.mount_per_user = j.at("fuse").at("mount_per_user").get<bool>();
     c.fuse.fuse_timeout_seconds = j.at("fuse").at("fuse_timeout_seconds").get<int>();
     c.fuse.allow_other = j.at("fuse").at("allow_other").get<bool>();

@@ -14,11 +14,12 @@ server:
 
 # === 🪓 FUSE MOUNT SETTINGS ===
 fuse:
-  enabled: true                     # Mounting enabled
-  root_mount_path: /mnt/vaulthalla  # Base mountpoint for all volumes
-  mount_per_user: true              # Isolate each user's mount
-  fuse_timeout_seconds: 60          # Idle timeout for auto-unmount
-  allow_other: true                 # Allow access by non-calling users (e.g. Nextcloud)
+  enabled: true                      # Mounting enabled
+  root_mount_path: /mnt/vaulthalla   # Base mountpoint for all volumes
+  backing_path: /var/lib/vaulthalla  # Backing store for FUSE mounts
+  mount_per_user: true               # Isolate each user's mount
+  fuse_timeout_seconds: 60           # Idle timeout for auto-unmount
+  allow_other: true                  # Allow access by non-calling users (e.g. Nextcloud)
 
 # === Caching & Previews ===
 caching:

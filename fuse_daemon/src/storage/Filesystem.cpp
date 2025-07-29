@@ -64,6 +64,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = path;
+            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -114,6 +115,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = makeAbsolute(path);
+            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -162,6 +164,7 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->path = path;
             dir->abs_path = path;
+            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;

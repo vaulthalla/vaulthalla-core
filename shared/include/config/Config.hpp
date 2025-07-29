@@ -19,6 +19,7 @@ struct ServerConfig {
 struct FuseConfig {
     bool enabled = true;
     std::filesystem::path root_mount_path = "/mnt/vaulthalla";
+    std::filesystem::path backing_path = "/var/lib/vaulthalla";
     bool mount_per_user = true;
     int fuse_timeout_seconds = 60;
     bool allow_other = true;

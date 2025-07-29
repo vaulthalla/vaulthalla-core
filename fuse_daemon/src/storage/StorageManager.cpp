@@ -1,6 +1,7 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
+#include "engine/VaultEncryptionManager.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
@@ -12,10 +13,13 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "util/fsPath.hpp"
+#include "util/files.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <thread>
+
+#include "util/Magic.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -296,13 +300,15 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
 
     std::cout << "[StorageManager] Creating file at path: " << path << std::endl;
 
-    const fs::path fullDiskPath = ConfigRegistry::get().fuse.root_mount_path / path;
+    const fs::path fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
     const auto file = std::make_shared<File>();
     file->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
+    file->vault_id = engine->vault->id;
     file->name = path.filename();
     file->path = engine->resolveAbsolutePathToVaultPath(path);
     file->abs_path = path;
+    file->backing_path = fullDiskPath;
     file->mode = mode;
     file->owner_uid = uid;
     file->group_gid = gid;
@@ -350,26 +356,38 @@ void StorageManager::renamePath(const fs::path& oldPath, const fs::path& newPath
     std::cout << "[StorageManager] Rename scheduled successfully for inode " << *entry->inode << std::endl;
 }
 
-void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPath, const std::optional<std::string>& iv_b64) {
+void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPath) {
     std::cout << "[StorageManager] Applying DB and cache updates: " << oldPath << " → " << newPath << std::endl;
 
     const auto entry = getEntry(oldPath);
-    const auto engine = resolveStorageEngine(newPath);  // use newPath here
+    const auto engine = resolveStorageEngine(newPath);
 
-    if (!entry || !engine) {
-        std::cerr << "[StorageManager] updatePaths failed: entry or engine missing." << std::endl;
-        return;
-    }
+    const auto oldAbsPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(oldPath);
+    const auto newAbsPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(newPath);
+
+    std::cout << "[StorageManager] Processing pending rename: " << oldAbsPath << " → " << newAbsPath << std::endl;
+
+    std::cout << "[StorageManager] Renaming on disk with encryption: " << oldAbsPath << " → " << newAbsPath << std::endl;
+
+    const auto buffer = util::readFileToVector(oldAbsPath);
+
+    std::string iv_b64;
+    const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
+
+    util::writeFile(newAbsPath, ciphertext);
+    std::filesystem::remove(oldAbsPath);
 
     entry->name = newPath.filename();
     entry->path = engine->resolveAbsolutePathToVaultPath(newPath);
     entry->abs_path = newPath;
+    entry->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(newPath);
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
 
     if (entry->isDirectory()) DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));
     else {
         const auto file = std::static_pointer_cast<File>(entry);
-         file->encryption_iv = *iv_b64;
+         file->encryption_iv = iv_b64;
+         file->size_bytes = std::filesystem::file_size(newAbsPath);
         FileQueries::upsertFile(file);
     }
 

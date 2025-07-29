@@ -40,6 +40,7 @@ struct convert<FuseConfig> {
         Node node;
         node["enabled"] = rhs.enabled;
         node["root_mount_path"] = rhs.root_mount_path;
+        node["backing_path"] = rhs.backing_path;
         node["mount_per_user"] = rhs.mount_per_user;
         node["fuse_timeout_seconds"] = rhs.fuse_timeout_seconds;
         node["allow_other"] = rhs.allow_other;
@@ -50,6 +51,7 @@ struct convert<FuseConfig> {
         if (!node.IsMap()) return false;
         rhs.enabled = node["enabled"].as<bool>(true);
         rhs.root_mount_path = node["root_mount_path"].as<std::string>("/mnt/vaulthalla");
+        rhs.backing_path = node["backing_path"].as<std::string>("/var/lib/vaulthalla");
         rhs.mount_per_user = node["mount_per_user"].as<bool>(true);
         rhs.fuse_timeout_seconds = node["fuse_timeout_seconds"].as<int>(60);
         rhs.allow_other = node["allow_other"].as<bool>(true);

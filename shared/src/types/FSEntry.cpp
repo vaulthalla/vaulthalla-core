@@ -19,6 +19,7 @@ FSEntry::FSEntry(const pqxx::row& row)
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
       abs_path(std::filesystem::path(row["abs_path"].as<std::string>())),
+      backing_path(std::filesystem::path(row["backing_path"].as<std::string>())),
       is_hidden(row["is_hidden"].as<bool>()),
       is_system(row["is_system"].as<bool>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
@@ -66,7 +67,8 @@ void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
         {"created_at", util::timestampToString(entry.created_at)},
         {"updated_at", util::timestampToString(entry.updated_at)},
         {"path", entry.path.string()},
-        {"abs_path", entry.abs_path.string()}
+        {"abs_path", entry.abs_path.string()},
+        {"backing_path", entry.backing_path.string()}
     };
 
     if (entry.parent_id) j["parent_id"] = entry.parent_id;

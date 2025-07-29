@@ -1,5 +1,5 @@
 #include "types/APIKey.hpp"
-#include "cloud/S3Provider.hpp"
+#include "storage/cloud/S3Provider.hpp"
 #include "util/imageUtil.hpp"
 #include "types/FSEntry.hpp"
 #include "util/u8.hpp"
@@ -8,6 +8,8 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <algorithm>
+
+#include "storage/CloudStorageEngine.hpp"
 
 namespace fs = std::filesystem;
 

@@ -1,5 +1,5 @@
-#include "auth/PasswordHash.hpp"
-#include "auth/PasswordUtils.hpp"
+#include "crypto/PasswordHash.hpp"
+#include "crypto/PasswordUtils.hpp"
 
 #include <iostream>
 #include <string>

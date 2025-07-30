@@ -32,7 +32,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("Unknown storage engine");
 
-        const auto absPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
+        const auto absPath = engine->paths->absPath(path, PathType::VAULT_ROOT);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
         UploadHandler::ensureDirectoriesInDb(vaultId, path, session.getAuthenticatedUser());

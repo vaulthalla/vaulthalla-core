@@ -16,12 +16,11 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "util/fsPath.hpp"
 #include "util/files.hpp"
+#include "util/Magic.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <thread>
-
-#include "util/Magic.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -49,7 +48,7 @@ void StorageManager::initStorageEngines() {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
                 engine = std::make_shared<CloudStorageEngine>(s3Vault);
             }
-            engines_[engine->paths->vaultRoot] = engine;
+            engines_[engine->paths->absRelToRoot(engine->paths->vaultRoot, PathType::FUSE_ROOT)] = engine;
             vaultToEngine_[vault->id] = engine;
         }
     } catch (const std::exception& e) {
@@ -168,16 +167,6 @@ void StorageManager::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
 }
 
 fs::path StorageManager::resolvePathFromInode(fuse_ino_t ino) {
-    // {
-    //     std::scoped_lock lock(renameQueueMutex_);
-    //     const auto it = renameRequests_.find(ino);
-    //     if (it != renameRequests_.end()) {
-    //         const auto& rename = it->second;
-    //         std::cout << "[StorageManager] Resolving path from pending rename: " << rename.oldPath << " → " << rename.newPath << std::endl;
-    //         return rename.newPath;
-    //     }
-    // }
-
     std::shared_lock lock(inodeMutex_);
     auto it = inodeToPath_.find(ino);
     if (it == inodeToPath_.end()) throw std::runtime_error("No path for inode");
@@ -308,11 +297,15 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
 
     const fs::path fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
+    std::cout << "[StorageManager] Full disk path for file: " << fullDiskPath << std::endl;
+    std::cout << "                 Absolute path for file: "
+    << engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT) << std::endl;
+
     const auto file = std::make_shared<File>();
     file->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
     file->vault_id = engine->vault->id;
     file->name = path.filename();
-    file->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
+    file->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
     file->abs_path = path;
     file->mode = mode;
     file->owner_uid = uid;
@@ -321,6 +314,7 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
     file->created_at = std::time(nullptr);
     file->updated_at = file->created_at;
     file->inode = std::make_optional(assignInode(path));
+    file->mime_type = StorageEngine::getMimeType(path.filename());
 
     std::error_code ec;
     std::filesystem::create_directories(fullDiskPath.parent_path(), ec); // ensure dirs exist
@@ -380,7 +374,6 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
 
     util::writeFile(newAbsPath, ciphertext);
-    std::filesystem::remove(oldAbsPath);
 
     entry->name = newPath.filename();
     entry->path = engine->paths->relPath(newPath, PathType::VAULT_ROOT);
@@ -392,8 +385,11 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
         const auto file = std::static_pointer_cast<File>(entry);
          file->encryption_iv = iv_b64;
          file->size_bytes = std::filesystem::file_size(newAbsPath);
+         file->mime_type = StorageEngine::getMimeType(newPath.filename());
         FileQueries::upsertFile(file);
     }
+
+    std::filesystem::remove(oldAbsPath);
 
     evictPath(oldPath);
     evictPath(newPath);

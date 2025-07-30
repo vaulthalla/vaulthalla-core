@@ -42,12 +42,12 @@ void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
                                           const std::filesystem::path& relPath,
                                           const std::shared_ptr<types::User>& user) {
     std::filesystem::path current;
-    std::optional<unsigned int> parentId = database::DirectoryQueries::getRootDirectoryId(vaultId);
+    std::optional parentId = DirectoryQueries::getRootDirectoryId(vaultId);
 
     for (const auto& part : relPath.parent_path()) {
         current /= part;
 
-        if (auto dirId = database::DirectoryQueries::getDirectoryIdByPath(vaultId, current)) {
+        if (const auto dirId = DirectoryQueries::getDirectoryIdByPath(vaultId, current)) {
             parentId = dirId;
             continue;  // directory already exists in DB
         }
@@ -63,7 +63,7 @@ void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
         dir->file_count = 0;
         dir->subdirectory_count = 0;
 
-        database::DirectoryQueries::upsertDirectory(dir);
+        DirectoryQueries::upsertDirectory(dir);
     }
 }
 

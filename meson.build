@@ -106,13 +106,14 @@ foreach asset : test_assets
     )
 endforeach
 
-test_sources = sources
-foreach f : run_command('find', tests_src + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    test_sources += files(f)
-endforeach
-
 test('test_cloud',
-     executable('test_cloud', test_sources,
+     executable('test_cloud', sources + files(join_paths(tests_src, 'test_S3Provider.cpp')),
+                link_with: [lib],
+                include_directories: inc,
+                dependencies: test_deps))
+
+test('test_path',
+     executable('test_path', sources + files(join_paths(tests_src, 'test_Path.cpp')),
                 link_with: [lib],
                 include_directories: inc,
                 dependencies: test_deps))

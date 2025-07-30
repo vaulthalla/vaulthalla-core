@@ -142,7 +142,9 @@ std::shared_ptr<vh::types::File> FileQueries::getFileByPath(const unsigned int v
 std::string FileQueries::getMimeType(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getMimeType", [&](pqxx::work& txn) -> std::string {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
-        return txn.exec_prepared("get_file_mime_type", p).one_row()["mime_type"].as<std::string>();
+        const auto res = txn.exec_prepared("get_file_mime_type", p);
+        if (res.empty()) return "application/octet-stream"; // Default MIME type if not found
+        return res.one_field().as<std::string>();
     });
 }
 

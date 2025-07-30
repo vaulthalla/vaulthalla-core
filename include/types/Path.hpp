@@ -75,9 +75,10 @@ struct Path {
         }
     }
 
-    // Get an absolute path relative a given path and type.
     [[nodiscard]] fs::path absRelToRoot(const fs::path& path, const PathType& type) const {
-        return makeAbsolute(relPath(path, type));
+        auto rel = relPath(path, type);
+        if (rel.empty() || rel.string().starts_with("..")) return makeAbsolute(path.filename());
+        return makeAbsolute(rel.lexically_normal());
     }
 };
 

@@ -7,6 +7,7 @@
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
+#include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "util/files.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -296,7 +297,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
 
             if (const auto engine = storageManager_->resolveStorageEngine(path)) {
                 dir->vault_id = engine->vault->id;
-                dir->path = engine->resolveAbsolutePathToVaultPath(path);
+                dir->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
             }
 
             if (auto parentEntry = storageManager_->getEntry(resolveParent(path)))
@@ -305,7 +306,6 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             const auto fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
             dir->abs_path = makeAbsolute(path);
-            dir->backing_path = fullDiskPath;
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             dir->mode = mode;

@@ -2,15 +2,19 @@
 #include "auth/AuthManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+
 #include <iostream>
 #include <thread>
+
+using namespace vh::services;
 
 namespace vh::websocket {
 
 WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
-                                 const std::shared_ptr<WebSocketRouter>& router,
-                                 const std::shared_ptr<auth::AuthManager>& authManager)
-    : acceptor_(ioc), ioc_(ioc), router_(router), authManager_(authManager),
+                                 const std::shared_ptr<WebSocketRouter>& router)
+    : acceptor_(ioc), ioc_(ioc), router_(router),
+      authManager_(ServiceDepsRegistry::instance().authManager),
       sessionManager_(authManager_->sessionManager()),
       broadcastManager_(std::make_shared<NotificationBroadcastManager>()) {
     beast::error_code ec;
@@ -45,7 +49,7 @@ void WebSocketServer::onAccept(tcp::socket socket) {
     socket.set_option(tcp::no_delay(true));
     socket.set_option(asio::socket_base::keep_alive(true));
 
-    const auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_, authManager_);
+    const auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_);
     session->accept(std::move(socket));
 }
 

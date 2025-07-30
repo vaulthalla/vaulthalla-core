@@ -1,16 +1,18 @@
 #include "concurrency/FSTask.hpp"
-#include "../../include/concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Operation.hpp"
 #include "types/Vault.hpp"
+#include "types/Path.hpp"
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 
@@ -20,12 +22,10 @@ using namespace vh::database;
 using namespace vh::services;
 using namespace std::chrono;
 
-FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine, const std::shared_ptr<SyncController>& controller)
+FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at)
            + seconds(engine->sync->interval.count())),
-    engine_(engine), controller_(controller) {
-    if (!controller_) throw std::invalid_argument("SyncController cannot be null");
-}
+    engine_(engine) {}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 
@@ -51,8 +51,7 @@ unsigned int FSTask::vaultId() const { return engine_->vault->id; }
 
 void FSTask::requeue() {
     next_run = system_clock::now() + seconds(engine_->sync->interval.count());
-    if (controller_) controller_->requeue(shared_from_this());
-    else throw std::runtime_error("SyncController is not set, cannot requeue task");
+    ServiceDepsRegistry::instance().syncController->requeue(shared_from_this());
 }
 
 void FSTask::push(const std::shared_ptr<Task>& task) {
@@ -62,8 +61,8 @@ void FSTask::push(const std::shared_ptr<Task>& task) {
 
 void FSTask::processOperations() const {
     for (const auto& op : OperationQueries::listOperationsByVault(engine_->vault->id)) {
-        const auto absSrc = engine_->getAbsolutePath(op->source_path);
-        const auto absDest = engine_->getAbsolutePath(op->destination_path);
+        const auto absSrc = engine_->paths->absPath(op->source_path, PathType::BACKING_ROOT);
+        const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
         {

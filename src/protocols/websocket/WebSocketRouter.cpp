@@ -1,12 +1,16 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "auth/SessionManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+
 #include <iostream>
+
+using namespace vh::services;
 
 namespace vh::websocket {
 
-WebSocketRouter::WebSocketRouter(const std::shared_ptr<auth::SessionManager>& sessionManager)
-    : sessionManager_(sessionManager) {
+WebSocketRouter::WebSocketRouter()
+    : sessionManager_(ServiceDepsRegistry::instance().authManager->sessionManager()) {
     if (!sessionManager_) throw std::invalid_argument("SessionManager cannot be null");
 }
 

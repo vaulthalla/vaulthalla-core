@@ -11,6 +11,7 @@ namespace vh::types {
 struct Vault;
 struct File;
 struct Sync;
+struct Path;
 }
 
 namespace vh::encryption {
@@ -24,7 +25,7 @@ enum class StorageType { Local, Cloud };
 struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     std::shared_ptr<types::Vault> vault;
     std::shared_ptr<types::Sync> sync;
-    fs::path cacheRoot, root;
+    std::shared_ptr<types::Path> paths;
     std::shared_ptr<encryption::VaultEncryptionManager> encryptionManager;
     std::shared_mutex mutex;
 
@@ -39,15 +40,6 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     [[nodiscard]] bool isDirectory(const fs::path& rel_path) const;
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const;
-
-    [[nodiscard]] std::filesystem::path getAbsolutePath(const std::filesystem::path& rel_path) const;
-
-    [[nodiscard]] std::filesystem::path getRelativePath(const std::filesystem::path& abs_path) const;
-
-    [[nodiscard]] std::filesystem::path getAbsoluteCachePath(const std::filesystem::path& rel_path,
-                                                             const std::filesystem::path& prefix = {}) const;
-
-    [[nodiscard]] std::filesystem::path getRelativeCachePath(const std::filesystem::path& abs_path) const;
 
     [[nodiscard]] std::shared_ptr<types::File> createFile(const fs::path& rel_path,
                                                           const std::vector<uint8_t>& = {}) const;
@@ -84,8 +76,6 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     void moveThumbnails(const fs::path& from, const fs::path& to) const;
 
     void copyThumbnails(const fs::path& from, const fs::path& to) const;
-
-    fs::path resolveAbsolutePathToVaultPath(const fs::path& path) const;
 
     static std::string getMimeType(const fs::path& path);
 

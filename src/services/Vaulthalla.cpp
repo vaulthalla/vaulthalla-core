@@ -17,8 +17,7 @@
 using namespace vh::services;
 using namespace vh::config;
 
-Vaulthalla::Vaulthalla(const std::shared_ptr<ServiceManager>& serviceManager)
-    : AsyncService(serviceManager, "Vaulthalla") {}
+Vaulthalla::Vaulthalla() : AsyncService("Vaulthalla") {}
 
 void Vaulthalla::runLoop() {
     std::cout << "Starting Vaulthalla service..." << std::endl;
@@ -28,6 +27,13 @@ void Vaulthalla::runLoop() {
         initThreatIntelligence();
         initProtocols();
         std::cout << "Vaulthalla service started." << std::endl;
+
+        while (!interruptFlag_.load()) std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        ioContext_->stop();
+        if (ioThread_.joinable()) ioThread_.join();
+
+        exit(EXIT_SUCCESS);
     } catch (const std::exception& e) {
         std::cerr << "[Vaulthalla] Exception: " << e.what() << std::endl;
     }
@@ -43,21 +49,20 @@ void Vaulthalla::initProtocols() {
     initWebsocketServer(boost::asio::ip::tcp::endpoint(addr, port++));
     initHttpServer(boost::asio::ip::tcp::endpoint(addr, port));
 
-    ioContext_->run();
+    ioThread_ = std::thread([ctx = ioContext_] { ctx->run(); });
 }
 
 
 void Vaulthalla::initWebsocketServer(const boost::asio::ip::tcp::endpoint& endpoint) {
-    wsRouter_ = std::make_shared<websocket::WebSocketRouter>(serviceManager_->authManager->sessionManager());
-    wsHandler_ = std::make_shared<websocket::WebSocketHandler>(serviceManager_, wsRouter_);
-    wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint,
-                                                                     wsRouter_, serviceManager_->authManager);
+    wsRouter_ = std::make_shared<websocket::WebSocketRouter>();
+    wsHandler_ = std::make_shared<websocket::WebSocketHandler>(wsRouter_);
+    wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint, wsRouter_);
 
     wsServer_->run();
 }
 
 void Vaulthalla::initHttpServer(const boost::asio::ip::tcp::endpoint& endpoint) {
-    httpServer_ = std::make_shared<http::HttpServer>(*ioContext_, endpoint, serviceManager_);
+    httpServer_ = std::make_shared<http::HttpServer>(*ioContext_, endpoint);
     httpServer_->run();
 }
 

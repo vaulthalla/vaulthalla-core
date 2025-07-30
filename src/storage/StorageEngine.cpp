@@ -4,6 +4,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Operation.hpp"
+#include "types/Path.hpp"
 #include "util/Magic.hpp"
 #include "crypto/Hash.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
@@ -32,11 +33,10 @@ namespace vh::storage {
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
-      cacheRoot(ConfigRegistry::get().caching.path / std::to_string(vault->id)),
-      root(vault->mount_point),
-      encryptionManager(std::make_shared<VaultEncryptionManager>(root)) {
-    if (!Filesystem::exists(root)) Filesystem::mkVault(root, vault->id);
-    if (!Filesystem::exists(cacheRoot)) Filesystem::mkCache(cacheRoot, vault->id);
+      paths(std::make_shared<Path>(vault->mount_point)),
+      encryptionManager(std::make_shared<VaultEncryptionManager>(paths->vaultRoot)) {
+    if (!FSEntryQueries::exists(paths->vaultRoot)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
+    if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }
 
 bool StorageEngine::isDirectory(const fs::path& rel_path) const {
@@ -47,34 +47,8 @@ bool StorageEngine::isFile(const fs::path& rel_path) const {
     return FileQueries::isFile(vault->id, rel_path);
 }
 
-fs::path StorageEngine::getRelativePath(const fs::path& abs_path) const {
-    return abs_path.lexically_relative(root).make_preferred();
-}
-
-fs::path StorageEngine::getAbsolutePath(const fs::path& rel_path) const {
-    if (rel_path.empty()) return root;
-
-    fs::path safe_rel = rel_path;
-    if (safe_rel.is_absolute()) safe_rel = safe_rel.lexically_relative("/");
-
-    return root / safe_rel;
-}
-
-fs::path StorageEngine::getRelativeCachePath(const fs::path& abs_path) const {
-    return abs_path.lexically_relative(cacheRoot).make_preferred();
-}
-
-fs::path StorageEngine::getAbsoluteCachePath(const fs::path& rel_path,
-                                                          const fs::path& prefix) const {
-    const auto relPath = rel_path.string().starts_with("/") ? fs::path(rel_path.string().substr(1)) : rel_path;
-    if (prefix.empty()) return cacheRoot / relPath;
-
-    const auto prefixPath = prefix.string().starts_with("/") ? fs::path(prefix.string().substr(1)) : prefix;
-    return cacheRoot / prefixPath / relPath;
-}
-
 std::shared_ptr<File> StorageEngine::createFile(const fs::path& rel_path, const std::vector<uint8_t>& buffer) const {
-    const auto absPath = getAbsolutePath(rel_path);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
 
     if (!fs::exists(absPath))
         throw std::runtime_error("File does not exist at path: " + absPath.string());
@@ -109,8 +83,8 @@ uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {
     return total;
 }
 
-uintmax_t StorageEngine::getVaultSize() const { return getDirectorySize(root); }
-uintmax_t StorageEngine::getCacheSize() const { return getDirectorySize(cacheRoot); }
+uintmax_t StorageEngine::getVaultSize() const { return getDirectorySize(paths->backingRoot); }
+uintmax_t StorageEngine::getCacheSize() const { return getDirectorySize(paths->cacheRoot); }
 uintmax_t StorageEngine::getVaultAndCacheTotalSize() const { return getVaultSize() + getCacheSize(); }
 
 uintmax_t StorageEngine::freeSpace() const {
@@ -118,8 +92,8 @@ uintmax_t StorageEngine::freeSpace() const {
 }
 
 void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
-    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-        const auto thumbnailPath = getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
+    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+        const auto thumbnailPath = paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
         if (fs::exists(thumbnailPath)) fs::remove(thumbnailPath);
     }
 }
@@ -138,9 +112,9 @@ std::string StorageEngine::getMimeType(const fs::path& path) {
 }
 
 void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
-    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-        auto fromPath = getAbsoluteCachePath(from, fs::path("thumbnails") / std::to_string(size));
-        auto toPath = getAbsoluteCachePath(to, fs::path("thumbnails") / std::to_string(size));
+    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+        auto fromPath = paths->absPath(from, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+        auto toPath = paths->absPath(to, PathType::THUMBNAIL_ROOT) / std::to_string(size);
 
         if (fromPath.extension() != ".jpg" && fromPath.extension() != ".jpeg") {
             fromPath += ".jpg";
@@ -158,9 +132,9 @@ void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std:
 }
 
 void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
-    for (const auto& size : config::ConfigRegistry::get().caching.thumbnails.sizes) {
-        auto fromPath = getAbsoluteCachePath(from, fs::path("thumbnails") / std::to_string(size));
-        auto toPath = getAbsoluteCachePath(to, fs::path("thumbnails") / std::to_string(size));
+    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+        auto fromPath = paths->absPath(from, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+        auto toPath = paths->absPath(to, PathType::THUMBNAIL_ROOT) / std::to_string(size);
 
         if (fromPath.extension() != ".jpg" && fromPath.extension() != ".jpeg") {
             fromPath += ".jpg";
@@ -177,31 +151,8 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
     }
 }
 
-fs::path StorageEngine::resolveAbsolutePathToVaultPath(const fs::path& path) const {
-    try {
-        auto normRoot = fs::weakly_canonical(config::ConfigRegistry::get().fuse.root_mount_path / root);
-
-        // If it's already relative to vault root (e.g., starts with /users/)
-        if (path.string().starts_with(makeAbsolute(root).string())) {
-            return makeAbsolute(fs::relative(path, makeAbsolute(root).string()));
-        }
-
-        auto normPath = fs::weakly_canonical(path);
-        auto mismatch = std::mismatch(normRoot.begin(), normRoot.end(), normPath.begin());
-        if (mismatch.first == normRoot.end()) {
-            return makeAbsolute(fs::relative(normPath, normRoot));
-        }
-
-        std::cerr << "[StorageEngine] Path " << normPath << " is not under root " << normRoot << std::endl;
-        return normPath.filename();
-    } catch (...) {
-        std::cerr << "[StorageEngine] Exception in resolveAbsolutePathToVaultPath" << std::endl;
-        return path.filename();
-    }
-}
-
 void StorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
-    const auto absPath = getAbsolutePath(relPath);
+    const auto absPath = paths->absPath(relPath, PathType::BACKING_ROOT);
 
     if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
     if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
@@ -221,7 +172,7 @@ void StorageEngine::finishUpload(const unsigned int userId, const std::filesyste
 }
 
 void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) const {
-    const auto absPath = getAbsolutePath(relPath);
+    const auto absPath = paths->absPath(relPath, PathType::BACKING_ROOT);
     if (!fs::exists(absPath)) fs::create_directories(absPath);
 
     const auto d = std::make_shared<Directory>();
@@ -268,7 +219,7 @@ void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsig
 
     entry->name = to.filename().string();
     entry->path = to;
-    entry->abs_path = getAbsolutePath(to);
+    entry->abs_path = paths->absPath(to, PathType::VAULT_ROOT);
     entry->last_modified_by = userId;
 
     if (isFile) FileQueries::upsertFile(std::static_pointer_cast<File>(entry));
@@ -290,7 +241,7 @@ void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigne
 
     entry->id = 0;
     entry->path = to;
-    entry->abs_path = getAbsolutePath(to);
+    entry->abs_path = paths->absPath(to, PathType::VAULT_ROOT);
     entry->name = to.filename().string();
     entry->created_at = {};
     entry->updated_at = {};

@@ -24,8 +24,7 @@ namespace http = boost::beast::http;
 
 class HttpRouter {
 public:
-    explicit HttpRouter(const std::shared_ptr<auth::AuthManager>& authManager,
-                        const std::shared_ptr<storage::StorageManager>& storageManager);
+    HttpRouter();
 
     PreviewResponse route(http::request<http::string_body>&& req) const;
 

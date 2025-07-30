@@ -11,8 +11,7 @@ struct ServiceManager;
 
 class AsyncService {
 public:
-    AsyncService(const std::shared_ptr<ServiceManager>& serviceManager,
-                 const std::string& serviceName);
+    explicit AsyncService(const std::string& serviceName);
 
     virtual ~AsyncService();
 
@@ -27,7 +26,6 @@ public:
     void handleInterrupt();
 
 protected:
-    std::shared_ptr<ServiceManager> serviceManager_;
     std::string serviceName_;
     std::atomic<bool> running_{false};
     std::atomic<bool> interruptFlag_{false};

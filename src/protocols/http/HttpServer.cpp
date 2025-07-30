@@ -5,6 +5,7 @@
 #include "protocols/http/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 
@@ -13,12 +14,11 @@ using namespace vh::services;
 
 namespace vh::http {
 
-HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint,
-                                     const std::shared_ptr<ServiceManager>& serviceManager)
+HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
     : acceptor_(ioc), socket_(ioc),
-      router_(std::make_shared<HttpRouter>(serviceManager->authManager, serviceManager->storageManager)),
-      authManager_(serviceManager->authManager),
-      storageManager_(serviceManager->storageManager) {
+      router_(),
+      authManager_(ServiceDepsRegistry::instance().authManager),
+      storageManager_(ServiceDepsRegistry::instance().storageManager) {
     beast::error_code ec;
     acceptor_.open(endpoint.protocol(), ec);
     if (ec) throw beast::system_error(ec);
@@ -38,9 +38,7 @@ void HttpServer::run() {
 void HttpServer::do_accept() {
     acceptor_.async_accept(socket_, [self = shared_from_this()](beast::error_code ec) mutable {
         if (!ec) {
-            auto session = std::make_shared<HttpSession>(
-                std::move(self->socket_), self->router_, self->authManager_, self->storageManager_
-            );
+            auto session = std::make_shared<HttpSession>(std::move(self->socket_), self->router_);
             ThreadPoolRegistry::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
         }
         self->do_accept();

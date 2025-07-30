@@ -1,11 +1,11 @@
 #include "protocols/websocket/WebSocketSession.hpp"
-
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "util/parse.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <boost/beast/http.hpp>
 #include <iostream>
@@ -21,15 +21,17 @@ using tcp = asio::ip::tcp;
 using json = nlohmann::json;
 } // namespace
 
+using namespace vh::services;
+
 namespace vh::websocket {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ‑‑ construction & destruction
 // ──────────────────────────────────────────────────────────────────────────────
 WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                                   const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
-                                   const std::shared_ptr<auth::AuthManager>& authManager)
-    : authManager_{authManager}, ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)),
+                                   const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
+    : authManager_{ServiceDepsRegistry::instance().authManager},
+      ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)),
       broadcastManager_{broadcastManager} {
     buffer_.max_size(65536);
 }

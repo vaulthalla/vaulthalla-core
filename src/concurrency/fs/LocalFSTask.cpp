@@ -4,7 +4,6 @@
 #include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Vault.hpp"
-#include "util/files.hpp"
 
 #include <iostream>
 

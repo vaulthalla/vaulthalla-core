@@ -3,14 +3,20 @@
 #include "types/File.hpp"
 #include "types/VaultRole.hpp"
 #include "types/Vault.hpp"
+#include "types/Path.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "storage/StorageEngine.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+
 #include <iostream>
+
+using namespace vh::types;
+using namespace vh::services;
 
 namespace vh::websocket {
 
-FileSystemHandler::FileSystemHandler(const std::shared_ptr<services::ServiceManager>& serviceManager)
-    : storageManager_(serviceManager->storageManager) {
+FileSystemHandler::FileSystemHandler()
+    : storageManager_(ServiceDepsRegistry::instance().storageManager) {
     if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
 }
 
@@ -20,13 +26,13 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
         const auto uploadId = WebSocketSession::generateUUIDv4();
         const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("Unknown storage engine");
 
-        const auto absPath = engine->getAbsolutePath(path);
+        const auto absPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
         UploadHandler::ensureDirectoriesInDb(vaultId, path, session.getAuthenticatedUser());
@@ -60,7 +66,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
         session.getUploadHandler()->finishUpload(vaultId);
 
@@ -98,7 +104,7 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
 
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
         storageManager_->mkdir(vaultId, path, session.getAuthenticatedUser());
 
@@ -129,8 +135,8 @@ void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
         const auto fromPath = payload.at("from").get<std::string>();
         const auto toPath = payload.at("to").get<std::string>();
 
-        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canMove);
-        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, fromPath, &VaultRole::canMove);
+        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
 
         storageManager_->move(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
 
@@ -161,8 +167,8 @@ void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session)
         const auto fromPath = payload.at("from").get<std::string>();
         const auto toPath = payload.at("to").get<std::string>();
 
-        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canRename);
-        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, fromPath, &VaultRole::canRename);
+        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
 
         storageManager_->rename(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
 
@@ -193,8 +199,8 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
         const auto fromPath = payload.at("from").get<std::string>();
         const auto toPath = payload.at("to").get<std::string>();
 
-        enforcePermissions(session, vaultId, fromPath, &types::VaultRole::canMove);
-        enforcePermissions(session, vaultId, toPath, &types::VaultRole::canCreate);
+        enforcePermissions(session, vaultId, fromPath, &VaultRole::canMove);
+        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
 
         storageManager_->copy(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
 
@@ -225,7 +231,7 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         const auto path = payload.value("path", "/");
 
         const auto user = session.getAuthenticatedUser();
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canList);
+        enforcePermissions(session, vaultId, path, &VaultRole::canList);
 
         const auto& vaultName = storageManager_->getVault(vaultId)->name;
         const auto files = storageManager_->listDir(vaultId, path);
@@ -265,7 +271,7 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
-        enforcePermissions(session, vaultId, path, &types::VaultRole::canDelete);
+        enforcePermissions(session, vaultId, path, &VaultRole::canDelete);
         storageManager_->removeEntry(userId, vaultId, path);
 
         const json response = {{"command", "fs.entry.delete.response"},

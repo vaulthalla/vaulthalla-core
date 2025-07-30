@@ -3,6 +3,7 @@
 #include "concurrency/ThreadPoolRegistry.hpp"
 #include "database/Transactions.hpp"
 #include "services/ServiceManager.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/Filesystem.hpp"
 
@@ -26,26 +27,32 @@ void signalHandler(int signum) {
 
 int main() {
     try {
+        std::cout << "[*] Initializing Vaulthalla services..." << std::endl;
         ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
         ThreadPoolRegistry::instance().init();
         Transactions::init();
+        ServiceDepsRegistry::init();
         const auto serviceManager = std::make_shared<ServiceManager>();
+        ServiceDepsRegistry::setSyncController(serviceManager->syncController);
 
-        Filesystem::init(serviceManager->storageManager);
-        serviceManager->storageManager->initStorageEngines();
-        serviceManager->initServices();
+        std::cout << "[*] Starting services..." << std::endl;
+        Filesystem::init(ServiceDepsRegistry::instance().storageManager);
+        ServiceDepsRegistry::instance().storageManager->initStorageEngines();
+        serviceManager->startServices();
 
         std::signal(SIGINT, signalHandler);
         std::signal(SIGTERM, signalHandler);
+
+        std::cout << "[✓] Vaulthalla services initialized successfully." << std::endl;
 
         while (!shouldExit) std::this_thread::sleep_for(std::chrono::seconds(1));
 
         std::cout << "[*] Shutting down Vaulthalla services..." << std::endl;
 
+        ThreadPoolRegistry::instance().shutdown();
         serviceManager->syncController->stop();
         serviceManager->fuseService->stop();
         serviceManager->vaulthallaService->stop();
-        ThreadPoolRegistry::instance().shutdown();
 
         std::cout << "[✓] Vaulthalla services shut down cleanly." << std::endl;
 

@@ -4,6 +4,7 @@
 #include "types/Vault.hpp"
 #include "types/Directory.hpp"
 #include "types/File.hpp"
+#include "types/Path.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -59,12 +60,11 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
 
             if (const auto engine = storageManager_->resolveStorageEngine(path)) {
                 dir->vault_id = engine->vault->id;
-                dir->path = engine->resolveAbsolutePathToVaultPath(path);
+                dir->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
             }
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = path;
-            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -85,6 +85,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
 }
 
 void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t mode) {
+    std::cout << "[Filesystem] Creating vault directory at: " << absPath.string() << std::endl;
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
@@ -96,6 +97,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
         while (!cur.empty() && !storageManager_->entryExists(cur)) {
             toCreate.push_back(cur);
+            if (cur.string() == "/") break; // stop at root
             cur = cur.parent_path();
         }
 
@@ -103,6 +105,8 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
         for (unsigned int i = 0; i < toCreate.size(); ++i) {
             const auto& path = makeAbsolute(toCreate[i]);
+
+            std::cout << "[Filesystem] Processing path: " << path.string() << std::endl;
 
             if (FSEntryQueries::getEntryIdByPath(path)) continue;
 
@@ -115,7 +119,6 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = makeAbsolute(path);
-            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -163,8 +166,6 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->path = path;
-            dir->abs_path = path;
-            dir->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -228,7 +229,7 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath) {
     }
 
     entry->name = mntRelNewPath.filename();
-    entry->path = engine->resolveAbsolutePathToVaultPath(mntRelNewPath);
+    entry->path = engine->paths->relPath(mntRelNewPath, PathType::VAULT_ROOT);
     entry->abs_path = mntRelNewPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(mntRelNewPath));
 

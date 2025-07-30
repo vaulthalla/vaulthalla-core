@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/StorageEngine.hpp"
+#include "types/Path.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -8,6 +9,8 @@
 #include <string>
 #include <random>
 #include <sstream>
+
+using namespace vh::types;
 
 namespace vh::util {
 
@@ -69,7 +72,7 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
                                                   const std::shared_ptr<storage::StorageEngine>& engine) {
     namespace fs = std::filesystem;
 
-    const auto abs_path = engine->getAbsolutePath(rel_path);
+    const auto abs_path = engine->paths->absPath(rel_path, PathType::BACKING_ROOT);
 
     // Read encrypted file into memory
     std::ifstream in(abs_path, std::ios::binary | std::ios::ate);

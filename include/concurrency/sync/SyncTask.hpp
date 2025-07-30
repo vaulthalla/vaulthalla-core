@@ -24,8 +24,7 @@ class SyncTask : public FSTask {
 public:
     ~SyncTask() override = default;
 
-    SyncTask(const std::shared_ptr<storage::StorageEngine>& engine,
-             const std::shared_ptr<services::SyncController>& controller) : FSTask(engine, controller) {}
+    SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
 
     void operator()() override;
 

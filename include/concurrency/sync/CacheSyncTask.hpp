@@ -16,8 +16,7 @@ public:
 
     ~CacheSyncTask() override = default;
 
-    CacheSyncTask(const std::shared_ptr<storage::StorageEngine>& engine,
-             const std::shared_ptr<services::SyncController>& controller) : SyncTask(engine, controller) {}
+    CacheSyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : SyncTask(engine) {}
 
     void sync() override;
 

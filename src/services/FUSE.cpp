@@ -5,6 +5,7 @@
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolRegistry.hpp"
 #include "concurrency/FUSERequestTask.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -15,9 +16,9 @@ using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::fuse;
 
-FUSE::FUSE(const std::shared_ptr<ServiceManager>& serviceManager)
-    : AsyncService(serviceManager, "FUSE"),
-      bridge_(std::make_shared<FUSEBridge>(serviceManager->storageManager)) {}
+FUSE::FUSE()
+    : AsyncService("FUSE"),
+      bridge_(std::make_shared<FUSEBridge>(ServiceDepsRegistry::instance().storageManager)) {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     std::cout << "[+] Initializing FUSE connection\n";

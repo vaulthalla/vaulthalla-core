@@ -14,6 +14,7 @@
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
 #include "types/Vault.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <iostream>
@@ -27,8 +28,8 @@ bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shar
     return a->next_run > b->next_run; // Min-heap based on next_run time
 }
 
-SyncController::SyncController(const std::shared_ptr<ServiceManager>& serviceManager)
-    : AsyncService(serviceManager, "SyncController"), storage_(serviceManager->storageManager) {}
+SyncController::SyncController()
+    : AsyncService("SyncController") {}
 
 void SyncController::requeue(const std::shared_ptr<FSTask>& task) {
     std::scoped_lock lock(pqMutex_);
@@ -55,7 +56,7 @@ void SyncController::runLoop() {
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
     unsigned int refreshTries = 0;
 
-    while (running_) {
+    while (running_ && !interruptFlag_.load()) {
         if (ThreadPoolRegistry::instance().syncPool()->interrupted()) {
             std::cout << "[SyncController] Interrupted, stopping." << std::endl;
             return;
@@ -128,13 +129,10 @@ void SyncController::runNow(const unsigned int vaultId) {
 }
 
 void SyncController::refreshEngines() {
-    if (const auto s = storage_.lock()) {
-        const auto latestEngines = s->getEngines();
-        pruneStaleTasks(latestEngines);
-        for (const auto& engine : latestEngines) processTask(engine);
-    }
+    const auto latestEngines = ServiceDepsRegistry::instance().storageManager->getEngines();
+    pruneStaleTasks(latestEngines);
+    for (const auto& engine : latestEngines) processTask(engine);
 }
-
 
 void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<StorageEngine> >& engines) {
     boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);

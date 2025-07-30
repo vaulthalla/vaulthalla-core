@@ -13,7 +13,7 @@ class WebSocketSession;
 
 class FileSystemHandler {
 public:
-    explicit FileSystemHandler(const std::shared_ptr<services::ServiceManager>& serviceManager);
+    FileSystemHandler();
 
     void handleUploadStart(const json& msg, WebSocketSession& session);
 

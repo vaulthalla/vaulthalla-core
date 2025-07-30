@@ -50,8 +50,7 @@ public:
     ~WebSocketSession();
 
     WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                     const std::shared_ptr<NotificationBroadcastManager>& broadcastManager,
-                     const std::shared_ptr<auth::AuthManager>& authManager);
+                     const std::shared_ptr<NotificationBroadcastManager>& broadcastManager);
 
     void send(const json& message);
 

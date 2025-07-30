@@ -19,7 +19,7 @@ namespace vh::services {
 
 class FUSE final : public AsyncService {
 public:
-    explicit FUSE(const std::shared_ptr<ServiceManager>& serviceManager);
+    FUSE();
 
     void stop() override;
 

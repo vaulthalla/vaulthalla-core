@@ -5,11 +5,7 @@
 
 using namespace vh::services;
 
-AsyncService::AsyncService(const std::shared_ptr<ServiceManager>& serviceManager,
-                           const std::string& serviceName)
-    : serviceManager_(serviceManager), serviceName_(serviceName) {
-    if (!serviceManager_) throw std::runtime_error("ServiceManager cannot be null");
-}
+AsyncService::AsyncService(const std::string& serviceName) : serviceName_(serviceName) {}
 
 AsyncService::~AsyncService() {
     stop(); // ensure cleanup

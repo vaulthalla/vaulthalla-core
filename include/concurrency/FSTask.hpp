@@ -25,7 +25,7 @@ public:
     FSTask() = default;
     ~FSTask() override = default;
 
-    FSTask(const std::shared_ptr<storage::StorageEngine>& engine, const std::shared_ptr<services::SyncController>& controller);
+    explicit FSTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
     void operator()() override = 0;
 
@@ -43,7 +43,6 @@ public:
 
 protected:
     std::shared_ptr<storage::StorageEngine> engine_;
-    std::shared_ptr<services::SyncController> controller_;
     std::vector<std::future<ExpectedFuture>> futures_;
     bool isRunning_ = false;
     std::atomic<bool> interruptFlag_{false};

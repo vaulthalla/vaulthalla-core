@@ -22,8 +22,7 @@ class LocalFSTask : public FSTask {
 public:
     ~LocalFSTask() override = default;
 
-    LocalFSTask(const std::shared_ptr<storage::StorageEngine>& engine,
-             const std::shared_ptr<services::SyncController>& controller) : FSTask(engine, controller) {}
+    LocalFSTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
 
     void operator()() override;
 

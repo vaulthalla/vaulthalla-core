@@ -20,16 +20,16 @@ class ThumbnailTask : public Task {
 public:
     ThumbnailTask(const std::shared_ptr<const storage::StorageEngine>& engine,
                   const std::vector<uint8_t>& buffer,
-                  const std::shared_ptr<types::File>& file)
+                  const std::shared_ptr<File>& file)
         : engine_(engine), buffer_(buffer), file_(file) {}
 
     void operator()() override {
         namespace fs = std::filesystem;
 
         try {
-            const auto& sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
+            const auto& sizes = ConfigRegistry::get().caching.thumbnails.sizes;
             for (const auto& size : sizes) {
-                fs::path cachePath = engine_->getAbsoluteCachePath(file_->path, fs::path("thumbnails") / std::to_string(size));
+                fs::path cachePath = engine_->paths->thumbnailRoot / std::to_string(size);
                 if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath += ".jpg";
 
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
@@ -41,14 +41,14 @@ public:
 
                 util::generateAndStoreThumbnail(buffer_, cachePath, *file_->mime_type, size);
 
-                auto index = std::make_shared<types::CacheIndex>();
+                auto index = std::make_shared<CacheIndex>();
                 index->vault_id = engine_->vault->id;
                 index->file_id = file_->id;
-                index->path = engine_->getRelativeCachePath(cachePath);
-                index->type = types::CacheIndex::Type::Thumbnail;
+                index->path = engine_->paths->relPath(cachePath, PathType::CACHE_ROOT);
+                index->type = CacheIndex::Type::Thumbnail;
                 index->size = fs::file_size(cachePath);
 
-                database::CacheQueries::upsertCacheIndex(index);
+                CacheQueries::upsertCacheIndex(index);
             }
         } catch (const std::exception& e) {
             std::cerr << "[ThumbnailTask] Failed to generate thumbnail(s): " << e.what() << std::endl;
@@ -58,7 +58,7 @@ public:
 private:
     std::shared_ptr<const storage::StorageEngine> engine_;
     std::vector<uint8_t> buffer_;
-    std::shared_ptr<types::File> file_;
+    std::shared_ptr<File> file_;
 };
 
 }

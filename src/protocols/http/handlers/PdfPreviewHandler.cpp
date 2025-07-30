@@ -20,7 +20,7 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
 
         const auto engine = storageManager_->getEngine(vault_id);
 
-        std::string file_path = engine->getAbsolutePath(rel_path);
+        std::string file_path = engine->paths->absPath(rel_path, PathType::BACKING_ROOT);
         std::string mime_type = "image/jpeg";
 
         const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);

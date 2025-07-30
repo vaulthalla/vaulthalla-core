@@ -24,7 +24,6 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
         p.append(file->last_modified_by);
         p.append(to_utf8_string(file->path.u8string()));
         p.append(to_utf8_string(file->abs_path.u8string()));
-        p.append(to_utf8_string(file->backing_path.u8string()));
         p.append(file->inode);
         p.append(file->mode);
         p.append(file->owner_uid);

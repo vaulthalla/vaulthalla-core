@@ -19,8 +19,7 @@ class HttpRouter;
 
 class HttpServer : public std::enable_shared_from_this<HttpServer> {
 public:
-    HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint,
-        const std::shared_ptr<services::ServiceManager>& serviceManager);
+    HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint);
 
     void run();
 

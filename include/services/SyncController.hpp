@@ -28,9 +28,9 @@ struct FSTaskCompare {
     bool operator()(const std::shared_ptr<concurrency::FSTask>& a, const std::shared_ptr<concurrency::FSTask>& b) const;
 };
 
-class SyncController : public AsyncService, std::enable_shared_from_this<SyncController> {
+class SyncController final : public AsyncService, std::enable_shared_from_this<SyncController> {
 public:
-    explicit SyncController(const std::shared_ptr<ServiceManager>& serviceManager);
+    SyncController();
     ~SyncController() override = default;
 
     void requeue(const std::shared_ptr<concurrency::FSTask>& task);
@@ -50,8 +50,6 @@ private:
                     std::vector<std::shared_ptr<concurrency::FSTask>>,
                     FSTaskCompare> pq;
 
-    std::weak_ptr<storage::StorageManager> storage_;
-
     mutable std::mutex pqMutex_;
     mutable std::shared_mutex taskMapMutex_;
 
@@ -67,7 +65,7 @@ private:
 
     template <typename T>
     std::shared_ptr<T> createTask(const std::shared_ptr<storage::StorageEngine>& engine) {
-        auto task = std::make_shared<T>(engine, shared_from_this());
+        auto task = std::make_shared<T>(engine);
         return task;
     }
 };

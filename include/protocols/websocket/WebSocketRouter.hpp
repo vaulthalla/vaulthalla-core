@@ -19,7 +19,7 @@ class WebSocketRouter {
   public:
     using HandlerFunc = std::function<void(const json& msg, WebSocketSession& session)>;
 
-    explicit WebSocketRouter(const std::shared_ptr<auth::SessionManager>& sessionManager);
+    explicit WebSocketRouter();
 
     void registerHandler(const std::string& command, HandlerFunc handler);
 

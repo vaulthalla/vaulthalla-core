@@ -9,6 +9,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/User.hpp"
+#include "types/Path.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
@@ -30,22 +31,26 @@ using namespace vh::config;
 StorageManager::StorageManager() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
+    cacheEntry(FSEntryQueries::getFSEntry("/"));
 }
 
 void StorageManager::initStorageEngines() {
+    std::cout << "[StorageManager] Initializing storage engines..." << std::endl;
     std::scoped_lock lock(mutex_);
 
     engines_.clear();
 
     try {
         for (auto& vault : VaultQueries::listVaults()) {
+            std::cout << "[StorageManager] Initializing engine for vault: " << vault->name << " (ID: " << vault->id << ")" << std::endl;
             std::shared_ptr<StorageEngine> engine;
             if (vault->type == VaultType::Local) engine = std::make_shared<StorageEngine>(vault);
             else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
                 engine = std::make_shared<CloudStorageEngine>(s3Vault);
             }
-            engines_[makeAbsolute(engine->root)] = engine;
+            engines_[engine->paths->vaultRoot] = engine;
+            vaultToEngine_[vault->id] = engine;
         }
     } catch (const std::exception& e) {
         std::cerr << "[StorageManager] Error initializing storage engines: " << e.what() << std::endl;
@@ -211,8 +216,9 @@ char StorageManager::getPathType(const fs::path& absPath) const {
         return 'u'; // unknown type
     }
 
-    if (engine->isFile(engine->getRelativePath(absPath))) return 'f';
-    if (engine->isDirectory(engine->getRelativePath(absPath))) return 'd';
+    const auto relPath = engine->paths->relPath(absPath, PathType::VAULT_ROOT);
+    if (engine->isFile(relPath)) return 'f';
+    if (engine->isDirectory(relPath)) return 'd';
     return 'u'; // unknown type
 }
 
@@ -243,7 +249,6 @@ std::shared_ptr<FSEntry> StorageManager::getEntry(const fs::path& absPath) {
 
 void StorageManager::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
     if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
-    std::cout << "[StorageManager] Caching entry: " << entry->abs_path << " with inode: " << *entry->inode << std::endl;
 
     std::unique_lock lock(inodeMutex_);
     inodeToPath_[*entry->inode] = entry->abs_path;
@@ -307,9 +312,8 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
     file->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
     file->vault_id = engine->vault->id;
     file->name = path.filename();
-    file->path = engine->resolveAbsolutePathToVaultPath(path);
+    file->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
     file->abs_path = path;
-    file->backing_path = fullDiskPath;
     file->mode = mode;
     file->owner_uid = uid;
     file->group_gid = gid;
@@ -379,9 +383,8 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     std::filesystem::remove(oldAbsPath);
 
     entry->name = newPath.filename();
-    entry->path = engine->resolveAbsolutePathToVaultPath(newPath);
+    entry->path = engine->paths->relPath(newPath, PathType::VAULT_ROOT);
     entry->abs_path = newPath;
-    entry->backing_path = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(newPath);
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
 
     if (entry->isDirectory()) DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));

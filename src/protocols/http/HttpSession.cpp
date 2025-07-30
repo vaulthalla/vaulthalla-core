@@ -3,19 +3,20 @@
 #include "auth/AuthManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/http/PreviewResponse.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
+
+using namespace vh::services;
 
 namespace vh::http {
 
 HttpSession::HttpSession(tcp::socket socket,
-                         std::shared_ptr<HttpRouter> router,
-                         std::shared_ptr<auth::AuthManager> auth,
-                         std::shared_ptr<storage::StorageManager> storage)
+                         std::shared_ptr<HttpRouter> router)
     : socket_(std::move(socket)),
       router_(std::move(router)),
-      auth_(std::move(auth)),
-      storage_(std::move(storage)) {
+      auth_(ServiceDepsRegistry::instance().authManager),
+      storage_(ServiceDepsRegistry::instance().storageManager) {
     if (!auth_) throw std::invalid_argument("AuthManager cannot be null");
     if (!storage_) throw std::invalid_argument("StorageManager cannot be null");
     buffer_.max_size(8192);

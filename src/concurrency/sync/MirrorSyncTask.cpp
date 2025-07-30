@@ -6,6 +6,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/RSync.hpp"
+#include "util/fsPath.hpp"
 
 #include <filesystem>
 
@@ -23,7 +24,7 @@ void MirrorSyncTask::sync() {
 
 void MirrorSyncTask::syncKeepLocal() {
     for (const auto& file : localFiles_) {
-        const auto strippedPath = stripLeadingSlash(file->path);
+        const auto strippedPath = stripLeadingSlash(file->path).u8string();
         const auto match = s3Map_.find(strippedPath);
 
         if (match == s3Map_.end()) {

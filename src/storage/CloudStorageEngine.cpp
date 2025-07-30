@@ -9,6 +9,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "util/files.hpp"
+#include "util/fsPath.hpp"
 #include "services/ThumbnailWorker.hpp"
 
 #include <iostream>
@@ -35,7 +36,7 @@ void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) co
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
     purgeThumbnails(path);
     FileQueries::deleteFile(vault->owner_id, vault->id, path);
-    const auto absPath = getAbsolutePath(path);
+    const auto absPath = paths->absPath(path, PathType::BACKING_ROOT);
     if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
 }
 
@@ -46,7 +47,7 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
-    const auto absPath = getAbsolutePath(rel_path);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
     if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
 
@@ -73,7 +74,7 @@ std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem:
 
 std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::path& rel_path) {
     auto buffer = downloadToBuffer(rel_path);
-    const auto absPath = getAbsolutePath(rel_path);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
     const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
 
     std::shared_ptr<File> file;
@@ -123,7 +124,7 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
 
 void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_path) {
     const auto index = downloadFile(rel_path);
-    std::filesystem::remove(getAbsoluteCachePath(index->path, {"files"}));
+    std::filesystem::remove(paths->absPath(index->path, PathType::FILE_CACHE_ROOT));
 }
 
 std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {
@@ -197,10 +198,4 @@ std::optional<std::string> CloudStorageEngine::getRemoteIVBase64(const std::file
     }
 
     return std::nullopt;
-}
-
-std::u8string vh::storage::stripLeadingSlash(const std::filesystem::path& path) {
-    std::u8string u8 = path.u8string();
-    if (!u8.empty() && u8[0] == u8'/') return u8.substr(1);
-    return u8;
 }

@@ -31,12 +31,13 @@ struct ServiceManager;
 
 class Vaulthalla final : public AsyncService {
 public:
-    explicit Vaulthalla(const std::shared_ptr<ServiceManager>& serviceManager);
+    Vaulthalla();
 
 protected:
     void runLoop() override;
 
 private:
+    std::thread ioThread_;
     std::shared_ptr<boost::asio::io_context> ioContext_;
     std::shared_ptr<websocket::WebSocketRouter> wsRouter_;
     std::shared_ptr<websocket::WebSocketHandler> wsHandler_;

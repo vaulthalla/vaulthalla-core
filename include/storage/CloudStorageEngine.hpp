@@ -57,6 +57,4 @@ private:
     std::optional<std::string> getRemoteIVBase64(const std::filesystem::path& rel_path) const;
 };
 
-std::u8string stripLeadingSlash(const std::filesystem::path& path);
-
 } // namespace vh::storage

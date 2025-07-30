@@ -20,8 +20,7 @@ using tcp = asio::ip::tcp;
 class WebSocketServer : public std::enable_shared_from_this<WebSocketServer> {
 public:
     WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
-                    const std::shared_ptr<WebSocketRouter>& router,
-                    const std::shared_ptr<auth::AuthManager>& authManager);
+                    const std::shared_ptr<WebSocketRouter>& router);
 
     void run();
 

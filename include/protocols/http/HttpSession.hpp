@@ -18,9 +18,7 @@ using tcp = boost::asio::ip::tcp;
 class HttpSession : public std::enable_shared_from_this<HttpSession> {
 public:
     HttpSession(tcp::socket socket,
-                std::shared_ptr<HttpRouter> router,
-                std::shared_ptr<auth::AuthManager> auth,
-                std::shared_ptr<storage::StorageManager> storage);
+                std::shared_ptr<HttpRouter> router);
 
     void run();
 

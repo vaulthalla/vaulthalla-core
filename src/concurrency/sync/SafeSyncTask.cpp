@@ -8,6 +8,8 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"
+#include "types/Path.hpp"
+#include "util/fsPath.hpp"
 
 #include <optional>
 
@@ -18,7 +20,7 @@ using namespace vh::database;
 
 void SafeSyncTask::sync() {
     for (const auto& file : localFiles_) {
-        const auto strippedPath = stripLeadingSlash(file->path);
+        const auto strippedPath = stripLeadingSlash(file->path).u8string();
         auto match = s3Map_.find(strippedPath);
 
         if (match == s3Map_.end()) {
@@ -44,7 +46,7 @@ void SafeSyncTask::sync() {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
-            if (dir->abs_path.empty()) dir->abs_path = engine_->getAbsolutePath(dir->path);
+            if (dir->abs_path.empty()) dir->abs_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
             DirectoryQueries::upsertDirectory(dir);
         }
     }

@@ -8,19 +8,22 @@
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/files.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 #include <ranges>
 
+using namespace vh::services;
+
 namespace vh::http {
 
-HttpRouter::HttpRouter(const std::shared_ptr<auth::AuthManager>& authManager,
-                       const std::shared_ptr<storage::StorageManager>& storageManager)
-    : authManager_(authManager), storageManager_(storageManager),
-      imagePreviewHandler_(std::make_shared<ImagePreviewHandler>(storageManager)),
-      pdfPreviewHandler_(std::make_shared<PdfPreviewHandler>(storageManager)) {
+HttpRouter::HttpRouter()
+    : authManager_(ServiceDepsRegistry::instance().authManager),
+      storageManager_(ServiceDepsRegistry::instance().storageManager),
+      imagePreviewHandler_(std::make_shared<ImagePreviewHandler>(storageManager_)),
+      pdfPreviewHandler_(std::make_shared<PdfPreviewHandler>(storageManager_)) {
     if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
-    if (!storageManager) throw std::invalid_argument("StorageManager cannot be null");
+    if (!storageManager_) throw std::invalid_argument("StorageManager cannot be null");
 }
 
 PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const {
@@ -32,7 +35,7 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
         return res;
     }
 
-    if (!config::ConfigRegistry::get().advanced.dev_mode) {
+    if (!ConfigRegistry::get().advanced.dev_mode) {
         try {
             const auto refresh_token = util::extractCookie(req, "refresh");
             authManager_->validateRefreshToken(refresh_token);
@@ -88,7 +91,7 @@ PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, cons
                                      const std::string& mime_type, const http::request<http::string_body>& req,
                                      const unsigned int size) const {
     const auto engine = storageManager_->getEngine(vaultId);
-    const auto pathToJpegCache = engine->getAbsoluteCachePath(rel_path, fs::path("thumbnails") / std::to_string(size));
+    const auto pathToJpegCache = engine->paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
 
     // Force `.jpg` extension if this is a PDF or image preview
     if (mime_type.starts_with("image/") || mime_type.starts_with("application/")) {

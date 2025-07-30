@@ -1,5 +1,6 @@
 #pragma once
 
+#include "services/AsyncService.hpp"
 #include "concurrency/FSTask.hpp"
 
 #include <memory>
@@ -21,23 +22,25 @@ class StorageManager;
 
 namespace vh::services {
 
+struct ServiceManager;
+
 struct FSTaskCompare {
     bool operator()(const std::shared_ptr<concurrency::FSTask>& a, const std::shared_ptr<concurrency::FSTask>& b) const;
 };
 
-class SyncController : public std::enable_shared_from_this<SyncController> {
+class SyncController : public AsyncService, std::enable_shared_from_this<SyncController> {
 public:
-    explicit SyncController(const std::weak_ptr<storage::StorageManager>& storage_manager);
-    ~SyncController();
-
-    void start();
-    void stop();
+    explicit SyncController(const std::shared_ptr<ServiceManager>& serviceManager);
+    ~SyncController() override = default;
 
     void requeue(const std::shared_ptr<concurrency::FSTask>& task);
 
     void interruptTask(unsigned int vaultId);
 
     void runNow(unsigned int vaultId);
+
+protected:
+    void runLoop() override;
 
 private:
     friend class concurrency::FSTask;
@@ -48,16 +51,11 @@ private:
                     FSTaskCompare> pq;
 
     std::weak_ptr<storage::StorageManager> storage_;
-    std::shared_ptr<concurrency::ThreadPool> pool_;
-    std::thread controllerThread_;
-    std::atomic<bool> running_{false};
 
     mutable std::mutex pqMutex_;
     mutable std::shared_mutex taskMapMutex_;
 
     std::unordered_map<unsigned int, std::shared_ptr<concurrency::FSTask>> taskMap_{};
-
-    void run();
 
     void refreshEngines();
 

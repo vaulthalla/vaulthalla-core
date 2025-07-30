@@ -4,7 +4,7 @@
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "services/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 
 #include <iostream>
 
@@ -16,9 +16,9 @@ namespace vh::http {
 HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint,
                                      const std::shared_ptr<ServiceManager>& serviceManager)
     : acceptor_(ioc), socket_(ioc),
-      router_(std::make_shared<HttpRouter>(serviceManager->authManager(), serviceManager->storageManager())),
-      authManager_(serviceManager->authManager()),
-      storageManager_(serviceManager->storageManager()) {
+      router_(std::make_shared<HttpRouter>(serviceManager->authManager, serviceManager->storageManager)),
+      authManager_(serviceManager->authManager),
+      storageManager_(serviceManager->storageManager) {
     beast::error_code ec;
     acceptor_.open(endpoint.protocol(), ec);
     if (ec) throw beast::system_error(ec);

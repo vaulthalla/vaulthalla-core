@@ -1,5 +1,5 @@
 #include "concurrency/FSTask.hpp"
-#include "services/ThreadPoolRegistry.hpp"
+#include "../../include/concurrency/ThreadPoolRegistry.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"

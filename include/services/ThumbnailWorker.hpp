@@ -4,7 +4,7 @@
 #include "types/File.hpp"
 #include "concurrency/thumbnail/ThumbnailTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "services/ThreadPoolRegistry.hpp"
+#include "../concurrency/ThreadPoolRegistry.hpp"
 
 #include <memory>
 #include <string>

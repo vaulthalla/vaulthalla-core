@@ -1,18 +1,16 @@
 [Unit]
-Description=Vaulthalla Core Daemon
+Description=Vaulthalla Service - The Final Cloud
 After=network.target
 Requires=postgresql.service
-Requires=vaulthalla-fuse.service
-After=vaulthalla-fuse.service
 
 [Service]
 User=vaulthalla
 Group=vaulthalla
-ExecStart=/usr/local/bin/vaulthalla/core_daemon
+ExecStart=/usr/local/bin/vaulthalla/vaulthalla
 Restart=on-failure
 RestartSec=3
 LimitNOFILE=65535
-SyslogIdentifier=vaulthalla-core
+SyslogIdentifier=vaulthalla
 WorkingDirectory=/var/lib/vaulthalla
 
 [Install]

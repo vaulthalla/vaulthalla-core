@@ -7,7 +7,7 @@
 
 using namespace vh::concurrency;
 
-namespace vh::services {
+namespace vh::concurrency {
 
 class ThreadPoolRegistry {
 public:

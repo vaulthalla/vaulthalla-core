@@ -1,6 +1,7 @@
 #include "services/SyncController.hpp"
+#include "services/ServiceManager.hpp"
 #include "storage/StorageManager.hpp"
-#include "services/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolRegistry.hpp"
 #include "concurrency/FSTask.hpp"
 #include "concurrency/fs/LocalFSTask.hpp"
 #include "concurrency/sync/CacheSyncTask.hpp"
@@ -26,30 +27,8 @@ bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shar
     return a->next_run > b->next_run; // Min-heap based on next_run time
 }
 
-SyncController::SyncController(const std::weak_ptr<StorageManager>& storage_manager)
-    : storage_(storage_manager),
-      pool_(ThreadPoolRegistry::instance().syncPool()) {}
-
-SyncController::~SyncController() {
-    stop();
-    if (pool_) pool_->stop();
-}
-
-void SyncController::start() {
-    if (running_) return;
-    running_ = true;
-
-    const auto self = shared_from_this();
-    controllerThread_ = std::thread([self]() { self->run(); });
-
-    std::cout << "[SyncController] Started." << std::endl;
-}
-
-void SyncController::stop() {
-    running_ = false;
-    if (controllerThread_.joinable()) controllerThread_.join();
-    std::cout << "[SyncController] Stopped." << std::endl;
-}
+SyncController::SyncController(const std::shared_ptr<ServiceManager>& serviceManager)
+    : AsyncService(serviceManager, "SyncController"), storage_(serviceManager->storageManager) {}
 
 void SyncController::requeue(const std::shared_ptr<FSTask>& task) {
     std::scoped_lock lock(pqMutex_);
@@ -71,13 +50,13 @@ void SyncController::interruptTask(const unsigned int vaultId) {
     } else std::cerr << "[SyncController] Task for vault ID " << vaultId << " is not running." << std::endl;
 }
 
-void SyncController::run() {
+void SyncController::runLoop() {
     refreshEngines();
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
     unsigned int refreshTries = 0;
 
     while (running_) {
-        if (pool_->interrupted()) {
+        if (ThreadPoolRegistry::instance().syncPool()->interrupted()) {
             std::cout << "[SyncController] Interrupted, stopping." << std::endl;
             return;
         }
@@ -111,7 +90,7 @@ void SyncController::run() {
 
         if (!task || task->isInterrupted()) continue;
 
-        if (task->next_run <= std::chrono::system_clock::now()) pool_->submit(task);
+        if (task->next_run <= std::chrono::system_clock::now()) ThreadPoolRegistry::instance().syncPool()->submit(task);
         else {
             std::scoped_lock lock(pqMutex_);
             pq.push(task);

@@ -9,8 +9,8 @@ namespace vh::websocket {
 WebSocketHandler::WebSocketHandler(const std::shared_ptr<services::ServiceManager>& serviceManager,
                                    const std::shared_ptr<WebSocketRouter>& router)
     : router_(router), serviceManager_(serviceManager) {
-    authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager());
-    storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager());
+    authHandler_ = std::make_shared<AuthHandler>(serviceManager_->authManager);
+    storageHandler_ = std::make_shared<StorageHandler>(serviceManager_->storageManager);
     fsHandler_ = std::make_shared<FileSystemHandler>(serviceManager_);
     shareHandler_ = std::make_shared<ShareHandler>();
     notificationHandler_ = std::make_shared<NotificationHandler>();

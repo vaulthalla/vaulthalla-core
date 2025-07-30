@@ -69,8 +69,7 @@ sudo chmod 750 /var/log/vaulthalla
 # === 5) Install Binaries ===
 echo "🚀 Installing core executables..."
 sudo install -d -o vaulthalla -g vaulthalla -m 755 /usr/local/bin/vaulthalla
-sudo install -m 755 build/fuse_daemon /usr/local/bin/vaulthalla/
-sudo install -m 755 build/core_daemon /usr/local/bin/vaulthalla/
+sudo install -m 755 build/vaulthalla /usr/local/bin/vaulthalla/
 
 # === 6) Deploy Config ===
 echo "⚙️  Deploying default config..."
@@ -151,18 +150,15 @@ else
     echo "🌐 Skipping cloud test vault setup in production mode."
 fi
 
-# === 10) Install systemd services ===
-echo "🛠️  Installing systemd services..."
-sudo install -m 644 deploy/systemd/vaulthalla-fuse.service /etc/systemd/system/
-sudo install -m 644 deploy/systemd/vaulthalla-core.service /etc/systemd/system/
-
+# === 10) Install systemd service ===
+echo "🛠️  Installing systemd service..."
+sudo install -m 644 deploy/systemd/vaulthalla.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now vaulthalla-fuse.service
-sudo systemctl enable --now vaulthalla-core.service
+sudo systemctl enable --now vaulthalla.service
 
 echo ""
 echo "🏁 Vaulthalla installed successfully!"
 
 if [[ "$DEV_MODE" == true ]]; then
-    sudo journalctl -f -u vaulthalla-core
+    sudo journalctl -f -u vaulthalla
 fi

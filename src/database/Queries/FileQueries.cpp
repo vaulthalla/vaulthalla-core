@@ -14,6 +14,9 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
     if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
 
     return Transactions::exec("FileQueries::addFile", [&](pqxx::work& txn) {
+        const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
+        const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
         if (file->inode) txn.exec_prepared("delete_fs_entry_by_inode", file->inode);
 
         pqxx::params p;
@@ -39,10 +42,11 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
-            pqxx::params stats_params{parentId, file->size_bytes, 1, 0}; // Increment size_bytes and file_count
+            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
             txn.exec_prepared("update_dir_stats", stats_params);
-            parentId = txn.exec_prepared("get_fs_entry_parent_id", parentId).one_field().as<std::optional<unsigned
-                int> >();
+            const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
+            if (res.empty()) break;
+            parentId = res.one_field().as<std::optional<unsigned int>>();
         }
 
         return fileId;
@@ -195,7 +199,7 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
 void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned int fsId) {
     Transactions::exec("FileQueries::markFileAsTrashed", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_file_parent_id_and_size", fsId).one_row();
-        const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
+        const auto parentId = row["parent_id"].as<std::optional<unsigned int>>();
         const auto sizeBytes = row["size_bytes"].as<unsigned int>();
 
         txn.exec_prepared("mark_file_trashed_by_id", pqxx::params{fsId, userId});
@@ -210,9 +214,10 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     const auto vaultId = txn.exec("SELECT vault_id FROM fs_entry WHERE id = $1", parentId).one_field().as<unsigned int>();
     const auto rootId = txn.exec_prepared("get_fs_entry_id_by_path", pqxx::params{vaultId, "/"}).one_field().as<unsigned int>();
 
+    // TODO: Fix decrement
     int subDirsDeleted = 0; // TODO: track subdirs
     while (parentId) {
-        pqxx::params stats_params{parentId, -static_cast<int>(sizeBytes), -1, 0};
+        pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, 0};
         const auto fsCount = txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
         const auto nextParent = txn.exec_prepared("get_fs_entry_parent_id", *parentId).one_field().as<std::optional<unsigned int>>();
         if (fsCount == 0 && *parentId != rootId) {

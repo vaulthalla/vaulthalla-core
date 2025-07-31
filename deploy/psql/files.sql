@@ -11,14 +11,16 @@ CREATE TABLE fs_entry
     path             TEXT         NOT NULL,   -- Full path for easy access
 
     -- FUSE compatibility
-    abs_path         TEXT UNIQUE NOT NULL,   -- Absolute path for FUSE operations
+    abs_path         TEXT NOT NULL,   -- Absolute path for FUSE operations
     uuid             UUID DEFAULT gen_random_uuid(), -- Unique identifier for FUSE operations
     inode            BIGINT UNIQUE,           -- bidirectional lookup and faster indexing
     mode             INTEGER   DEFAULT 0755,  -- Emulate POSIX permissions
     owner_uid        INTEGER,                 -- Linux UID for access checks
     group_gid        INTEGER,                 -- Linux GID for group access checks
     is_hidden        BOOLEAN   DEFAULT FALSE,
-    is_system        BOOLEAN   DEFAULT FALSE -- Mark internal-only entries (e.g. keys)
+    is_system        BOOLEAN   DEFAULT FALSE, -- Mark internal-only entries (e.g. keys)
+
+    UNIQUE (parent_id, name) -- Ensure no duplicate names in the same directory
 );
 
 CREATE TABLE directories

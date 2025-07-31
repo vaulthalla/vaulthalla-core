@@ -160,7 +160,11 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("get_fs_entry_parent_id_and_path", "SELECT parent_id, path FROM fs_entry WHERE id = $1");
 
+    conn_->prepare("get_fs_entry_parent_id_by_inode", "SELECT parent_id FROM fs_entry WHERE inode = $1");
+
     conn_->prepare("get_fs_entry_id_by_path", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = $2");
+
+    conn_->prepare("fs_entry_exists_by_inode", "SELECT EXISTS(SELECT 1 FROM fs_entry WHERE inode = $1)");
 }
 
 void DBConnection::initPreparedFiles() const {
@@ -176,10 +180,9 @@ void DBConnection::initPreparedFiles() const {
                    "WITH upsert_entry AS ("
                    "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, abs_path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
                    "  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
-                   "  ON CONFLICT (abs_path) DO UPDATE SET "
+                   "  ON CONFLICT (parent_id, name) DO UPDATE SET "
                    "    last_modified_by = EXCLUDED.last_modified_by, "
                    "    parent_id = EXCLUDED.parent_id, "
-                   "    name = EXCLUDED.name, "
                    "    inode = EXCLUDED.inode, "
                    "    mode = EXCLUDED.mode, "
                    "    owner_uid = EXCLUDED.owner_uid, "
@@ -336,6 +339,12 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("get_file_size_bytes", "SELECT size_bytes FROM files WHERE fs_entry_id = $1");
 
+    conn_->prepare("get_file_size_by_inode",
+        "SELECT f.size_bytes "
+        "FROM files f "
+        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+        "WHERE fs.inode = $1");
+
     conn_->prepare("get_file_parent_id_and_size",
                    "SELECT fs.parent_id, f.size_bytes "
                    "FROM files f "
@@ -347,6 +356,12 @@ void DBConnection::initPreparedFiles() const {
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
+
+    conn_->prepare("get_file_parent_id_and_size_by_inode",
+        "SELECT fs.parent_id, f.size_bytes "
+        "FROM files f "
+        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+        "WHERE fs.inode = $1");
 
     conn_->prepare("is_file",
                    "SELECT EXISTS (SELECT 1 FROM files f "
@@ -397,10 +412,9 @@ void DBConnection::initPreparedDirectories() const {
                    "WITH inserted AS ( "
                    "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, abs_path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
                    "  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
-                   "  ON CONFLICT (abs_path) DO UPDATE SET "
+                   "  ON CONFLICT (parent_id, name) DO UPDATE SET "
                    "    last_modified_by = EXCLUDED.last_modified_by, "
                    "    parent_id = EXCLUDED.parent_id, "
-                   "    name = EXCLUDED.name, "
                    "    inode = EXCLUDED.inode, "
                    "    mode = EXCLUDED.mode, "
                    "    owner_uid = EXCLUDED.owner_uid, "

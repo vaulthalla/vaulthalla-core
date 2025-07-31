@@ -1,7 +1,5 @@
 #pragma once
 
-#include "auth/AuthManager.hpp"
-#include "storage/StorageManager.hpp"
 #include "services/SyncController.hpp"
 #include "services/FUSE.hpp"
 #include "services/Vaulthalla.hpp"

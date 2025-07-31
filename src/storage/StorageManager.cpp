@@ -315,6 +315,7 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
     file->updated_at = file->created_at;
     file->inode = std::make_optional(assignInode(path));
     file->mime_type = StorageEngine::getMimeType(path.filename());
+    file->size_bytes = 0;
 
     if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
     std::filesystem::create_directories(fullBackingPath.parent_path());

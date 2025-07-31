@@ -104,7 +104,7 @@ std::vector<uint8_t> VaultEncryptionManager::decrypt(
     const std::vector<uint8_t>& ciphertext,
     const std::string& b64_iv) const
 {
-    auto iv = b64_decode(b64_iv);
+    const auto iv = b64_decode(b64_iv);
     return decrypt_aes256_gcm(ciphertext, key_, iv);
 }
 

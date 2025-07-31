@@ -162,8 +162,11 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
     fuse_reply_entry(req, &e);
 }
 
-void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent, const char* name, mode_t mode, struct fuse_file_info* fi) {
-    std::cout << "[FUSE] create called. parent: " << parent << ", name: " << name << ", mode: " << std::oct << mode << std::endl;
+void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
+                        const char* name, mode_t mode, struct fuse_file_info* fi) {
+    std::cout << "[FUSE] create called. parent=" << parent
+              << " name=" << (name ? name : "(null)")
+              << " mode=" << std::oct << mode << std::endl;
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -171,94 +174,93 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent, const char* na
     }
 
     try {
-        std::cout << "[FUSE] Resolving parent path" << std::endl;
-        const fs::path parentPath = storageManager_->resolvePathFromInode(parent);
-        const fs::path fullPath = parentPath / name;
+        fs::path parentPath = storageManager_->resolvePathFromInode(parent);
+        fs::path fullPath   = parentPath / name;
 
-        std::cout << "[FUSE] Full path for new file: " << fullPath << std::endl;
-
-        // Check if file already exists
         if (storageManager_->entryExists(fullPath)) {
-            std::cout << "[FUSE] File already exists" << std::endl;
             fuse_reply_err(req, EEXIST);
             return;
         }
 
-        std::cout << "[FUSE] Creating file at path: " << fullPath << std::endl;
+        auto newEntry = storageManager_->createFile(fullPath, mode, getuid(), getgid());
+        auto st       = statFromEntry(newEntry, *newEntry->inode);
 
-        // Create the entry in the storage (this may involve inserting into DB or filesystem layer)
-        const auto newEntry = storageManager_->createFile(fullPath, mode, getuid(), getgid());
-        const auto st = statFromEntry(newEntry, *newEntry->inode);
+        // open backing file immediately
+        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
+        int fd = ::open(backingPath.c_str(), O_CREAT | O_RDWR, mode);
+        if (fd < 0) {
+            fuse_reply_err(req, errno);
+            return;
+        }
 
-        // Fill response
-        fuse_entry_param e{};
-        e.ino = *newEntry->inode;
-        e.attr = st;
-        e.attr_timeout = 60.0;
-        e.entry_timeout = 60.0;
+        auto* fh = new FileHandle{backingPath.string(), fd};
+        fi->fh = reinterpret_cast<uint64_t>(fh);
 
-        fi->fh = static_cast<uint64_t>(*newEntry->inode); // Optional: set file handle to inode
-        fi->direct_io = 0;  // You can change this if you want to bypass kernel caching
+        fi->direct_io = 1;
         fi->keep_cache = 0;
+
+        fuse_entry_param e{};
+        e.ino           = *newEntry->inode;
+        e.attr          = st;
+        e.attr_timeout  = 60.0;
+        e.entry_timeout = 60.0;
 
         fuse_reply_create(req, &e, fi);
     } catch (const std::exception& ex) {
-        std::cerr << "[FUSE] create failed: " << ex.what() << "\n";
+        std::cerr << "[FUSE] create failed: " << ex.what() << std::endl;
         fuse_reply_err(req, EIO);
     }
 }
 
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) {
     std::cout << "[FUSE] open called for inode: " << ino << std::endl;
-
-    {
-        std::scoped_lock lock(openHandleMutex_);
-        openHandleCounts_[ino]++;
-    }
-
     try {
-        fs::path path = storageManager_->resolvePathFromInode(ino);
-        const auto diskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
+        const fs::path path = storageManager_->resolvePathFromInode(ino);
+        const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
-        const int fd = ::open(diskPath.c_str(), fi->flags);
+        int fd = ::open(backingPath.c_str(), O_RDWR);
         if (fd < 0) {
-            std::cerr << "Failed to open file: " << path << " (" << strerror(errno) << ")" << std::endl;
             fuse_reply_err(req, errno);
             return;
         }
 
-        std::cout << "[open] ino=" << ino << " opened diskPath=" << diskPath << " fd=" << fd << std::endl;
+        auto* fh = new FileHandle{backingPath.string(), fd};
+        fi->fh = reinterpret_cast<uint64_t>(fh);
 
-        std::cout << "[FUSE] open() got fd: " << fd << std::endl;
+        fi->direct_io = 1;
+        fi->keep_cache = 0;
 
-        fi->fh = static_cast<uint64_t>(fd);  // REQUIRED: set the file handle
-        fuse_reply_open(req, fi);            // Only call this if fi is valid
-
-    } catch (...) {
-        std::cerr << "Unhandled exception in open()" << std::endl;
+        fuse_reply_open(req, fi);
+    } catch (const std::exception& ex) {
+        std::cerr << "[FUSE] open failed: " << ex.what() << std::endl;
         fuse_reply_err(req, EIO);
     }
 }
 
-void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
-    std::cout << "[FUSE] read called for inode: " << ino
-              << ", size: " << size << ", offset: " << off << std::endl;
+void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf,
+                       size_t size, off_t off, fuse_file_info* fi) {
+    const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    std::cout << "[FUSE] write ino=" << ino
+              << " off=" << off << " size=" << size
+              << " path=" << fh->path << std::endl;
 
-    const int fd = static_cast<int>(fi->fh);   // use the fd we opened in open()
-    std::vector<char> buffer(size);
-
-    const ssize_t bytesRead = ::pread(fd, buffer.data(), size, off);
-    if (bytesRead == -1) fuse_reply_err(req, errno);
-    else fuse_reply_buf(req, buffer.data(), bytesRead);
+    const ssize_t res = ::pwrite(fh->fd, buf, size, off);
+    if (res < 0) fuse_reply_err(req, errno);
+    else fuse_reply_write(req, res);
 }
 
-void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf, size_t size,
-                       off_t off, struct fuse_file_info* fi) {
-    std::cout << "[FUSE] write called for inode: " << ino << " offset: " << off << " size: " << size << std::endl;
+void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
+                      off_t off, fuse_file_info* fi) const {
+    const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    std::cout << "[FUSE] read ino=" << ino
+              << " off=" << off << " size=" << size
+              << " path=" << fh->path << std::endl;
 
-    const ssize_t res = pwrite(static_cast<int>(fi->fh), buf, size, off);
-    if (res == -1) fuse_reply_err(req, errno);
-    else fuse_reply_write(req, res);
+    std::vector<char> buffer(size);
+    const ssize_t res = ::pread(fh->fd, buffer.data(), size, off);
+
+    if (res < 0) fuse_reply_err(req, errno);
+    else fuse_reply_buf(req, buffer.data(), res);
 }
 
 void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
@@ -405,9 +407,9 @@ void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi
 void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) {
     std::cout << "[FUSE] release called for inode: " << ino << std::endl;
 
-    int fd = static_cast<int>(fi->fh);
-    if (fd < 0) {
-        std::cerr << "[release] Invalid file handle: " << fd << std::endl;
+    auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    if (!fh) {
+        std::cerr << "[release] Invalid file handle (null)" << std::endl;
         fuse_reply_err(req, EBADF);
         return;
     }
@@ -415,11 +417,16 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     if (const auto rename = storageManager_->getPendingRename(ino))
         storageManager_->updatePaths(rename->oldPath, rename->newPath);
 
-    if (::close(fd) < 0) std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;
+    if (::close(fh->fd) < 0)
+        std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;
+
+    delete fh;  // clean up heap allocation
+    fi->fh = 0; // clear the kernel-side handle
 
     {
         std::scoped_lock lock(openHandleMutex_);
-        if (--openHandleCounts_[ino] == 0) openHandleCounts_.erase(ino);
+        if (--openHandleCounts_[ino] == 0)
+            openHandleCounts_.erase(ino);
     }
 
     fuse_reply_err(req, 0);
@@ -435,6 +442,7 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.rename = FUSE_DISPATCH(rename);
     ops.open = FUSE_DISPATCH(open);
     ops.read = FUSE_DISPATCH(read);
+    ops.write = FUSE_DISPATCH(write);
     ops.forget = FUSE_DISPATCH(forget);
     ops.access = FUSE_DISPATCH(access);
     ops.flush = FUSE_DISPATCH(flush);

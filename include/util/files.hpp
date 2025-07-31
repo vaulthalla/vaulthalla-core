@@ -88,6 +88,9 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
     // Decrypt
     auto plaintext = engine->decrypt(vault_id, rel_path, ciphertext);
 
+    if (plaintext.empty())
+        throw std::runtime_error("Decryption failed or returned empty data for file: " + abs_path.string());
+
     // Write to temp file
     fs::path tmp_dir = fs::temp_directory_path();
     fs::path tmp_file = tmp_dir / ("vaulthalla_dec_" + generate_random_suffix() + ".tmp");

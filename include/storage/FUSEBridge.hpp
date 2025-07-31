@@ -16,7 +16,15 @@ namespace vh::storage {
 class StorageManager;
 }
 
+namespace fs = std::filesystem;
+
 namespace vh::fuse {
+
+struct FileHandle {
+    fs::path path;
+    int fd;  // optional: backing fd you control
+    size_t size = 0;
+};
 
 class FUSEBridge {
 public:

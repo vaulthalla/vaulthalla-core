@@ -369,10 +369,11 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     std::cout << "[StorageManager] Renaming on disk with encryption: " << oldAbsPath << " → " << newAbsPath << std::endl;
 
     const auto buffer = util::readFileToVector(oldAbsPath);
+    if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
 
     std::string iv_b64;
     const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
-
+    if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
     util::writeFile(newAbsPath, ciphertext);
 
     entry->name = newPath.filename();

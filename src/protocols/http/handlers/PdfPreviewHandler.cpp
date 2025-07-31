@@ -19,8 +19,8 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         const auto size_it = params.find("size");
 
         const auto engine = storageManager_->getEngine(vault_id);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vault_id));
 
-        std::string file_path = engine->paths->absPath(rel_path, PathType::VAULT_ROOT);
         std::string mime_type = "image/jpeg";
 
         const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);

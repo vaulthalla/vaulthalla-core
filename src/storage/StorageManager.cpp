@@ -376,7 +376,7 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     util::writeFile(newAbsPath, ciphertext);
 
     entry->name = newPath.filename();
-    entry->path = engine->paths->relPath(newPath, PathType::VAULT_ROOT);
+    entry->path = engine->paths->absRelToRoot(newPath, PathType::VAULT_ROOT);
     entry->abs_path = newPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
 

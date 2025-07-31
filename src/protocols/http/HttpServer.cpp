@@ -16,7 +16,7 @@ namespace vh::http {
 
 HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
     : acceptor_(ioc), socket_(ioc),
-      router_(),
+      router_(std::make_shared<HttpRouter>()),
       authManager_(ServiceDepsRegistry::instance().authManager),
       storageManager_(ServiceDepsRegistry::instance().storageManager) {
     beast::error_code ec;

@@ -21,8 +21,8 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         const auto engine = storageManager_->getEngine(vault_id);
         const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
 
-        std::string file_path = engine->paths->absPath(rel_path, PathType::BACKING_ROOT);
-        std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
+        std::string file_path = engine->paths->absPath(rel_path, PathType::VAULT_ROOT);
+        std::string mime_type = FileQueries::getMimeType(vault_id, {rel_path});
 
         if (scale_it != params.end() || size_it != params.end()) {
             std::optional<std::string> scale, size;

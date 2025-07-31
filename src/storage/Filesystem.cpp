@@ -34,6 +34,7 @@ bool Filesystem::isReady() {
 }
 
 void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
+    std::cout << "[Filesystem] Creating directory at: " << absPath.string() << std::endl;
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
@@ -50,7 +51,6 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
 
         std::ranges::reverse(toCreate);
 
-        std::cout << "[Filesystem] Directories to create: " << toCreate.size() << std::endl;
         for (const auto& p : toCreate) {
             const auto path = makeAbsolute(p);
 
@@ -61,7 +61,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
             if (const auto engine = storageManager_->resolveStorageEngine(path)) {
                 dir->vault_id = engine->vault->id;
                 dir->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
-            }
+            } else dir->path = path;
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = path;
@@ -188,9 +188,6 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
 }
 
 bool Filesystem::exists(const fs::path& absPath) {
-    std::lock_guard lock(mutex_);
-    if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
-
     try {
         return storageManager_->entryExists(absPath);
     } catch (const std::exception& ex) {

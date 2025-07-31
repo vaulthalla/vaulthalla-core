@@ -17,10 +17,13 @@
 #include "util/fsPath.hpp"
 #include "util/files.hpp"
 #include "util/Magic.hpp"
+#include "services/ThumbnailWorker.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <thread>
+
+#include "storage/Filesystem.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -248,7 +251,7 @@ void StorageManager::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
 
 bool StorageManager::entryExists(const fs::path& absPath) const {
     std::shared_lock lock(inodeMutex_);
-    return pathToEntry_.contains(absPath);
+    return pathToEntry_.contains(absPath) || FSEntryQueries::exists(absPath);
 }
 
 std::shared_ptr<FSEntry> StorageManager::getEntryFromInode(fuse_ino_t ino) const {
@@ -295,11 +298,8 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
 
     std::cout << "[StorageManager] Creating file at path: " << path << std::endl;
 
-    const fs::path fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
-
-    std::cout << "[StorageManager] Full disk path for file: " << fullDiskPath << std::endl;
-    std::cout << "                 Absolute path for file: "
-    << engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT) << std::endl;
+    const auto fullDiskPath = engine->paths->absPath(path, PathType::FUSE_ROOT);
+    const auto fullBackingPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
 
     const auto file = std::make_shared<File>();
     file->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
@@ -316,10 +316,12 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
     file->inode = std::make_optional(assignInode(path));
     file->mime_type = StorageEngine::getMimeType(path.filename());
 
-    std::error_code ec;
-    std::filesystem::create_directories(fullDiskPath.parent_path(), ec); // ensure dirs exist
-    std::ofstream(fullDiskPath).close(); // create empty file
-    if (!std::filesystem::exists(fullDiskPath))
+    if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
+    std::filesystem::create_directories(fullBackingPath.parent_path());
+    std::cout << "[StorageManager] Ensured parent directories exist for: " << fullBackingPath << std::endl;
+    std::ofstream(fullBackingPath).close(); // create empty file
+    std::cout << "[StorageManager] Created empty file at: " << fullBackingPath << std::endl;
+    if (!std::filesystem::exists(fullBackingPath))
         std::cerr << "[StorageManager] Failed to create real file at: " << fullDiskPath << std::endl;
 
     std::cout << "[StorageManager] File created on disk at: " << fullDiskPath << std::endl;
@@ -360,16 +362,21 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
 
     const auto entry = getEntry(oldPath);
     const auto engine = resolveStorageEngine(newPath);
+    if (!engine) {
+        throw std::filesystem::filesystem_error(
+            "[StorageManager] No storage engine found for DB-backed rename",
+            oldPath,
+            std::make_error_code(std::errc::no_such_file_or_directory));
+    }
 
-    const auto oldAbsPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(oldPath);
-    const auto newAbsPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(newPath);
+    const auto oldAbsPath = engine->paths->absPath(oldPath, PathType::BACKING_ROOT);
+    const auto newAbsPath = engine->paths->absPath(newPath, PathType::BACKING_ROOT);
 
     std::cout << "[StorageManager] Processing pending rename: " << oldAbsPath << " → " << newAbsPath << std::endl;
 
-    std::cout << "[StorageManager] Renaming on disk with encryption: " << oldAbsPath << " → " << newAbsPath << std::endl;
-
     const auto buffer = util::readFileToVector(oldAbsPath);
     if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
+    services::ThumbnailWorker::enqueue(engine, buffer, std::static_pointer_cast<File>(entry));
 
     std::string iv_b64;
     const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
@@ -377,7 +384,7 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     util::writeFile(newAbsPath, ciphertext);
 
     entry->name = newPath.filename();
-    entry->path = engine->paths->absRelToRoot(newPath, PathType::VAULT_ROOT);
+    entry->path = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     entry->abs_path = newPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
 

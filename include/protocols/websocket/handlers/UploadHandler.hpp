@@ -38,10 +38,6 @@ public:
 
     bool uploadInProgress() const { return currentUpload_.has_value(); }
 
-    static void ensureDirectoriesInDb(unsigned int vaultId,
-                               const std::filesystem::path& relPath,
-                               const std::shared_ptr<types::User>& user);
-
 private:
     WebSocketSession& session_;
     std::optional<UploadContext> currentUpload_;

@@ -48,7 +48,7 @@ bool StorageEngine::isFile(const fs::path& rel_path) const {
 }
 
 std::shared_ptr<File> StorageEngine::createFile(const fs::path& rel_path, const std::vector<uint8_t>& buffer) const {
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
 
     if (!fs::exists(absPath))
         throw std::runtime_error("File does not exist at path: " + absPath.string());
@@ -152,7 +152,7 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
 }
 
 void StorageEngine::finishUpload(const unsigned int userId, const std::filesystem::path& relPath) {
-    const auto absPath = paths->absPath(relPath, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(relPath, PathType::BACKING_VAULT_ROOT);
 
     if (!std::filesystem::exists(absPath)) throw std::runtime_error("File does not exist at path: " + absPath.string());
     if (!std::filesystem::is_regular_file(absPath)) throw std::runtime_error("Path is not a regular file: " + absPath.string());
@@ -172,7 +172,7 @@ void StorageEngine::finishUpload(const unsigned int userId, const std::filesyste
 }
 
 void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) const {
-    const auto absPath = paths->absPath(relPath, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(relPath, PathType::BACKING_VAULT_ROOT);
     if (!fs::exists(absPath)) fs::create_directories(absPath);
 
     const auto d = std::make_shared<Directory>();

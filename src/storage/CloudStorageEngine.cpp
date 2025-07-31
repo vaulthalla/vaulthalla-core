@@ -36,7 +36,7 @@ void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) co
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
     purgeThumbnails(path);
     FileQueries::deleteFile(vault->owner_id, vault->id, path);
-    const auto absPath = paths->absPath(path, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(path, PathType::BACKING_VAULT_ROOT);
     if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
 }
 
@@ -47,7 +47,7 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
 }
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
     if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
 
@@ -74,7 +74,7 @@ std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem:
 
 std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::path& rel_path) {
     auto buffer = downloadToBuffer(rel_path);
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_ROOT);
+    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
     const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
 
     std::shared_ptr<File> file;

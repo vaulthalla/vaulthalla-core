@@ -240,9 +240,6 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
 void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf,
                        size_t size, off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
-    std::cout << "[FUSE] write ino=" << ino
-              << " off=" << off << " size=" << size
-              << " path=" << fh->path << std::endl;
 
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
     if (res < 0) fuse_reply_err(req, errno);
@@ -252,9 +249,6 @@ void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf,
 void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
                       off_t off, fuse_file_info* fi) const {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
-    std::cout << "[FUSE] read ino=" << ino
-              << " off=" << off << " size=" << size
-              << " path=" << fh->path << std::endl;
 
     std::vector<char> buffer(size);
     const ssize_t res = ::pread(fh->fd, buffer.data(), size, off);
@@ -264,7 +258,6 @@ void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
 }
 
 void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
-    std::cout << "[FUSE] mkdir called for parent inode: " << parent << std::endl;
     try {
         if (std::string_view(name).find('/') != std::string::npos) {
             fuse_reply_err(req, EINVAL);
@@ -299,15 +292,13 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
 
             if (const auto engine = storageManager_->resolveStorageEngine(path)) {
                 dir->vault_id = engine->vault->id;
-                dir->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
-            }
-
-            if (auto parentEntry = storageManager_->getEntry(resolveParent(path)))
-                dir->parent_id = parentEntry->id;
+                dir->path = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+            } else dir->path = path;
 
             const auto fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
-            dir->abs_path = makeAbsolute(path);
+            dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
+            dir->abs_path = path;
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             dir->mode = mode;
@@ -321,7 +312,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             DirectoryQueries::upsertDirectory(dir);
 
             try {
-                std::filesystem::create_directory(fullDiskPath); // Make just this one level
+                std::filesystem::create_directories(fullDiskPath); // Make just this one level
             } catch (const std::filesystem::filesystem_error& fsErr) {
                 std::cerr << "[mkdir] Filesystem error: " << fsErr.what() << " for path: " << fullDiskPath << std::endl;
                 fuse_reply_err(req, EIO);

@@ -95,6 +95,18 @@ TEST_F(PathTest, AbsRelToRoot_DeepSubdir) {
 
 TEST_F(PathTest, AbsPath_BackupRoot) {
     Path p("users/admin");
-    fs::path abs = p.absPath("shadow.db", PathType::BACKING_ROOT);
+    fs::path abs = p.absPath("shadow.db", PathType::BACKING_VAULT_ROOT);
     EXPECT_EQ(abs, "/var/lib/vaulthalla/users/admin/shadow.db");
+}
+
+TEST_F(PathTest, AbsRelToRoot_ResolvePath) {
+    Path p("users/admin");
+    fs::path abs = p.absRelToRoot("/mnt/vaulthalla/users/admin/test-assets/sample.jpg", PathType::VAULT_ROOT);
+    EXPECT_EQ(abs, "/test-assets/sample.jpg");
+}
+
+TEST_F(PathTest, AbsRelToAbsOther_ConvertPaths) {
+    Path p("users/admin");
+    fs::path abs = p.absRelToAbsOther("/users/admin/test.txt", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    EXPECT_EQ(abs, "/test.txt");
 }

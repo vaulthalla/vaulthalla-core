@@ -61,8 +61,8 @@ void FSTask::push(const std::shared_ptr<Task>& task) {
 
 void FSTask::processOperations() const {
     for (const auto& op : OperationQueries::listOperationsByVault(engine_->vault->id)) {
-        const auto absSrc = engine_->paths->absPath(op->source_path, PathType::BACKING_ROOT);
-        const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_ROOT);
+        const auto absSrc = engine_->paths->absPath(op->source_path, PathType::BACKING_VAULT_ROOT);
+        const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
         {

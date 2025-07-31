@@ -38,35 +38,6 @@ void UploadHandler::startUpload(const std::string& uploadId,
     };
 }
 
-void UploadHandler::ensureDirectoriesInDb(const unsigned int vaultId,
-                                          const std::filesystem::path& relPath,
-                                          const std::shared_ptr<types::User>& user) {
-    std::filesystem::path current;
-    std::optional parentId = DirectoryQueries::getRootDirectoryId(vaultId);
-
-    for (const auto& part : relPath.parent_path()) {
-        current /= part;
-
-        if (const auto dirId = DirectoryQueries::getDirectoryIdByPath(vaultId, current)) {
-            parentId = dirId;
-            continue;  // directory already exists in DB
-        }
-
-        const auto dir = std::make_shared<types::Directory>();
-        dir->vault_id = vaultId;
-        dir->name = part.string();
-        dir->created_by = user->id;
-        dir->last_modified_by = user->id;
-        dir->path = current.string();
-        dir->parent_id = parentId;
-        dir->size_bytes = 0;
-        dir->file_count = 0;
-        dir->subdirectory_count = 0;
-
-        DirectoryQueries::upsertDirectory(dir);
-    }
-}
-
 void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {
     if (!currentUpload_) throw std::runtime_error("No upload in progress");
 

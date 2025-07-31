@@ -12,6 +12,7 @@
 
 using namespace vh::types;
 using namespace vh::services;
+using namespace vh::storage;
 
 namespace vh::websocket {
 
@@ -35,7 +36,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto absPath = engine->paths->absPath(path, PathType::VAULT_ROOT);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
-        UploadHandler::ensureDirectoriesInDb(vaultId, path, session.getAuthenticatedUser());
+        std::filesystem::create_directories(absPath.parent_path());
 
         session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
 

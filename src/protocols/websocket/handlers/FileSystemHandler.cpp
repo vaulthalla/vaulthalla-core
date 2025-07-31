@@ -7,6 +7,7 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 
 #include <iostream>
 
@@ -71,8 +72,6 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         session.getUploadHandler()->finishUpload(vaultId);
 
-        UploadContext context;
-
         // storageManager_->finishUpload(vaultId, session.getAuthenticatedUser()->id, path);
 
         const json data = {{"path", path}};
@@ -107,7 +106,10 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
 
         enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
-        storageManager_->mkdir(vaultId, path, session.getAuthenticatedUser());
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+        engine->mkdir(path, session.getAuthenticatedUser()->id);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
         const json data = {{"path", path}};
 
@@ -133,15 +135,18 @@ void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto fromPath = payload.at("from").get<std::string>();
-        const auto toPath = payload.at("to").get<std::string>();
+        const auto from = payload.at("from").get<std::string>();
+        const auto to = payload.at("to").get<std::string>();
 
-        enforcePermissions(session, vaultId, fromPath, &VaultRole::canMove);
-        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
+        enforcePermissions(session, vaultId, from, &VaultRole::canMove);
+        enforcePermissions(session, vaultId, to, &VaultRole::canCreate);
 
-        storageManager_->move(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+        engine->move(from, to, session.getAuthenticatedUser()->id);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
-        const json data = {{"from", fromPath}, {"to", toPath}};
+        const json data = {{"from", from}, {"to", to}};
 
         const json response = {{"command", "fs.entry.move.response"},
                                {"status", "ok"},
@@ -150,7 +155,7 @@ void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Move on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+        std::cout << "[FileSystemHandler] Move on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleMove error: " << e.what() << std::endl;
@@ -165,15 +170,18 @@ void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session)
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto fromPath = payload.at("from").get<std::string>();
-        const auto toPath = payload.at("to").get<std::string>();
+        const auto from = fs::path(payload.at("from").get<std::string>());
+        const auto to = fs::path(payload.at("to").get<std::string>());
 
-        enforcePermissions(session, vaultId, fromPath, &VaultRole::canRename);
-        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
+        enforcePermissions(session, vaultId, from, &VaultRole::canRename);
+        enforcePermissions(session, vaultId, to, &VaultRole::canCreate);
 
-        storageManager_->rename(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+        engine->rename(from, to, session.getAuthenticatedUser()->id);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
-        const json data = {{"from", fromPath}, {"to", toPath}};
+        const json data = {{"from", from}, {"to", to}};
 
         const json response = {{"command", "fs.entry.rename.response"},
                                {"status", "ok"},
@@ -182,7 +190,7 @@ void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Rename on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+        std::cout << "[FileSystemHandler] Rename on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleRename error: " << e.what() << std::endl;
@@ -197,15 +205,18 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto fromPath = payload.at("from").get<std::string>();
-        const auto toPath = payload.at("to").get<std::string>();
+        const auto from = fs::path(payload.at("from").get<std::string>());
+        const auto to = fs::path(payload.at("to").get<std::string>());
 
-        enforcePermissions(session, vaultId, fromPath, &VaultRole::canMove);
-        enforcePermissions(session, vaultId, toPath, &VaultRole::canCreate);
+        enforcePermissions(session, vaultId, from, &VaultRole::canMove);
+        enforcePermissions(session, vaultId, to, &VaultRole::canCreate);
 
-        storageManager_->copy(vaultId, session.getAuthenticatedUser()->id, fromPath, toPath);
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+        engine->copy(from, to, session.getAuthenticatedUser()->id);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
-        const json data = {{"from", fromPath}, {"to", toPath}};
+        const json data = {{"from", from}, {"to", to}};
 
         const json response = {{"command", "fs.entry.copy.response"},
                                {"status", "ok"},
@@ -214,7 +225,7 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Copy on vault '" << vaultId << "' from '" << fromPath << "' to '" << toPath << "'" << std::endl;
+        std::cout << "[FileSystemHandler] Copy on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleCopy error: " << e.what() << std::endl;
@@ -231,16 +242,14 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.value("path", "/");
 
-        const auto user = session.getAuthenticatedUser();
         enforcePermissions(session, vaultId, path, &VaultRole::canList);
 
         const auto& vaultName = storageManager_->getVault(vaultId)->name;
-        const auto files = storageManager_->listDir(vaultId, path);
 
         const json data = {
             {"vault", vaultName},
             {"path", path},
-            {"files", files}
+            {"files", DirectoryQueries::listDir(vaultId, path, false)}
         };
 
         const json response = {{"command", "fs.dir.list.response"},
@@ -273,7 +282,11 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
         const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
         enforcePermissions(session, vaultId, path, &VaultRole::canDelete);
-        storageManager_->removeEntry(userId, vaultId, path);
+
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+        engine->remove(path, session.getAuthenticatedUser()->id);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
         const json response = {{"command", "fs.entry.delete.response"},
                                {"status", "ok"},

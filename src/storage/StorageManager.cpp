@@ -17,7 +17,9 @@
 #include "util/fsPath.hpp"
 #include "util/files.hpp"
 #include "util/Magic.hpp"
+#include "crypto/Hash.hpp"
 #include "services/ThumbnailWorker.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -29,6 +31,7 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::config;
+using namespace vh::services;
 
 StorageManager::StorageManager() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
@@ -375,9 +378,10 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
 
     std::cout << "[StorageManager] Processing pending rename: " << oldAbsPath << " → " << newAbsPath << std::endl;
 
+    // TODO: handle potential directory renames
+
     const auto buffer = util::readFileToVector(oldAbsPath);
     if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
-    services::ThumbnailWorker::enqueue(engine, buffer, std::static_pointer_cast<File>(entry));
 
     std::string iv_b64;
     const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
@@ -392,9 +396,11 @@ void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPat
     if (entry->isDirectory()) DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));
     else {
         const auto file = std::static_pointer_cast<File>(entry);
-         file->encryption_iv = iv_b64;
-         file->size_bytes = std::filesystem::file_size(newAbsPath);
-         file->mime_type = StorageEngine::getMimeType(newPath.filename());
+        ThumbnailWorker::enqueue(engine, buffer, file);
+        file->encryption_iv = iv_b64;
+        file->size_bytes = std::filesystem::file_size(newAbsPath);
+        file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
+        file->content_hash = crypto::Hash::blake2b(newAbsPath);
         FileQueries::upsertFile(file);
     }
 
@@ -492,65 +498,9 @@ std::shared_ptr<Vault> StorageManager::getVault(const unsigned int vaultId) cons
     return VaultQueries::getVault(vaultId);
 }
 
-void StorageManager::finishUpload(const unsigned int vaultId, const unsigned int userId,
-                                  const std::filesystem::path& relPath) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->finishUpload(userId, relPath);
-}
-
-void StorageManager::removeEntry(const unsigned int userId, const unsigned int vaultId, const std::filesystem::path& relPath) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->remove(relPath, userId);
-    syncNow(vaultId);
-}
-
-void StorageManager::mkdir(const unsigned int vaultId, const std::string& relPath,
-                           const std::shared_ptr<User>& user) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->mkdir(relPath, user->id);
-}
-
-void StorageManager::move(const unsigned int vaultId, const unsigned int userId,
-                          const std::filesystem::path& from, const std::filesystem::path& to) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->move(from, to, userId);
-    syncNow(engine->vault->id);
-}
-
-void StorageManager::rename(const unsigned int vaultId, const unsigned int userId,
-                            const std::string& from, const std::string& to) const {
-    const auto engine = getEngine(vaultId);
-    engine->rename(from, to, userId);
-    syncNow(engine->vault->id);
-}
-
-void StorageManager::copy(const unsigned int vaultId, const unsigned int userId,
-                          const std::filesystem::path& from, const std::filesystem::path& to) const {
-    const auto engine = getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-    engine->copy(from, to, userId);
-    syncNow(engine->vault->id);
-}
-
-std::vector<std::shared_ptr<FSEntry> > StorageManager::listDir(const unsigned int vaultId,
-                                                               const std::string& relPath,
-                                                               const bool recursive) const {
-    std::lock_guard lock(mutex_);
-    return DirectoryQueries::listDir(vaultId, relPath, recursive);
-}
-
 std::shared_ptr<StorageEngine> StorageManager::getEngine(const unsigned int id) const {
     std::scoped_lock lock(mutex_);
     if (!vaultToEngine_.contains(id))
         throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(id));
     return vaultToEngine_.at(id);
 }
-
-void StorageManager::syncNow(unsigned int vaultId) {
-    // TODO: Implement immediate sync logic
-}
-

@@ -8,10 +8,13 @@
 #include "storage/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <boost/algorithm/string.hpp>
 #include <iostream>
+
+using namespace vh::services;
 
 namespace vh::websocket {
 
@@ -361,7 +364,7 @@ void StorageHandler::handleSyncVault(const json& msg, WebSocketSession& session)
         const auto user = session.getAuthenticatedUser();
         const auto vaultId = msg.at("payload").at("id").get<unsigned int>();
 
-        storageManager_->syncNow(vaultId);
+        ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
         const json response = {
             {"command", "storage.vault.sync.response"},

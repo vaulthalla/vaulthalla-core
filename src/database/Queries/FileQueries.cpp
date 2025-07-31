@@ -219,12 +219,13 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     while (parentId) {
         pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, 0};
         const auto fsCount = txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
-        const auto nextParent = txn.exec_prepared("get_fs_entry_parent_id", *parentId).one_field().as<std::optional<unsigned int>>();
+        const auto parentRes = txn.exec_prepared("get_fs_entry_parent_id", *parentId);
         if (fsCount == 0 && *parentId != rootId) {
             txn.exec_prepared("delete_fs_entry", *parentId);
             --subDirsDeleted;
         }
-        parentId = nextParent;
+        if (parentRes.empty()) break;
+        parentId = parentRes.one_field().as<std::optional<unsigned int>>();;
     }
 }
 

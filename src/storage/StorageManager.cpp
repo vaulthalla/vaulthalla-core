@@ -322,13 +322,9 @@ std::shared_ptr<FSEntry> StorageManager::createFile(const fs::path& path, mode_t
 
     if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
     std::filesystem::create_directories(fullBackingPath.parent_path());
-    std::cout << "[StorageManager] Ensured parent directories exist for: " << fullBackingPath << std::endl;
     std::ofstream(fullBackingPath).close(); // create empty file
-    std::cout << "[StorageManager] Created empty file at: " << fullBackingPath << std::endl;
     if (!std::filesystem::exists(fullBackingPath))
         std::cerr << "[StorageManager] Failed to create real file at: " << fullDiskPath << std::endl;
-
-    std::cout << "[StorageManager] File created on disk at: " << fullDiskPath << std::endl;
 
     FileQueries::upsertFile(file);
     cacheEntry(file);
@@ -362,8 +358,6 @@ void StorageManager::renamePath(const fs::path& oldPath, const fs::path& newPath
 }
 
 void StorageManager::updatePaths(const fs::path& oldPath, const fs::path& newPath) {
-    std::cout << "[StorageManager] Applying DB and cache updates: " << oldPath << " → " << newPath << std::endl;
-
     const auto entry = getEntry(oldPath);
     const auto engine = resolveStorageEngine(newPath);
     if (!engine) {

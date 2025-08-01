@@ -32,13 +32,12 @@ int main() {
         ThreadPoolRegistry::instance().init();
         Transactions::init();
         ServiceDepsRegistry::init();
-        const auto serviceManager = std::make_shared<ServiceManager>();
-        ServiceDepsRegistry::setSyncController(serviceManager->syncController);
+        ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
 
         std::cout << "[*] Starting services..." << std::endl;
         Filesystem::init(ServiceDepsRegistry::instance().storageManager);
         ServiceDepsRegistry::instance().storageManager->initStorageEngines();
-        serviceManager->startServices();
+        ServiceManager::instance().startAll();
 
         std::signal(SIGINT, signalHandler);
         std::signal(SIGTERM, signalHandler);
@@ -50,9 +49,7 @@ int main() {
         std::cout << "[*] Shutting down Vaulthalla services..." << std::endl;
 
         ThreadPoolRegistry::instance().shutdown();
-        serviceManager->syncController->stop();
-        serviceManager->fuseService->stop();
-        serviceManager->vaulthallaService->stop();
+        ServiceManager::instance().stopAll(SIGTERM);
 
         std::cout << "[✓] Vaulthalla services shut down cleanly." << std::endl;
 

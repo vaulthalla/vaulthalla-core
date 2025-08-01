@@ -284,52 +284,12 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
 
         const std::filesystem::path fullPath = parentPath / name;
 
-        // ---------------------------
-        // Recursive directory creation
-        // ---------------------------
-        std::vector<std::filesystem::path> toCreate;
-        std::filesystem::path cur = fullPath;
-
-        // Traverse upwards until we find an existing entry
-        while (!cur.empty() && !cache->entryExists(cur)) {
-            toCreate.push_back(cur);
-            cur = cur.parent_path();
-        }
-
-        // Now create from top-down (reverse order)
-        std::ranges::reverse(toCreate.begin(), toCreate.end());
-
-        for (const auto& path : toCreate) {
-            auto dir = std::make_shared<Directory>();
-
-            if (const auto engine = storageManager_->resolveStorageEngine(path)) {
-                dir->vault_id = engine->vault->id;
-                dir->path = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-            } else dir->path = path;
-
-            const auto fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
-
-            dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
-            dir->abs_path = path;
-            dir->name = path.filename();
-            dir->created_at = dir->updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-            dir->mode = mode;
-            dir->owner_uid = getuid();
-            dir->group_gid = getgid();
-            dir->inode = cache->assignInode(path);
-            dir->is_hidden = false;
-            dir->is_system = false;
-
-            cache->cacheEntry(dir);
-            DirectoryQueries::upsertDirectory(dir);
-
-            try {
-                std::filesystem::create_directories(fullDiskPath); // Make just this one level
-            } catch (const std::filesystem::filesystem_error& fsErr) {
-                std::cerr << "[mkdir] Filesystem error: " << fsErr.what() << " for path: " << fullDiskPath << std::endl;
-                fuse_reply_err(req, EIO);
-                return;
-            }
+        try {
+            Filesystem::mkdir(fullPath, mode);
+        } catch (const std::filesystem::filesystem_error& fsErr) {
+            std::cerr << "[mkdir] Filesystem error: " << fsErr.what() << " for path: " << fullPath << std::endl;
+            fuse_reply_err(req, EIO);
+            return;
         }
 
         // Final directory (last one created) = fullPath

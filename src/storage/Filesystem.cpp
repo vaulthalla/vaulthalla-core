@@ -61,28 +61,34 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
         for (const auto& p : toCreate) {
             const auto path = makeAbsolute(p);
 
-            if (FSEntryQueries::getEntryIdByPath(path)) continue;
-
             auto dir = std::make_shared<Directory>();
+
+            const auto fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
             if (const auto engine = storageManager_->resolveStorageEngine(path)) {
                 dir->vault_id = engine->vault->id;
-                dir->path = engine->paths->relPath(path, PathType::VAULT_ROOT);
+                dir->path = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             } else dir->path = path;
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
             dir->abs_path = path;
             dir->name = path.filename();
-            dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
             dir->inode = cache->assignInode(path);
-            dir->is_hidden = false;
+            dir->is_hidden = dir->name.front() == '.' && !dir->name.starts_with("..");
             dir->is_system = false;
 
             cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
+
+            try {
+                std::filesystem::create_directories(fullDiskPath);
+            } catch (const std::exception& e) {
+                throw std::runtime_error(
+                    "Failed to create directory on disk: " + fullDiskPath.string() + " - " + e.what());
+            }
         }
 
         std::cout << "[Filesystem] Successfully created directory: " << absPath.string() << std::endl;

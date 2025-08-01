@@ -19,7 +19,7 @@ void FSEntryQueries::upsertFSEntry(const std::shared_ptr<FSEntry>& entry) {
             entry->parent_id,
             entry->name,
             to_utf8_string(entry->path.u8string()),
-            to_utf8_string(entry->abs_path.u8string()),
+            to_utf8_string(entry->fuse_path.u8string()),
             entry->inode,
             entry->mode,
             entry->owner_uid,
@@ -38,10 +38,10 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const fs::path& absPath) {
     return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
         const auto path_str = to_utf8_string(absPath.u8string());
 
-        const auto fileRes = txn.exec_prepared("get_file_by_abs_path", path_str);
+        const auto fileRes = txn.exec_prepared("get_file_by_fuse_path", path_str);
         if (!fileRes.empty()) return std::make_shared<File>(fileRes[0]);
 
-        const auto dirRes = txn.exec_prepared("get_dir_by_abs_path", path_str);
+        const auto dirRes = txn.exec_prepared("get_dir_by_fuse_path", path_str);
         if (!dirRes.empty()) return std::make_shared<Directory>(dirRes[0]);
 
         return nullptr;
@@ -65,7 +65,7 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
 
 std::optional<unsigned int> FSEntryQueries::getEntryIdByPath(const fs::path& absPath) {
     return Transactions::exec("FSEntryQueries::getEntryIdByPath", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("get_fs_entry_id_by_abs_path", to_utf8_string(absPath.u8string()));
+        const auto res = txn.exec_prepared("get_fs_entry_id_by_fuse_path", to_utf8_string(absPath.u8string()));
         std::optional<unsigned int> entryId;
         if (res.empty()) entryId = std::nullopt;
         else entryId = res.one_field().as<unsigned int>();
@@ -78,7 +78,7 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
     Transactions::exec("FSEntryQueries::renameEntry", [&](pqxx::work& txn) {
         pqxx::params p{entry->id, entry->name,
                        to_utf8_string(entry->path.u8string()),
-                       to_utf8_string(entry->abs_path.u8string()),
+                       to_utf8_string(entry->fuse_path.u8string()),
                        entry->parent_id};
         txn.exec_prepared("rename_fs_entry", p);
     });
@@ -92,14 +92,14 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
         const bool changed =
             cached->name != entry->name ||
             cached->path != entry->path ||
-            cached->abs_path != entry->abs_path ||
+            cached->fuse_path != entry->fuse_path ||
             cached->parent_id != entry->parent_id;
 
         if (!changed) return false;
 
         cached->name = entry->name;
         cached->path = entry->path;
-        cached->abs_path = entry->abs_path;
+        cached->fuse_path = entry->fuse_path;
         cached->parent_id = entry->parent_id;
         return true;
     };
@@ -116,14 +116,14 @@ std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const fs::path& a
 
         const auto files = files_from_pq_res(
             recursive
-                ? txn.exec_prepared("list_files_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
-                : txn.exec_prepared("list_files_in_dir_by_abs_path", p)
+                ? txn.exec_prepared("list_files_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
+                : txn.exec_prepared("list_files_in_dir_by_fuse_path", p)
             );
 
         const auto directories = directories_from_pq_res(
             recursive
-                ? txn.exec_prepared("list_directories_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
-                : txn.exec_prepared("list_directories_in_dir_by_abs_path", p)
+                ? txn.exec_prepared("list_directories_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
+                : txn.exec_prepared("list_directories_in_dir_by_fuse_path", p)
             );
 
         return merge_entries(files, directories);
@@ -151,7 +151,7 @@ std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(unsigned int entr
 bool FSEntryQueries::exists(const fs::path& absPath) {
     return Transactions::exec("FSEntryQueries::exists", [&](pqxx::work& txn) {
         const auto path = to_utf8_string(absPath.u8string());
-        return txn.exec("SELECT EXISTS(SELECT 1 FROM fs_entry WHERE abs_path = "
+        return txn.exec("SELECT EXISTS(SELECT 1 FROM fs_entry WHERE fuse_path = "
                         + txn.quote(path) + ")").one_field().as<bool>();
     });
 }

@@ -42,7 +42,7 @@ void MirrorSyncTask::syncKeepLocal() {
     }
 
     futures_.reserve(s3Map_.size());
-    for (const auto& file : uMap2Vector(s3Map_)) remove(file, DeleteTask::Type::REMOTE);
+    for (const auto& file : uMap2Vector(s3Map_)) remove(file, CloudDeleteTask::Type::REMOTE);
     processFutures();
 }
 
@@ -68,6 +68,6 @@ void MirrorSyncTask::syncKeepRemote() {
     }
 
     futures_.reserve(localMap_.size());
-    for (const auto& file : uMap2Vector(localMap_)) remove(file, DeleteTask::Type::LOCAL);
+    for (const auto& file : uMap2Vector(localMap_)) remove(file, CloudDeleteTask::Type::LOCAL);
     processFutures();
 }

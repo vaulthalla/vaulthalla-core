@@ -35,7 +35,8 @@ void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
 void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) const {
     const auto path = rel_path.string().front() != '/' ? std::filesystem::path("/" / rel_path) : rel_path;
     purgeThumbnails(path);
-    FileQueries::deleteFile(vault->owner_id, vault->id, path);
+    const auto file = FileQueries::getFileByPath(vault->id, path);
+    FileQueries::deleteFile(vault->owner_id, file);
     const auto absPath = paths->absPath(path, PathType::BACKING_VAULT_ROOT);
     if (std::filesystem::exists(absPath)) std::filesystem::remove(absPath);
 }

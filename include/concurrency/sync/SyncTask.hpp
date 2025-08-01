@@ -1,7 +1,7 @@
 #pragma once
 
 #include "concurrency/FSTask.hpp"
-#include "DeleteTask.hpp"
+#include "CloudDeleteTask.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -37,7 +37,7 @@ protected:
 
     void upload(const std::shared_ptr<types::File>& file);
     void download(const std::shared_ptr<types::File>& file, bool freeAfterDownload = false);
-    void remove(const std::shared_ptr<types::File>& file, const DeleteTask::Type& type = DeleteTask::Type::PURGE);
+    void remove(const std::shared_ptr<types::File>& file, const CloudDeleteTask::Type& type = CloudDeleteTask::Type::PURGE);
 
     std::shared_ptr<storage::CloudStorageEngine> cloudEngine() const;
 

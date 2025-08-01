@@ -46,7 +46,7 @@ SELECT id, 'keep_both' FROM ins;
 
 -- Seed root directory
 WITH inserted_fs_entry AS (
-    INSERT INTO fs_entry (name, path, abs_path, inode, mode, parent_id, created_by, last_modified_by)
+    INSERT INTO fs_entry (name, path, fuse_path, inode, mode, parent_id, created_by, last_modified_by)
     VALUES (
         '/', '/', '/', 1, 0755, NULL,
         (SELECT id FROM users WHERE name = 'admin'),

@@ -121,10 +121,10 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
     if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
 
     std::unique_lock lock(mutex_);
-    inodeToPath_[*entry->inode] = entry->abs_path;
+    inodeToPath_[*entry->inode] = entry->fuse_path;
     inodeToEntry_[*entry->inode] = entry;
-    pathToInode_[entry->abs_path] = *entry->inode;
-    pathToEntry_[entry->abs_path] = entry;
+    pathToInode_[entry->fuse_path] = *entry->inode;
+    pathToEntry_[entry->fuse_path] = entry;
 }
 
 bool FSCache::entryExists(const fs::path& absPath) const {

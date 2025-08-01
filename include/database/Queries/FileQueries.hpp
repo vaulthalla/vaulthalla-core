@@ -10,6 +10,7 @@
 namespace vh::types {
 struct FSEntry;
 struct File;
+struct TrashedFile;
 struct Directory;
 struct DirectoryStats;
 }
@@ -22,9 +23,9 @@ public:
 
     static unsigned int upsertFile(const std::shared_ptr<types::File>& file);
 
-    static void deleteFile(unsigned int userId, unsigned int fileId);
+    static void markTrashedFileDeleted(unsigned int id);
 
-    static void deleteFile(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
+    static void deleteFile(unsigned int userId, const std::shared_ptr<types::File>& file);
 
     [[nodiscard]] static std::string getMimeType(unsigned int vaultId, const std::filesystem::path& relPath);
 
@@ -36,7 +37,7 @@ public:
 
     static std::vector<std::shared_ptr<types::File>> listFilesInDir(unsigned int vaultId, const std::filesystem::path& path = {"/"}, bool recursive = true);
 
-    static std::vector<std::shared_ptr<types::File>> listTrashedFiles(unsigned int vaultId);
+    static std::vector<std::shared_ptr<types::TrashedFile>> listTrashedFiles(unsigned int vaultId);
 
     static void markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
 

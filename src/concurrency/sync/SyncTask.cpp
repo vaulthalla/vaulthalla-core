@@ -86,7 +86,8 @@ void SyncTask::operator()() {
 void SyncTask::removeTrashedFiles() {
     const auto files = FileQueries::listTrashedFiles(vaultId());
     futures_.reserve(files.size());
-    for (const auto& file : files) remove(file);
+    for (const auto& file : files)
+        push(std::make_shared<CloudTrashedDeleteTask>(cloudEngine(), file));
     processFutures();
 }
 
@@ -98,8 +99,8 @@ void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterD
     push(std::make_shared<DownloadTask>(cloudEngine(), file, freeAfterDownload));
 }
 
-void SyncTask::remove(const std::shared_ptr<File>& file, const DeleteTask::Type& type) {
-    push(std::make_shared<DeleteTask>(cloudEngine(), file, type));
+void SyncTask::remove(const std::shared_ptr<File>& file, const CloudDeleteTask::Type& type) {
+    push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, type));
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {

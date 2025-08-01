@@ -50,7 +50,7 @@ std::shared_ptr<File> StorageEngine::createFile(const fs::path& rel_path, const 
     file->size_bytes = fs::file_size(absPath);
     file->created_by = file->last_modified_by = vault->owner_id;
     file->path = rel_path;
-    file->abs_path = makeAbsolute(absPath);
+    file->fuse_path = makeAbsolute(absPath);
     file->mime_type = buffer.empty() ? util::Magic::get_mime_type(absPath) : util::Magic::get_mime_type_from_buffer(buffer);
     file->content_hash = crypto::Hash::blake2b(absPath.string());
     const auto parentPath = file->path.has_parent_path() ? fs::path{"/"} / file->path.parent_path() : fs::path("/");

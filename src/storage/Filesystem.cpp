@@ -75,7 +75,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
             } else dir->path = path;
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
-            dir->abs_path = path;
+            dir->fuse_path = path;
             dir->name = path.filename();
             dir->mode = mode;
             dir->owner_uid = getuid();
@@ -138,7 +138,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
             } else dir->path = makeAbsolute(path);
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
-            dir->abs_path = makeAbsolute(path);
+            dir->fuse_path = makeAbsolute(path);
             dir->name = path.filename();
             dir->created_at = dir->updated_at = std::time(nullptr);
             dir->mode = mode;
@@ -231,11 +231,9 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
 
     const auto entry = cache->getEntry(from);
 
-    OperationQueries::addOperation(std::make_shared<Operation>(entry, to, userId, Operation::Op::Copy));
-
     entry->id = 0;
     entry->path = engine->paths->absRelToRoot(to, PathType::VAULT_ROOT);
-    entry->abs_path = to;
+    entry->fuse_path = to;
     entry->name = to.filename().string();
     entry->created_by = entry->last_modified_by = userId;
     entry->parent_id = DirectoryQueries::getDirectoryIdByPath(engine->vault->id, to.parent_path());
@@ -261,7 +259,7 @@ void Filesystem::remove(const fs::path& path, const unsigned int userId, std::sh
     else if (engine->isDirectory(rel_path))
         for (const auto& file : FileQueries::listFilesInDir(engine->vault->id, rel_path, true)) {
             FileQueries::markFileAsTrashed(userId, file->id);
-            cache->evictPath(file->abs_path);
+            cache->evictPath(file->fuse_path);
         }
     else throw std::runtime_error("[StorageEngine] Path does not exist: " + rel_path.string());
 }
@@ -285,7 +283,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     file->vault_id = engine->vault->id;
     file->name = path.filename();
     file->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
-    file->abs_path = path;
+    file->fuse_path = path;
     file->mode = mode;
     file->owner_uid = uid;
     file->group_gid = gid;
@@ -361,7 +359,7 @@ void Filesystem::updatePaths(const fs::path& oldPath, const fs::path& newPath, c
 
     entry->name = newPath.filename();
     entry->path = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-    entry->abs_path = newPath;
+    entry->fuse_path = newPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
     if (userId) entry->last_modified_by = *userId;
 

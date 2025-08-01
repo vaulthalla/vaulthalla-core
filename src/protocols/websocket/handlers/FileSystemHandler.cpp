@@ -274,7 +274,10 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
 void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session) {
     try {
-        const auto userId = session.getAuthenticatedUser()->id;
+        const auto user = session.getAuthenticatedUser();
+        if (!user) throw std::runtime_error("User not authenticated");
+
+        const auto userId = user->id;
         if (userId == 0) throw std::runtime_error("User not authenticated");
 
         const auto& payload = msg.at("payload");
@@ -285,7 +288,7 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
 
         const auto engine = storageManager_->getEngine(vaultId);
         if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
-        engine->remove(path, session.getAuthenticatedUser()->id);
+        engine->remove(path, userId);
         ServiceDepsRegistry::instance().syncController->runNow(vaultId);
 
         const json response = {{"command", "fs.entry.delete.response"},

@@ -2,6 +2,7 @@
 #include "database/Transactions.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
+#include "types/TrashedFile.hpp"
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
 
@@ -26,7 +27,7 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
         p.append(file->created_by);
         p.append(file->last_modified_by);
         p.append(to_utf8_string(file->path.u8string()));
-        p.append(to_utf8_string(file->abs_path.u8string()));
+        p.append(to_utf8_string(file->fuse_path.u8string()));
         p.append(file->inode);
         p.append(file->mode);
         p.append(file->owner_uid);
@@ -53,40 +54,29 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
     });
 }
 
-void FileQueries::deleteFile(const unsigned int userId, const unsigned int fileId) {
+void FileQueries::markTrashedFileDeleted(const unsigned int id) {
     Transactions::exec("FileQueries::deleteFile", [&](pqxx::work& txn) {
-        const auto isTrashed = txn.exec_prepared("is_file_trashed", fileId).one_field().as<bool>();
-
-        if (!isTrashed) {
-            const auto row = txn.exec_prepared("get_file_parent_id_and_size", fileId).one_row();
-            const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
-            const auto sizeBytes = row["size_bytes"].as<unsigned int>();
-
-            txn.exec_prepared("mark_file_trashed_by_id", pqxx::params{fileId, userId});
-
-            updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
-        }
-
-        txn.exec_prepared("mark_trashed_file_deleted", fileId);
+        txn.exec_prepared("mark_trashed_file_deleted_by_id", id);
     });
 }
 
-void FileQueries::deleteFile(const unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath) {
+void FileQueries::deleteFile(const unsigned int userId, const std::shared_ptr<types::File>& file) {
     Transactions::exec("FileQueries::deleteFileByPath", [&](pqxx::work& txn) {
-        const auto isTrashed = txn.exec_prepared("is_file_trashed_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_field().as<bool>();
+        const auto path = to_utf8_string(file->path.u8string());
 
-        if (!isTrashed) {
-            pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
-            const auto row = txn.exec_prepared("get_file_parent_id_and_size_by_path", p).one_row();
-            const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
-            const auto sizeBytes = row["size_bytes"].as<unsigned int>();
+        pqxx::params p{file->vault_id, path};
+        const auto row = txn.exec_prepared("get_file_parent_id_and_size_by_path", p).one_row();
+        const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
+        const auto sizeBytes = row["size_bytes"].as<unsigned int>();
 
-            txn.exec_prepared("mark_file_trashed", pqxx::params{vaultId, to_utf8_string(relPath.u8string()), userId});
+        txn.exec_prepared("mark_file_trashed", pqxx::params{file->vault_id, path, userId});
 
-            updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
-        }
+        updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
 
-        txn.exec_prepared("mark_trashed_file_deleted_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
+        const auto uuid = std::string(file->uuid.begin(), file->uuid.end());
+
+        txn.exec_prepared("mark_trashed_file_deleted_fuse_path_and_uuid",
+            pqxx::params{to_utf8_string(file->fuse_path.u8string()), uuid});
     });
 }
 
@@ -172,10 +162,10 @@ std::vector<std::shared_ptr<vh::types::File> > FileQueries::listFilesInDir(
     });
 }
 
-std::vector<std::shared_ptr<vh::types::File> > FileQueries::listTrashedFiles(unsigned int vaultId) {
+std::vector<std::shared_ptr<vh::types::TrashedFile> > FileQueries::listTrashedFiles(unsigned int vaultId) {
     return Transactions::exec("FileQueries::listTrashedFiles", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("list_trashed_files", vaultId);
-        return types::files_from_pq_res(res);
+        return types::trashed_files_from_pq_res(res);
     });
 }
 
@@ -259,7 +249,7 @@ std::string FileQueries::getContentHash(const unsigned int vaultId, const std::f
 
 std::shared_ptr<vh::types::File> FileQueries::getFileByAbsPath(const std::filesystem::path& absPath) {
     return Transactions::exec("FileQueries::getFileByAbsPath", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_file_by_abs_path", absPath.string()).one_row();
+        const auto row = txn.exec_prepared("get_file_by_fuse_path", absPath.string()).one_row();
         return std::make_shared<types::File>(row);
     });
 }
@@ -275,8 +265,8 @@ std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesAbsPath(cons
     return Transactions::exec("FileQueries::listFilesAbsPath", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(absPath.string(), recursive);
         const auto res = recursive
-                             ? txn.exec_prepared("list_files_in_dir_by_abs_path_recursive", pqxx::params{patterns.like})
-                             : txn.exec_prepared("list_files_in_dir_by_abs_path", pqxx::params{patterns.like, patterns.not_like});
+                             ? txn.exec_prepared("list_files_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
+                             : txn.exec_prepared("list_files_in_dir_by_fuse_path", pqxx::params{patterns.like, patterns.not_like});
 
         return types::files_from_pq_res(res);
     });

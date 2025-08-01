@@ -10,17 +10,18 @@
 #include <sstream>
 #include <pugixml.hpp>
 #include <iostream>
+#include <boost/uuid/nil_generator.hpp>
+#include <boost/uuid/string_generator.hpp>
 
 using namespace vh::types;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
+      uuid(row["uuid"].is_null() ? boost::uuids::nil_uuid() : boost::uuids::string_generator()(row["uuid"].as<std::string>())),
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
-      abs_path(std::filesystem::path(row["abs_path"].as<std::string>())),
-      is_hidden(row["is_hidden"].as<bool>()),
-      is_system(row["is_system"].as<bool>()),
+      fuse_path(std::filesystem::path(row["fuse_path"].as<std::string>())),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
@@ -47,7 +48,13 @@ FSEntry::FSEntry(const pqxx::row& row)
     if (row["mode"].is_null()) mode = std::nullopt;
     else mode = row["mode"].as<mode_t>();
 
-    if (abs_path.empty()) throw std::runtime_error("FSEntry must have a non-empty abs_path");
+    if (row["is_hidden"].is_null()) is_hidden = false;
+    else is_hidden = row["is_hidden"].as<bool>();
+
+    if (row["is_system"].is_null()) is_system = false;
+    else is_system = row["is_system"].as<bool>();
+
+    if (fuse_path.empty()) throw std::runtime_error("FSEntry must have a non-empty abs_path");
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {
@@ -66,7 +73,7 @@ void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
         {"created_at", util::timestampToString(entry.created_at)},
         {"updated_at", util::timestampToString(entry.updated_at)},
         {"path", entry.path.string()},
-        {"abs_path", entry.abs_path.string()},
+        {"abs_path", entry.fuse_path.string()},
     };
 
     if (entry.parent_id) j["parent_id"] = entry.parent_id;
@@ -208,7 +215,7 @@ void FSEntry::print() const {
     std::cout << "  Name: " << name << std::endl;
     std::cout << "  Size: " << size_bytes << " bytes" << std::endl;
     std::cout << "  Path: " << path.string() << std::endl;
-    std::cout << "  Absolute Path: " << abs_path.string() << std::endl;
+    std::cout << "  Absolute Path: " << fuse_path.string() << std::endl;
     std::cout << "  Hidden: " << (is_hidden ? "Yes" : "No") << std::endl;
     std::cout << "  System: " << (is_system ? "Yes" : "No") << std::endl;
     std::cout << "  Created At: " << util::timestampToString(created_at) << std::endl;

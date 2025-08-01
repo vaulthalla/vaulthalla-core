@@ -8,6 +8,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <memory>
+#include <boost/uuid/uuid.hpp>
 
 namespace pqxx {
 class row;
@@ -22,11 +23,12 @@ struct Directory;
 struct FSEntry {
     unsigned int id{};
     std::string name{};
+    boost::uuids::uuid uuid{};
     uintmax_t size_bytes{0};
     std::optional<unsigned int> parent_id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
     std::optional<ino_t> inode{};
     std::optional<mode_t> mode{};
-    std::filesystem::path path{}, abs_path{};
+    std::filesystem::path path{}, fuse_path{};
     bool is_hidden{}, is_system{};
     std::time_t created_at{}, updated_at{};
 

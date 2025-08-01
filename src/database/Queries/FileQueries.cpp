@@ -211,16 +211,20 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
 void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
                                                      std::optional<unsigned int> parentId,
                                                      const unsigned int sizeBytes) {
-    const auto vaultId = txn.exec("SELECT vault_id FROM fs_entry WHERE id = $1", parentId).one_field().as<unsigned int>();
-    const auto rootId = txn.exec_prepared("get_fs_entry_id_by_path", pqxx::params{vaultId, "/"}).one_field().as<unsigned int>();
+    const auto vaultId = txn.exec("SELECT vault_id FROM fs_entry WHERE id = $1", parentId).one_field().as<std::optional<unsigned int>>();
+    const auto stopAt = vaultId ?
+    txn.exec_prepared("get_vault_root_dir_id_by_vault_id", *vaultId).one_field().as<unsigned int>()
+    : txn.exec_prepared("get_fs_entry_id_by_path", pqxx::params{vaultId, "/"}).one_field().as<unsigned int>();
 
     // TODO: Fix decrement
     int subDirsDeleted = 0; // TODO: track subdirs
+    bool deleteDirs = true;
     while (parentId) {
         pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, 0};
         const auto fsCount = txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
         const auto parentRes = txn.exec_prepared("get_fs_entry_parent_id", *parentId);
-        if (fsCount == 0 && *parentId != rootId) {
+        if (*parentId == stopAt) deleteDirs = false;
+        if (deleteDirs && fsCount == 0) {
             txn.exec_prepared("delete_fs_entry", *parentId);
             --subDirsDeleted;
         }

@@ -138,6 +138,8 @@ void DBConnection::initPreparedVaults() const {
                    "WHERE v.id = $1");
 
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
+
+    conn_->prepare("get_vault_root_dir_id_by_vault_id", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = '/'");
 }
 
 void DBConnection::initPreparedFsEntries() const {

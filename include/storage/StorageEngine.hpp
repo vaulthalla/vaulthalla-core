@@ -47,41 +47,23 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath,
                                                const std::vector<uint8_t>& payload) const;
 
-    void finishUpload(unsigned int userId, const fs::path& relPath);
-
-    void mkdir(const fs::path& relPath, unsigned int userId) const;
-
-    void move(const fs::path& from, const fs::path& to, unsigned int userId) const;
-
-    void rename(const fs::path& from, const fs::path& to, unsigned int userId) const;
-
-    void copy(const fs::path& from, const fs::path& to, unsigned int userId) const;
-
-    void remove(const fs::path& rel_path, unsigned int userId) const;
+    void mkdir(const fs::path& relPath, unsigned int userId);
+    void move(const fs::path& from, const fs::path& to, unsigned int userId);
+    void rename(const fs::path& from, const fs::path& to, unsigned int userId);
+    void copy(const fs::path& from, const fs::path& to, unsigned int userId);
+    void remove(const fs::path& rel_path, unsigned int userId);
 
     [[nodiscard]] static uintmax_t getDirectorySize(const fs::path& path);
-
     [[nodiscard]] uintmax_t getVaultSize() const;
-
     [[nodiscard]] uintmax_t getCacheSize() const;
-
     [[nodiscard]] uintmax_t getVaultAndCacheTotalSize() const;
-
     [[nodiscard]] uintmax_t freeSpace() const;
 
     [[nodiscard]] virtual StorageType type() const { return StorageType::Local; }
 
     void purgeThumbnails(const fs::path& rel_path) const;
-
     void moveThumbnails(const fs::path& from, const fs::path& to) const;
-
     void copyThumbnails(const fs::path& from, const fs::path& to) const;
-
-    static std::string getMimeType(const fs::path& path);
-
-protected:
-    void removeFile(const fs::path& rel_path, unsigned int userId) const;
-    void removeDirectory(const fs::path& rel_path, unsigned int userId) const;
 };
 
 } // namespace vh::storage

@@ -26,6 +26,7 @@ struct StorageEngine;
 struct PendingRename {
     std::filesystem::path oldPath;
     std::filesystem::path newPath;
+    std::optional<unsigned int> userId = std::nullopt;
 };
 
 class StorageManager {
@@ -41,7 +42,7 @@ public:
     std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
 
 
-    void queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath);
+    void queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath, std::optional<unsigned int> userId = std::nullopt);
 
     void clearPendingRename(fuse_ino_t ino);
 

@@ -96,9 +96,9 @@ char StorageManager::getPathType(const fs::path& absPath) const {
     return 'u'; // unknown type
 }
 
-void StorageManager::queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath) {
+void StorageManager::queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath, std::optional<unsigned int> userId) {
     std::scoped_lock lock(renameQueueMutex_);
-    renameRequests_[ino] = PendingRename{ oldPath, newPath };
+    renameRequests_[ino] = PendingRename{ oldPath, newPath, userId };
 }
 
 void StorageManager::clearPendingRename(fuse_ino_t ino) {

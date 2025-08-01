@@ -1,6 +1,10 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
+#include <ranges>
 
 namespace fs = std::filesystem;
 
@@ -37,4 +41,17 @@ inline fs::path stripLeadingSlash(const fs::path& path) {
     if (norm.empty() || norm == "/") return "/";
     if (norm.string().front() == '/') return { norm.string().substr(1) };
     return norm;
+}
+
+inline std::string inferMimeTypeFromPath(const fs::path& path) {
+    static const std::unordered_map<std::string, std::string> mimeMap = {
+        {".jpg", "image/jpeg"}, {".jpeg", "image/jpeg"}, {".png", "image/png"},
+        {".pdf", "application/pdf"}, {".txt", "text/plain"}, {".html", "text/html"},
+    };
+
+    std::string ext = path.extension().string();
+    std::ranges::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    const auto it = mimeMap.find(ext);
+    return it != mimeMap.end() ? it->second : "application/octet-stream";
 }

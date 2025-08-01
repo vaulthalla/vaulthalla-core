@@ -1,16 +1,26 @@
 CREATE TABLE fs_entry
 (
     id               SERIAL PRIMARY KEY,
-    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE,
-    parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
+    vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE DEFAULT NULL,
+    parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE DEFAULT NULL,
     name             VARCHAR(500) NOT NULL,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
-    path             TEXT         NOT NULL, -- Full path for easy access
+    path             TEXT         NOT NULL,   -- Full path for easy access
 
-    UNIQUE (vault_id, parent_id, name)
+    -- FUSE compatibility
+    fuse_path        TEXT NOT NULL,   -- Absolute path for FUSE operations
+    uuid             UUID DEFAULT gen_random_uuid(), -- Unique identifier for FUSE operations
+    inode            BIGINT UNIQUE,           -- bidirectional lookup and faster indexing
+    mode             INTEGER   DEFAULT 0755,  -- Emulate POSIX permissions
+    owner_uid        INTEGER,                 -- Linux UID for access checks
+    group_gid        INTEGER,                 -- Linux GID for group access checks
+    is_hidden        BOOLEAN   DEFAULT FALSE,
+    is_system        BOOLEAN   DEFAULT FALSE, -- Mark internal-only entries (e.g. keys)
+
+    UNIQUE (parent_id, name) -- Ensure no duplicate names in the same directory
 );
 
 CREATE TABLE directories
@@ -33,24 +43,13 @@ CREATE TABLE files
 
 CREATE TABLE files_trashed
 (
-    fs_entry_id      INTEGER,  -- from fs_entry.id, no FK
-    vault_id         INTEGER,  -- from fs_entry.vault_id, no FK
-    parent_id        INTEGER,  -- from fs_entry.parent_id, no FK
-    name             VARCHAR(500) NOT NULL,
-    created_by       INTEGER REFERENCES users (id),
-    created_at       TIMESTAMP,
-    updated_at       TIMESTAMP,
-    last_modified_by INTEGER REFERENCES users (id),
-    path             TEXT         NOT NULL,
-
-    size_bytes       BIGINT    DEFAULT 0,
-    mime_type        VARCHAR(255),
-    content_hash     VARCHAR(128),
-
+    id               SERIAL PRIMARY KEY,
+    vault_id         INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    fuse_path        TEXT NOT NULL,
+    uuid             UUID,  -- For resolving future obfuscated paths
     trashed_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     trashed_by       INTEGER REFERENCES users (id),
-    deleted_at       TIMESTAMP, -- NULL if not permanently deleted
-    encryption_iv    TEXT
+    deleted_at       TIMESTAMP
 );
 
 CREATE TABLE cache_index
@@ -120,6 +119,16 @@ CREATE TABLE file_metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (file_id, key)
+);
+
+CREATE TABLE fs_mutation_log
+(
+    id          SERIAL PRIMARY KEY,
+    fs_entry_id INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE,
+    action      VARCHAR(32) NOT NULL, -- create, modify, chmod, move, delete
+    actor_uid   INTEGER,              -- calling Linux UID
+    timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    note        TEXT
 );
 
 CREATE TABLE file_metadata_string
@@ -237,12 +246,12 @@ CREATE INDEX idx_fs_entry_parent
 -- ===============================
 
 -- Primary access for listing trashed files and status checks
-CREATE INDEX idx_files_trashed_vault_path_not_deleted
-    ON files_trashed (vault_id, path) WHERE deleted_at IS NULL;
+CREATE INDEX idx_files_trashed_fuse_path_not_deleted
+    ON files_trashed (fuse_path) WHERE deleted_at IS NULL;
 
 -- Lookup by entry ID for trash checks, soft delete
 CREATE INDEX idx_files_trashed_entry_not_deleted
-    ON files_trashed (fs_entry_id) WHERE deleted_at IS NULL;
+    ON files_trashed (id) WHERE deleted_at IS NULL;
 
 -- Optional: fast purging / retention enforcement
 CREATE INDEX idx_files_trashed_deleted_at

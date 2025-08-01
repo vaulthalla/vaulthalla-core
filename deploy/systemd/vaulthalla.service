@@ -1,0 +1,17 @@
+[Unit]
+Description=Vaulthalla Service - The Final Cloud
+After=network.target
+Requires=postgresql.service
+
+[Service]
+User=vaulthalla
+Group=vaulthalla
+ExecStart=/usr/local/bin/vaulthalla/vaulthalla
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65535
+SyslogIdentifier=vaulthalla
+WorkingDirectory=/var/lib/vaulthalla
+
+[Install]
+WantedBy=multi-user.target

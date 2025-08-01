@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.7.0',
+        version: '0.8.0',
         license: 'AGPLv3',
         default_options: ['warning_level=3', 'cpp_std=c++23'])
 
@@ -28,86 +28,58 @@ uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
 
-global_deps     = [boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium]
-core_deps       = global_deps
-fuse_deps       = global_deps + [libfuse]
-test_deps       = fuse_deps + [gtest]
+deps = [libfuse, boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium]
+test_deps = deps + [gtest]
 
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮
-source_root = meson.project_source_root()
-core_src_dir    = join_paths(source_root, 'core_daemon/src')
-fuse_src_dir    = join_paths(source_root, 'fuse_daemon/src')
-shared_src_dir  = join_paths(source_root, 'shared/src')
-tests_src_dir   = join_paths(source_root, 'tests')
 
-core_main       = files(join_paths(source_root, 'main.cpp'))
-fuse_main       = files(join_paths(source_root, 'fuse_daemon/src/main.cpp'))
+source_root = meson.project_source_root()
+src         = join_paths(source_root, 'src')
+tests_src   = join_paths(source_root, 'tests')
+main        = files(join_paths(source_root, 'main.cpp'))
 
 hash_pass_src   = files(
-    join_paths(core_src_dir, 'auth/PasswordHash.cpp'),
-    join_paths(core_src_dir, 'auth/PasswordUtils.cpp')
+    join_paths(src, 'crypto/PasswordHash.cpp'),
+    join_paths(src, 'crypto/PasswordUtils.cpp')
 )
 hash_pass_main  = files(join_paths(source_root, 'deploy/hash_password.cpp'))
 
-# ╭──────────────────── INCLUDE DIRS ─────────────────────╮
-shared_inc_paths = ['shared/include', 'vendor']
-core_inc_paths = shared_inc_paths + ['core_daemon/include']
-fuse_inc_paths = shared_inc_paths + ['fuse_daemon/include']
 
-core_inc       = include_directories(core_inc_paths)
-fuse_inc       = include_directories(fuse_inc_paths)
-hash_pass_inc  = include_directories('core_daemon/include', 'shared/include')
+# ╭──────────────────── INCLUDE DIRS ─────────────────────╮
+
+inc       = include_directories('include', 'vendor')
+hash_pass_inc  = include_directories('include')
+
 
 # ╭──────────────────── SOURCE COLLECTION ───────────────╮
-shared_sources = []
-foreach f : run_command('find', shared_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    shared_sources += files(f)
-endforeach
 
-core_sources = shared_sources
-foreach f : run_command('find', core_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    core_sources += files(f)
-endforeach
-
-fuse_sources = shared_sources
-foreach f : run_command('find', fuse_src_dir, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    fuse_sources += files(f)
+sources = []
+foreach f : run_command('find', src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    sources += files(f)
 endforeach
 
 
 # ╭──────────────────── LIBRARIES ───────────────────────╮
-core_lib = static_library('core', core_sources,
-                          include_directories: core_inc,
-                          dependencies: core_deps)
 
-fuse_lib = static_library('fuse', fuse_sources,
-                          include_directories: fuse_inc,
-                          dependencies: fuse_deps)
+lib = static_library('core', sources,
+                     include_directories: inc,
+                     dependencies: deps)
+
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
-core_dep = declare_dependency(
-    include_directories: core_inc,
-    link_with: core_lib,
-    dependencies: core_deps
-)
 
-fuse_dep = declare_dependency(
-    include_directories: fuse_inc,
-    link_with: fuse_lib,
-    dependencies: fuse_deps
-)
+dep = declare_dependency(
+    include_directories: inc,
+    link_with: lib,
+    dependencies: deps)
+
 
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
-executable('core_daemon', core_main,
-           link_with: core_lib,
-           include_directories: core_inc,
-           dependencies: core_dep)
-
-executable('fuse_daemon', fuse_main,
-           link_with: fuse_lib,
-           include_directories: fuse_inc,
-           dependencies: fuse_dep)
+executable('vaulthalla', main,
+           link_with: lib,
+           include_directories: inc,
+           dependencies: dep)
 
 executable('hash_password',
            [hash_pass_src, hash_pass_main],
@@ -117,6 +89,7 @@ executable('hash_password',
 
 
 # ╭──────────────────── TESTS ───────────────────────────╮
+
 test_assets = files(
     'test-assets/sample.jpg',
     'test-assets/sample.pdf',
@@ -133,13 +106,14 @@ foreach asset : test_assets
     )
 endforeach
 
-test_sources = fuse_sources
-foreach f : run_command('find', tests_src_dir + '/cloud', '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    test_sources += files(f)
-endforeach
-
 test('test_cloud',
-     executable('test_cloud', test_sources,
-                link_with: [core_lib, fuse_lib],
-                include_directories: fuse_inc,
+     executable('test_cloud', sources + files(join_paths(tests_src, 'test_S3Provider.cpp')),
+                link_with: [lib],
+                include_directories: inc,
+                dependencies: test_deps))
+
+test('test_path',
+     executable('test_path', sources + files(join_paths(tests_src, 'test_Path.cpp')),
+                link_with: [lib],
+                include_directories: inc,
                 dependencies: test_deps))

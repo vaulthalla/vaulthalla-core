@@ -1,12 +1,13 @@
 CREATE TABLE users
 (
-    id            SERIAL PRIMARY KEY,
-    name          VARCHAR(50) UNIQUE NOT NULL,
-    email         VARCHAR(255) UNIQUE DEFAULT NULL,
-    password_hash VARCHAR(255)       NOT NULL,
-    created_at    TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
-    last_login    TIMESTAMP,
-    is_active     BOOLEAN             DEFAULT TRUE
+    id               SERIAL PRIMARY KEY,
+    linux_uid        INTEGER UNIQUE,                -- Maps a user to a local UID
+    name             VARCHAR(50) UNIQUE NOT NULL,
+    email            VARCHAR(255) UNIQUE DEFAULT NULL,
+    password_hash    VARCHAR(255)       NOT NULL,
+    created_at       TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
+    last_login       TIMESTAMP,
+    is_active        BOOLEAN             DEFAULT TRUE
 );
 
 CREATE TABLE refresh_tokens
@@ -25,6 +26,7 @@ CREATE TABLE refresh_tokens
 CREATE TABLE groups
 (
     id          SERIAL PRIMARY KEY,
+    linux_gid   INTEGER UNIQUE, -- will add not null constraint later
     name        VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

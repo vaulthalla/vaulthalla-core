@@ -1,0 +1,87 @@
+#pragma once
+
+#include <string>
+#include <optional>
+#include <memory>
+#include <vector>
+#include <ctime>
+#include <cstdint>
+#include <filesystem>
+
+#include <nlohmann/json_fwd.hpp> // Forward-decl only
+
+#include "Permission.hpp"
+
+namespace pqxx {
+class row;
+class result;
+}
+
+namespace vh::types {
+
+struct UserRole;
+struct VaultRole;
+
+struct User {
+    static constexpr uint16_t ADMIN_MASK = 0xFFFE;
+
+    unsigned int id{};
+    std::optional<unsigned int> linux_uid{std::nullopt};
+    std::string name, password_hash;
+    std::optional<std::string> email{std::nullopt};
+    std::time_t created_at{};
+    std::optional<std::time_t> last_login;
+    bool is_active{true};
+    std::shared_ptr<UserRole> role;
+    std::vector<std::shared_ptr<VaultRole>> roles;
+
+    User();
+    explicit User(std::string name, std::string email = "", bool isActive = true);
+    explicit User(const pqxx::row& row);
+    User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides);
+
+    [[nodiscard]] std::shared_ptr<VaultRole> getRole(unsigned int vaultId) const;
+
+    void updateUser(const nlohmann::json& j);
+    void setPasswordHash(const std::string& hash);
+
+    [[nodiscard]] bool isAdmin() const;
+    [[nodiscard]] bool isSuperAdmin() const;
+
+    // Admin checks
+    [[nodiscard]] bool canManageAdmins() const;
+    [[nodiscard]] bool canManageUsers() const;
+    [[nodiscard]] bool canManageRoles() const;
+    [[nodiscard]] bool canManageSettings() const;
+    [[nodiscard]] bool canManageVaults() const;
+    [[nodiscard]] bool canAccessAuditLog() const;
+    [[nodiscard]] bool canAccessAnyAPIKey() const;
+
+    // Vault permissions
+    [[nodiscard]] bool canMigrateVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVaultAccess(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVaultTags(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVaultMetadata(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVaultVersions(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVaultFileLocks(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canShareVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canSyncVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canCreateVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canDownloadVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canDeleteVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canRenameVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canMoveVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canListVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+};
+
+} // namespace vh::types
+
+namespace vh::types {
+
+void to_json(nlohmann::json& j, const User& u);
+void from_json(const nlohmann::json& j, User& u);
+
+nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users);
+nlohmann::json to_json(const std::shared_ptr<User>& user);
+
+} // namespace vh::types

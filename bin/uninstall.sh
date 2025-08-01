@@ -25,22 +25,10 @@ fi
 
 # === 1) Stop and disable systemd service (if exists) ===
 echo "🗑️  Removing systemd services..."
-
-# Stop services if running
-sudo systemctl stop vaulthalla-fuse.service || true
-sudo systemctl stop vaulthalla-core.service || true
-
-# Disable services
-sudo systemctl disable vaulthalla-fuse.service || true
-sudo systemctl disable vaulthalla-core.service || true
-
-# Remove service files
-sudo rm -f /etc/systemd/system/vaulthalla-core.service
-sudo rm -f /etc/systemd/system/vaulthalla-fuse.service
-
-# Reload systemd daemon
+sudo systemctl stop vaulthalla.service || true
+sudo systemctl disable vaulthalla.service || true
+sudo rm -f /etc/systemd/system/vaulthalla.service
 sudo systemctl daemon-reload
-
 echo "✅ Systemd services uninstalled."
 
 # === 2) Remove binaries ===
@@ -92,17 +80,8 @@ fi
 # === 6) Uninstall Conan and Meson ===
 if [[ "$DEV_MODE" == true ]]; then
     echo
-    echo "🚫 Skipping Conan and Meson uninstall in DEV_MODE."
+    echo "🚫 Skipping Meson uninstall in DEV_MODE."
 else
-    echo
-    read -p "❓ Uninstall Conan (Python package manager)? [y/N]: " remove_conan
-    if [[ "$remove_conan" == "y" || "$remove_conan" == "Y" ]]; then
-        echo "🚫 Removing Conan..."
-        pip uninstall -y conan || sudo pip uninstall -y conan || echo "⚠️ Conan uninstall failed or not found"
-    else
-        echo "✅ Conan left installed."
-    fi
-
     echo
     read -p "❓ Uninstall Meson build system and Ninja? [y/N]: " remove_meson
     if [[ "$remove_meson" == "y" || "$remove_meson" == "Y" ]]; then

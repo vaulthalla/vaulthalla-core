@@ -60,14 +60,14 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
 
         std::ranges::reverse(toCreate);
 
+        if (!engine) engine = storageManager_->resolveStorageEngine(absPath);
+
         for (const auto& p : toCreate) {
             const auto path = makeAbsolute(p);
 
             auto dir = std::make_shared<Directory>();
 
             const auto fullDiskPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
-
-            if (!engine) engine = storageManager_->resolveStorageEngine(path);
 
             if (engine) {
                 dir->vault_id = engine->vault->id;

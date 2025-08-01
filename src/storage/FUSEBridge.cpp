@@ -268,6 +268,9 @@ void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
 }
 
 void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
+    std::cout << "[mkdir] Called for parent: " << parent
+              << ", name: " << (name ? name : "(null)")
+              << ", mode: " << std::oct << mode << std::endl;
     try {
         if (std::string_view(name).find('/') != std::string::npos) {
             fuse_reply_err(req, EINVAL);

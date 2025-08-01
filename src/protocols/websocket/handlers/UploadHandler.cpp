@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <iostream>
 
+using namespace vh::storage;
+
 namespace vh::websocket {
 
 UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}

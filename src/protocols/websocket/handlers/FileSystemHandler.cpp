@@ -37,8 +37,6 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto absPath = engine->paths->absPath(path, PathType::VAULT_ROOT);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
-        std::filesystem::create_directories(absPath.parent_path());
-
         session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
 
         const json data = {
@@ -240,7 +238,8 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
     try {
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
-        const auto path = payload.value("path", "/");
+        auto path = fs::path(payload.value("path", "/"));
+        if (path.empty()) path = fs::path("/");
 
         enforcePermissions(session, vaultId, path, &VaultRole::canList);
 
@@ -259,9 +258,6 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
         };
 
         session.send(response);
-
-        std::cout << "[FileSystemHandler] ListDir on mount '" << vaultName << "' path '" << path <<
-            std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << std::endl;

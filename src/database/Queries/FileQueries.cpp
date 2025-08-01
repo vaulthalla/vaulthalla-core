@@ -5,12 +5,15 @@
 #include "types/TrashedFile.hpp"
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <optional>
 
 using namespace vh::database;
+using namespace vh::services;
+using namespace vh::types;
 
-unsigned int FileQueries::upsertFile(const std::shared_ptr<types::File>& file) {
+unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
     if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
 
@@ -60,7 +63,7 @@ void FileQueries::markTrashedFileDeleted(const unsigned int id) {
     });
 }
 
-void FileQueries::deleteFile(const unsigned int userId, const std::shared_ptr<types::File>& file) {
+void FileQueries::deleteFile(const unsigned int userId, const std::shared_ptr<File>& file) {
     Transactions::exec("FileQueries::deleteFileByPath", [&](pqxx::work& txn) {
         const auto path = to_utf8_string(file->path.u8string());
 
@@ -80,7 +83,7 @@ void FileQueries::deleteFile(const unsigned int userId, const std::shared_ptr<ty
     });
 }
 
-void FileQueries::moveFile(const std::shared_ptr<types::File>& file, const std::filesystem::path& newPath, unsigned int userId) {
+void FileQueries::moveFile(const std::shared_ptr<File>& file, const std::filesystem::path& newPath, unsigned int userId) {
     const auto commonPath = common_path_prefix(file->path, newPath);
     Transactions::exec("FileQueries::moveFile", [&](pqxx::work& txn) {
         // Update the file's path and parent_id up to the common path
@@ -126,10 +129,10 @@ void FileQueries::moveFile(const std::shared_ptr<types::File>& file, const std::
     });
 }
 
-std::shared_ptr<vh::types::File> FileQueries::getFileByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
-    return Transactions::exec("FileQueries::getFileByPath", [&](pqxx::work& txn) -> std::shared_ptr<vh::types::File> {
+std::shared_ptr<File> FileQueries::getFileByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getFileByPath", [&](pqxx::work& txn) -> std::shared_ptr<File> {
         const auto row = txn.exec_prepared("get_file_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_row();
-        return std::make_shared<types::File>(row);
+        return std::make_shared<File>(row);
     });
 }
 
@@ -149,7 +152,7 @@ bool FileQueries::isFile(const unsigned int vaultId, const std::filesystem::path
     });
 }
 
-std::vector<std::shared_ptr<vh::types::File> > FileQueries::listFilesInDir(
+std::vector<std::shared_ptr<File>> FileQueries::listFilesInDir(
     const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
     return Transactions::exec("FileQueries::listFilesInDir", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(path.string(), recursive);
@@ -158,14 +161,14 @@ std::vector<std::shared_ptr<vh::types::File> > FileQueries::listFilesInDir(
                              : txn.exec_prepared("list_files_in_dir",
                                                  pqxx::params{vaultId, patterns.like, patterns.not_like});
 
-        return types::files_from_pq_res(res);
+        return files_from_pq_res(res);
     });
 }
 
-std::vector<std::shared_ptr<vh::types::TrashedFile> > FileQueries::listTrashedFiles(unsigned int vaultId) {
+std::vector<std::shared_ptr<TrashedFile>> FileQueries::listTrashedFiles(unsigned int vaultId) {
     return Transactions::exec("FileQueries::listTrashedFiles", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("list_trashed_files", vaultId);
-        return types::trashed_files_from_pq_res(res);
+        return trashed_files_from_pq_res(res);
     });
 }
 
@@ -215,7 +218,9 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
         const auto parentRes = txn.exec_prepared("get_fs_entry_parent_id", *parentId);
         if (*parentId == stopAt) deleteDirs = false;
         if (deleteDirs && fsCount == 0) {
+            const auto fusePath = txn.exec_prepared("get_fuse_path_from_fs_entry", *parentId).one_field().as<std::string>();
             txn.exec_prepared("delete_fs_entry", *parentId);
+            ServiceDepsRegistry::instance().fsCache->evictPath(fusePath);
             --subDirsDeleted;
         }
         if (parentRes.empty()) break;
@@ -247,27 +252,27 @@ std::string FileQueries::getContentHash(const unsigned int vaultId, const std::f
 
 // FUSE
 
-std::shared_ptr<vh::types::File> FileQueries::getFileByAbsPath(const std::filesystem::path& absPath) {
+std::shared_ptr<File> FileQueries::getFileByAbsPath(const std::filesystem::path& absPath) {
     return Transactions::exec("FileQueries::getFileByAbsPath", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_file_by_fuse_path", absPath.string()).one_row();
-        return std::make_shared<types::File>(row);
+        return std::make_shared<File>(row);
     });
 }
 
-std::shared_ptr<vh::types::File> FileQueries::getFileByInode(ino_t inode) {
+std::shared_ptr<File> FileQueries::getFileByInode(ino_t inode) {
     return Transactions::exec("FileQueries::getFileByInode", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_file_by_inode", inode).one_row();
-        return std::make_shared<types::File>(row);
+        return std::make_shared<File>(row);
     });
 }
 
-std::vector<std::shared_ptr<vh::types::File>> FileQueries::listFilesAbsPath(const std::filesystem::path& absPath, bool recursive) {
+std::vector<std::shared_ptr<File>> FileQueries::listFilesAbsPath(const std::filesystem::path& absPath, bool recursive) {
     return Transactions::exec("FileQueries::listFilesAbsPath", [&](pqxx::work& txn) {
         const auto patterns = computePatterns(absPath.string(), recursive);
         const auto res = recursive
                              ? txn.exec_prepared("list_files_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
                              : txn.exec_prepared("list_files_in_dir_by_fuse_path", pqxx::params{patterns.like, patterns.not_like});
 
-        return types::files_from_pq_res(res);
+        return files_from_pq_res(res);
     });
 }

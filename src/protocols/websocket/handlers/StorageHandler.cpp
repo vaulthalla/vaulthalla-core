@@ -14,6 +14,9 @@
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 
+using namespace vh::types;
+using namespace vh::database;
+
 using namespace vh::services;
 
 namespace vh::websocket {
@@ -30,18 +33,18 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
         const auto type = payload.at("type").get<std::string>();
         const auto typeLower = boost::algorithm::to_lower_copy(type);
 
-        std::shared_ptr<types::api::APIKey> key;
+        std::shared_ptr<api::APIKey> key;
 
         if (typeLower == "s3") {
-            types::api::S3Provider provider =
-                types::api::s3_provider_from_string(payload.at("provider").get<std::string>());
+            api::S3Provider provider =
+                api::s3_provider_from_string(payload.at("provider").get<std::string>());
             const auto accessKey = payload.at("access_key").get<std::string>();
             const auto secretKey = payload.at("secret_access_key").get<std::string>();
             const auto region = payload.at("region").get<std::string>();
             const auto endpoint = payload.at("endpoint").get<std::string>();
 
             key = std::make_shared<
-                types::api::S3APIKey>(name, userID, provider, accessKey, secretKey, region, endpoint);
+                api::S3APIKey>(name, userID, provider, accessKey, secretKey, region, endpoint);
         } else throw std::runtime_error("Unsupported API key type: " + type);
 
         apiKeyManager_->addAPIKey(key);
@@ -95,7 +98,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     try {
         const auto keys = apiKeyManager_->listAPIKeys();
 
-        const json data = {{"keys", types::api::to_json(keys).dump(4)}};
+        const json data = {{"keys", api::to_json(keys).dump(4)}};
 
         const json response = {{"command", "storage.apiKey.list.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -123,7 +126,7 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
         if (!user) throw std::runtime_error("User not authenticated");
         const auto keys = apiKeyManager_->listUserAPIKeys(user->id);
 
-        const json data{{"keys", types::api::to_json(keys).dump(4)}};
+        const json data{{"keys", api::to_json(keys).dump(4)}};
 
         const json response = {{"command", "storage.apiKey.list.user.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -151,8 +154,8 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
         const auto user = session.getAuthenticatedUser();
         auto key = apiKeyManager_->getAPIKey(keyId, user->id);
 
-        if (key->type != types::api::APIKeyType::S3)
-            throw std::runtime_error("Unsupported API key type: " + types::api::to_string(key->type));
+        if (key->type != api::APIKeyType::S3)
+            throw std::runtime_error("Unsupported API key type: " + api::to_string(key->type));
 
         json data = {{"api_key", key}};
 
@@ -184,14 +187,14 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
         const std::string typeLower = boost::algorithm::to_lower_copy(type);
         const std::string mountPoint = payload.at("mount_point").get<std::string>();
 
-        std::shared_ptr<types::Vault> vault;
-        std::shared_ptr<types::Sync> sync = nullptr;
+        std::shared_ptr<Vault> vault;
+        std::shared_ptr<Sync> sync = nullptr;
 
         if (typeLower == "s3") {
             const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
             const std::string bucket = payload.at("bucket").get<std::string>();
-            vault = std::make_shared<types::S3Vault>(name, apiKeyID, bucket);
-            sync = std::make_shared<types::Sync>(payload);
+            vault = std::make_shared<S3Vault>(name, apiKeyID, bucket);
+            sync = std::make_shared<Sync>(payload);
         }
 
         vault->name = name;
@@ -225,7 +228,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 void StorageHandler::handleUpdateVault(const json& msg, WebSocketSession& session) const {
     try {
         const json& payload = msg.at("payload");
-        const auto vault = std::make_shared<types::Vault>(payload);
+        const auto vault = std::make_shared<Vault>(payload);
 
         storageManager_->updateVault(vault);
 
@@ -291,13 +294,13 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         json data = {};
 
-        if (vault->type == types::VaultType::S3) {
-            const auto s3Vault = std::static_pointer_cast<types::S3Vault>(vault);
+        if (vault->type == VaultType::S3) {
+            const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
             data["vault"] = *s3Vault;
         } else data["vault"] = *vault;
 
         if (vault->owner_id == user->id) data["vault"]["owner"] = user->name;
-        else data["vault"]["owner"] = database::VaultQueries::getVaultOwnersName(vaultId);
+        else data["vault"]["owner"] = VaultQueries::getVaultOwnersName(vaultId);
 
         const json response = {{"command", "storage.vault.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -322,18 +325,11 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session) const {
     try {
         const auto user = session.getAuthenticatedUser();
-        const auto vaults = storageManager_->listVaults(user);
+        std::vector<std::shared_ptr<Vault>> vaults;
+        if (user->isAdmin()) vaults = VaultQueries::listVaults();
+        else vaults = VaultQueries::listUserVaults(user->id);
 
-        nlohmann::json jVaults = nlohmann::json::array();
-
-        for (const auto& vault : vaults) {
-            nlohmann::json jVault = *vault;
-            if (vault->owner_id == user->id) jVault["owner"] = user->name;
-            else jVault["owner"] = database::VaultQueries::getVaultOwnersName(vault->id);
-            jVaults.push_back(jVault);
-        }
-
-        const json data = {{"vaults", jVaults}};
+        const json data = {{"vaults", vaults}};
 
         const json response = {
             {"command", "storage.vault.list.response"},

@@ -6,9 +6,9 @@
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 
-namespace vh::types {
+using namespace vh::types;
 
-std::string to_string(const VaultType type) {
+std::string vh::types::to_string(const VaultType type) {
     switch (type) {
         case VaultType::Local: return "local";
         case VaultType::S3: return "s3";
@@ -16,7 +16,7 @@ std::string to_string(const VaultType type) {
     }
 }
 
-VaultType from_string(const std::string& type) {
+VaultType vh::types::from_string(const std::string& type) {
     if (type == "local") return VaultType::Local;
     if (type == "s3") return VaultType::S3;
     throw std::invalid_argument("Invalid VaultType: " + type);
@@ -33,7 +33,7 @@ Vault::Vault(const pqxx::row& row)
       is_active(row["is_active"].as<bool>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].c_str())) {}
 
-void to_json(nlohmann::json& j, const Vault& v) {
+void vh::types::to_json(nlohmann::json& j, const Vault& v) {
     j = {
         {"id", v.id},
         {"name", v.name},
@@ -47,7 +47,7 @@ void to_json(nlohmann::json& j, const Vault& v) {
     };
 }
 
-void from_json(const nlohmann::json& j, Vault& v) {
+void vh::types::from_json(const nlohmann::json& j, Vault& v) {
     v.id = j.at("id").get<unsigned int>();
     v.name = j.at("name").get<std::string>();
     v.description = j.at("description").get<std::string>();
@@ -59,13 +59,10 @@ void from_json(const nlohmann::json& j, Vault& v) {
     v.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
 }
 
-nlohmann::json to_json(const std::vector<std::shared_ptr<Vault>>& vaults) {
-    nlohmann::json j = nlohmann::json::array();
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& vaults) {
+    j = nlohmann::json::array();
     for (const auto& vault : vaults) {
         if (const auto* s3 = dynamic_cast<const S3Vault*>(vault.get())) j.push_back(*s3);
         else j.push_back(*vault);
     }
-    return j;
-}
-
 }

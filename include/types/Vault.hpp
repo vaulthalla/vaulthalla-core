@@ -37,6 +37,6 @@ struct Vault {
 void to_json(nlohmann::json& j, const Vault& v);
 void from_json(const nlohmann::json& j, Vault& v);
 
-nlohmann::json to_json(const std::vector<std::shared_ptr<Vault>>& vaults);
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& vaults);
 
 }

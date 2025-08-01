@@ -8,11 +8,15 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "types/File.hpp"
 #include "types/Vault.hpp"
+#include "types/Path.hpp"
+#include "types/CacheIndex.hpp"
 
 #include <memory>
 #include <string>
 #include <filesystem>
 #include <iostream>
+
+using namespace vh::types;
 
 namespace vh::concurrency {
 

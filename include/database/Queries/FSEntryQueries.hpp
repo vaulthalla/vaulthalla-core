@@ -29,6 +29,8 @@ struct FSEntryQueries {
     [[nodiscard]] static bool exists(const fs::path& absPath);
 
     static void renameEntry(const std::shared_ptr<types::FSEntry>& entry);
+
+    [[nodiscard]] static ino_t getNextInode();
 };
 
 }

@@ -4,14 +4,13 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
-#include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "util/files.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "storage/VaultEncryptionManager.hpp"
+#include "storage/Filesystem.hpp"
 
 #include <boost/beast/core/file.hpp>
 #include <cerrno>
@@ -90,7 +89,7 @@ void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off
     (void)fi;
 
     const auto path = storageManager_->resolvePathFromInode(ino);
-    auto entries = storageManager_->listDir(path, false);
+    auto entries = FSEntryQueries::listDir(path, false);
 
     for (const auto& entry : entries) {
         std::cout << "[FUSE] Entry: " << entry->name << ", inode: " << *entry->inode << std::endl;
@@ -182,7 +181,7 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
             return;
         }
 
-        auto newEntry = storageManager_->createFile(fullPath, mode, getuid(), getgid());
+        auto newEntry = Filesystem::createFile(fullPath, getuid(), getgid(), mode);
         auto st       = statFromEntry(newEntry, *newEntry->inode);
 
         // open backing file immediately
@@ -214,6 +213,12 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
 
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) {
     std::cout << "[FUSE] open called for inode: " << ino << std::endl;
+
+    {
+        std::scoped_lock lock(openHandleMutex_);
+        openHandleCounts_[ino]++;
+    }
+
     try {
         const fs::path path = storageManager_->resolvePathFromInode(ino);
         const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
@@ -363,7 +368,7 @@ void FUSEBridge::rename(const fuse_req_t& req,
         }
 
         try {
-            storageManager_->renamePath(fromPath, toPath);
+            Filesystem::renamePath(fromPath, toPath);
         } catch (const std::filesystem::filesystem_error& fsErr) {
             std::cerr << "[FUSE] rename failed: " << fsErr.what() << " for path: " << fromPath << " → " << toPath << std::endl;
             fuse_reply_err(req, EIO);
@@ -406,7 +411,7 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     }
 
     if (const auto rename = storageManager_->getPendingRename(ino))
-        storageManager_->updatePaths(rename->oldPath, rename->newPath);
+        Filesystem::updatePaths(rename->oldPath, rename->newPath);
 
     if (::close(fh->fd) < 0)
         std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;

@@ -34,10 +34,6 @@ public:
 
     void initStorageEngines();
 
-    std::vector<std::shared_ptr<types::FSEntry>> listDir(const fs::path& absPath, bool recursive = false) const;
-
-    void registerEntry(unsigned int entryId);
-
     fuse_ino_t assignInode(const fs::path& path);
 
     fuse_ino_t getOrAssignInode(const fs::path& path);
@@ -66,15 +62,11 @@ public:
     // -- Optional future UX --
     void updateCachedEntry(const std::shared_ptr<types::FSEntry>& entry);
 
-    std::shared_ptr<types::FSEntry> createFile(const fs::path& path, mode_t mode, uid_t uid, gid_t gid);
-
-    void renamePath(const fs::path& oldPath, const fs::path& newPath);
-
     void queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath);
 
-    std::optional<PendingRename> getPendingRename(fuse_ino_t ino) const;
+    void clearPendingRename(fuse_ino_t ino);
 
-    void updatePaths(const fs::path& oldPath, const fs::path& newPath);
+    std::optional<PendingRename> getPendingRename(fuse_ino_t ino) const;
 
     fs::path resolvePathFromInode(fuse_ino_t ino);
 

@@ -155,3 +155,11 @@ bool FSEntryQueries::exists(const fs::path& absPath) {
                         + txn.quote(path) + ")").one_field().as<bool>();
     });
 }
+
+ino_t FSEntryQueries::getNextInode() {
+    return Transactions::exec("FSEntryQueries::getNextInode", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("get_next_inode");
+        if (res.empty()) throw std::runtime_error("No inode available");
+        return res.one_field().as<ino_t>();
+    });
+}

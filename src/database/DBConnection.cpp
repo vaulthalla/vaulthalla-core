@@ -165,6 +165,8 @@ void DBConnection::initPreparedFsEntries() const {
     conn_->prepare("get_fs_entry_id_by_path", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("fs_entry_exists_by_inode", "SELECT EXISTS(SELECT 1 FROM fs_entry WHERE inode = $1)");
+
+    conn_->prepare("get_next_inode", "SELECT MAX(inode) + 1 FROM fs_entry");
 }
 
 void DBConnection::initPreparedFiles() const {

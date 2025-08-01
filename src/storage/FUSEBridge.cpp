@@ -8,11 +8,10 @@
 #include "types/Directory.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
-#include "util/files.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
-#include <boost/beast/core/file.hpp>
 #include <cerrno>
 #include <cstring>
 #include <sys/statvfs.h>
@@ -30,6 +29,7 @@ using namespace vh::fuse;
 using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::config;
+using namespace vh::services;
 
 FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager) {}
@@ -37,8 +37,9 @@ FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
 void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
     std::cout << "[getattr] Called for inode: " << ino << std::endl;
     try {
+        const auto& cache = ServiceDepsRegistry::instance().fsCache;
         if (ino == FUSE_ROOT_ID) {
-            const auto entry = storageManager_->getEntry("/");
+            const auto entry = cache->getEntry("/");
             if (!entry) {
                 std::cerr << "[getattr] No entry found for inode " << ino
                           << ", resolved path: " << "/" << std::endl;
@@ -54,14 +55,14 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
             return;
         }
 
-        const auto path = storageManager_->resolvePathFromInode(ino);
+        const auto path = cache->resolvePath(ino);
         if (path.empty()) {
             std::cerr << "[getattr] No path found for inode " << ino << std::endl;
             fuse_reply_err(req, ENOENT);
             return;
         }
 
-        const auto entry = storageManager_->getEntry(path);
+        const auto entry = cache->getEntry(path);
 
         if (!entry) {
             std::cerr << "[getattr] No entry found for inode " << ino
@@ -88,7 +89,7 @@ void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off
     std::cout << "[FUSE] readdir called for inode: " << ino << ", size: " << size << ", offset: " << off << std::endl;
     (void)fi;
 
-    const auto path = storageManager_->resolvePathFromInode(ino);
+    const auto path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
     auto entries = FSEntryQueries::listDir(path, false);
 
     for (const auto& entry : entries) {
@@ -139,11 +140,13 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
         return;
     }
 
-    const auto parentPath = storageManager_->resolvePathFromInode(parent);
-    const auto path = parentPath / name;
-    const fuse_ino_t ino = storageManager_->getOrAssignInode(path);
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
-    const auto entry = storageManager_->getEntry(path);
+    const auto parentPath = cache->resolvePath(parent);
+    const auto path = parentPath / name;
+    const fuse_ino_t ino = cache->getOrAssignInode(path);
+
+    const auto entry = cache->getEntry(path);
     if (!entry) {
         std::cerr << "[FUSE] lookup failed: entry not found at path: " << path << "\n";
         fuse_reply_err(req, ENOENT);
@@ -172,11 +175,13 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
         return;
     }
 
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
     try {
-        fs::path parentPath = storageManager_->resolvePathFromInode(parent);
+        fs::path parentPath = cache->resolvePath(parent);
         fs::path fullPath   = parentPath / name;
 
-        if (storageManager_->entryExists(fullPath)) {
+        if (cache->entryExists(fullPath)) {
             fuse_reply_err(req, EEXIST);
             return;
         }
@@ -220,7 +225,7 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
     }
 
     try {
-        const fs::path path = storageManager_->resolvePathFromInode(ino);
+        const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
         const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
         int fd = ::open(backingPath.c_str(), O_RDWR);
@@ -269,7 +274,9 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             return;
         }
 
-        const auto parentPath = storageManager_->resolvePathFromInode(parent);
+        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
+        const auto parentPath = cache->resolvePath(parent);
         if (parentPath.empty()) {
             fuse_reply_err(req, ENOENT);
             return;
@@ -284,7 +291,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
         std::filesystem::path cur = fullPath;
 
         // Traverse upwards until we find an existing entry
-        while (!cur.empty() && !storageManager_->entryExists(cur)) {
+        while (!cur.empty() && !cache->entryExists(cur)) {
             toCreate.push_back(cur);
             cur = cur.parent_path();
         }
@@ -309,11 +316,11 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
-            dir->inode = storageManager_->assignInode(path);
+            dir->inode = cache->assignInode(path);
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(dir);
+            cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
 
             try {
@@ -326,8 +333,8 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
         }
 
         // Final directory (last one created) = fullPath
-        const auto finalInode = storageManager_->resolveInode(fullPath);
-        const auto finalEntry = storageManager_->getEntry(fullPath);
+        const auto finalInode = cache->resolveInode(fullPath);
+        const auto finalEntry = cache->getEntry(fullPath);
 
         fuse_entry_param e{};
         e.ino = finalInode;
@@ -351,18 +358,20 @@ void FUSEBridge::rename(const fuse_req_t& req,
                         unsigned int flags) const {
     std::cout << "[FUSE] rename called: " << name << " → " << newname << std::endl;
 
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
     try {
-        const auto fromPath = storageManager_->resolvePathFromInode(parent) / name;
-        const auto toPath = storageManager_->resolvePathFromInode(newparent) / newname;
+        const auto fromPath = cache->resolvePath(parent) / name;
+        const auto toPath = cache->resolvePath(newparent) / newname;
 
         // Flags handling (RENAME_NOREPLACE = 1, RENAME_EXCHANGE = 2)
-        if ((flags & RENAME_NOREPLACE) && storageManager_->entryExists(toPath)) {
+        if ((flags & RENAME_NOREPLACE) && cache->entryExists(toPath)) {
             fuse_reply_err(req, EEXIST);
             return;
         }
 
         // Confirm source exists
-        if (!storageManager_->entryExists(fromPath)) {
+        if (!cache->entryExists(fromPath)) {
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -383,7 +392,7 @@ void FUSEBridge::rename(const fuse_req_t& req,
 }
 
 void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
-    storageManager_->decrementInodeRef(ino, nlookup);
+    ServiceDepsRegistry::instance().fsCache->decrementInodeRef(ino, nlookup);
     fuse_reply_none(req); // no return value
 }
 

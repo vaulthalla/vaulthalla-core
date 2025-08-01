@@ -15,6 +15,7 @@
 #include "crypto/Hash.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "util/Magic.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 #include <ranges>
@@ -42,13 +43,15 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
     try {
         if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
         std::vector<fs::path> toCreate;
         fs::path cur = absPath;
 
-        while (!cur.empty() && !storageManager_->entryExists(cur)) {
+        while (!cur.empty() && !cache->entryExists(cur)) {
             toCreate.push_back(cur);
             cur = cur.parent_path();
         }
@@ -74,11 +77,11 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode) {
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
-            dir->inode = storageManager_->assignInode(path);
+            dir->inode = cache->assignInode(path);
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(dir);
+            cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
         }
 
@@ -93,13 +96,15 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
     try {
         if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
         std::vector<fs::path> toCreate;
         fs::path cur = absPath;
 
-        while (!cur.empty() && !storageManager_->entryExists(cur)) {
+        while (!cur.empty() && !cache->entryExists(cur)) {
             toCreate.push_back(cur);
             if (cur.string() == "/") break; // stop at root
             cur = cur.parent_path();
@@ -128,11 +133,11 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
-            dir->inode = storageManager_->assignInode(path);
+            dir->inode = cache->assignInode(path);
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(dir);
+            cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
 
             std::cout << "[Filesystem] Directory created: " << path.string() << std::endl;
@@ -148,13 +153,15 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
     try {
         if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
         std::vector<fs::path> toCreate;
         fs::path cur = absPath;
 
-        while (!cur.empty() && !storageManager_->entryExists(cur)) {
+        while (!cur.empty() && !cache->entryExists(cur)) {
             toCreate.push_back(cur);
             cur = cur.parent_path();
         }
@@ -175,11 +182,11 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
-            dir->inode = storageManager_->assignInode(path);
+            dir->inode = cache->assignInode(path);
             dir->is_hidden = false;
             dir->is_system = false;
 
-            storageManager_->cacheEntry(dir);
+            cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);
 
             std::cout << "[Filesystem] Directory created: " << path.string() << std::endl;
@@ -193,7 +200,7 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
 
 bool Filesystem::exists(const fs::path& absPath) {
     try {
-        return storageManager_->entryExists(absPath);
+        return ServiceDepsRegistry::instance().fsCache->entryExists(absPath);
     } catch (const std::exception& ex) {
         std::cerr << "[Filesystem] exists exception: " << ex.what() << std::endl;
         return false;
@@ -206,6 +213,8 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
         std::cerr << "[StorageManager] No storage engine found for path: " << path << std::endl;
         return nullptr;
     }
+
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
     std::cout << "[StorageManager] Creating file at path: " << path << std::endl;
 
@@ -224,7 +233,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     file->is_hidden = path.filename().string().starts_with('.');
     file->created_at = std::time(nullptr);
     file->updated_at = file->created_at;
-    file->inode = std::make_optional(storageManager_->assignInode(path));
+    file->inode = std::make_optional(cache->assignInode(path));
     file->mime_type = StorageEngine::getMimeType(path.filename());
     file->size_bytes = 0;
 
@@ -235,7 +244,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
         std::cerr << "[StorageManager] Failed to create real file at: " << fullDiskPath << std::endl;
 
     FileQueries::upsertFile(file);
-    storageManager_->cacheEntry(file);
+    cache->cacheEntry(file);
 
     std::cout << "[StorageManager] File created successfully at: " << path << std::endl;
     return file;
@@ -244,7 +253,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
 void Filesystem::renamePath(const fs::path& oldPath, const fs::path& newPath) {
     std::cout << "[StorageManager] Renaming path from " << oldPath << " to " << newPath << std::endl;
 
-    const auto entry = storageManager_->getEntry(oldPath);
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(oldPath);
     const auto engine = storageManager_->resolveStorageEngine(oldPath);
     if (!engine) {
         throw std::filesystem::filesystem_error(
@@ -266,7 +275,8 @@ void Filesystem::renamePath(const fs::path& oldPath, const fs::path& newPath) {
 }
 
 void Filesystem::updatePaths(const fs::path& oldPath, const fs::path& newPath) {
-    const auto entry = storageManager_->getEntry(oldPath);
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+    const auto entry = cache->getEntry(oldPath);
     const auto engine = storageManager_->resolveStorageEngine(newPath);
     if (!engine) {
         throw std::filesystem::filesystem_error(
@@ -308,9 +318,9 @@ void Filesystem::updatePaths(const fs::path& oldPath, const fs::path& newPath) {
 
     std::filesystem::remove(oldAbsPath);
 
-    storageManager_->evictPath(oldPath);
-    storageManager_->evictPath(newPath);
-    storageManager_->cacheEntry(entry);
+    cache->evictPath(oldPath);
+    cache->evictPath(newPath);
+    cache->cacheEntry(entry);
     storageManager_->clearPendingRename(*entry->inode);
 
     std::cout << "[StorageManager] updatePaths committed: " << oldPath << " → " << newPath << std::endl;

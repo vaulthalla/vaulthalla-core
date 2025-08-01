@@ -3,6 +3,7 @@
 #include "auth/AuthManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "services/SyncController.hpp"
+#include "storage/FSCache.hpp"
 
 #include <memory>
 #include <mutex>
@@ -13,6 +14,7 @@ struct ServiceDepsRegistry {
     std::shared_ptr<storage::StorageManager> storageManager;
     std::shared_ptr<auth::AuthManager> authManager;
     std::shared_ptr<SyncController> syncController;
+    std::shared_ptr<storage::FSCache> fsCache;
 
     ServiceDepsRegistry(const ServiceDepsRegistry&) = delete;
     ServiceDepsRegistry& operator=(const ServiceDepsRegistry&) = delete;
@@ -26,6 +28,7 @@ struct ServiceDepsRegistry {
         auto& ctx = instance();
         ctx.storageManager = std::make_shared<storage::StorageManager>();
         ctx.authManager = std::make_shared<auth::AuthManager>();
+        ctx.fsCache = std::make_shared<storage::FSCache>();
     }
 
     static void setSyncController(const std::shared_ptr<SyncController>& syncController) {

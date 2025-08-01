@@ -28,25 +28,27 @@ class FSCache {
 public:
     FSCache();
 
-    void cache(const std::shared_ptr<types::FSEntry>& entry);
-    void evictByPath(const fs::path& vaultPath);
-    void evictByInode(fuse_ino_t inode);
+    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath);
 
-    std::shared_ptr<types::FSEntry> getByPath(const fs::path& vaultPath) const;
-    std::shared_ptr<types::FSEntry> getByInode(fuse_ino_t inode) const;
+    fuse_ino_t assignInode(const fs::path& path);
+    fuse_ino_t getOrAssignInode(const fs::path& path);
+    fuse_ino_t resolveInode(const fs::path& absPath);
+    fs::path resolvePath(fuse_ino_t ino);
+    void linkPath(const fs::path& absPath, fuse_ino_t ino);
+    void decrementInodeRef(fuse_ino_t ino, uint64_t nlookup);
 
-    bool exists(const fs::path& vaultPath) const;
-    fs::path resolvePathFromInode(fuse_ino_t inode) const;
-    fuse_ino_t resolveInode(const fs::path& vaultPath) const;
-
-    fuse_ino_t assignInode(const fs::path& vaultPath);
+    void cacheEntry(const std::shared_ptr<types::FSEntry>& entry);
+    [[nodiscard]] bool entryExists(const fs::path& absPath) const;
+    std::shared_ptr<types::FSEntry> getEntryFromInode(fuse_ino_t ino) const;
+    void evictPath(const std::filesystem::path& path);
 
 private:
     mutable std::shared_mutex mutex_;
     fuse_ino_t nextInode_ = 2;
-
-    std::unordered_map<fs::path, CacheEntry> pathCache_;
-    std::unordered_map<fuse_ino_t, CacheEntry> inodeCache_;
+    std::unordered_map<fuse_ino_t, fs::path> inodeToPath_;
+    std::unordered_map<fs::path, fuse_ino_t> pathToInode_;
+    std::unordered_map<fuse_ino_t, std::shared_ptr<types::FSEntry>> inodeToEntry_;
+    std::pmr::unordered_map<fs::path, std::shared_ptr<types::FSEntry>> pathToEntry_;
 };
 
 }

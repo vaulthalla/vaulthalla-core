@@ -222,19 +222,22 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     if (!engine) engine = storageManager_->resolveStorageEngine(from);
     if (!engine) throw std::runtime_error("[StorageManager] No storage engine found for copy operation");
 
-    const bool isFile = engine->isFile(from);
-    if (!isFile && !engine->isDirectory(from)) throw std::runtime_error("[StorageEngine] Path does not exist: " + from.string());
+    const auto fromVaultPath = engine->paths->absRelToAbsOther(from, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto toVaultPath = engine->paths->absRelToAbsOther(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+
+    const bool isFile = engine->isFile(fromVaultPath);
+    if (!isFile && !engine->isDirectory(fromVaultPath)) throw std::runtime_error("[StorageEngine] Path does not exist: " + fromVaultPath.string());
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
     const auto entry = cache->getEntry(from);
 
     entry->id = 0;
-    entry->path = engine->paths->absRelToRoot(to, PathType::VAULT_ROOT);
+    entry->path = toVaultPath;
     entry->fuse_path = to;
     entry->name = to.filename().string();
     entry->created_by = entry->last_modified_by = userId;
-    entry->parent_id = DirectoryQueries::getDirectoryIdByPath(engine->vault->id, to.parent_path());
+    entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(to));
     entry->inode = cache->getOrAssignInode(to);
     entry->is_hidden = entry->name.front() == '.' && !entry->name.starts_with("..");
     entry->is_system = false;

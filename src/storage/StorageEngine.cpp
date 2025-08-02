@@ -135,26 +135,26 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
 }
 
 void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) {
-    Filesystem::mkdir(paths->absRelToRoot(relPath, PathType::FUSE_ROOT), 0755, userId, shared_from_this());
+    Filesystem::mkdir(paths->absRelToAbsOther(relPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT), 0755, userId, shared_from_this());
 }
 
 void StorageEngine::move(const fs::path& from, const fs::path& to, const unsigned int userId) {
-    Filesystem::renamePath(paths->absRelToRoot(from, PathType::FUSE_ROOT),
-                                  paths->absRelToRoot(to, PathType::FUSE_ROOT), userId, shared_from_this());
+    Filesystem::renamePath(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+                                  paths->absRelToAbsOther(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
 void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsigned int userId) {
-    Filesystem::renamePath(paths->absRelToRoot(from, PathType::FUSE_ROOT),
-                                  paths->absRelToRoot(to, PathType::FUSE_ROOT), userId, shared_from_this());
+    Filesystem::renamePath(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+                                  paths->absRelToAbsOther(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
 void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigned int userId) {
-    Filesystem::copy(paths->absRelToRoot(from, PathType::FUSE_ROOT),
-                     paths->absRelToRoot(to, PathType::FUSE_ROOT), userId, shared_from_this());
+    Filesystem::copy(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+                     paths->absRelToAbsOther(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
 void StorageEngine::remove(const fs::path& rel_path, const unsigned int userId) {
-    Filesystem::remove(paths->absRelToRoot(rel_path, PathType::FUSE_ROOT), userId, shared_from_this());
+    Filesystem::remove(paths->absRelToAbsOther(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
 }

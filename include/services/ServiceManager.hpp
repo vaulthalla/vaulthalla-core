@@ -57,6 +57,10 @@ public:
 
     std::shared_ptr<SyncController> getSyncController() const { return syncController; }
 
+    // prevent accidental copies
+    ServiceManager(const ServiceManager&) = delete;
+    ServiceManager& operator=(const ServiceManager&) = delete;
+
 private:
     std::shared_ptr<SyncController> syncController;
     std::shared_ptr<FUSE> fuseService;
@@ -104,10 +108,6 @@ private:
         std::cerr << "[ServiceManager] Escalating to kill -9.\n";
         std::_Exit(EXIT_FAILURE);
     }
-
-    // prevent accidental copies
-    ServiceManager(const ServiceManager&) = delete;
-    ServiceManager& operator=(const ServiceManager&) = delete;
 };
 
 }

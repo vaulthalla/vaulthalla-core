@@ -52,8 +52,6 @@ public:
 
     void unlink(const fuse_req_t& req, fuse_ino_t parent, const char* name) const;
 
-    void truncate(const char* path, off_t size, fuse_file_info* fi) const;
-
     void rename(const fuse_req_t& req,
                         fuse_ino_t parent,
                         const char* name,
@@ -63,6 +61,16 @@ public:
 
     void mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const;
 
+    void flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const;
+
+    void release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi);
+
+    void access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const;
+
+    // Not implemented yet
+
+    void truncate(const char* path, off_t size, fuse_file_info* fi) const;
+
     void rmdir(const char* path) const;
 
     void utimens(const char* path, const timespec tv[2], fuse_file_info* fi) const;
@@ -71,13 +79,7 @@ public:
 
     void chown(const char* path, uid_t uid, gid_t gid, fuse_file_info* fi) const;
 
-    void flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const;
-
     void fsync(const char* path, int isdatasync, fuse_file_info* fi) const;
-
-    void release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi);
-
-    void access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const;
 
     void statfs(const char* path, struct statvfs* stbuf) const;
 

@@ -5,7 +5,7 @@
 
 namespace vh::fuse {
 
-class FUSERequestTask : public Task {
+class FUSERequestTask : public concurrency::Task {
 public:
     FUSERequestTask(fuse_session* session, const fuse_buf& buf) : session_(session), buf_(buf) {}
 

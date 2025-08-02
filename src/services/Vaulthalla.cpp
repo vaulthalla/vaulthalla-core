@@ -8,7 +8,7 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <iostream>

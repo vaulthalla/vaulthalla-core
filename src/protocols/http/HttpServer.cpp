@@ -4,7 +4,7 @@
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
@@ -39,7 +39,7 @@ void HttpServer::do_accept() {
     acceptor_.async_accept(socket_, [self = shared_from_this()](beast::error_code ec) mutable {
         if (!ec) {
             auto session = std::make_shared<HttpSession>(std::move(self->socket_), self->router_);
-            ThreadPoolRegistry::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
+            ThreadPoolManager::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
         }
         self->do_accept();
     });

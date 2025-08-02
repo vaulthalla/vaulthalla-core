@@ -1,6 +1,6 @@
 #include "services/Vaulthalla.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 #include "database/Transactions.hpp"
 #include "services/ServiceManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -29,7 +29,7 @@ int main() {
     try {
         std::cout << "[*] Initializing Vaulthalla services..." << std::endl;
         ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
-        ThreadPoolRegistry::instance().init();
+        ThreadPoolManager::instance().init();
         Transactions::init();
         ServiceDepsRegistry::init();
         ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
@@ -48,7 +48,7 @@ int main() {
 
         std::cout << "[*] Shutting down Vaulthalla services..." << std::endl;
 
-        ThreadPoolRegistry::instance().shutdown();
+        ThreadPoolManager::instance().shutdown();
         ServiceManager::instance().stopAll(SIGTERM);
 
         std::cout << "[✓] Vaulthalla services shut down cleanly." << std::endl;

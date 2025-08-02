@@ -1,5 +1,5 @@
 #include "concurrency/FSTask.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
@@ -56,7 +56,7 @@ void FSTask::requeue() {
 
 void FSTask::push(const std::shared_ptr<Task>& task) {
     futures_.push_back(task->getFuture().value());
-    ThreadPoolRegistry::instance().syncPool()->submit(task);
+    ThreadPoolManager::instance().syncPool()->submit(task);
 }
 
 void FSTask::processOperations() const {

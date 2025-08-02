@@ -1,7 +1,7 @@
 #include "services/SyncController.hpp"
 #include "services/ServiceManager.hpp"
 #include "storage/StorageManager.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FSTask.hpp"
 #include "concurrency/fs/LocalFSTask.hpp"
 #include "concurrency/sync/CacheSyncTask.hpp"
@@ -57,11 +57,6 @@ void SyncController::runLoop() {
     unsigned int refreshTries = 0;
 
     while (running_ && !interruptFlag_.load()) {
-        if (ThreadPoolRegistry::instance().syncPool()->interrupted()) {
-            std::cout << "[SyncController] Interrupted, stopping." << std::endl;
-            return;
-        }
-
         if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
             std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
             refreshEngines();
@@ -91,7 +86,7 @@ void SyncController::runLoop() {
 
         if (!task || task->isInterrupted()) continue;
 
-        if (task->next_run <= std::chrono::system_clock::now()) ThreadPoolRegistry::instance().syncPool()->submit(task);
+        if (task->next_run <= std::chrono::system_clock::now()) ThreadPoolManager::instance().syncPool()->submit(task);
         else {
             std::scoped_lock lock(pqMutex_);
             pq.push(task);

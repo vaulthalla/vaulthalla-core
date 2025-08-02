@@ -3,7 +3,7 @@
 #include "storage/FUSEBridge.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "concurrency/ThreadPoolRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FUSERequestTask.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
@@ -125,7 +125,7 @@ void FUSE::runLoop() {
         if (res == -EINTR) continue;
         if (res <= 0) break;
 
-        ThreadPoolRegistry::instance().fusePool()->submit(std::make_shared<FUSERequestTask>(session_, buf));
+        ThreadPoolManager::instance().fusePool()->submit(std::make_shared<FUSERequestTask>(session_, buf));
     }
 
     fuse_session_unmount(session_);

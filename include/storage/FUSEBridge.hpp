@@ -67,21 +67,11 @@ public:
 
     void access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const;
 
-    // Not implemented yet
+    void rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* name) const;
 
-    void truncate(const char* path, off_t size, fuse_file_info* fi) const;
+    void fsync(const fuse_req_t& req, fuse_ino_t ino, int datasync, fuse_file_info* fi) const;
 
-    void rmdir(const char* path) const;
-
-    void utimens(const char* path, const timespec tv[2], fuse_file_info* fi) const;
-
-    void chmod(const char* path, mode_t mode, fuse_file_info* fi) const;
-
-    void chown(const char* path, uid_t uid, gid_t gid, fuse_file_info* fi) const;
-
-    void fsync(const char* path, int isdatasync, fuse_file_info* fi) const;
-
-    void statfs(const char* path, struct statvfs* stbuf) const;
+    void statfs(const fuse_req_t& req, fuse_ino_t ino) const;
 
     fuse_lowlevel_ops getOperations() const;
 

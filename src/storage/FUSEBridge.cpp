@@ -88,8 +88,22 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
 
 void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
                          struct stat* attr, int to_set, fuse_file_info* fi) const {
+    const fuse_ctx* ctx = fuse_req_ctx(req);
+
     std::cout << "[setattr] Called for inode: " << ino
               << " mask=" << to_set << std::endl;
+
+    if (to_set & FUSE_SET_ATTR_MODE) {
+        std::cerr << "⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!" << std::endl;
+        fuse_reply_err(req, EPERM);
+        return;
+    }
+
+    if (to_set & (FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
+        std::cerr << "⚔️ [Vaulthalla] Illegal access: chown is forbidden beyond the gates!" << std::endl;
+        fuse_reply_err(req, EPERM);
+        return;
+    }
 
     try {
         const auto& cache = ServiceDepsRegistry::instance().fsCache;
@@ -444,6 +458,47 @@ void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* na
     }
 }
 
+void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* name) const {
+    const fuse_ctx *ctx = fuse_req_ctx(req);
+    uid_t uid = ctx->uid;
+    gid_t gid = ctx->gid;
+
+    std::cout << "[rmdir] Called for parent=" << parent
+              << " name=" << (name ? name : "(null)") << std::endl;
+
+    if (!name || strlen(name) == 0) {
+        fuse_reply_err(req, EINVAL);
+        return;
+    }
+
+    try {
+        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
+        const auto parentPath = cache->resolvePath(parent);
+        const auto fullPath   = parentPath / name;
+
+        if (!cache->entryExists(fullPath)) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
+        if (::rmdir(backingPath.c_str()) < 0) {
+            std::cerr << "[rmdir] Failed to remove backing directory: " << strerror(errno)
+                      << " (" << backingPath << ")" << std::endl;
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid));
+
+        fuse_reply_err(req, 0);
+    } catch (const std::exception& ex) {
+        std::cerr << "[rmdir] Exception: " << ex.what() << std::endl;
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const {
     std::cout << "[FUSE] flush called for inode: " << ino << std::endl;
 
@@ -478,6 +533,42 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     fuse_reply_err(req, 0);
 }
 
+void FUSEBridge::fsync(const fuse_req_t& req, fuse_ino_t ino, int isdatasync, fuse_file_info* fi) const {
+    (void) isdatasync; // if we want to treat differently
+
+    try {
+        int fd = fi->fh;
+        if (::fsync(fd) < 0) {
+            std::cerr << "[fsync] Failed: " << strerror(errno) << std::endl;
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        fuse_reply_err(req, 0);
+    } catch (const std::exception& ex) {
+        std::cerr << "[fsync] Exception: " << ex.what() << std::endl;
+        fuse_reply_err(req, EIO);
+    }
+}
+
+void FUSEBridge::statfs(const fuse_req_t& req, fuse_ino_t ino) const {
+    try {
+        struct statvfs st{};
+        auto backingPath = ConfigRegistry::get().fuse.backing_path;
+
+        if (::statvfs(backingPath.c_str(), &st) < 0) {
+            std::cerr << "[statfs] Failed: " << strerror(errno) << std::endl;
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        fuse_reply_statfs(req, &st);
+    } catch (const std::exception& ex) {
+        std::cerr << "[statfs] Exception: " << ex.what() << std::endl;
+        fuse_reply_err(req, EIO);
+    }
+}
+
 fuse_lowlevel_ops FUSEBridge::getOperations() const {
     fuse_lowlevel_ops ops = {};
     ops.getattr = FUSE_DISPATCH(getattr);
@@ -495,6 +586,9 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.release = FUSE_DISPATCH(release);
     ops.setattr = FUSE_DISPATCH(setattr);
     ops.unlink = FUSE_DISPATCH(unlink);
+    ops.rmdir = FUSE_DISPATCH(rmdir);
+    ops.fsync = FUSE_DISPATCH(fsync);
+    ops.statfs = FUSE_DISPATCH(statfs);
     return ops;
 }
 

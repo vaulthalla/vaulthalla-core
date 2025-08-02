@@ -14,7 +14,7 @@ namespace vh::types {
 namespace vh::database {
 
 struct FSEntryQueries {
-    static void upsertFSEntry(const std::shared_ptr<types::FSEntry>& entry);
+    static void updateFSEntry(const std::shared_ptr<types::FSEntry>& entry);
 
     static std::shared_ptr<types::FSEntry> getFSEntry(const fs::path& absPath);
 

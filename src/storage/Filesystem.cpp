@@ -220,7 +220,7 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     if (from == to) return;
 
     if (!engine) engine = storageManager_->resolveStorageEngine(from);
-    if (!engine) throw std::runtime_error("[StorageManager] No storage engine found for copy operation");
+    if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for copy operation");
 
     const auto fromVaultPath = engine->paths->absRelToAbsOther(from, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     const auto toVaultPath = engine->paths->absRelToAbsOther(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
@@ -248,7 +248,7 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
 
 void Filesystem::remove(const fs::path& path, const unsigned int userId, std::shared_ptr<StorageEngine> engine) {
     if (!engine) engine = storageManager_->resolveStorageEngine(path);
-    if (!engine) throw std::runtime_error("[StorageManager] No storage engine found for remove operation");
+    if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for remove operation");
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
     const auto rel_path = engine->paths->absRelToRoot(path, PathType::VAULT_ROOT);
@@ -268,13 +268,13 @@ void Filesystem::remove(const fs::path& path, const unsigned int userId, std::sh
 std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode) {
     const auto engine = storageManager_->resolveStorageEngine(path);
     if (!engine) {
-        std::cerr << "[StorageManager] No storage engine found for path: " << path << std::endl;
+        std::cerr << "[Filesystem] No storage engine found for path: " << path << std::endl;
         return nullptr;
     }
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
-    std::cout << "[StorageManager] Creating file at path: " << path << std::endl;
+    std::cout << "[Filesystem] Creating file at path: " << path << std::endl;
 
     const auto fullDiskPath = engine->paths->absPath(path, PathType::FUSE_ROOT);
     const auto fullBackingPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
@@ -299,88 +299,111 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     std::filesystem::create_directories(fullBackingPath.parent_path());
     std::ofstream(fullBackingPath).close(); // create empty file
     if (!std::filesystem::exists(fullBackingPath))
-        std::cerr << "[StorageManager] Failed to create real file at: " << fullDiskPath << std::endl;
+        std::cerr << "[Filesystem] Failed to create real file at: " << fullDiskPath << std::endl;
 
     FileQueries::upsertFile(file);
     cache->cacheEntry(file);
 
-    std::cout << "[StorageManager] File created successfully at: " << path << std::endl;
+    std::cout << "[Filesystem] File created successfully at: " << path << std::endl;
     return file;
 }
 
-void Filesystem::renamePath(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId, std::shared_ptr<StorageEngine> engine) {
-    std::cout << "[StorageManager] Renaming path from " << oldPath << " to " << newPath << std::endl;
+void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId, std::shared_ptr<StorageEngine> engine) {
+    std::cout << "[Filesystem] Renaming path from " << oldPath << " to " << newPath << std::endl;
 
     const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(oldPath);
     if (!engine) engine = storageManager_->resolveStorageEngine(oldPath);
     if (!engine) {
         throw std::filesystem::filesystem_error(
-            "[StorageManager] No storage engine found for DB-backed rename",
+            "[Filesystem] No storage engine found for DB-backed rename",
             oldPath,
             std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
+    std::vector<uint8_t> buffer;
     if (entry->isDirectory()) {
-        const auto children = FSEntryQueries::listDir(oldPath, true);
-        if (!children.empty()) {
-            std::cerr << "[StorageManager] WARN: Directory rename does not update children entries yet" << std::endl;
+        for (const auto& item : FSEntryQueries::listDir(oldPath, true)) {
+            handleRename({
+                .from = item->fuse_path,
+                .to = updateSubdirPath(oldPath, newPath, item->fuse_path),
+                .buffer = buffer,
+                .userId = userId,
+                .engine = engine,
+                .entry = item
+            });
+            buffer.clear();
         }
     }
 
-    storageManager_->queuePendingRename(*entry->inode, oldPath, newPath, userId);
+    handleRename({
+            .from = oldPath,
+            .to = newPath,
+            .buffer = buffer,
+            .userId = userId,
+            .engine = engine,
+            .entry = entry
+        });
 
-    std::cout << "[StorageManager] Rename scheduled successfully for inode " << *entry->inode << std::endl;
+    std::filesystem::remove(engine->paths->absPath(oldPath, PathType::BACKING_ROOT));
+    std::cout << "[Filesystem] Successfully renamed " << oldPath << " to " << newPath << std::endl;
 }
 
-void Filesystem::updatePaths(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId, std::shared_ptr<StorageEngine> engine) {
+void Filesystem::handleRename(const RenameContext& context) {
+    const auto& engine = context.engine;
+    const auto& entry = context.entry;
+    const auto& oldPath = context.from;
+    const auto& newPath = context.to;
+    const auto& userId = context.userId;
+    auto buffer = context.buffer;
+
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
-    const auto entry = cache->getEntry(oldPath);
-    if (!engine) engine = storageManager_->resolveStorageEngine(newPath);
-    if (!engine) {
-        throw std::filesystem::filesystem_error(
-            "[StorageManager] No storage engine found for DB-backed rename",
-            oldPath,
-            std::make_error_code(std::errc::no_such_file_or_directory));
-    }
 
     const auto oldAbsPath = engine->paths->absPath(oldPath, PathType::BACKING_ROOT);
     const auto newAbsPath = engine->paths->absPath(newPath, PathType::BACKING_ROOT);
+    const auto oldVaultPath = engine->paths->absRelToAbsOther(oldPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto newVaultPath = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
-    std::cout << "[StorageManager] Processing pending rename: " << oldAbsPath << " → " << newAbsPath << std::endl;
+    auto id = 0;
+    if (entry->id == 0) id = FSEntryQueries::getEntryIdByPath(entry->fuse_path).value_or(0);
+    else id = entry->id;
 
-    // TODO: handle potential directory renames
-
-    const auto buffer = util::readFileToVector(oldAbsPath);
-    if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
-
-    std::string iv_b64;
-    const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
-    if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
-    util::writeFile(newAbsPath, ciphertext);
-
+    entry->id = id;
     entry->name = newPath.filename();
-    entry->path = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    entry->path = newVaultPath;
     entry->fuse_path = newPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
     if (userId) entry->last_modified_by = *userId;
 
-    if (entry->isDirectory()) DirectoryQueries::upsertDirectory(std::static_pointer_cast<Directory>(entry));
+    if (entry->isDirectory()) std::filesystem::create_directories(newAbsPath);
     else {
+        std::filesystem::create_directories(newAbsPath.parent_path());
         const auto file = std::static_pointer_cast<File>(entry);
+
+        if (!file->encryption_iv.empty()) {
+            const auto tmp = util::decrypt_file_to_temp(engine->vault->id, oldVaultPath, engine);
+            buffer = util::readFileToVector(tmp);
+        } else buffer = util::readFileToVector(oldAbsPath);
+
+        if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
+
+        std::string iv_b64;
+        const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
+        if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
+        util::writeFile(newAbsPath, ciphertext);
+
         ThumbnailWorker::enqueue(engine, buffer, file);
         file->encryption_iv = iv_b64;
         file->size_bytes = std::filesystem::file_size(newAbsPath);
         file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
         file->content_hash = crypto::Hash::blake2b(newAbsPath);
-        FileQueries::upsertFile(file);
+
+        FileQueries::updateFile(file);
+        std::filesystem::remove(oldAbsPath);
     }
 
-    std::filesystem::remove(oldAbsPath);
+    FSEntryQueries::updateFSEntry(entry);
 
     cache->evictPath(oldPath);
     cache->evictPath(newPath);
     cache->cacheEntry(entry);
-    storageManager_->clearPendingRename(*entry->inode);
-
-    std::cout << "[StorageManager] updatePaths committed: " << oldPath << " → " << newPath << std::endl;
 }

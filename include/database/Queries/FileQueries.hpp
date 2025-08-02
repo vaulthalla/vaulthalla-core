@@ -23,6 +23,8 @@ public:
 
     static unsigned int upsertFile(const std::shared_ptr<types::File>& file);
 
+    static void updateFile(const std::shared_ptr<types::File>& file);
+
     static void markTrashedFileDeleted(unsigned int id);
 
     static void deleteFile(unsigned int userId, const std::shared_ptr<types::File>& file);

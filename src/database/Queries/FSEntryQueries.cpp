@@ -8,31 +8,25 @@
 using namespace vh::database;
 using namespace vh::types;
 
-void FSEntryQueries::upsertFSEntry(const std::shared_ptr<FSEntry>& entry) {
-    if (entry->parent_id && *entry->parent_id == 0) entry->parent_id = std::nullopt;
+void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
+    Transactions::exec("FSEntryQueries::updateFSEntry", [&](pqxx::work& txn) {
+        pqxx::params p;
+        p.append(entry->inode);
+        p.append(entry->vault_id);
+        p.append(entry->parent_id);
+        p.append(entry->name);
+        p.append(entry->last_modified_by);
+        p.append(to_utf8_string(entry->path.u8string()));
+        p.append(to_utf8_string(entry->fuse_path.u8string()));
+        p.append(entry->mode);
+        p.append(entry->owner_uid);
+        p.append(entry->group_gid);
+        p.append(entry->is_hidden);
+        p.append(entry->is_system);
 
-    Transactions::exec("FSEntryQueries::upsertFSEntry", [&](pqxx::work& txn) {
-        if (entry->inode) txn.exec_prepared("delete_fs_entry_by_inode", entry->inode);
-
-        pqxx::params p{
-            entry->vault_id,
-            entry->parent_id,
-            entry->name,
-            to_utf8_string(entry->path.u8string()),
-            to_utf8_string(entry->fuse_path.u8string()),
-            entry->inode,
-            entry->mode,
-            entry->owner_uid,
-            entry->group_gid,
-            entry->is_hidden,
-            entry->is_system
-        };
-
-        if (txn.exec_prepared("upsert_fs_entry", p).empty())
-            throw std::runtime_error("Upsert failed: no row returned");
+        txn.exec_prepared("update_fs_entry_by_inode", p);
     });
 }
-
 
 std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const fs::path& absPath) {
     return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {

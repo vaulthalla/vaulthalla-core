@@ -58,6 +58,7 @@ void UploadHandler::finishUpload(const unsigned int vaultId) {
     if (!currentUpload_) throw std::runtime_error("No upload in progress");
 
     auto& upload = *currentUpload_;
+    upload.file.close();
 
     if (upload.bytesReceived != upload.expectedSize) {
         std::filesystem::remove(upload.tmpPath);
@@ -65,8 +66,6 @@ void UploadHandler::finishUpload(const unsigned int vaultId) {
     }
 
     std::filesystem::rename(upload.tmpPath, upload.finalPath);
-
-    upload.file.close();
 
     currentUpload_.reset();
 }

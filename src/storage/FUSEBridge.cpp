@@ -340,7 +340,7 @@ void FUSEBridge::rename(const fuse_req_t& req,
         }
 
         try {
-            Filesystem::renamePath(fromPath, toPath);
+            Filesystem::rename(fromPath, toPath);
         } catch (const std::filesystem::filesystem_error& fsErr) {
             std::cerr << "[FUSE] rename failed: " << fsErr.what() << " for path: " << fromPath << " → " << toPath << std::endl;
             fuse_reply_err(req, EIO);
@@ -381,9 +381,6 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
         fuse_reply_err(req, EBADF);
         return;
     }
-
-    if (const auto rename = storageManager_->getPendingRename(ino))
-        Filesystem::updatePaths(rename->oldPath, rename->newPath);
 
     if (::close(fh->fd) < 0)
         std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;

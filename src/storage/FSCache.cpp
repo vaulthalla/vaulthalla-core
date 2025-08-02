@@ -2,6 +2,7 @@
 #include "types/FSEntry.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "util/fsPath.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <iostream>
 #include <mutex>
@@ -9,6 +10,7 @@
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::services;
 
 FSCache::FSCache() {
     inodeToPath_[FUSE_ROOT_ID] = "/";

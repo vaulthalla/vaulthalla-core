@@ -43,6 +43,20 @@ inline fs::path stripLeadingSlash(const fs::path& path) {
     return norm;
 }
 
+inline fs::path updateSubdirPath(const fs::path& oldBase, const fs::path& newBase, const fs::path& input) {
+    // Make sure input starts with oldBase
+    auto inputStr = input.lexically_normal().string();
+    auto oldStr   = oldBase.lexically_normal().string();
+
+    if (inputStr.find(oldStr) != 0) {
+        throw std::invalid_argument("Input path does not start with old base path");
+    }
+
+    // Replace the prefix
+    fs::path relative = fs::relative(input, oldBase);
+    return newBase / relative;
+}
+
 inline std::string inferMimeTypeFromPath(const fs::path& path) {
     static const std::unordered_map<std::string, std::string> mimeMap = {
         {".jpg", "image/jpeg"}, {".jpeg", "image/jpeg"}, {".png", "image/png"},

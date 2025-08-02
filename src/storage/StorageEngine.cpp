@@ -139,12 +139,12 @@ void StorageEngine::mkdir(const fs::path& relPath, const unsigned int userId) {
 }
 
 void StorageEngine::move(const fs::path& from, const fs::path& to, const unsigned int userId) {
-    Filesystem::renamePath(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+    Filesystem::rename(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
                                   paths->absRelToAbsOther(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
 void StorageEngine::rename(const fs::path& from, const fs::path& to, const unsigned int userId) {
-    Filesystem::renamePath(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+    Filesystem::rename(paths->absRelToAbsOther(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
                                   paths->absRelToAbsOther(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 

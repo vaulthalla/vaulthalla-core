@@ -143,6 +143,25 @@ void DBConnection::initPreparedVaults() const {
 }
 
 void DBConnection::initPreparedFsEntries() const {
+    conn_->prepare("update_fs_entry_by_inode",
+    R"SQL(
+    UPDATE fs_entry
+    SET vault_id         = $2,
+        parent_id        = $3,
+        name             = $4,
+        last_modified_by = $5,
+        path             = $6,
+        fuse_path        = $7,
+        mode             = $8,
+        owner_uid        = $9,
+        group_gid        = $10,
+        is_hidden        = $11,
+        is_system        = $12,
+        updated_at       = CURRENT_TIMESTAMP
+    WHERE inode = $1
+    RETURNING id
+    )SQL");
+
     conn_->prepare("delete_fs_entry", "DELETE FROM fs_entry WHERE id = $1");
 
     conn_->prepare("delete_fs_entry_by_path", "DELETE FROM fs_entry WHERE vault_id = $1 AND path = $2");
@@ -181,6 +200,10 @@ void DBConnection::initPreparedFiles() const {
                    "size_bytes = EXCLUDED.size_bytes, "
                    "mime_type = EXCLUDED.mime_type, "
                    "content_hash = EXCLUDED.content_hash");
+
+    conn_->prepare("update_file_only",
+        "UPDATE files SET size_bytes = $2, mime_type = $3, content_hash = $4, encryption_iv = $5 "
+        "WHERE fs_entry_id = $1");
 
     conn_->prepare("upsert_file_full",
                    "WITH upsert_entry AS ("

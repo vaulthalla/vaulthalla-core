@@ -57,6 +57,36 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
     });
 }
 
+void FileQueries::updateFile(const std::shared_ptr<File>& file) {
+    if (!file) throw std::invalid_argument("File cannot be null");
+    if (file->id == 0) throw std::invalid_argument("File ID cannot be zero");
+    if (!file->path.string().starts_with("/")) file->setPath("/" + to_utf8_string(file->path.u8string()));
+
+    Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
+        const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
+        const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
+
+        pqxx::params p;
+        p.append(file->id);
+        p.append(file->size_bytes);
+        p.append(file->mime_type);
+        p.append(file->content_hash);
+        p.append(file->encryption_iv);
+
+        txn.exec_prepared("update_file_only", p);
+
+        std::optional<unsigned int> parentId = file->parent_id;
+        while (parentId) {
+            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
+            txn.exec_prepared("update_dir_stats", stats_params);
+            const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
+            if (res.empty()) break;
+            parentId = res.one_field().as<std::optional<unsigned int>>();
+        }
+    });
+}
+
 void FileQueries::markTrashedFileDeleted(const unsigned int id) {
     Transactions::exec("FileQueries::deleteFile", [&](pqxx::work& txn) {
         txn.exec_prepared("mark_trashed_file_deleted_by_id", id);

@@ -50,7 +50,7 @@ public:
     void create(const fuse_req_t& req, fuse_ino_t parent, const char* name,
                         mode_t mode, struct fuse_file_info* fi);
 
-    void unlink(const char* path) const;
+    void unlink(const fuse_req_t& req, fuse_ino_t parent, const char* name) const;
 
     void truncate(const char* path, off_t size, fuse_file_info* fi) const;
 

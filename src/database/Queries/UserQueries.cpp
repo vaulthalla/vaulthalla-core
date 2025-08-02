@@ -98,6 +98,14 @@ void UserQueries::deleteUser(const unsigned int userId) {
     });
 }
 
+unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
+    return Transactions::exec("UserQueries::getUserIdByLinuxUID", [&](pqxx::work& txn) {
+        const pqxx::result res = txn.exec_prepared("get_user_id_by_linux_uid", pqxx::params{linuxUid});
+        if (res.empty()) throw std::runtime_error("No user found with Linux UID: " + std::to_string(linuxUid));
+        return res.one_field().as<unsigned int>();
+    });
+}
+
 std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
     return Transactions::exec("UserQueries::listUsersWithRoles", [&](pqxx::work& txn) {
         const pqxx::result res = txn.exec_prepared("get_users");

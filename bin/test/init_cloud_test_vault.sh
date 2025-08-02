@@ -1,6 +1,11 @@
 #!/bin/bash
 
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
+-- Set user linux_uid for testing
+UPDATE users
+SET linux_uid = 1000
+WHERE name = 'admin';
+
 -- Cloud Test Vault and keys
 INSERT INTO api_keys (name, user_id, type, created_at)
 VALUES ('R2 Test Key', (SELECT id FROM users WHERE name = 'admin'), 's3', NOW())

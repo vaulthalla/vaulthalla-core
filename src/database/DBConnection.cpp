@@ -78,6 +78,8 @@ void DBConnection::initPreparedUsers() const {
                    "    ORDER BY created_at DESC "
                    "    LIMIT 5"
                    ")");
+
+    conn_->prepare("get_user_id_by_linux_uid", "SELECT id FROM users WHERE linux_uid = $1");
 }
 
 void DBConnection::initPreparedUserRoles() const {

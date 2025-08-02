@@ -11,6 +11,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "database/Queries/UserQueries.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -402,6 +403,47 @@ void FUSEBridge::access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) 
     fuse_reply_err(req, 0); // Access checks are not implemented, always allow
 }
 
+void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* name) const {
+    const fuse_ctx *ctx = fuse_req_ctx(req);
+    uid_t uid = ctx->uid;
+    gid_t gid = ctx->gid;
+
+    std::cout << "[unlink] Called for parent=" << parent
+              << " name=" << (name ? name : "(null)") << std::endl;
+
+    if (!name || strlen(name) == 0) {
+        fuse_reply_err(req, EINVAL);
+        return;
+    }
+
+    try {
+        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+
+        const auto parentPath = cache->resolvePath(parent);
+        const auto fullPath   = parentPath / name;
+
+        if (!cache->entryExists(fullPath)) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
+        if (::unlink(backingPath.c_str()) < 0) {
+            std::cerr << "[unlink] Failed to unlink backing file: " << strerror(errno)
+                      << " (" << backingPath << ")" << std::endl;
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid));
+
+        fuse_reply_err(req, 0);
+    } catch (const std::exception& ex) {
+        std::cerr << "[unlink] Exception: " << ex.what() << std::endl;
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const {
     std::cout << "[FUSE] flush called for inode: " << ino << std::endl;
 
@@ -452,6 +494,7 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.flush = FUSE_DISPATCH(flush);
     ops.release = FUSE_DISPATCH(release);
     ops.setattr = FUSE_DISPATCH(setattr);
+    ops.unlink = FUSE_DISPATCH(unlink);
     return ops;
 }
 

@@ -256,17 +256,17 @@ void Filesystem::remove(const fs::path& path, const unsigned int userId, std::sh
     if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for remove operation");
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
-    const auto rel_path = engine->paths->absRelToRoot(path, PathType::VAULT_ROOT);
+    const auto vaultPath = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
-    if (engine->isFile(rel_path)) {
-        FileQueries::markFileAsTrashed(userId, engine->vault->id, rel_path);
+    if (engine->isFile(vaultPath)) {
+        FileQueries::markFileAsTrashed(userId, engine->vault->id, vaultPath);
         cache->evictPath(path);
-    } else if (engine->isDirectory(rel_path))
-        for (const auto& file : FileQueries::listFilesInDir(engine->vault->id, rel_path, true)) {
+    } else if (engine->isDirectory(vaultPath))
+        for (const auto& file : FileQueries::listFilesInDir(engine->vault->id, vaultPath, true)) {
             FileQueries::markFileAsTrashed(userId, file->id);
             cache->evictPath(file->fuse_path);
         }
-    else throw std::runtime_error("[StorageEngine] Path does not exist: " + rel_path.string());
+    else throw std::runtime_error("[StorageEngine] Path does not exist: " + vaultPath.string());
 }
 
 std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode) {

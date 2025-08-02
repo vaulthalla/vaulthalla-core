@@ -16,6 +16,8 @@
 #include "services/ThumbnailWorker.hpp"
 #include "util/Magic.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "database/Transactions.hpp"
+#include "util/fsDBHelpers.hpp"
 
 #include <iostream>
 #include <ranges>
@@ -38,7 +40,8 @@ bool Filesystem::isReady() {
     return static_cast<bool>(storageManager_);
 }
 
-void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional<unsigned int>& userId, std::shared_ptr<StorageEngine> engine) {
+void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional<unsigned int>& userId,
+                       std::shared_ptr<StorageEngine> engine) {
     std::cout << "[Filesystem] Creating directory at: " << absPath.string() << std::endl;
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
@@ -177,7 +180,7 @@ void Filesystem::mkCache(const fs::path& absPath, mode_t mode) {
 
         std::ranges::reverse(toCreate);
 
-        for (const auto & p : toCreate) {
+        for (const auto& p : toCreate) {
             const auto path = makeAbsolute(p);
 
             if (FSEntryQueries::getEntryIdByPath(path)) continue;
@@ -216,7 +219,8 @@ bool Filesystem::exists(const fs::path& absPath) {
     }
 }
 
-void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int userId, std::shared_ptr<StorageEngine> engine) {
+void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int userId,
+                      std::shared_ptr<StorageEngine> engine) {
     if (from == to) return;
 
     if (!engine) engine = storageManager_->resolveStorageEngine(from);
@@ -226,7 +230,8 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     const auto toVaultPath = engine->paths->absRelToAbsOther(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
     const bool isFile = engine->isFile(fromVaultPath);
-    if (!isFile && !engine->isDirectory(fromVaultPath)) throw std::runtime_error("[StorageEngine] Path does not exist: " + fromVaultPath.string());
+    if (!isFile && !engine->isDirectory(fromVaultPath)) throw std::runtime_error(
+        "[StorageEngine] Path does not exist: " + fromVaultPath.string());
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
@@ -256,8 +261,7 @@ void Filesystem::remove(const fs::path& path, const unsigned int userId, std::sh
     if (engine->isFile(rel_path)) {
         FileQueries::markFileAsTrashed(userId, engine->vault->id, rel_path);
         cache->evictPath(path);
-    }
-    else if (engine->isDirectory(rel_path))
+    } else if (engine->isDirectory(rel_path))
         for (const auto& file : FileQueries::listFilesInDir(engine->vault->id, rel_path, true)) {
             FileQueries::markFileAsTrashed(userId, file->id);
             cache->evictPath(file->fuse_path);
@@ -298,8 +302,8 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
     std::filesystem::create_directories(fullBackingPath.parent_path());
     std::ofstream(fullBackingPath).close(); // create empty file
-    if (!std::filesystem::exists(fullBackingPath))
-        std::cerr << "[Filesystem] Failed to create real file at: " << fullDiskPath << std::endl;
+    if (!std::filesystem::exists(fullBackingPath)) std::cerr << "[Filesystem] Failed to create real file at: " <<
+                                                   fullDiskPath << std::endl;
 
     FileQueries::upsertFile(file);
     cache->cacheEntry(file);
@@ -308,7 +312,8 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     return file;
 }
 
-void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId, std::shared_ptr<StorageEngine> engine) {
+void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId,
+                        std::shared_ptr<StorageEngine> engine) {
     std::cout << "[Filesystem] Renaming path from " << oldPath << " to " << newPath << std::endl;
 
     const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(oldPath);
@@ -320,31 +325,38 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
             std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
-    std::vector<uint8_t> buffer;
-    if (entry->isDirectory()) {
-        for (const auto& item : FSEntryQueries::listDir(oldPath, true)) {
-            handleRename({
-                .from = item->fuse_path,
-                .to = updateSubdirPath(oldPath, newPath, item->fuse_path),
-                .buffer = buffer,
-                .userId = userId,
-                .engine = engine,
-                .entry = item
-            });
-            buffer.clear();
+    Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
+        std::vector<uint8_t> buffer;
+        if (entry->isDirectory()) {
+            for (const auto& item : FSEntryQueries::listDir(oldPath, true)) {
+                handleRename({
+                    .from = item->fuse_path,
+                    .to = updateSubdirPath(oldPath, newPath, item->fuse_path),
+                    .buffer = buffer,
+                    .userId = userId,
+                    .engine = engine,
+                    .entry = item,
+                    .txn = txn
+                });
+                buffer.clear();
+            }
         }
-    }
 
-    handleRename({
+        handleRename({
             .from = oldPath,
             .to = newPath,
             .buffer = buffer,
             .userId = userId,
             .engine = engine,
-            .entry = entry
+            .entry = entry,
+            .txn = txn
         });
 
-    std::filesystem::remove(engine->paths->absPath(oldPath, PathType::BACKING_ROOT));
+        txn.commit();
+
+        std::filesystem::remove_all(engine->paths->absPath(oldPath, PathType::BACKING_ROOT));
+    });
+
     std::cout << "[Filesystem] Successfully renamed " << oldPath << " to " << newPath << std::endl;
 }
 
@@ -355,6 +367,7 @@ void Filesystem::handleRename(const RenameContext& context) {
     const auto& newPath = context.to;
     const auto& userId = context.userId;
     auto buffer = context.buffer;
+    auto& txn = context.txn;
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
@@ -379,6 +392,19 @@ void Filesystem::handleRename(const RenameContext& context) {
         std::filesystem::create_directories(newAbsPath.parent_path());
         const auto file = std::static_pointer_cast<File>(entry);
 
+        if (canFastPath(entry, engine)) {
+            std::cout << "[Filesystem] Fast‑path rename (ciphertext untouched): "
+                      << oldAbsPath << " -> " << newAbsPath << std::endl;
+
+            std::filesystem::rename(oldAbsPath, newAbsPath);
+            updateFSEntry(txn, entry);
+
+            cache->evictPath(oldPath);
+            cache->evictPath(newPath);
+            cache->cacheEntry(entry);
+            return; // bail early, no reencrypt
+        }
+
         if (!file->encryption_iv.empty()) {
             const auto tmp = util::decrypt_file_to_temp(engine->vault->id, oldVaultPath, engine);
             buffer = util::readFileToVector(tmp);
@@ -397,13 +423,19 @@ void Filesystem::handleRename(const RenameContext& context) {
         file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
         file->content_hash = crypto::Hash::blake2b(newAbsPath);
 
-        FileQueries::updateFile(file);
-        std::filesystem::remove(oldAbsPath);
+        updateFile(txn, file);
     }
 
-    FSEntryQueries::updateFSEntry(entry);
+    updateFSEntry(txn, entry);
 
     cache->evictPath(oldPath);
     cache->evictPath(newPath);
     cache->cacheEntry(entry);
+}
+
+bool Filesystem::canFastPath(const std::shared_ptr<FSEntry>& entry, const std::shared_ptr<StorageEngine>& engine) {
+    if (entry->isDirectory()) return false;
+    const auto file = std::static_pointer_cast<File>(entry);
+    if (file->encryption_iv.empty()) return false;
+    return file->vault_id == engine->vault->id;
 }

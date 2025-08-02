@@ -5,6 +5,7 @@
 #include <mutex>
 #include <optional>
 #include <vector>
+#include <pqxx/pqxx>
 
 namespace fs = std::filesystem;
 
@@ -23,6 +24,7 @@ struct RenameContext {
     std::optional<unsigned int> userId;
     std::shared_ptr<StorageEngine> engine;
     std::shared_ptr<types::FSEntry> entry;
+    pqxx::work& txn;
 };
 
 class Filesystem {
@@ -45,6 +47,8 @@ private:
     inline static std::shared_ptr<StorageManager> storageManager_ = nullptr;
 
     static void handleRename(const RenameContext& context);
+
+    static bool canFastPath(const std::shared_ptr<types::FSEntry>& entry, const std::shared_ptr<StorageEngine>& engine);
 };
 
 }

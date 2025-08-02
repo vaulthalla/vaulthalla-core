@@ -32,6 +32,8 @@ public:
 
     void getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const;
 
+    void setattr(fuse_req_t req, fuse_ino_t ino, struct stat* attr, int to_set, fuse_file_info* fi) const;
+
     void readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const;
 
     void lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const;

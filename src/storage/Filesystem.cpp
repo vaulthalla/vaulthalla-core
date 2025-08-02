@@ -376,6 +376,13 @@ void Filesystem::handleRename(const RenameContext& context) {
     const auto oldVaultPath = engine->paths->absRelToAbsOther(oldPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     const auto newVaultPath = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
+    if (!std::filesystem::exists(oldAbsPath)) {
+        throw std::filesystem::filesystem_error(
+            "[Filesystem] Source path does not exist: " + oldAbsPath.string(),
+            oldAbsPath,
+            std::make_error_code(std::errc::no_such_file_or_directory));
+    }
+
     auto id = 0;
     if (entry->id == 0) id = FSEntryQueries::getEntryIdByPath(entry->fuse_path).value_or(0);
     else id = entry->id;
@@ -410,20 +417,20 @@ void Filesystem::handleRename(const RenameContext& context) {
             buffer = util::readFileToVector(tmp);
         } else buffer = util::readFileToVector(oldAbsPath);
 
-        if (buffer.empty()) throw std::runtime_error("Failed to read file: " + oldAbsPath.string());
+        if (!buffer.empty()) {
+            std::string iv_b64;
+            const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
+            if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
+            util::writeFile(newAbsPath, ciphertext);
 
-        std::string iv_b64;
-        const auto ciphertext = engine->encryptionManager->encrypt(buffer, iv_b64);
-        if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
-        util::writeFile(newAbsPath, ciphertext);
+            ThumbnailWorker::enqueue(engine, buffer, file);
+            file->encryption_iv = iv_b64;
+            file->size_bytes = std::filesystem::file_size(newAbsPath);
+            file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
+            file->content_hash = crypto::Hash::blake2b(newAbsPath);
 
-        ThumbnailWorker::enqueue(engine, buffer, file);
-        file->encryption_iv = iv_b64;
-        file->size_bytes = std::filesystem::file_size(newAbsPath);
-        file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
-        file->content_hash = crypto::Hash::blake2b(newAbsPath);
-
-        updateFile(txn, file);
+            updateFile(txn, file);
+        }
     }
 
     updateFSEntry(txn, entry);

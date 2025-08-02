@@ -85,6 +85,45 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
     }
 }
 
+void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
+                         struct stat* attr, int to_set, fuse_file_info* fi) const {
+    std::cout << "[setattr] Called for inode: " << ino
+              << " mask=" << to_set << std::endl;
+
+    try {
+        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+        const auto path   = cache->resolvePath(ino);
+        if (path.empty()) {
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
+
+        timespec times[2];
+        if (to_set & FUSE_SET_ATTR_ATIME) times[0] = attr->st_atim;
+        else times[0].tv_nsec = UTIME_OMIT;
+        if (to_set & FUSE_SET_ATTR_MTIME) times[1] = attr->st_mtim;
+        else times[1].tv_nsec = UTIME_OMIT;
+
+        if (::utimensat(AT_FDCWD, backingPath.c_str(), times, 0) < 0) {
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        // Re-stat file so kernel gets fresh info
+        struct stat st;
+        if (::stat(backingPath.c_str(), &st) < 0) {
+            fuse_reply_err(req, errno);
+            return;
+        }
+
+        fuse_reply_attr(req, &st, 1.0);
+    } catch (...) {
+        fuse_reply_err(req, EIO);
+    }
+}
+
 void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
     std::cout << "[FUSE] readdir called for inode: " << ino << ", size: " << size << ", offset: " << off << std::endl;
     (void)fi;
@@ -228,7 +267,7 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
         const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
         const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
-        int fd = ::open(backingPath.c_str(), O_RDWR);
+        int fd = ::open(backingPath.c_str(), fi->flags & O_ACCMODE);
         if (fd < 0) {
             fuse_reply_err(req, errno);
             return;
@@ -412,6 +451,7 @@ fuse_lowlevel_ops FUSEBridge::getOperations() const {
     ops.access = FUSE_DISPATCH(access);
     ops.flush = FUSE_DISPATCH(flush);
     ops.release = FUSE_DISPATCH(release);
+    ops.setattr = FUSE_DISPATCH(setattr);
     return ops;
 }
 

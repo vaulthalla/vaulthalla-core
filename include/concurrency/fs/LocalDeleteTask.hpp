@@ -9,7 +9,6 @@
 #include "database/Queries/FileQueries.hpp"
 
 #include <memory>
-#include <iostream>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -52,7 +51,6 @@ struct LocalDeleteTask : PromisedTask {
             FileQueries::markTrashedFileDeleted(file->id);
             promise.set_value(true);
         } catch (const std::exception& e) {
-            std::cerr << "[LocalDeleteTask] Error: " << e.what() << " (fuse_path = " << file->fuse_path << ")\n";
             promise.set_value(false);
         }
     }

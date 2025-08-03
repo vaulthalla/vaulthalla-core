@@ -11,6 +11,7 @@ namespace fs = std::filesystem;
 
 namespace vh::types {
     struct FSEntry;
+    struct File;
 }
 
 namespace vh::storage {
@@ -27,6 +28,14 @@ struct RenameContext {
     pqxx::work& txn;
 };
 
+struct NewFileContext {
+    fs::path path{}, fuse_path{};
+    std::vector<uint8_t> buffer{};
+    std::shared_ptr<StorageEngine> engine = nullptr;
+    std::optional<unsigned int> userId{}, linux_uid{}, linux_gid{};
+    mode_t mode = 0644;
+};
+
 class Filesystem {
 public:
     static void init(std::shared_ptr<StorageManager> manager);
@@ -41,6 +50,9 @@ public:
     static void rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId = std::nullopt, std::shared_ptr<StorageEngine> engine = nullptr);
 
     static std::shared_ptr<types::FSEntry> createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode = 0644);
+    static std::shared_ptr<types::File> createFile(const NewFileContext& ctx);
+
+    static bool isPreviewable(const std::string& mimeType);
 
 private:
     inline static std::mutex mutex_;

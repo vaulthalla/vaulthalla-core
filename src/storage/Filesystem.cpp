@@ -283,34 +283,94 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     const auto fullDiskPath = engine->paths->absPath(path, PathType::FUSE_ROOT);
     const auto fullBackingPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
 
-    const auto file = std::make_shared<File>();
-    file->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
-    file->vault_id = engine->vault->id;
-    file->name = path.filename();
-    file->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
-    file->fuse_path = path;
-    file->mode = mode;
-    file->owner_uid = uid;
-    file->group_gid = gid;
-    file->is_hidden = path.filename().string().starts_with('.');
-    file->created_at = std::time(nullptr);
-    file->updated_at = file->created_at;
-    file->inode = std::make_optional(cache->getOrAssignInode(path));
-    file->mime_type = inferMimeTypeFromPath(path.filename());
-    file->size_bytes = 0;
+    const auto f = std::make_shared<File>();
+    f->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
+    f->vault_id = engine->vault->id;
+    f->name = path.filename();
+    f->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
+    f->fuse_path = path;
+    f->mode = mode;
+    f->owner_uid = uid;
+    f->group_gid = gid;
+    f->is_hidden = path.filename().string().starts_with('.');
+    f->created_at = std::time(nullptr);
+    f->updated_at = f->created_at;
+    f->inode = std::make_optional(cache->getOrAssignInode(path));
+    f->mime_type = inferMimeTypeFromPath(path.filename());
+    f->size_bytes = 0;
 
     if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
     std::filesystem::create_directories(fullBackingPath.parent_path());
     std::ofstream(fullBackingPath).close(); // create empty file
-    if (!std::filesystem::exists(fullBackingPath)) std::cerr << "[Filesystem] Failed to create real file at: " <<
-                                                   fullDiskPath << std::endl;
+    if (!std::filesystem::exists(fullBackingPath))
+        std::cerr << "[Filesystem] Failed to create real file at: " << fullDiskPath << std::endl;
 
-    FileQueries::upsertFile(file);
-    cache->cacheEntry(file);
+    FileQueries::upsertFile(f);
+    cache->cacheEntry(f);
 
-    std::cout << "[Filesystem] File created successfully at: " << path << std::endl;
-    return file;
+    return f;
 }
+
+std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
+    const auto engine = ctx.engine ? ctx.engine : storageManager_->resolveStorageEngine(ctx.path);
+    if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for file creation");
+
+    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+    std::cout << "[Filesystem] Creating file at path: " << ctx.path << std::endl;
+    if (ctx.path.empty()) throw std::runtime_error("Cannot create file at empty path");
+    if (cache->entryExists(ctx.fuse_path)) {
+        std::cerr << "[Filesystem] File already exists at path: " << ctx.path << std::endl;
+        const auto entry = cache->getEntry(ctx.fuse_path);
+        if (entry->isDirectory()) throw std::filesystem::filesystem_error(
+            "[Filesystem] Cannot create file at path, a directory already exists",
+            ctx.fuse_path,
+            std::make_error_code(std::errc::file_exists));
+        return std::static_pointer_cast<File>(entry);
+    }
+
+    const auto fullDiskPath = engine->paths->absPath(ctx.fuse_path, PathType::FUSE_ROOT);
+    const auto fullBackingPath = engine->paths->absPath(ctx.fuse_path, PathType::BACKING_ROOT);
+
+    const auto f = std::make_shared<File>();
+    f->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(ctx.path));
+    f->vault_id = engine->vault->id;
+    f->name = ctx.path.filename();
+    f->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
+    f->fuse_path = ctx.fuse_path;
+    f->mode = ctx.mode;
+    f->owner_uid = ctx.linux_uid;
+    f->group_gid = ctx.linux_gid;
+    f->is_hidden = ctx.path.filename().string().starts_with('.');
+    f->created_by = f->last_modified_by = ctx.userId;
+    f->inode = std::make_optional(cache->getOrAssignInode(ctx.fuse_path));
+    f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : util::Magic::get_mime_type_from_buffer(ctx.buffer);
+    f->size_bytes = ctx.buffer.size();
+
+    if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
+    std::filesystem::create_directories(fullBackingPath.parent_path());
+
+    if (ctx.buffer.empty()) std::ofstream(fullBackingPath).close();
+    else {
+        std::string iv_b64;
+        const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, iv_b64);
+        f->encryption_iv = iv_b64;
+        util::writeFile(fullBackingPath, ciphertext);
+    }
+
+    f->content_hash = crypto::Hash::blake2b(fullBackingPath);
+
+    if (!std::filesystem::exists(fullBackingPath))
+        std::cerr << "[Filesystem] Failed to create real file at: " << fullDiskPath << std::endl;
+
+    f->id = FileQueries::upsertFile(f);
+    cache->cacheEntry(f);
+
+    if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
+        ThumbnailWorker::enqueue(engine, ctx.buffer, f);
+
+    return f;
+}
+
 
 void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId,
                         std::shared_ptr<StorageEngine> engine) {
@@ -397,7 +457,7 @@ void Filesystem::handleRename(const RenameContext& context) {
     if (entry->isDirectory()) std::filesystem::create_directories(newAbsPath);
     else {
         std::filesystem::create_directories(newAbsPath.parent_path());
-        const auto file = std::static_pointer_cast<File>(entry);
+        const auto f = std::static_pointer_cast<File>(entry);
 
         if (canFastPath(entry, engine)) {
             std::cout << "[Filesystem] Fast‑path rename (ciphertext untouched): "
@@ -412,7 +472,7 @@ void Filesystem::handleRename(const RenameContext& context) {
             return; // bail early, no reencrypt
         }
 
-        if (!file->encryption_iv.empty()) {
+        if (!f->encryption_iv.empty()) {
             const auto tmp = util::decrypt_file_to_temp(engine->vault->id, oldVaultPath, engine);
             buffer = util::readFileToVector(tmp);
         } else buffer = util::readFileToVector(oldAbsPath);
@@ -423,13 +483,15 @@ void Filesystem::handleRename(const RenameContext& context) {
             if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldAbsPath.string());
             util::writeFile(newAbsPath, ciphertext);
 
-            ThumbnailWorker::enqueue(engine, buffer, file);
-            file->encryption_iv = iv_b64;
-            file->size_bytes = std::filesystem::file_size(newAbsPath);
-            file->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
-            file->content_hash = crypto::Hash::blake2b(newAbsPath);
+            f->encryption_iv = iv_b64;
+            f->size_bytes = std::filesystem::file_size(newAbsPath);
+            f->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
+            f->content_hash = crypto::Hash::blake2b(newAbsPath);
 
-            updateFile(txn, file);
+            if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
+                ThumbnailWorker::enqueue(engine, buffer, f);
+
+            updateFile(txn, f);
         }
     }
 
@@ -446,3 +508,8 @@ bool Filesystem::canFastPath(const std::shared_ptr<FSEntry>& entry, const std::s
     if (file->encryption_iv.empty()) return false;
     return file->vault_id == engine->vault->id;
 }
+
+bool Filesystem::isPreviewable(const std::string& mimeType) {
+    return mimeType.starts_with("image") || mimeType.starts_with("application") || mimeType.contains("pdf");
+}
+

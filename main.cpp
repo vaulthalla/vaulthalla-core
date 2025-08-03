@@ -48,8 +48,8 @@ int main() {
 
         std::cout << "[*] Shutting down Vaulthalla services..." << std::endl;
 
-        ThreadPoolManager::instance().shutdown();
         ServiceManager::instance().stopAll(SIGTERM);
+        ThreadPoolManager::instance().shutdown();
 
         std::cout << "[✓] Vaulthalla services shut down cleanly." << std::endl;
 

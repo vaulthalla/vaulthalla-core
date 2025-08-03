@@ -13,6 +13,7 @@
 #include "util/fsPath.hpp"
 
 #include <optional>
+#include <iostream>
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -68,7 +69,8 @@ void CacheSyncTask::sync() {
 
     const auto freeSpace = engine_->freeSpace();
     const auto reqFreeSpace = computeReqFreeSpaceForDownload(files);
-    const auto [purgeableSpace, maxSize] = computeIndicesSizeAndMaxSize(CacheQueries::listCacheIndicesByType(vaultId(), CacheIndex::Type::File));
+    const auto [purgeableSpace, maxSize] =
+        computeIndicesSizeAndMaxSize(CacheQueries::listCacheIndicesByType(vaultId(), CacheIndex::Type::File));
     const bool freeAfterDownload = freeSpace + purgeableSpace < reqFreeSpace;
 
     if (freeAfterDownload) ensureFreeSpace(maxSize);
@@ -78,7 +80,8 @@ void CacheSyncTask::sync() {
     processFutures();
 }
 
-std::pair<uintmax_t, uintmax_t> CacheSyncTask::computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {
+std::pair<uintmax_t, uintmax_t>
+CacheSyncTask::computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<CacheIndex> >& indices) {
     uintmax_t sum = 0;
     uintmax_t maxSize = 0;
     for (const auto& index : indices) {

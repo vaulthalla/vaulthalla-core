@@ -13,6 +13,8 @@
 
 #include <optional>
 
+#include "concurrency/ThreadPoolManager.hpp"
+
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
@@ -44,14 +46,9 @@ void SafeSyncTask::sync() {
         std::cout << "[SafeSyncTask] Processed file: " << file->name << std::endl;
     }
 
-    std::cout << "[SafeSyncTask] Futures size: " << futures_.size() << std::endl;
-
-    std::cout << "[SafeSyncTask] Processing remaining S3 files..." << std::endl;
     processFutures();
-    std::cout << "[SafeSyncTask] Remaining S3 files processed." << std::endl;
 
     // Create any missing directories locally based on what's in S3
-    std::cout << "[SafeSyncTask] Checking for missing directories..." << std::endl;
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";

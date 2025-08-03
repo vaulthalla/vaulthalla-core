@@ -20,6 +20,7 @@ struct UploadTask : PromisedTask {
 
     void operator()() override {
         try {
+            std::cout << "[UploadTask] Uploading file: " << file->path << std::endl;
             engine->uploadFile(file->path);
             promise.set_value(true);
         } catch (const std::exception& e) {

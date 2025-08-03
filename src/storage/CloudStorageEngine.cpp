@@ -42,6 +42,7 @@ void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) co
 }
 
 void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, const bool rmThumbnails) const {
+    std::cout << "[CloudStorageEngine] Removing file from S3: " << rel_path.string() << std::endl;
     if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
         "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
     if (rmThumbnails) purgeThumbnails(rel_path);

@@ -3,20 +3,18 @@
 #include "concurrency/Task.hpp"
 #include "storage/CloudStorageEngine.hpp"
 #include "types/File.hpp"
-#include "types/CacheIndex.hpp"
 
 #include <memory>
-#include <iostream>
 
 namespace vh::concurrency {
 
 struct DownloadTask : PromisedTask {
     std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<types::File> file;
+    std::shared_ptr<File> file;
     bool freeAfterDownload;
 
     DownloadTask(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<types::File> f,
+                 std::shared_ptr<File> f,
                  const bool freeAfter = false)
         : engine(std::move(eng)), file(std::move(f)), freeAfterDownload(freeAfter) {}
 
@@ -26,7 +24,6 @@ struct DownloadTask : PromisedTask {
             else engine->downloadFile(file->path);
             promise.set_value(true);
         } catch (const std::exception& e) {
-            std::cerr << "[DownloadTask] Error: " << e.what() << " (path = " << file->path << ")\n";
             promise.set_value(false); // or wrap exception if desired
         }
     }

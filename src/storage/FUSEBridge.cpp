@@ -217,7 +217,8 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 
 void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
                         const char* name, mode_t mode, struct fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}", parent, name, mode);
+    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
+        parent, name, mode);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -338,7 +339,8 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
         try {
             Filesystem::mkdir(fullPath, mode);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            LogRegistry::fuse()->error("[mkdir] Failed to create directory: {} → {}: {}", parentPath.string(), name, fsErr.what());
+            LogRegistry::fuse()->error("[mkdir] Failed to create directory: {} → {}: {}",
+                parentPath.string(), name, fsErr.what());
             fuse_reply_err(req, EIO);
             return;
         }
@@ -391,7 +393,8 @@ void FUSEBridge::rename(const fuse_req_t& req,
         try {
             Filesystem::rename(fromPath, toPath);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            LogRegistry::fuse()->error("[rename] Failed to rename: {} → {}: {}", fromPath.string(), toPath.string(), fsErr.what());
+            LogRegistry::fuse()->error("[rename] Failed to rename: {} → {}: {}",
+                fromPath.string(), toPath.string(), fsErr.what());
             fuse_reply_err(req, EIO);
             return;
         }

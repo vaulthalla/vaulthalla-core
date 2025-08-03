@@ -3,11 +3,10 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
-#include <thread>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -33,7 +32,8 @@ WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& end
 }
 
 void WebSocketServer::run() {
-    std::cout << "[WebSocketServer] Starting to accept connections on " << acceptor_.local_endpoint() << std::endl;
+    LogRegistry::ws()->info("[WebSocketServer] Starting WebSocket server on {}",
+                            acceptor_.local_endpoint().address().to_string());
     doAccept();
 }
 

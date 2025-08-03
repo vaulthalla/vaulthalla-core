@@ -59,6 +59,24 @@ struct convert<FuseConfig> {
     }
 };
 
+// LoggingConfig
+template<>
+struct convert<LoggingConfig> {
+    static Node encode(const LoggingConfig& rhs) {
+        Node node;
+        node["log_dir"] = rhs.log_dir.string();
+        node["log_rotation_days"] = rhs.log_rotation_days.count();
+        return node;
+    }
+
+    static bool decode(const Node& node, LoggingConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.log_dir = node["log_dir"].as<std::string>("/var/log/vaulthalla");
+        rhs.log_rotation_days = std::chrono::days(node["log_rotation_days"].as<int>(30));
+        return true;
+    }
+};
+
 // === PDFDocumentConfig ===
 template<>
 struct convert<PDFDocumentConfig> {

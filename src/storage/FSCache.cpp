@@ -3,14 +3,15 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
-#include <iostream>
 #include <mutex>
 
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::services;
+using namespace vh::logging;
 
 FSCache::FSCache() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
@@ -21,14 +22,14 @@ FSCache::FSCache() {
 
 std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
     const auto path = makeAbsolute(absPath);
-    std::cout << "[StorageManager] Retrieving entry for path: " << path << std::endl;
+    LogRegistry::storage()->debug("[FSCache] Retrieving entry for path: {}", path.string());
     const auto it = pathToEntry_.find(path);
     if (it != pathToEntry_.end()) return it->second;
 
     try {
         auto entry = FSEntryQueries::getFSEntry(path);
         if (!entry) {
-            std::cerr << "[StorageManager] Entry not found for path: " << path << std::endl;
+            LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", path.string());
             return nullptr;
         }
 
@@ -39,7 +40,7 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
         }
         return entry;
     } catch (const std::exception& e) {
-        std::cerr << "[StorageManager] Error retrieving entry for path " << path << ": " << e.what() << std::endl;
+        LogRegistry::storage()->error("[FSCache] Error retrieving entry for path {}: {}", path.string(), e.what());
         return nullptr;
     }
 }
@@ -51,13 +52,13 @@ fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
 
     const auto entry = FSEntryQueries::getFSEntry(absPath);
     if (!entry) {
-        std::cerr << "[StorageManager] Entry not found for path: " << absPath << std::endl;
+        LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
         return FUSE_ROOT_ID; // or some error code
     }
 
     fuse_ino_t ino = entry && entry->inode ? *entry->inode : getOrAssignInode(absPath);
     if (ino == FUSE_ROOT_ID) {
-        std::cerr << "[StorageManager] Failed to resolve inode for path: " << absPath << std::endl;
+        LogRegistry::storage()->error("[FSCache] Failed to resolve inode for path: {}", absPath.string());
         return FUSE_ROOT_ID; // or some error code
     }
 
@@ -91,7 +92,7 @@ fuse_ino_t FSCache::getOrAssignInode(const fs::path& path) {
 void FSCache::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
     std::unique_lock lock(mutex_);
     if (pathToInode_.contains(absPath)) {
-        std::cerr << "[StorageManager] Path already linked: " << absPath << std::endl;
+        LogRegistry::storage()->debug("[FSCache] Path {} already linked to inode {}", absPath.string(), ino);
         return; // Path already exists
     }
     pathToInode_[absPath] = ino;

@@ -3,10 +3,10 @@
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
 #include "protocols/websocket/handlers/GroupHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -29,7 +29,7 @@ void WebSocketHandler::registerAllHandlers() const {
     registerSettingsHandlers();
     registerGroupHandlers();
 
-    std::cout << "[WebSocketHandler] All handlers registered.\n";
+    LogRegistry::ws()->info("[WebSocketHandler] All handlers registered successfully.");
 }
 
 void WebSocketHandler::registerAuthHandlers() const {

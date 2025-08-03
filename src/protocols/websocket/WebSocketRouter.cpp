@@ -2,10 +2,10 @@
 #include "auth/SessionManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -20,7 +20,7 @@ void WebSocketRouter::registerHandler(const std::string& command, HandlerFunc ha
 
 void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
     try {
-        std::cout << "[Router] Routing message: " << msg.dump() << std::endl;
+        LogRegistry::ws()->debug("[Router] Routing message: {}", msg.dump());
 
         const std::string command = msg.at("command").get<std::string>();
         const std::string accessToken = msg.value("token", "");
@@ -28,7 +28,7 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         if (!command.starts_with("auth")) {
             const auto client = sessionManager_->getClientSession(session.getUUID());
             if (!client || !client->validateToken(accessToken)) {
-                std::cerr << "[Router] Unauthorized access attempt with command: " << command << std::endl;
+                LogRegistry::ws()->warn("[Router] Unauthorized access attempt for command: {}", command);
                 const json errorResponse = {{"command", "error"},
                                       {"status", "unauthorized"},
                                       {"message", "You must be authenticated to perform this action."}};
@@ -40,14 +40,18 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         const auto it = handlers_.find(command);
         if (it != handlers_.end()) it->second(msg, session);
         else {
-            std::cerr << "[Router] Unknown command: " << command << std::endl;
+            LogRegistry::ws()->warn("[Router] Unknown command: {}", command);
             const json errorResponse = {{"command", "error"},
                                         {"status", "unknown_command"},
                                         {"message", "Unknown command: " + command}};
             session.send(errorResponse);
         }
     } catch (const std::exception& e) {
-        std::cerr << "[Router] Error routing message: " << e.what() << std::endl;
+        LogRegistry::ws()->error("[Router] Error routing message: {}", e.what());
+        const json errorResponse = {{"command", "error"},
+                                    {"status", "internal_error"},
+                                    {"message", "An internal error occurred while processing your request."}};
+        session.send(errorResponse);
     }
 }
 

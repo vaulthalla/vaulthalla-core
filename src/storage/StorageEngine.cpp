@@ -11,9 +11,8 @@
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
-#include "crypto/Hash.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
-#include "util/fsPath.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <iostream>
 
@@ -23,6 +22,7 @@ using namespace vh::encryption;
 using namespace vh::config;
 using namespace vh::storage;
 using namespace vh::services;
+using namespace vh::logging;
 namespace fs = std::filesystem;
 
 namespace vh::storage {
@@ -82,7 +82,7 @@ void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std:
         }
 
         if (!fs::exists(fromPath)) {
-            std::cerr << "[StorageEngine] Thumbnail does not exist: " << fromPath.string() << std::endl;
+            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 
@@ -102,7 +102,7 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
         }
 
         if (!fs::exists(fromPath)) {
-            std::cerr << "[StorageEngine] Thumbnail does not exist: " << fromPath.string() << std::endl;
+            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 

@@ -20,6 +20,7 @@ Config loadConfig(const std::string& path) {
 
     if (auto node = root["server"]) YAML::convert<ServerConfig>::decode(node, cfg.server);
     if (auto node = root["fuse"]) YAML::convert<FuseConfig>::decode(node, cfg.fuse);
+    if (auto node = root["logging"]) YAML::convert<LoggingConfig>::decode(node, cfg.logging);
     if (auto node = root["caching"]) YAML::convert<CachingConfig>::decode(node, cfg.caching);
     if (auto node = root["database"]) YAML::convert<DatabaseConfig>::decode(node, cfg.database);
     if (auto node = root["auth"]) YAML::convert<AuthConfig>::decode(node, cfg.auth);
@@ -60,6 +61,7 @@ void Config::save() const {
     unordered_map<string, string> sectionMap = {
         {"server", encode(server)},
         {"fuse", encode(fuse)},
+        {"logging", encode(logging)},
         {"caching", encode(caching)},
         {"database", encode(database)},
         {"auth", encode(auth)},
@@ -103,6 +105,10 @@ void to_json(nlohmann::json& j, const Config& c) {
              {"mount_per_user", c.fuse.mount_per_user},
              {"fuse_timeout_seconds", c.fuse.fuse_timeout_seconds},
              {"allow_other", c.fuse.allow_other}
+         }},
+        {"logging", {
+             {"log_dir", c.logging.log_dir},
+             {"log_rotation_days", c.logging.log_rotation_days.count()}
          }},
         {"caching", {
              {"path", c.caching.path},
@@ -190,6 +196,9 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.fuse.mount_per_user = j.at("fuse").at("mount_per_user").get<bool>();
     c.fuse.fuse_timeout_seconds = j.at("fuse").at("fuse_timeout_seconds").get<int>();
     c.fuse.allow_other = j.at("fuse").at("allow_other").get<bool>();
+
+    c.logging.log_dir = j.at("logging").at("log_dir").get<std::string>();
+    c.logging.log_rotation_days = std::chrono::days(j.at("logging").at("log_rotation_days").get<unsigned int>());
 
     // Add inside from_json(const nlohmann::json& j, Config& c)
     const auto& cache = j.at("caching");

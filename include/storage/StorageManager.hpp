@@ -23,12 +23,6 @@ namespace vh::storage {
 
 struct StorageEngine;
 
-struct PendingRename {
-    std::filesystem::path oldPath;
-    std::filesystem::path newPath;
-    std::optional<unsigned int> userId = std::nullopt;
-};
-
 class StorageManager {
 public:
     StorageManager();
@@ -37,16 +31,7 @@ public:
 
     std::vector<std::shared_ptr<StorageEngine>> getEngines() const;
 
-    [[nodiscard]] char getPathType(const fs::path& absPath) const;
-
     std::shared_ptr<StorageEngine> resolveStorageEngine(const fs::path& absPath) const;
-
-
-    void queuePendingRename(fuse_ino_t ino, const fs::path& oldPath, const fs::path& newPath, std::optional<unsigned int> userId = std::nullopt);
-
-    void clearPendingRename(fuse_ino_t ino);
-
-    std::optional<PendingRename> getPendingRename(fuse_ino_t ino) const;
 
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
@@ -67,7 +52,6 @@ private:
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine>> vaultToEngine_;
 
     mutable std::mutex renameQueueMutex_;
-    std::unordered_map<fuse_ino_t, PendingRename> renameRequests_;
 };
 
 }

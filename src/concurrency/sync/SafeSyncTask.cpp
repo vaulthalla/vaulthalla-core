@@ -13,12 +13,15 @@
 
 #include <optional>
 
+#include "concurrency/ThreadPoolManager.hpp"
+
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 
 void SafeSyncTask::sync() {
+    std::cout << "[SafeSyncTask] Starting sync for vault: " << engine_->vault->name << std::endl;
     for (const auto& file : localFiles_) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
         auto match = s3Map_.find(strippedPath);
@@ -41,10 +44,8 @@ void SafeSyncTask::sync() {
 
     processFutures();
 
-    // Create any missing directories locally based on what's in S3
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
-            std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
             if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
             DirectoryQueries::upsertDirectory(dir);
@@ -63,9 +64,9 @@ void SafeSyncTask::sync() {
             std::to_string(requiredSpace) + ", Available: " + std::to_string(availableSpace));
     }
 
-    for (const auto& file : filesToDownload) {
-        download(file);
-    }
+    for (const auto& file : filesToDownload) download(file);
 
     processFutures();
+
+    std::cout << "[SafeSyncTask] Sync completed for vault: " << engine_->vault->name << std::endl;
 }

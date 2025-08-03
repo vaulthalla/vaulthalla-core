@@ -258,10 +258,12 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     }
 }
 
-std::string FileQueries::getEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath) {
-    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::string {
+std::optional<std::string> FileQueries::getEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::string> {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
-        return txn.exec_prepared("get_file_encryption_iv", p).one_field().as<std::string>();
+        const auto res = txn.exec_prepared("get_file_encryption_iv", p);
+        if (res.empty()) return std::nullopt;
+        return res.one_field().as<std::string>();
     });
 }
 

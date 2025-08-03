@@ -11,6 +11,7 @@
 #include "util/files.hpp"
 #include "util/fsPath.hpp"
 #include "services/ThumbnailWorker.hpp"
+#include "storage/Filesystem.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -62,7 +63,9 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key.string());
 
     s3Provider_->setObjectContentHash(s3Key, FileQueries::getContentHash(vault->id, rel_path));
-    s3Provider_->setObjectEncryptionMetadata(s3Key, FileQueries::getEncryptionIV(vault->id, rel_path));
+
+    if (const auto iv = FileQueries::getEncryptionIV(vault->id, rel_path))
+        s3Provider_->setObjectEncryptionMetadata(s3Key, *iv);
 }
 
 std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
@@ -82,41 +85,26 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
 
     if (remoteFileIsEncrypted(rel_path)) {
         auto iv_b64 = getRemoteIVBase64(rel_path);
-        if (!iv_b64) {
-            try {
-                iv_b64 = FileQueries::getEncryptionIV(vault->id, rel_path);
-            } catch (const std::exception& e) {
-                std::cerr << "[CloudStorageEngine] Failed to get IV for encrypted file: " << e.what() << std::endl;
-                throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
-            }
-        }
-        if (iv_b64) {
-            const auto decrypted = encryptionManager->decrypt(buffer, *iv_b64);
-            file = createFile(rel_path, decrypted);
-            file->encryption_iv = *iv_b64;
-        }
-        s3Provider_->setObjectEncryptionMetadata(s3Key, *iv_b64);
-        if (file->content_hash) s3Provider_->setObjectContentHash(s3Key, *file->content_hash);
-        util::writeFile(absPath, buffer);
-    }
-    else {
-        std::string iv_b64;
-        const auto ciphertext = encryptionManager->encrypt(buffer, iv_b64);
-        util::writeFile(absPath, ciphertext);
-
-        file = createFile(rel_path, buffer);
-        file->encryption_iv = iv_b64;
-
-        std::unordered_map<std::string, std::string> meta{
-        {"vh-encrypted", "true"},
-        {"content-hash", *file->content_hash}
-        };
-        if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
-            throw std::runtime_error("[CloudStorageEngine] Failed to upload file with metadata: " + rel_path.string());
-        buffer = downloadToBuffer(rel_path);
+        if (!iv_b64) iv_b64 = FileQueries::getEncryptionIV(vault->id, rel_path);
+        if (!iv_b64) throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
+        buffer = encryptionManager->decrypt(buffer, *iv_b64);
     }
 
-    file->id = FileQueries::upsertFile(file);
+    Filesystem::createFile({
+            .path = makeAbsolute(rel_path),
+            .fuse_path = paths->absRelToAbsOther(absPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+            .buffer = buffer,
+            .engine = shared_from_this(),
+            .userId = vault->owner_id
+        });
+
+    std::unordered_map<std::string, std::string> meta{
+            {"vh-encrypted", "true"},
+            {"content-hash", *file->content_hash}
+    };
+
+    if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
+        throw std::runtime_error("[CloudStorageEngine] Failed to reupload new file with enhanced metadata: " + rel_path.string());
 
     ThumbnailWorker::enqueue(shared_from_this(), buffer, file);
 

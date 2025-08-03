@@ -10,7 +10,7 @@ public:
 
     ~SafeSyncTask() override = default;
 
-    SafeSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine) : SyncTask(engine) {}
+    explicit SafeSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine) : SyncTask(engine) {}
 
     void sync() override;
 };

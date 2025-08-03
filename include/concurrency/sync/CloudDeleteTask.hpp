@@ -6,15 +6,15 @@
 #include "types/File.hpp"
 #include "types/CacheIndex.hpp"
 #include "types/Path.hpp"
+#include "database/Queries/FileQueries.hpp"
 
 #include <memory>
-#include <iostream>
 
 using namespace vh::types;
 
 namespace vh::concurrency {
 
-struct CloudDeleteTask : PromisedTask {
+struct CloudDeleteTask final : PromisedTask {
     enum class Type { PURGE, LOCAL, REMOTE };
 
     std::shared_ptr<storage::CloudStorageEngine> engine;
@@ -34,13 +34,12 @@ struct CloudDeleteTask : PromisedTask {
             else throw std::runtime_error("Unknown delete task type");
             promise.set_value(true);
         } catch (const std::exception& e) {
-            std::cerr << "[DeleteTask] Error: " << e.what() << " (path = " << file->path << ")\n";
             promise.set_value(false);
         }
     }
 };
 
-struct CloudTrashedDeleteTask : PromisedTask {
+struct CloudTrashedDeleteTask final : PromisedTask {
     enum class Type { PURGE, LOCAL, REMOTE };
 
     std::shared_ptr<storage::CloudStorageEngine> engine;
@@ -54,14 +53,14 @@ struct CloudTrashedDeleteTask : PromisedTask {
 
     void operator()() override {
         try {
-            const auto vaultPath = engine->paths->absRelToRoot(file->fuse_path, PathType::VAULT_ROOT);
+            const auto vaultPath = engine->paths->absRelToAbsOther(file->fuse_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             if (type == Type::PURGE) purge(vaultPath);
             else if (type == Type::LOCAL) handleLocalDelete();
             else if (type == Type::REMOTE) engine->removeRemotely(vaultPath);
             else throw std::runtime_error("Unknown delete task type");
+            FileQueries::markTrashedFileDeleted(file->id);
             promise.set_value(true);
         } catch (const std::exception& e) {
-            std::cerr << "[DeleteTask] Error: " << e.what() << " (fuse_path = " << file->fuse_path << ")\n";
             promise.set_value(false);
         }
     }

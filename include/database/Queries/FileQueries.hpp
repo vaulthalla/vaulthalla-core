@@ -49,7 +49,7 @@ public:
                                                std::optional<unsigned int> parentId,
                                                unsigned int sizeBytes);
 
-    [[nodiscard]] static std::string getEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath);
+    [[nodiscard]] static std::optional<std::string> getEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath);
 
     static void setEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv);
 

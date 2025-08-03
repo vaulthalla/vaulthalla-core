@@ -1,64 +1,84 @@
 #pragma once
-#include "ThreadPool.hpp"
+
+#include "concurrency/ThreadPool.hpp"
 
 #include <atomic>
 #include <chrono>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <string>
 #include <thread>
 #include <vector>
+#include <condition_variable>
+#include <iostream>
 
 namespace vh::concurrency {
 
 class ThreadPoolManager {
 public:
     static ThreadPoolManager& instance() {
-        static ThreadPoolManager inst;
-        return inst;
+        static ThreadPoolManager instance;
+        return instance;
     }
 
-    void init(size_t reserveFactor = 3) {
-        if (running_.load()) return;
+    void init() {
+        if (running_.exchange(true)) return; // already running
 
-        totalThreads_ = std::max(std::thread::hardware_concurrency() * reserveFactor, static_cast<size_t>(12));
-        for (size_t i = 0; i < totalThreads_; ++i) reserve_.push_back(std::make_unique<ThreadWorker>(nullptr));
+        totalThreads_ = std::max(
+            std::thread::hardware_concurrency() * RESERVE_FACTOR,
+            8u // safety floor
+        );
 
-        pools_["fuse"]  = std::make_shared<ThreadPool>("fuse", 4);
-        pools_["http"]  = std::make_shared<ThreadPool>("http", 3);
-        pools_["thumb"] = std::make_shared<ThreadPool>("thumb", 2);
-        pools_["sync"]  = std::make_shared<ThreadPool>("sync", 3);
+        const unsigned int base = totalThreads_ / NUM_POOLS;
+        const unsigned int rem  = totalThreads_ % NUM_POOLS;
 
-        highPressureFactor_ = totalThreads_ / pools_.size();
+        unsigned int fuseN  = base + (rem > 0 ? 1 : 0);
+        unsigned int syncN  = base + (rem > 1 ? 1 : 0);
+        unsigned int thumbN = base; // thumb/http get no extra by default
+        unsigned int httpN  = base;
 
-        stopFlag_ = false;
-        monitor_ = std::thread([this] { rebalanceLoop(); });
-        running_.store(true);
+        fuse_  = std::make_shared<ThreadPool>(nullptr, fuseN);
+        sync_  = std::make_shared<ThreadPool>(nullptr, syncN);
+        thumb_ = std::make_shared<ThreadPool>(nullptr, thumbN);
+        http_  = std::make_shared<ThreadPool>(nullptr, httpN);
+
+        stopFlag_.store(false);
+
+        monitorThread_ = std::thread([this] { rebalanceLoop(); });
     }
 
     void shutdown() {
-        stopFlag_ = true;
-        if (monitor_.joinable()) monitor_.join();
-
-        for (auto& [_, pool] : pools_) {
-            pool->stop();
+        stopFlag_.store(true);
+        {
+            std::scoped_lock lock(pressureMutex_);
+            pressureFlag_.store(true); // optional, just to trip the predicate
         }
-        pools_.clear();
-        reserve_.clear();
+        pressureCv_.notify_all();  // wake the monitor
+
+        std::cout << "[ThreadPoolManager] Shutting down monitor thread..." << std::endl;
+        if (monitorThread_.joinable()) monitorThread_.join();
+
+        std::cout << "[ThreadPoolManager] Stopping thread pools..." << std::endl;
+        if (fuse_)  fuse_->stop();
+        if (sync_)  sync_->stop();
+        if (thumb_) thumb_->stop();
+        if (http_)  http_->stop();
+
         running_.store(false);
     }
 
-    std::shared_ptr<ThreadPool> get(const std::string& name) {
-        auto it = pools_.find(name);
-        if (it == pools_.end()) return nullptr;
-        return it->second;
-    }
+    std::shared_ptr<ThreadPool>& fusePool() { return fuse_; }
+    std::shared_ptr<ThreadPool>& syncPool() { return sync_; }
+    std::shared_ptr<ThreadPool>& thumbPool() { return thumb_; }
+    std::shared_ptr<ThreadPool>& httpPool() { return http_; }
 
-    std::shared_ptr<ThreadPool>& fusePool() { return pools_["fuse"]; }
-    std::shared_ptr<ThreadPool>& httpPool() { return pools_["http"]; }
-    std::shared_ptr<ThreadPool>& thumbPool() { return pools_["thumb"]; }
-    std::shared_ptr<ThreadPool>& syncPool() { return pools_["sync"]; }
+    void signalPressureChange() {
+        {
+            std::scoped_lock lock(pressureMutex_);
+            pressureFlag_.store(true);
+        }
+        pressureCv_.notify_one();
+    }
 
 private:
     ThreadPoolManager() = default;
@@ -67,66 +87,54 @@ private:
     void rebalanceLoop() {
         using namespace std::chrono_literals;
         while (!stopFlag_.load()) {
-            for (auto& [name, pool] : pools_) {
-                const auto pending = pool->pendingTasks();
-                const auto workers = pool->numWorkers();
+            std::unique_lock lock(pressureMutex_);
+            pressureCv_.wait(lock, [this] {
+                return stopFlag_.load() || pressureFlag_.load();
+            });
+            if (stopFlag_.load()) return;
+            pressureFlag_.store(false);
 
-                // high pressure → try reserve, then steal
-                if (pending > workers * highPressureFactor_) {
-                    if (reserve_.empty()) stealFor(pool);
-                    else {
-                        pool->adoptWorker(std::move(reserve_.back()));
-                        reserve_.pop_back();
-                    }
-                }
+            auto fuseQ  = fuse_->queueDepth();
+            auto syncQ  = sync_->queueDepth();
+            auto httpQ  = http_->queueDepth();
+            auto thumbQ = thumb_->queueDepth();
 
-                // low pressure → consider returning a worker to reserve
-                if (pending < workers * lowPressureFactor_ && workers > minPoolSize(name)) {
-                    auto w = pool->donateWorker();
-                    if (w) reserve_.push_back(std::move(w));
-                }
-            }
-            std::this_thread::sleep_for(50ms);
+            // Compare backlog/worker ratios
+            auto fuseRatio  = fuseQ  / std::max(1u, fuse_->workerCount());
+            auto syncRatio  = syncQ  / std::max(1u, sync_->workerCount());
+            auto httpRatio  = httpQ  / std::max(1u, http_->workerCount());
+            auto thumbRatio = thumbQ / std::max(1u, thumb_->workerCount());
+
+            maybeReassign(fuse_, http_, fuseRatio, httpRatio);
+            maybeReassign(sync_, thumb_, syncRatio, thumbRatio);
         }
     }
 
-    void stealFor(const std::shared_ptr<ThreadPool>& needy) {
-        for (auto& [donorName, donor] : pools_) {
-            if (donor == needy) continue;
-            if (priorityOf(donorName) < priorityOf(needy->name())) continue;
-            if (donor->pendingTasks() < donor->numWorkers() / 2) {
-                if (auto w = donor->donateWorker()) {
-                    needy->adoptWorker(std::move(w));
-                    return;
-                }
-            }
+    static void maybeReassign(std::shared_ptr<ThreadPool>& hungry,
+                   std::shared_ptr<ThreadPool>& donor,
+                   unsigned int hungryRatio,
+                   unsigned int donorRatio) {
+        // If hungry backlog per worker > 4x donor backlog, steal
+        if (hungryRatio > donorRatio * 4 && donor->hasIdleWorker()) {
+            auto [t, flag] = donor->giveWorker();
+            hungry->acceptWorker(std::move(t), flag);
+        }
+        // Return borrowed if hungry is calm
+        else if (hungryRatio < 2 && hungry->hasBorrowedWorker()) {
+            auto [t, flag] = hungry->giveWorker();
+            donor->acceptWorker(std::move(t), flag);
         }
     }
 
-    [[nodiscard]] static int priorityOf(const std::string& name) {
-        if (name == "fuse") return 3;
-        if (name == "http") return 2;
-        if (name == "thumb") return 1;
-        if (name == "sync") return 0;
-        return 0;
-    }
-
-    [[nodiscard]] static size_t minPoolSize(const std::string& name) {
-        if (name == "fuse") return 2;
-        if (name == "http") return 2;
-        if (name == "thumb") return 1;
-        if (name == "sync") return 1;
-        return 1;
-    }
-
-    std::map<std::string, std::shared_ptr<ThreadPool>> pools_;
-    std::vector<std::unique_ptr<ThreadWorker>> reserve_;
-    std::thread monitor_;
+    static constexpr unsigned int RESERVE_FACTOR = 3, NUM_POOLS = 4;
+    std::shared_ptr<ThreadPool> fuse_, sync_, thumb_, http_;
     std::atomic<bool> stopFlag_{false};
     std::atomic<bool> running_{false};
-    size_t totalThreads_{0};
-    size_t highPressureFactor_ = 4; // tasks per worker before scaling up
-    const size_t lowPressureFactor_  = 1; // scale down if <1× tasks per worker
+    std::thread monitorThread_;
+    unsigned int totalThreads_{0};
+    std::condition_variable pressureCv_;
+    std::mutex pressureMutex_;
+    std::atomic<bool> pressureFlag_{false}; // true if pressure change signal received
 };
 
-}
+} // namespace vh::concurrency

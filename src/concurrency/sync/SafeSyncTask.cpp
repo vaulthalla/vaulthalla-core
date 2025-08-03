@@ -19,11 +19,14 @@ using namespace vh::types;
 using namespace vh::database;
 
 void SafeSyncTask::sync() {
+    std::cout << "[SafeSyncTask] Starting sync for vault: " << engine_->vault->name << std::endl;
     for (const auto& file : localFiles_) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
+        std::cout << "[SafeSyncTask] Processing file: " << file->name << std::endl;
         auto match = s3Map_.find(strippedPath);
 
         if (match == s3Map_.end()) {
+            std::cout << "[SafeSyncTask] File not found in S3, uploading: " << file->name << std::endl;
             upload(file);
             continue;
         }
@@ -37,11 +40,18 @@ void SafeSyncTask::sync() {
         else upload(file);
 
         s3Map_.erase(match);
+
+        std::cout << "[SafeSyncTask] Processed file: " << file->name << std::endl;
     }
 
+    std::cout << "[SafeSyncTask] Futures size: " << futures_.size() << std::endl;
+
+    std::cout << "[SafeSyncTask] Processing remaining S3 files..." << std::endl;
     processFutures();
+    std::cout << "[SafeSyncTask] Remaining S3 files processed." << std::endl;
 
     // Create any missing directories locally based on what's in S3
+    std::cout << "[SafeSyncTask] Checking for missing directories..." << std::endl;
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             std::cout << "[SafeSyncTask] Creating directory: " << dir->path << "\n";
@@ -63,9 +73,10 @@ void SafeSyncTask::sync() {
             std::to_string(requiredSpace) + ", Available: " + std::to_string(availableSpace));
     }
 
-    for (const auto& file : filesToDownload) {
-        download(file);
-    }
+    std::cout << "[SafeSyncTask] Downloading " << filesToDownload.size() << " files from S3..." << std::endl;
+    for (const auto& file : filesToDownload) download(file);
 
     processFutures();
+
+    std::cout << "[SafeSyncTask] Sync completed for vault: " << engine_->vault->name << std::endl;
 }

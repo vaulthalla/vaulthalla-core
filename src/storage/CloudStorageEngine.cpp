@@ -49,6 +49,7 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
 
 void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
     const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
+    std::cout << "[CloudStorageEngine] Uploading file: " << absPath.string() << std::endl;
     if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
         throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
 

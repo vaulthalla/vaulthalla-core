@@ -12,10 +12,10 @@ namespace vh::concurrency {
 
 struct UploadTask : PromisedTask {
     std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<types::File> file;
+    std::shared_ptr<File> file;
 
     UploadTask(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<types::File> f)
+                 std::shared_ptr<File> f)
         : engine(std::move(eng)), file(std::move(f)) {}
 
     void operator()() override {
@@ -23,7 +23,7 @@ struct UploadTask : PromisedTask {
             engine->uploadFile(file->path);
             promise.set_value(true);
         } catch (const std::exception& e) {
-            std::cerr << "[UploadTask] Error: " << e.what() << " (path = " << file->path << ")\n";
+            std::cerr << "[UploadTask] Error: " << e.what() << " (path = " << file->path << ")" << std::endl;
             promise.set_value(false);
         }
     }

@@ -87,11 +87,8 @@ private:
             std::shared_ptr<Task> task;
             {
                 std::unique_lock lock(queueMutex_);
-                cv_.wait(lock, [this] {
-                    return stopFlag_.load() || !taskQueue_.empty();
-                });
-                if (stopFlag_.load() && taskQueue_.empty())
-                    return;
+                cv_.wait(lock, [this] { return stopFlag_.load() || !taskQueue_.empty(); });
+                if (stopFlag_.load() && taskQueue_.empty()) return;
                 task = std::move(taskQueue_.front());
                 taskQueue_.pop_front();
             }
@@ -113,9 +110,8 @@ private:
                 }
             }
 
-            if (target) {
-                target->enqueue(std::move(task));
-            } else {
+            if (target) target->enqueue(std::move(task));
+            else {
                 // no worker? requeue
                 std::scoped_lock lock(queueMutex_);
                 taskQueue_.push_front(std::move(task));

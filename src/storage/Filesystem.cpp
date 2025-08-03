@@ -383,7 +383,7 @@ void Filesystem::handleRename(const RenameContext& context) {
             std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
-    auto id = 0;
+    unsigned int id = 0;
     if (entry->id == 0) id = FSEntryQueries::getEntryIdByPath(entry->fuse_path).value_or(0);
     else id = entry->id;
 

@@ -95,8 +95,7 @@ private:
             if (donor == needy) continue;
             if (priorityOf(donorName) < priorityOf(needy->name())) continue;
             if (donor->pendingTasks() < donor->numWorkers() / 2) {
-                auto w = donor->donateWorker();
-                if (w) {
+                if (auto w = donor->donateWorker()) {
                     needy->adoptWorker(std::move(w));
                     return;
                 }

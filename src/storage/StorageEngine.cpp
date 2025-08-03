@@ -36,29 +36,6 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }
 
-std::shared_ptr<File> StorageEngine::createFile(const fs::path& rel_path, const std::vector<uint8_t>& buffer) const {
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
-
-    if (!fs::exists(absPath))
-        throw std::runtime_error("File does not exist at path: " + absPath.string());
-    if (!fs::is_regular_file(absPath))
-        throw std::runtime_error("Path is not a regular file: " + absPath.string());
-
-    auto file = std::make_shared<File>();
-    file->vault_id = vault->id;
-    file->name = absPath.filename().string();
-    file->size_bytes = fs::file_size(absPath);
-    file->created_by = file->last_modified_by = vault->owner_id;
-    file->path = rel_path;
-    file->fuse_path = makeAbsolute(absPath);
-    file->mime_type = buffer.empty() ? util::Magic::get_mime_type(absPath) : util::Magic::get_mime_type_from_buffer(buffer);
-    file->content_hash = crypto::Hash::blake2b(absPath.string());
-    const auto parentPath = file->path.has_parent_path() ? fs::path{"/"} / file->path.parent_path() : fs::path("/");
-    file->parent_id = DirectoryQueries::getDirectoryIdByPath(vault->id, parentPath);
-
-    return file;
-}
-
 bool StorageEngine::isDirectory(const fs::path& rel_path) const {
     return DirectoryQueries::isDirectory(vault->id, rel_path);
 }

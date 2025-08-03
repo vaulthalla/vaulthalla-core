@@ -41,9 +41,6 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const;
 
-    [[nodiscard]] std::shared_ptr<types::File> createFile(const fs::path& rel_path,
-                                                          const std::vector<uint8_t>& = {}) const;
-
     [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath,
                                                const std::vector<uint8_t>& payload) const;
 

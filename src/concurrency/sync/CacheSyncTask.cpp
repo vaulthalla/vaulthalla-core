@@ -11,14 +11,15 @@
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <optional>
-#include <iostream>
 
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::logging;
 
 void CacheSyncTask::sync() {
     for (const auto& file : localFiles_) {
@@ -26,7 +27,7 @@ void CacheSyncTask::sync() {
         const auto match = s3Map_.find(strippedPath);
 
         if (match == s3Map_.end()) {
-            std::cout << "[CacheSyncTask] Local file not found in S3 map, caching: " << file->path << "\n";
+            LogRegistry::sync()->debug("[CacheSyncTask] File not found in S3 map, uploading: {}", file->path.string());
             upload(file);
             continue;
         }
@@ -46,8 +47,7 @@ void CacheSyncTask::sync() {
             continue;
         }
 
-        std::cout << "[CacheSyncTask][1/2] Local file is newer than remote copy: " << file->path << "\n"
-            << "[CacheSyncTask][2/2] Assuming an upload is scheduled, skipping download.\n";
+        LogRegistry::sync()->debug("[CacheSyncTask] Local file is newer than remote copy: {}", file->path.string());
 
         s3Map_.erase(match);
     }
@@ -57,7 +57,6 @@ void CacheSyncTask::sync() {
     // Ensure all directories in the S3 map exist locally
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
-            std::cout << "[CacheSyncTask] Creating directory: " << dir->path << "\n";
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
             if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
             DirectoryQueries::upsertDirectory(dir);
@@ -113,7 +112,7 @@ void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
 
         for (const auto& index : purgeable) {
             if (!std::filesystem::remove(index->path)) {
-                std::cerr << "[CacheSyncTask] Failed to remove cache index file: " << index->path << "\n";
+                LogRegistry::sync()->warn("[CacheSyncTask] Failed to remove cache index: {}", index->path.string());
                 continue;
             }
 

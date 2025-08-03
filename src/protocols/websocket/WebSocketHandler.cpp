@@ -16,7 +16,6 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<WebSocketRouter>& route
     storageHandler_ = std::make_shared<StorageHandler>(ServiceDepsRegistry::instance().storageManager);
     fsHandler_ = std::make_shared<FileSystemHandler>();
     shareHandler_ = std::make_shared<ShareHandler>();
-    notificationHandler_ = std::make_shared<NotificationHandler>();
     registerAllHandlers();
 }
 

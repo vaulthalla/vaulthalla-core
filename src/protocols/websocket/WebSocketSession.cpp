@@ -2,7 +2,6 @@
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
-#include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "util/parse.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -26,20 +25,15 @@ using namespace vh::logging;
 
 namespace vh::websocket {
 
-WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                                   const std::shared_ptr<NotificationBroadcastManager>& broadcastManager)
+WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router)
     : authManager_{ServiceDepsRegistry::instance().authManager},
-      ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)),
-      broadcastManager_{broadcastManager} {
+      ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)) {
     buffer_.max_size(65536);
 }
 
 WebSocketSession::~WebSocketSession() {
-    if (broadcastManager_ && isRegistered_) {
-        broadcastManager_->unregisterSession(shared_from_this());
-        LogRegistry::ws()->info("[WebSocketSession] Unregistered session for IP: {}",
-                               getClientIp());
-    }
+    close();
+    LogRegistry::ws()->info("[WebSocketSession] Session destroyed for IP: {}", getClientIp());
 }
 
 std::string WebSocketSession::getClientIp() const {
@@ -84,8 +78,6 @@ void WebSocketSession::accept(tcp::socket&& socket) {
             return;
         }
 
-        if (self->broadcastManager_) self->broadcastManager_->registerSession(self);
-
         self->isRegistered_ = true;
         LogRegistry::ws()->info("[Session] Handshake accepted from IP: {}", self->getClientIp());
 
@@ -122,12 +114,6 @@ void WebSocketSession::accept(tcp::socket&& socket) {
 }
 
 void WebSocketSession::close() {
-    if (broadcastManager_ && isRegistered_) {
-        // drop pub/sub ref
-        broadcastManager_->unregisterSession(shared_from_this());
-        isRegistered_ = false;
-    }
-
     if (ws_ && ws_->is_open()) {
         // close websocket
         beast::error_code ec;

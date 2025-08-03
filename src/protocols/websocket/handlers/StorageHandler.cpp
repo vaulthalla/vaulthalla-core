@@ -9,19 +9,20 @@
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <boost/algorithm/string.hpp>
-#include <iostream>
 
+using namespace vh::websocket;
 using namespace vh::types;
 using namespace vh::database;
-
+using namespace vh::storage;
+using namespace vh::logging;
 using namespace vh::services;
+using json = nlohmann::json;
 
-namespace vh::websocket {
-
-StorageHandler::StorageHandler(const std::shared_ptr<storage::StorageManager>& storageManager)
+StorageHandler::StorageHandler(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager), apiKeyManager_(std::make_shared<keys::APIKeyManager>()) {
 }
 
@@ -55,9 +56,9 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Added API key: " << name << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Added API key for user ID: {} with type: {}", userID, type);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleAddAPIKey error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleAddAPIKey error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.add.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -80,10 +81,10 @@ void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& sessi
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Removed API key with ID: " << keyId << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Removed API key with ID: {} for user ID: {}", keyId, user->id);
 
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleRemoveAPIKey error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleRemoveAPIKey error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.remove.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -107,7 +108,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed API keys for all users." << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] Listed all API keys successfully.");
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << std::endl;
 
@@ -135,7 +136,7 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed API keys for user ID: " << user->id << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] Listed API keys for user ID: {}", user->id);
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << std::endl;
 
@@ -166,7 +167,7 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Fetched API key with ID: " << keyId << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] Fetched API key with ID: {} for user ID: {}", keyId, user->id);
     } catch (const std::exception& e) {
         std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << std::endl;
 
@@ -212,9 +213,9 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Mounted vault: " << name << " -> " << type << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Added vault with ID: {} and type: {}", vault->id, type);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleInitLocalDisk error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleAddVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.add.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -241,9 +242,9 @@ void StorageHandler::handleUpdateVault(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Updated vault with ID: " << vault->id << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Updated vault with ID: {}", vault->id);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleUpdateVault error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleUpdateVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.update.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -272,9 +273,9 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Removed local disk vault with ID: " << vaultId << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Removed vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleRemoveLocalDiskVault error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleRemoveVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.remove.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -309,9 +310,9 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Fetched local disk vault with ID: " << vaultId << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Fetched vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleGetLocalDiskVault error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleGetVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -340,9 +341,9 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Listed vaults." << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] Listed {} vaults for user ID: {}", vaults.size(), user->id);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListVaults error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleListVaults error: {}", e.what());
 
         const json response = {
             {"command", "storage.vault.list.response"},
@@ -370,9 +371,9 @@ void StorageHandler::handleSyncVault(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[StorageHandler] Triggered sync for vault ID: " << vaultId << std::endl;
+        LogRegistry::storage()->info("[StorageHandler] Triggered sync for vault ID: {}", vaultId);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleSyncVault error: " << e.what() << std::endl;
+        LogRegistry::storage()->error("[StorageHandler] handleSyncVault error: {}", e.what());
 
         const json response = {
             {"command", "storage.vault.sync.response"},
@@ -384,6 +385,3 @@ void StorageHandler::handleSyncVault(const json& msg, WebSocketSession& session)
         session.send(response);
     }
 }
-
-
-} // namespace vh::websocket

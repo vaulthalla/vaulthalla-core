@@ -68,7 +68,7 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
         const auto entry = cache->getEntry(path);
 
         if (!entry) {
-            log->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path);
+            log->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path.string());
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -512,7 +512,7 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     }
 
     if (::close(fh->fd) < 0)
-        LogRegistry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path, strerror(errno));
+        LogRegistry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
 
     delete fh;  // clean up heap allocation
     fi->fh = 0; // clear the kernel-side handle

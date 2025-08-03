@@ -36,7 +36,6 @@ class User;
 
 namespace vh::websocket {
 class WebSocketRouter;
-class NotificationBroadcastManager;
 class UploadHandler;
 
 namespace beast = boost::beast;
@@ -49,8 +48,7 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession> {
 public:
     ~WebSocketSession();
 
-    WebSocketSession(const std::shared_ptr<WebSocketRouter>& router,
-                     const std::shared_ptr<NotificationBroadcastManager>& broadcastManager);
+    WebSocketSession(const std::shared_ptr<WebSocketRouter>& router);
 
     void send(const json& message);
 
@@ -107,7 +105,6 @@ private:
     bool writingInProgress_ = false;
 
     std::unordered_set<std::string> subscribedChannels_;
-    std::shared_ptr<NotificationBroadcastManager> broadcastManager_;
     bool isRegistered_ = false;
 
     void doRead();

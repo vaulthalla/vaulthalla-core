@@ -5,6 +5,8 @@
 
 using namespace vh::services;
 
+// TODO: Get this wired to a logger for better output control
+
 AsyncService::AsyncService(const std::string& serviceName) : serviceName_(serviceName) {}
 
 AsyncService::~AsyncService() {

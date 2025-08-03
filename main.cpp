@@ -21,7 +21,7 @@ namespace {
 std::atomic shouldExit = false;
 
 void signalHandler(int signum) {
-    LogRegistry::vaulthalla()->info("[!] Signal {} received. Shutting down gracefully...", signum);
+    LogRegistry::vaulthalla()->info("[!] Signal {} received. Shutting down gracefully...", std::to_string(signum));
     shouldExit = true;
 }
 }

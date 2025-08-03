@@ -13,13 +13,13 @@
 #include "storage/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
+using namespace vh::logging;
 using namespace std::chrono;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
@@ -43,7 +43,7 @@ std::shared_ptr<StorageEngine> FSTask::engine() const {
 void FSTask::processFutures() {
     for (auto& f : futures_)
         if (std::get<bool>(f.get()) == false)
-            std::cerr << "[FSTask] A filesystem task failed." << std::endl;
+            LogRegistry::sync()->error("[FSTask] Future failed");
     futures_.clear();
 }
 

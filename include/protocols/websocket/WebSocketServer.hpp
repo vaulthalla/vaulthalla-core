@@ -31,7 +31,6 @@ private:
     std::shared_ptr<WebSocketRouter> router_;
     std::shared_ptr<auth::AuthManager> authManager_;
     std::shared_ptr<auth::SessionManager> sessionManager_;
-    std::shared_ptr<NotificationBroadcastManager> broadcastManager_;
 
     void doAccept();
     void onAccept(tcp::socket socket);

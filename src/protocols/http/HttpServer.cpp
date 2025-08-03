@@ -6,11 +6,11 @@
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::http {
 
@@ -31,7 +31,8 @@ HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
 }
 
 void HttpServer::run() {
-    std::cout << "[HttpServer] Preview server listening on " << acceptor_.local_endpoint() << std::endl;
+    LogRegistry::http()->info("[HttpServer] Starting HTTP preview server on {}",
+                              acceptor_.local_endpoint().address().to_string());
     do_accept();
 }
 

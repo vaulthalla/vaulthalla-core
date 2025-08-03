@@ -15,14 +15,15 @@
 #include "types/RSync.hpp"
 #include "types/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <boost/dynamic_bitset.hpp>
-#include <iostream>
 #include <thread>
 
 using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::concurrency;
+using namespace vh::logging;
 
 bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shared_ptr<FSTask>& b) const {
     return a->next_run > b->next_run; // Min-heap based on next_run time
@@ -34,21 +35,21 @@ SyncController::SyncController()
 void SyncController::requeue(const std::shared_ptr<FSTask>& task) {
     std::scoped_lock lock(pqMutex_);
     pq.push(task);
-    std::cout << "[SyncController] Requeued sync task for vault ID: " << task->vaultId() << std::endl;
+    LogRegistry::sync()->debug("[SyncController] Requeued task for vault ID: {}", task->vaultId());
 }
 
 void SyncController::interruptTask(const unsigned int vaultId) {
     std::scoped_lock lock(taskMapMutex_, pqMutex_);
 
     if (!taskMap_.contains(vaultId)) {
-        std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
+        LogRegistry::sync()->error("[SyncController] No task found for vault ID: {}", vaultId);
         return;
     }
 
     if (const auto& task = taskMap_[vaultId]) {
         task->interrupt();
-        std::cout << "[SyncController] Interrupted sync task for vault ID: " << vaultId << std::endl;
-    } else std::cerr << "[SyncController] Task for vault ID " << vaultId << " is not running." << std::endl;
+        LogRegistry::sync()->info("[SyncController] Interrupted task for vault ID: {}", vaultId);
+    } else LogRegistry::sync()->error("[SyncController] Task for vault ID: {} is null", vaultId);
 }
 
 void SyncController::runLoop() {
@@ -58,7 +59,7 @@ void SyncController::runLoop() {
 
     while (running_ && !interruptFlag_.load()) {
         if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
-            std::cout << "[SyncController] Refreshing cloud storage engines." << std::endl;
+            LogRegistry::sync()->debug("[SyncController] Refreshing sync engines...");
             refreshEngines();
             lastRefresh = std::chrono::system_clock::now();
         }
@@ -95,14 +96,14 @@ void SyncController::runLoop() {
 }
 
 void SyncController::runNow(const unsigned int vaultId) {
-    std::cout << "[SyncController] Running sync task immediately for vault ID: " << vaultId << std::endl;
+    LogRegistry::sync()->debug("[SyncController] Early sync request for vault ID: {}", vaultId);
 
     std::shared_ptr<FSTask> task;
 
     {
         std::scoped_lock lock(taskMapMutex_);
         if (!taskMap_.contains(vaultId)) {
-            std::cerr << "[SyncController] No sync task found for vault ID: " << vaultId << std::endl;
+            LogRegistry::sync()->error("[SyncController] No task found for vault ID: {}", vaultId);
             return;
         }
         task = taskMap_[vaultId];
@@ -161,11 +162,11 @@ std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<Storage
     std::shared_ptr<FSTask> task;
     if (engine->type() == StorageType::Local) task = createTask<LocalFSTask>(engine);
     else if (engine->type() == StorageType::Cloud) {
-        const auto sync = std::static_pointer_cast<types::RSync>(engine->sync);
-        if (sync->strategy == types::RSync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
-        else if (sync->strategy == types::RSync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
-        else if (sync->strategy == types::RSync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
-    } else std::cerr << "[SyncController] Unsupported sync strategy for vault ID: " << engine->vault->id << std::endl;
+        const auto sync = std::static_pointer_cast<RSync>(engine->sync);
+        if (sync->strategy == RSync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
+        else if (sync->strategy == RSync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
+        else if (sync->strategy == RSync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
+    } else throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
     return task;
 }
 

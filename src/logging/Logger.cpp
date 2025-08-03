@@ -26,13 +26,9 @@ void Logger::init(const std::string& logDir, spdlog::level::level_enum logLevel)
 
 #ifdef __linux__
     // Optional: syslog sink for journald/systemd integration
-    try {
-        auto syslogSink = std::make_shared<spdlog::sinks::syslog_sink_mt>("vaulthalla", LOG_PID, LOG_USER, true);
-        syslogSink->set_level(logLevel);
-        coreSinks.push_back(syslogSink);
-    } catch (const spdlog::spdlog_ex& e) {
-        std::cerr << "[Logger] Failed to init syslog sink: " << e.what() << std::endl;
-    }
+    auto syslogSink = std::make_shared<spdlog::sinks::syslog_sink_mt>("vaulthalla", LOG_PID, LOG_USER, true);
+    syslogSink->set_level(logLevel);
+    coreSinks.push_back(syslogSink);
 #endif
 
     coreLogger_ = std::make_shared<spdlog::logger>("core", begin(coreSinks), end(coreSinks));

@@ -9,14 +9,14 @@
 #include "types/File.hpp"
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
-#include "types/CacheIndex.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <memory>
 #include <string>
 #include <filesystem>
-#include <iostream>
 
 using namespace vh::types;
+using namespace vh::logging;
 
 namespace vh::concurrency {
 
@@ -39,7 +39,7 @@ public:
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
 
                 if (!file_->mime_type || file_->mime_type->empty()) {
-                    std::cerr << "Thumbnail has no mime_type" << std::endl;
+                    LogRegistry::thumb()->warn("[ThumbnailTask] No MIME type for file ID {}. Skipping thumbnail generation.", file_->id);
                     return;
                 }
 
@@ -55,7 +55,9 @@ public:
                 CacheQueries::upsertCacheIndex(index);
             }
         } catch (const std::exception& e) {
-            std::cerr << "[ThumbnailTask] Failed to generate thumbnail(s): " << e.what() << std::endl;
+            LogRegistry::thumb()->error("[ThumbnailTask] Error generating thumbnail for file ID {}: {}", file_->id, e.what());
+        } catch (...) {
+            LogRegistry::thumb()->error("[ThumbnailTask] Unknown error generating thumbnail for file ID {}", file_->id);
         }
     }
 

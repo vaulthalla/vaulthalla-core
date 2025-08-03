@@ -4,9 +4,11 @@
 #include "storage/StorageEngine.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <pdfium/fpdfview.h>
-#include <iostream>
+
+using namespace vh::logging;
 
 namespace vh::http {
 
@@ -83,7 +85,7 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         return res;
 
     } catch (const std::exception& e) {
-        std::cerr << "[PdfPreviewHandler] Error: " << e.what() << std::endl;
+        LogRegistry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", rel_path, e.what());
         http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
         res.set(http::field::content_type, "text/plain");
         res.body() = "Failed to preview PDF: " + std::string(e.what());

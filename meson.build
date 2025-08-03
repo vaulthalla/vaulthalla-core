@@ -27,8 +27,9 @@ pugixml         = dependency('pugixml', required: true)
 uuid            = dependency('uuid', required: true)
 thread_dep      = dependency('threads', required: true)
 gtest           = dependency('gtest', required: true, main: true)
+spdlog          = dependency('spdlog', required: true)
 
-deps = [libfuse, boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium]
+deps = [libfuse, boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium, spdlog]
 test_deps = deps + [gtest]
 
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮

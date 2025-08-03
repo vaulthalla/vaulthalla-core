@@ -4,24 +4,24 @@
 #include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Vault.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::types;
+using namespace vh::logging;
 using namespace std::chrono;
 
 void LocalFSTask::operator()() {
-    std::cout << "[LocalFSTask] Started sync for vault: " << engine_->vault->name << std::endl;
+    LogRegistry::sync()->info("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
     const auto start = steady_clock::now();
 
     try {
         handleInterrupt();
 
         if (!engine_) {
-            std::cerr << "[LocalFSTask] Engine not initialized!" << std::endl;
+            LogRegistry::sync()->error("[LocalFSTask] Engine is null, cannot proceed with sync.");
             return;
         }
 
@@ -32,12 +32,21 @@ void LocalFSTask::operator()() {
         removeTrashedFiles();
         handleInterrupt();
     } catch (const std::exception& e) {
-        std::cerr << "[LocalFSTask] Exception: " << e.what() << std::endl;
+        LogRegistry::sync()->error("[LocalFSTask] Exception during sync: {}", e.what());
+        isRunning_ = false;
+        requeue();
+        return;
+    } catch (...) {
+        LogRegistry::sync()->error("[LocalFSTask] Unknown exception during sync.");
+        isRunning_ = false;
+        requeue();
+        return;
     }
 
     isRunning_ = false;
     const auto end = steady_clock::now();
-    std::cout << "[LocalFSTask] Finished sync in " << duration_cast<seconds>(end - start).count() << " seconds." << std::endl;
+    const auto duration = duration_cast<milliseconds>(end - start);
+    LogRegistry::sync()->info("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
     requeue();
 }
 

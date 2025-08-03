@@ -10,7 +10,7 @@
 
 namespace vh::logging {
 
-void LogRegistry::init(const std::string& logDir, spdlog::level::level_enum defaultLevel) {
+void LogRegistry::init(const std::string& logDir) {
     if (initialized_) {
         spdlog::warn("[LogRegistry] Already initialized, ignoring second init()");
         return;
@@ -20,6 +20,8 @@ void LogRegistry::init(const std::string& logDir, spdlog::level::level_enum defa
     if (!fs::exists(logDir)) {
         fs::create_directories(logDir);
     }
+
+    const auto defaultLevel = spdlog::level::info; // Default log level
 
     // Shared console sink
     auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -43,7 +45,7 @@ void LogRegistry::init(const std::string& logDir, spdlog::level::level_enum defa
 #endif
 
     // Helper to register a subsystem logger
-    auto makeLogger = [&](const std::string& name, spdlog::level::level_enum lvl = defaultLevel) {
+    auto makeLogger = [&](const std::string& name, spdlog::level::level_enum lvl) {
         std::vector<spdlog::sink_ptr> sinks;
         sinks.push_back(consoleSink);
         sinks.push_back(rotatingSink);
@@ -58,14 +60,14 @@ void LogRegistry::init(const std::string& logDir, spdlog::level::level_enum defa
 
     makeLogger("fuse", spdlog::level::debug);  // FUSE layer is chatty
     makeLogger("filesystem", spdlog::level::debug); // Filesystem operations
-    makeLogger("auth");
-    makeLogger("ws");
-    makeLogger("http");
-    makeLogger("db");
-    makeLogger("vaulthalla");
-    makeLogger("sync");
-    makeLogger("thumb");
-    makeLogger("storage");
+    makeLogger("auth", spdlog::level::info); // Authentication events
+    makeLogger("ws", spdlog::level::debug); // WebSocket events
+    makeLogger("http", spdlog::level::debug); // HTTP server events
+    makeLogger("db", spdlog::level::debug); // Database operations
+    makeLogger("vaulthalla", spdlog::level::info); // Core application events
+    makeLogger("sync", spdlog::level::info); // Sync operations
+    makeLogger("thumb", spdlog::level::debug); // Thumbnail generation
+    makeLogger("storage", spdlog::level::debug); // Storage operations
 
     // Audit logger (special: append-only file sink, no rotation)
     {

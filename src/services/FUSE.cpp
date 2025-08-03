@@ -6,8 +6,8 @@
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FUSERequestTask.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
-#include <iostream>
 #include <cstring>
 #include <thread>
 #include <atomic>
@@ -15,6 +15,7 @@
 using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::fuse;
+using namespace vh::logging;
 
 FUSE::FUSE()
     : AsyncService("FUSE"),
@@ -30,14 +31,14 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     conn->max_readahead = MB;
     conn->max_write = MB;
 
-    std::cout << "    max_readahead: " << conn->max_readahead << "\n";
-    std::cout << "    max_write:     " << conn->max_write << "\n";
+    LogRegistry::fuse()->info("[FUSE] Connection initialized with max_readahead={} bytes, max_write={} bytes",
+                              conn->max_readahead, conn->max_write);
 }
 
 void FUSE::stop() {
     if (!isRunning()) return;
 
-    std::cout << "[" << serviceName_ << "] Stopping service..." << std::endl;
+    LogRegistry::fuse()->info("[FUSE] Stopping FUSE connection...");
     interruptFlag_.store(true);
 
     if (session_) {
@@ -54,11 +55,11 @@ void FUSE::stop() {
     running_.store(false);
     interruptFlag_.store(false);
 
-    std::cout << "[" << serviceName_ << "] Service stopped." << std::endl;
+    LogRegistry::fuse()->info("[FUSE] FUSE service stopped");
 }
 
 void FUSE::runLoop() {
-    std::cout << "Starting Vaulthalla FUSE daemon..." << std::endl;
+    LogRegistry::fuse()->info("[FUSE] Running FUSE service");
 
     std::vector<std::string> argsStr = {
         "vaulthalla-fuse",
@@ -79,13 +80,13 @@ void FUSE::runLoop() {
     fuse_args args = FUSE_ARGS_INIT(static_cast<int>(argsCStr.size()), argsCStr.data());
 
     if (fuse_opt_parse(&args, nullptr, nullptr, nullptr) == -1) {
-        std::cerr << "[-] fuse_opt_parse failed\n";
+        LogRegistry::fuse()->error("[FUSE] Failed to parse FUSE options");
         return;
     }
 
     fuse_cmdline_opts opts{};
     if (fuse_parse_cmdline(&args, &opts) != 0) {
-        std::cerr << "[-] Failed to parse FUSE options\n";
+        LogRegistry::fuse()->error("[FUSE] Failed to parse FUSE options");
         return;
     }
 
@@ -94,14 +95,14 @@ void FUSE::runLoop() {
 
     session_ = fuse_session_new(&args, &ops, sizeof(ops), bridge_.get());
     if (!session_) {
-        std::cerr << "[-] fuse_session_new failed\n";
+        LogRegistry::fuse()->error("[FUSE] Failed to create FUSE session");
         free(opts.mountpoint);
         fuse_opt_free_args(&args);
         return;
     }
 
     if (fuse_set_signal_handlers(session_) != 0) {
-        std::cerr << "[-] fuse_set_signal_handlers failed\n";
+        LogRegistry::fuse()->error("[FUSE] Failed to set signal handlers");
         fuse_session_destroy(session_);
         free(opts.mountpoint);
         fuse_opt_free_args(&args);
@@ -109,7 +110,7 @@ void FUSE::runLoop() {
     }
 
     if (fuse_session_mount(session_, opts.mountpoint) != 0) {
-        std::cerr << "[-] fuse_session_mount failed\n";
+        LogRegistry::fuse()->error("[FUSE] Failed to mount FUSE filesystem at {}", opts.mountpoint);
         fuse_remove_signal_handlers(session_);
         fuse_session_destroy(session_);
         free(opts.mountpoint);
@@ -117,7 +118,7 @@ void FUSE::runLoop() {
         return;
     }
 
-    std::cout << "[+] FUSE mounted at " << opts.mountpoint << "\n";
+    LogRegistry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
 
     while (!fuse_session_exited(session_) && running_) {
         fuse_buf buf{};
@@ -128,6 +129,8 @@ void FUSE::runLoop() {
         ThreadPoolManager::instance().fusePool()->submit(std::make_shared<FUSERequestTask>(session_, buf));
     }
 
+    LogRegistry::fuse()->info("[FUSE] FUSE service loop exiting");
+
     fuse_session_unmount(session_);
     fuse_remove_signal_handlers(session_);
     fuse_session_destroy(session_);
@@ -135,4 +138,6 @@ void FUSE::runLoop() {
 
     free(opts.mountpoint);
     fuse_opt_free_args(&args);
+
+    LogRegistry::fuse()->info("[FUSE] FUSE service stopped successfully");
 }

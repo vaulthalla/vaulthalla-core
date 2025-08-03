@@ -9,8 +9,7 @@ namespace vh::logging {
 class LogRegistry {
 public:
     // Initialize all loggers with sinks/levels.
-    static void init(const std::string& logDir,
-                     spdlog::level::level_enum defaultLevel = spdlog::level::info);
+    static void init(const std::string& logDir);
 
     // Generic access by name
     static std::shared_ptr<spdlog::logger> get(const std::string& name);

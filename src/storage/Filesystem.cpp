@@ -85,7 +85,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
             dir->inode = cache->assignInode(path);
             dir->is_hidden = dir->name.front() == '.' && !dir->name.starts_with("..");
             dir->is_system = false;
-            if (userId) dir->created_at = dir->updated_at = *userId;
+            dir->created_by = dir->last_modified_by = userId;
 
             cache->cacheEntry(dir);
             DirectoryQueries::upsertDirectory(dir);

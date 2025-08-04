@@ -1,7 +1,6 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "util/files.hpp"
 #include "types/User.hpp"
 #include "logging/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
@@ -16,31 +15,21 @@ using namespace vh::logging;
 
 UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}
 
-void UploadHandler::startUpload(const std::string& uploadId,
-                                const std::filesystem::path& tmpPath,
-                                const std::filesystem::path& finalPath,
-                                const uint64_t expectedSize) {
+void UploadHandler::startUpload(const UploadArgs& args) {
     LogRegistry::ws()->debug("[UploadHandler] Starting upload (uploadId: {}, tmpPath: {}, finalPath: {}, expectedSize: {})",
-                             uploadId, tmpPath.string(), finalPath.string(), expectedSize);
+                             args.uploadId, args.tmpPath.string(), args.finalPath.string(), args.expectedSize);
 
     if (currentUpload_) throw std::runtime_error("Upload already in progress");
 
-    if (std::filesystem::is_directory(finalPath))
+    if (std::filesystem::is_directory(args.finalPath))
         throw std::runtime_error("Upload final path is a directory — filename must be provided");
 
-    std::filesystem::create_directories(finalPath.parent_path());
+    std::optional<unsigned int> userId = std::nullopt;
+    if (session_.getAuthenticatedUser()) userId = session_.getAuthenticatedUser()->id;
 
-    std::ofstream file(tmpPath, std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) throw std::runtime_error("Cannot open temp file");
+    Filesystem::mkdir(args.fuseFrom.parent_path(), 0755, userId, args.engine);
 
-    currentUpload_ = UploadContext {
-        .uploadId = uploadId,
-        .tmpPath = tmpPath,
-        .finalPath = finalPath,
-        .expectedSize = expectedSize,
-        .bytesReceived = 0,
-        .file = std::move(file)
-    };
+    currentUpload_.emplace(args);
 }
 
 void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {
@@ -57,7 +46,7 @@ void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {
     buffer.consume(size);
 }
 
-void UploadHandler::finishUpload(const std::shared_ptr<StorageEngine>& engine) {
+void UploadHandler::finishUpload() {
     if (!currentUpload_) throw std::runtime_error("No upload in progress");
 
     auto& upload = *currentUpload_;
@@ -68,15 +57,13 @@ void UploadHandler::finishUpload(const std::shared_ptr<StorageEngine>& engine) {
         throw std::runtime_error("Upload size mismatch");
     }
 
-    const auto fuseFrom = engine->paths->absRelToRoot(upload.tmpPath, PathType::FUSE_ROOT);
-    const auto fuseTo = engine->paths->absRelToRoot(upload.finalPath, PathType::FUSE_ROOT);
     std::optional<unsigned int> userId = std::nullopt;
     if (session_.getAuthenticatedUser()) userId = session_.getAuthenticatedUser()->id;
 
     LogRegistry::ws()->debug("[UploadHandler] Finishing upload (uploadId: {}, fuseFrom: {}, fuseTo: {}, userId: {})",
-                             upload.uploadId, fuseFrom.string(), fuseTo.string(), userId.value_or(0));
+                             upload.uploadId, upload.fuseFrom.string(), upload.fuseTo.string(), userId.value_or(0));
 
-    Filesystem::rename(fuseFrom, fuseTo, userId, engine);
+    Filesystem::rename(upload.fuseFrom, upload.fuseTo, userId, upload.engine);
 
     currentUpload_.reset();
 }

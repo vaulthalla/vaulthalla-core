@@ -38,7 +38,15 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
         const auto absPath = engine->paths->absPath(path, PathType::VAULT_ROOT);
         const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
 
-        session.getUploadHandler()->startUpload(uploadId, tmpPath, absPath, payload.at("size").get<uint64_t>());
+        session.getUploadHandler()->startUpload( {
+            .uploadId = uploadId,
+            .expectedSize = payload.at("size").get<uint64_t>(),
+            .engine = engine,
+            .tmpPath = tmpPath,
+            .finalPath = absPath,
+            .fuseFrom = engine->paths->absRelToRoot(tmpPath, PathType::FUSE_ROOT),
+            .fuseTo = engine->paths->absRelToRoot(absPath, PathType::FUSE_ROOT)
+        });
 
         const json data = {
             {"upload_id", uploadId}
@@ -69,7 +77,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
-        session.getUploadHandler()->finishUpload(storageManager_->getEngine(vaultId));
+        session.getUploadHandler()->finishUpload();
 
         const json data = {{"path", path}};
 

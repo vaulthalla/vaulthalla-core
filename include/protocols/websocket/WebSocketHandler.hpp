@@ -4,9 +4,10 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/AuthHandler.hpp"
 #include "protocols/websocket/handlers/FileSystemHandler.hpp"
-#include "protocols/websocket/handlers/NotificationHandler.hpp"
 #include "protocols/websocket/handlers/ShareHandler.hpp"
 #include "protocols/websocket/handlers/StorageHandler.hpp"
+#include "protocols/websocket/WebSocketSession.hpp"
+#include "types/User.hpp"
 #include <memory>
 
 namespace vh::websocket {
@@ -24,7 +25,6 @@ class WebSocketHandler {
     std::shared_ptr<FileSystemHandler> fsHandler_;
     std::shared_ptr<StorageHandler> storageHandler_;
     std::shared_ptr<ShareHandler> shareHandler_;
-    std::shared_ptr<NotificationHandler> notificationHandler_;
 
     void registerAuthHandlers() const;
     void registerFileSystemHandlers() const;
@@ -33,9 +33,6 @@ class WebSocketHandler {
     void registerPermissionsHandlers() const;
     void registerSettingsHandlers() const;
     void registerGroupHandlers() const;
-    void registerShareHandlers() const;
-    void registerSearchHandlers() const;
-    void registerNotificationHandlers() const;
 
     template <typename... Funcs> static void enforcePermissions(
         WebSocketSession& session,

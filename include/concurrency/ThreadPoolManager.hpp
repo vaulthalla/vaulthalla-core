@@ -1,16 +1,15 @@
 #pragma once
 
 #include "concurrency/ThreadPool.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <atomic>
-#include <chrono>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <vector>
 #include <condition_variable>
-#include <iostream>
+
+using namespace vh::logging;
 
 namespace vh::concurrency {
 
@@ -55,10 +54,10 @@ public:
         }
         pressureCv_.notify_all();  // wake the monitor
 
-        std::cout << "[ThreadPoolManager] Shutting down monitor thread..." << std::endl;
+        LogRegistry::vaulthalla()->debug("[ThreadPoolManager] Waiting for monitor thread to finish...");
         if (monitorThread_.joinable()) monitorThread_.join();
 
-        std::cout << "[ThreadPoolManager] Stopping thread pools..." << std::endl;
+        LogRegistry::vaulthalla()->info("[ThreadPoolManager] Stopping thread pools...");
         if (fuse_)  fuse_->stop();
         if (sync_)  sync_->stop();
         if (thumb_) thumb_->stop();

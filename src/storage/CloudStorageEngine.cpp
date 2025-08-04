@@ -13,7 +13,6 @@
 #include "services/ThumbnailWorker.hpp"
 #include "storage/Filesystem.hpp"
 
-#include <iostream>
 #include <fstream>
 
 using namespace vh::storage;

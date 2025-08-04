@@ -4,13 +4,14 @@
 #include "types/File.hpp"
 #include "concurrency/thumbnail/ThumbnailTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "../concurrency/ThreadPoolManager.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <memory>
 #include <string>
-#include <iostream>
 
 using namespace vh::concurrency;
+using namespace vh::logging;
 
 namespace vh::services {
 
@@ -24,7 +25,7 @@ struct ThumbnailWorker {
             auto task = std::make_unique<ThumbnailTask>(engine, buffer, file);
             ThreadPoolManager::instance().thumbPool()->submit(std::move(task));
         } catch (const std::exception& e) {
-            std::cerr << "[ThumbnailWorker] Failed to enqueue task: " << e.what() << std::endl;
+            LogRegistry::thumb()->error("[ThumbnailWorker] Failed to enqueue thumbnail task: {}", e.what());
         }
     }
 };

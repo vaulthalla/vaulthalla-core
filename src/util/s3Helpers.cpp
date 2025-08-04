@@ -15,18 +15,17 @@ std::string sha256Hex(const std::string& data) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char*>(data.data()), data.size(), hash);
     std::ostringstream oss;
-    for (unsigned char c : hash) oss << std::hex << std::setw(2) << std::setfill('0') << (int)c;
+    for (const unsigned char c : hash) oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
     return oss.str();
 }
 
 std::string hmacSha256Hex(const std::string& key, const std::string& data) {
     unsigned char digest[SHA256_DIGEST_LENGTH];
-    HMAC(EVP_sha256(), key.data(), key.size(),
+    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
          reinterpret_cast<const unsigned char*>(data.data()), data.size(), digest, nullptr);
 
     std::ostringstream oss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++
-         i) oss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
+    for (const unsigned char i : digest) oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(i);
     return oss.str();
 }
 
@@ -34,7 +33,7 @@ std::string hmacSha256Raw(const std::string& key, const std::string& data) {
     unsigned char digest[SHA256_DIGEST_LENGTH];
     HMAC(EVP_sha256(), key.data(), key.size(),
          reinterpret_cast<const unsigned char*>(data.data()), data.size(), digest, nullptr);
-    return std::string(reinterpret_cast<char*>(digest), SHA256_DIGEST_LENGTH);
+    return {reinterpret_cast<char*>(digest), SHA256_DIGEST_LENGTH};
 }
 
 std::string hmacSha256HexFromRaw(const std::string& rawKey, const std::string& data) {
@@ -172,12 +171,12 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>
 
 void trimInPlace(std::string& s) {
     // Trim start
-    s.erase(s.begin(), std::ranges::find_if(s.begin(), s.end(), [](unsigned char ch) {
+    s.erase(s.begin(), std::ranges::find_if(s.begin(), s.end(), [](const unsigned char ch) {
         return !std::isspace(ch);
     }));
 
     // Trim end
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) {
         return !std::isspace(ch);
     }).base(), s.end());
 }

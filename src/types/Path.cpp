@@ -1,8 +1,6 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 
-#include <iostream>
-
 using namespace vh::types;
 
 Path::Path(const fs::path& vaultMountPoint) {

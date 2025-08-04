@@ -2,6 +2,7 @@
 #include "util/timestamp.hpp"
 #include "types/Directory.hpp"
 #include "types/File.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -9,11 +10,12 @@
 #include <unordered_set>
 #include <sstream>
 #include <pugixml.hpp>
-#include <iostream>
 #include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
 
 using namespace vh::types;
+using namespace vh::util;
+using namespace vh::logging;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
@@ -22,8 +24,8 @@ FSEntry::FSEntry(const pqxx::row& row)
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
       fuse_path(std::filesystem::path(row["fuse_path"].as<std::string>())),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
+      created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      updated_at(parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
     else parent_id = row["parent_id"].as<unsigned int>();
 
@@ -70,8 +72,8 @@ void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
         {"is_system", entry.is_system},
         {"name", entry.name},
         {"size_bytes", entry.size_bytes},
-        {"created_at", util::timestampToString(entry.created_at)},
-        {"updated_at", util::timestampToString(entry.updated_at)},
+        {"created_at", timestampToString(entry.created_at)},
+        {"updated_at", timestampToString(entry.updated_at)},
         {"path", entry.path.string()},
         {"abs_path", entry.fuse_path.string()},
     };
@@ -93,8 +95,8 @@ void vh::types::from_json(const nlohmann::json& j, FSEntry& entry) {
     entry.last_modified_by = j.at("last_modified_by").get<unsigned int>();
     entry.name = j.at("name").get<std::string>();
     entry.size_bytes = j.at("size_bytes").get<uintmax_t>();
-    entry.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
-    entry.updated_at = util::parsePostgresTimestamp(j.at("updated_at").get<std::string>());
+    entry.created_at = parsePostgresTimestamp(j.at("created_at").get<std::string>());
+    entry.updated_at = parsePostgresTimestamp(j.at("updated_at").get<std::string>());
     entry.path = std::filesystem::path(j.at("path").get<std::string>());
 
     if (j.contains("parent_id") && !j["parent_id"].is_null()) entry.parent_id = j.at("parent_id").get<unsigned int>();
@@ -129,13 +131,13 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
     pugi::xml_parse_result result = doc.load_string(reinterpret_cast<const char*>(xml.c_str()));
 
     if (!result) {
-        std::cerr << "[fromS3XML] Failed to parse XML: " << result.description() << std::endl;
+        LogRegistry::types()->error("[FSEntry] [fromS3XML] Failed to parse XML: {}", result.description());
         return {};
     }
 
     pugi::xml_node root = doc.child("ListBucketResult");
     if (!root) {
-        std::cerr << "[fromS3XML] Missing <ListBucketResult> root node" << std::endl;
+        LogRegistry::types()->error("[FSEntry] [fromS3XML] Missing root element 'ListBucketResult'");
         return {};
     }
 
@@ -145,7 +147,7 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
         auto modifiedNode = content.child("LastModified");
 
         if (!keyNode || !sizeNode || !modifiedNode) {
-            std::cerr << "[fromS3XML] Skipping entry due to missing child elements" << std::endl;
+            LogRegistry::types()->warn("[FSEntry] [fromS3XML] Missing required child nodes in <Contents>");
             continue;
         }
 
@@ -200,7 +202,7 @@ std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntr
 
     for (const auto& entry : entries) {
         if (grouped.contains(entry->path.u8string())) {
-            std::cerr << "[groupEntriesByPath] Duplicate entry found for path: " << entry->path.string() << std::endl;
+            LogRegistry::types()->warn("[FSEntry] [groupEntriesByPath] Duplicate entry found for path: {}", entry->path.string());
             continue;
         }
         grouped[entry->path.u8string()] = entry;
@@ -210,23 +212,40 @@ std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntr
 }
 
 void FSEntry::print() const {
-    std::cout << "[FSEntry]" << std::endl;
-    std::cout << "  ID: " << id << std::endl;
-    std::cout << "  Name: " << name << std::endl;
-    std::cout << "  Size: " << size_bytes << " bytes" << std::endl;
-    std::cout << "  Path: " << path.string() << std::endl;
-    std::cout << "  Absolute Path: " << fuse_path.string() << std::endl;
-    std::cout << "  Hidden: " << (is_hidden ? "Yes" : "No") << std::endl;
-    std::cout << "  System: " << (is_system ? "Yes" : "No") << std::endl;
-    std::cout << "  Created At: " << util::timestampToString(created_at) << std::endl;
-    std::cout << "  Updated At: " << util::timestampToString(updated_at) << std::endl;
-    if (parent_id) std::cout << "  Parent ID: " << *parent_id << std::endl;
-    if (vault_id) std::cout << "  Vault ID: " << *vault_id << std::endl;
-    if (created_by) std::cout << "  Created By: " << *created_by << std::endl;
-    if (last_modified_by) std::cout << "  Last Modified By: " << *last_modified_by << std::endl;
-    if (owner_uid) std::cout << "  Owner UID: " << *owner_uid << std::endl;
-    if (group_gid) std::cout << "  Group GID: " << *group_gid << std::endl;
-    if (inode) std::cout << "  Inode: " << *inode << std::endl;
-    if (mode) std::cout << "  Mode: " << std::oct << *mode << std::endl;
+    LogRegistry::types()->debug("[FSEntry]\n"
+                                "  ID: {}\n"
+                                "  Name: {}\n"
+                                "  Size: {} bytes\n"
+                                "  Path: {}\n"
+                                "  Absolute Path: {}\n"
+                                "  Hidden: {}\n"
+                                "  System: {}\n"
+                                "  Created At: {}\n"
+                                "  Updated At: {}\n"
+                                "  Parent ID: {}\n"
+                                "  Vault ID: {}\n"
+                                "  Created By: {}\n"
+                                "  Last Modified By: {}\n"
+                                "  Owner UID: {}\n"
+                                "  Group GID: {}\n"
+                                "  Inode: {}\n"
+                                "  Mode: {}",
+                                id,
+                                name,
+                                size_bytes,
+                                path.string(),
+                                fuse_path.string(),
+                                is_hidden ? "Yes" : "No",
+                                is_system ? "Yes" : "No",
+                                timestampToString(created_at),
+                                timestampToString(updated_at),
+                                parent_id ? std::to_string(*parent_id) : "N/A",
+                                vault_id ? std::to_string(*vault_id) : "N/A",
+                                created_by ? std::to_string(*created_by) : "N/A",
+                                last_modified_by ? std::to_string(*last_modified_by) : "N/A",
+                                owner_uid ? std::to_string(*owner_uid) : "N/A",
+                                group_gid ? std::to_string(*group_gid) : "N/A",
+                                inode ? std::to_string(*inode) : "N/A",
+                                mode ? std::to_string(*mode) : "N/A");
 }
 

@@ -9,24 +9,25 @@
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
-#include <iostream>
 #include <sodium.h>
 
 using namespace vh::services;
 using namespace vh::config;
+using namespace vh::logging;
 
 Vaulthalla::Vaulthalla() : AsyncService("Vaulthalla") {}
 
 void Vaulthalla::runLoop() {
-    std::cout << "Starting Vaulthalla service..." << std::endl;
+    LogRegistry::vaulthalla()->info("[Vaulthalla] Starting service...");
 
     try {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initThreatIntelligence();
         initProtocols();
-        std::cout << "Vaulthalla service started." << std::endl;
+        LogRegistry::vaulthalla()->info("[Vaulthalla] Protocols initialized successfully");
 
         while (!interruptFlag_.load()) std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -35,7 +36,11 @@ void Vaulthalla::runLoop() {
 
         exit(EXIT_SUCCESS);
     } catch (const std::exception& e) {
-        std::cerr << "[Vaulthalla] Exception: " << e.what() << std::endl;
+        LogRegistry::vaulthalla()->error("[Vaulthalla] Exception in run loop: {}", e.what());
+        exit(EXIT_FAILURE);
+    } catch (...) {
+        LogRegistry::vaulthalla()->error("[Vaulthalla] Unknown exception in run loop");
+        exit(EXIT_FAILURE);
     }
 }
 

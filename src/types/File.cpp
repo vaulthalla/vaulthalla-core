@@ -1,22 +1,14 @@
 #include "types/File.hpp"
 #include "util/timestamp.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
-#include <format>
 #include <regex>
 #include <pugixml.hpp>
-#include <iostream>
 
 using namespace vh::types;
-
-inline std::string octMode(const unsigned long long mode) {
-    return std::format("{:04o}", mode & 07777);   // -> "0644"
-}
-
-inline std::string hexMode(const unsigned long long mode) {
-    return std::format("0x{:03X}", mode & 0xFFF); // -> "0x1A4"
-}
+using namespace vh::logging;
 
 File::File(const pqxx::row& row)
     : FSEntry(row),
@@ -62,13 +54,13 @@ std::vector<std::shared_ptr<File>> vh::types::filesFromS3XML(const std::u8string
     pugi::xml_parse_result result = doc.load_string(reinterpret_cast<const char*>(xml.c_str()));
 
     if (!result) {
-        std::cerr << "[fileListFromS3XML] Failed to parse XML: " << result.description() << std::endl;
+        LogRegistry::types()->error("[File] [filesFromS3XML] Failed to parse XML: {}", result.description());
         return {};
     }
 
     pugi::xml_node root = doc.child("ListBucketResult");
     if (!root) {
-        std::cerr << "[fileListFromS3XML] Missing <ListBucketResult> root node" << std::endl;
+        LogRegistry::types()->error("[File] [filesFromS3XML] No ListBucketResult node found in XML");
         return {};
     }
 
@@ -78,7 +70,7 @@ std::vector<std::shared_ptr<File>> vh::types::filesFromS3XML(const std::u8string
         auto modifiedNode = content.child("LastModified");
 
         if (!keyNode || !sizeNode || !modifiedNode) {
-            std::cerr << "[fileListFromS3XML] Skipping entry due to missing child elements" << std::endl;
+            LogRegistry::types()->warn("[File] [filesFromS3XML] Skipping entry due to missing child elements");
             continue;
         }
 
@@ -103,7 +95,7 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> vh::types::groupEntries
 
     for (const auto& file : entries) {
         if (grouped.contains(file->path.u8string())) {
-            std::cerr << "[groupEntriesByPath] Duplicate entry found for path: " << file->path.string() << std::endl;
+            LogRegistry::types()->warn("[File] [groupEntriesByPath] Duplicate entry found for path: {}", file->path.string());
             continue;
         }
         grouped[file->path.u8string()] = file;

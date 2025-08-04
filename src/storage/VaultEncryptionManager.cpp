@@ -1,16 +1,16 @@
 #include "storage/VaultEncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <sodium.h>
 #include <fstream>
 #include <stdexcept>
 #include <sstream>
-#include <iostream>
 #include <cstring>
 
-namespace vh::encryption {
-
-using namespace crypto;
+using namespace vh::encryption;
+using namespace vh::crypto;
+using namespace vh::logging;
 
 static std::vector<uint8_t> read_file(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
@@ -64,14 +64,12 @@ void VaultEncryptionManager::load_key() {
     }
 
     if (!fs::exists(vault_key_path_)) {
-        std::cout << "Vault key size: " << AES_KEY_SIZE << " bytes" << std::endl;
+        LogRegistry::crypto()->debug("[VaultEncryptionManager] Creating new vault key at: {}", vault_key_path_.string());
         std::vector<uint8_t> new_key(AES_KEY_SIZE);
         randombytes_buf(new_key.data(), AES_KEY_SIZE);
 
         std::ofstream out(vault_key_path_, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            throw std::runtime_error("Failed to create vault key: " + vault_key_path_.string());
-        }
+        if (!out) throw std::runtime_error("Failed to create vault key: " + vault_key_path_.string());
         out.write(reinterpret_cast<const char*>(new_key.data()), new_key.size());
         out.close();
 
@@ -85,9 +83,7 @@ void VaultEncryptionManager::load_key() {
 
     // Load existing key
     key_ = read_file(vault_key_path_);
-    if (key_.size() != AES_KEY_SIZE) {
-        throw std::runtime_error("Vault key must be 32 bytes (AES-256)");
-    }
+    if (key_.size() != AES_KEY_SIZE) throw std::runtime_error("Vault key must be 32 bytes (AES-256)");
 }
 
 std::vector<uint8_t> VaultEncryptionManager::encrypt(
@@ -106,6 +102,4 @@ std::vector<uint8_t> VaultEncryptionManager::decrypt(
 {
     const auto iv = b64_decode(b64_iv);
     return decrypt_aes256_gcm(ciphertext, key_, iv);
-}
-
 }

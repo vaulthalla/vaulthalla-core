@@ -96,3 +96,11 @@ if ! dpkg -l | grep -q libboost-filesystem-dev; then
 else
     echo "✅ Boost components already installed."
 fi
+
+# -- libspdlog --
+if ! dpkg -l | grep -q libspdlog-dev; then
+    echo "🔌 Installing libspdlog-dev..."
+    sudo apt install -y libspdlog-dev
+else
+    echo "✅ libspdlog-dev already installed."
+fi

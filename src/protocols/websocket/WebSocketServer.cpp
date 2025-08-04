@@ -1,13 +1,11 @@
 #include "protocols/websocket/WebSocketServer.hpp"
 #include "auth/AuthManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "protocols/websocket/handlers/NotificationBroadcastManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
-#include <thread>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -15,8 +13,7 @@ WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& end
                                  const std::shared_ptr<WebSocketRouter>& router)
     : acceptor_(ioc), ioc_(ioc), router_(router),
       authManager_(ServiceDepsRegistry::instance().authManager),
-      sessionManager_(authManager_->sessionManager()),
-      broadcastManager_(std::make_shared<NotificationBroadcastManager>()) {
+      sessionManager_(authManager_->sessionManager()) {
     beast::error_code ec;
 
     acceptor_.open(endpoint.protocol(), ec);
@@ -33,7 +30,8 @@ WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& end
 }
 
 void WebSocketServer::run() {
-    std::cout << "[WebSocketServer] Starting to accept connections on " << acceptor_.local_endpoint() << std::endl;
+    LogRegistry::ws()->info("[WebSocketServer] Starting WebSocket server on {}",
+                            acceptor_.local_endpoint().address().to_string());
     doAccept();
 }
 
@@ -49,7 +47,7 @@ void WebSocketServer::onAccept(tcp::socket socket) {
     socket.set_option(tcp::no_delay(true));
     socket.set_option(asio::socket_base::keep_alive(true));
 
-    const auto session = std::make_shared<WebSocketSession>(router_, broadcastManager_);
+    const auto session = std::make_shared<WebSocketSession>(router_);
     session->accept(std::move(socket));
 }
 

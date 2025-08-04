@@ -3,31 +3,31 @@
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/sync/UploadTask.hpp"
 #include "types/Vault.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "services/SyncController.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
+#include "logging/LogRegistry.hpp"
 
-#include <iostream>
 #include <utility>
 
 using namespace vh::concurrency;
 using namespace vh::types;
 using namespace vh::database;
 using namespace std::chrono;
+using namespace vh::logging;
 
 void SyncTask::operator()() {
-    std::cout << "[SyncWorker] Started sync for vault: " << engine_->vault->name << std::endl;
+    LogRegistry::sync()->info("[SyncTask] Starting sync for vault '{}'", engine_->vault->id);
     const auto start = steady_clock::now();
 
     try {
         handleInterrupt();
 
         if (!engine_) {
-            std::cerr << "[SyncWorker] Engine not initialized!" << std::endl;
+            LogRegistry::sync()->error("[SyncTask] Engine is null, cannot proceed with sync.");
             return;
         }
 
@@ -52,9 +52,13 @@ void SyncTask::operator()() {
 
         sync();
 
-        std::cout << "[SyncWorker] Sync finished for Vault: " << engine_->vault->name << std::endl;
+        LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}'", engine_->vault->id);
+
         SyncQueries::reportSyncSuccess(engine_->sync->id);
         next_run = system_clock::now() + seconds(engine_->sync->interval.count());
+
+        LogRegistry::sync()->debug("[SyncTask] Next sync for vault '{}' scheduled at {}",
+                                   engine_->vault->id, next_run.time_since_epoch().count());
 
         handleInterrupt();
 
@@ -66,21 +70,24 @@ void SyncTask::operator()() {
 
         requeue();
         isRunning_ = false;
+
+        LogRegistry::sync()->debug("[SyncTask] Sync task requeued for vault '{}'", engine_->vault->id);
     } catch (const std::exception& e) {
         isRunning_ = false;
         if (std::string(e.what()).contains("Sync task interrupted")) {
-            std::cout << "[SyncWorker] Sync task interrupted for vault: " << engine_->vault-> name << std::endl;
+            LogRegistry::sync()->info("[SyncTask] Sync task interrupted for vault '{}'", engine_->vault->id);
             return;
         }
-        std::cerr << "[SyncWorker] Error during sync: " << e.what() << std::endl;
+        LogRegistry::sync()->error("[SyncTask] Exception during sync for vault '{}': {}", engine_->vault->id, e.what());
     } catch (...) {
-        std::cerr << "[SyncWorker] Unknown error during sync." << std::endl;
+        LogRegistry::sync()->error("[SyncTask] Unknown exception during sync for vault '{}'", engine_->vault->id);
         isRunning_ = false;
     }
 
-    std::cout << "[SyncWorker] Sync task completed for vault: " << engine_->vault->name
-              << " in " << duration_cast<milliseconds>(steady_clock::now() - start).count()
-              << " ms" << std::endl;
+    const auto end = steady_clock::now();
+    const auto duration = duration_cast<milliseconds>(end - start);
+    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms",
+                              engine_->vault->id, duration.count());
 }
 
 void SyncTask::removeTrashedFiles() {
@@ -122,8 +129,8 @@ std::vector<std::shared_ptr<File> > SyncTask::uMap2Vector(
 }
 
 void SyncTask::ensureFreeSpace(const uintmax_t size) const {
-    if (engine_->vault->quota != 0 && engine_->freeSpace() < size) throw std::runtime_error(
-        "Not enough space to cache file");
+    if (engine_->vault->quota != 0 && engine_->freeSpace() < size)
+        throw std::runtime_error("Not enough space to cache file");
 }
 
 std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::symmetric_diff(

@@ -1,9 +1,9 @@
 #include "services/AsyncService.hpp"
 #include "services/ServiceManager.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 AsyncService::AsyncService(const std::string& serviceName) : serviceName_(serviceName) {}
 
@@ -21,18 +21,24 @@ void AsyncService::start() {
         try {
             runLoop();
         } catch (const std::exception& e) {
-            std::cerr << "[" << serviceName_ << "] Exception: " << e.what() << std::endl;
+            LogRegistry::vaulthalla()->error("[{}] Service encountered an error: {}", serviceName_, e.what());
+            running_.store(false);
+            return;
+        } catch (...) {
+            LogRegistry::vaulthalla()->error("[{}] Service encountered an unknown error.", serviceName_);
+            running_.store(false);
+            return;
         }
         running_.store(false);
     });
 
-    std::cout << "[" << serviceName_ << "] Service started." << std::endl;
+    LogRegistry::vaulthalla()->info("[{}] Service started.", serviceName_);
 }
 
 void AsyncService::stop() {
     if (!isRunning()) return;
 
-    std::cout << "[" << serviceName_ << "] Stopping service..." << std::endl;
+    LogRegistry::vaulthalla()->info("[{}] Stopping service...", serviceName_);
     interruptFlag_.store(true);
 
     // Only join if we’re not calling stop() from the same thread
@@ -43,18 +49,18 @@ void AsyncService::stop() {
     running_.store(false);
     interruptFlag_.store(false);
 
-    std::cout << "[" << serviceName_ << "] Service stopped." << std::endl;
+    LogRegistry::vaulthalla()->info("[{}] Service stopped.", serviceName_);
 }
 
 void AsyncService::restart() {
-    std::cout << "[" << serviceName_ << "] Restarting service..." << std::endl;
+    LogRegistry::vaulthalla()->info("[{}] Restarting service...", serviceName_);
     stop();
     start();
 }
 
 void AsyncService::handleInterrupt() {
     if (interruptFlag_.load()) {
-        std::cout << "[" << serviceName_ << "] Interrupt signal received. Stopping service..." << std::endl;
+        LogRegistry::vaulthalla()->info("[{}] Service interrupted.", serviceName_);
         stop();
     }
 }

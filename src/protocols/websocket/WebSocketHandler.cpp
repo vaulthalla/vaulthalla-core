@@ -3,10 +3,10 @@
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
 #include "protocols/websocket/handlers/GroupHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -16,7 +16,6 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<WebSocketRouter>& route
     storageHandler_ = std::make_shared<StorageHandler>(ServiceDepsRegistry::instance().storageManager);
     fsHandler_ = std::make_shared<FileSystemHandler>();
     shareHandler_ = std::make_shared<ShareHandler>();
-    notificationHandler_ = std::make_shared<NotificationHandler>();
     registerAllHandlers();
 }
 
@@ -29,7 +28,7 @@ void WebSocketHandler::registerAllHandlers() const {
     registerSettingsHandlers();
     registerGroupHandlers();
 
-    std::cout << "[WebSocketHandler] All handlers registered.\n";
+    LogRegistry::ws()->info("[WebSocketHandler] All handlers registered successfully.");
 }
 
 void WebSocketHandler::registerAuthHandlers() const {

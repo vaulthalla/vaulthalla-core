@@ -4,10 +4,10 @@
 #include "storage/StorageManager.hpp"
 #include "protocols/http/PreviewResponse.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::http {
 
@@ -39,12 +39,11 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
     if (ec == http::error::end_of_stream) return do_close();
 
     if (ec) {
-        std::cerr << "[HttpSession] Read error: " << ec.message() << std::endl;
+        LogRegistry::http()->error("[HttpSession] Read error: {}", ec.message());
         return;
     }
 
-    // TODO: Add more robust and efficient logging
-    // std::cout << "[HttpSession] Async request: " << req_.target() << std::endl;
+    LogRegistry::http()->debug("[HttpSession] Read {} bytes: {}", bytes, req_.target());
 
     auto self = shared_from_this();
 
@@ -60,7 +59,7 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
                               });
         }, std::move(res));
     } catch (const std::exception& e) {
-        std::cerr << "[HttpSession] Handler threw: " << e.what() << std::endl;
+        LogRegistry::http()->error("[HttpSession] Exception during request handling: {}", e.what());
 
         http::response<http::string_body> err{http::status::internal_server_error, req_.version()};
         err.set(http::field::content_type, "text/plain");
@@ -77,7 +76,7 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
 
 void HttpSession::on_write(const bool close, beast::error_code ec, std::size_t bytes) {
     if (ec) {
-        std::cerr << "[HttpSession] Write error: " << ec.message() << std::endl;
+        LogRegistry::http()->error("[HttpSession] Write error: {}", ec.message());
         return;
     }
 

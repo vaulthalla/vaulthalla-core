@@ -25,6 +25,11 @@ struct FuseConfig {
     bool allow_other = true;
 };
 
+struct LoggingConfig {
+    std::filesystem::path log_dir = "/var/log/vaulthalla";
+    std::chrono::days log_rotation_days = std::chrono::days(30);
+};
+
 struct PDFDocumentConfig {
     bool enabled = true;
     unsigned int max_pages = 0;
@@ -128,6 +133,7 @@ struct Config {
 
     ServerConfig server;
     FuseConfig fuse;
+    LoggingConfig logging;
     CachingConfig caching;
     DatabaseConfig database;
     AuthConfig auth;

@@ -12,12 +12,12 @@
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <cerrno>
 #include <cstring>
 #include <sys/statvfs.h>
 #include <unistd.h>
-#include <iostream>
 
 #define FUSE_DISPATCH(op) \
 [](fuse_req_t req, auto... args) { \
@@ -31,19 +31,21 @@ using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::services;
+using namespace vh::logging;
 
 FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager) {}
 
 void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
-    std::cout << "[getattr] Called for inode: " << ino << std::endl;
+    const auto log = LogRegistry::fuse();
+    log->debug("[getattr] Called for inode: {}", ino);
+
     try {
         const auto& cache = ServiceDepsRegistry::instance().fsCache;
         if (ino == FUSE_ROOT_ID) {
             const auto entry = cache->getEntry("/");
             if (!entry) {
-                std::cerr << "[getattr] No entry found for inode " << ino
-                          << ", resolved path: " << "/" << std::endl;
+                log->error("[getattr] No entry found for inode {}, resolved path: /", ino);
                 fuse_reply_err(req, ENOENT);
                 return;
             }
@@ -58,7 +60,7 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
 
         const auto path = cache->resolvePath(ino);
         if (path.empty()) {
-            std::cerr << "[getattr] No path found for inode " << ino << std::endl;
+            log->error("[getattr] No path resolved for inode {}, returning ENOENT", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -66,8 +68,7 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
         const auto entry = cache->getEntry(path);
 
         if (!entry) {
-            std::cerr << "[getattr] No entry found for inode " << ino
-                      << ", resolved path: " << path << std::endl;
+            log->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path.string());
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -94,13 +95,13 @@ void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
               << " mask=" << to_set << std::endl;
 
     if (to_set & FUSE_SET_ATTR_MODE) {
-        std::cerr << "⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!" << std::endl;
+        LogRegistry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!");
         fuse_reply_err(req, EPERM);
         return;
     }
 
     if (to_set & (FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
-        std::cerr << "⚔️ [Vaulthalla] Illegal access: chown is forbidden beyond the gates!" << std::endl;
+        LogRegistry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: changing ownership is forbidden beyond the gates!");
         fuse_reply_err(req, EPERM);
         return;
     }
@@ -140,15 +141,11 @@ void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
 }
 
 void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
-    std::cout << "[FUSE] readdir called for inode: " << ino << ", size: " << size << ", offset: " << off << std::endl;
+    LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
     const auto path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
     auto entries = FSEntryQueries::listDir(path, false);
-
-    for (const auto& entry : entries) {
-        std::cout << "[FUSE] Entry: " << entry->name << ", inode: " << *entry->inode << std::endl;
-    }
 
     std::vector<char> buf(size);
     size_t buf_used = 0;
@@ -188,7 +185,7 @@ void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off
 }
 
 void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const {
-    std::cout << "[FUSE] lookup called for parent: " << parent << ", name: " << name << std::endl;
+    LogRegistry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
         return;
@@ -202,7 +199,7 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 
     const auto entry = cache->getEntry(path);
     if (!entry) {
-        std::cerr << "[FUSE] lookup failed: entry not found at path: " << path << "\n";
+        LogRegistry::fuse()->error("[lookup] Entry not found for path: {}", path.string());
         fuse_reply_err(req, ENOENT);
         return;
     }
@@ -220,9 +217,8 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 
 void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
                         const char* name, mode_t mode, struct fuse_file_info* fi) {
-    std::cout << "[FUSE] create called. parent=" << parent
-              << " name=" << (name ? name : "(null)")
-              << " mode=" << std::oct << mode << std::endl;
+    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
+        parent, name, mode);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -265,13 +261,13 @@ void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
 
         fuse_reply_create(req, &e, fi);
     } catch (const std::exception& ex) {
-        std::cerr << "[FUSE] create failed: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[create] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) {
-    std::cout << "[FUSE] open called for inode: " << ino << std::endl;
+    LogRegistry::fuse()->debug("[open] Called for inode: {}, flags: {}", ino, fi->flags);
 
     {
         std::scoped_lock lock(openHandleMutex_);
@@ -296,7 +292,7 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
 
         fuse_reply_open(req, fi);
     } catch (const std::exception& ex) {
-        std::cerr << "[FUSE] open failed: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[open] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
@@ -322,9 +318,8 @@ void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
 }
 
 void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
-    std::cout << "[mkdir] Called for parent: " << parent
-              << ", name: " << (name ? name : "(null)")
-              << ", mode: " << std::oct << mode << std::endl;
+    LogRegistry::fuse()->debug("[mkdir] Called for parent: {}, name: {}, mode: {}", parent, name, mode);
+
     try {
         if (std::string_view(name).find('/') != std::string::npos) {
             fuse_reply_err(req, EINVAL);
@@ -344,7 +339,8 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
         try {
             Filesystem::mkdir(fullPath, mode);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            std::cerr << "[mkdir] Filesystem error: " << fsErr.what() << " for path: " << fullPath << std::endl;
+            LogRegistry::fuse()->error("[mkdir] Failed to create directory: {} → {}: {}",
+                parentPath.string(), name, fsErr.what());
             fuse_reply_err(req, EIO);
             return;
         }
@@ -362,7 +358,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
         fuse_reply_entry(req, &e);
 
     } catch (const std::exception& ex) {
-        std::cerr << "[mkdir] Exception: " << ex.what() << "\n";
+        LogRegistry::fuse()->error("[mkdir] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
@@ -373,7 +369,8 @@ void FUSEBridge::rename(const fuse_req_t& req,
                         fuse_ino_t newparent,
                         const char* newname,
                         unsigned int flags) const {
-    std::cout << "[FUSE] rename called: " << name << " → " << newname << std::endl;
+    LogRegistry::fuse()->debug("[rename] Called for parent: {}, name: {}, newparent: {}, newname: {}, flags: {}",
+                               parent, name, newparent, newname, flags);
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
@@ -396,24 +393,27 @@ void FUSEBridge::rename(const fuse_req_t& req,
         try {
             Filesystem::rename(fromPath, toPath);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            std::cerr << "[FUSE] rename failed: " << fsErr.what() << " for path: " << fromPath << " → " << toPath << std::endl;
+            LogRegistry::fuse()->error("[rename] Failed to rename: {} → {}: {}",
+                fromPath.string(), toPath.string(), fsErr.what());
             fuse_reply_err(req, EIO);
             return;
         }
 
         fuse_reply_err(req, 0);  // Success
     } catch (const std::exception& ex) {
-        std::cerr << "[FUSE] rename failed: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[rename] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
+    LogRegistry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
     ServiceDepsRegistry::instance().fsCache->decrementInodeRef(ino, nlookup);
     fuse_reply_none(req); // no return value
 }
 
 void FUSEBridge::access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const {
+    LogRegistry::fuse()->debug("[access] Called for inode: {}, mask: {}", ino, mask);
     fuse_reply_err(req, 0); // Access checks are not implemented, always allow
 }
 
@@ -422,8 +422,7 @@ void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* na
     uid_t uid = ctx->uid;
     gid_t gid = ctx->gid;
 
-    std::cout << "[unlink] Called for parent=" << parent
-              << " name=" << (name ? name : "(null)") << std::endl;
+    LogRegistry::fuse()->debug("[unlink] Called for parent: {}, name: {}", parent, name);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -443,8 +442,7 @@ void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* na
 
         auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
         if (::unlink(backingPath.c_str()) < 0) {
-            std::cerr << "[unlink] Failed to unlink backing file: " << strerror(errno)
-                      << " (" << backingPath << ")" << std::endl;
+            LogRegistry::fuse()->error("[unlink] Failed to remove backing file: {}: {}", backingPath.string(), strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
@@ -453,7 +451,7 @@ void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* na
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        std::cerr << "[unlink] Exception: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[unlink] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
@@ -463,8 +461,7 @@ void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* nam
     uid_t uid = ctx->uid;
     gid_t gid = ctx->gid;
 
-    std::cout << "[rmdir] Called for parent=" << parent
-              << " name=" << (name ? name : "(null)") << std::endl;
+    LogRegistry::fuse()->debug("[rmdir] Called for parent: {}, name: {}", parent, name);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -484,8 +481,7 @@ void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* nam
 
         auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
         if (::rmdir(backingPath.c_str()) < 0) {
-            std::cerr << "[rmdir] Failed to remove backing directory: " << strerror(errno)
-                      << " (" << backingPath << ")" << std::endl;
+            LogRegistry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", backingPath.string(), strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
@@ -494,13 +490,13 @@ void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* nam
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        std::cerr << "[rmdir] Exception: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[rmdir] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const {
-    std::cout << "[FUSE] flush called for inode: " << ino << std::endl;
+    LogRegistry::fuse()->debug("[flush] Called for inode: {}, file handle: {}", ino, fi->fh);
 
     // This can be a no-op unless you want to sync(2) or call fsync(fd)
     // You usually don’t finalize here since flush may be called multiple times per FD
@@ -509,17 +505,17 @@ void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi
 }
 
 void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) {
-    std::cout << "[FUSE] release called for inode: " << ino << std::endl;
+    LogRegistry::fuse()->debug("[release] Called for inode: {}, file handle: {}", ino, fi->fh);
 
     auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     if (!fh) {
-        std::cerr << "[release] Invalid file handle (null)" << std::endl;
+        LogRegistry::fuse()->error("[release] Invalid file handle for inode: {}", ino);
         fuse_reply_err(req, EBADF);
         return;
     }
 
     if (::close(fh->fd) < 0)
-        std::cerr << "[release] Failed to close FD: " << strerror(errno) << std::endl;
+        LogRegistry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
 
     delete fh;  // clean up heap allocation
     fi->fh = 0; // clear the kernel-side handle
@@ -534,37 +530,39 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
 }
 
 void FUSEBridge::fsync(const fuse_req_t& req, fuse_ino_t ino, int isdatasync, fuse_file_info* fi) const {
+    LogRegistry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, isdatasync);
     (void) isdatasync; // if we want to treat differently
 
     try {
         int fd = fi->fh;
         if (::fsync(fd) < 0) {
-            std::cerr << "[fsync] Failed: " << strerror(errno) << std::endl;
+            LogRegistry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        std::cerr << "[fsync] Exception: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[fsync] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void FUSEBridge::statfs(const fuse_req_t& req, fuse_ino_t ino) const {
+    LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
     try {
         struct statvfs st{};
         auto backingPath = ConfigRegistry::get().fuse.backing_path;
 
         if (::statvfs(backingPath.c_str(), &st) < 0) {
-            std::cerr << "[statfs] Failed: " << strerror(errno) << std::endl;
+            LogRegistry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", backingPath.string(), strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
 
         fuse_reply_statfs(req, &st);
     } catch (const std::exception& ex) {
-        std::cerr << "[statfs] Exception: " << ex.what() << std::endl;
+        LogRegistry::fuse()->error("[statfs] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }

@@ -1,7 +1,6 @@
 #include "concurrency/sync/SafeSyncTask.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
@@ -10,18 +9,18 @@
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <optional>
-
-#include "concurrency/ThreadPoolManager.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::logging;
 
 void SafeSyncTask::sync() {
-    std::cout << "[SafeSyncTask] Starting sync for vault: " << engine_->vault->name << std::endl;
+    LogRegistry::sync()->info("[SafeSyncTask] Starting sync for vault '{}'", engine_->vault->id);
     for (const auto& file : localFiles_) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
         auto match = s3Map_.find(strippedPath);
@@ -68,5 +67,6 @@ void SafeSyncTask::sync() {
 
     processFutures();
 
-    std::cout << "[SafeSyncTask] Sync completed for vault: " << engine_->vault->name << std::endl;
+    LogRegistry::sync()->info("[SafeSyncTask] Sync completed for vault '{}' with {} files processed",
+                              engine_->vault->id, localFiles_.size() + s3Map_.size());
 }

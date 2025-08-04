@@ -25,10 +25,10 @@ std::string Magic::mime_type(const std::string& path) const {
 
     const char* result = magic_file(cookie, path.c_str());
     if (!result) {
-        std::string err = magic_error(cookie) ? magic_error(cookie) : "Unknown error";
+        const std::string err = magic_error(cookie) ? magic_error(cookie) : "Unknown error";
         throw std::runtime_error("magic_file failed: " + err);
     }
-    return std::string(result);
+    return {result};
 }
 
 std::string Magic::mime_type_buffer(const std::string& buffer) const {
@@ -39,7 +39,7 @@ std::string Magic::mime_type_buffer(const std::string& buffer) const {
         std::string err = magic_error(cookie) ? magic_error(cookie) : "Unknown error";
         throw std::runtime_error("magic_buffer failed: " + err);
     }
-    return std::string(result);
+    return {result};
 }
 
 // Static interface

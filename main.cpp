@@ -6,8 +6,8 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/Filesystem.hpp"
+#include "logging/LogRegistry.hpp"
 
-#include <iostream>
 #include <signal.h>
 
 using namespace vh::config;
@@ -15,26 +15,29 @@ using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::database;
 using namespace vh::storage;
+using namespace vh::logging;
 
 namespace {
 std::atomic shouldExit = false;
 
 void signalHandler(int signum) {
-    std::cout << "\n[!] Signal " << signum << " received. Shutting down gracefully..." << std::endl;
+    LogRegistry::vaulthalla()->info("[!] Signal {} received. Shutting down gracefully...", std::to_string(signum));
     shouldExit = true;
 }
 }
 
 int main() {
     try {
-        std::cout << "[*] Initializing Vaulthalla services..." << std::endl;
         ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
+        LogRegistry::init(ConfigRegistry::get().logging.log_dir);
+        const auto log = LogRegistry::vaulthalla();
+
+        log->info("[*] Initializing Vaulthalla services...");
+
         ThreadPoolManager::instance().init();
         Transactions::init();
         ServiceDepsRegistry::init();
         ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
-
-        std::cout << "[*] Starting services..." << std::endl;
         Filesystem::init(ServiceDepsRegistry::instance().storageManager);
         ServiceDepsRegistry::instance().storageManager->initStorageEngines();
         ServiceManager::instance().startAll();
@@ -42,20 +45,20 @@ int main() {
         std::signal(SIGINT, signalHandler);
         std::signal(SIGTERM, signalHandler);
 
-        std::cout << "[✓] Vaulthalla services initialized successfully." << std::endl;
+        log->info("[✓] Vaulthalla services initialized successfully.");
 
         while (!shouldExit) std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        std::cout << "[*] Shutting down Vaulthalla services..." << std::endl;
+        log->info("[*] Shutting down Vaulthalla services...");
 
         ServiceManager::instance().stopAll(SIGTERM);
         ThreadPoolManager::instance().shutdown();
 
-        std::cout << "[✓] Vaulthalla services shut down cleanly." << std::endl;
+        log->info("[✓] Vaulthalla services shut down cleanly.");
 
         return EXIT_SUCCESS;
     } catch (const std::exception& e) {
-        std::cerr << "[-] Failed to initialize Vaulthalla: " << e.what() << std::endl;
+        LogRegistry::vaulthalla()->error("[-] Failed to initialize Vaulthalla: {}", e.what());
         return EXIT_FAILURE;
     }
 }

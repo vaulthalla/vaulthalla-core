@@ -9,11 +9,12 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/files.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
-#include <iostream>
 #include <ranges>
 
 using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::http {
 
@@ -71,7 +72,12 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
             try {
                 return handleCachedPreview(vault_id, rel_path, mime_type, req, size);
             } catch (const std::exception& e) {
-                std::cerr << "[HttpRouter] Error handling cached preview: " << e.what() << std::endl;
+                LogRegistry::http()->error("[HttpRouter] Error handling cached preview for {}: {}", rel_path, e.what());
+                http::response<http::string_body> res{http::status::internal_server_error, req.version()};
+                res.set(http::field::content_type, "text/plain");
+                res.body() = "Failed to handle cached preview: " + std::string(e.what());
+                res.prepare_payload();
+                return res;
             }
         }
     }

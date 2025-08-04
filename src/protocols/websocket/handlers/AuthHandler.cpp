@@ -2,14 +2,17 @@
 #include "auth/AuthManager.hpp"
 #include "auth/Client.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include <iostream>
-
 #include "types/User.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "logging/LogRegistry.hpp"
 
-namespace vh::websocket {
+using namespace vh::websocket;
+using namespace vh::auth;
+using namespace vh::types;
+using namespace vh::database;
+using namespace vh::logging;
 
-AuthHandler::AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager)
+AuthHandler::AuthHandler(const std::shared_ptr<AuthManager>& authManager)
     : authManager_(authManager), sessionManager_(authManager->sessionManager()) {
     if (!authManager_) throw std::invalid_argument("AuthManager cannot be null");
 }
@@ -38,9 +41,9 @@ void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) const 
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User '" << username << "' logged in." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] User '{}' logged in successfully.", username);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleLogin error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleLogin error: {}", e.what());
 
         const json response = {{"command", "auth.login.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -56,7 +59,7 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const auto password = payload.at("password").get<std::string>();
         const auto isActive = payload.at("is_active").get<bool>();
 
-        auto user = std::make_shared<types::User>(name, email, isActive);
+        auto user = std::make_shared<User>(name, email, isActive);
         const auto client = authManager_->registerUser(user, password, session.shared_from_this());
         user = client->getUser();
         std::string token = client->getRawToken();
@@ -73,9 +76,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User '" << name << "' registered." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] User '{}' registered successfully.", name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleRegister error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleRegister error: {}", e.what());
 
         const json response = {{"command", "auth.register.response"},
                          {"status", "error"},
@@ -104,9 +107,9 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Updated user '" << user->name << "'." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] Updated user '{}' data.", user->name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleUpdateUser error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleUpdateUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.update.response"},
                          {"status", "error"},
@@ -134,9 +137,9 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Changed password for user '" << user->name << "'." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] User '{}' changed password successfully.", user->name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleChangePassword error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleChangePassword error: {}", e.what());
 
         const json response = {{"command", "auth.user.change_password.response"},
                          {"status", "error"},
@@ -157,7 +160,7 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
         if (user->id != requestId && !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can fetch user data");
 
-        const auto requestedUser = database::UserQueries::getUserById(requestId);
+        const auto requestedUser = UserQueries::getUserById(requestId);
 
         const json data = {{"user", *requestedUser}};
 
@@ -168,9 +171,9 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Fetched user data for '" << requestedUser->name << "'." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] Fetched user '{}' data.", requestedUser->name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleGetUser error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleGetUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.get.response"},
                          {"status", "error"},
@@ -199,9 +202,9 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User '" << client->getUser()->name << "' refreshed session." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] Session '{}' refreshed successfully.", session.getRefreshToken());
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleRefresh error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleRefresh error: {}", e.what());
 
         const json response = {{"command", "auth.refresh.response"},
                          {"status", "error"},
@@ -229,9 +232,9 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Session '" << refreshToken << "' logged out." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] User '{}' logged out successfully.", session.getAuthenticatedUser()->name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleLogout error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleLogout error: {}", e.what());
 
         const json response = {{"command", "auth.logout.response"},
                          {"status", "error"},
@@ -246,10 +249,10 @@ void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
     try {
         const auto user = session.getAuthenticatedUser();
         if (!user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list users");
-        const auto users = database::UserQueries::listUsers();
+        const auto users = UserQueries::listUsers();
 
         const json data = {
-            {"users", types::to_json(users)}
+            {"users", to_json(users)}
         };
 
         const json response = {{"command", "auth.users.list.response"},
@@ -259,9 +262,9 @@ void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[AuthHandler] Listed " << users.size() << " users." << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] Fetched list of users successfully.");
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] handleListUsers error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] handleListUsers error: {}", e.what());
 
         json response = {{"command", "auth.users.list.response"},
                          {"status", "error"},
@@ -287,11 +290,15 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        std::cout << "[AuthHandler] User authentication check: "
-                  << (client->isAuthenticated() ? "Authenticated" : "Unauthenticated") << std::endl;
+        LogRegistry::auth()->info("[AuthHandler] Checked authentication status for token '{}'.", token);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthHandler] isUserAuthenticated error: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthHandler] isUserAuthenticated error: {}", e.what());
+
+        const json response = {{"command", "auth.isAuthenticated.response"},
+                         {"status", "error"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"error", e.what()}};
+
+        session.send(response);
     }
 }
-
-} // namespace vh::websocket

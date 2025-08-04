@@ -4,11 +4,13 @@
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <boost/beast/http/file_body.hpp>
-#include <iostream>
 
 using namespace vh::storage;
+using namespace vh::util;
+using namespace vh::logging;
 
 namespace vh::http {
 
@@ -19,7 +21,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         const auto size_it = params.find("size");
 
         const auto engine = storageManager_->getEngine(vault_id);
-        const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
+        const auto tmpPath = decrypt_file_to_temp(vault_id, rel_path, engine);
 
         std::string file_path = engine->paths->absPath(rel_path, PathType::VAULT_ROOT);
         std::string mime_type = FileQueries::getMimeType(vault_id, {rel_path});
@@ -29,7 +31,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
             if (scale_it != params.end()) scale = scale_it->second;
             if (size_it != params.end()) size = size_it->second;
 
-            std::vector<uint8_t> resized = util::resize_and_compress_image(tmpPath, scale, size);
+            std::vector<uint8_t> resized = resize_and_compress_image(tmpPath, scale, size);
 
             http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
             res.set(http::field::content_type, mime_type);
@@ -61,7 +63,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         res.keep_alive(req.keep_alive());
         return res;
     } catch (const std::exception& e) {
-        std::cerr << "[ImagePreviewHandler] Resize failed: " << e.what() << std::endl;
+        LogRegistry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", rel_path, e.what());
         http::response<http::string_body> err{http::status::unsupported_media_type, req.version()};
         err.set(http::field::content_type, "text/plain");
         err.body() = "Failed to load image: " + std::string(e.what());

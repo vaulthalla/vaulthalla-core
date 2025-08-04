@@ -8,12 +8,13 @@
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::types;
 using namespace vh::services;
 using namespace vh::storage;
+using namespace vh::database;
+using namespace vh::logging;
 
 namespace vh::websocket {
 
@@ -50,11 +51,11 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] UploadStart on vault '" << vaultId << "' path '" << path << "'"
-            << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] UploadStart on vault '{}' path '{}' with upload ID '{}'",
+                               vaultId, path, uploadId);
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleUploadStart error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleUploadStart error: {}", e.what());
         const json response = {{"command", "fs.upload.start.response"}, {"status", "error"}, {"error", e.what()}};
         session.send(response);
     }
@@ -68,9 +69,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
-        session.getUploadHandler()->finishUpload(vaultId);
-
-        // storageManager_->finishUpload(vaultId, session.getAuthenticatedUser()->id, path);
+        session.getUploadHandler()->finishUpload();
 
         const json data = {{"path", path}};
 
@@ -82,10 +81,10 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
         };
         session.send(response);
 
-        std::cout << "[FileSystemHandler] UploadFinish on vault '" << vaultId << "' path '" << path << "'" << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] UploadFinish on vault '{}' path '{}'", vaultId, path);
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleUploadFinish error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleUploadFinish error: {}", e.what());
 
         const json response = {
             {"command", "fs.upload.finish.response"},
@@ -118,10 +117,10 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Mkdir on vault '" << vaultId << "' path '" << path << "'" << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] Mkdir on vault '{}' path '{}'", vaultId, path);
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleMkdir error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleMkdir error: {}", e.what());
 
         const json response = {{"command", "fs.dir.create.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -153,10 +152,10 @@ void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Move on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] Move on vault '{}' from '{}' to '{}'", vaultId, from, to);
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleMove error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleMove error: {}", e.what());
 
         const json response = {{"command", "fs.entry.move.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -188,10 +187,10 @@ void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Rename on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] Rename on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleRename error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleRename error: {}", e.what());
 
         const json response = {{"command", "fs.entry.rename.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -223,10 +222,10 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        std::cout << "[FileSystemHandler] Copy on vault '" << vaultId << "' from '" << from << "' to '" << to << "'" << std::endl;
+        LogRegistry::fs()->info("[FileSystemHandler] Copy on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleCopy error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleCopy error: {}", e.what());
 
         const json response = {{"command", "fs.entry.copy.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -257,10 +256,12 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
                                {"data", data}
         };
 
+        LogRegistry::fs()->debug("[FileSystemHandler] handleListDir on vault '{}' path '{}'", vaultId, path.string());
+
         session.send(response);
 
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleListDir error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleListDir error: {}", e.what());
 
         const json response = {{"command", "fs.listDir.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -293,8 +294,10 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
                                {"data", {{"path", path.string()}}}};
 
         session.send(response);
+
+        LogRegistry::fs()->info("[FileSystemHandler] Delete on vault '{}' path '{}'", vaultId, path.string());
     } catch (const std::exception& e) {
-        std::cerr << "[FileSystemHandler] handleDeleteFile error: " << e.what() << std::endl;
+        LogRegistry::fs()->error("[FileSystemHandler] handleDelete error: {}", e.what());
 
         const json response = {{"command", "fs.entry.delete.response"}, {"status", "error"}, {"error", e.what()}};
 

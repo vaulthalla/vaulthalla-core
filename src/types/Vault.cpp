@@ -2,7 +2,6 @@
 #include "types/S3Vault.hpp"
 #include "util/timestamp.hpp"
 
-
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 

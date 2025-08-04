@@ -1,31 +1,26 @@
 #pragma once
 
-#include "auth/Client.hpp"
-#include "auth/SessionManager.hpp"
-#include <atomic>
+#include "AsyncService.hpp"
+
 #include <chrono>
-#include <thread>
+
+namespace vh::auth {
+class SessionManager;
+}
 
 namespace vh::services {
 
-class ConnectionLifecycleManager {
+class ConnectionLifecycleManager : public AsyncService {
   public:
-    explicit ConnectionLifecycleManager(std::shared_ptr<auth::SessionManager> sessionManager);
-
-    ~ConnectionLifecycleManager();
-
-    void start();
-
-    void stop();
+    ConnectionLifecycleManager();
+    ~ConnectionLifecycleManager() override;
 
   private:
-    void run() const;
+    void runLoop() override;
 
     void sweepActiveSessions() const;
 
     std::shared_ptr<auth::SessionManager> sessionManager_;
-    std::thread lifecycleThread_;
-    std::atomic<bool> running_{false};
 
     constexpr static std::chrono::milliseconds SweepInterval{1000}; // 1 second sweep interval
 };

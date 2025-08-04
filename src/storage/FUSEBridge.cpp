@@ -6,8 +6,6 @@
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
 #include "types/FSEntry.hpp"
-#include "types/Directory.hpp"
-#include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
@@ -33,6 +31,12 @@ using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
+
+
+
+// TODO: Refactor FUSEBridge to be completely static utilizing ServiceDepsRegistry for StorageManager context
+
+
 
 FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager) {}
@@ -140,7 +144,7 @@ void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
     }
 }
 
-void FUSEBridge::readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const {
+void FUSEBridge::readdir(const fuse_req_t& req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) const {
     LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
@@ -215,8 +219,8 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
     fuse_reply_entry(req, &e);
 }
 
-void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
-                        const char* name, mode_t mode, fuse_file_info* fi) {
+void FUSEBridge::create(const fuse_req_t& req, const fuse_ino_t parent,
+                        const char* name, const mode_t mode, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 

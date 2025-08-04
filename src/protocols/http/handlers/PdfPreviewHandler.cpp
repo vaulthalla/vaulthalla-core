@@ -27,7 +27,6 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
 
         const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
 
-        FPDF_InitLibrary();
         FPDF_DOCUMENT doc = FPDF_LoadDocument(tmpPath.c_str(), nullptr);
         if (!doc) throw std::runtime_error("Failed to load PDF");
 
@@ -56,7 +55,7 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         FPDFBitmap_FillRect(bitmap, 0, 0, new_w, new_h, 0xFFFFFFFF);
         FPDF_RenderPageBitmap(bitmap, page, 0, 0, new_w, new_h, 0, 0);
 
-        uint8_t* buffer = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
+        auto* buffer = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
         std::vector<uint8_t> rgb_data(new_w * new_h * 3);
 
         for (int y = 0; y < new_h; ++y) {
@@ -74,7 +73,6 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         FPDFBitmap_Destroy(bitmap);
         FPDF_ClosePage(page);
         FPDF_CloseDocument(doc);
-        FPDF_DestroyLibrary();
 
         http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
         res.set(http::field::content_type, mime_type);

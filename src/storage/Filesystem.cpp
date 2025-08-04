@@ -413,7 +413,7 @@ void Filesystem::handleRename(const RenameContext& context) {
     entry->path = newVaultPath;
     entry->fuse_path = newPath;
     entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
-    if (userId) entry->last_modified_by = *userId;
+    entry->created_by = entry->last_modified_by = userId;
 
     if (entry->isDirectory()) std::filesystem::create_directories(newAbsPath);
     else {

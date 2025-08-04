@@ -232,7 +232,7 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] User '{}' logged out successfully.", session.getAuthenticatedUser()->name);
+        LogRegistry::auth()->info("[AuthHandler] Session '{}' logged out successfully.", refreshToken);
     } catch (const std::exception& e) {
         LogRegistry::auth()->error("[AuthHandler] handleLogout error: {}", e.what());
 

@@ -8,7 +8,8 @@
 #include "storage/Filesystem.hpp"
 #include "logging/LogRegistry.hpp"
 
-#include <signal.h>
+#include <csignal>
+#include <pdfium/fpdfview.h>
 
 using namespace vh::config;
 using namespace vh::services;
@@ -32,6 +33,13 @@ int main() {
         LogRegistry::init(ConfigRegistry::get().logging.log_dir);
         const auto log = LogRegistry::vaulthalla();
 
+        FPDF_LIBRARY_CONFIG config;
+        config.version = 3;
+        config.m_pUserFontPaths = nullptr;
+        config.m_pIsolate = nullptr;
+        config.m_v8EmbedderSlot = 0;
+        FPDF_InitLibraryWithConfig(&config);
+
         log->info("[*] Initializing Vaulthalla services...");
 
         ThreadPoolManager::instance().init();
@@ -53,6 +61,7 @@ int main() {
 
         ServiceManager::instance().stopAll(SIGTERM);
         ThreadPoolManager::instance().shutdown();
+        FPDF_DestroyLibrary();
 
         log->info("[✓] Vaulthalla services shut down cleanly.");
 

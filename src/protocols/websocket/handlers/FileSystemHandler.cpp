@@ -69,7 +69,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
 
         enforcePermissions(session, vaultId, path, &VaultRole::canCreate);
 
-        session.getUploadHandler()->finishUpload();
+        session.getUploadHandler()->finishUpload(storageManager_->getEngine(vaultId));
 
         const json data = {{"path", path}};
 

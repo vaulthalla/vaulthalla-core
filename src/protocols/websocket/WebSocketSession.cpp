@@ -38,6 +38,7 @@ WebSocketSession::~WebSocketSession() {
 
 std::string WebSocketSession::getClientIp() const {
     try {
+        if (!ws_ || !ws_->next_layer().is_open()) return "unknown";
         return ws_->next_layer().remote_endpoint().address().to_string();
     } catch (...) {
         return "unknown";
@@ -54,7 +55,7 @@ std::string WebSocketSession::getRefreshToken() const {
 }
 
 void WebSocketSession::accept(tcp::socket&& socket) {
-    ws_ = std::make_shared<websocket::stream<tcp::socket> >(std::move(socket));
+    ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
     strand_ = asio::make_strand(ws_->get_executor());
 
     auto self = shared_from_this();

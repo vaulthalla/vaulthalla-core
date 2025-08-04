@@ -2,7 +2,9 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "util/files.hpp"
+#include "types/User.hpp"
 #include "logging/LogRegistry.hpp"
+#include "storage/Filesystem.hpp"
 
 #include <filesystem>
 
@@ -55,7 +57,7 @@ void UploadHandler::handleBinaryFrame(beast::flat_buffer& buffer) {
     buffer.consume(size);
 }
 
-void UploadHandler::finishUpload() {
+void UploadHandler::finishUpload(const std::shared_ptr<StorageEngine>& engine) {
     if (!currentUpload_) throw std::runtime_error("No upload in progress");
 
     auto& upload = *currentUpload_;
@@ -66,7 +68,15 @@ void UploadHandler::finishUpload() {
         throw std::runtime_error("Upload size mismatch");
     }
 
-    std::filesystem::rename(upload.tmpPath, upload.finalPath);
+    const auto fuseFrom = engine->paths->absRelToRoot(upload.tmpPath, PathType::FUSE_ROOT);
+    const auto fuseTo = engine->paths->absRelToRoot(upload.finalPath, PathType::FUSE_ROOT);
+    std::optional<unsigned int> userId = std::nullopt;
+    if (session_.getAuthenticatedUser()) userId = session_.getAuthenticatedUser()->id;
+
+    LogRegistry::ws()->debug("[UploadHandler] Finishing upload (uploadId: {}, fuseFrom: {}, fuseTo: {}, userId: {})",
+                             upload.uploadId, fuseFrom.string(), fuseTo.string(), userId.value_or(0));
+
+    Filesystem::rename(fuseFrom, fuseTo, userId, engine);
 
     currentUpload_.reset();
 }

@@ -14,7 +14,7 @@ void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session)
         if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can create groups");
 
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const std::string groupName = payload.at("name").get<std::string>();
         const std::string groupDescription = payload.value("description", "");
 

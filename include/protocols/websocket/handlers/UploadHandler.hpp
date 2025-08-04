@@ -6,6 +6,10 @@
 #include <nlohmann/json.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 
+namespace vh::storage {
+class StorageEngine;
+}
+
 namespace vh::types {
     struct User;
 }
@@ -34,7 +38,7 @@ public:
 
     void handleBinaryFrame(boost::beast::flat_buffer& buffer);
 
-    void finishUpload();
+    void finishUpload(const std::shared_ptr<storage::StorageEngine>& engine);
 
     bool uploadInProgress() const { return currentUpload_.has_value(); }
 

@@ -73,7 +73,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
 
             if (engine) {
                 dir->vault_id = engine->vault->id;
-                dir->path = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+                dir->path = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             } else dir->path = path;
 
             dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
@@ -179,8 +179,8 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     if (!engine) engine = storageManager_->resolveStorageEngine(from);
     if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for copy operation");
 
-    const auto fromVaultPath = engine->paths->absRelToAbsOther(from, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-    const auto toVaultPath = engine->paths->absRelToAbsOther(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto fromVaultPath = engine->paths->absRelToAbsRel(from, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto toVaultPath = engine->paths->absRelToAbsRel(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
     const bool isFile = engine->isFile(fromVaultPath);
     if (!isFile && !engine->isDirectory(fromVaultPath))
@@ -209,7 +209,7 @@ void Filesystem::remove(const fs::path& path, const unsigned int userId, std::sh
     if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for remove operation");
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
-    const auto vaultPath = engine->paths->absRelToAbsOther(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto vaultPath = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
     if (engine->isFile(vaultPath)) {
         FileQueries::markFileAsTrashed(userId, engine->vault->id, vaultPath);
@@ -394,8 +394,8 @@ void Filesystem::handleRename(const RenameContext& context) {
 
     const auto oldAbsPath = engine->paths->absPath(oldPath, PathType::BACKING_ROOT);
     const auto newAbsPath = engine->paths->absPath(newPath, PathType::BACKING_ROOT);
-    const auto oldVaultPath = engine->paths->absRelToAbsOther(oldPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-    const auto newVaultPath = engine->paths->absRelToAbsOther(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto oldVaultPath = engine->paths->absRelToAbsRel(oldPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto newVaultPath = engine->paths->absRelToAbsRel(newPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
     if (!std::filesystem::exists(oldAbsPath)) {
         throw std::filesystem::filesystem_error(

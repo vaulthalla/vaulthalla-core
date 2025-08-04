@@ -1,6 +1,7 @@
 #include "storage/FUSEBridge.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"

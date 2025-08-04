@@ -15,6 +15,7 @@
 
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::config;
 
 namespace vh::http {
 

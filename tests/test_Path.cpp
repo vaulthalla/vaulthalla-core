@@ -97,19 +97,19 @@ TEST_F(PathTest, AbsRelToRoot_ResolvePath) {
 
 TEST_F(PathTest, AbsRelToAbsOther_ConvertPaths) {
     Path p("users/admin");
-    fs::path abs = p.absRelToAbsOther("/users/admin/test.txt", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    fs::path abs = p.absRelToAbsRel("/users/admin/test.txt", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     EXPECT_EQ(abs, "/test.txt");
 }
 
 TEST_F(PathTest, AbsRelToAbsOther_OutsideRootFallsBack) {
     Path p("users/admin");
-    fs::path abs = p.absRelToAbsOther("/etc/passwd", PathType::VAULT_ROOT, PathType::CACHE_ROOT);
+    fs::path abs = p.absRelToAbsRel("/etc/passwd", PathType::VAULT_ROOT, PathType::CACHE_ROOT);
     EXPECT_EQ(abs.filename(), "passwd"); // Should collapse to filename
 }
 
 TEST_F(PathTest, AbsRelToAbsOther_BackupRootToVault) {
     Path p("users/admin");
-    fs::path abs = p.absRelToAbsOther("/var/lib/vaulthalla/users/admin/shadow.db", PathType::BACKING_VAULT_ROOT, PathType::VAULT_ROOT);
+    fs::path abs = p.absRelToAbsRel("/var/lib/vaulthalla/users/admin/shadow.db", PathType::BACKING_VAULT_ROOT, PathType::VAULT_ROOT);
     EXPECT_EQ(abs, "/shadow.db");
 }
 
@@ -121,6 +121,6 @@ TEST_F(PathTest, AbsRelToRoot_EmptyString) {
 
 TEST_F(PathTest, AbsRelToAbsOther_ReduceFuseToVault) {
     Path p("users/admin");
-    fs::path out = p.absRelToAbsOther("/users/admin/sample_data/Invoice-102-Cooper-Larson.pdf", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    fs::path out = p.absRelToAbsRel("/users/admin/sample_data/Invoice-102-Cooper-Larson.pdf", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     EXPECT_EQ(out, "/sample_data/Invoice-102-Cooper-Larson.pdf");  // should treat as absolute under vault root
 }

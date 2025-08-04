@@ -91,7 +91,7 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
 
     Filesystem::createFile({
             .path = makeAbsolute(rel_path),
-            .fuse_path = paths->absRelToAbsOther(absPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+            .fuse_path = paths->absRelToAbsRel(absPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
             .buffer = buffer,
             .engine = shared_from_this(),
             .userId = vault->owner_id

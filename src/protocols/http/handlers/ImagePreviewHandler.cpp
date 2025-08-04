@@ -11,6 +11,7 @@
 using namespace vh::storage;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::database;
 
 namespace vh::http {
 

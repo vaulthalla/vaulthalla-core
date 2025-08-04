@@ -14,6 +14,8 @@
 namespace fs = std::filesystem;
 
 using namespace vh::types;
+using namespace vh::database;
+using namespace vh::config;
 
 namespace vh::concurrency {
 

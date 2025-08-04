@@ -17,6 +17,8 @@
 
 using namespace vh::types;
 using namespace vh::logging;
+using namespace vh::config;
+using namespace vh::database;
 
 namespace vh::concurrency {
 

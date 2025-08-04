@@ -1,18 +1,21 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
+#include "config/ConfigRegistry.hpp"
 
 using namespace vh::types;
+using namespace vh::config;
 
-Path::Path(const fs::path& vaultMountPoint) {
-    const auto& conf = ConfigRegistry::get();
-    fuseRoot = conf.fuse.root_mount_path;
-    vaultRoot = fuseRoot / stripLeadingSlash(vaultMountPoint);
-    cacheRoot = conf.fuse.backing_path / stripLeadingSlash(conf.caching.path) / stripLeadingSlash(vaultMountPoint);
-    thumbnailRoot = cacheRoot / "thumbnails";
-    fileCacheRoot = cacheRoot / "files";
-    backingRoot = conf.fuse.backing_path;
-    backingVaultRoot = conf.fuse.backing_path / stripLeadingSlash(vaultMountPoint);
-}
+Path::Path(const fs::path& vaultMountPoint)
+    : fuseRoot(ConfigRegistry::get().fuse.root_mount_path),
+      vaultRoot(fuseRoot / stripLeadingSlash(vaultMountPoint)),
+      cacheRoot(ConfigRegistry::get().fuse.backing_path /
+                stripLeadingSlash(ConfigRegistry::get().caching.path) /
+                stripLeadingSlash(vaultMountPoint)),
+      thumbnailRoot(cacheRoot / "thumbnails"),
+      fileCacheRoot(cacheRoot / "files"),
+      backingRoot(ConfigRegistry::get().fuse.backing_path),
+      backingVaultRoot(ConfigRegistry::get().fuse.backing_path /
+                       stripLeadingSlash(vaultMountPoint)) {}
 
 fs::path Path::absPath(const fs::path& relPath, const PathType& type) const {
     switch (type) {
@@ -62,6 +65,6 @@ fs::path Path::absRelToRoot(const fs::path& path, const PathType& type) const {
     return makeAbsolute(rel.lexically_normal());
 }
 
-fs::path Path::absRelToAbsOther(const fs::path& path, const PathType& initial, const PathType& target) const {
+fs::path Path::absRelToAbsRel(const fs::path& path, const PathType& initial, const PathType& target) const {
     return absRelToRoot(absPath(path, initial), target);
 }

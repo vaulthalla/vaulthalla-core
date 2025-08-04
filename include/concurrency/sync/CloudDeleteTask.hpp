@@ -7,10 +7,15 @@
 #include "types/CacheIndex.hpp"
 #include "types/Path.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <memory>
 
+#include "config/Config.hpp"
+
 using namespace vh::types;
+using namespace vh::database;
+using namespace vh::config;
 
 namespace vh::concurrency {
 
@@ -53,7 +58,7 @@ struct CloudTrashedDeleteTask final : PromisedTask {
 
     void operator()() override {
         try {
-            const auto vaultPath = engine->paths->absRelToAbsOther(file->fuse_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+            const auto vaultPath = engine->paths->absRelToAbsRel(file->fuse_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             if (type == Type::PURGE) purge(vaultPath);
             else if (type == Type::LOCAL) handleLocalDelete();
             else if (type == Type::REMOTE) engine->removeRemotely(vaultPath);

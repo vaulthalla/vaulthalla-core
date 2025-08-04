@@ -3,10 +3,8 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/syslog_sink.h>
 
 #include <filesystem>
-#include <iostream>
 
 namespace vh::logging {
 
@@ -17,9 +15,7 @@ void LogRegistry::init(const std::string& logDir) {
     }
 
     namespace fs = std::filesystem;
-    if (!fs::exists(logDir)) {
-        fs::create_directories(logDir);
-    }
+    if (!fs::exists(logDir)) fs::create_directories(logDir);
 
     constexpr auto defaultLevel = spdlog::level::info; // Default log level
 

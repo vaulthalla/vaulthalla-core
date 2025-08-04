@@ -7,7 +7,6 @@
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
-#include <iostream>
 #include <ranges>
 
 namespace vh::types {

@@ -14,8 +14,6 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "logging/LogRegistry.hpp"
 
-#include <iostream>
-
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::encryption;

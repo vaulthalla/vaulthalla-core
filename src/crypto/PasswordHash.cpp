@@ -1,5 +1,4 @@
 #include "crypto/PasswordHash.hpp"
-#include <iostream>
 #include <sodium.h>
 #include <stdexcept>
 

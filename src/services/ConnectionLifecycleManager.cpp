@@ -1,38 +1,30 @@
 #include "services/ConnectionLifecycleManager.hpp"
-#include <iostream>
+#include "auth/SessionManager.hpp"
+#include "auth/Client.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
-namespace vh::services {
+using namespace vh::services;
+using namespace vh::auth;
+using namespace vh::logging;
 
-ConnectionLifecycleManager::ConnectionLifecycleManager(std::shared_ptr<auth::SessionManager> sessionManager)
-    : sessionManager_(std::move(sessionManager)) {}
+ConnectionLifecycleManager::ConnectionLifecycleManager()
+    : AsyncService("LifecycleManager"),
+      sessionManager_(ServiceDepsRegistry::instance().authManager->sessionManager()) {}
 
 ConnectionLifecycleManager::~ConnectionLifecycleManager() {
     stop();
 }
 
-void ConnectionLifecycleManager::start() {
-    running_ = true;
-    lifecycleThread_ = std::thread(&ConnectionLifecycleManager::run, this);
-    std::cout << "[LifecycleManager] Started." << std::endl;
-}
-
-void ConnectionLifecycleManager::stop() {
-    running_ = false;
-    if (lifecycleThread_.joinable()) {
-        lifecycleThread_.join();
-    }
-    std::cout << "[LifecycleManager] Stopped." << std::endl;
-}
-
-void ConnectionLifecycleManager::run() const {
-    while (running_) {
+void ConnectionLifecycleManager::runLoop() {
+    while (running_ && !interruptFlag_.load()) {
         sweepActiveSessions();
         std::this_thread::sleep_for(SweepInterval);
     }
 }
 
 void ConnectionLifecycleManager::sweepActiveSessions() const {
-    auto sessions = sessionManager_->getActiveSessions(); // Expose activeSessions_ snapshot in SessionManager
+    const auto sessions = sessionManager_->getActiveSessions(); // Expose activeSessions_ snapshot in SessionManager
 
     for (const auto& [tokenStr, client] : sessions) {
         if (!client) continue;
@@ -41,8 +33,7 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         const auto secondsLeft = client->getToken()->getTimeLeft();
 
         if (token->revoked) {
-            std::cout << "[LifecycleManager] Token revoked. Closing session for user " << client->getUser()->id
-                      << std::endl;
+            LogRegistry::ws()->info("[LifecycleManager] Token revoked. Closing session for user {}", client->getUser()->id);
             client->sendControlMessage("token_revoked", {});
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
@@ -50,20 +41,16 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         }
 
         if (secondsLeft <= 0) {
-            std::cout << "[LifecycleManager] Token expired. Closing session for user " << client->getUser()->id
-                      << std::endl;
+            LogRegistry::ws()->info("[LifecycleManager] Token expired. Closing session for user {}", client->getUser()->id);
             client->sendControlMessage("token_expired", {});
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
             continue;
         }
 
-        if (secondsLeft <= 10) {
+        if (secondsLeft <= 10)
             client->sendControlMessage("token_refresh_urgent", {{"deadline_ms", 10000}});
-        } else if (secondsLeft <= 300) {
+        else if (secondsLeft <= 300)
             client->sendControlMessage("token_refresh_requested", {{"deadline_ms", 300000}});
-        }
     }
 }
-
-} // namespace vh::services

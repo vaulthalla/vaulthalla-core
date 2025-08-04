@@ -1,28 +1,25 @@
 #pragma once
 
 #include "services/AsyncService.hpp"
-#include "concurrency/FSTask.hpp"
 
 #include <memory>
 #include <queue>
-#include <atomic>
 #include <thread>
 #include <unordered_map>
 #include <mutex>
 #include <shared_mutex>
 
-namespace vh::concurrency {
-class ThreadPool;
-class SyncTask;
+namespace vh::storage {
+class StorageEngine;
 }
 
-namespace vh::storage {
-class StorageManager;
+namespace vh::concurrency {
+class ThreadPool;
+struct SyncTask;
+struct FSTask;
 }
 
 namespace vh::services {
-
-struct ServiceManager;
 
 struct FSTaskCompare {
     bool operator()(const std::shared_ptr<concurrency::FSTask>& a, const std::shared_ptr<concurrency::FSTask>& b) const;

@@ -8,16 +8,22 @@
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "logging/LogRegistry.hpp"
+
 #include <chrono>
-#include <iostream>
 #include <sodium.h>
 #include <stdexcept>
 #include <uuid/uuid.h>
 #include <ranges>
 
-namespace vh::auth {
+using namespace vh::auth;
+using namespace vh::types;
+using namespace vh::crypto;
+using namespace vh::database;
+using namespace vh::storage;
+using namespace vh::logging;
 
-AuthManager::AuthManager(const std::shared_ptr<storage::StorageManager>& storageManager)
+AuthManager::AuthManager(const std::shared_ptr<StorageManager>& storageManager)
     : sessionManager_(std::make_shared<SessionManager>()), storageManager_(storageManager) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
@@ -26,12 +32,12 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSo
     std::shared_ptr<Client> client;
 
     if (!session->getRefreshToken().empty()) {
-        std::cout << "[Session] Attempting token rehydration...\n";
+        LogRegistry::auth()->debug("[AuthManager] Attempting to rehydrate session from provided refresh token.");
         auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
-        if (!validatedClient) std::cout << "[Session] Provided token was invalid or expired.\n";
+        if (!validatedClient) LogRegistry::auth()->error("[AuthManager] Failed to rehydrate session: invalid refresh token.");
         else {
             client = validatedClient;
-            std::cout << "[Session] Rehydrated session from provided token.\n";
+            LogRegistry::auth()->debug("[AuthManager] Successfully rehydrated session for user: {}", client->getUserName());
         }
     }
 
@@ -49,18 +55,18 @@ bool AuthManager::validateToken(const std::string& token) const {
         const auto session = sessionManager_->getClientSession(token);
 
         if (!session) {
-            std::cerr << "[AuthManager] Invalid token: session not found for token " << token << std::endl;
+            LogRegistry::auth()->error("[AuthManager] Invalid token: session not found for token {}", token);
             return false;
         }
 
         if (!session->isAuthenticated()) {
-            std::cerr << "[AuthManager] Invalid token: session is not authenticated for token " << token << std::endl;
+            LogRegistry::auth()->error("[AuthManager] Invalid token: authentication failed");
             return false;
         }
 
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] Token validation failed: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthManager] Token validation failed: {}", e.what());
         return false;
     }
 }
@@ -69,13 +75,13 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
     return sessionManager_;
 }
 
-std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> user,
+std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<User> user,
                                                   const std::string& password,
                                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
     isValidRegistration(user, password);
 
-    user->setPasswordHash(crypto::hashPassword(password));
-    database::UserQueries::createUser(user);
+    user->setPasswordHash(hashPassword(password));
+    UserQueries::createUser(user);
 
     user = findUser(user->name);
     auto client = sessionManager_->getClientSession(session->getUUID());
@@ -86,7 +92,7 @@ std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<types::User> u
 
     if (!user) throw std::runtime_error("Failed to create user: " + user->name);
 
-    std::cout << "[AuthManager] Registered new user: " << user->name << std::endl;
+    LogRegistry::auth()->info("[AuthManager] User registered: {}", user->name);
     return client;
 }
 
@@ -96,36 +102,37 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& name, const st
         auto user = findUser(name);
         if (!user) throw std::runtime_error("User not found: " + name);
 
-        if (!crypto::verifyPassword(password, user->password_hash))
+        if (!verifyPassword(password, user->password_hash))
             throw std::runtime_error("Invalid password for user: " + name);
 
-        database::UserQueries::revokeAllRefreshTokens(user->id);
-        database::UserQueries::updateLastLoggedInUser(user->id);
-        user = database::UserQueries::getUserById(user->id);
+        UserQueries::revokeAllRefreshTokens(user->id);
+        UserQueries::updateLastLoggedInUser(user->id);
+        user = UserQueries::getUserById(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
         client->getSession()->setAuthenticatedUser(user);
 
         sessionManager_->promoteSession(client);
 
-        std::cout << "[AuthManager] User logged in: " << name << std::endl;
+        LogRegistry::auth()->info("[AuthManager] User logged in: {}", user->name);
         return client;
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] loginUser failed: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthManager] loginUser failed: {}", e.what());
         return nullptr;
     }
 }
 
-void AuthManager::updateUser(const std::shared_ptr<types::User>& user) {
+void AuthManager::updateUser(const std::shared_ptr<User>& user) {
     try {
         if (!user) throw std::runtime_error("Cannot update null user");
 
-        database::UserQueries::updateUser(user);
-        users_[user->name] = database::UserQueries::getUserById(user->id);
+        UserQueries::updateUser(user);
+        users_[user->name] = UserQueries::getUserById(user->id);
 
-        std::cout << "[AuthManager] Updated user: " << user->name << std::endl;
+        LogRegistry::auth()->debug("[AuthManager] User updated: {}", user->name);
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] updateUser failed: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthManager] updateUser failed: {}", e.what());
+        throw std::runtime_error("Failed to update user: " + user->name + " - " + e.what());
     }
 }
 
@@ -153,7 +160,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
 
         if (const auto priorSession = sessionManager_->getClientSession(tokenJti)) {
             if (!priorSession->isAuthenticated()) throw std::runtime_error("Prior session is not authenticated");
-            std::cout << "[AuthManager] Rehydrating existing session for JTI: " << tokenJti << std::endl;
+            LogRegistry::auth()->debug("[AuthManager] Rehydrating existing session for JTI: {}", tokenJti);
             priorSession->setSession(session);
             return priorSession; // Session already exists, rehydrate it
         }
@@ -172,7 +179,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
         if (tokenJti.empty()) throw std::runtime_error("Missing JTI in refresh token");
 
         // 3. Lookup refresh token by jti
-        auto storedToken = database::UserQueries::getRefreshToken(tokenJti);
+        auto storedToken = UserQueries::getRefreshToken(tokenJti);
         if (!storedToken) throw std::runtime_error("Refresh token not found for JTI: " + tokenJti);
 
         if (storedToken->isRevoked()) throw std::runtime_error("Refresh token has been revoked");
@@ -183,16 +190,16 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
             throw std::runtime_error("Refresh token has expired");
 
         // 4. Secure compare stored hash to hashed input token
-        if (!crypto::verifyPassword(refreshToken, storedToken->getHashedToken()))
+        if (!verifyPassword(refreshToken, storedToken->getHashedToken()))
             throw std::runtime_error("Refresh token hash mismatch");
 
-        auto user = database::UserQueries::getUserByRefreshToken(tokenJti);
+        auto user = UserQueries::getUserByRefreshToken(tokenJti);
         auto client = std::make_shared<Client>(session, storedToken, user);
         sessionManager_->createSession(client);
         return client;
 
     } catch (const std::exception& e) {
-        std::cerr << "[AuthManager] validateRefreshToken failed: " << e.what() << std::endl;
+        LogRegistry::auth()->error("[AuthManager] validateRefreshToken failed: {}", e.what());
         return nullptr;
     }
 }
@@ -202,15 +209,15 @@ void AuthManager::changePassword(const std::string& name, const std::string& old
     const auto user = findUser(name);
     if (!user) throw std::runtime_error("User not found: " + name);
 
-    if (!crypto::verifyPassword(oldPassword, user->password_hash))
+    if (!verifyPassword(oldPassword, user->password_hash))
         throw std::runtime_error("Invalid old password for user: " + name);
 
-    user->setPasswordHash(crypto::hashPassword(newPassword));
+    user->setPasswordHash(hashPassword(newPassword));
 
-    std::cout << "[AuthManager] Changed password for user: " << name << std::endl;
+    LogRegistry::auth()->info("[AuthManager] Changing password for user: {}", user->name);
 }
 
-bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, const std::string& password) {
+bool AuthManager::isValidRegistration(const std::shared_ptr<User>& user, const std::string& password) {
     std::vector<std::string> errors;
 
     if (!isValidName(user->name)) errors.emplace_back("Name must be between 3 and 50 characters.");
@@ -235,6 +242,7 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<types::User>& user, 
         std::ostringstream oss;
         oss << "Registration failed due to the following issues:\n";
         for (const auto& err : errors) oss << "- " << err << std::endl;
+        LogRegistry::auth()->error("[AuthManager] Registration validation failed: {}", oss.str());
         throw std::runtime_error(oss.str());
     }
 
@@ -255,11 +263,11 @@ bool AuthManager::isValidPassword(const std::string& password) {
            std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
 }
 
-std::shared_ptr<types::User> AuthManager::findUser(const std::string& name) {
+std::shared_ptr<User> AuthManager::findUser(const std::string& name) {
     const auto it = users_.find(name);
     if (it != users_.end()) return it->second;
 
-    if (const auto user = database::UserQueries::getUserByName(name)) {
+    if (const auto user = UserQueries::getUserByName(name)) {
         users_[name] = user;
         return user;
     }
@@ -291,11 +299,9 @@ AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSessio
 
     return {token,
             std::make_shared<RefreshToken>(jti,
-                                           crypto::hashPassword(
+                                           hashPassword(
                                                token), // Store hashed token
                                            0,          // User ID will be set later
                                            session->getUserAgent(),
                                            session->getClientIp())};
 }
-
-} // namespace vh::auth

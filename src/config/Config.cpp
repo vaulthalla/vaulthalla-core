@@ -2,7 +2,6 @@
 #include "config/config_yaml.hpp"
 
 #include <cstdlib>
-#include <iostream>
 #include <yaml-cpp/yaml.h>
 #include <nlohmann/json.hpp>
 #include <fstream>

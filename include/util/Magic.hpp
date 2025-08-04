@@ -12,8 +12,8 @@ public:
     Magic();
     ~Magic();
 
-    std::string mime_type(const std::string& path) const;
-    std::string mime_type_buffer(const std::string& buffer) const;
+    [[nodiscard]] std::string mime_type(const std::string& path) const;
+    [[nodiscard]] std::string mime_type_buffer(const std::string& buffer) const;
 
     static std::string get_mime_type(const std::string& path);
     static std::string get_mime_type_from_buffer(const std::string& buffer);

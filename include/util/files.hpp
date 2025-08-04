@@ -8,7 +8,6 @@
 #include <vector>
 #include <string>
 #include <random>
-#include <sstream>
 
 using namespace vh::types;
 
@@ -18,7 +17,7 @@ inline std::vector<uint8_t> readFileToVector(const std::filesystem::path& path) 
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) throw std::runtime_error("Failed to open file: " + path.string());
 
-    std::streamsize size = in.tellg();
+    const std::streamsize size = in.tellg();
     in.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> buffer(size);
@@ -33,7 +32,7 @@ inline std::string readFileToString(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) throw std::runtime_error("Failed to open file: " + path.string());
 
-    std::streamsize size = in.tellg();
+    const std::streamsize size = in.tellg();
     in.seekg(0, std::ios::beg);
 
     std::string buffer(size, '\0');
@@ -47,23 +46,21 @@ inline std::string readFileToString(const std::filesystem::path& path) {
 inline void writeFile(const std::filesystem::path& absPath, const std::vector<uint8_t>& ciphertext) {
     std::ofstream out(absPath, std::ios::binary | std::ios::trunc);
     if (!out) throw std::runtime_error("Failed to write encrypted file: " + absPath.string());
-    out.write(reinterpret_cast<const char*>(ciphertext.data()), ciphertext.size());
+    out.write(reinterpret_cast<const char*>(ciphertext.data()), static_cast<long>(ciphertext.size()));
     out.close();
 }
 
-inline std::string generate_random_suffix(size_t length = 8) {
+inline std::string generate_random_suffix(const size_t length = 8) {
     static constexpr char charset[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz";
-    static thread_local std::mt19937 rng{std::random_device{}()};
-    static thread_local std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
+    thread_local std::mt19937 rng{std::random_device{}()};
+    thread_local std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
 
     std::string result;
     result.reserve(length);
-    for (size_t i = 0; i < length; ++i) {
-        result += charset[dist(rng)];
-    }
+    for (size_t i = 0; i < length; ++i) result += charset[dist(rng)];
     return result;
 }
 
@@ -86,7 +83,7 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
         throw std::runtime_error("Failed to read encrypted file: " + abs_path.string());
 
     // Decrypt
-    auto plaintext = engine->decrypt(vault_id, rel_path, ciphertext);
+    const auto plaintext = engine->decrypt(vault_id, rel_path, ciphertext);
 
     if (plaintext.empty())
         throw std::runtime_error("Decryption failed or returned empty data for file: " + abs_path.string());
@@ -96,11 +93,9 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
     fs::path tmp_file = tmp_dir / ("vaulthalla_dec_" + generate_random_suffix() + ".tmp");
 
     std::ofstream out(tmp_file, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        throw std::runtime_error("Failed to create temp decrypted file: " + tmp_file.string());
-    }
+    if (!out) throw std::runtime_error("Failed to create temp decrypted file: " + tmp_file.string());
 
-    out.write(reinterpret_cast<const char*>(plaintext.data()), plaintext.size());
+    out.write(reinterpret_cast<const char*>(plaintext.data()), static_cast<long>(plaintext.size()));
     out.close();
 
     // Optional: tie temp file lifetime to vault or PID

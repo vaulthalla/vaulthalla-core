@@ -7,7 +7,7 @@
 
 namespace vh::services {
 
-struct ServiceManager;
+class ServiceManager;
 
 class AsyncService {
 public:

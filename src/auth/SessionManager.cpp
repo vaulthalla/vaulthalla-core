@@ -1,9 +1,11 @@
 #include "auth/SessionManager.hpp"
 #include "types/RefreshToken.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include <iostream>
+#include "logging/LogRegistry.hpp"
 
-namespace vh::auth {
+using namespace vh::auth;
+using namespace vh::database;
+using namespace vh::logging;
 
 void SessionManager::createSession(const std::shared_ptr<Client>& client) {
     std::lock_guard lock(sessionMutex_);
@@ -11,7 +13,7 @@ void SessionManager::createSession(const std::shared_ptr<Client>& client) {
     if (!client || !client->getSession()) throw std::invalid_argument("Session must not be null");
 
     activeSessions_[client->getSession()->getUUID()] = client;
-    std::cout << "[SessionManager] Created new stateless session." << std::endl;
+    LogRegistry::ws()->debug("[SessionManager] Created session for user: {}", client->getUserName());
 }
 
 std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client) {
@@ -24,14 +26,14 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
         refreshToken->setUserId(client->getUser()->id);
         refreshToken->setUserAgent(client->getSession()->getUserAgent());
         refreshToken->setIpAddress(client->getSession()->getClientIp());
-        database::UserQueries::addRefreshToken(refreshToken);
-        client->setRefreshToken(database::UserQueries::getRefreshToken(refreshToken->getJti()));
+        UserQueries::addRefreshToken(refreshToken);
+        client->setRefreshToken(UserQueries::getRefreshToken(refreshToken->getJti()));
         activeSessions_[client->getSession()->getUUID()] = client;
 
-        std::cout << "[SessionManager] Promoted session for user: " << client->getUserName() << std::endl;
+        LogRegistry::ws()->debug("[SessionManager] Promoted session for user: {}", client->getUserName());
         return client->getRawToken();
     } catch (const std::exception& e) {
-        std::cerr << "[SessionManager] promoteSession failed: " << e.what() << std::endl;
+        LogRegistry::ws()->error("[SessionManager] Failed to promote session: {}", e.what());
         return "";
     }
 }
@@ -51,8 +53,8 @@ void SessionManager::invalidateSession(const std::string& sessionUUID) {
     if (it != activeSessions_.end()) {
         if (it->second->getUser()) {
             it->second->invalidateToken();
-            database::UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
-            std::cout << "[SessionManager] Invalidated session for user: " << it->second->getUserName() << std::endl;
+            UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
+            LogRegistry::ws()->debug("[SessionManager] Invalidated session: {}", sessionUUID);
         }
         activeSessions_.erase(it);
     }
@@ -62,5 +64,3 @@ std::unordered_map<std::string, std::shared_ptr<Client> > SessionManager::getAct
     std::lock_guard lock(sessionMutex_);
     return activeSessions_;
 }
-
-} // namespace vh::auth

@@ -3,15 +3,17 @@
 #include "services/SyncController.hpp"
 #include "services/FUSE.hpp"
 #include "services/Vaulthalla.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <csignal>
 #include <cstdlib>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <chrono>
+
+using namespace vh::logging;
 
 namespace vh::services {
 
@@ -23,18 +25,21 @@ public:
     }
 
     void startAll() {
+        LogRegistry::vaulthalla()->debug("[ServiceManager] Starting all services...");
         std::lock_guard lock(mutex_);
-
         tryStart("Vaulthalla", vaulthallaService);
         tryStart("FUSE", fuseService);
         tryStart("SyncController", syncController);
+        LogRegistry::vaulthalla()->debug("[ServiceManager] All services started.");
     }
 
     void stopAll(int signal = SIGTERM) {
+        LogRegistry::vaulthalla()->debug("[ServiceManager] Stopping all services...");
         std::lock_guard lock(mutex_);
         stopService("SyncController", syncController, signal);
         stopService("FUSE", fuseService, signal);
         stopService("Vaulthalla", vaulthallaService, signal);
+        LogRegistry::vaulthalla()->debug("[ServiceManager] All services stopped.");
     }
 
     void restartService(const std::string& name) {
@@ -43,7 +48,7 @@ public:
         auto svc = services_.at(name);
         if (!svc) return;
 
-        std::cout << "[ServiceManager] Restarting " << name << "...\n";
+        LogRegistry::vaulthalla()->debug("[ServiceManager] Restarting service: {}", name);
         stopService(name, svc, SIGTERM);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         tryStart(name, svc);
@@ -81,11 +86,11 @@ private:
 
     void tryStart(const std::string& name, const std::shared_ptr<AsyncService>& svc) {
         if (!svc) return;
-        std::cout << "[ServiceManager] Starting " << name << "...\n";
+        LogRegistry::vaulthalla()->debug("[ServiceManager] Starting service: {}", name);
         try {
             svc->start();
         } catch (const std::exception& e) {
-            std::cerr << "[-] " << name << " failed to start: " << e.what() << "\n";
+            LogRegistry::vaulthalla()->error("[ServiceManager] Failed to start {}: {}", name, e.what());
             hardFail();
         }
     }
@@ -93,19 +98,19 @@ private:
     void stopService(const std::string& name, const std::shared_ptr<AsyncService>& svc, int signal) {
         if (!svc || !svc->isRunning()) return;
 
-        std::cout << "[ServiceManager] Stopping " << name << "...\n";
+        LogRegistry::vaulthalla()->debug("[ServiceManager] Stopping service: {}", name);
         try {
             svc->stop();
         } catch (...) {
-            std::cerr << "[-] " << name << " ignored SIGTERM, escalating to SIGKILL...\n";
+            LogRegistry::vaulthalla()->error("[ServiceManager] Failed to stop {} gracefully, sending signal {}", name, signal);
             std::raise(SIGKILL); // Kill whole process group
         }
     }
 
     [[noreturn]] void hardFail() {
-        std::cerr << "[ServiceManager] Fatal service failure. Sending SIGTERM...\n";
+        LogRegistry::vaulthalla()->error("[ServiceManager] Critical failure, cannot continue.");
         stopAll(SIGTERM);
-        std::cerr << "[ServiceManager] Escalating to kill -9.\n";
+        LogRegistry::vaulthalla()->error("[ServiceManager] Exiting with failure status.");
         std::_Exit(EXIT_FAILURE);
     }
 };

@@ -19,15 +19,9 @@ namespace vh::http {
 class HttpServer;
 }
 
-namespace vh::config {
-class Config;
-}
-
 namespace vh::services {
 
 class ConnectionLifecycleManager;
-
-struct ServiceManager;
 
 class Vaulthalla final : public AsyncService {
 public:

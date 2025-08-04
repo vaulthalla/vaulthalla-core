@@ -29,12 +29,12 @@ inline std::chrono::seconds parsePostgresInterval(const std::string& s) {
 
 inline std::string intervalToString(const std::chrono::seconds& interval) {
     auto total_seconds = interval.count();
-    int days = total_seconds / 86400;
+    const int days = static_cast<int>(total_seconds) / 86400;
     total_seconds %= 86400;
-    int hours = total_seconds / 3600;
+    const int hours = static_cast<int>(total_seconds) / 3600;
     total_seconds %= 3600;
-    int minutes = total_seconds / 60;
-    int seconds = total_seconds % 60;
+    const int minutes = static_cast<int>(total_seconds) / 60;
+    const int seconds = static_cast<int>(total_seconds) % 60;
 
     std::ostringstream oss;
     if (days > 0) oss << days << " day ";

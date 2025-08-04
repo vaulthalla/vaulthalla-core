@@ -38,15 +38,14 @@ FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
     : storageManager_(storageManager) {}
 
 void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
-    const auto log = LogRegistry::fuse();
-    log->debug("[getattr] Called for inode: {}", ino);
+    LogRegistry::fuse()->debug("[getattr] Called for inode: {}", ino);
 
     try {
         const auto& cache = ServiceDepsRegistry::instance().fsCache;
         if (ino == FUSE_ROOT_ID) {
             const auto entry = cache->getEntry("/");
             if (!entry) {
-                log->error("[getattr] No entry found for inode {}, resolved path: /", ino);
+                LogRegistry::fuse()->error("[getattr] No entry found for inode {}, resolved path: /", ino);
                 fuse_reply_err(req, ENOENT);
                 return;
             }
@@ -61,7 +60,7 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
 
         const auto path = cache->resolvePath(ino);
         if (path.empty()) {
-            log->error("[getattr] No path resolved for inode {}, returning ENOENT", ino);
+            LogRegistry::fuse()->error("[getattr] No path resolved for inode {}, returning ENOENT", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -69,7 +68,7 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
         const auto entry = cache->getEntry(path);
 
         if (!entry) {
-            log->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path.string());
+            LogRegistry::fuse()->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path.string());
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -92,8 +91,8 @@ void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
                          struct stat* attr, int to_set, fuse_file_info* fi) const {
     const fuse_ctx* ctx = fuse_req_ctx(req);
 
-    std::cout << "[setattr] Called for inode: " << ino
-              << " mask=" << to_set << std::endl;
+    LogRegistry::fuse()->debug("[setattr] Called for inode: {}, to_set: {}, uid: {}, gid: {}",
+        ino, to_set, ctx->uid, ctx->gid);
 
     if (to_set & FUSE_SET_ATTR_MODE) {
         LogRegistry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!");
@@ -217,7 +216,7 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
 }
 
 void FUSEBridge::create(const fuse_req_t& req, fuse_ino_t parent,
-                        const char* name, mode_t mode, struct fuse_file_info* fi) {
+                        const char* name, mode_t mode, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 
@@ -298,8 +297,8 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
     }
 }
 
-void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf,
-                       size_t size, off_t off, fuse_file_info* fi) {
+void FUSEBridge::write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
+                       const size_t size, const off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
 
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
@@ -307,8 +306,8 @@ void FUSEBridge::write(fuse_req_t req, fuse_ino_t ino, const char* buf,
     else fuse_reply_write(req, res);
 }
 
-void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, size_t size,
-                      off_t off, fuse_file_info* fi) const {
+void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, const size_t size,
+                      const off_t off, fuse_file_info* fi) const {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
 
     std::vector<char> buffer(size);
@@ -407,7 +406,7 @@ void FUSEBridge::rename(const fuse_req_t& req,
     }
 }
 
-void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const {
+void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, const uint64_t nlookup) const {
     LogRegistry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
     ServiceDepsRegistry::instance().fsCache->decrementInodeRef(ino, nlookup);
     fuse_reply_none(req); // no return value
@@ -530,7 +529,7 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     fuse_reply_err(req, 0);
 }
 
-void FUSEBridge::fsync(const fuse_req_t& req, fuse_ino_t ino, int isdatasync, fuse_file_info* fi) const {
+void FUSEBridge::fsync(const fuse_req_t& req, const fuse_ino_t ino, const int isdatasync, fuse_file_info* fi) const {
     LogRegistry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, isdatasync);
     (void) isdatasync; // if we want to treat differently
 
@@ -549,7 +548,7 @@ void FUSEBridge::fsync(const fuse_req_t& req, fuse_ino_t ino, int isdatasync, fu
     }
 }
 
-void FUSEBridge::statfs(const fuse_req_t& req, fuse_ino_t ino) const {
+void FUSEBridge::statfs(const fuse_req_t& req, const fuse_ino_t ino) const {
     LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
     try {
         struct statvfs st{};

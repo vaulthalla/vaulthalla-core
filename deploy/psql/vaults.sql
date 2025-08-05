@@ -1,26 +1,22 @@
 CREATE TABLE api_keys
 (
-    id         SERIAL PRIMARY KEY,
-    user_id    INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    type       VARCHAR(50)         NOT NULL, -- 'S3', etc.
-    name       VARCHAR(100) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE s3_api_keys
-(
-    api_key_id        INTEGER PRIMARY KEY REFERENCES api_keys (id) ON DELETE CASCADE,
-    provider          VARCHAR(50) NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
-    access_key        TEXT        NOT NULL,
-    secret_access_key TEXT        NOT NULL,
-    region            VARCHAR(20) NOT NULL,
-    endpoint          TEXT DEFAULT NULL
+    id                          SERIAL PRIMARY KEY,
+    user_id                     INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    type                        VARCHAR(50)         NOT NULL, -- 'S3', etc.
+    name                        VARCHAR(100) UNIQUE NOT NULL,
+    provider                    VARCHAR(50)         NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
+    access_key                  TEXT                NOT NULL,
+    encrypted_secret_access_key TEXT                NOT NULL,
+    iv                          TEXT                NOT NULL, -- Initialization vector for encryption
+    region                      VARCHAR(20)         NOT NULL,
+    endpoint                    TEXT      DEFAULT NULL,
+    created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE s3_buckets
 (
     id         SERIAL PRIMARY KEY,
-    api_key_id INTEGER REFERENCES s3_api_keys (api_key_id) ON DELETE CASCADE,
+    api_key_id INTEGER REFERENCES api_keys (id) ON DELETE CASCADE,
     name       TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -37,7 +33,7 @@ CREATE TABLE vault
     description    TEXT                         DEFAULT NULL,
     quota          BIGINT              NOT NULL DEFAULT (0), -- 0 means no quota
     owner_id       INTEGER             REFERENCES users (id) ON DELETE SET NULL,
-    mount_point    TEXT                NOT NULL,  -- relative to the Vaulthalla /mnt/vaulthalla root mnt
+    mount_point    TEXT                NOT NULL,             -- relative to the Vaulthalla /mnt/vaulthalla root mnt
     allow_fs_write BOOLEAN                      DEFAULT FALSE,
     is_active      BOOLEAN                      DEFAULT TRUE,
     created_at     TIMESTAMP                    DEFAULT CURRENT_TIMESTAMP,

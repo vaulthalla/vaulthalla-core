@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
   protected:
-    std::shared_ptr<vh::types::api::S3APIKey> apiKey_;
+    std::shared_ptr<vh::types::api::APIKey> apiKey_;
     std::string bucket_;
     std::shared_ptr<vh::cloud::S3Provider> s3Provider_;
     std::filesystem::path test_dir;
@@ -24,8 +24,8 @@ class S3ProviderIntegrationTest : public ::testing::Test {
         test_dir = fs::temp_directory_path() / "vaulthalla_test_dir";
         fs::create_directory(test_dir);
 
-        apiKey_ = std::make_shared<vh::types::api::S3APIKey>("Test S3 Key",
-                                                             1, // user_id
+        apiKey_ = std::make_shared<vh::types::api::APIKey>(1,
+                                                             "Test S3 Key",
                                                              vh::types::api::S3Provider::CloudflareR2,
                                                              std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY"),
                                                              std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY"),

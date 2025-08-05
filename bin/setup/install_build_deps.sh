@@ -104,3 +104,19 @@ if ! dpkg -l | grep -q libspdlog-dev; then
 else
     echo "✅ libspdlog-dev already installed."
 fi
+
+# -- tss2 --
+if ! dpkg -l | grep -q libtss2-dev; then
+    echo "🔌 Installing libtss2-dev..."
+    sudo apt install -y libtss2-dev
+else
+  echo "✅ libtss2-dev already installed."
+fi
+
+# -- tpm2-tools --
+if ! dpkg -l | grep -q tpm2-tools; then
+    echo "🔌 Installing tpm2-tools..."
+    sudo apt install -y tpm2-tools
+else
+  echo "✅ tpm2-tools already installed."
+fi

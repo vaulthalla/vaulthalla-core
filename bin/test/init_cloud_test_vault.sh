@@ -6,22 +6,21 @@ UPDATE users
 SET linux_uid = 1000
 WHERE name = 'admin';
 
--- Cloud Test Vault and keys
-INSERT INTO api_keys (name, user_id, type, created_at)
-VALUES ('R2 Test Key', (SELECT id FROM users WHERE name = 'admin'), 's3', NOW())
+-- Insert a test API key for Cloudflare R2
+INSERT INTO api_keys (user_id, name, provider, access_key,
+                      encrypted_secret_access_key, iv,
+                      region, endpoint)
+VALUES (
+    (SELECT id FROM users WHERE name = 'admin'),
+    'R2 Test Key',
+    'Cloudflare R2',
+    '${VAULTHALLA_TEST_R2_ACCESS_KEY}',
+    decode('00000000000000000000000000000000', 'hex'), -- placeholder encrypted secret
+    decode('000000000000000000000000', 'hex'),        -- placeholder IV
+    'wnam',
+    '${VAULTHALLA_TEST_R2_ENDPOINT}'
+)
 ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO s3_api_keys (api_key_id, provider, access_key, secret_access_key, region, endpoint)
-SELECT
-  (SELECT id FROM api_keys WHERE name = 'R2 Test Key'),
-  'Cloudflare R2',
-  '${VAULTHALLA_TEST_R2_ACCESS_KEY}',
-  '${VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY}',
-  'wnam',
-  '${VAULTHALLA_TEST_R2_ENDPOINT}'
-WHERE NOT EXISTS (
-  SELECT 1 FROM s3_api_keys WHERE api_key_id = (SELECT id FROM api_keys WHERE name = 'R2 Test Key')
-);
 
 -- Create test vault for R2
 INSERT INTO vault (type, name, mount_point, is_active, created_at, owner_id, description)

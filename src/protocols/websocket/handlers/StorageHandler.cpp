@@ -5,7 +5,7 @@
 #include "types/S3Vault.hpp"
 #include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "storage/APIKeyManager.hpp"
+#include "keys/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -31,23 +31,13 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
         const auto& payload = msg.at("payload");
         const auto userID = payload.at("user_id").get<unsigned int>();
         const auto name = payload.at("name").get<std::string>();
-        const auto type = payload.at("type").get<std::string>();
-        const auto typeLower = boost::algorithm::to_lower_copy(type);
+        const auto provider = api::s3_provider_from_string(payload.at("provider").get<std::string>());
+        const auto accessKey = payload.at("access_key").get<std::string>();
+        const auto secretKey = payload.at("secret_access_key").get<std::string>();
+        const auto region = payload.at("region").get<std::string>();
+        const auto endpoint = payload.at("endpoint").get<std::string>();
 
-        std::shared_ptr<api::APIKey> key;
-
-        if (typeLower == "s3") {
-            api::S3Provider provider =
-                api::s3_provider_from_string(payload.at("provider").get<std::string>());
-            const auto accessKey = payload.at("access_key").get<std::string>();
-            const auto secretKey = payload.at("secret_access_key").get<std::string>();
-            const auto region = payload.at("region").get<std::string>();
-            const auto endpoint = payload.at("endpoint").get<std::string>();
-
-            key = std::make_shared<
-                api::S3APIKey>(name, userID, provider, accessKey, secretKey, region, endpoint);
-        } else throw std::runtime_error("Unsupported API key type: " + type);
-
+        auto key = std::make_shared<api::APIKey>(userID, name, provider, accessKey, secretKey, region, endpoint);
         apiKeyManager_->addAPIKey(key);
 
         const json response = {{"command", "storage.apiKey.add.response"},
@@ -56,7 +46,7 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Added API key for user ID: {} with type: {}", userID, type);
+        LogRegistry::storage()->info("[StorageHandler] Added API key for user ID: {}", userID);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleAddAPIKey error: {}", e.what());
 
@@ -99,7 +89,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
     try {
         const auto keys = apiKeyManager_->listAPIKeys();
 
-        const json data = {{"keys", api::to_json(keys).dump(4)}};
+        const json data = {{"keys", json(keys).dump(4)}};
 
         const json response = {{"command", "storage.apiKey.list.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -127,7 +117,7 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
         if (!user) throw std::runtime_error("User not authenticated");
         const auto keys = apiKeyManager_->listUserAPIKeys(user->id);
 
-        const json data{{"keys", api::to_json(keys).dump(4)}};
+        const json data{{"keys", json(keys).dump(4)}};
 
         const json response = {{"command", "storage.apiKey.list.user.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -154,9 +144,6 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
         unsigned int keyId = msg.at("payload").at("id").get<unsigned int>();
         const auto user = session.getAuthenticatedUser();
         auto key = apiKeyManager_->getAPIKey(keyId, user->id);
-
-        if (key->type != api::APIKeyType::S3)
-            throw std::runtime_error("Unsupported API key type: " + api::to_string(key->type));
 
         json data = {{"api_key", key}};
 

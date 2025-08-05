@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.8.2',
+        version: '0.8.3',
         license: 'AGPLv3',
         default_options: ['warning_level=3', 'cpp_std=c++23'])
 
@@ -9,28 +9,33 @@ if get_option('buildtype') == 'debug'
     add_project_link_arguments('-fsanitize=address,undefined', language: 'cpp')
 endif
 
-add_project_link_arguments('-lcrypto', language: 'cpp')
-add_project_link_arguments('-lz', language: 'cpp')
-add_project_link_arguments('-lturbojpeg', language: 'cpp')
-
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
-boost_dep       = dependency('boost', modules: ['filesystem', 'system'], required: true)
-libpqxx         = dependency('libpqxx', required: true)
-pdfium          = dependency('libpdfium', required: true)
-libsodium       = dependency('libsodium', required: true)
-libmagic        = dependency('libmagic', required: true)
-libcurl         = dependency('libcurl', required: true)
-libfuse         = dependency('fuse3', required: true)
-yaml_cpp        = dependency('yaml-cpp', required: true)
-libjpeg         = dependency('libjpeg', required: true)
-pugixml         = dependency('pugixml', required: true)
-uuid            = dependency('uuid', required: true)
-thread_dep      = dependency('threads', required: true)
-gtest           = dependency('gtest', required: true, main: true)
-spdlog          = dependency('spdlog', required: true)
 
-deps = [libfuse, boost_dep, libpqxx, yaml_cpp, libmagic, uuid, pugixml, thread_dep, libsodium, libcurl, libjpeg, pdfium, spdlog]
-test_deps = deps + [gtest]
+hash_deps = [
+    dependency('libsodium', required: true),
+    dependency('libcurl', required: true)
+]
+
+deps = hash_deps + [
+    dependency('boost', modules: ['filesystem', 'system'], required: true),
+    dependency('libpqxx', required: true),
+    dependency('libpdfium', required: true),
+    dependency('libmagic', required: true),
+    dependency('fuse3', required: true),
+    dependency('yaml-cpp', required: true),
+    dependency('libjpeg', required: true),
+    dependency('pugixml', required: true),
+    dependency('uuid', required: true),
+    dependency('threads', required: true),
+    dependency('spdlog', required: true),
+    dependency('libturbojpeg', required: true),
+    dependency('tss2-esys', required: true),
+    dependency('tss2-tctildr', required: true),
+    dependency('openssl', version: '>=3.0', required: true),
+    dependency('zlib', required: true)
+]
+
+test_deps = deps + dependency('gtest', required: true, main: true)
 
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮
 
@@ -84,7 +89,7 @@ executable('vaulthalla', main,
 
 executable('hash_password',
            [hash_pass_src, hash_pass_main],
-           dependencies: [libsodium, libcurl],
+           dependencies: hash_deps,
            include_directories: hash_pass_inc,
            install: true)
 

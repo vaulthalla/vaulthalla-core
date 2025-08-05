@@ -22,6 +22,7 @@ void DBConnection::initPrepared() const {
 
     initPreparedUsers();
     initPreparedVaults();
+    initPreparedAPIKeys();
     initPreparedFsEntries();
     initPreparedFiles();
     initPreparedDirectories();
@@ -80,6 +81,29 @@ void DBConnection::initPreparedUsers() const {
                    ")");
 
     conn_->prepare("get_user_id_by_linux_uid", "SELECT id FROM users WHERE linux_uid = $1");
+}
+
+void DBConnection::initPreparedAPIKeys() const {
+    conn_->prepare("list_api_keys", "SELECT * FROM api_keys");
+
+    conn_->prepare("list_user_api_keys",
+                   "SELECT * FROM api_keys WHERE user_id = $1");
+
+    conn_->prepare("get_api_key", "SELECT * FROM api_keys WHERE id = $1");
+
+    conn_->prepare("insert_api_key",
+                   "INSERT INTO api_keys (user_id, name, provider, access_key, "
+                   "encrypted_secret_access_key, iv, region, endpoint) "
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
+                   "RETURNING id");
+
+    conn_->prepare("remove_api_key",
+                   "DELETE FROM api_keys WHERE id = $1");
+
+    conn_->prepare("update_api_key_metadata",
+                   "UPDATE api_keys SET name = $2, provider = $3, access_key = $4, "
+                   "region = $5, endpoint = $6 "
+                   "WHERE id = $1");
 }
 
 void DBConnection::initPreparedUserRoles() const {

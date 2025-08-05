@@ -13,7 +13,6 @@ using namespace vh::database;
 
 void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
-
     Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
         if (directory->inode) txn.exec_prepared("delete_fs_entry_by_inode", directory->inode);
 

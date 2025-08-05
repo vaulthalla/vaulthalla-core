@@ -8,10 +8,16 @@
 #include "types/FSEntry.hpp"
 #include "types/User.hpp"
 #include "types/Path.hpp"
+#include "types/APIKey.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+
+// for test setup
+#include "keys/APIKeyManager.hpp"
+#include "types/S3Bucket.hpp"
+#include "types/RSync.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -25,6 +31,8 @@ StorageManager::StorageManager() = default;
 void StorageManager::initStorageEngines() {
     LogRegistry::storage()->debug("[StorageManager] Initializing storage engines...");
     std::scoped_lock lock(mutex_);
+
+    if (ConfigRegistry::get().advanced.dev_mode) initDevCloudVault();
 
     engines_.clear();
 
@@ -170,3 +178,57 @@ unsigned int StorageManager::getOpenHandleCount(const fuse_ino_t ino) const {
     if (openHandleCounts_.contains(ino)) return openHandleCounts_.at(ino);
     return 0;
 }
+
+void StorageManager::initDevCloudVault() {
+    try {
+        const std::string prefix = "VAULTHALLA_TEST_R2_";
+        const auto accessKey = prefix + "ACCESS_KEY";
+        const auto secretKey = prefix + "SECRET_ACCESS_KEY";
+        const auto endpoint = prefix + "ENDPOINT";
+
+        auto key = std::make_shared<api::APIKey>();
+        key->user_id = 1; // Default user ID for dev mode
+        key->name = "R2 Test Key";
+        key->provider = api::S3Provider::CloudflareR2;
+        key->region = "wnam";
+
+        if (std::getenv(accessKey.c_str())) key->access_key = std::getenv(accessKey.c_str());
+        else return;
+
+        if (std::getenv(secretKey.c_str())) key->secret_access_key = std::getenv(secretKey.c_str());
+        else return;
+
+        if (std::getenv(endpoint.c_str())) key->endpoint = std::getenv(endpoint.c_str());
+        else return;
+
+        key->id = ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
+
+        if (key->id == 0) {
+            LogRegistry::storage()->error("[StorageManager] Failed to create API key for Cloudflare R2");
+            return;
+        }
+
+        const auto bucket = std::make_shared<api::S3Bucket>();
+        bucket->name = "vaulthalla-test";
+        bucket->api_key = key;
+
+        const auto vault = std::make_shared<S3Vault>();
+        vault->name = "R2 Test Vault";
+        vault->description = "Test vault for Cloudflare R2 in development mode";
+        vault->mount_point = "cloud/r2_test_vault";
+        vault->api_key_id = key->id;
+        vault->owner_id = 1;
+        vault->bucket = bucket->name;
+        vault->type = VaultType::S3;
+
+        const auto sync = std::make_shared<RSync>();
+        sync->interval = std::chrono::minutes(10);
+        sync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
+        sync->strategy = RSync::Strategy::Sync;
+
+        vault->id = VaultQueries::upsertVault(vault, sync);
+    } catch (const std::exception& e) {
+        LogRegistry::storage()->error("[StorageManager] Error initializing dev Cloudflare R2 vault: {}", e.what());
+    }
+}
+

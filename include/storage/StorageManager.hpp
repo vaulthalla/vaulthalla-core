@@ -57,6 +57,8 @@ private:
     std::pmr::unordered_map<std::string, std::shared_ptr<StorageEngine>> engines_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine>> vaultToEngine_;
     std::unordered_map<fuse_ino_t, int> openHandleCounts_;
+
+    void initDevCloudVault();
 };
 
 }

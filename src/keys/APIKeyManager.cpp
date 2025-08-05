@@ -25,7 +25,7 @@ void APIKeyManager::initAPIKeys() {
     }
 }
 
-void APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
+unsigned int APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
     std::lock_guard lock(apiKeysMutex_);
 
     // --- Encrypt secret_access_key before storage ---
@@ -42,13 +42,15 @@ void APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
     key->secret_access_key.clear(); // wipe plaintext from memory
 
     // Persist to DB
-    key->id = database::APIKeyQueries::addAPIKey(key);
+    key->id = database::APIKeyQueries::upsertAPIKey(key);
 
     // Refresh from DB (ensures created_at, etc. are up to date)
     key = database::APIKeyQueries::getAPIKey(key->id);
 
     // Cache in memory
     apiKeys_[key->id] = key;
+
+    return key->id;
 }
 
 void APIKeyManager::removeAPIKey(unsigned int keyId, unsigned int userId) {

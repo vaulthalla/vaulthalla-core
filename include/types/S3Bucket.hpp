@@ -14,11 +14,12 @@ namespace vh::types::api {
 struct APIKey;
 
 struct S3Bucket {
-    std::unique_ptr<APIKey> api_key;
+    std::shared_ptr<APIKey> api_key;
     std::string name;
     std::time_t created_at, updated_at;
     bool enabled{true};
 
+    S3Bucket() = default;
     explicit S3Bucket(const pqxx::row& row);
 };
 

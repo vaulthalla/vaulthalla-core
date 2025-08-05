@@ -7,25 +7,29 @@
 #include "types/S3Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
 #include "util/files.hpp"
 #include "util/fsPath.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "storage/Filesystem.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <fstream>
 
 using namespace vh::storage;
 using namespace vh::types;
-using namespace vh::database;
 using namespace vh::encryption;
 using namespace vh::concurrency;
 using namespace vh::services;
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
-      key_(APIKeyQueries::getAPIKey(vault->api_key_id)),
-      s3Provider_(std::make_shared<cloud::S3Provider>(key_, vault->bucket)) {}
+      key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
+      s3Provider_(std::make_shared<cloud::S3Provider>(key_, vault->bucket)) {
+    LogRegistry::storage()->info("[CloudStorageEngine] Initialized for vault: {} (ID: {}, Bucket: {})",
+                                 vault->name, vault->id, vault->bucket);
+    LogRegistry::storage()->info("[CloudStorageEngine] Decrypted secret key: {}", key_->secret_access_key);
+}
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);
@@ -54,7 +58,8 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const
 
     const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
 
-    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024) s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
+    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024)
+        s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
     else s3Provider_->uploadLargeObject(stripLeadingSlash(rel_path), absPath);
 
     std::vector<uint8_t> buffer;
@@ -115,7 +120,8 @@ void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_pat
     std::filesystem::remove(paths->absPath(index->path, PathType::FILE_CACHE_ROOT));
 }
 
-std::unordered_map<std::u8string, std::shared_ptr<File> > CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {
+std::unordered_map<std::u8string, std::shared_ptr<File>>
+CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) const {
     return groupEntriesByPath(filesFromS3XML(s3Provider_->listObjects(prefix)));
 }
 

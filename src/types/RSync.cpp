@@ -25,9 +25,9 @@ void vh::types::from_json(const nlohmann::json& j, RSync& s) {
 
 std::string vh::types::to_string(const RSync::Strategy& s) {
     switch (s) {
-    case RSync::Strategy::Cache: return "Cache";
-    case RSync::Strategy::Sync: return "Sync";
-    case RSync::Strategy::Mirror: return "Mirror";
+    case RSync::Strategy::Cache: return "cache";
+    case RSync::Strategy::Sync: return "sync";
+    case RSync::Strategy::Mirror: return "mirror";
     default: throw std::invalid_argument("Unknown sync strategy");
     }
 }

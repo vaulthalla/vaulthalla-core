@@ -4,6 +4,7 @@
 #include "types/S3Vault.hpp"
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
+#include "util/u8.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
@@ -13,9 +14,19 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
     if (!sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-        pqxx::params p{vault->name, to_string(vault->type), vault->description, vault->owner_id};
         const auto exists = vault->id != 0;
-        const auto vaultId = txn.exec_prepared("insert_vault", p).one_row()["id"].as<unsigned int>();
+
+        pqxx::params p{
+            vault->name,
+            to_string(vault->type),
+            vault->description,
+            vault->owner_id,
+            to_utf8_string(vault->mount_point.u8string()),
+            vault->quota,
+            vault->is_active
+        };
+
+        const auto vaultId = txn.exec_prepared("upsert_vault", p).one_row()["id"].as<unsigned int>();
 
         if (!exists) {
             if (vault->type == VaultType::Local) {
@@ -33,12 +44,6 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
 
                 txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
             }
-
-            pqxx::params dir_params{vaultId, std::nullopt, "/", vault->owner_id, vault->owner_id, "/"};
-            const auto dirId = txn.exec_prepared("insert_directory", dir_params).one_row()["id"].as<unsigned int>();
-
-            pqxx::params dir_stats_params{dirId, 0, 0, 0}; // Initialize stats with zero values
-            txn.exec_prepared("insert_dir_stats", dir_stats_params);
         }
 
         txn.commit();

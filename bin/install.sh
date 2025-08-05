@@ -118,6 +118,14 @@ else
     sudo cp deploy/config/config.example.yaml /etc/vaulthalla/config.yaml
 fi
 
+if [[ "$DEV_MODE" == true ]]; then
+    sudo cp ~/vh/vaulthalla.env /etc/vaulthalla/
+    sudo chown -R vaulthalla:vaulthalla /etc/vaulthalla/
+    sudo chmod 644 /etc/vaulthalla/vaulthalla.env
+else
+    echo "🔒 Production mode enabled."
+fi
+
 # === 7) Setup Database ===
 VAUL_PG_PASS=$(uuidgen)
 echo "🔐 Creating PostgreSQL user and database..."
@@ -177,13 +185,6 @@ fi
 
 echo "🔑 Seeding admin user..."
 sudo ./bin/setup/seed_admin.sh "$HASHED_PASS"
-
-#if [[ $DEV_MODE == true ]]; then
-#    echo "🔄 Running cloud test vault setup..."
-#    source ./bin/test/init_cloud_test_vault.sh
-#else
-#    echo "🌐 Skipping cloud test vault setup in production mode."
-#fi
 
 # === 10) Install systemd service ===
 echo "🛠️  Installing systemd service..."

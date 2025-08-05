@@ -15,7 +15,7 @@ public:
 
     void initAPIKeys();
 
-    void addAPIKey(std::shared_ptr<types::api::APIKey>& key);
+    unsigned int addAPIKey(std::shared_ptr<types::api::APIKey>& key);
     void removeAPIKey(unsigned int keyId, unsigned int userId);
 
     [[nodiscard]] std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys() const;

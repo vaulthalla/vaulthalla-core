@@ -1,11 +1,6 @@
 #!/bin/bash
 
 cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
--- Set user linux_uid for testing
-UPDATE users
-SET linux_uid = 1000
-WHERE name = 'admin';
-
 -- Insert a test API key for Cloudflare R2
 INSERT INTO api_keys (user_id, name, provider, access_key,
                       encrypted_secret_access_key, iv,

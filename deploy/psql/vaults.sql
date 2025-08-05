@@ -2,15 +2,16 @@ CREATE TABLE api_keys
 (
     id                          SERIAL PRIMARY KEY,
     user_id                     INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    type                        VARCHAR(50)         NOT NULL, -- 'S3', etc.
-    name                        VARCHAR(100) UNIQUE NOT NULL,
+    name                        VARCHAR(100) NOT NULL,
     provider                    VARCHAR(50)         NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
     access_key                  TEXT                NOT NULL,
-    encrypted_secret_access_key TEXT                NOT NULL,
-    iv                          TEXT                NOT NULL, -- Initialization vector for encryption
+    encrypted_secret_access_key BYTEA NOT NULL, -- Encrypted secret access key
+    iv                          BYTEA NOT NULL, -- Initialization vector for encryption
     region                      VARCHAR(20)         NOT NULL,
     endpoint                    TEXT      DEFAULT NULL,
-    created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (user_id, name, access_key)  -- Ensure unique API keys per user
 );
 
 CREATE TABLE s3_buckets

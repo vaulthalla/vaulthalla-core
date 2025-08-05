@@ -23,7 +23,7 @@ using namespace vh::services;
 using json = nlohmann::json;
 
 StorageHandler::StorageHandler(const std::shared_ptr<StorageManager>& storageManager)
-    : storageManager_(storageManager), apiKeyManager_(std::make_shared<keys::APIKeyManager>()) {
+    : storageManager_(storageManager), apiKeyManager_(ServiceDepsRegistry::instance().apiKeyManager) {
 }
 
 void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session) const {

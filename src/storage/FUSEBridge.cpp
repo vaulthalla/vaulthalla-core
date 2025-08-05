@@ -18,30 +18,16 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
-#define FUSE_DISPATCH(op) \
-[](fuse_req_t req, auto... args) { \
-auto* self = static_cast<FUSEBridge*>(fuse_req_userdata(req)); \
-return self->op(req, args...); \
-}
-
 using namespace vh::database;
-using namespace vh::fuse;
 using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
 
+namespace vh::fuse {
 
-
-// TODO: Refactor FUSEBridge to be completely static utilizing ServiceDepsRegistry for StorageManager context
-
-
-
-FUSEBridge::FUSEBridge(const std::shared_ptr<StorageManager>& storageManager)
-    : storageManager_(storageManager) {}
-
-void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const {
+void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[getattr] Called for inode: {}", ino);
 
     try {
@@ -91,8 +77,8 @@ void FUSEBridge::getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file
     }
 }
 
-void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
-                         struct stat* attr, int to_set, fuse_file_info* fi) const {
+void setattr(const fuse_req_t req, const fuse_ino_t ino,
+                         struct stat* attr, int to_set, fuse_file_info* fi) {
     const fuse_ctx* ctx = fuse_req_ctx(req);
 
     LogRegistry::fuse()->debug("[setattr] Called for inode: {}, to_set: {}, uid: {}, gid: {}",
@@ -144,7 +130,7 @@ void FUSEBridge::setattr(fuse_req_t req, fuse_ino_t ino,
     }
 }
 
-void FUSEBridge::readdir(const fuse_req_t& req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) const {
+void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
@@ -188,7 +174,7 @@ void FUSEBridge::readdir(const fuse_req_t& req, const fuse_ino_t ino, const size
         fuse_reply_buf(req, buf.data(), buf_used);
 }
 
-void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const {
+void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     LogRegistry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -219,8 +205,7 @@ void FUSEBridge::lookup(const fuse_req_t& req, const fuse_ino_t& parent, const c
     fuse_reply_entry(req, &e);
 }
 
-void FUSEBridge::create(const fuse_req_t& req, const fuse_ino_t parent,
-                        const char* name, const mode_t mode, fuse_file_info* fi) {
+void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 
@@ -270,19 +255,16 @@ void FUSEBridge::create(const fuse_req_t& req, const fuse_ino_t parent,
     }
 }
 
-void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) {
+void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[open] Called for inode: {}, flags: {}", ino, fi->flags);
 
-    {
-        std::scoped_lock lock(openHandleMutex_);
-        openHandleCounts_[ino]++;
-    }
+    ServiceDepsRegistry::instance().storageManager->registerOpenHandle(ino);
 
     try {
         const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
         const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
-        int fd = ::open(backingPath.c_str(), fi->flags & O_ACCMODE);
+        const int fd = ::open(backingPath.c_str(), fi->flags & O_ACCMODE);
         if (fd < 0) {
             fuse_reply_err(req, errno);
             return;
@@ -301,7 +283,7 @@ void FUSEBridge::open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_in
     }
 }
 
-void FUSEBridge::write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
+void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
                        const size_t size, const off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
 
@@ -310,8 +292,7 @@ void FUSEBridge::write(const fuse_req_t req, const fuse_ino_t ino, const char* b
     else fuse_reply_write(req, res);
 }
 
-void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, const size_t size,
-                      const off_t off, fuse_file_info* fi) const {
+void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
 
     std::vector<char> buffer(size);
@@ -321,7 +302,7 @@ void FUSEBridge::read(const fuse_req_t& req, fuse_ino_t ino, const size_t size,
     else fuse_reply_buf(req, buffer.data(), res);
 }
 
-void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const {
+void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode) {
     LogRegistry::fuse()->debug("[mkdir] Called for parent: {}, name: {}, mode: {}", parent, name, mode);
 
     try {
@@ -367,12 +348,7 @@ void FUSEBridge::mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const ch
     }
 }
 
-void FUSEBridge::rename(const fuse_req_t& req,
-                        fuse_ino_t parent,
-                        const char* name,
-                        fuse_ino_t newparent,
-                        const char* newname,
-                        unsigned int flags) const {
+void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, const fuse_ino_t newparent, const char* newname, const unsigned int flags) {
     LogRegistry::fuse()->debug("[rename] Called for parent: {}, name: {}, newparent: {}, newname: {}, flags: {}",
                                parent, name, newparent, newname, flags);
 
@@ -410,21 +386,21 @@ void FUSEBridge::rename(const fuse_req_t& req,
     }
 }
 
-void FUSEBridge::forget(const fuse_req_t& req, const fuse_ino_t& ino, const uint64_t nlookup) const {
+void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) {
     LogRegistry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
     ServiceDepsRegistry::instance().fsCache->decrementInodeRef(ino, nlookup);
     fuse_reply_none(req); // no return value
 }
 
-void FUSEBridge::access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const {
+void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
     LogRegistry::fuse()->debug("[access] Called for inode: {}, mask: {}", ino, mask);
     fuse_reply_err(req, 0); // Access checks are not implemented, always allow
 }
 
-void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* name) const {
+void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const fuse_ctx *ctx = fuse_req_ctx(req);
-    uid_t uid = ctx->uid;
-    gid_t gid = ctx->gid;
+    const uid_t uid = ctx->uid;
+    const gid_t gid = ctx->gid;
 
     LogRegistry::fuse()->debug("[unlink] Called for parent: {}, name: {}", parent, name);
 
@@ -460,10 +436,10 @@ void FUSEBridge::unlink(const fuse_req_t& req, fuse_ino_t parent, const char* na
     }
 }
 
-void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* name) const {
+void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const fuse_ctx *ctx = fuse_req_ctx(req);
-    uid_t uid = ctx->uid;
-    gid_t gid = ctx->gid;
+    const uid_t uid = ctx->uid;
+    const gid_t gid = ctx->gid;
 
     LogRegistry::fuse()->debug("[rmdir] Called for parent: {}, name: {}", parent, name);
 
@@ -499,7 +475,7 @@ void FUSEBridge::rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* nam
     }
 }
 
-void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const {
+void flush(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[flush] Called for inode: {}, file handle: {}", ino, fi->fh);
 
     // This can be a no-op unless you want to sync(2) or call fsync(fd)
@@ -508,10 +484,10 @@ void FUSEBridge::flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi
     fuse_reply_err(req, 0);
 }
 
-void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) {
+void release(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[release] Called for inode: {}, file handle: {}", ino, fi->fh);
 
-    auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     if (!fh) {
         LogRegistry::fuse()->error("[release] Invalid file handle for inode: {}", ino);
         fuse_reply_err(req, EBADF);
@@ -524,18 +500,14 @@ void FUSEBridge::release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* 
     delete fh;  // clean up heap allocation
     fi->fh = 0; // clear the kernel-side handle
 
-    {
-        std::scoped_lock lock(openHandleMutex_);
-        if (--openHandleCounts_[ino] == 0)
-            openHandleCounts_.erase(ino);
-    }
+    ServiceDepsRegistry::instance().storageManager->closeOpenHandle(ino);
 
     fuse_reply_err(req, 0);
 }
 
-void FUSEBridge::fsync(const fuse_req_t& req, const fuse_ino_t ino, const int isdatasync, fuse_file_info* fi) const {
-    LogRegistry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, isdatasync);
-    (void) isdatasync; // if we want to treat differently
+void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_file_info* fi) {
+    LogRegistry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, datasync);
+    (void) datasync; // if we want to treat differently
 
     try {
         int fd = fi->fh;
@@ -552,7 +524,7 @@ void FUSEBridge::fsync(const fuse_req_t& req, const fuse_ino_t ino, const int is
     }
 }
 
-void FUSEBridge::statfs(const fuse_req_t& req, const fuse_ino_t ino) const {
+void statfs(const fuse_req_t req, const fuse_ino_t ino) {
     LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
     try {
         struct statvfs st{};
@@ -571,30 +543,30 @@ void FUSEBridge::statfs(const fuse_req_t& req, const fuse_ino_t ino) const {
     }
 }
 
-fuse_lowlevel_ops FUSEBridge::getOperations() const {
+fuse_lowlevel_ops getOperations() {
     fuse_lowlevel_ops ops = {};
-    ops.getattr = FUSE_DISPATCH(getattr);
-    ops.readdir = FUSE_DISPATCH(readdir);
-    ops.lookup = FUSE_DISPATCH(lookup);
-    ops.mkdir = FUSE_DISPATCH(mkdir);
-    ops.create = FUSE_DISPATCH(create);
-    ops.rename = FUSE_DISPATCH(rename);
-    ops.open = FUSE_DISPATCH(open);
-    ops.read = FUSE_DISPATCH(read);
-    ops.write = FUSE_DISPATCH(write);
-    ops.forget = FUSE_DISPATCH(forget);
-    ops.access = FUSE_DISPATCH(access);
-    ops.flush = FUSE_DISPATCH(flush);
-    ops.release = FUSE_DISPATCH(release);
-    ops.setattr = FUSE_DISPATCH(setattr);
-    ops.unlink = FUSE_DISPATCH(unlink);
-    ops.rmdir = FUSE_DISPATCH(rmdir);
-    ops.fsync = FUSE_DISPATCH(fsync);
-    ops.statfs = FUSE_DISPATCH(statfs);
+    ops.getattr = getattr;
+    ops.setattr = setattr;
+    ops.readdir = readdir;
+    ops.lookup = lookup;
+    ops.open = open;
+    ops.read = read;
+    ops.forget = forget;
+    ops.write = write;
+    ops.create = create;
+    ops.release = release;
+    ops.access = access;
+    ops.mkdir = mkdir;
+    ops.rename = rename;
+    ops.unlink = unlink;
+    ops.rmdir = rmdir;
+    ops.flush = flush;
+    ops.fsync = fsync;
+    ops.statfs = statfs;
     return ops;
 }
 
-struct stat FUSEBridge::statFromEntry(const std::shared_ptr<FSEntry>& entry, const fuse_ino_t& ino) const {
+struct stat statFromEntry(const std::shared_ptr<FSEntry>& entry, const fuse_ino_t& ino) {
     struct stat st = {};
     st.st_ino = ino;
     st.st_mode = entry->isDirectory() ? S_IFDIR | 0755 : S_IFREG | 0644;
@@ -603,4 +575,6 @@ struct stat FUSEBridge::statFromEntry(const std::shared_ptr<FSEntry>& entry, con
     st.st_atim = st.st_ctim = st.st_mtim;
     st.st_nlink = 1;
     return st;
+}
+
 }

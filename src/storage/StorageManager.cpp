@@ -154,3 +154,19 @@ std::shared_ptr<StorageEngine> StorageManager::getEngine(const unsigned int id) 
         throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(id));
     return vaultToEngine_.at(id);
 }
+
+void StorageManager::registerOpenHandle(const fuse_ino_t ino) {
+    std::scoped_lock lock(openHandleMutex_);
+    ++openHandleCounts_[ino];
+}
+
+void StorageManager::closeOpenHandle(const fuse_ino_t ino) {
+    std::scoped_lock lock(openHandleMutex_);
+    if (--openHandleCounts_[ino] == 0) openHandleCounts_.erase(ino);
+}
+
+unsigned int StorageManager::getOpenHandleCount(const fuse_ino_t ino) const {
+    std::scoped_lock lock(openHandleMutex_);
+    if (openHandleCounts_.contains(ino)) return openHandleCounts_.at(ino);
+    return 0;
+}

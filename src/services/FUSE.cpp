@@ -18,11 +18,10 @@ using namespace vh::fuse;
 using namespace vh::logging;
 
 FUSE::FUSE()
-    : AsyncService("FUSE"),
-      bridge_(std::make_shared<FUSEBridge>(ServiceDepsRegistry::instance().storageManager)) {}
+    : AsyncService("FUSE") {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
-    std::cout << "[+] Initializing FUSE connection\n";
+    LogRegistry::fuse()->info("[FUSE] Initializing FUSE connection...");
 
     constexpr uintmax_t MB = 1024 * 1024;
 
@@ -90,10 +89,10 @@ void FUSE::runLoop() {
         return;
     }
 
-    fuse_lowlevel_ops ops = bridge_->getOperations();
+    fuse_lowlevel_ops ops = getOperations();
     ops.init = fuse_ll_init;
 
-    session_ = fuse_session_new(&args, &ops, sizeof(ops), bridge_.get());
+    session_ = fuse_session_new(&args, &ops, sizeof(ops), nullptr);
     if (!session_) {
         LogRegistry::fuse()->error("[FUSE] Failed to create FUSE session");
         free(opts.mountpoint);

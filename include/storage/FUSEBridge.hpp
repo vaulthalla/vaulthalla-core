@@ -5,15 +5,9 @@
 #include <filesystem>
 #include <fuse3/fuse_lowlevel.h>
 #include <memory>
-#include <mutex>
-#include <unordered_map>
 
 namespace vh::types {
 struct FSEntry;
-}
-
-namespace vh::storage {
-class StorageManager;
 }
 
 namespace fs = std::filesystem;
@@ -22,66 +16,49 @@ namespace vh::fuse {
 
 struct FileHandle {
     fs::path path;
-    int fd;  // optional: backing fd you control
+    int fd;
     size_t size = 0;
 };
 
-class FUSEBridge {
-public:
-    explicit FUSEBridge(const std::shared_ptr<storage::StorageManager>& storageManager);
+void getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info* fi);
 
-    void getattr(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi) const;
+void setattr(fuse_req_t req, fuse_ino_t ino, struct stat* attr, int to_set, fuse_file_info* fi);
 
-    void setattr(fuse_req_t req, fuse_ino_t ino, struct stat* attr, int to_set, fuse_file_info* fi) const;
+void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi);
 
-    void readdir(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const;
+void lookup(fuse_req_t req, fuse_ino_t parent, const char* name);
 
-    void lookup(const fuse_req_t& req, const fuse_ino_t& parent, const char* name) const;
+void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info* fi);
 
-    void open(const fuse_req_t& req, const fuse_ino_t& ino, fuse_file_info* fi);
+void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi);
 
-    void read(const fuse_req_t& req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info* fi) const;
+void forget(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup);
 
-    void forget(const fuse_req_t& req, const fuse_ino_t& ino, uint64_t nlookup) const;
+void write(fuse_req_t req, fuse_ino_t ino, const char* buf, size_t size,
+                   off_t off, fuse_file_info* fi);
 
-    void write(fuse_req_t req, fuse_ino_t ino, const char* buf, size_t size,
-                       off_t off, struct fuse_file_info* fi);
+void create(fuse_req_t req, fuse_ino_t parent, const char* name, mode_t mode, fuse_file_info* fi);
 
-    void create(const fuse_req_t& req, fuse_ino_t parent, const char* name,
-                        mode_t mode, struct fuse_file_info* fi);
+void unlink(fuse_req_t req, fuse_ino_t parent, const char* name);
 
-    void unlink(const fuse_req_t& req, fuse_ino_t parent, const char* name) const;
+void rename(fuse_req_t req, fuse_ino_t parent, const char* name, fuse_ino_t newparent, const char* newname, unsigned int flags);
 
-    void rename(const fuse_req_t& req,
-                        fuse_ino_t parent,
-                        const char* name,
-                        fuse_ino_t newparent,
-                        const char* newname,
-                        unsigned int flags) const;
+void mkdir(fuse_req_t req, fuse_ino_t parent, const char* name, mode_t mode);
 
-    void mkdir(const fuse_req_t& req, const fuse_ino_t& parent, const char* name, mode_t mode) const;
+void flush(fuse_req_t req, fuse_ino_t ino, fuse_file_info* fi);
 
-    void flush(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi) const;
+void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info* fi);
 
-    void release(const fuse_req_t& req, fuse_ino_t ino, fuse_file_info* fi);
+void access(fuse_req_t req, fuse_ino_t ino, int mask);
 
-    void access(const fuse_req_t& req, const fuse_ino_t& ino, int mask) const;
+void rmdir(fuse_req_t req, fuse_ino_t parent, const char* name);
 
-    void rmdir(const fuse_req_t& req, fuse_ino_t parent, const char* name) const;
+void fsync(fuse_req_t req, fuse_ino_t ino, int datasync, fuse_file_info* fi);
 
-    void fsync(const fuse_req_t& req, fuse_ino_t ino, int datasync, fuse_file_info* fi) const;
+void statfs(fuse_req_t req, fuse_ino_t ino);
 
-    void statfs(const fuse_req_t& req, fuse_ino_t ino) const;
+fuse_lowlevel_ops getOperations();
 
-    fuse_lowlevel_ops getOperations() const;
-
-private:
-    std::shared_ptr<storage::StorageManager> storageManager_;
-    std::unordered_map<fuse_ino_t, int> openHandleCounts_;
-    std::mutex openHandleMutex_;
-
-
-    struct stat statFromEntry(const std::shared_ptr<types::FSEntry>& entry, const fuse_ino_t& ino) const;
-};
+struct stat statFromEntry(const std::shared_ptr<types::FSEntry>& entry, const fuse_ino_t& ino);
 
 }

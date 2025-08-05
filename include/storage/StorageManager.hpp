@@ -46,12 +46,17 @@ public:
 
     std::shared_ptr<StorageEngine> getEngine(unsigned int id) const;
 
+    void registerOpenHandle(fuse_ino_t);
+
+    void closeOpenHandle(fuse_ino_t);
+
+    [[nodiscard]] unsigned int getOpenHandleCount(fuse_ino_t ino) const;
+
 private:
-    mutable std::mutex mutex_;
+    mutable std::mutex mutex_, openHandleMutex_;
     std::pmr::unordered_map<std::string, std::shared_ptr<StorageEngine>> engines_;
     std::unordered_map<unsigned int, std::shared_ptr<StorageEngine>> vaultToEngine_;
-
-    mutable std::mutex renameQueueMutex_;
+    std::unordered_map<fuse_ino_t, int> openHandleCounts_;
 };
 
 }

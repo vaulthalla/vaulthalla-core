@@ -29,7 +29,6 @@ protected:
     void runLoop() override;
 
 private:
-    std::shared_ptr<fuse::FUSEBridge> bridge_;
     fuse_session* session_{nullptr};
 };
 

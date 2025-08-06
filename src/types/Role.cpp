@@ -9,12 +9,15 @@
 using namespace vh::types;
 
 Role::Role(const pqxx::row& row)
-    : role_id(row["role_id"].as<unsigned int>()),
-      name(row["name"].as<std::string>()),
+    : name(row["name"].as<std::string>()),
       description(row["description"].as<std::string>()),
       type(row["type"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())) {}
+      permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())) {
+    if (!row["role_id"].is_null()) role_id = row["role_id"].as<unsigned int>();
+    else if (!row["id"].is_null()) role_id = row["id"].as<unsigned int>();
+    else throw std::runtime_error("Role row does not contain 'role_id' or 'id'");
+}
 
 Role::Role(const nlohmann::json& j)
     : role_id(j.contains("role_id") ? j.at("role_id").get<unsigned int>() : 0),
@@ -23,6 +26,12 @@ Role::Role(const nlohmann::json& j)
       type(j.at("type").get<std::string>()),
       created_at(static_cast<std::time_t>(0)),
       permissions(type == "user" ? adminMaskFromJson(j.at("permissions")) : vaultMaskFromJson(j.at("permissions"))) {}
+
+Role::Role(std::string name, std::string description, std::string type, const uint16_t permissions)
+    : name(std::move(name)),
+      description(std::move(description)),
+      type(std::move(type)),
+      permissions(permissions) {}
 
 void vh::types::to_json(nlohmann::json& j, const Role& r) {
     j = {

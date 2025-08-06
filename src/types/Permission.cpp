@@ -7,7 +7,6 @@ namespace vh::types {
 Permission::Permission(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
-      display_name(row["display_name"].as<std::string>()),
       description(row["description"].as<std::string>()),
       bit_position(row["bit_position"].as<uint16_t>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
@@ -17,12 +16,16 @@ Permission::Permission(const pqxx::row& row)
 Permission::Permission(const nlohmann::json& j)
     : id(j.at("id").get<unsigned int>()),
       name(j.at("name").get<std::string>()),
-      display_name(j.at("display_name").get<std::string>()),
       description(j.at("description").get<std::string>()),
       bit_position(j.at("bit_position").get<uint16_t>()),
       created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())),
       updated_at(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {
 }
+
+Permission::Permission(const unsigned int bitPos, std::string name, std::string description)
+    : name(std::move(name)),
+      description(std::move(description)),
+      bit_position(bitPos) {}
 
 std::string to_string(const AdminPermission p) {
     switch (p) {
@@ -61,7 +64,7 @@ void to_json(nlohmann::json& j, const Permission& p) {
     j = {
         {"id", p.id},
         {"name", p.name},
-        {"display_name", p.display_name},
+
         {"description", p.description},
         {"bit_position", p.bit_position},
         {"created_at", util::timestampToString(p.created_at)},
@@ -72,7 +75,6 @@ void to_json(nlohmann::json& j, const Permission& p) {
 void from_json(const nlohmann::json& j, Permission& p) {
     p.id = j.at("id").get<unsigned int>();
     p.name = j.at("name").get<std::string>();
-    p.display_name = j.at("display_name").get<std::string>();
     p.description = j.at("description").get<std::string>();
     p.bit_position = j.at("bit_position").get<uint16_t>();
 }

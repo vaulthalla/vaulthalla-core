@@ -5,12 +5,14 @@
 CREATE TABLE permission
 (
     id           SERIAL PRIMARY KEY,
-    name         VARCHAR(50) UNIQUE NOT NULL,
+    name         VARCHAR(50) NOT NULL,
     description  TEXT,
     category     VARCHAR(12)        NOT NULL CHECK (category IN ('user', 'vault')),
     bit_position INTEGER            NOT NULL CHECK (bit_position >= 0 AND bit_position < 64),
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (name, category) -- Uniqueness: One permission per name-category pair
 );
 
 CREATE TABLE role
@@ -83,6 +85,9 @@ CREATE TABLE vault_permission_overrides
 -- ###########################################
 --- Indexes
 -- ###########################################
+
+CREATE UNIQUE INDEX idx_permission_name_category
+    ON permission (LOWER(name), category);
 
 CREATE INDEX idx_vault_role_assignments_vault_subject
     ON vault_role_assignments (vault_id, subject_type, subject_id);

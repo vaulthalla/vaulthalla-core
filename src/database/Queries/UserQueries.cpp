@@ -177,4 +177,11 @@ void UserQueries::revokeAndPurgeRefreshTokens(const unsigned int userId) {
     });
 }
 
+bool UserQueries::adminUserExists() {
+    return Transactions::exec("UserQueries::adminUserExists", [](pqxx::work& txn) {
+        return txn.exec_prepared("admin_user_exists").one_field().as<bool>();
+    });
+}
+
+
 } // namespace vh::database

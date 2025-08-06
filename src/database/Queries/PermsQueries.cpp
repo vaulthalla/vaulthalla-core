@@ -38,11 +38,11 @@ std::shared_ptr<Role> PermsQueries::getRole(const unsigned int id) {
 
 std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
     return Transactions::exec("PermsQueries::getRoleByName", [&](pqxx::work& txn) {
-        const auto row = txn.exec("SELECT * FROM role WHERE name = " + txn.quote(name)).one_row();
-        return std::make_shared<Role>(row);
+        const auto res = txn.exec_prepared("get_role_by_name", pqxx::params{name});
+        if (res.empty()) throw std::runtime_error("Role not found: " + name);
+        return std::make_shared<Role>(res.one_row());
     });
 }
-
 
 std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
     return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {

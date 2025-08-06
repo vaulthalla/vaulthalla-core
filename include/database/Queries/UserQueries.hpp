@@ -36,5 +36,7 @@ class UserQueries {
     static void revokeAllRefreshTokens(unsigned int userId);
     static void revokeAndPurgeRefreshTokens(unsigned int userId);
     static std::shared_ptr<types::User> getUserByRefreshToken(const std::string& jti);
+
+    [[nodiscard]] static bool adminUserExists();
 };
 } // namespace vh::database

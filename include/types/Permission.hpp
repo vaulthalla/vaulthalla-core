@@ -38,13 +38,14 @@ enum class VaultPermission : uint16_t {
 };
 
 struct Permission {
-    unsigned int id;
-    std::string name, display_name, description;
+    unsigned int id{};
+    std::string name, description;
     uint16_t bit_position;
-    std::time_t created_at, updated_at;
+    std::time_t created_at{}, updated_at{};
 
     explicit Permission(const pqxx::row& row);
     explicit Permission(const nlohmann::json& j);
+    Permission(unsigned int bitPos, std::string name, std::string description);
 };
 
 inline unsigned short adminPermToBit(const AdminPermission& perm) { return static_cast<unsigned short>(perm); }

@@ -13,7 +13,7 @@ namespace vh::database {
 struct GroupQueries {
     GroupQueries() = default;
 
-    static void createGroup(const std::string& name, const std::string& description = "");
+    static unsigned int createGroup(const std::string& name, const std::string& description = "");
     static void deleteGroup(unsigned int groupId);
     static void addMemberToGroup(unsigned int groupId, const std::string& name);
     static void removeMemberFromGroup(unsigned int groupId, unsigned int userId);

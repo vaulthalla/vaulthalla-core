@@ -4,11 +4,12 @@
 
 using namespace vh::database;
 
-void GroupQueries::createGroup(const std::string& name, const std::string& description) {
-    Transactions::exec("GroupQueries::createGroup",
+unsigned int GroupQueries::createGroup(const std::string& name, const std::string& description) {
+    return Transactions::exec("GroupQueries::createGroup",
         [&](pqxx::work& txn) {
-            txn.exec("INSERT INTO groups (name, description) VALUES ("
-                + txn.quote(name) + ", " + txn.quote(description) + ")");});
+            return txn.exec("INSERT INTO groups (name, description) VALUES ("
+                + txn.quote(name) + ", " + txn.quote(description) + ") RETURNING id").one_field().as<unsigned int>();
+    });
 }
 
 void GroupQueries::deleteGroup(const unsigned int groupId) {

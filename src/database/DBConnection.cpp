@@ -32,6 +32,7 @@ void DBConnection::initPrepared() const {
     initPreparedUserRoles();
     initPreparedVaultRoles();
     initPreparedPermOverrides();
+    initPreparedPermissions();
     initPreparedSync();
     initPreparedCache();
 }
@@ -82,6 +83,8 @@ void DBConnection::initPreparedUsers() const {
                    ")");
 
     conn_->prepare("get_user_id_by_linux_uid", "SELECT id FROM users WHERE linux_uid = $1");
+
+    conn_->prepare("admin_user_exists", "SELECT EXISTS(SELECT 1 FROM users WHERE name = 'admin') AS exists");
 }
 
 void DBConnection::initPreparedAPIKeys() const {
@@ -586,7 +589,7 @@ void DBConnection::initPreparedOperations() const {
 void DBConnection::initPreparedRoles() const {
     conn_->prepare("insert_role",
                    "INSERT INTO role (name, description, type) "
-                   "VALUES ($1, $2, $3)");
+                   "VALUES ($1, $2, $3) RETURNING id");
 
     conn_->prepare("update_role",
                    "UPDATE role SET name = $2, description = $3, type = $4 "
@@ -603,6 +606,13 @@ void DBConnection::initPreparedRoles() const {
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE r.id = $1");
 
+    conn_->prepare("get_role_by_name",
+                   "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
+                   "p.permissions::int AS permissions "
+                   "FROM role r "
+                   "JOIN permissions p ON r.id = p.role_id "
+                   "WHERE r.name = $1");
+
     conn_->prepare("list_roles",
                    "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
                    "p.permissions::int AS permissions "
@@ -615,10 +625,15 @@ void DBConnection::initPreparedRoles() const {
                    "FROM role r "
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE r.type = $1");
+
+    conn_->prepare("assign_permission_to_role",
+        "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
 }
 
 void DBConnection::initPreparedPermissions() const {
-    conn_->prepare("insert_permission", "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2)");
+    conn_->prepare("insert_raw_permission",
+        "INSERT INTO permission (bit_position, name, description, category) "
+        "VALUES ($1, $2, $3, $4)");
 
     conn_->prepare("upsert_permission",
                    "INSERT INTO permissions (role_id, permissions) "

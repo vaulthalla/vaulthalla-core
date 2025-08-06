@@ -14,14 +14,15 @@ class result;
 namespace vh::types {
 
 struct Role {
-    unsigned int role_id;
+    unsigned int role_id{};
     std::string name, description, type;
-    std::time_t created_at;
+    std::time_t created_at{};
     uint16_t permissions{0};
 
     Role() = default;
     explicit Role(const pqxx::row& row);
     explicit Role(const nlohmann::json& j);
+    Role(std::string name, std::string description, std::string type, uint16_t permissions);
 };
 
 // JSON + DB helpers

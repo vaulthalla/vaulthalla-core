@@ -24,12 +24,9 @@ endif
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
 
-hash_deps = [
+deps = [
     dependency('libsodium', required: true),
-    dependency('libcurl', required: true)
-]
-
-deps = hash_deps + [
+    dependency('libcurl', required: true),
     dependency('boost', modules: ['filesystem', 'system'], required: true),
     dependency('libpqxx', required: true),
     dependency('libpdfium', required: true),
@@ -56,13 +53,6 @@ source_root = meson.project_source_root()
 src         = join_paths(source_root, 'src')
 tests_src   = join_paths(source_root, 'tests')
 main        = files(join_paths(source_root, 'main.cpp'))
-
-hash_pass_src   = files(
-    join_paths(src, 'crypto/PasswordHash.cpp'),
-    join_paths(src, 'crypto/PasswordUtils.cpp')
-)
-hash_pass_main  = files(join_paths(source_root, 'deploy/hash_password.cpp'))
-
 
 # ╭──────────────────── INCLUDE DIRS ─────────────────────╮
 
@@ -100,12 +90,6 @@ executable('vaulthalla', main,
            include_directories: inc,
            dependencies: dep)
 
-executable('hash_password',
-           [hash_pass_src, hash_pass_main],
-           dependencies: hash_deps,
-           include_directories: hash_pass_inc,
-           install: true)
-
 
 # ╭──────────────────── TESTS ───────────────────────────╮
 
@@ -124,18 +108,6 @@ foreach asset : test_assets
         copy: true
     )
 endforeach
-
-test('test_cloud',
-     executable('test_cloud', sources + files(join_paths(tests_src, 'test_S3Provider.cpp')),
-                link_with: [lib],
-                include_directories: inc,
-                dependencies: test_deps))
-
-test('test_path',
-     executable('test_path', sources + files(join_paths(tests_src, 'test_Path.cpp')),
-                link_with: [lib],
-                include_directories: inc,
-                dependencies: test_deps))
 
 all_test_sources = sources
 foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')

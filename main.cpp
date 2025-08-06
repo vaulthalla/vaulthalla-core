@@ -2,11 +2,13 @@
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "database/Transactions.hpp"
+#include "database/Queries/UserQueries.hpp"
 #include "services/ServiceManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "logging/LogRegistry.hpp"
+#include "util/initdb.hpp"
 
 #include <csignal>
 #include <pdfium/fpdfview.h>
@@ -44,6 +46,10 @@ int main() {
 
         ThreadPoolManager::instance().init();
         Transactions::init();
+
+        if (!UserQueries::adminUserExists()) vh::seed::init();
+        // if (ConfigRegistry::get().advanced.dev_mode) vh::seed::initDevCloudVault();
+
         ServiceDepsRegistry::init();
         ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
         Filesystem::init(ServiceDepsRegistry::instance().storageManager);

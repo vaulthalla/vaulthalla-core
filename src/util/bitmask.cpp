@@ -8,3 +8,7 @@ std::string vh::util::bitmask::permissions_to_bitstring(const uint16_t perms) {
     bitstring += "'";
     return bitstring;
 }
+
+std::bitset<16> vh::util::bitmask::bitmask_to_bitset(const uint16_t mask) {
+    return std::bitset<16>(mask);
+}

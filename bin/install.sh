@@ -40,7 +40,7 @@ fi
 #fi
 
 # === 1) Install Build Dependencies ===
-./bin/setup/install_build_deps.sh
+./bin/setup/install_deps.sh
 
 # === 2) Create System User and Group ===
 if ! id vaulthalla &>/dev/null; then
@@ -147,44 +147,6 @@ for sql_file in auth vaults files sync acl; do
     echo "📄 Applying $sql_file.sql..."
     sudo -u vaulthalla psql -d vaulthalla -f "deploy/psql/$sql_file.sql"
 done
-
-echo "🌱 Seeding database..."
-sudo -u vaulthalla psql -d vaulthalla -f deploy/psql/seed.sql
-
-echo "🔐 Set admin password:"
-ADMIN_PLAIN="${ADMIN_PLAIN:-vh!adm1n}"
-
-if [[ "$DEV_MODE" == true ]]; then
-    echo "⚠️  [DEV_MODE] Using default admin password vh!adm1n"
-else
-    while true; do
-        echo "🔑 Please enter a secure admin password:"
-        read -rs ADMIN_PLAIN
-        echo
-
-        if [[ -z "$ADMIN_PLAIN" ]]; then
-            echo "❗ Password cannot be empty."
-            continue
-        fi
-
-        # Try to hash and validate
-        if HASHED_PASS=$(./build/hash_password --validate "$ADMIN_PLAIN" 2>&1); then
-            echo "✅ Password accepted."
-            break
-        else
-            echo "❌ Password rejected:"
-            echo "$HASHED_PASS"
-        fi
-    done
-fi
-
-# In dev mode, we still hash after the conditional block:
-if [[ "$DEV_MODE" == true ]]; then
-    HASHED_PASS=$(./build/hash_password "$ADMIN_PLAIN")
-fi
-
-echo "🔑 Seeding admin user..."
-sudo ./bin/setup/seed_admin.sh "$HASHED_PASS"
 
 # === 10) Install systemd service ===
 echo "🛠️  Installing systemd service..."

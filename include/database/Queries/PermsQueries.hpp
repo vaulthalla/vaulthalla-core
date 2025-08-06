@@ -6,6 +6,7 @@
 
 namespace vh::types {
 struct Role;
+struct UserRole;
 struct VaultRole;
 struct Permission;
 }

@@ -4,21 +4,16 @@ set -euo pipefail
 
 echo "🔍 Checking for required build dependencies..."
 
-# Check if Vaulthalla pubkey is already installed
-if ! grep -q "vaulthalla" /etc/apt/trusted.gpg.d/vaulthalla.gpg; then
-    echo "🔗 Adding Vaulthalla public key..."
-    sudo curl -fsSL https://apt.vaulthalla.sh/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/vaulthalla.gpg
-else
-    echo "✅ Vaulthalla public key already exists."
-fi
+echo "🔗 Installing Vaulthalla public key..."
+sudo curl -fsSL https://apt.vaulthalla.sh/pubkey.gpg | sudo gpg --dearmor --y -o /etc/apt/trusted.gpg.d/vaulthalla.gpg
 
-# Check if Vaulthalla debian source list is available
-if ! grep -q "https://apt.vaulthalla.sh" /etc/apt/sources.list.d/vaulthalla.list; then
-    echo "🔗 Adding Vaulthalla repository..."
-    echo "deb [arch=amd64] https://apt.vaulthalla.sh stable main" | sudo tee /etc/apt/sources.list.d/vaulthalla.list > /dev/null
-else
-    echo "✅ Vaulthalla repository already exists."
-fi
+## Check if Vaulthalla debian source list is available
+#if ! grep -q "https://apt.vaulthalla.sh" /etc/apt/sources.list.d/vaulthalla.list; then
+#    echo "🔗 Adding Vaulthalla repository..."
+#    echo "deb [arch=amd64] https://apt.vaulthalla.sh stable main" | sudo tee /etc/apt/sources.list.d/vaulthalla.list > /dev/null
+#else
+#    echo "✅ Vaulthalla repository already exists."
+#fi
 
 sudo apt update
 
@@ -60,9 +55,3 @@ check_pkg libboost-system-dev "Boost system"
 check_pkg libspdlog-dev "libspdlog-dev"
 check_pkg libtss2-dev "libtss2-dev"
 check_pkg tpm2-tools "tpm2-tools"
-
-# -- Lintian sanity check --
-if command -v lintian >/dev/null; then
-    echo "🔍 Running lintian on built package..."
-    lintian ../vaulthalla_*.changes || true
-fi

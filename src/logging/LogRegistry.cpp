@@ -19,9 +19,10 @@ void LogRegistry::init(const std::string& logDir) {
 
     constexpr auto defaultLevel = spdlog::level::info; // Default log level
 
-    // Shared console sink
     const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     consoleSink->set_level(defaultLevel);
+    consoleSink->set_color_mode(spdlog::color_mode::automatic);
+    consoleSink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%n] %v");
 
     // Shared rotating file sink (10MB * 5 files)
     const auto rotatingSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(

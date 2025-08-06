@@ -137,7 +137,11 @@ void DBConnection::initPreparedVaults() const {
            mount_point = EXCLUDED.mount_point
        RETURNING id)");
 
-    conn_->prepare("insert_s3_bucket", "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) RETURNING id");
+    conn_->prepare("upsert_s3_bucket",
+                   "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) "
+                   "ON CONFLICT (name, api_key_id) DO UPDATE "
+                   "SET name = EXCLUDED.name, api_key_id = EXCLUDED.api_key_id "
+                   "RETURNING id");
 
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
 
@@ -689,7 +693,7 @@ void DBConnection::initPreparedSync() const {
                    ") "
                    "INSERT INTO fsync (sync_id, conflict_policy) "
                    "SELECT id, $3 FROM ins "
-                   "RETURNING sync_id");
+                   "RETURNING sync_id as id");
 
     conn_->prepare("insert_sync_and_rsync",
                    "WITH ins AS ("
@@ -698,7 +702,7 @@ void DBConnection::initPreparedSync() const {
                    ") "
                    "INSERT INTO rsync (sync_id, conflict_policy, strategy) "
                    "SELECT id, $3, $4 FROM ins "
-                   "RETURNING sync_id");
+                   "RETURNING sync_id as id");
 
     conn_->prepare("update_sync_and_fsync",
                    "WITH updated_sync AS ("

@@ -26,7 +26,10 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
             vault->is_active
         };
 
-        const auto vaultId = txn.exec_prepared("upsert_vault", p).one_row()["id"].as<unsigned int>();
+        const auto vaultRes = txn.exec_prepared("upsert_vault", p);
+        if (vaultRes.empty() || vaultRes.affected_rows() == 0)
+            throw std::runtime_error("Failed to upsert vault: " + vault->name);
+        const auto vaultId = vaultRes.one_field().as<unsigned int>();
 
         if (!exists) {
             if (vault->type == VaultType::Local) {
@@ -35,14 +38,15 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 txn.exec_prepared("insert_sync_and_fsync", sync_params);
             } else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-                txn.exec_prepared("insert_s3_bucket", pqxx::params{s3Vault->bucket, s3Vault->api_key_id});
+                const auto bucketId = txn.exec_prepared("upsert_s3_bucket",
+                    pqxx::params{s3Vault->bucket, s3Vault->api_key_id}).one_field().as<unsigned int>();
 
                 const auto rSync = std::static_pointer_cast<RSync>(sync);
                 pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
                                          to_string(rSync->strategy)};
-                txn.exec_prepared("insert_sync_and_rsync", sync_params).one_row()["id"].as<unsigned int>();
+                txn.exec_prepared("insert_sync_and_rsync", sync_params);
 
-                txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, s3Vault->bucket});
+                txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, bucketId});
             }
         }
 

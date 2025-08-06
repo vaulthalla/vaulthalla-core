@@ -25,11 +25,7 @@ using namespace vh::services;
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
       key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
-      s3Provider_(std::make_shared<cloud::S3Provider>(key_, vault->bucket)) {
-    LogRegistry::storage()->info("[CloudStorageEngine] Initialized for vault: {} (ID: {}, Bucket: {})",
-                                 vault->name, vault->id, vault->bucket);
-    LogRegistry::storage()->info("[CloudStorageEngine] Decrypted secret key: {}", key_->secret_access_key);
-}
+      s3Provider_(std::make_shared<cloud::S3Provider>(key_, vault->bucket)) {}
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);

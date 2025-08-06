@@ -59,19 +59,15 @@ APIKey::APIKey(const pqxx::row& row)
       region(row["region"].as<std::string>()),
       endpoint(row["endpoint"].as<std::string>())
 {
-    // Encrypted secret_access_key
     if (!row["encrypted_secret_access_key"].is_null()) {
-        auto blob = row["encrypted_secret_access_key"].as<std::string>();
-        encrypted_secret_access_key.assign(blob.begin(), blob.end());
+        const pqxx::binarystring key(row["encrypted_secret_access_key"]);
+        encrypted_secret_access_key.assign(key.begin(), key.end());
     }
 
-    // IV for AES-GCM
     if (!row["iv"].is_null()) {
-        auto blob = row["iv"].as<std::string>();
+        const pqxx::binarystring blob(row["iv"]);
         iv.assign(blob.begin(), blob.end());
     }
-
-    // secret_access_key stays empty until APIKeyManager decrypts it
 }
 
 void vh::types::api::from_json(const nlohmann::json& j, APIKey& key) {

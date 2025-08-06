@@ -1,7 +1,10 @@
 #include "crypto/encrypt.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
+
+using namespace vh::logging;
 
 namespace vh::crypto {
 
@@ -10,8 +13,10 @@ std::vector<uint8_t> encrypt_aes256_gcm(
     const std::vector<uint8_t>& key,
     std::vector<uint8_t>& out_iv)
 {
-    if (key.size() != AES_KEY_SIZE)
+    if (key.size() != AES_KEY_SIZE) {
+        LogRegistry::crypto()->error("[encrypt_aes256_gcm] Invalid AES-256 key size: {} bytes", key.size());
         throw std::invalid_argument("Invalid AES-256 key size");
+    }
 
     out_iv.resize(AES_IV_SIZE);
     randombytes_buf(out_iv.data(), AES_IV_SIZE);
@@ -37,8 +42,12 @@ std::vector<uint8_t> decrypt_aes256_gcm(
     const std::vector<uint8_t>& key,
     const std::vector<uint8_t>& iv)
 {
-    if (key.size() != AES_KEY_SIZE || iv.size() != AES_IV_SIZE)
+    if (key.size() != AES_KEY_SIZE || iv.size() != AES_IV_SIZE) {
+        LogRegistry::crypto()->error("[decrypt_aes256_gcm] Invalid key or IV size: "
+                                     "key size = {}, iv size = {}",
+                                     key.size(), iv.size());
         throw std::invalid_argument("Invalid key or IV size");
+    }
 
     std::vector<uint8_t> decrypted(ciphertext_with_tag.size() - AES_TAG_SIZE);
     unsigned long long decrypted_len = 0;

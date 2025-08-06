@@ -34,8 +34,7 @@ struct APIKey {
     std::string endpoint;
 
     // Encrypted parts (stored in DB)
-    std::vector<uint8_t> encrypted_secret_access_key;
-    std::vector<uint8_t> iv;
+    std::vector<uint8_t> encrypted_secret_access_key, iv;
 
     // Runtime only (never stored in DB)
     std::string secret_access_key;

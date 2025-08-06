@@ -39,7 +39,10 @@ fi
 #    mkdir -p build
 #fi
 
-# === 1) Create system user ===
+# === 1) Install Build Dependencies ===
+./bin/setup/install_build_deps.sh
+
+# === 2) Create System User and Group ===
 if ! id vaulthalla &>/dev/null; then
     echo "👤 Creating system user 'vaulthalla'..."
     sudo useradd -r -s /usr/sbin/nologin vaulthalla
@@ -47,9 +50,41 @@ else
     echo "👤 System user 'vaulthalla' already exists."
 fi
 
-# === 2) Install Build Dependencies ===
+# Check if 'tss' group exists and add 'vaulthalla' to it
+if getent group tss > /dev/null; then
+    echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
+    sudo usermod -aG tss vaulthalla
+else
+    echo "⚠️ No 'tss' group found, creating one..."
+    sudo groupadd --system tss
+    sudo usermod -aG tss vaulthalla
+fi
 
-./bin/setup/install_build_deps.sh
+# === 3) Ensure TPM device permissions ===
+udev_rule_file="/etc/udev/rules.d/60-tpm.rules"
+
+check_perms() {
+    local dev=$1
+    if [ -e "$dev" ]; then
+        perms=$(stat -c "%a %G" "$dev")
+        if [[ "$perms" != "660 tss" ]]; then
+            return 1
+        fi
+    fi
+    return 0
+}
+
+if ! check_perms /dev/tpm0 || ! check_perms /dev/tpmrm0; then
+    echo "🔧 Fixing TPM device permissions via udev rule..."
+    cat <<'EOF' | sudo tee "$udev_rule_file" >/dev/null
+KERNEL=="tpm[0-9]*",   GROUP="tss", MODE="0660"
+KERNEL=="tpmrm[0-9]*", GROUP="tss", MODE="0660"
+EOF
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+else
+    echo "✅ TPM device permissions already correct."
+fi
 
 # === 3) Build Project ===
 echo "🏗️  Starting Vaulthalla build..."
@@ -81,6 +116,14 @@ if [[ -f ./config.yaml ]]; then
 else
     echo "📄 Using example config"
     sudo cp deploy/config/config.example.yaml /etc/vaulthalla/config.yaml
+fi
+
+if [[ "$DEV_MODE" == true ]]; then
+    sudo cp ~/vh/vaulthalla.env /etc/vaulthalla/
+    sudo chown -R vaulthalla:vaulthalla /etc/vaulthalla/
+    sudo chmod 644 /etc/vaulthalla/vaulthalla.env
+else
+    echo "🔒 Production mode enabled."
 fi
 
 # === 7) Setup Database ===
@@ -142,13 +185,6 @@ fi
 
 echo "🔑 Seeding admin user..."
 sudo ./bin/setup/seed_admin.sh "$HASHED_PASS"
-
-if [[ $DEV_MODE == true ]]; then
-    echo "🔄 Running cloud test vault setup..."
-    source ./bin/test/init_cloud_test_vault.sh
-else
-    echo "🌐 Skipping cloud test vault setup in production mode."
-fi
 
 # === 10) Install systemd service ===
 echo "🛠️  Installing systemd service..."

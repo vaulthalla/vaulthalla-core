@@ -59,3 +59,12 @@ INSERT INTO directories (fs_entry_id)
 SELECT id FROM inserted_fs_entry
 ON CONFLICT DO NOTHING;
 EOF
+
+if [[ "$DEV_MODE" == true ]]; then
+    cat <<EOF | sudo -u vaulthalla psql -d vaulthalla
+    -- Set user linux_uid for testing
+    UPDATE users
+    SET linux_uid = 1000
+    WHERE name = 'admin';
+EOF
+fi

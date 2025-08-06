@@ -11,14 +11,14 @@
 #include <unordered_map>
 
 namespace vh::types::api {
-struct S3APIKey;
+struct APIKey;
 }
 
 namespace vh::cloud {
 
 class S3Provider {
 public:
-    S3Provider(const std::shared_ptr<types::api::S3APIKey>& apiKey, const std::string& bucket);
+    S3Provider(const std::shared_ptr<types::api::APIKey>& apiKey, std::string  bucket);
 
     ~S3Provider();
 
@@ -58,7 +58,7 @@ public:
     bool downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
 
 private:
-    std::shared_ptr<types::api::S3APIKey> apiKey_;
+    std::shared_ptr<types::api::APIKey> apiKey_;
     std::string bucket_;
 
     std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;

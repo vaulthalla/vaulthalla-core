@@ -105,7 +105,7 @@ bool extractETag(const std::string& respHdr, std::string& etagOut) {
     return !etagOut.empty();
 }
 
-std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>& api_key,
+std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& api_key,
                                                  const std::string& method,
                                                  const std::string& fullPath,
                                                  const std::map<std::string, std::string>& headers,

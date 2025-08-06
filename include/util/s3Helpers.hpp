@@ -7,7 +7,7 @@
 #include <map>
 
 namespace vh::types::api {
-struct S3APIKey;
+struct APIKey;
 }
 
 namespace vh::util {
@@ -21,7 +21,7 @@ std::string composeMultiPartUploadXMLBody(const std::vector<std::string>& etags)
 size_t writeToString(const char* ptr, size_t size, size_t nmemb, void* userdata);
 void parsePagination(const std::string& response, std::string& continuationToken, bool& moreResults);
 [[nodiscard]] bool extractETag(const std::string& respHdr, std::string& etagOut);
-std::string buildAuthorizationHeader(const std::shared_ptr<types::api::S3APIKey>& api_key,
+std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& api_key,
                                      const std::string& method, const std::string& fullPath,
                                      const std::map<std::string, std::string>& headers,
                                      const std::string& payloadHash);

@@ -10,7 +10,7 @@
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/VaultEncryptionManager.hpp"
+#include "../../include/keys/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"

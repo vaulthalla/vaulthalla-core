@@ -6,6 +6,8 @@ Requires=postgresql.service
 [Service]
 User=vaulthalla
 Group=vaulthalla
+SupplementaryGroups=tss
+EnvironmentFile=/etc/vaulthalla/vaulthalla.env
 ExecStart=/usr/local/bin/vaulthalla/vaulthalla
 Restart=on-failure
 RestartSec=3

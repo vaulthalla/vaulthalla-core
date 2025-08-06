@@ -8,7 +8,7 @@ namespace vh::database {
 struct APIKeyQueries {
     APIKeyQueries() = default;
 
-    static unsigned int addAPIKey(const std::shared_ptr<types::api::APIKey>& key);
+    static unsigned int upsertAPIKey(const std::shared_ptr<types::api::APIKey>& key);
 
     static void removeAPIKey(unsigned int keyId);
 

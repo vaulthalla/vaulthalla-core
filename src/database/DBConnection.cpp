@@ -22,6 +22,8 @@ void DBConnection::initPrepared() const {
 
     initPreparedUsers();
     initPreparedVaults();
+    initPreparedVaultKeys();
+    initPreparedAPIKeys();
     initPreparedFsEntries();
     initPreparedFiles();
     initPreparedDirectories();
@@ -82,6 +84,46 @@ void DBConnection::initPreparedUsers() const {
     conn_->prepare("get_user_id_by_linux_uid", "SELECT id FROM users WHERE linux_uid = $1");
 }
 
+void DBConnection::initPreparedAPIKeys() const {
+    conn_->prepare("list_api_keys", "SELECT * FROM api_keys");
+
+    conn_->prepare("list_user_api_keys",
+                   "SELECT * FROM api_keys WHERE user_id = $1");
+
+    conn_->prepare("get_api_key", "SELECT * FROM api_keys WHERE id = $1");
+
+    conn_->prepare("upsert_api_key",
+                   "INSERT INTO api_keys (user_id, name, provider, access_key, "
+                   "encrypted_secret_access_key, iv, region, endpoint) "
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
+                   "ON CONFLICT (user_id, name, access_key) DO UPDATE SET "
+                   "  provider = EXCLUDED.provider, "
+                   "  encrypted_secret_access_key = EXCLUDED.encrypted_secret_access_key, "
+                   "  iv = EXCLUDED.iv, "
+                   "  region = EXCLUDED.region, "
+                   "  endpoint = EXCLUDED.endpoint, "
+                   "  created_at = CURRENT_TIMESTAMP "
+                   "RETURNING id");
+
+    conn_->prepare("remove_api_key",
+                   "DELETE FROM api_keys WHERE id = $1");
+}
+
+void DBConnection::initPreparedVaultKeys() const {
+    conn_->prepare("insert_vault_key",
+        "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
+        "VALUES ($1, $2, $3)");
+
+    conn_->prepare("update_vault_key",
+        "UPDATE vault_keys "
+        "SET encrypted_key = $2, iv = $3, updated_at = NOW() "
+        "WHERE vault_id = $1");
+
+    conn_->prepare("get_vault_key", "SELECT * FROM vault_keys WHERE vault_id = $1");
+
+    conn_->prepare("delete_vault_key", "DELETE FROM vault_keys WHERE vault_id = $1");
+}
+
 void DBConnection::initPreparedUserRoles() const {
     conn_->prepare("get_user_assigned_role",
                    "SELECT ura.id as assignment_id, ura.user_id, ura.role_id, ura.assigned_at, "
@@ -100,17 +142,22 @@ void DBConnection::initPreparedUserRoles() const {
 
 void DBConnection::initPreparedVaults() const {
     conn_->prepare("upsert_vault",
-                   R"(INSERT INTO vault (name, type, description, owner_id, quota, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)
+                   R"(INSERT INTO vault (name, type, description, owner_id, mount_point, quota, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (name, owner_id)
        DO UPDATE SET
            type = EXCLUDED.type,
            description = EXCLUDED.description,
            quota = EXCLUDED.quota,
-           is_active = EXCLUDED.is_active
+           is_active = EXCLUDED.is_active,
+           mount_point = EXCLUDED.mount_point
        RETURNING id)");
 
-    conn_->prepare("insert_s3_bucket", "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) RETURNING id");
+    conn_->prepare("upsert_s3_bucket",
+                   "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) "
+                   "ON CONFLICT (name, api_key_id) DO UPDATE "
+                   "SET name = EXCLUDED.name, api_key_id = EXCLUDED.api_key_id "
+                   "RETURNING id");
 
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
 
@@ -146,7 +193,7 @@ void DBConnection::initPreparedVaults() const {
 
 void DBConnection::initPreparedFsEntries() const {
     conn_->prepare("update_fs_entry_by_inode",
-    R"SQL(
+                   R"SQL(
     UPDATE fs_entry
     SET vault_id         = $2,
         parent_id        = $3,
@@ -204,8 +251,8 @@ void DBConnection::initPreparedFiles() const {
                    "content_hash = EXCLUDED.content_hash");
 
     conn_->prepare("update_file_only",
-        "UPDATE files SET size_bytes = $2, mime_type = $3, content_hash = $4, encryption_iv = $5 "
-        "WHERE fs_entry_id = $1");
+                   "UPDATE files SET size_bytes = $2, mime_type = $3, content_hash = $4, encryption_iv = $5 "
+                   "WHERE fs_entry_id = $1");
 
     conn_->prepare("upsert_file_full",
                    "WITH upsert_entry AS ("
@@ -662,7 +709,7 @@ void DBConnection::initPreparedSync() const {
                    ") "
                    "INSERT INTO fsync (sync_id, conflict_policy) "
                    "SELECT id, $3 FROM ins "
-                   "RETURNING sync_id");
+                   "RETURNING sync_id as id");
 
     conn_->prepare("insert_sync_and_rsync",
                    "WITH ins AS ("
@@ -671,7 +718,7 @@ void DBConnection::initPreparedSync() const {
                    ") "
                    "INSERT INTO rsync (sync_id, conflict_policy, strategy) "
                    "SELECT id, $3, $4 FROM ins "
-                   "RETURNING sync_id");
+                   "RETURNING sync_id as id");
 
     conn_->prepare("update_sync_and_fsync",
                    "WITH updated_sync AS ("

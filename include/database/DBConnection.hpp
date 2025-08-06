@@ -17,6 +17,8 @@ class DBConnection {
     void initPrepared() const;
     void initPreparedUsers() const;
     void initPreparedVaults() const;
+    void initPreparedVaultKeys() const;
+    void initPreparedAPIKeys() const;
     void initPreparedFsEntries() const;
     void initPreparedFiles() const;
     void initPreparedDirectories() const;

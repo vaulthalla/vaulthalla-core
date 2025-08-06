@@ -1,81 +1,52 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
+#include "types/APIKey.hpp"
 
-namespace vh::database {
-unsigned int APIKeyQueries::addAPIKey(const std::shared_ptr<types::api::APIKey>& key) {
+using namespace vh::database;
+using namespace vh::types::api;
+
+unsigned int APIKeyQueries::upsertAPIKey(const std::shared_ptr<APIKey>& key) {
     return Transactions::exec("APIKeyQueries::addAPIKey", [&](pqxx::work& txn) {
-        pqxx::result res =
-            txn.exec("INSERT INTO api_keys (user_id, type, name) VALUES (" + txn.quote(key->user_id) + ", " +
-                     txn.quote(types::api::to_string(key->type)) + ", " + txn.quote(key->name) + ") RETURNING id");
-
-        const auto keyId = res[0][0].as<unsigned int>();
-
-        if (auto s3Key = std::dynamic_pointer_cast<types::api::S3APIKey>(key)) {
-            txn.exec("INSERT INTO s3_api_keys (api_key_id, provider, access_key, secret_access_key, region, endpoint) "
-                     "VALUES (" +
-                     txn.quote(keyId) + ", " + txn.quote(types::api::to_string(s3Key->provider)) + ", " +
-                     txn.quote(s3Key->access_key) + ", " + txn.quote(s3Key->secret_access_key) + ", " +
-                     txn.quote(s3Key->region) + ", " + txn.quote(s3Key->endpoint) + ")");
-        }
-
-        txn.commit();
-
-        return keyId;
+        pqxx::binarystring enc_secret(key->encrypted_secret_access_key.data(), key->encrypted_secret_access_key.size());
+        pqxx::binarystring iv(key->iv.data(), key->iv.size());
+        pqxx::params p{
+            key->user_id,
+            key->name,
+            to_string(key->provider),
+            key->access_key,
+            enc_secret,
+            iv,
+            key->region,
+            key->endpoint
+        };
+        return txn.exec_prepared("upsert_api_key", p).one_field().as<unsigned int>();
     });
 }
 
 void APIKeyQueries::removeAPIKey(const unsigned int keyId) {
     Transactions::exec("APIKeyQueries::removeAPIKey", [&](pqxx::work& txn) {
-        txn.exec("DELETE FROM s3_api_keys WHERE api_key_id = " + txn.quote(keyId));
-        txn.exec("DELETE FROM api_keys WHERE id = " + txn.quote(keyId));
-        txn.commit();
+        txn.exec_prepared("remove_api_key", keyId);
     });
 }
 
-std::vector<std::shared_ptr<types::api::APIKey>> APIKeyQueries::listAPIKeys(const unsigned int userId) {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned int userId) {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
-        pqxx::result res = txn.exec("SELECT api_keys.*, s3_api_keys.provider "
-                                    "FROM api_keys "
-                                    "LEFT JOIN s3_api_keys ON api_keys.id = s3_api_keys.api_key_id "
-                                    "WHERE api_keys.user_id = " +
-                                    txn.quote(userId));
-
-        std::vector<std::shared_ptr<types::api::APIKey>> keys;
-        for (const auto& row : res) keys.push_back(std::make_shared<types::api::APIKey>(row));
-
-        return keys;
+        const auto res = txn.exec_prepared("list_user_api_keys", userId);
+        return api_keys_from_pq_res(res);
     });
 }
 
-std::vector<std::shared_ptr<types::api::APIKey>> APIKeyQueries::listAPIKeys() {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys() {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
-        pqxx::result res = txn.exec("SELECT api_keys.*, s3_api_keys.provider "
-            "FROM api_keys "
-            "LEFT JOIN s3_api_keys ON api_keys.id = s3_api_keys.api_key_id");
-
-        std::vector<std::shared_ptr<types::api::APIKey> > keys;
-        for (const auto& row : res) keys.push_back(std::make_shared<types::api::APIKey>(row));
-
-        return keys;
+        const auto res = txn.exec_prepared("list_api_keys");
+        return api_keys_from_pq_res(res);
     });
 }
 
-std::shared_ptr<types::api::APIKey> APIKeyQueries::getAPIKey(const unsigned int keyId) {
-    return Transactions::exec("APIKeyQueries::getAPIKey", [&](pqxx::work& txn) {
-        const pqxx::row row = txn.exec("SELECT type FROM api_keys WHERE id = " + txn.quote(keyId)).one_row();
-
-        const auto type = row["type"].as<std::string>();
-
-        if (type == "s3") {
-            pqxx::result res = txn.exec("SELECT * FROM api_keys "
-                                        "JOIN s3_api_keys ON api_keys.id = s3_api_keys.api_key_id "
-                                        "WHERE api_keys.id = " +
-                                        txn.quote(keyId));
-            if (res.empty()) throw std::runtime_error("API key not found with ID: " + std::to_string(keyId));
-            return std::make_shared<types::api::S3APIKey>(res[0]);
-        } else {
-            throw std::runtime_error("Unsupported API key type: " + type);
-        }
+std::shared_ptr<APIKey> APIKeyQueries::getAPIKey(const unsigned int keyId) {
+    return Transactions::exec("APIKeyQueries::getAPIKey", [&](pqxx::work& txn) -> std::shared_ptr<APIKey> {
+        const auto res = txn.exec_prepared("get_api_key", keyId);
+        if (res.empty()) return nullptr;
+        return std::make_shared<APIKey>(res.one_row());
     });
 }
-} // namespace vh::database

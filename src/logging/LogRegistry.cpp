@@ -51,7 +51,7 @@ void LogRegistry::init(const std::string& logDir) {
     makeLogger("vaulthalla", spdlog::level::info);
     makeLogger("sync", spdlog::level::info);
     makeLogger("thumb", spdlog::level::debug);
-    makeLogger("storage", spdlog::level::debug);
+    makeLogger("storage", spdlog::level::info);
     makeLogger("types", spdlog::level::debug);
 
     // Audit logger (special: append-only file sink, no rotation)

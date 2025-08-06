@@ -7,7 +7,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
-#include "storage/VaultEncryptionManager.hpp"
+#include "keys/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
@@ -16,7 +16,7 @@
 
 using namespace vh::types;
 using namespace vh::database;
-using namespace vh::encryption;
+using namespace vh::keys;
 using namespace vh::config;
 using namespace vh::storage;
 using namespace vh::services;
@@ -29,7 +29,7 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
       paths(std::make_shared<Path>(vault->mount_point)),
-      encryptionManager(std::make_shared<VaultEncryptionManager>(paths->vaultRoot)) {
+      encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
     if (!FSEntryQueries::exists(paths->vaultRoot)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }

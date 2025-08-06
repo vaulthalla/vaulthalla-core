@@ -12,6 +12,7 @@
 #include <mutex>
 #include <regex>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 using namespace vh::cloud;
@@ -41,8 +42,8 @@ struct HeaderList {
 } // namespace
 
 // --- ctor/dtor ------------------------------------------------------------
-S3Provider::S3Provider(const std::shared_ptr<api::S3APIKey>& apiKey, const std::string& bucket)
-: apiKey_(apiKey), bucket_(bucket) {
+S3Provider::S3Provider(const std::shared_ptr<api::APIKey>& apiKey, std::string bucket)
+: apiKey_(apiKey), bucket_(std::move(bucket)) {
     if (!apiKey_) throw std::runtime_error("S3Provider requires a valid S3APIKey");
     ensureCurlGlobalInit();
 }

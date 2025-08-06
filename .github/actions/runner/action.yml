@@ -1,0 +1,45 @@
+name: Modular CI/CD Pipeline
+description: Unified action to control which CI/CD jobs run via input flags.
+
+inputs:
+  build:
+    description: Run the build step
+    default: 'true'
+    required: false
+  test:
+    description: Run the test step
+    default: 'false'
+    required: false
+  package:
+    description: Run the package step
+    default: 'false'
+    required: false
+  deploy:
+    description: Run the deploy step
+    default: 'false'
+    required: false
+  release:
+    description: If true, auto-runs package and deploy
+    default: 'false'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Build
+      if: ${{ inputs.build == 'true' }}
+      uses: ./.github/actions/build
+      with:
+        profile: ${{ (inputs.package == 'true' || inputs.deploy == 'true' || inputs.release == 'true') && 'vps-release' || 'vps-debug' }}
+
+    - name: Test
+      if: ${{ inputs.test == 'true' }}
+      uses: ./.github/actions/test
+
+    - name: Package
+      if: ${{ inputs.package == 'true' || inputs.release == 'true' }}
+      uses: ./.github/actions/package
+
+    - name: Deploy
+      if: ${{ inputs.deploy == 'true' || inputs.release == 'true' }}
+      uses: ./.github/actions/deploy

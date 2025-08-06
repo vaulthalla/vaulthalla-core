@@ -1,0 +1,42 @@
+name: 'Build Project'
+description: 'Compiles the project.'
+
+inputs:
+  build_type:
+    description: Type of build to perform.
+    default: release
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Set PATH
+      shell: bash
+      run: echo "PATH=$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Show ccache stats
+      shell: bash
+      run: ccache -s
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: /home/gh-runner/.cache/ccache
+        key: ${{ runner.os }}-ccache-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        ./bin/setup/install_build_deps.sh
+
+    - name: Build
+      shell: bash
+      run: |
+        meson setup build --buildtype=${{ inputs.build_type }}
+        meson compile -C build
+        sudo meson install -C build
+        sudo ldconfig

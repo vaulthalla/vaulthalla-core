@@ -1,0 +1,28 @@
+name: 'Debian Package and Upload'
+description: 'Packages and uploads Debian binary to Nexus Sonatype.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create Debian Package
+      shell: bash
+      run: |
+        VERSION=$(meson introspect build --projectinfo | jq -r .version)
+
+        # make upstream tarball in the parent dir
+        git archive --format=tar --prefix=vaulthalla-$VERSION/ HEAD \
+          | gzip -9 > ../vaulthalla_$VERSION.orig.tar.gz
+
+        # build source + binary package
+        dpkg-buildpackage -us -uc -b
+
+    - name: Upload Package to Nexus Sonatype
+      shell: bash
+      run: |
+        # push all .deb files (and possibly .dsc/.changes) to Nexus
+        for pkg in ../*.deb; do
+          curl -sSf -u "$UPLOAD_USER:$UPLOAD_PASS" \
+            -H "Content-Type: multipart/form-data" \
+            --data-binary "@$f" \
+            "$NEXUS_REPO_URL"
+          done

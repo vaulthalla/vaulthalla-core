@@ -1,13 +1,26 @@
 project('vaulthalla', 'cpp',
         version: '0.8.4',
         license: 'AGPLv3',
-        default_options: ['warning_level=3', 'cpp_std=c++23'])
+        default_options: [
+            'warning_level=3',
+            'cpp_std=c++23',
+        ])
 
-# ╭──────────────────── DEBUG FLAGS ─────────────────────╮
 if get_option('buildtype') == 'debug'
-    add_project_arguments('-fsanitize=address,undefined', language: 'cpp')
-    add_project_link_arguments('-fsanitize=address,undefined', language: 'cpp')
+    add_project_arguments(['-g', '-O0', '-fsanitize=address,undefined'], language: 'cpp')
+    add_project_link_arguments(['-g', '-O0', '-fsanitize=address,undefined'], language: 'cpp')
+
+elif get_option('buildtype') == 'release'
+    add_project_arguments(['-O3', '-DNDEBUG'], language: 'cpp')
+    add_project_link_arguments(['-O3'], language: 'cpp')
+    # lower warnings in release
+    add_project_arguments('-Wno-unused-variable', language: 'cpp')  # optional
+
+else
+    add_project_arguments(['-O2', '-DNDEBUG'], language: 'cpp')
+    add_project_link_arguments(['-O2'], language: 'cpp')
 endif
+
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
 
@@ -120,6 +133,17 @@ test('test_cloud',
 
 test('test_path',
      executable('test_path', sources + files(join_paths(tests_src, 'test_Path.cpp')),
+                link_with: [lib],
+                include_directories: inc,
+                dependencies: test_deps))
+
+all_test_sources = sources
+foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    all_test_sources += files(f)
+endforeach
+
+test('test_all',
+     executable('test_all', all_test_sources,
                 link_with: [lib],
                 include_directories: inc,
                 dependencies: test_deps))

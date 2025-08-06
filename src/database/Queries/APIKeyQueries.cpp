@@ -7,14 +7,8 @@ using namespace vh::types::api;
 
 unsigned int APIKeyQueries::upsertAPIKey(const std::shared_ptr<APIKey>& key) {
     return Transactions::exec("APIKeyQueries::addAPIKey", [&](pqxx::work& txn) {
-        pqxx::binarystring enc_secret(
-            key->encrypted_secret_access_key.data(),
-            key->encrypted_secret_access_key.size());
-
-        pqxx::binarystring iv(
-            key->iv.data(),
-            key->iv.size());
-
+        pqxx::binarystring enc_secret(key->encrypted_secret_access_key.data(), key->encrypted_secret_access_key.size());
+        pqxx::binarystring iv(key->iv.data(), key->iv.size());
         pqxx::params p{
             key->user_id,
             key->name,

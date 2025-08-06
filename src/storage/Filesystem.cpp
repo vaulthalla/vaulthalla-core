@@ -10,7 +10,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "util/fsPath.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
-#include "storage/VaultEncryptionManager.hpp"
+#include "../../include/keys/VaultEncryptionManager.hpp"
 #include "util/files.hpp"
 #include "crypto/Hash.hpp"
 #include "services/ThumbnailWorker.hpp"

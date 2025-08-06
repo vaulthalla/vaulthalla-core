@@ -14,7 +14,7 @@ struct Sync;
 struct Path;
 }
 
-namespace vh::encryption {
+namespace vh::keys {
 class VaultEncryptionManager;
 }
 
@@ -26,7 +26,7 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     std::shared_ptr<types::Vault> vault;
     std::shared_ptr<types::Sync> sync;
     std::shared_ptr<types::Path> paths;
-    std::shared_ptr<encryption::VaultEncryptionManager> encryptionManager;
+    std::shared_ptr<keys::VaultEncryptionManager> encryptionManager;
     std::shared_mutex mutex;
 
     static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB

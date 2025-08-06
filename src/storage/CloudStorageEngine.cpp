@@ -1,5 +1,5 @@
 #include "storage/CloudStorageEngine.hpp"
-#include "storage/VaultEncryptionManager.hpp"
+#include "keys/VaultEncryptionManager.hpp"
 #include "storage/cloud/S3Provider.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
@@ -18,7 +18,7 @@
 
 using namespace vh::storage;
 using namespace vh::types;
-using namespace vh::encryption;
+using namespace vh::keys;
 using namespace vh::concurrency;
 using namespace vh::services;
 

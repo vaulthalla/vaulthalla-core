@@ -22,6 +22,7 @@ void DBConnection::initPrepared() const {
 
     initPreparedUsers();
     initPreparedVaults();
+    initPreparedVaultKeys();
     initPreparedAPIKeys();
     initPreparedFsEntries();
     initPreparedFiles();
@@ -106,6 +107,21 @@ void DBConnection::initPreparedAPIKeys() const {
 
     conn_->prepare("remove_api_key",
                    "DELETE FROM api_keys WHERE id = $1");
+}
+
+void DBConnection::initPreparedVaultKeys() const {
+    conn_->prepare("insert_vault_key",
+        "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
+        "VALUES ($1, $2, $3)");
+
+    conn_->prepare("update_vault_key",
+        "UPDATE vault_keys "
+        "SET encrypted_key = $2, iv = $3, updated_at = NOW() "
+        "WHERE vault_id = $1");
+
+    conn_->prepare("get_vault_key", "SELECT * FROM vault_keys WHERE vault_id = $1");
+
+    conn_->prepare("delete_vault_key", "DELETE FROM vault_keys WHERE vault_id = $1");
 }
 
 void DBConnection::initPreparedUserRoles() const {

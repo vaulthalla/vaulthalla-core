@@ -3,15 +3,15 @@ CREATE TABLE api_keys
     id                          SERIAL PRIMARY KEY,
     user_id                     INTEGER REFERENCES users (id) ON DELETE CASCADE,
     name                        VARCHAR(100) NOT NULL,
-    provider                    VARCHAR(50)         NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
-    access_key                  TEXT                NOT NULL,
-    encrypted_secret_access_key BYTEA NOT NULL, -- Encrypted secret access key
-    iv                          BYTEA NOT NULL, -- Initialization vector for encryption
-    region                      VARCHAR(20)         NOT NULL,
+    provider                    VARCHAR(50)  NOT NULL, -- 'AWS', 'Cloudflare R2', etc.
+    access_key                  TEXT         NOT NULL,
+    encrypted_secret_access_key BYTEA        NOT NULL, -- Encrypted secret access key
+    iv                          BYTEA        NOT NULL, -- Initialization vector for encryption
+    region                      VARCHAR(20)  NOT NULL,
     endpoint                    TEXT      DEFAULT NULL,
     created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE (user_id, name, access_key)  -- Ensure unique API keys per user
+    UNIQUE (user_id, name, access_key)                 -- Ensure unique API keys per user
 );
 
 CREATE TABLE s3_buckets
@@ -41,6 +41,17 @@ CREATE TABLE vault
     updated_at     TIMESTAMP                    DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (name, owner_id)                                  -- Ensure unique vault names per user
+);
+
+CREATE TABLE vault_keys
+(
+    vault_id      SERIAL PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    encrypted_key BYTEA NOT NULL,        -- Encrypted vault key
+    iv            BYTEA NOT NULL,        -- Initialization vector for encryption
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (vault_id) -- Ensure unique keys per vault and user
 );
 
 CREATE TABLE s3

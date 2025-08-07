@@ -1,0 +1,10 @@
+Template: vaulthalla/init-db
+Type: select
+Choices: Yes, No
+Default: Yes
+Description: Initialize the PostgreSQL database for Vaulthalla?
+ Vaulthalla requires a PostgreSQL database to function. Selecting "Yes" will automatically create the
+ database and user with a secure, randomly generated password.
+ .
+ If you select "No", you must manually create the required database and user. Vaulthalla will not
+ function without this step, and support is not provided for manual setup issues via GitHub Issues.

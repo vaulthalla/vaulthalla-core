@@ -1,28 +1,74 @@
 #!/bin/sh
 set -e
 
+. /usr/share/debconf/confmodule
+
+DB_USER="vaulthalla"
+DB_NAME="vaulthalla"
+CONFIG_FILE="/etc/vaulthalla/config.yaml"
+
 case "$1" in
     configure)
         # Create system user and group if they don't exist
-        if ! id vaulthalla >/dev/null 2>&1; then
-            echo "👤 Creating system user 'vaulthalla'..."
-            adduser --system --group --no-create-home --shell /usr/sbin/nologin vaulthalla
+        if ! id "$DB_USER" >/dev/null 2>&1; then
+            echo "👤 Creating system user '$DB_USER'..."
+            adduser --quiet --system --group --no-create-home --shell /usr/sbin/nologin "$DB_USER"
         fi
 
         # Create runtime directories
         echo "📁 Creating runtime directories..."
         for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthalla; do
-            install -d -o vaulthalla -g vaulthalla -m 755 "$dir"
+            install -d -o "$DB_USER" -g "$DB_USER" -m 755 "$dir"
         done
         chmod 750 /var/log/vaulthalla
+        chmod 700 /run/vaulthalla
 
         # Ensure /etc/vaulthalla exists
         install -d -m 755 /etc/vaulthalla
 
         # Copy example config only if real config doesn't exist
-        if [ ! -f /etc/vaulthalla/config.yaml ]; then
-            cp /etc/vaulthalla/config.example.yaml /etc/vaulthalla/config.yaml
-            echo "📄 Installed example config to /etc/vaulthalla/config.yaml"
+        if [ ! -f "$CONFIG_FILE" ]; then
+            cp /etc/vaulthalla/config.example.yaml "$CONFIG_FILE"
+            echo "📄 Installed example config to $CONFIG_FILE"
+        fi
+
+        # Get debconf value and fallback to Yes
+        db_get vaulthalla/init-db
+        INIT_DB="$RET"
+        [ -z "$INIT_DB" ] && INIT_DB="Yes"
+
+        if [ "$INIT_DB" = "Yes" ]; then
+            echo "[vaulthalla] Setting up PostgreSQL database..."
+
+            # Generate safe password
+            VAUL_PG_PASS=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)
+            ESCAPED_PASS=$(printf '%s\n' "$VAUL_PG_PASS" | sed 's/[&/]/\\&/g')
+
+            if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
+                echo "[vaulthalla] User '${DB_USER}' already exists."
+            else
+                sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${VAUL_PG_PASS}';"
+            fi
+
+            if sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+                echo "[vaulthalla] Database '${DB_NAME}' already exists."
+            else
+                sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
+            fi
+
+            sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
+
+            if [ -f "$CONFIG_FILE" ]; then
+                echo "[vaulthalla] Injecting DB password into config.yaml..."
+                sed -i "s/^\(\s*password:\s*\).*/\1${ESCAPED_PASS}/" "$CONFIG_FILE"
+                chmod 600 "$CONFIG_FILE"
+            else
+                echo "[vaulthalla] WARNING: Config file not found, password not injected."
+            fi
+
+            echo "[vaulthalla] Database setup complete."
+        else
+            echo "[vaulthalla] Skipping database setup per user choice."
         fi
         ;;
 esac

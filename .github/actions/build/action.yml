@@ -30,11 +30,13 @@ runs:
 
     - name: Install Dependencies
       shell: bash
+      working-directory: ${{ github.workspace }}
       run: |
         ./bin/setup/install_build_deps.sh
 
     - name: Build
       shell: bash
+      working-directory: ${{ github.workspace }}
       run: |
         meson setup build --buildtype=${{ inputs.build_type }}
         meson compile -C build

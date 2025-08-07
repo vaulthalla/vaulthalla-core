@@ -142,13 +142,7 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaultha
 echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
 
-# === 9) Apply Schema + Seed DB ===
-for sql_file in auth vaults files sync acl; do
-    echo "📄 Applying $sql_file.sql..."
-    sudo -u vaulthalla psql -d vaulthalla -f "deploy/psql/$sql_file.sql"
-done
-
-# === 10) Install systemd service ===
+# === 9) Install systemd service ===
 echo "🛠️  Installing systemd service..."
 sudo install -m 644 deploy/systemd/vaulthalla.service /etc/systemd/system/
 sudo systemctl daemon-reload

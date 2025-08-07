@@ -30,6 +30,15 @@ class DBPool {
         cv_.notify_one();
     }
 
+    void initPreparedStatements() {
+        for (auto i = 0; i < pool_.size(); ++i) {
+            auto conn = std::move(pool_.front());
+            pool_.pop();
+            conn->initPrepared();
+            pool_.push(std::move(conn));
+        }
+    }
+
   private:
     std::queue<std::unique_ptr<DBConnection>> pool_;
     std::mutex mtx_;

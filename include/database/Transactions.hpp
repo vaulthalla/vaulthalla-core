@@ -12,7 +12,7 @@ class Transactions {
   public:
     static inline std::shared_ptr<DBPool> dbPool_;
 
-    static void init() { dbPool_ = std::make_unique<vh::database::DBPool>(); }
+    static void init() { dbPool_ = std::make_unique<DBPool>(); }
 
     template <typename Func>
     static auto exec(const std::string& ctx, Func&& func) -> decltype(func(std::declval<pqxx::work&>())) {

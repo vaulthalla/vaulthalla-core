@@ -57,7 +57,6 @@ main        = files(join_paths(source_root, 'main.cpp'))
 # ╭──────────────────── INCLUDE DIRS ─────────────────────╮
 
 inc       = include_directories('include', 'vendor')
-hash_pass_inc  = include_directories('include')
 
 
 # ╭──────────────────── SOURCE COLLECTION ───────────────╮
@@ -70,23 +69,27 @@ endforeach
 
 # ╭──────────────────── LIBRARIES ───────────────────────╮
 
-lib = static_library('core', sources,
+lib_core = static_library('core', sources,
                      include_directories: inc,
                      dependencies: deps)
+
+lib_seed = static_library('seed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
+    include_directories: include_directories('seed/include', 'include', 'vendor'),
+    link_with: lib_core)
 
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 
 dep = declare_dependency(
     include_directories: inc,
-    link_with: lib,
+    link_with: lib_core,
     dependencies: deps)
 
 
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
 executable('vaulthalla', main,
-           link_with: lib,
+           link_with: [lib_seed],
            include_directories: inc,
            dependencies: dep)
 
@@ -116,6 +119,6 @@ endforeach
 
 test('test_all',
      executable('test_all', all_test_sources,
-                link_with: [lib],
+                link_with: [lib_core, lib_seed],
                 include_directories: inc,
                 dependencies: test_deps))

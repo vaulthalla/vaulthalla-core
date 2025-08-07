@@ -1,7 +1,11 @@
-#include "util/initdb.hpp"
+#include "seed_db.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
+#include "database/Queries/UserQueries.hpp"
+#include "database/Queries/GroupQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
+#include "database/Transactions.hpp"
 #include "keys/APIKeyManager.hpp"
 #include "types/S3Bucket.hpp"
 #include "types/S3Vault.hpp"
@@ -18,10 +22,6 @@
 #include "types/Group.hpp"
 #include "types/Permission.hpp"
 #include "crypto/PasswordHash.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/GroupQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "database/Transactions.hpp"
 #include "util/bitmask.hpp"
 
 #include <memory>

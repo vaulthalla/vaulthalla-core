@@ -10,11 +10,12 @@ class DBConnection {
 
     [[nodiscard]] pqxx::connection& get() const;
 
+    void initPrepared() const;
+
   private:
     std::string DB_CONNECTION_STR;
     std::unique_ptr<pqxx::connection> conn_;
 
-    void initPrepared() const;
     void initPreparedUsers() const;
     void initPreparedVaults() const;
     void initPreparedVaultKeys() const;

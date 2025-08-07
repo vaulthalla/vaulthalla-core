@@ -10,7 +10,6 @@ DBConnection::DBConnection() {
     DB_CONNECTION_STR = "postgresql://" + db.user + ":" + db.password + "@" + db.host + ":" + std::to_string(db.port) +
                         "/" + db.name;
     conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
-    initPrepared();
 }
 
 DBConnection::~DBConnection() { if (conn_ && conn_->is_open()) conn_->close(); }

@@ -11,7 +11,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/initdb.hpp"
+#include "seed/include/seed_db.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;

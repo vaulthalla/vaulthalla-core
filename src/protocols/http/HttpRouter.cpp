@@ -61,7 +61,7 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
     }
 
     const auto vault_id = std::stoi(vault_it->second);
-    std::string rel_path = path_it->second;
+    std::filesystem::path rel_path = path_it->second;
     const std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
     const auto size_it = params.find("size");
@@ -73,7 +73,7 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
             try {
                 return handleCachedPreview(vault_id, rel_path, mime_type, req, size);
             } catch (const std::exception& e) {
-                LogRegistry::http()->error("[HttpRouter] Error handling cached preview for {}: {}", rel_path, e.what());
+                LogRegistry::http()->error("[HttpRouter] Error handling cached preview for {}: {}", rel_path.string(), e.what());
                 http::response<http::string_body> res{http::status::internal_server_error, req.version()};
                 res.set(http::field::content_type, "text/plain");
                 res.body() = "Failed to handle cached preview: " + std::string(e.what());
@@ -83,7 +83,8 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
         }
     }
 
-    if (mime_type.starts_with("image/") || mime_type.ends_with("/octet-stream"))
+    const auto filename = rel_path.filename().string();
+    if (mime_type.starts_with("image/" || filename.ends_with(".webp")))
         return imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
 
     if (mime_type.ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);

@@ -41,6 +41,8 @@ else
 fi
 
 # -- Libraries --
+check_pkg pkg-config "pkg-config"
+check_pkg libturbojpeg0-dev "libturbojpeg0-dev"
 check_pkg libmagic1 "libmagic1"
 check_pkg libmagic-dev "libmagic-dev"
 check_pkg libsodium-dev "libsodium-dev"

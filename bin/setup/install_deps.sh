@@ -7,13 +7,13 @@ echo "🔍 Checking for required build dependencies..."
 echo "🔗 Installing Vaulthalla public key..."
 sudo curl -fsSL https://apt.vaulthalla.sh/pubkey.gpg | sudo gpg --dearmor --y -o /etc/apt/trusted.gpg.d/vaulthalla.gpg
 
-## Check if Vaulthalla debian source list is available
-#if ! grep -q "https://apt.vaulthalla.sh" /etc/apt/sources.list.d/vaulthalla.list; then
-#    echo "🔗 Adding Vaulthalla repository..."
-#    echo "deb [arch=amd64] https://apt.vaulthalla.sh stable main" | sudo tee /etc/apt/sources.list.d/vaulthalla.list > /dev/null
-#else
-#    echo "✅ Vaulthalla repository already exists."
-#fi
+# Check if Vaulthalla debian source list is available
+if ! grep -q "https://apt.vaulthalla.sh" /etc/apt/sources.list.d/vaulthalla.list; then
+    echo "🔗 Adding Vaulthalla repository..."
+    echo "deb [arch=amd64] https://apt.vaulthalla.sh stable main" | sudo tee /etc/apt/sources.list.d/vaulthalla.list > /dev/null
+else
+    echo "✅ Vaulthalla repository already exists."
+fi
 
 sudo apt update
 

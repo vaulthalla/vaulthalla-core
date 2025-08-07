@@ -1,97 +1,74 @@
 # ⚡️ Vaulthalla | The Final Cloud ⚡️
 
-**Military-grade encryption. Lightning-fast performance.**
+**Military-grade encryption. Lightning-fast performance.**  
 **Your files, your terms, forever.**
 
 ---
 
-**No plugins. No PHP. No compromises.**
+**No plugins. No PHP. No compromises.**  
 **Storage distilled to perfection.**
 
 ## Why Vaulthalla?
 
-Vaulthalla is crafted from the ground up for security, speed, and simplicity:
+Vaulthalla is engineered from scratch for speed, sovereignty, and unyielding security:
 
-| Feature                 | Description                                                                                                |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| ❌ **Pure Performance**  | No PHP, no interpreters. Compiled directly to blazing-fast native code.                                    |
-| 🚫 **Zero Bloat**       | No calendars, chat widgets, or gimmicks. Pure, elegant storage.                                            |
-| 🛑 **Total Simplicity** | Forget app stores and endless extensions. Vaulthalla keeps your deployment clean, stable, and streamlined. |
-| 💀 **Radical Honesty**  | No dark patterns, no tracking, no subscription creep. True self-sovereignty.                               |
+| Feature                  | Description                                                                                         |
+|--------------------------|-----------------------------------------------------------------------------------------------------|
+| ⚙️ **Compiled Core**      | C++23 codebase, zero runtime overhead. Built for raw performance.                                   |
+| 🔄 **True FUSE Mounts**   | Filesystem integration via libfuse3. Your cloud, your `/mnt`.                                       |
+| 🔐 **AES256-GCM/NI**      | libsodium-backed encryption with hardware AES-NI acceleration.                                      |
+| 🧱 **TPM2 Key Sealing**   | All encryption keys sealed via `tpm2-tss`, never stored in plaintext.                               |
+| 💾 **PostgreSQL Backbone**| Transactional, ACID-compliant metadata persistence.                                                  |
+| 🚫 **No Docker Needed**   | Built Debian-first. No containers required to go live.                                               |
+| ☁️ **S3 Compatible**      | Sync and mirror to AWS, MinIO, R2, and any S3-compatible endpoint.                                   |
+| 🔄 **Zero Trust Sync**    | Local-to-cloud sync with enforced permissions and sealed metadata.                                  |
 
-## ⚙️ Engineered for Excellence
+## ☁️ Intelligent Synchronization
 
-Vaulthalla isn't assembled; it's meticulously designed:
+Three flexible strategies for managing storage:
 
-* **🧠 Pure C++ Core:** Memory-safe, runtime-free, uncompromising speed.
-* **🧰 Modern Toolchain:** Conan and Meson for modular, predictable builds.
-* **🧷 Linux-Native Integration:** True FUSE filesystem mounts.
-* **⚡ Instant WebSockets:** Async real-time sync via Boost::Beast.
-* **🖥️ Sleek Next.js UI:** Instant navigation powered by React.
-* **🛢️ Robust PostgreSQL:** ACID-compliant storage.
-* **🐳 Docker-First:** Optimized containers or bare-metal deployment.
-* **☁️ S3 Fluent:** Compatibility with AWS, MinIO, and S3 endpoints.
-* **🛡️ Secure by Design:** Encryption everywhere, zero-trust default.
+* **⚡ Smart Cache:** Lazy downloads, automatic eviction, and disk-aware operation.
+* **🔄 Two-Way Sync:** Local and cloud parity. Robust conflict resolution.
+* **🪞 Mirror Mode:** One-direction replication, perfect for backup or cold storage.
 
-## ☁️ Intelligent Cloud Synchronization
+## 🔐 Security by Design
 
-Vaulthalla supports three synchronization strategies:
+Everything encrypted. Nothing assumed. Vaulthalla enforces best practices out of the box:
 
-* **⚡ Smart Cache:** Downloads on-demand, auto-eviction under pressure.
-* **🔄 Sync:** Two-way harmony for local/cloud files.
-* **🪞 Mirror:** One-way source of truth, ideal for backups.
-
-## 🔐 Enterprise-Grade Security
-
-Uncompromising security architecture that exceeds enterprise standards:
-
-* 🔑 Native AES256 Encryption
-* 📖 Live Dictionary Filter
-* 🛑 Password Blocklist
-* 🔎 Breach Check Integration
-* 🔒 JWT Sessions
-* 💪 Enforced Password Strength
+* AES-256-GCM file encryption with libsodium
+* TPM2-sealed symmetric keys using `tpm2-tss`
+* Role-based access control and permission bitmasks
+* Password hash hardening and live dictionary blacklisting
+* Encrypted API secrets and key metadata
+* JWT-secured sessions
 
 ---
 
 ## 🚀 Quick Installation (Development Mode)
 
-Vaulthalla is currently in **early active development**. Breaking changes are expected, and not all features are fully implemented. A stable v1 release is anticipated in approximately 1-2 months.
-
-Clone the repository and enter the Vaulthalla directory:
+Vaulthalla is under active development. Expect frequent updates. For local testing:
 
 ```bash
 git clone https://github.com/vaulthalla/server.git
 cd server
-```
-
-Run the installation script via Make, enabling developer mode:
-
-```bash
 make install -- -d
 ```
 
-The `-d` option (`--dev`) enables development mode, auto-configuring defaults for rapid local testing:
+The `-d` flag enables developer mode:
 
-* Uses debug builds
-* Default admin password (`vh!adm1n`)
-* Enables verbose logging and test vault setup
+* Debug build
+* Auto-created admin user (`vh!adm1n`)
+* Verbose logging
+* Dev vaults and Cloudflare R2 S3 test setup
 
-**Note:** Use caution in production environments. This development script may overwrite existing data and configurations.
+**⚠️ Warning:** Dev mode will reset your database and overwrite any existing Vaulthalla configs.
 
 ---
 
 ## ✅ Verifying Installation
 
-Check service status:
-
 ```bash
 systemctl status vaulthalla-core vaulthalla-fuse
-```
-
-View live logs:
-
-```bash
 journalctl -f -u vaulthalla-core
 ```
 
@@ -99,26 +76,28 @@ journalctl -f -u vaulthalla-core
 
 ## ⚠️ Considerations
 
-* Ensure port `443` (HTTPS) and required firewall rules are correctly set.
-* Review default configs in `/etc/vaulthalla/config.yaml` for tuning.
-* Regularly back up your database and encryption keys.
+* Port 443 must be open for HTTPS.
+* Default config lives in `/etc/vaulthalla/config.yaml`.
+* Back up encryption keys and database state regularly.
 
 ---
 
 ## 💡 Support & Contribution
 
-Pull requests, feature suggestions, and issue reports are warmly welcome. A contributor interest form will be available soon for those wanting to learn more and help shape the future of Vaulthalla.
+We welcome contributions, issue reports, and feedback. Contributor interest form coming soon.
 
 ---
 
 ## 🚧 Development Notes
 
-For detailed architecture docs and development guidelines, visit [Vaulthalla Docs](#).
+Full architecture documentation coming soon.
 
 ---
 
 ### Mission Statement
 
-**Vaulthalla exists for those who refuse to settle.** It shatters the limits of bloated stacks and sluggish sync. No plugins, no gimmicks; just raw, unrelenting performance.
+**Vaulthalla is for those who refuse to rent back their own data.**
 
-Where others crumble under their own weight, Vaulthalla stands: **a single, battle-forged platform engineered for speed, hardened for security, and built for absolute sovereignty.**
+No subscriptions. No surveillance. No bloat. Just one battle-forged binary—hardened for performance, encrypted like state secrets, and mounted directly into your filesystem.
+
+This is storage as it should be: fast, sovereign, and truly yours.

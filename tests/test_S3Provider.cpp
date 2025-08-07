@@ -7,6 +7,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <pdfium/fpdfview.h>
 
 namespace fs = std::filesystem;
 
@@ -42,9 +43,19 @@ class S3ProviderIntegrationTest : public ::testing::Test {
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
         s3Provider_ = std::make_shared<vh::cloud::S3Provider>(apiKey_, bucket_);
+
+        FPDF_LIBRARY_CONFIG config;
+        config.version = 3;
+        config.m_pUserFontPaths = nullptr;
+        config.m_pIsolate = nullptr;
+        config.m_v8EmbedderSlot = 0;
+        FPDF_InitLibraryWithConfig(&config);
     }
 
-    void TearDown() override { fs::remove_all(test_dir); }
+    void TearDown() override {
+        fs::remove_all(test_dir);
+        FPDF_DestroyLibrary();
+    }
 
     static void writeTextFile(const fs::path& path, const std::string& content) {
         std::ofstream out(path);

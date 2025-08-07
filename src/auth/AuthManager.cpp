@@ -33,7 +33,7 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSo
 
     if (!session->getRefreshToken().empty()) {
         LogRegistry::auth()->debug("[AuthManager] Attempting to rehydrate session from provided refresh token.");
-        auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
+        const auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
         if (!validatedClient) LogRegistry::auth()->error("[AuthManager] Failed to rehydrate session: invalid refresh token.");
         else {
             client = validatedClient;
@@ -42,7 +42,7 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSo
     }
 
     if (!client) {
-        auto tokenPair = createRefreshToken(session);
+        const auto tokenPair = createRefreshToken(session);
         client = std::make_shared<Client>(session, tokenPair.second);
         session->setRefreshTokenCookie(tokenPair.first);
     }

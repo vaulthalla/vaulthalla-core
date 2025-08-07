@@ -32,7 +32,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        ./bin/setup/install_build_deps.sh
+        ./bin/setup/install_deps.sh
 
     - name: Build
       shell: bash

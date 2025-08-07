@@ -14,13 +14,13 @@ Role::Role(const pqxx::row& row)
       type(row["type"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
       permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())) {
-    if (!row["role_id"].is_null()) role_id = row["role_id"].as<unsigned int>();
-    else if (!row["id"].is_null()) role_id = row["id"].as<unsigned int>();
+    if (!row["role_id"].is_null()) id = row["role_id"].as<unsigned int>();
+    else if (!row["id"].is_null()) id = row["id"].as<unsigned int>();
     else throw std::runtime_error("Role row does not contain 'role_id' or 'id'");
 }
 
 Role::Role(const nlohmann::json& j)
-    : role_id(j.contains("role_id") ? j.at("role_id").get<unsigned int>() : 0),
+    : id(j.contains("role_id") ? j.at("role_id").get<unsigned int>() : 0),
       name(j.at("name").get<std::string>()),
       description(j.at("description").get<std::string>()),
       type(j.at("type").get<std::string>()),
@@ -35,7 +35,7 @@ Role::Role(std::string name, std::string description, std::string type, const ui
 
 void vh::types::to_json(nlohmann::json& j, const Role& r) {
     j = {
-        {"role_id", r.role_id},
+        {"role_id", r.id},
         {"name", r.name},
         {"description", r.description},
         {"type", r.type},
@@ -45,7 +45,7 @@ void vh::types::to_json(nlohmann::json& j, const Role& r) {
 }
 
 void vh::types::from_json(const nlohmann::json& j, Role& r) {
-    if (j.contains("role_id")) r.role_id = j.at("role_id").get<unsigned int>();
+    if (j.contains("role_id")) r.id = j.at("role_id").get<unsigned int>();
     r.name = j.at("name").get<std::string>();
     r.description = j.at("description").get<std::string>();
     r.type = j.at("type").get<std::string>();

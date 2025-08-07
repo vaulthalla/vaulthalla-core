@@ -21,10 +21,10 @@ void PermsQueries::deleteRole(const unsigned int id) {
 
 void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
     Transactions::exec("PermsQueries::updateRole", [&](pqxx::work& txn) {
-        pqxx::params p{role->role_id, role->name, role->description, role->type};
+        pqxx::params p{role->id, role->name, role->description, role->type};
         txn.exec_prepared("update_role", p);
 
-        pqxx::params perms_params{role->role_id, role->permissions};
+        pqxx::params perms_params{role->id, role->permissions};
         txn.exec_prepared("upsert_permissions", perms_params);
     });
 }

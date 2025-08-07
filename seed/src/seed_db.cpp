@@ -1,29 +1,36 @@
 #include "seed_db.hpp"
-#include "config/ConfigRegistry.hpp"
+
+// Database
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Transactions.hpp"
-#include "keys/APIKeyManager.hpp"
+
+// Types
+#include "types/Permission.hpp"
 #include "types/S3Bucket.hpp"
 #include "types/S3Vault.hpp"
 #include "types/RSync.hpp"
 #include "types/FSync.hpp"
-#include "logging/LogRegistry.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "types/User.hpp"
+#include "types/Group.hpp"
+#include "types/Role.hpp"
 #include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
-#include "types/Role.hpp"
 #include "types/Vault.hpp"
 #include "types/Directory.hpp"
-#include "types/Group.hpp"
-#include "types/Permission.hpp"
+
+// Misc
+#include "config/ConfigRegistry.hpp"
+#include "keys/APIKeyManager.hpp"
+#include "logging/LogRegistry.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "util/bitmask.hpp"
 
+// Libraries
 #include <memory>
 
 using namespace vh::seed;
@@ -100,11 +107,11 @@ void vh::seed::initRoles() {
 
     Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
         for (auto& r : roles) {
-            r.role_id = txn.exec_prepared("insert_role",
+            r.id = txn.exec_prepared("insert_role",
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
 
             txn.exec_prepared("assign_permission_to_role",
-                pqxx::params{r.role_id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
+                pqxx::params{r.id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
         }
     });
 }
@@ -118,7 +125,7 @@ void vh::seed::initAdmin() {
     user->setPasswordHash(hashPassword("vh!adm1n"));
     const auto role = PermsQueries::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
-    user->role->role_id = role->role_id;
+    user->role->id = role->id;
     user->role->name = role->name;
     user->role->description = role->description;
     user->role->type = role->type;

@@ -14,7 +14,7 @@ class result;
 namespace vh::types {
 
 struct Role {
-    unsigned int role_id{};
+    unsigned int id{};
     std::string name, description, type;
     std::time_t created_at{};
     uint16_t permissions{0};

@@ -65,7 +65,7 @@ void UserQueries::createUser(const std::shared_ptr<User>& user) {
         pqxx::params p{user->name, user->email, user->password_hash, user->is_active};
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
 
-        txn.exec_prepared("assign_user_role", pqxx::params{userId, user->role->role_id});
+        txn.exec_prepared("assign_user_role", pqxx::params{userId, user->role->id});
 
         for (const auto& role : user->roles) {
             pqxx::params role_params{"user", role->vault_id, userId, role->role_id};
@@ -82,8 +82,8 @@ void UserQueries::updateUser(const std::shared_ptr<User>& user) {
         const auto existingRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{user->id}).one_row();
         const auto existingRoleId = existingRoleRow["role_id"].as<unsigned int>();
 
-        if (user->role->role_id != existingRoleId)
-            txn.exec_prepared("update_user_role", pqxx::params{user->id, user->role->role_id});
+        if (user->role->id != existingRoleId)
+            txn.exec_prepared("update_user_role", pqxx::params{user->id, user->role->id});
     });
 }
 

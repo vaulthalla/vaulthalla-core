@@ -5,10 +5,14 @@
 #include "database/Transactions.hpp"
 #include "types/VaultRole.hpp"
 #include <pqxx/pqxx>
+#include "logging/LogRegistry.hpp"
+
+using namespace vh::logging;
+using namespace vh::types;
 
 namespace vh::database {
 
-std::shared_ptr<types::User> UserQueries::getUserByName(const std::string& name) {
+std::shared_ptr<User> UserQueries::getUserByName(const std::string& name) {
     return Transactions::exec("UserQueries::getUserByName", [&](pqxx::work& txn) {
         const auto userRow = txn.exec_prepared("get_user_by_name", pqxx::params{name}).one_row();
         const auto userId = userRow["id"].as<unsigned int>();
@@ -18,11 +22,11 @@ std::shared_ptr<types::User> UserQueries::getUserByName(const std::string& name)
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
         const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, userRoleRow, rolesRes, overridesRes);
+        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 
-std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
+std::shared_ptr<User> UserQueries::getUserById(const unsigned int id) {
     return Transactions::exec("UserQueries::getUserById", [&](pqxx::work& txn) {
         const auto userRow = txn.exec_prepared("get_user", pqxx::params{id}).one_row();
         const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{id}).one_row();
@@ -31,13 +35,19 @@ std::shared_ptr<types::User> UserQueries::getUserById(const unsigned int id) {
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
         const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, userRoleRow, rolesRes, overridesRes);
+        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 
-std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::string& jti) {
-    return Transactions::exec("UserQueries::getUserByRefreshToken", [&](pqxx::work& txn) {
-        const auto userRow = txn.exec_prepared("get_user_by_refresh_token", pqxx::params{jti}).one_row();
+std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti) {
+    return Transactions::exec("UserQueries::getUserByRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<User> {
+        const auto res = txn.exec_prepared("get_user_by_refresh_token", pqxx::params{jti});
+        if (res.empty()) {
+            LogRegistry::db()->error("[UserQueries] No user found for refresh token JTI: {}", jti);
+            return nullptr;
+        }
+
+        const auto userRow = res.one_row();
         const auto userId = userRow["id"].as<unsigned int>();
         const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{userId}).one_row();
 
@@ -45,11 +55,11 @@ std::shared_ptr<types::User> UserQueries::getUserByRefreshToken(const std::strin
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
         const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-        return std::make_shared<types::User>(userRow, userRoleRow, rolesRes, overridesRes);
+        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 
-void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
+void UserQueries::createUser(const std::shared_ptr<User>& user) {
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         pqxx::params p{user->name, user->email, user->password_hash, user->is_active};
@@ -64,7 +74,7 @@ void UserQueries::createUser(const std::shared_ptr<types::User>& user) {
     });
 }
 
-void UserQueries::updateUser(const std::shared_ptr<types::User>& user) {
+void UserQueries::updateUser(const std::shared_ptr<User>& user) {
     Transactions::exec("UserQueries::updateUser", [&](pqxx::work& txn) {
         pqxx::params u_params{user->id, user->name, user->email, user->password_hash};
         txn.exec_prepared("update_user", u_params);
@@ -106,11 +116,11 @@ unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
     });
 }
 
-std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
+std::vector<std::shared_ptr<User> > UserQueries::listUsers() {
     return Transactions::exec("UserQueries::listUsersWithRoles", [&](pqxx::work& txn) {
         const pqxx::result res = txn.exec_prepared("get_users");
 
-        std::vector<std::shared_ptr<types::User>> usersWithRoles;
+        std::vector<std::shared_ptr<User>> usersWithRoles;
 
         for (const auto& row : res) {
             const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{row["id"].as<unsigned int>()}).one_row();
@@ -118,7 +128,7 @@ std::vector<std::shared_ptr<types::User> > UserQueries::listUsers() {
             const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
             const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
 
-            usersWithRoles.push_back(std::make_shared<types::User>(row, userRoleRow, rolesRes, overridesRes));
+            usersWithRoles.push_back(std::make_shared<User>(row, userRoleRow, rolesRes, overridesRes));
         }
         return usersWithRoles;
     });
@@ -145,9 +155,13 @@ void UserQueries::removeRefreshToken(const std::string& jti) {
 }
 
 std::shared_ptr<auth::RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
-    return Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) {
+    return Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<auth::RefreshToken> {
         const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
-        return std::make_shared<auth::RefreshToken>(res[0]);
+        if (res.empty()) {
+            LogRegistry::db()->error("[UserQueries] No refresh token found for JTI: {}", jti);
+            return nullptr;
+        }
+        return std::make_shared<auth::RefreshToken>(res.one_row());
     });
 }
 

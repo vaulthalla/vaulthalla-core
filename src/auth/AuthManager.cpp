@@ -50,27 +50,6 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSo
     sessionManager_->createSession(client);
 }
 
-bool AuthManager::validateToken(const std::string& token) const {
-    try {
-        const auto session = sessionManager_->getClientSession(token);
-
-        if (!session) {
-            LogRegistry::auth()->error("[AuthManager] Invalid token: session not found for token {}", token);
-            return false;
-        }
-
-        if (!session->isAuthenticated()) {
-            LogRegistry::auth()->error("[AuthManager] Invalid token: authentication failed");
-            return false;
-        }
-
-        return true;
-    } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthManager] Token validation failed: {}", e.what());
-        return false;
-    }
-}
-
 std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
     return sessionManager_;
 }
@@ -180,13 +159,14 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
 
         // 3. Lookup refresh token by jti
         auto storedToken = UserQueries::getRefreshToken(tokenJti);
-        if (!storedToken) throw std::runtime_error("Refresh token not found for JTI: " + tokenJti);
+        if (!storedToken) {
+            LogRegistry::auth()->error("[AuthManager] Refresh token not found: {}", tokenJti);
+            return nullptr;
+        }
 
         if (storedToken->isRevoked()) throw std::runtime_error("Refresh token has been revoked");
 
-        const auto now = std::chrono::system_clock::now();
-
-        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < now)
+        if (std::chrono::system_clock::from_time_t(storedToken->getExpiresAt()) < std::chrono::system_clock::now())
             throw std::runtime_error("Refresh token has expired");
 
         // 4. Secure compare stored hash to hashed input token
@@ -194,10 +174,15 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
             throw std::runtime_error("Refresh token hash mismatch");
 
         auto user = UserQueries::getUserByRefreshToken(tokenJti);
+        if (!user) {
+            LogRegistry::auth()->error("[AuthManager] User not found for refresh token: {}", tokenJti);
+            return nullptr;
+        }
+
         auto client = std::make_shared<Client>(session, storedToken, user);
         sessionManager_->createSession(client);
-        return client;
 
+        return client;
     } catch (const std::exception& e) {
         LogRegistry::auth()->error("[AuthManager] validateRefreshToken failed: {}", e.what());
         return nullptr;

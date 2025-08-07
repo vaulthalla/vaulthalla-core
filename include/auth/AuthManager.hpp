@@ -44,8 +44,6 @@ public:
 
     [[nodiscard]] std::shared_ptr<SessionManager> sessionManager() const;
 
-    [[nodiscard]] bool validateToken(const std::string& token) const;
-
     void validateRefreshToken(const std::string& refreshToken) const;
 
     std::shared_ptr<Client> validateRefreshToken(const std::string& refreshToken,

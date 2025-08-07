@@ -96,21 +96,13 @@ executable('vaulthalla', main,
 
 # ╭──────────────────── TESTS ───────────────────────────╮
 
-test_assets = files(
-    'test-assets/sample.jpg',
-    'test-assets/sample.pdf',
-    'test-assets/Screenshot 2025-06-26 at 3.29.35\u202FPM.png')
-
-foreach asset : test_assets
-    asset_path = '@0@'.format(asset)
-    asset_name = asset_path.split('/')[-1]
-
-    configure_file(
-        input: asset,
-        output: asset_name,
-        copy: true
-    )
-endforeach
+configure_file(input: 'test-assets/sample.jpg', output: 'sample.jpg', copy: true)
+configure_file(input: 'test-assets/sample.pdf', output: 'sample.pdf', copy: true)
+configure_file(
+    input: 'test-assets/Screenshot 2025-06-26 at 3.29.35\u202FPM.png',
+    output: 'Screenshot 2025-06-26 at 3.29.35\u202FPM.png',
+    copy: true
+)
 
 all_test_sources = sources
 foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')

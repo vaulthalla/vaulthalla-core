@@ -1,0 +1,19 @@
+name: C++ CI Release
+on:
+  release:
+    branches:
+      - main
+    types:
+      - published
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - ubuntu-latest-lts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/runner
+        with:
+          release: 'true'

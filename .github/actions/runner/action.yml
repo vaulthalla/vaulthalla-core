@@ -14,10 +14,6 @@ inputs:
     description: Run the package step
     default: 'false'
     required: false
-  deploy:
-    description: Run the deploy step
-    default: 'false'
-    required: false
   release:
     description: If true, auto-runs package and deploy
     default: 'false'
@@ -30,7 +26,7 @@ runs:
       if: ${{ inputs.build == 'true' }}
       uses: ./.github/actions/build
       with:
-        profile: ${{ (inputs.package == 'true' || inputs.deploy == 'true' || inputs.release == 'true') && 'vps-release' || 'vps-debug' }}
+        build_type: ${{ (inputs.package == 'true' || inputs.release == 'true') && 'release' || 'debug' }}
 
     - name: Test
       if: ${{ inputs.test == 'true' }}
@@ -39,7 +35,3 @@ runs:
     - name: Package
       if: ${{ inputs.package == 'true' || inputs.release == 'true' }}
       uses: ./.github/actions/package
-
-    - name: Deploy
-      if: ${{ inputs.deploy == 'true' || inputs.release == 'true' }}
-      uses: ./.github/actions/deploy

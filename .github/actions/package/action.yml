@@ -19,7 +19,7 @@ runs:
     - name: Upload Package to Nexus Sonatype
       shell: bash
       run: |
-        source ~/.bashrc  # Load environment variables
+        source ~/fuck_github.env  # Load environment variables
         echo "Nexus User: $NEXUS_USER"
         echo "Nexus Repo URL: $NEXUS_REPO_URL"
         # push all .deb files (and possibly .dsc/.changes) to Nexus

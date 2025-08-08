@@ -206,7 +206,7 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Session '{}' refreshed successfully.", session.getRefreshToken());
+        LogRegistry::auth()->debug("[AuthHandler] Session '{}' refreshed successfully.", session.getRefreshToken());
     } catch (const std::exception& e) {
         LogRegistry::auth()->error("[AuthHandler] handleRefresh error: {}", e.what());
 

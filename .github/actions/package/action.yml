@@ -23,6 +23,6 @@ runs:
         for pkg in ../*.deb; do
           curl -sSf -u "$NEXUS_USER:$NEXUS_PASS" \
             -H "Content-Type: multipart/form-data" \
-            --data-binary "@$f" \
+            --data-binary "@$pkg" \
             "$NEXUS_REPO_URL"
           done

@@ -18,9 +18,7 @@ Build-Depends:
  libpugixml-dev,
  libgtest-dev,
  libboost-filesystem-dev,
- libboost-system-dev,
- ${shlibs:Depends},
- ${misc:Depends}
+ libboost-system-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/vaulthalla/server
 #Vcs-Browser: https://salsa.debian.org/debian/vaulthalla

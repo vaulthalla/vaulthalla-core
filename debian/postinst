@@ -26,12 +26,6 @@ case "$1" in
         # Ensure /etc/vaulthalla exists
         install -d -m 755 /etc/vaulthalla
 
-        # Copy example config only if real config doesn't exist
-        if [ ! -f "$CONFIG_FILE" ]; then
-            cp /etc/vaulthalla/config.example.yaml "$CONFIG_FILE"
-            echo "📄 Installed example config to $CONFIG_FILE"
-        fi
-
         # Get debconf value and fallback to Yes
         db_get vaulthalla/init-db
         INIT_DB="$RET"

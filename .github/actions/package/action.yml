@@ -20,9 +20,6 @@ runs:
       shell: bash
       run: |
         source ~/fuck_github.env  # Load environment variables
-        echo "Nexus User: $NEXUS_USER"
-        echo "Nexus Repo URL: $NEXUS_REPO_URL"
-        # push all .deb files (and possibly .dsc/.changes) to Nexus
         for pkg in ../*.deb; do
           curl -sSf -u "$NEXUS_USER:$NEXUS_PASS" \
             -H "Content-Type: multipart/form-data" \

@@ -19,6 +19,7 @@ runs:
     - name: Upload Package to Nexus Sonatype
       shell: bash
       run: |
+        source ~/.bashrc  # Load environment variables
         # push all .deb files (and possibly .dsc/.changes) to Nexus
         for pkg in ../*.deb; do
           curl -sSf -u "$NEXUS_USER:$NEXUS_PASS" \

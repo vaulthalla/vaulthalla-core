@@ -97,7 +97,7 @@ executable('vaulthalla', main,
 
 # ╭──────────────────── INSTALLATION ────────────────────╮
 
-install_data('deploy/config/config.example.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
+install_data('deploy/config/config.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
 install_data('deploy/config/config_template.yaml.in', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
 install_data('deploy/systemd/vaulthalla.service', install_dir: get_option('systemd_system_unit_dir'))
 

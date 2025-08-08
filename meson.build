@@ -92,7 +92,8 @@ executable('vaulthalla', main,
            link_with: [lib_seed],
            include_directories: inc,
            dependencies: dep,
-           install: true)
+           install: true,
+           install_dir: join_paths(get_option('bindir'), 'vaulthalla'))
 
 
 # ╭──────────────────── INSTALLATION ────────────────────╮

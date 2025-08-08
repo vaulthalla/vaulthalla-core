@@ -19,7 +19,6 @@ Build-Depends:
  libgtest-dev,
  libboost-filesystem-dev,
  libboost-system-dev,
- libturbojpeg0-dev
  ${shlibs:Depends},
  ${misc:Depends}
 Standards-Version: 4.6.2

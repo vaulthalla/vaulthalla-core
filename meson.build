@@ -95,6 +95,13 @@ executable('vaulthalla', main,
            install: true)
 
 
+# ╭──────────────────── INSTALLATION ────────────────────╮
+
+install_data('deploy/config/config.example.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
+install_data('deploy/config/config_template.yaml.in', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
+install_data('deploy/systemd/vaulthalla.service', install_dir: get_option('systemd_system_unit_dir'))
+
+
 # ╭──────────────────── TESTS ───────────────────────────╮
 
 configure_file(input: 'test-assets/sample.jpg', output: 'sample.jpg', copy: true)

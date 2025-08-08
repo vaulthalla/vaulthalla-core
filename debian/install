@@ -1,4 +1,0 @@
-build/vaulthalla     usr/bin/vaulthalla/
-deploy/config/config.example.yaml   etc/vaulthalla
-deploy/config/config_template.yaml.in  etc/vaulthalla/
-deploy/systemd/vaulthalla.service  lib/systemd/system/

@@ -1,0 +1,6 @@
+option(
+    'systemd_system_unit_dir',
+    type: 'string',
+    value: '/lib/systemd/system',
+    description: 'Directory for systemd service files'
+)

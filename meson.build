@@ -91,7 +91,8 @@ dep = declare_dependency(
 executable('vaulthalla', main,
            link_with: [lib_seed],
            include_directories: inc,
-           dependencies: dep)
+           dependencies: dep,
+           install: true)
 
 
 # ╭──────────────────── TESTS ───────────────────────────╮

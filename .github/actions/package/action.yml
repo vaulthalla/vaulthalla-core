@@ -21,7 +21,7 @@ runs:
       run: |
         # push all .deb files (and possibly .dsc/.changes) to Nexus
         for pkg in ../*.deb; do
-          curl -sSf -u "$UPLOAD_USER:$UPLOAD_PASS" \
+          curl -sSf -u "$NEXUS_USER:$NEXUS_PASS" \
             -H "Content-Type: multipart/form-data" \
             --data-binary "@$f" \
             "$NEXUS_REPO_URL"

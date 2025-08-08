@@ -2,7 +2,7 @@
 .idea
 ~/*
 .env
-config.yaml
+/config.yaml
 
 # Server
 /build/

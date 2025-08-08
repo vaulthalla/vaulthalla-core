@@ -26,7 +26,9 @@ class AuthHandler {
     void handleLogout(const json& msg, WebSocketSession& session) const;
     void handleGetUser(const json& msg, WebSocketSession& session) const;
     void handleListUsers(const json& msg, WebSocketSession& session);
+    static void handleGetUserByName(const json& msg, WebSocketSession& session) ;
     void isUserAuthenticated(const json& msg, WebSocketSession& session) const;
+    static void doesAdminHaveDefaultPassword(const json& msg, WebSocketSession& session) ;
 
   private:
     std::shared_ptr<auth::AuthManager> authManager_;

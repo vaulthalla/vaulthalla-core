@@ -1,6 +1,7 @@
 #include "protocols/websocket/handlers/AuthHandler.hpp"
 #include "auth/AuthManager.hpp"
 #include "auth/Client.hpp"
+#include "database/Queries/PermsQueries.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "types/User.hpp"
 #include "database/Queries/UserQueries.hpp"
@@ -58,6 +59,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const auto email = payload.at("email").get<std::string>();
         const auto password = payload.at("password").get<std::string>();
         const auto isActive = payload.at("is_active").get<bool>();
+        const auto role = payload.at("role").get<std::string>();
+
+        const auto userRole = PermsQueries::getRoleByName(role);
 
         auto user = std::make_shared<User>(name, email, isActive);
         const auto client = authManager_->registerUser(user, password, session.shared_from_this());
@@ -278,10 +282,17 @@ void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
 void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session) const {
     try {
         const auto token = msg.at("token").get<std::string>();
-        const auto client = sessionManager_->getClientSession(token);
+        const auto client = sessionManager_->getClientSession(session.getUUID());
+        if (!client) throw std::runtime_error("Session not found for token: " + token);
 
-        const json data = {{"isAuthenticated", client && client->isAuthenticated()},
-                     {"user", *client->getUser()}};
+        const auto user = client->getUser();
+        if (!user) throw std::runtime_error("User not found for token: " + token);
+
+        const auto isAuthenticated = client->isAuthenticated() && client->validateToken(token);
+
+        json data = {{"isAuthenticated", isAuthenticated}};
+
+        if (isAuthenticated) data["user"] = *user;
 
         const json response = {{"command", "auth.isAuthenticated.response"},
                          {"status", "ok"},
@@ -295,6 +306,65 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
         LogRegistry::auth()->error("[AuthHandler] isUserAuthenticated error: {}", e.what());
 
         const json response = {{"command", "auth.isAuthenticated.response"},
+                         {"status", "error"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
+void AuthHandler::handleGetUserByName(const json& msg, WebSocketSession& session) {
+    try {
+        const auto user = session.getAuthenticatedUser();
+        if (!user) throw std::runtime_error("User not authenticated");
+
+        const auto name = msg.at("payload").at("name").get<std::string>();
+        if (user->name != name && !user->canManageRoles())
+            throw std::runtime_error("Permission denied: Only admins can fetch user by name");
+
+        const auto retUser = UserQueries::getUserByName(name);
+        if (!retUser) throw std::runtime_error("User not found");
+
+        const json data = {{"user", *retUser}};
+        const json response = {{"command", "auth.user.get.byName.response"},
+                         {"status", "ok"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"data", data}};
+
+        session.send(response);
+
+        LogRegistry::auth()->info("[AuthHandler] Fetched user by name successfully.");
+    } catch (const std::exception& e) {
+        LogRegistry::auth()->error("[AuthHandler] handleGetUserByName error: {}", e.what());
+
+        const json response = {{"command", "auth.user.get.byName.response"},
+                         {"status", "error"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"error", e.what()}};
+
+        session.send(response);
+    }
+}
+
+void AuthHandler::doesAdminHaveDefaultPassword(const json& msg, WebSocketSession& session) {
+    try {
+        const bool isDefault = UserQueries::adminPasswordIsDefault();
+
+        const json data = {{"isDefault", isDefault}};
+
+        const json response = {{"command", "auth.admin.default_password.response"},
+                         {"status", "ok"},
+                         {"requestId", msg.at("requestId").get<std::string>()},
+                         {"data", data}};
+
+        session.send(response);
+
+        LogRegistry::auth()->info("[AuthHandler] Checked if admin has default password.");
+    } catch (const std::exception& e) {
+        LogRegistry::auth()->error("[AuthHandler] doesAdminHaveDefaultPassword error: {}", e.what());
+
+        const json response = {{"command", "auth.admin.default_password.response"},
                          {"status", "error"},
                          {"requestId", msg.at("requestId").get<std::string>()},
                          {"error", e.what()}};

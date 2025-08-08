@@ -38,5 +38,6 @@ class UserQueries {
     static std::shared_ptr<types::User> getUserByRefreshToken(const std::string& jti);
 
     [[nodiscard]] static bool adminUserExists();
+    [[nodiscard]] static bool adminPasswordIsDefault();
 };
 } // namespace vh::database

@@ -64,8 +64,16 @@ void WebSocketHandler::registerAuthHandlers() const {
         authHandler_->handleGetUser(msg, session);
     });
 
+    router_->registerHandler("auth.user.get.byName", [this](const json& msg, WebSocketSession& session) {
+        AuthHandler::handleGetUserByName(msg, session);
+    });
+
     router_->registerHandler("auth.users.list", [this](const json& msg, WebSocketSession& session) {
         authHandler_->handleListUsers(msg, session);
+    });
+
+    router_->registerHandler("auth.admin.default_password", [this](const json& msg, WebSocketSession& session) {
+        AuthHandler::doesAdminHaveDefaultPassword(msg, session);
     });
 }
 

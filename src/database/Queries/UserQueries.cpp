@@ -4,8 +4,10 @@
 #include "types/RefreshToken.hpp"
 #include "database/Transactions.hpp"
 #include "types/VaultRole.hpp"
-#include <pqxx/pqxx>
 #include "logging/LogRegistry.hpp"
+#include "crypto/PasswordHash.hpp"
+
+#include <pqxx/pqxx>
 
 using namespace vh::logging;
 using namespace vh::types;
@@ -197,5 +199,11 @@ bool UserQueries::adminUserExists() {
     });
 }
 
+bool UserQueries::adminPasswordIsDefault() {
+    return Transactions::exec("UserQueries::adminPasswordIsDefault", [](pqxx::work& txn) {
+        const auto passwordHash = txn.exec_prepared("get_admin_password").one_field().as<std::string>();
+        return crypto::verifyPassword("vh!adm1n", passwordHash);
+    });
+}
 
 } // namespace vh::database

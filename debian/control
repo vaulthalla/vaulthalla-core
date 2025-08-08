@@ -39,7 +39,6 @@ Depends:
  libpugixml1v5,
  libboost-filesystem1.83.0,
  libboost-system1.83.0,
- libturbojpeg0-dev
  ${shlibs:Depends},
  ${misc:Depends}
 Description: Self-hosted cloud platform with native FUSE and S3 sync

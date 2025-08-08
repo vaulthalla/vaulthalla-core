@@ -1,17 +1,26 @@
+// Services
 #include "services/Vaulthalla.hpp"
-#include "config/ConfigRegistry.hpp"
-#include "concurrency/ThreadPoolManager.hpp"
-#include "database/Transactions.hpp"
-#include "database/Queries/UserQueries.hpp"
 #include "services/ServiceManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+
+// Database
+#include "database/Transactions.hpp"
+#include "database/Queries/UserQueries.hpp"
+
+// Storage
 #include "storage/StorageManager.hpp"
 #include "storage/Filesystem.hpp"
-#include "logging/LogRegistry.hpp"
+
+// Seed
 #include "seed/include/seed_db.hpp"
 #include "seed/include/init_db_tables.hpp"
-#include "database/DBConnection.hpp"
 
+// Misc
+#include "config/ConfigRegistry.hpp"
+#include "concurrency/ThreadPoolManager.hpp"
+#include "logging/LogRegistry.hpp"
+
+// Libraries
 #include <csignal>
 #include <pdfium/fpdfview.h>
 
@@ -25,7 +34,7 @@ using namespace vh::logging;
 namespace {
 std::atomic shouldExit = false;
 
-void signalHandler(int signum) {
+void signalHandler(const int signum) {
     LogRegistry::vaulthalla()->info("[!] Signal {} received. Shutting down gracefully...", std::to_string(signum));
     shouldExit = true;
 }

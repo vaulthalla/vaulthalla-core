@@ -30,7 +30,7 @@ Multi-Arch: foreign
 Depends:
  libmagic1,
  libpqxx-7.10,
- libpdfium-dev20250629,
+ libpdfium-dev2025,
  libsodium23,
  libcurl4,
  libuuid1,

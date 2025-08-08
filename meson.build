@@ -29,7 +29,7 @@ deps = [
     dependency('libcurl', required: true),
     dependency('boost', modules: ['filesystem', 'system'], required: true),
     dependency('libpqxx', required: true),
-    dependency('libpdfium', required: true),
+    dependency('pdfium', required: true),
     dependency('libmagic', required: true),
     dependency('fuse3', required: true),
     dependency('yaml-cpp', required: true),

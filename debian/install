@@ -1,6 +1,4 @@
-build/core_daemon     usr/bin/vaulthalla/
-build/fuse_daemon     usr/bin/vaulthalla/
+build/vaulthalla     usr/bin/vaulthalla/
 deploy/config/config.example.yaml   etc/vaulthalla
 deploy/config/config_template.yaml.in  etc/vaulthalla/
-deploy/systemd/vaulthalla-core.service  lib/systemd/system/
-deploy/systemd/vaulthalla-fuse.service  lib/systemd/system/
+deploy/systemd/vaulthalla.service  lib/systemd/system/

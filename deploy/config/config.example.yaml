@@ -96,7 +96,6 @@ scheduler:
 
 # === ⚙️ ADVANCED FEATURES ===
 advanced:
-  enable_file_versioning: true      # Keep past versions
   max_upload_size_mb: 2048          # Upload limit per file
   enable_sharing: true              # Allow internal file sharing
   enable_public_links: true         # Allow external share links

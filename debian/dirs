@@ -1,4 +1,4 @@
-usr/local/bin/vaulthalla
+usr/bin/vaulthalla
 mnt/vaulthalla
 var/lib/vaulthalla
 var/log/vaulthalla

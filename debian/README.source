@@ -1,4 +1,4 @@
-vaulthalla for Debian
+vaulthalla-server for Debian
 --------------------
 
 <This file describes information about the source package, see Debian policy
@@ -6,5 +6,5 @@ manual section 4.14. You WILL either need to modify or delete this file.>
 
 
 
- -- Cooper <coop@unknown>  Mon, 21 Jul 2025 19:18:51 +0000
+ -- Cooper Larson <cooper@valkyrianlabs.com>  Mon, 21 Jul 2025 19:18:51 +0000
 

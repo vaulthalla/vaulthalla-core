@@ -13,6 +13,6 @@
 
 # Debian
 /debian/**/*debhelper*
-/debian/vaulthalla
-/debian/vaulthalla.substvars
+/debian/vaulthalla-server
+/debian/vaulthalla-server.substvars
 /debian/files

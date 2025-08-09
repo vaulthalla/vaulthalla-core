@@ -1,6 +1,6 @@
 Document: vaulthalla
 Title: Debian vaulthalla Manual
-Author: <insert document author here>
+Author: Cooper Larson <cooper@vaulthalla.sh>
 Abstract: This manual describes what vaulthalla is
  and how it can be used to
  manage online manuals on Debian systems.

@@ -12,7 +12,7 @@ case "$1" in
         # Create system user and group if they don't exist
         if ! id "$DB_USER" >/dev/null 2>&1; then
             echo "👤 Creating system user '$DB_USER'..."
-            adduser --quiet --system --group --no-create-home --shell /usr/sbin/nologin "$DB_USER"
+            adduser --quiet --system --group --home /nonexistent --no-create-home --shell /usr/sbin/nologin "$DB_USER"
         fi
 
         # Create runtime directories

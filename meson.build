@@ -1,4 +1,4 @@
-project('vaulthalla', 'cpp',
+project('vaulthalla-server', 'cpp',
         version: '0.8.8',
         license: 'AGPLv3',
         default_options: [

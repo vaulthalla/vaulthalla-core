@@ -1,12 +1,12 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Source: https://github.com/vaulthalla/server
 Upstream-Name: Vaulthalla
-Upstream-Contact: Cooper Larson <cooper@vaulthalla.sh>
+Upstream-Contact: Cooper Larson <cooper@valkyrianlabs.com>
 
 Files:
  *
 Copyright:
-  2025 Cooper Larson, Valkyrian Labs <cooper@vaulthalla.sh>
+  2025 Cooper Larson, Valkyrian Labs <cooper@valkyrianlabs.com>
 License: AGPL-3.0+
 Comment:
  This program is licensed under the GNU Affero General Public License,

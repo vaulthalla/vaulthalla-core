@@ -10,8 +10,8 @@ runs:
         VERSION=$(meson introspect build --projectinfo | jq -r .version)
 
         # make upstream tarball in the parent dir
-        git archive --format=tar --prefix=vaulthalla-$VERSION/ HEAD \
-          | gzip -9 > ../vaulthalla_$VERSION.orig.tar.gz
+        git archive --format=tar --prefix=vaulthalla-server-$VERSION/ HEAD \
+          | gzip -9 > ../vaulthalla-server_$VERSION.orig.tar.gz
 
         # build source + binary package
         dpkg-buildpackage -us -uc -b

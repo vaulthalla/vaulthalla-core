@@ -26,12 +26,12 @@ case "$1" in
         # Ensure /etc/vaulthalla exists
         install -d -m 755 /etc/vaulthalla
 
-        # Get debconf value and fallback to Yes
+        # Get debconf value and fallback to true
         db_get vaulthalla/init-db
         INIT_DB="$RET"
-        [ -z "$INIT_DB" ] && INIT_DB="Yes"
+        [ -z "$INIT_DB" ] && INIT_DB="true"
 
-        if [ "$INIT_DB" = "Yes" ]; then
+        if [ "$INIT_DB" = "true" ]; then
             echo "[vaulthalla] Setting up PostgreSQL database..."
 
             # Generate safe password

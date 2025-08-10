@@ -101,11 +101,6 @@ for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthal
 done
 sudo chmod 750 /var/log/vaulthalla
 
-# === 5) Install Binaries ===
-echo "🚀 Installing core executables..."
-sudo install -d -o vaulthalla -g vaulthalla -m 755 /usr/local/bin/vaulthalla
-sudo install -m 755 build/vaulthalla /usr/local/bin/vaulthalla/
-
 # === 6) Deploy Config ===
 echo "⚙️  Deploying default config..."
 sudo install -d -m 755 /etc/vaulthalla

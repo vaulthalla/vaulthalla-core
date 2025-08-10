@@ -44,7 +44,6 @@ int main() {
     try {
         ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
         LogRegistry::init(ConfigRegistry::get().logging.log_dir);
-        const auto log = LogRegistry::vaulthalla();
 
         FPDF_LIBRARY_CONFIG config;
         config.version = 3;
@@ -53,35 +52,39 @@ int main() {
         config.m_v8EmbedderSlot = 0;
         FPDF_InitLibraryWithConfig(&config);
 
-        log->info("[*] Initializing Vaulthalla services...");
+        LogRegistry::vaulthalla()->info("[*] Initializing Vaulthalla services...");
 
         ThreadPoolManager::instance().init();
 
+        LogRegistry::vaulthalla()->info("[*] Initializing services...");
         Transactions::init();
         seed::init_tables_if_not_exists();
         Transactions::dbPool_->initPreparedStatements();
         if (!UserQueries::adminUserExists()) vh::seed::init();
 
+        LogRegistry::vaulthalla()->info("[*] Initializing service dependencies...");
         ServiceDepsRegistry::init();
         ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
         Filesystem::init(ServiceDepsRegistry::instance().storageManager);
         ServiceDepsRegistry::instance().storageManager->initStorageEngines();
+
+        LogRegistry::vaulthalla()->info("[✓] Vaulthalla services initialized, starting...");
         ServiceManager::instance().startAll();
+
+        LogRegistry::vaulthalla()->info("[*] Vaulthalla services started successfully.");
 
         std::signal(SIGINT, signalHandler);
         std::signal(SIGTERM, signalHandler);
 
-        log->info("[✓] Vaulthalla services initialized successfully.");
-
         while (!shouldExit) std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        log->info("[*] Shutting down Vaulthalla services...");
+        LogRegistry::vaulthalla()->info("[*] Shutting down Vaulthalla services...");
 
         ServiceManager::instance().stopAll(SIGTERM);
         ThreadPoolManager::instance().shutdown();
         FPDF_DestroyLibrary();
 
-        log->info("[✓] Vaulthalla services shut down cleanly.");
+        LogRegistry::vaulthalla()->info("[✓] Vaulthalla services shut down cleanly.");
 
         return EXIT_SUCCESS;
     } catch (const std::exception& e) {

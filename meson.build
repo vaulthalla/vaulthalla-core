@@ -94,12 +94,32 @@ executable('vaulthalla', main,
            dependencies: dep,
            install: true)
 
+executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
+           include_directories: include_directories('vendor'),
+           install: true)
+
 
 # ╭──────────────────── INSTALLATION ────────────────────╮
 
 install_data('deploy/config/config.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
 install_data('deploy/config/config_template.yaml.in', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
-install_data('deploy/systemd/vaulthalla.service', install_dir: get_option('systemd_system_unit_dir'))
+install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
+
+install_dir = join_paths(get_option('prefix'), get_option('bindir'))
+
+configure_file(
+    input: 'deploy/systemd/vaulthalla.service.in',
+    output: 'vaulthalla.service',
+    configuration: { 'BINDIR': install_dir },
+    install_dir: get_option('systemd_system_unit_dir')
+)
+
+configure_file(
+    input: 'deploy/systemd/vaulthalla-cli.service.in',
+    output: 'vaulthalla-cli.service',
+    configuration: { 'BINDIR': install_dir },
+    install_dir: get_option('systemd_system_unit_dir')
+)
 
 
 # ╭──────────────────── TESTS ───────────────────────────╮

@@ -41,6 +41,7 @@ void LogRegistry::init(const std::string& logDir) {
         spdlog::register_logger(logger);
     };
 
+    makeLogger("vaulthalla", spdlog::level::info);
     makeLogger("fuse", spdlog::level::debug);  // FUSE layer is chatty
     makeLogger("filesystem", spdlog::level::debug);
     makeLogger("cloud", spdlog::level::debug);
@@ -48,8 +49,8 @@ void LogRegistry::init(const std::string& logDir) {
     makeLogger("auth", spdlog::level::info);
     makeLogger("ws", spdlog::level::debug);
     makeLogger("http", spdlog::level::debug);
+    makeLogger("shell", spdlog::level::info);
     makeLogger("db", spdlog::level::debug);
-    makeLogger("vaulthalla", spdlog::level::info);
     makeLogger("sync", spdlog::level::info);
     makeLogger("thumb", spdlog::level::debug);
     makeLogger("storage", spdlog::level::info);
@@ -74,5 +75,7 @@ std::shared_ptr<spdlog::logger> LogRegistry::get(const std::string& name) {
     if (!logger) throw std::runtime_error("[LogRegistry] Logger not found: " + name);
     return logger;
 }
+
+bool LogRegistry::isInitialized() { return initialized_; }
 
 }

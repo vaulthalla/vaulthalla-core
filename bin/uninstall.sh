@@ -26,8 +26,12 @@ fi
 # === 1) Stop and disable systemd service (if exists) ===
 echo "🗑️  Removing systemd services..."
 sudo systemctl stop vaulthalla.service || true
+sudo systemctl stop vaulthalla-cli.service || true
+sudo systemctl stop vaulthalla-cli.socket || true
+sudo systemctl disable vaulthalla-cli.service || true
+sudo systemctl disable vaulthalla-cli.socket || true
 sudo systemctl disable vaulthalla.service || true
-sudo rm -f /etc/systemd/system/vaulthalla.service
+sudo rm -f /etc/systemd/system/vaulthalla*
 sudo systemctl daemon-reload
 echo "✅ Systemd services uninstalled."
 

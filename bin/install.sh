@@ -50,6 +50,24 @@ else
     echo "👤 System user 'vaulthalla' already exists."
 fi
 
+# Create 'vaulthalla' group if it doesn't exist
+if ! getent group vaulthalla > /dev/null; then
+    echo "👥 Creating 'vaulthalla' group..."
+    sudo groupadd --system vaulthalla
+else
+    echo "👥 'vaulthalla' group already exists."
+fi
+
+# === 10) Add current user to vaulthalla group ===
+SUDO_USER=$(who -m | awk '{print $1}')
+if [[ -n "$SUDO_USER" ]]; then
+    echo "👤 Adding current user '$SUDO_USER' to 'vaulthalla' group..."
+    sudo usermod -aG vaulthalla "$SUDO_USER"
+    echo "Please log out and back in for group changes to take effect."
+else
+    echo "⚠️  No SUDO_USER found, skipping user group addition."
+fi
+
 # Check if 'tss' group exists and add 'vaulthalla' to it
 if getent group tss > /dev/null; then
     echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
@@ -149,13 +167,4 @@ echo "🏁 Vaulthalla installed successfully!"
 
 if [[ "$DEV_MODE" == true ]]; then
     sudo journalctl -f -u vaulthalla
-fi
-
-# === 10) Add current user to vaulthalla group ===
-if [[ -n "$SUDO_USER" ]]; then
-    echo "👤 Adding current user '$SUDO_USER' to 'vaulthalla' group..."
-    sudo usermod -aG vaulthalla "$SUDO_USER"
-    echo "Please log out and back in for group changes to take effect."
-else
-    echo "⚠️  No SUDO_USER found, skipping user group addition."
 fi

@@ -2,7 +2,8 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "protocols/shell/Token.hpp"
-#include "protocols/shell/commands/SystemCommands.hpp"
+#include "protocols/shell/commands/system.hpp"
+#include "protocols/shell/commands/vault.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -28,8 +29,8 @@ struct Peer {
     pid_t pid;
 };
 
-Peer peercred(int fd) {
-    struct ucred c{};
+Peer peercred(const int fd) {
+    ucred c{};
     socklen_t len = sizeof(c);
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &c, &len) != 0) throw std::runtime_error("SO_PEERCRED failed");
     return {c.uid, c.gid, c.pid};
@@ -38,18 +39,17 @@ Peer peercred(int fd) {
 bool in_group(uid_t uid, gid_t admin_gid) {
     if (uid == 0) return true;
     // Quick check: primary group ok?
-    struct passwd* pw = getpwuid(uid);
+    const passwd* pw = getpwuid(uid);
     if (!pw) return false;
     if (pw->pw_gid == admin_gid) return true;
     int ng = 0;
     getgrouplist(pw->pw_name, pw->pw_gid, nullptr, &ng);
     std::vector<gid_t> gs(ng);
     if (getgrouplist(pw->pw_name, pw->pw_gid, gs.data(), &ng) < 0) return false;
-    for (auto g : gs) if (g == admin_gid) return true;
-    return false;
+    return std::ranges::any_of(gs, [admin_gid](gid_t g) { return g == admin_gid; });
 }
 
-bool readn(int fd, void* buf, size_t n) {
+bool readn(const int fd, void* buf, size_t n) {
     auto* p = static_cast<unsigned char*>(buf);
     while (n) {
         ssize_t r = ::read(fd, p, n);
@@ -60,7 +60,7 @@ bool readn(int fd, void* buf, size_t n) {
     return true;
 }
 
-bool writen(int fd, const void* buf, size_t n) {
+bool writen(const int fd, const void* buf, size_t n) {
     auto* p = static_cast<const unsigned char*>(buf);
     while (n) {
         ssize_t w = ::write(fd, p, n);
@@ -71,9 +71,9 @@ bool writen(int fd, const void* buf, size_t n) {
     return true;
 }
 
-void send_json(int fd, const json& j) {
-    auto s = j.dump();
-    uint32_t len = htonl(static_cast<uint32_t>(s.size()));
+void send_json(const int fd, const json& j) {
+    const auto s = j.dump();
+    const auto len = htonl(static_cast<uint32_t>(s.size()));
     (void)writen(fd, &len, 4);
     (void)writen(fd, s.data(), s.size());
 }
@@ -88,6 +88,7 @@ CtlServerService::CtlServerService()
       socketPath_("/run/vaulthalla/cli.sock"),
       adminGid_(getgrnam("vaulthalla")->gr_gid) {
     shell::registerSystemCommands(router_);
+    shell::registerVaultCommands(router_);
 }
 
 CtlServerService::~CtlServerService() { closeListener(); }
@@ -131,8 +132,8 @@ void CtlServerService::runLoop() {
 
         // Handle one request/response per connection (simple MVP)
         try {
-            auto p = peercred(cfd);
-            if (!in_group(p.uid, static_cast<gid_t>(adminGid_))) {
+            const auto p = peercred(cfd);
+            if (!in_group(p.uid, adminGid_)) {
                 send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "permission denied"}});
                 ::close(cfd);
                 continue;
@@ -202,8 +203,22 @@ void CtlServerService::runLoop() {
                     call.name = req.value("name", "");
                     if (req.contains("options") && req["options"].is_object()) {
                         for (auto& [k, v] : req["options"].items()) {
-                            // coerce non-strings to strings for now
-                            call.options[k] = v.is_string() ? v.get<std::string>() : v.dump();
+                            // normalize key as you do elsewhere (lowercase, strip dashes) if needed
+                            std::string norm = k;
+                            std::ranges::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
+                            // if you strip leading dashes: erase(0, norm.find_first_not_of('-'));
+
+                            std::string_view key_sv = own(call, std::move(norm));
+
+                            const auto& val_sv = [&v, &call]() -> std::optional<std::string_view> {
+                                if (v.is_string()) return own(call, v.get<std::string>());
+                                if (v.is_boolean()) return own(call, v.get<bool>() ? std::string("true") : std::string("false"));
+                                if (v.is_number()) return own(call, v.dump()); // or v.get<int>() then to_string
+                                if (!v.is_null()) return own(call, v.dump());
+                                return std::nullopt;
+                            };
+
+                            setOpt(call, key_sv, val_sv());
                         }
                     }
                     if (req.contains("positionals") && req["positionals"].is_array()) {

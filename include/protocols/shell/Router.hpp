@@ -2,9 +2,11 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <initializer_list>
 #include <nlohmann/json.hpp>
 
 namespace vh::shell {
@@ -13,8 +15,8 @@ struct CommandCall;
 
 struct CommandResult {
     int exit_code = 0;                 // 0 = success
-    std::string stdout_text;           // what the CLI should print to stdout
-    std::string stderr_text;           // what the CLI should print to stderr
+    std::string stdout_text;           // CLI stdout
+    std::string stderr_text;           // CLI stderr
     nlohmann::json data;               // optional machine-readable payload
     bool has_data = false;
 };
@@ -22,33 +24,39 @@ struct CommandResult {
 using CommandHandler = std::function<CommandResult(const CommandCall&)>;
 
 struct CommandInfo {
-    std::string description;
+    std::string description;                 // own
     CommandHandler handler;
-    std::unordered_set<std::string> aliases;
-    void print(const std::string& canonical) const;
+    std::unordered_set<std::string> aliases; // own normalized aliases (no dashes)
+    void print(std::string_view canonical) const;
 };
 
 class Router {
 public:
-    void registerCommand(const std::string& name, std::string desc, CommandHandler handler,
-                         std::initializer_list<std::string> aliases = {});
+    // Views in, storage owns copies
+    void registerCommand(std::string_view name,
+                         std::string_view desc,
+                         CommandHandler handler,
+                         std::initializer_list<std::string_view> aliases = {});
     CommandResult execute(const CommandCall& call) const;
-    CommandResult executeLine(const std::string& line) const;
+
+    // Accept a view; we'll copy only once if needed
+    CommandResult executeLine(std::string_view line) const;
+
     std::string listCommands() const;
 
 private:
+    // Own the canonical command entries and alias strings
     std::unordered_map<std::string, CommandInfo> commands_;
-    std::unordered_map<std::string, std::string> aliasMap_;
+    std::unordered_map<std::string, std::string> aliasMap_; // alias -> canonical
 
-    std::string canonicalFor(const std::string& nameOrAlias) const;
+    std::string canonicalFor(std::string_view nameOrAlias) const;
 
-    static std::string normalize(const std::string& s);
+    // Normalizers: views in, lowercase copies out (owned)
+    static std::string normalize(std::string_view s);
     static std::string joinAliases(const std::unordered_set<std::string>& aliases);
-    static std::string strip_leading_dashes(const std::string& s);
-    static std::string normalize_alias(const std::string& s);
-    static std::string pretty_alias(const std::string& a);
-    static int term_width();
-    static std::string wrap_text(std::string_view s, size_t width);
+    static std::string strip_leading_dashes(std::string_view s);
+    static std::string normalize_alias(std::string_view s);
+    static std::string pretty_alias(std::string_view a);
 };
 
-}
+} // namespace vh::shell

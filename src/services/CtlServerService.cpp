@@ -1,5 +1,9 @@
 #include "services/CtlServerService.hpp"
 #include "protocols/shell/Router.hpp"
+#include "protocols/shell/Parser.hpp"
+#include "protocols/shell/Token.hpp"
+#include "protocols/shell/commands/SystemCommands.hpp"
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
@@ -18,12 +22,16 @@ using nlohmann::json;
 
 namespace {
 
-struct Peer { uid_t uid; gid_t gid; pid_t pid; };
+struct Peer {
+    uid_t uid;
+    gid_t gid;
+    pid_t pid;
+};
 
 Peer peercred(int fd) {
-    struct ucred c{}; socklen_t len = sizeof(c);
-    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &c, &len) != 0)
-        throw std::runtime_error("SO_PEERCRED failed");
+    struct ucred c{};
+    socklen_t len = sizeof(c);
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &c, &len) != 0) throw std::runtime_error("SO_PEERCRED failed");
     return {c.uid, c.gid, c.pid};
 }
 
@@ -43,12 +51,23 @@ bool in_group(uid_t uid, gid_t admin_gid) {
 
 bool readn(int fd, void* buf, size_t n) {
     auto* p = static_cast<unsigned char*>(buf);
-    while (n) { ssize_t r = ::read(fd, p, n); if (r <= 0) return false; p += r; n -= r; }
+    while (n) {
+        ssize_t r = ::read(fd, p, n);
+        if (r <= 0) return false;
+        p += r;
+        n -= r;
+    }
     return true;
 }
+
 bool writen(int fd, const void* buf, size_t n) {
     auto* p = static_cast<const unsigned char*>(buf);
-    while (n) { ssize_t w = ::write(fd, p, n); if (w <= 0) return false; p += w; n -= w; }
+    while (n) {
+        ssize_t w = ::write(fd, p, n);
+        if (w <= 0) return false;
+        p += w;
+        n -= w;
+    }
     return true;
 }
 
@@ -64,15 +83,20 @@ void send_json(int fd, const json& j) {
 namespace vh::services {
 
 CtlServerService::CtlServerService()
-  : AsyncService("vaulthalla-cli"),
-    router_(std::make_shared<shell::Router>()),
-    socketPath_("/run/vaulthalla/cli.sock"),
-    adminGid_(getgrnam("vaulthalla")->gr_gid) {}
+    : AsyncService("vaulthalla-cli"),
+      router_(std::make_shared<shell::Router>()),
+      socketPath_("/run/vaulthalla/cli.sock"),
+      adminGid_(getgrnam("vaulthalla")->gr_gid) {
+    shell::registerSystemCommands(router_);
+}
 
 CtlServerService::~CtlServerService() { closeListener(); }
 
 void CtlServerService::closeListener() {
-    if (listenFd_ >= 0) { ::close(listenFd_); listenFd_ = -1; }
+    if (listenFd_ >= 0) {
+        ::close(listenFd_);
+        listenFd_ = -1;
+    }
     ::unlink(socketPath_.c_str());
 }
 
@@ -86,7 +110,8 @@ void CtlServerService::runLoop() {
     ::unlink(socketPath_.c_str());
     listenFd_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (listenFd_ < 0) throw std::runtime_error("socket()");
-    sockaddr_un addr{}; addr.sun_family = AF_UNIX;
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
     std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", socketPath_.c_str());
     if (::bind(listenFd_, reinterpret_cast<sockaddr*>(&addr),
                sizeof(sa_family_t) + std::strlen(addr.sun_path) + 1) != 0)
@@ -114,37 +139,96 @@ void CtlServerService::runLoop() {
             }
 
             uint32_t be = 0;
-            if (!readn(cfd, &be, 4)) { ::close(cfd); continue; }
+            if (!readn(cfd, &be, 4)) {
+                ::close(cfd);
+                continue;
+            }
             uint32_t len = ntohl(be);
-            if (len > (1u<<20)) { // 1 MiB cap
-                send_json(cfd, {{"ok",false},{"exit_code",1},{"message","request too large"}});
-                ::close(cfd); continue;
+            if (len > (1u << 20)) {
+                // 1 MiB cap
+                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "request too large"}});
+                ::close(cfd);
+                continue;
             }
             std::string body(len, '\0');
-            if (!readn(cfd, body.data(), len)) { ::close(cfd); continue; }
+            if (!readn(cfd, body.data(), len)) {
+                ::close(cfd);
+                continue;
+            }
 
             json req = json::parse(body, nullptr, true);
             std::string cmd = req.value("cmd", "");
             std::vector<std::string> args = req.value("args", std::vector<std::string>{});
             if (cmd.empty()) cmd = "help";
 
+            // ... after parsing `req` ...
             int exit_code = 0;
-            try {
-                router_->execute(cmd, args);
-            } catch (const std::invalid_argument& e) {
-                exit_code = 1;
-                send_json(cfd, {{"ok",false},{"exit_code",exit_code},{"message",e.what()}});
-                ::close(cfd); continue;
-            } catch (const std::exception& e) {
-                exit_code = 1;
-                send_json(cfd, {{"ok",false},{"exit_code",exit_code},{"message",e.what()}});
-                ::close(cfd); continue;
+
+            auto try_exec_line = [&](const std::string& line) {
+                try {
+                    router_->executeLine(line); // uses tokenize() + parseTokens() under the hood
+                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"message", "ok"}});
+                } catch (const std::invalid_argument& e) {
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                } catch (const std::exception& e) {
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                }
+            };
+
+            // 1) Preferred: raw command line string (max fidelity)
+            if (req.contains("line") && req["line"].is_string()) {
+                std::string line = req["line"].get<std::string>();
+                if (line.empty()) line = "help";
+                try_exec_line(line);
+                ::close(cfd);
+                continue;
             }
 
-            send_json(cfd, {{"ok",true},{"exit_code",0},{"message","ok"}});
+            // 2) Structured: name + options + positionals (maps cleanly to CommandCall)
+            if (req.contains("name") || req.contains("options") || req.contains("positionals")) {
+                try {
+                    shell::CommandCall call;
+                    call.name = req.value("name", "");
+                    if (req.contains("options") && req["options"].is_object()) {
+                        for (auto& [k, v] : req["options"].items()) {
+                            // coerce non-strings to strings for now
+                            call.options[k] = v.is_string() ? v.get<std::string>() : v.dump();
+                        }
+                    }
+                    if (req.contains("positionals") && req["positionals"].is_array()) {
+                        for (auto& it : req["positionals"]) call.positionals.push_back(it.get<std::string>());
+                    }
+                    router_->execute(call); // calls handler(const CommandCall&)
+                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"message", "ok"}});
+                } catch (const std::invalid_argument& e) {
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                } catch (const std::exception& e) {
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                }
+                ::close(cfd);
+                continue;
+            }
+
+            // 3) Back-compat: cmd + args → reconstruct a line so tokenizer parses flags too
+            {
+                std::string cmd = req.value("cmd", "");
+                std::vector<std::string> args = req.value("args", std::vector<std::string>{});
+                if (cmd.empty()) cmd = "help";
+
+                // naive join (good enough if client already split on spaces)
+                std::string line = cmd;
+                for (auto& a : args) {
+                    line.push_back(' ');
+                    line += a;
+                }
+
+                try_exec_line(line);
+                ::close(cfd);
+                continue;
+            }
         } catch (...) {
             // best-effort error response
-            send_json(cfd, {{"ok",false},{"exit_code",1},{"message","internal error"}});
+            send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "internal error"}});
         }
         ::close(cfd);
     }

@@ -5,7 +5,7 @@ namespace vh::shell {
 
 void registerSystemCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand("help", "Show help info",
-        [&r](auto&) { r->listCommands(); },
+        [&r](auto&) -> CommandResult { return {0, r->listCommands(), ""}; },
         {"-h", "--help", "?"});
 }
 

@@ -15,16 +15,6 @@ struct CommandCall {
     std::string name;
     std::unordered_map<std::string, std::string> options;
     std::vector<std::string> positionals;
-
-    void print() const {
-        LogRegistry::shell()->info("[CommandCall] name: {}", name);
-        LogRegistry::shell()->info("[CommandCall] options:");
-        for (const auto& [key, value] : options)
-            LogRegistry::shell()->info("[CommandCall] key: {}, value: {}", key, value);
-        LogRegistry::shell()->info("[CommandCall] positionals:");
-        for (const auto& pos : positionals)
-            LogRegistry::shell()->info("[CommandCall] position: {}", pos);
-    }
 };
 
 inline CommandCall parseTokens(const std::vector<Token>& tokens) {

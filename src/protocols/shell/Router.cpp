@@ -6,6 +6,9 @@
 #include <fmt/core.h>
 #include <cctype>
 #include <stdexcept>
+#include <string>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 using namespace vh::shell;
 using namespace vh::logging;
@@ -44,45 +47,83 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     return n;
 }
 
-void Router::execute(const CommandCall& call) const {
-    LogRegistry::shell()->info("[execute(call)] Executing command...");
-    call.print();
-
+CommandResult Router::execute(const CommandCall& call) const {
     const auto canonical = canonicalFor(call.name);
     if (!commands_.contains(canonical))
         throw std::invalid_argument(fmt::format("Unknown command or alias: {}", call.name));
     return commands_.at(canonical).handler(call);
 }
 
-void Router::execute(const std::string& name, const std::vector<std::string>& args) const {
-    // Legacy shim: wrap into a CommandCall with only positionals.
-    CommandCall call;
-    call.name = name;
-    call.positionals = args;
-
-    LogRegistry::shell()->info("[execute(name, args)] Executing command...");
-    call.print();
-
-    // call.options remains empty
-    execute(call);
-}
-
-void Router::executeLine(const std::string& line) const {
+CommandResult Router::executeLine(const std::string& line) const {
     const auto tokens = tokenize(line);
     const auto call = parseTokens(tokens);
 
-    LogRegistry::shell()->info("[executeLine] Executing command...");
-    call.print();
-
-    if (call.name.empty()) {
-        // No-op on empty line; alternatively, throw if you prefer strict mode
-        return;
-    }
-    execute(call);
+    if (call.name.empty()) return CommandResult(1, "", "no command provided");
+    return execute(call);
 }
 
-void Router::listCommands() const {
-    for (const auto& [name, info] : commands_) fmt::print("{}\n", name);
+std::string Router::listCommands() const {
+    struct Row { std::string name, aliases, desc; };
+
+    // 1) Collect rows in deterministic order
+    std::vector<std::string> keys;
+    keys.reserve(commands_.size());
+    for (const auto& [key, _] : commands_) keys.push_back(key);
+    std::ranges::sort(keys.begin(), keys.end());
+
+    std::vector<Row> rows;
+    rows.reserve(keys.size());
+
+    auto join_aliases = [](const std::unordered_set<std::string>& s) {
+        if (s.empty()) return std::string("-");
+        std::vector<std::string> v(s.begin(), s.end());
+        std::ranges::sort(v.begin(), v.end()); // stable-ish
+        std::string out;
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (i) out += ", ";
+            out += pretty_alias(v[i]);
+        }
+        return out;
+    };
+
+    size_t name_w = std::max<size_t>(4, 0);    // width for "NAME"
+    size_t alias_w = std::max<size_t>(7, 0);   // width for "ALIASES"
+
+    for (const auto& k : keys) {
+        const auto& info = commands_.at(k);
+        Row r{k, join_aliases(info.aliases), info.description};
+        name_w  = std::max(name_w,  r.name.size());
+        alias_w = std::max(alias_w, r.aliases.size());
+        rows.push_back(std::move(r));
+    }
+
+    // 2) Render
+    std::string out;
+    out.reserve(64 + rows.size() * 64);
+    out += "vaulthalla commands:\n";
+    out += fmt::format("  {:{}}  {:{}}  {}\n", "NAME", name_w, "ALIASES", alias_w, "DESCRIPTION");
+    out += fmt::format("  {:-<{}}  {:-<{}}  {}\n", "", name_w, "", alias_w, "-----------");
+
+    const int W = term_width();
+    const size_t left = 2 + name_w + 2 + alias_w + 2; // "  " + name + "  " + aliases + "  "
+    const size_t desc_width = (W > left + 10) ? (W - left) : 40;
+
+    for (const auto& r : rows) {
+        auto wrapped = wrap_text(r.desc, desc_width);
+        // first line
+        out += fmt::format("  {:{}}  {:{}}  {}\n", r.name, name_w, r.aliases, alias_w,
+                           wrapped.substr(0, wrapped.find('\n')));
+        // continuation lines
+        size_t pos = wrapped.find('\n');
+        while (pos != std::string::npos) {
+            const size_t next = wrapped.find('\n', pos + 1);
+            auto line = wrapped.substr(pos + 1, next - (pos + 1));
+            out += fmt::format("  {:{}}  {:{}}  {}\n", "", name_w, "", alias_w, line);
+            pos = next;
+        }
+    }
+
+    return out;
 }
 
 std::string Router::normalize(const std::string& s) {
@@ -112,7 +153,35 @@ std::string Router::joinAliases(const std::unordered_set<std::string>& aliases) 
     return out;
 }
 
-void CommandInfo::print(const std::string& canonical) const {
-    auto logger = LogRegistry::shell();
-    logger->info("{} (aliases: {}) - {}", canonical, Router::joinAliases(aliases), description);
+std::string Router::pretty_alias(const std::string& a) {
+    if (a == "?") return "?";
+    if (a.size() == 1) return fmt::format("-{}", a);
+    return fmt::format("--{}", a);
+}
+
+int Router::term_width() {
+    if (!isatty(STDOUT_FILENO)) return 80;
+    winsize ws{};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) return ws.ws_col;
+    const char* c = std::getenv("COLUMNS");
+    if (c) { int n = std::atoi(c); if (n > 0) return n; }
+    return 80;
+}
+
+std::string Router::wrap_text(std::string_view s, size_t width) {
+    std::string out; size_t col = 0;
+    size_t i = 0;
+    while (i < s.size()) {
+        // take a word
+        size_t j = i;
+        while (j < s.size() && s[j] != ' ') ++j;
+        size_t wlen = j - i;
+        if (col && col + 1 + wlen > width) { out += '\n'; col = 0; }
+        if (col) { out += ' '; ++col; }
+        out.append(s.substr(i, wlen));
+        col += wlen;
+        while (j < s.size() && s[j] == ' ') ++j;
+        i = j;
+    }
+    return out;
 }

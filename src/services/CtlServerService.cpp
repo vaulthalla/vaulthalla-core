@@ -166,7 +166,18 @@ void CtlServerService::runLoop() {
 
             auto try_exec_line = [&](const std::string& line) {
                 try {
-                    router_->executeLine(line); // uses tokenize() + parseTokens() under the hood
+                    const auto res = router_->executeLine(line); // uses tokenize() + parseTokens() under the hood
+
+                    json resp{
+                            {"ok", res.exit_code == 0},
+                            {"exit_code", res.exit_code},
+                        };
+                    if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
+                    if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
+                    if (res.has_data) resp["data"] = res.data;
+
+                    send_json(cfd, resp);
+
                     send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"message", "ok"}});
                 } catch (const std::invalid_argument& e) {
                     send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
@@ -198,8 +209,17 @@ void CtlServerService::runLoop() {
                     if (req.contains("positionals") && req["positionals"].is_array()) {
                         for (auto& it : req["positionals"]) call.positionals.push_back(it.get<std::string>());
                     }
-                    router_->execute(call); // calls handler(const CommandCall&)
-                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"message", "ok"}});
+                    const auto res = router_->execute(call); // calls handler(const CommandCall&)
+
+                    json resp{
+                        {"ok", res.exit_code == 0},
+                        {"exit_code", res.exit_code},
+                    };
+                    if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
+                    if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
+                    if (res.has_data) resp["data"] = res.data;
+
+                    send_json(cfd, resp);
                 } catch (const std::invalid_argument& e) {
                     send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
                 } catch (const std::exception& e) {

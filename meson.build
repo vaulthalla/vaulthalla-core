@@ -96,6 +96,7 @@ executable('vaulthalla', main,
 
 executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
            include_directories: include_directories('vendor'),
+           dependencies: [dependency('fmt', required: true)],
            install: true)
 
 

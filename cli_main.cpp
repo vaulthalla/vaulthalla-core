@@ -7,6 +7,8 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <arpa/inet.h>
+#include <cstring>
+#include <fmt/core.h>
 
 static bool readn(int fd, void* b, size_t n) {
     auto* p = (uint8_t*)b;
@@ -61,10 +63,9 @@ int main(int argc, char** argv) {
     if (!readn(s, resp.data(), len)) return 1;
 
     auto r = nlohmann::json::parse(resp);
-    if (!r.value("ok", false)) {
-        std::cerr << "[vhctl] " << r.value("message", "error") << "\n";
-    } else if (r.contains("payload")) {
-        std::cout << r["payload"].dump(2) << "\n";
-    }
-    return r.value("exit_code", r.value("ok", false) ? 0 : 1);
+    if (r.contains("stdout")) fmt::print("{}",
+    r["stdout"].get<std::string>());
+    if (r.contains("stderr")) fmt::print(stderr, "{}",
+        r["stderr"].get<std::string>());
+    return r.value("exit_code", 0);
 }

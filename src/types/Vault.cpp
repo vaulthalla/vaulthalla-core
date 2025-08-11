@@ -2,6 +2,7 @@
 #include "types/S3Vault.hpp"
 #include "util/timestamp.hpp"
 #include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/Table.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -91,82 +92,38 @@ std::string vh::types::to_string(const std::shared_ptr<Vault>& v) {
     return to_string(*v);
 }
 
+
 std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaults) {
     if (vaults.empty()) return "No vaults found\n";
 
-    struct Row { std::string name, type, quota, mount, desc; };
-    std::vector<Row> rows;
-    rows.reserve(vaults.size());
-
-    // Build rows (materialize strings once)
-    size_t name_w = 4;      // "NAME"
-    size_t type_w = 4;      // "TYPE"
-    size_t quota_w = 5;     // "QUOTA"
-    size_t mount_w = 5;     // "MOUNT"
+    Table tbl({
+        { "NAME",  Align::Left,  4, 64,  false, false },
+        { "TYPE",  Align::Left,  4, 24,  false, false },
+        { "QUOTA", Align::Right, 5, 32,  false, false },
+        // keep mount reasonable; ellipsize middle for deep paths
+        { "MOUNT", Align::Left,  5, 48,  false, true  },
+        // description wraps, effectively acts as flex column
+        { "DESCRIPTION", Align::Left, 11, 2000, true, false },
+    }, /*term_width*/ term_width());
 
     for (const auto& vp : vaults) {
-        const Vault& v = *vp;
-        Row r;
-        r.name  = v.name;
-        r.type  = to_string(v.type);
-        r.desc  = v.description;
-
-        if (v.quota == 0) r.quota = "∞";  // Use infinity symbol for no quota
-        else r.quota = fmt::format("{} ({})", human_bytes(static_cast<uint64_t>(v.quota)),
-                              static_cast<unsigned long long>(v.quota));
-        r.mount = v.mount_point.string();
-
-        name_w  = std::max(name_w,  r.name.size());
-        type_w  = std::max(type_w,  r.type.size());
-        quota_w = std::max(quota_w, r.quota.size());
-        mount_w = std::max(mount_w, r.mount.size());
-
-        rows.push_back(std::move(r));
+        const auto& v = *vp;
+        const std::string quota = (v.quota == 0)
+            ? "∞"
+            : fmt::format("{} ({})",
+                          human_bytes(static_cast<uint64_t>(v.quota)),
+                          static_cast<unsigned long long>(v.quota));
+        tbl.add_row({
+            v.name,
+            to_string(v.type),
+            quota,
+            v.mount_point.string(),
+            v.description
+        });
     }
 
-    // Keep mount column reasonable so DESCRIPTION has breathing room
-    const int term = term_width();
-    const size_t hard_mount_cap = 48;                       // adjust to taste
-    mount_w = std::min(mount_w, hard_mount_cap);
-
-    // Compute description width given terminal width
-    const size_t left = 2 + name_w + 2 + type_w + 2 + quota_w + 2 + mount_w + 2;
-    const size_t desc_width = (term > static_cast<int>(left + 10))
-                                ? (static_cast<size_t>(term) - left)
-                                : 40;                      // fallback if no TTY or tiny width
-
-    // Header
     std::string out;
-    out.reserve(96 + rows.size() * 96);
     out += "vaulthalla vaults:\n";
-    out += fmt::format("  {:{}}  {:{}}  {:{}}  {:{}}  {}\n",
-                       "NAME", name_w, "TYPE", type_w, "QUOTA", quota_w, "MOUNT", mount_w, "DESCRIPTION");
-    out += fmt::format("  {:-<{}}  {:-<{}}  {:-<{}}  {:-<{}}  {}\n",
-                       "", name_w, "", type_w, "", quota_w, "", mount_w, "-----------");
-
-    // Rows
-    for (auto& r : rows) {
-        // Clamp mount to column width with ellipsis if needed
-        std::string mount_col = (r.mount.size() > mount_w) ? ellipsize_middle(r.mount, mount_w) : r.mount;
-
-        // Wrap description to desc_width
-        auto wrapped = wrap_text(r.desc, desc_width);
-        // First line: print everything
-        out += fmt::format("  {:{}}  {:{}}  {:{}}  {:{}}  {}\n",
-                           r.name, name_w, r.type, type_w, r.quota, quota_w, mount_col, mount_w,
-                           wrapped.substr(0, wrapped.find('\n')));
-
-        // Continuations: description only
-        size_t pos = wrapped.find('\n');
-        while (pos != std::string::npos) {
-            const size_t next = wrapped.find('\n', pos + 1);
-            auto line = wrapped.substr(pos + 1, next - (pos + 1));
-            out += fmt::format("  {:{}}  {:{}}  {:{}}  {:{}}  {}\n",
-                               "", name_w, "", type_w, "", quota_w, "", mount_w, line);
-            pos = next;
-        }
-        out += '\n';  // Add a blank line between vaults
-    }
-
+    out += tbl.render();
     return out;
 }

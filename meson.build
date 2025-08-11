@@ -88,7 +88,7 @@ dep = declare_dependency(
 
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
-executable('vaulthalla', main,
+executable('vaulthalla-server', main,
            link_with: [lib_seed],
            include_directories: inc,
            dependencies: dep,
@@ -99,14 +99,15 @@ executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
            dependencies: [dependency('fmt', required: true)],
            install: true)
 
-
 # ╭──────────────────── INSTALLATION ────────────────────╮
+
+install_dir = join_paths(get_option('prefix'), get_option('bindir'))
+install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
+install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
 install_data('deploy/config/config.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
 install_data('deploy/config/config_template.yaml.in', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
 install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
-
-install_dir = join_paths(get_option('prefix'), get_option('bindir'))
 
 configure_file(
     input: 'deploy/systemd/vaulthalla.service.in',

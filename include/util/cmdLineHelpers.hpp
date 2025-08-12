@@ -55,4 +55,25 @@ inline std::string ellipsize_middle(std::string s, size_t maxw) {
     return s.substr(0, keep) + "..." + s.substr(s.size() - tail);
 }
 
+inline std::string snake_case_to_title(const std::string& s) {
+    // converts ex. "snake_case_string" to "Snake Case String"
+    std::string out;
+    out.reserve(s.size());
+    bool next_upper = true;
+    for (char c : s) {
+        if (c == '_') {
+            out.push_back(' ');
+            next_upper = true;
+            continue;
+        }
+
+        if (next_upper) {
+            out.push_back(static_cast<char>(std::toupper(c)));
+            next_upper = false;
+        } else out.push_back(static_cast<char>(std::tolower(c)));
+    }
+
+    return out;
+}
+
 }

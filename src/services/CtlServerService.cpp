@@ -4,6 +4,7 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/commands/system.hpp"
 #include "protocols/shell/commands/vault.hpp"
+#include "protocols/shell/commands/user.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -94,6 +95,7 @@ CtlServerService::CtlServerService()
       adminGid_(getgrnam("vaulthalla")->gr_gid) {
     shell::registerSystemCommands(router_);
     shell::registerVaultCommands(router_);
+    shell::registerUserCommands(router_);
 }
 
 CtlServerService::~CtlServerService() { closeListener(); }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "protocols/shell/Token.hpp"
-#include "types/User.hpp"
+#include "protocols/shell/types.hpp"
 
 #include <string_view>
 #include <string>
@@ -10,22 +10,6 @@
 #include <cctype>
 
 namespace vh::shell {
-
-struct FlagKV {
-    std::string_view key;
-    std::optional<std::string_view> value;
-};
-
-struct CommandCall {
-    std::string_view name;
-    std::vector<FlagKV> options;
-    std::vector<std::string_view> positionals;
-    bool rewrote = false;
-    std::shared_ptr<types::User> user;
-
-    // owns any strings you create at runtime (JSON, rewrites, etc.)
-    std::vector<std::string> arena;
-};
 
 // Own a string and return a stable view into it
 inline std::string_view own(CommandCall& c, std::string s) {

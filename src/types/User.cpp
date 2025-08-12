@@ -3,11 +3,15 @@
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 #include "util/timestamp.hpp"
+#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/Table.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
 #include <ranges>
+
+using namespace vh::shell;
 
 namespace vh::types {
 
@@ -178,6 +182,33 @@ bool User::canMoveVaultData(const unsigned int vaultId, const std::filesystem::p
 bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::List, path);
+}
+
+std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
+    if (users.empty()) return "No users found\n";
+
+    Table tbl({
+        {"Name", Align::Left, 4, 32, false, false},
+        {"Email", Align::Left, 4, 32, false, false},
+        {"Role", Align::Left, 4, 16, false, false},
+        {"Created At", Align::Left, 4, 20, false, false},
+        {"Last Login", Align::Left, 4, 20, false, false},
+        {"Active", Align::Left, 4, 8, false, false}
+    }, term_width());
+
+    for (const auto& user : users) {
+        if (!user) continue; // Skip null pointers
+        tbl.add_row({
+            user->name,
+            user->email.value_or("N/A"),
+            user->role ? snake_case_to_title(user->role->name) : "No Role",
+            util::timestampToString(user->created_at),
+            user->last_login ? util::timestampToString(*user->last_login) : "Never",
+            user->is_active ? "Yes" : "No"
+        });
+    }
+
+    return "Vaulthalla users:\n" + tbl.render();
 }
 
 } // namespace vh::types

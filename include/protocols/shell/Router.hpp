@@ -1,5 +1,7 @@
 #pragma once
 
+#include <protocols/shell/types.hpp>
+
 #include <functional>
 #include <string>
 #include <string_view>
@@ -14,25 +16,6 @@ namespace vh::types {
 }
 
 namespace vh::shell {
-
-struct CommandCall;
-
-struct CommandResult {
-    int exit_code = 0;                 // 0 = success
-    std::string stdout_text;           // CLI stdout
-    std::string stderr_text;           // CLI stderr
-    nlohmann::json data;               // optional machine-readable payload
-    bool has_data = false;
-};
-
-using CommandHandler = std::function<CommandResult(const CommandCall&)>;
-
-struct CommandInfo {
-    std::string description;                 // own
-    CommandHandler handler;
-    std::unordered_set<std::string> aliases; // own normalized aliases (no dashes)
-    void print(std::string_view canonical) const;
-};
 
 class Router {
 public:

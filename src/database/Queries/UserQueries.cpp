@@ -61,9 +61,9 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
     });
 }
 
-void UserQueries::createUser(const std::shared_ptr<User>& user) {
+unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
-    Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
+    return Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         pqxx::params p{user->name, user->email, user->password_hash, user->is_active, user->linux_uid};
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
 
@@ -73,6 +73,8 @@ void UserQueries::createUser(const std::shared_ptr<User>& user) {
             pqxx::params role_params{"user", role->vault_id, userId, role->role_id};
             txn.exec_prepared("assign_vault_role", role_params);
         }
+
+        return userId;
     });
 }
 

@@ -11,21 +11,15 @@
 
 namespace vh::shell {
 
-// Own a string and return a stable view into it
-inline std::string_view own(CommandCall& c, std::string s) {
-    c.arena.emplace_back(std::move(s));
-    return std::string_view(c.arena.back());
-}
-
 // Upsert a flag (last wins)
 inline void setOpt(CommandCall& c,
-                   std::string_view key,
-                   std::optional<std::string_view> val) {
-    for (auto& kv : c.options) if (kv.key == key) { kv.value = val; return; }
+                   const std::string& key,
+                   const std::optional<std::string>& val) {
+    for (auto& [k, v] : c.options) if (k == key) { v = val; return; }
     c.options.push_back(FlagKV{key, val});
 }
 
-static inline bool looks_number(std::string_view s) {
+static inline bool looks_number(std::string s) {
     if (s.empty()) return false;
     size_t i = 0;
     if (s[i] == '-') { if (s.size()==1) return false; ++i; }
@@ -44,8 +38,9 @@ inline CommandCall parseTokens(const std::vector<Token>& toks) {
     call.options.reserve(8);
     call.positionals.reserve(8);
 
-    // 1) Command name = first Word
     size_t i = 0;
+
+    // 1) Command name = first Word
     for (; i < toks.size(); ++i) {
         if (toks[i].type == TokenType::Word) {
             call.name = toks[i].text;
@@ -53,18 +48,13 @@ inline CommandCall parseTokens(const std::vector<Token>& toks) {
             break;
         }
     }
-    // Optional: if no Word found, allow leading help alias as "name"
+    // Optional: allow leading Flag as "name" (help-style)
     if (call.name.empty() && !toks.empty() && toks[0].type == TokenType::Flag) {
-        // Only if you explicitly allow this (e.g., "help"/"h" came in as a Flag)
         call.name = toks[0].text;
         i = 1;
     }
 
     bool stop_flags = false;
-
-    auto push_flag = [&](std::string_view k, std::optional<std::string_view> v) {
-        call.options.push_back(FlagKV{ k, v });
-    };
 
     for (; i < toks.size(); ++i) {
         const Token& t = toks[i];
@@ -76,14 +66,12 @@ inline CommandCall parseTokens(const std::vector<Token>& toks) {
         }
 
         if (!stop_flags && t.type == TokenType::Flag) {
-            // Try to consume a following value if the next token is a Word
+            const auto key = t.text;
             if (i + 1 < toks.size() && toks[i+1].type == TokenType::Word) {
-                // Accept negative numbers as values too
-                push_flag(t.text, toks[i+1].text);
-                ++i;
+                setOpt(call, key, toks[i+1].text);
+                ++i; // consumed value
             } else {
-                // Boolean flag
-                push_flag(t.text, std::nullopt);
+                setOpt(call, key, std::nullopt);
             }
             continue;
         }

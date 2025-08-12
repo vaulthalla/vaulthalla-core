@@ -5,14 +5,14 @@
 
 namespace vh::shell {
 
-enum class TokenType { Word, Flag, Value }; // keep Value available if you want later
+enum class TokenType { Word, Flag, Value };
 
 struct Token {
     TokenType type;
-    std::string text; // owning; keep it simple
+    std::string text;
 };
 
-static inline bool looks_negative_number(std::string_view s) {
+inline bool looks_negative_number(std::string_view s) {
     if (s.size() < 2 || s[0] != '-') return false;
     bool dot = false, digit = false;
     for (size_t i = 1; i < s.size(); ++i) {

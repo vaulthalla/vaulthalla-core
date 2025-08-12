@@ -11,14 +11,14 @@
 namespace vh::shell {
 
 struct FlagKV {
-    std::string_view key;
-    std::optional<std::string_view> value;
+    std::string key;
+    std::optional<std::string> value;
 };
 
 struct CommandCall {
-    std::string_view name;
+    std::string name;
     std::vector<FlagKV> options;
-    std::vector<std::string_view> positionals;
+    std::vector<std::string> positionals;
     bool rewrote = false;
     std::shared_ptr<types::User> user;
 
@@ -40,7 +40,7 @@ struct CommandInfo {
     std::string description;                 // own
     CommandHandler handler;
     std::unordered_set<std::string> aliases; // own normalized aliases (no dashes)
-    void print(std::string_view canonical) const;
+    void print(std::string canonical) const;
 };
 
 }

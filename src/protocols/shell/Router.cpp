@@ -15,17 +15,17 @@
 using namespace vh::shell;
 using namespace vh::logging;
 
-void Router::registerCommand(const std::string_view name,
-                             const std::string_view desc,
+void Router::registerCommand(const std::string& name,
+                             const std::string& desc,
                              CommandHandler handler,
-                             const std::initializer_list<std::string_view> aliases)
+                             const std::initializer_list<std::string> aliases)
 {
     std::string key = normalize(name);
 
     CommandInfo info{std::string(desc), std::move(handler), {}};
 
     // record aliases
-    for (const std::string_view alias : aliases) {
+    for (const std::string& alias : aliases) {
         std::string a = normalize_alias(alias);
 
         if (auto it = aliasMap_.find(a); it != aliasMap_.end() && it->second != key) {
@@ -40,7 +40,7 @@ void Router::registerCommand(const std::string_view name,
     commands_[key] = std::move(info);
 }
 
-std::string Router::canonicalFor(const std::string_view nameOrAlias) const {
+std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     std::string n = normalize(nameOrAlias);
     if (commands_.contains(n)) return n;
 
@@ -58,12 +58,11 @@ CommandResult Router::execute(const CommandCall& call) const {
     return commands_.at(canonical).handler(call);
 }
 
-CommandResult Router::executeLine(const std::string_view line, const std::shared_ptr<types::User>& user) const {
+CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const {
     LogRegistry::shell()->info("[Router] Executing line: '{}'", line);
     // Tokenizer expects a string that lives while tokens/views are used.
     // We keep it local so Token/CommandCall views remain valid through execute().
-    const std::string owned(line);
-    const auto tokens = tokenize(owned);   // your tokenize returns Token views into 'owned'
+    const auto tokens = tokenize(line);   // your tokenize returns Token views into 'owned'
     auto call   = parseTokens(tokens);
     call.user = user;
 
@@ -131,32 +130,32 @@ std::string Router::listCommands() const {
     return out;
 }
 
-std::string Router::normalize(std::string_view s) {
+std::string Router::normalize(const std::string& s) {
     std::string out;
     out.reserve(s.size());
     for (unsigned char c : s) out.push_back(static_cast<char>(std::tolower(c)));
     return out;
 }
 
-std::string Router::strip_leading_dashes(std::string_view s) {
+std::string Router::strip_leading_dashes(const std::string& s) {
     size_t i = 0; while (i < s.size() && s[i] == '-') ++i;
     return std::string{s.substr(i)};
 }
 
-std::string Router::normalize_alias(std::string_view s) {
+std::string Router::normalize_alias(const std::string& s) {
     return normalize(strip_leading_dashes(s));
 }
 
 std::string Router::joinAliases(const std::unordered_set<std::string>& aliases) {
     if (aliases.empty()) return "-";
-    std::vector<std::string> v(aliases.begin(), aliases.end());
-    std::sort(v.begin(), v.end());
+    std::vector v(aliases.begin(), aliases.end());
+    std::ranges::sort(v.begin(), v.end());
     std::string out;
     for (size_t i=0;i<v.size();++i) { if (i) out += ", "; out += v[i]; }
     return out;
 }
 
-std::string Router::pretty_alias(std::string_view a) {
+std::string Router::pretty_alias(const std::string& a) {
     if (a == "?") return "?";
     if (a.size() == 1) return fmt::format("-{}", a);
     return fmt::format("--{}", a);

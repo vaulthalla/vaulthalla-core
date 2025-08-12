@@ -224,13 +224,12 @@ void CtlServerService::runLoop() {
                             std::ranges::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
                             // if you strip leading dashes: erase(0, norm.find_first_not_of('-'));
 
-                            std::string_view key_sv = own(call, std::move(norm));
+                            const auto key_sv = std::move(norm);
 
-                            const auto& val_sv = [&v, &call]() -> std::optional<std::string_view> {
-                                if (v.is_string()) return own(call, v.get<std::string>());
-                                if (v.is_boolean()) return own(call, v.get<bool>() ? std::string("true") : std::string("false"));
-                                if (v.is_number()) return own(call, v.dump()); // or v.get<int>() then to_string
-                                if (!v.is_null()) return own(call, v.dump());
+                            const auto& val_sv = [&v]() -> std::optional<std::string> {
+                                if (v.is_string()) return v.get<std::string>();
+                                if (v.is_boolean()) return v.get<bool>() ? std::string("true") : std::string("false");
+                                if (!v.is_null()) return v.dump();
                                 return std::nullopt;
                             };
 

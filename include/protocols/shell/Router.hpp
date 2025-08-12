@@ -20,30 +20,28 @@ namespace vh::shell {
 class Router {
 public:
     // Views in, storage owns copies
-    void registerCommand(std::string_view name,
-                         std::string_view desc,
+    void registerCommand(const std::string& name,
+                         const std::string& desc,
                          CommandHandler handler,
-                         std::initializer_list<std::string_view> aliases = {});
+                         std::initializer_list<std::string> aliases = {});
     CommandResult execute(const CommandCall& call) const;
 
     // Accept a view; we'll copy only once if needed
-    CommandResult executeLine(std::string_view line, const std::shared_ptr<types::User>& user) const;
+    CommandResult executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const;
 
     std::string listCommands() const;
 
 private:
-    // Own the canonical command entries and alias strings
     std::unordered_map<std::string, CommandInfo> commands_;
     std::unordered_map<std::string, std::string> aliasMap_; // alias -> canonical
 
-    std::string canonicalFor(std::string_view nameOrAlias) const;
+    std::string canonicalFor(const std::string& nameOrAlias) const;
 
-    // Normalizers: views in, lowercase copies out (owned)
-    static std::string normalize(std::string_view s);
+    static std::string normalize(const std::string& s);
+    static std::string normalize_alias(const std::string& s);
     static std::string joinAliases(const std::unordered_set<std::string>& aliases);
-    static std::string strip_leading_dashes(std::string_view s);
-    static std::string normalize_alias(std::string_view s);
-    static std::string pretty_alias(std::string_view a);
+    static std::string strip_leading_dashes(const std::string& s);
+    static std::string pretty_alias(const std::string& a);
 };
 
 } // namespace vh::shell

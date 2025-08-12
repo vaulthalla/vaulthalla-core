@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <string_view>
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -28,7 +27,7 @@ struct Cell {
 
 class Table {
 public:
-    explicit Table(std::vector<Column> cols, int term_width = 0)
+    explicit Table(std::vector<Column> cols, const int term_width = 0)
         : cols_(std::move(cols)), term_width_(term_width) {}
 
     void add_row(std::vector<std::string> cells) {
@@ -50,8 +49,8 @@ public:
                 width[i] = std::max(width[i], std::min(cols_[i].max, r[i].text.size()));
 
         // 2) Budget to terminal width: 2 leading spaces + "  " between cols
-        const std::size_t pad_left = 2;
-        const std::size_t gap = 2;
+        constexpr std::size_t pad_left = 2;
+        constexpr std::size_t gap = 2;
         auto total_width = [&](const std::vector<std::size_t>& w){
             std::size_t sum = pad_left + (ncol ? (gap * (ncol-1)) : 0);
             for (auto x : w) sum += x;

@@ -18,7 +18,7 @@ protected:
     void onStop(); // close listener to break accept()
 
 private:
-    std::shared_ptr<vh::shell::Router> router_;
+    std::shared_ptr<shell::Router> router_;
     std::string socketPath_;
     unsigned adminGid_;
     int listenFd_ = -1;

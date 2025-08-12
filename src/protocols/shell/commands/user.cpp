@@ -1,18 +1,133 @@
 #include "protocols/shell/commands/user.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "database/Queries/PermsQueries.hpp"
 #include "util/shellArgsHelpers.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "auth/AuthManager.hpp"
+#include "storage/StorageEngine.hpp"
+#include "crypto/PasswordHash.hpp"
+#include "logging/LogRegistry.hpp"
+#include "types/UserRole.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::auth;
+using namespace vh::services;
+using namespace vh::logging;
+
+static CommandResult usage_user_root() {
+    return {
+        0,
+        "Usage:\n"
+        "  user create --name <name> --role <role> [--email <email>] [--linux-uid <uid>]\n"
+        "  user delete <name>\n"
+        "  user info   <name>\n",
+        ""
+    };
+}
 
 void vh::shell::registerUserCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("users", "list users",
-        [](const CommandCall& call) -> CommandResult {
-            if (!call.user->isAdmin() || !call.user->canManageUsers())
-                return invalid("You do not have permission to list users.");
+    r->registerCommand("users", "List users",
+                       [](const CommandCall& call) -> CommandResult {
+                           if (!call.user) return invalid("You must be logged in to list users.");
 
-            return ok(to_string(UserQueries::listUsers()));
-        }, {});
+                           if (!call.user->isAdmin() || !call.user->canManageUsers())
+                               return invalid(
+                                   "You do not have permission to list users.");
+
+                           return ok(to_string(UserQueries::listUsers()));
+                       }, {});
+
+    r->registerCommand("user", "Manage a single user",
+                       [](const CommandCall& call) -> CommandResult {
+                           if (call.positionals.empty()) return invalid("Usage: user <subcommand> [options]");
+
+                           const std::string_view sub = call.positionals[0];
+                           CommandCall subcall = call;
+                           subcall.positionals.erase(subcall.positionals.begin());
+
+                           if (sub == "create" || sub == "c") {
+                               const auto nameOpt = optVal(subcall, "name");
+                               const auto emailOpt = optVal(subcall, "email");
+                               const auto linuxUidOpt = optVal(subcall, "linux-uid");
+                               const auto roleOpt = optVal(subcall, "role");
+
+                               std::vector<std::string> errors;
+                               if (!nameOpt) errors.emplace_back("Missing required option: --name");
+                               if (nameOpt && nameOpt->empty()) errors.emplace_back("Option --name cannot be empty");
+                               if (!roleOpt) errors.emplace_back("Missing required option: --role");
+                               if (roleOpt && roleOpt->empty()) errors.emplace_back("Option --role cannot be empty");
+
+                               if (!errors.empty()) {
+                                   std::string errorMsg = "User creation failed:\n";
+                                   for (const auto& err : errors) errorMsg += "  - " + err + "\n";
+                                   return invalid(errorMsg);
+                               }
+
+                               const auto user = std::make_shared<User>();
+                               user->name = *nameOpt;
+                               user->email = emailOpt;
+                               if (linuxUidOpt) user->linux_uid = parseInt(*linuxUidOpt);
+                               user->role = std::make_shared<UserRole>();
+
+                               if (!AuthManager::isValidName(user->name)) return invalid(
+                                   "Invalid user name: " + user->name);
+
+                               constexpr unsigned short maxRetries = 1024;
+                               std::string password;
+                               for (unsigned short i = 1; i < maxRetries; ++i) {
+                                   password = crypto::generate_secure_password();
+                                   if (AuthManager::isValidPassword(password)) {
+                                       try {
+                                           AuthManager::isValidRegistration(user, password);
+                                           break; // Valid password found
+                                       } catch (const std::exception& e) {
+                                           LogRegistry::auth()->warn("[AuthManager] Password validation failed: {}", e.what());
+                                       }
+                                   }
+                                   if (i == maxRetries) return invalid(
+                                       "Failed to generate a valid password after " + std::to_string(maxRetries) +
+                                       " attempts.");
+                               }
+
+                               try {
+                                   if (const auto rInt = parseInt(*roleOpt)) {
+                                       const auto role = PermsQueries::getRole(*rInt);
+                                       if (!role) return invalid("Invalid role ID: " + std::to_string(*rInt));
+                                       user->role->id = role->id;
+                                       user->role->name = role->name;
+                                       user->role->permissions = role->permissions;
+                                   } else {
+                                       const auto role = PermsQueries::getRoleByName(std::string(*roleOpt));
+                                       if (!role) return invalid("Invalid role name: " + std::string(*roleOpt));
+                                       user->role->id = role->id;
+                                       user->role->name = role->name;
+                                       user->role->permissions = role->permissions;
+                                   }
+
+                                   user->setPasswordHash(crypto::hashPassword(password));
+                                   user->id = UserQueries::createUser(user);
+
+                                   // skip until we know whether we want this or not
+                                   // ServiceDepsRegistry::instance().storageManager->initUserStorage(user);
+
+                                   std::string out = "User created successfully: " + user->name + "\n";
+                                   out += "Password: " + password + "\n";
+                                   return ok(out);
+
+                               } catch (const std::exception& e) {
+                                   return invalid("User creation failed: " + std::string(e.what()));
+                               }
+                           }
+                           if (sub == "delete" || sub == "rm") {
+                               // TODO: Implement user deletion
+                           }
+                           if (sub == "info" || sub == "get") {
+                               // TODO: Implement user info retrieval
+                           }
+
+                           return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
+                       }, {"u"});
 }

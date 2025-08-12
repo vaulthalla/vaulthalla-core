@@ -7,6 +7,7 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
+#include "types/DBQueryParams.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -158,17 +159,26 @@ static CommandResult handle_vaults_list(const CommandCall& call) {
     }
     const bool json = hasFlag(call, "json");
 
-    // TODO: query DB with filters: backend == local/s3 (if specified), ORDER BY created_at DESC LIMIT <limit>
-    // TODO: pagination (next token) if needed for large sets
-    // TODO: respect authZ: only list vaults the caller can see
+    const auto user = call.user;
+    const bool listAll = user->isAdmin() || user->canManageVaults();
+
+    DBQueryParams p{
+        .sortBy = "created_at",
+        .order = SortOrder::DESC,
+        .limit = limit,
+        .offset = 0, // TODO: handle pagination if needed
+    };
+
+    const auto vaults = listAll ?
+        VaultQueries::listVaults(std::move(p)) : VaultQueries::listUserVaults(user->id, std::move(p));
 
     if (json) {
-        auto out = nlohmann::json(VaultQueries::listVaults()).dump(4);
+        auto out = nlohmann::json(vaults).dump(4);
         out.push_back('\n');
         return ok(out);
     }
 
-    return ok(to_string(VaultQueries::listVaults()));
+    return ok(to_string(vaults));
 }
 
 // ---------- registration ----------

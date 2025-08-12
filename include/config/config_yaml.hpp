@@ -44,6 +44,7 @@ struct convert<FuseConfig> {
         node["mount_per_user"] = rhs.mount_per_user;
         node["fuse_timeout_seconds"] = rhs.fuse_timeout_seconds;
         node["allow_other"] = rhs.allow_other;
+        node["admin_linux_uid"] = rhs.admin_linux_uid;
         return node;
     }
 
@@ -55,6 +56,7 @@ struct convert<FuseConfig> {
         rhs.mount_per_user = node["mount_per_user"].as<bool>(true);
         rhs.fuse_timeout_seconds = node["fuse_timeout_seconds"].as<int>(60);
         rhs.allow_other = node["allow_other"].as<bool>(true);
+        rhs.admin_linux_uid = node["admin_linux_uid"].as<unsigned int>(0); // Default to root
         return true;
     }
 };

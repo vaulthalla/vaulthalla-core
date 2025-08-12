@@ -3,6 +3,7 @@
 #include "protocols/shell/Parser.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/cmdLineHelpers.hpp"
+#include "types/User.hpp"
 
 #include <fmt/core.h>
 #include <cctype>
@@ -51,17 +52,20 @@ std::string Router::canonicalFor(const std::string_view nameOrAlias) const {
 
 CommandResult Router::execute(const CommandCall& call) const {
     const auto canonical = canonicalFor(call.name); // call.name is string_view
+    LogRegistry::shell()->info("[Router] Executing command: '{}'", canonical);
     if (!commands_.contains(canonical))
         throw std::invalid_argument(fmt::format("Unknown command or alias: {}", call.name));
     return commands_.at(canonical).handler(call);
 }
 
-CommandResult Router::executeLine(const std::string_view line) const {
+CommandResult Router::executeLine(const std::string_view line, const std::shared_ptr<types::User>& user) const {
+    LogRegistry::shell()->info("[Router] Executing line: '{}'", line);
     // Tokenizer expects a string that lives while tokens/views are used.
     // We keep it local so Token/CommandCall views remain valid through execute().
     const std::string owned(line);
     const auto tokens = tokenize(owned);   // your tokenize returns Token views into 'owned'
-    const auto call   = parseTokens(tokens);
+    auto call   = parseTokens(tokens);
+    call.user = user;
 
     if (call.name.empty()) return CommandResult{1, "", "no command provided"};
     return execute(call);

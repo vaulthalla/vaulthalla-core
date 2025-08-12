@@ -4,6 +4,8 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/commands/system.hpp"
 #include "protocols/shell/commands/vault.hpp"
+#include "database/Queries/UserQueries.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -20,6 +22,9 @@
 #include <pwd.h>
 
 using nlohmann::json;
+
+using namespace vh::database;
+using namespace vh::logging;
 
 namespace {
 
@@ -134,7 +139,16 @@ void CtlServerService::runLoop() {
         try {
             const auto p = peercred(cfd);
             if (!in_group(p.uid, adminGid_)) {
-                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "permission denied"}});
+                LogRegistry::shell()->warn("[CtlServerService] Connection from UID {} (PID {}) not in vaulthalla-admin group", p.uid, p.pid);
+                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "permission denied"}});
+                ::close(cfd);
+                continue;
+            }
+
+            const auto user = UserQueries::getUserByLinuxUID(p.uid);
+            if (!user) {
+                LogRegistry::shell()->warn("[CtlServerService] No user found for UID {} (PID {})", p.uid, p.pid);
+                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "user not found"}});
                 ::close(cfd);
                 continue;
             }
@@ -147,7 +161,7 @@ void CtlServerService::runLoop() {
             uint32_t len = ntohl(be);
             if (len > (1u << 20)) {
                 // 1 MiB cap
-                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "request too large"}});
+                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "request too large"}});
                 ::close(cfd);
                 continue;
             }
@@ -167,7 +181,7 @@ void CtlServerService::runLoop() {
 
             auto try_exec_line = [&](const std::string& line) {
                 try {
-                    const auto res = router_->executeLine(line); // uses tokenize() + parseTokens() under the hood
+                    const auto res = router_->executeLine(line, user); // uses tokenize() + parseTokens() under the hood
 
                     json resp{
                             {"ok", res.exit_code == 0},
@@ -179,11 +193,11 @@ void CtlServerService::runLoop() {
 
                     send_json(cfd, resp);
 
-                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"message", "ok"}});
+                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"stderr", "ok"}});
                 } catch (const std::invalid_argument& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
                 } catch (const std::exception& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
                 }
             };
 
@@ -236,9 +250,9 @@ void CtlServerService::runLoop() {
 
                     send_json(cfd, resp);
                 } catch (const std::invalid_argument& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
                 } catch (const std::exception& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", e.what()}});
+                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
                 }
                 ::close(cfd);
                 continue;
@@ -263,7 +277,7 @@ void CtlServerService::runLoop() {
             }
         } catch (...) {
             // best-effort error response
-            send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"message", "internal error"}});
+            send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "internal error"}});
         }
         ::close(cfd);
     }

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <protocols/shell/Token.hpp>
+#include "protocols/shell/Token.hpp"
+#include "types/User.hpp"
 
 #include <string_view>
 #include <string>
@@ -20,6 +21,7 @@ struct CommandCall {
     std::vector<FlagKV> options;
     std::vector<std::string_view> positionals;
     bool rewrote = false;
+    std::shared_ptr<types::User> user;
 
     // owns any strings you create at runtime (JSON, rewrites, etc.)
     std::vector<std::string> arena;

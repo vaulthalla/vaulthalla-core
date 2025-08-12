@@ -123,6 +123,8 @@ void vh::seed::initAdmin() {
     user->name = "admin";
     user->email = "";
     user->setPasswordHash(hashPassword("vh!adm1n"));
+    user->linux_uid = ConfigRegistry::get().fuse.admin_linux_uid;
+
     const auto role = PermsQueries::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;

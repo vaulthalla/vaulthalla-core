@@ -64,7 +64,7 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
 void UserQueries::createUser(const std::shared_ptr<User>& user) {
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
-        pqxx::params p{user->name, user->email, user->password_hash, user->is_active};
+        pqxx::params p{user->name, user->email, user->password_hash, user->is_active, user->linux_uid};
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
 
         txn.exec_prepared("assign_user_role", pqxx::params{userId, user->role->id});
@@ -115,6 +115,25 @@ unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
         const pqxx::result res = txn.exec_prepared("get_user_id_by_linux_uid", pqxx::params{linuxUid});
         if (res.empty()) throw std::runtime_error("No user found with Linux UID: " + std::to_string(linuxUid));
         return res.one_field().as<unsigned int>();
+    });
+}
+
+std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
+    return Transactions::exec("UserQueries::getUserByLinuxUID", [&](pqxx::work& txn) -> std::shared_ptr<User> {
+        const pqxx::result res = txn.exec_prepared("get_user_by_linux_uid", pqxx::params{linuxUid});
+        if (res.empty()) {
+            LogRegistry::db()->error("[UserQueries] No user found with Linux UID: {}", linuxUid);
+            return nullptr;
+        }
+        const auto userRow = res.one_row();
+        const auto userId = userRow["id"].as<unsigned int>();
+        const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{userId}).one_row();
+
+        pqxx::params p{"user", userId};
+        const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
+        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+
+        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 

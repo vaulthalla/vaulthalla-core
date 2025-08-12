@@ -38,8 +38,8 @@ void DBConnection::initPrepared() const {
 
 void DBConnection::initPreparedUsers() const {
     conn_->prepare("insert_user",
-                   "INSERT INTO users (name, email, password_hash, is_active) "
-                   "VALUES ($1, $2, $3, $4) RETURNING id");
+                   "INSERT INTO users (name, email, password_hash, is_active, linux_uid) "
+                   "VALUES ($1, $2, $3, $4, $5) RETURNING id");
 
     conn_->prepare("get_user", "SELECT * FROM users WHERE id = $1");
 
@@ -83,6 +83,8 @@ void DBConnection::initPreparedUsers() const {
 
     conn_->prepare("get_user_id_by_linux_uid", "SELECT id FROM users WHERE linux_uid = $1");
 
+    conn_->prepare("get_user_by_linux_uid", "SELECT * FROM users WHERE linux_uid = $1");
+
     conn_->prepare("admin_user_exists", "SELECT EXISTS(SELECT 1 FROM users WHERE name = 'admin') AS exists");
 
     conn_->prepare("get_admin_password", "SELECT password_hash FROM users WHERE name = 'admin'");
@@ -115,13 +117,13 @@ void DBConnection::initPreparedAPIKeys() const {
 
 void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("insert_vault_key",
-        "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
-        "VALUES ($1, $2, $3)");
+                   "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
+                   "VALUES ($1, $2, $3)");
 
     conn_->prepare("update_vault_key",
-        "UPDATE vault_keys "
-        "SET encrypted_key = $2, iv = $3, updated_at = NOW() "
-        "WHERE vault_id = $1");
+                   "UPDATE vault_keys "
+                   "SET encrypted_key = $2, iv = $3, updated_at = NOW() "
+                   "WHERE vault_id = $1");
 
     conn_->prepare("get_vault_key", "SELECT * FROM vault_keys WHERE vault_id = $1");
 
@@ -172,18 +174,48 @@ void DBConnection::initPreparedVaults() const {
                    "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
                    "WHERE v.id = $1");
 
-    conn_->prepare("list_vaults",
-                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
-                   "FROM vault v "
-                   "LEFT JOIN s3 s ON v.id = s.vault_id "
-                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id");
+    // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
+    conn_->prepare(
+        "list_vaults",
+        "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+        "FROM vault v "
+        "LEFT JOIN s3 s ON v.id = s.vault_id "
+        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
+        "ORDER BY "
+        "CASE WHEN $1::text IS NULL THEN v.id END ASC, "
+        "CASE WHEN $1::text = 'id'         AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.id        END ASC, "
+        "CASE WHEN $1::text = 'id'         AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.id        END DESC, "
+        "CASE WHEN $1::text = 'name'       AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.name      END ASC, "
+        "CASE WHEN $1::text = 'name'       AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
+        "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
+        "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
+        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN s3b.name    END ASC, "
+        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'desc' THEN s3b.name    END DESC "
+        "LIMIT  COALESCE($3::bigint, 9223372036854775807) "
+        "OFFSET COALESCE($4::bigint, 0)"
+        );
 
-    conn_->prepare("list_user_vaults",
-                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
-                   "FROM vault v "
-                   "LEFT JOIN s3 s ON v.id = s.vault_id "
-                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
-                   "WHERE v.owner_id = $1");
+    // list_user_vaults(owner_id, SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
+    conn_->prepare(
+        "list_user_vaults",
+        "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+        "FROM vault v "
+        "LEFT JOIN s3 s ON v.id = s.vault_id "
+        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
+        "WHERE v.owner_id = $1 "
+        "ORDER BY "
+        "CASE WHEN $2::text IS NULL THEN v.id END ASC, "
+        "CASE WHEN $2::text = 'id'         AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.id        END ASC, "
+        "CASE WHEN $2::text = 'id'         AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.id        END DESC, "
+        "CASE WHEN $2::text = 'name'       AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.name      END ASC, "
+        "CASE WHEN $2::text = 'name'       AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
+        "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
+        "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
+        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN s3b.name    END ASC, "
+        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'desc' THEN s3b.name    END DESC "
+        "LIMIT  COALESCE($4::bigint, 9223372036854775807) "
+        "OFFSET COALESCE($5::bigint, 0)"
+        );
 
     conn_->prepare("get_vault_owners_name",
                    "SELECT u.name FROM users u "
@@ -628,13 +660,13 @@ void DBConnection::initPreparedRoles() const {
                    "WHERE r.type = $1");
 
     conn_->prepare("assign_permission_to_role",
-        "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
+                   "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
 }
 
 void DBConnection::initPreparedPermissions() const {
     conn_->prepare("insert_raw_permission",
-        "INSERT INTO permission (bit_position, name, description, category) "
-        "VALUES ($1, $2, $3, $4)");
+                   "INSERT INTO permission (bit_position, name, description, category) "
+                   "VALUES ($1, $2, $3, $4)");
 
     conn_->prepare("upsert_permission",
                    "INSERT INTO permissions (role_id, permissions) "

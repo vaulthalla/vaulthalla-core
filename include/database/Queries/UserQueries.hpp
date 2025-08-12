@@ -28,6 +28,7 @@ class UserQueries {
     static std::vector<std::shared_ptr<types::User>> listUsers();
     static void updateLastLoggedInUser(unsigned int userId);
     [[nodiscard]] static unsigned int getUserIdByLinuxUID(unsigned int linuxUid);
+    [[nodiscard]] static std::shared_ptr<types::User> getUserByLinuxUID(unsigned int linuxUid);
 
     static void addRefreshToken(const std::shared_ptr<auth::RefreshToken>& token);
     static void removeRefreshToken(const std::string& jti);

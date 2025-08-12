@@ -9,6 +9,10 @@
 #include <initializer_list>
 #include <nlohmann/json.hpp>
 
+namespace vh::types {
+    struct User;
+}
+
 namespace vh::shell {
 
 struct CommandCall;
@@ -40,7 +44,7 @@ public:
     CommandResult execute(const CommandCall& call) const;
 
     // Accept a view; we'll copy only once if needed
-    CommandResult executeLine(std::string_view line) const;
+    CommandResult executeLine(std::string_view line, const std::shared_ptr<types::User>& user) const;
 
     std::string listCommands() const;
 

@@ -77,9 +77,10 @@ std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
                               });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
+std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(DBQueryParams&& params) {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_vaults");
+        pqxx::params p{params.sortBy, to_string(params.order), params.limit, params.offset};
+        const auto res = txn.exec_prepared("list_vaults", p);
 
         std::vector<std::shared_ptr<Vault> > vaults;
 
@@ -101,9 +102,11 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
     });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId) {
+std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId, DBQueryParams&& params) {
     return Transactions::exec("VaultQueries::listUserVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_user_vaults", pqxx::params{userId});
+        pqxx::params p{userId, params.sortBy, to_string(params.order), params.limit, params.offset};
+
+        const auto res = txn.exec_prepared("list_user_vaults", p);
 
         std::vector<std::shared_ptr<Vault> > vaults;
         for (const auto& row : res) {

@@ -20,6 +20,7 @@ fuse:
   mount_per_user: true               # Isolate each user's mount
   fuse_timeout_seconds: 60           # Idle timeout for auto-unmount
   allow_other: true                  # Allow access by non-calling users (e.g. Nextcloud)
+  admin_linux_uid: 1000              # UID for admin user (Linux) to allow full access
 
 # === Caching & Previews ===
 caching:

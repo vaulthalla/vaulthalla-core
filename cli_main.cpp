@@ -32,6 +32,11 @@ static bool writen(int fd, const void* b, size_t n) {
     return true;
 }
 
+static std::string ensureNewLine(const std::string& s) {
+    if (s.empty() || s.back() != '\n') return s + '\n';
+    return s;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: vhctl-uds <cmd> [args...]\n";
@@ -63,9 +68,7 @@ int main(int argc, char** argv) {
     if (!readn(s, resp.data(), len)) return 1;
 
     auto r = nlohmann::json::parse(resp);
-    if (r.contains("stdout")) fmt::print("{}",
-    r["stdout"].get<std::string>());
-    if (r.contains("stderr")) fmt::print(stderr, "{}",
-        r["stderr"].get<std::string>());
+    if (r.contains("stdout")) fmt::print("{}", ensureNewLine(r["stdout"].get<std::string>()));
+    if (r.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(r["stderr"].get<std::string>()));
     return r.value("exit_code", 0);
 }

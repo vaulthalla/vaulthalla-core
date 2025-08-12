@@ -133,6 +133,10 @@ public:
     void set_term_width(int w) { term_width_ = w; }
 
 private:
+    std::vector<Column> cols_;
+    std::vector<std::vector<Cell>> rows_;
+    int term_width_ = 0;
+
     // Simple word wrapper; replace if you have a smarter wrap_text()
     static std::vector<std::string> wrap_lines(const std::string& s, std::size_t width) {
         if (width == 0) return {""};
@@ -165,11 +169,6 @@ private:
         const std::size_t right = keep - left;
         return s.substr(0, left) + "…" + s.substr(s.size() - right);
     }
-
-private:
-    std::vector<Column> cols_;
-    std::vector<std::vector<Cell>> rows_;
-    int term_width_ = 0;
 };
 
 }

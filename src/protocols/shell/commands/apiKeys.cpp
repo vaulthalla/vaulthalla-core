@@ -2,9 +2,11 @@
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "types/APIKey.hpp"
+#include "types/S3Bucket.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "keys/APIKeyManager.hpp"
+#include "storage/cloud/S3Controller.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -12,6 +14,7 @@ using namespace vh::database;
 using namespace vh::services;
 using namespace vh::keys;
 using namespace vh::types::api;
+using namespace vh::cloud;
 
 static std::vector<std::string> getProviderOptions() {
     return {
@@ -44,23 +47,40 @@ static CommandResult usage_api_keys_root() {
     };
 }
 
+static S3Provider s3_provider_from_shell_input(const std::string& str) {
+    if (str == "aws") return S3Provider::AWS;
+    if (str == "cloudflare-r2") return S3Provider::CloudflareR2;
+    if (str == "wasabi") return S3Provider::Wasabi;
+    if (str == "backblaze-b2") return S3Provider::BackblazeB2;
+    if (str == "digitalocean") return S3Provider::DigitalOcean;
+    if (str == "minio") return S3Provider::MinIO;
+    if (str == "ceph") return S3Provider::Ceph;
+    if (str == "storj") return S3Provider::Storj;
+    if (str == "other") return S3Provider::Other;
+    throw std::invalid_argument("Invalid provider: " + str);
+}
+
 static CommandResult handleListAPIKeys(const CommandCall& call) {
-    const bool json = hasFlag(call, "json");
+    try {
+        const bool json = hasFlag(call, "json");
 
-    const auto user = call.user;
-    if (!user) return invalid("You must be logged in to list API keys.");
+        const auto user = call.user;
+        if (!user) return invalid("You must be logged in to list API keys.");
 
-    std::vector<std::shared_ptr<APIKey>> keys;
-    if (user->canAccessAnyAPIKey()) keys = APIKeyQueries::listAPIKeys();
-    else keys = APIKeyQueries::listAPIKeys(user->id);
+        std::vector<std::shared_ptr<APIKey>> keys;
+        if (user->canAccessAnyAPIKey()) keys = APIKeyQueries::listAPIKeys();
+        else keys = APIKeyQueries::listAPIKeys(user->id);
 
-    if (json) {
-        auto out = nlohmann::json(keys).dump(4);
-        out.push_back('\n');
-        return ok(out);
+        if (json) {
+            auto out = nlohmann::json(keys).dump(4);
+            out.push_back('\n');
+            return ok(out);
+        }
+
+        return ok(to_string(keys));
+    } catch (const std::exception& e) {
+        return invalid("Failed to list API keys: " + std::string(e.what()));
     }
-
-    return ok(to_string(keys));
 }
 
 static CommandResult handleCreateAPIKey(const CommandCall& call) {
@@ -96,7 +116,11 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         key->secret_access_key = *secretOpt; // This will be encrypted later
         key->region = *regionOpt;
         key->endpoint = *endpointOpt;
-        key->provider = s3_provider_from_string(*providerOpt);
+        key->provider = s3_provider_from_shell_input(*providerOpt);
+
+        const auto [valid, validationErrors] = S3Controller(key, "").validateAPICredentials();
+
+        if (!valid) return invalid("API key validation failed:\n" + validationErrors);
 
         key->id = ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
 
@@ -107,18 +131,22 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
 }
 
 static CommandResult handleDeleteAPIKey(const CommandCall& call) {
-    const auto id = call.positionals.empty() ? "" : call.positionals[0];
-    if (id.empty()) return invalid("Usage: api-key delete <id>");
+    try {
+        const auto id = call.positionals.empty() ? "" : call.positionals[0];
+        if (id.empty()) return invalid("Usage: api-key delete <id>");
 
-    const auto key = APIKeyQueries::getAPIKey(std::stoi(id));
-    if (!key) return invalid("API key not found: " + id);
+        const auto key = APIKeyQueries::getAPIKey(std::stoi(id));
+        if (!key) return invalid("API key not found: " + id);
 
-    if (!call.user->canAccessAnyAPIKey() && key->user_id != call.user->id)
-        return invalid("You do not have permission to delete this API key.");
+        if (!call.user->canAccessAnyAPIKey() && key->user_id != call.user->id)
+            return invalid("You do not have permission to delete this API key.");
 
-    ServiceDepsRegistry::instance().apiKeyManager->removeAPIKey(key->id, key->user_id);
+        ServiceDepsRegistry::instance().apiKeyManager->removeAPIKey(key->id, key->user_id);
 
-    return ok("API key deleted successfully: " + std::to_string(key->id) + "\n");
+        return ok("API key deleted successfully: " + std::to_string(key->id) + "\n");
+    } catch (const std::exception& e) {
+        return invalid("Failed to delete API key: " + std::string(e.what()));
+    }
 }
 
 static CommandResult handleAPIKeyInfo(const CommandCall& call) {

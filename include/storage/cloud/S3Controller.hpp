@@ -16,11 +16,13 @@ struct APIKey;
 
 namespace vh::cloud {
 
-class S3Provider {
-public:
-    S3Provider(const std::shared_ptr<types::api::APIKey>& apiKey, std::string  bucket);
+struct ValidateResult { bool ok; std::string msg; };
 
-    ~S3Provider();
+class S3Controller {
+public:
+    S3Controller(const std::shared_ptr<types::api::APIKey>& apiKey, std::string  bucket);
+
+    ~S3Controller();
 
     bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const;
 
@@ -56,6 +58,8 @@ public:
     bool setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64) const;
 
     bool downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
+
+    [[nodiscard]] ValidateResult validateAPICredentials() const;
 
 private:
     std::shared_ptr<types::api::APIKey> apiKey_;

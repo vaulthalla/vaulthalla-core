@@ -40,12 +40,11 @@ struct APIKey {
     std::string secret_access_key;
 
     APIKey() = default;
+    explicit APIKey(const pqxx::row& row);
     APIKey(unsigned int userId, std::string name,
            S3Provider provider, std::string accessKey,
            std::string secretAccessKey,
            std::string region, std::string endpoint);
-
-    explicit APIKey(const pqxx::row& row);
 };
 
 // JSON

@@ -32,4 +32,6 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles)
 
 std::vector<std::shared_ptr<Role>> roles_from_pq_res(const pqxx::result& res);
 
+std::string to_string(const std::vector<std::shared_ptr<Role>>& roles);
+
 } // namespace vh::types

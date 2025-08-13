@@ -84,6 +84,7 @@ void from_json(const nlohmann::json& j, User& u);
 nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users);
 nlohmann::json to_json(const std::shared_ptr<User>& user);
 
+std::string to_string(const std::shared_ptr<User>& user);
 std::string to_string(const std::vector<std::shared_ptr<User>>& users);
 
 } // namespace vh::types

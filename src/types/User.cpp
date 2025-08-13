@@ -184,6 +184,22 @@ bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::p
     return role && role->validatePermission(role->permissions, VaultPermission::List, path);
 }
 
+std::string to_string(const std::shared_ptr<User>& user) {
+    if (!user) return "No user found\n";
+
+    std::string out = "User: " + user->name + "\n";
+    out += "Email: " + user->email.value_or("N/A") + "\n";
+    if (user->linux_uid) out += "Linux UID: " + std::to_string(*user->linux_uid) + "\n";
+    else out += "Linux UID: Not set\n";
+    out += "Created At: " + util::timestampToString(user->created_at) + "\n";
+    out += "Last Login: " + (user->last_login ? util::timestampToString(*user->last_login) : "Never") + "\n";
+    out += "Active: " + std::string(user->is_active ? "Yes" : "No") + "\n";
+    out += "Role: " + to_string(user->role);
+    out += "Vault Roles: " + to_string(user->roles);
+
+    return out;
+}
+
 std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
     if (users.empty()) return "No users found\n";
 

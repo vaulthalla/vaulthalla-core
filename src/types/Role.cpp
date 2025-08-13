@@ -1,12 +1,15 @@
 #include "types/Role.hpp"
 #include "types/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
+#include "protocols/shell/Table.hpp"
+#include "util/cmdLineHelpers.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::shell;
 
 Role::Role(const pqxx::row& row)
     : name(row["name"].as<std::string>()),
@@ -62,4 +65,31 @@ std::vector<std::shared_ptr<Role> > vh::types::roles_from_pq_res(const pqxx::res
     std::vector<std::shared_ptr<Role> > roles;
     for (const auto& item : res) roles.push_back(std::make_shared<Role>(item));
     return roles;
+}
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles) {
+    if (roles.empty()) return "No roles assigned";
+
+    Table tbl({
+        {"ID", Align::Left, 4, 8, false, false},
+        {"Name", Align::Left, 4, 32, false, false},
+        {"Type", Align::Left, 4, 16, false, false},
+        {"Description", Align::Left, 4, 64, false, false},
+        {"Permissions", Align::Left, 4, 32, false, false},
+        {"Created At", Align::Left, 4, 20, false, false}
+    }, term_width());
+
+    for (const auto& role : roles) {
+        if (!role) continue; // Skip null pointers
+        tbl.add_row({
+            std::to_string(role->id),
+            role->name,
+            role->type,
+            role->description,
+            role->type == "user" ? admin_perms_to_string(role->permissions) : vault_perms_to_string(role->permissions),
+            util::timestampToString(role->created_at)
+        });
+    }
+
+    return "Roles:\n" + tbl.render();
 }

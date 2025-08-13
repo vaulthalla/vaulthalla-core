@@ -1,5 +1,6 @@
 #include "types/UserRole.hpp"
 #include "util/timestamp.hpp"
+#include "util/cmdLineHelpers.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>
@@ -45,4 +46,15 @@ std::vector<std::shared_ptr<UserRole>> vh::types::user_roles_from_pq_res(const p
 void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<UserRole>>& roles) {
     j = nlohmann::json::array();
     for (const auto& role : roles) j.push_back(*role);
+}
+
+std::string vh::types::to_string(const std::shared_ptr<UserRole>& role) {
+    std::string prefix(4, ' ');
+    std::string out = shell::snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
+    out += prefix + "- Description: " + role->description + "\n";
+    out += prefix + "- Type: " + role->type + "\n";
+    out += prefix + "- Created at: " + util::timestampToString(role->created_at) + "\n";
+    out += prefix + "- Assigned at: " + util::timestampToString(role->assigned_at) + "\n";
+    out += prefix + "- Permissions:\n" + admin_perms_to_string(role->permissions, 12);
+    return out;
 }

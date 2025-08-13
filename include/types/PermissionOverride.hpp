@@ -29,4 +29,6 @@ std::vector<std::shared_ptr<PermissionOverride>> permissionOverridesFromPqRes(co
 std::vector<std::shared_ptr<PermissionOverride>> permissionOverridesFromJson(const nlohmann::json& j);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<PermissionOverride>>& overrides);
 
+std::string to_string(const std::vector<std::shared_ptr<PermissionOverride>>& overrides);
+
 }

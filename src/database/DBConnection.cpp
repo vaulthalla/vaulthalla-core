@@ -38,8 +38,8 @@ void DBConnection::initPrepared() const {
 
 void DBConnection::initPreparedUsers() const {
     conn_->prepare("insert_user",
-                   "INSERT INTO users (name, email, password_hash, is_active, linux_uid) "
-                   "VALUES ($1, $2, $3, $4, $5) RETURNING id");
+                   "INSERT INTO users (name, email, password_hash, is_active, linux_uid, last_modified_by) "
+                   "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id");
 
     conn_->prepare("get_user", "SELECT * FROM users WHERE id = $1");
 
@@ -52,7 +52,8 @@ void DBConnection::initPreparedUsers() const {
     conn_->prepare("get_users", "SELECT * FROM users");
 
     conn_->prepare("update_user",
-                   "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5 "
+                   "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5, linux_uid = $6, "
+                   "last_modified_by = $7, updated_at = NOW() "
                    "WHERE id = $1");
 
     conn_->prepare("update_user_password", "UPDATE users SET password_hash = $2 WHERE id = $1");
@@ -98,6 +99,8 @@ void DBConnection::initPreparedAPIKeys() const {
 
     conn_->prepare("get_api_key", "SELECT * FROM api_keys WHERE id = $1");
 
+    conn_->prepare("get_api_key_by_name", "SELECT * FROM api_keys WHERE name = $1");
+
     conn_->prepare("upsert_api_key",
                    "INSERT INTO api_keys (user_id, name, provider, access_key, "
                    "encrypted_secret_access_key, iv, region, endpoint) "
@@ -139,11 +142,13 @@ void DBConnection::initPreparedUserRoles() const {
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE ura.user_id = $1");
 
+    conn_->prepare("get_user_role_id", "SELECT role_id FROM user_role_assignments WHERE user_id = $1");
+
     conn_->prepare("assign_user_role",
                    "INSERT INTO user_role_assignments (user_id, role_id) "
                    "VALUES ($1, $2) ON CONFLICT (user_id, role_id) DO NOTHING");
 
-    conn_->prepare("change_user_role", "UPDATE user_role_assignments SET role_id = $2 WHERE user_id = $1");
+    conn_->prepare("update_user_role", "UPDATE user_role_assignments SET role_id = $2 WHERE user_id = $1");
 }
 
 void DBConnection::initPreparedVaults() const {

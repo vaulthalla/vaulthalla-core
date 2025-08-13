@@ -64,7 +64,14 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
 unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     return Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
-        pqxx::params p{user->name, user->email, user->password_hash, user->is_active, user->linux_uid};
+        pqxx::params p{
+            user->name,
+            user->email,
+            user->password_hash,
+            user->is_active,
+            user->linux_uid,
+            user->last_modified_by
+        };
         const auto userId = txn.exec_prepared("insert_user", p).one_row()[0].as<unsigned int>();
 
         txn.exec_prepared("assign_user_role", pqxx::params{userId, user->role->id});
@@ -80,13 +87,18 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
 
 void UserQueries::updateUser(const std::shared_ptr<User>& user) {
     Transactions::exec("UserQueries::updateUser", [&](pqxx::work& txn) {
-        pqxx::params u_params{user->id, user->name, user->email, user->password_hash};
+        pqxx::params u_params{
+            user->id,
+            user->name,
+            user->email,
+            user->password_hash,
+            user->is_active,
+            user->linux_uid,
+            user->last_modified_by
+        };
         txn.exec_prepared("update_user", u_params);
 
-        const auto existingRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{user->id}).one_row();
-        const auto existingRoleId = existingRoleRow["role_id"].as<unsigned int>();
-
-        if (user->role->id != existingRoleId)
+        if (user->role->id != txn.exec_prepared("get_user_role_id", pqxx::params{user->id}).one_field().as<unsigned int>())
             txn.exec_prepared("update_user_role", pqxx::params{user->id, user->role->id});
     });
 }

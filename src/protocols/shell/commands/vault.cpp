@@ -99,7 +99,7 @@ static CommandResult handle_vault_info(const CommandCall& call) {
     if (json) {
         // TODO: serialize stable JSON schema
         return ok(
-            "{ \"name\":\"" + std::string(name) + "\", \"backend\":\"local\", \"encrypted\":true }\n"
+            R"({ "name":")" + std::string(name) + "\", \"backend\":\"local\", \"encrypted\":true }\n"
         );
     } else {
         // pretty text

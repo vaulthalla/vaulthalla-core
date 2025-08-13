@@ -56,4 +56,7 @@ void from_json(const nlohmann::json& j, APIKey& key);
 
 std::vector<std::shared_ptr<APIKey>> api_keys_from_pq_res(const pqxx::result& res);
 
+std::string to_string(const std::shared_ptr<APIKey>& key);
+std::string to_string(const std::vector<std::shared_ptr<APIKey>>& keys);
+
 } // namespace vh::types::api

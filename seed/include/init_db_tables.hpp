@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS users
     password_hash    VARCHAR(255)       NOT NULL,
     created_at       TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,
     last_login       TIMESTAMP,
+    last_modified_by INTEGER            REFERENCES users (id) ON DELETE SET NULL,
+    updated_at       TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,
     is_active        BOOLEAN            DEFAULT TRUE
 );
         )");

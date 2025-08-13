@@ -26,10 +26,10 @@ struct User {
     static constexpr uint16_t ADMIN_MASK = 0xFFFE;
 
     unsigned int id{};
-    std::optional<unsigned int> linux_uid{std::nullopt};
+    std::optional<unsigned int> linux_uid{std::nullopt}, last_modified_by{std::nullopt};
     std::string name, password_hash;
     std::optional<std::string> email{std::nullopt};
-    std::time_t created_at{};
+    std::time_t created_at{}, updated_at{};
     std::optional<std::time_t> last_login;
     bool is_active{true};
     std::shared_ptr<UserRole> role;

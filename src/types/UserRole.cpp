@@ -49,7 +49,7 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Use
 }
 
 std::string vh::types::to_string(const std::shared_ptr<UserRole>& role) {
-    std::string prefix(4, ' ');
+    const std::string prefix(4, ' ');
     std::string out = shell::snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
     out += prefix + "- Description: " + role->description + "\n";
     out += prefix + "- Type: " + role->type + "\n";

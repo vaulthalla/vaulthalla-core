@@ -31,12 +31,15 @@ User::User(const pqxx::row& row)
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
       is_active(row["is_active"].as<bool>()),
       role(nullptr) {
     if (row["last_login"].is_null()) last_login = std::nullopt;
     else last_login = std::make_optional(util::parsePostgresTimestamp(row["last_login"].as<std::string>()));
     if (row["email"].is_null()) email = std::nullopt;
     else email = std::make_optional(row["email"].as<std::string>());
+    if (row["last_modified_by"].is_null()) last_modified_by = std::nullopt;
+    else last_modified_by = std::make_optional(row["last_modified_by"].as<unsigned int>());
 }
 
 User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides)

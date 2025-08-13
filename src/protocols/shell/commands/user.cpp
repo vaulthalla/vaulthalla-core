@@ -21,9 +21,10 @@ static CommandResult usage_user_root() {
     return {
         0,
         "Usage:\n"
-        "  user create --name <name> --role <role> [--email <email>] [--linux-uid <uid>]\n"
-        "  user delete <name>\n"
-        "  user info <name> \n",
+        "  user [create | new] --name <name> --role <role> [--email <email>] [--linux-uid <uid>]\n"
+        "  user [delete | rm] <name>\n"
+        "  user [info | get] <name> \n"
+        "  user [update | set] <name> [--name <name>] [--email <email>] [--role <role>] [--linux-uid <uid>]\n",
         ""
     };
 }
@@ -51,6 +52,7 @@ static CommandResult createUser(const CommandCall& subcall) {
     user->email = emailOpt;
     if (linuxUidOpt) user->linux_uid = parseInt(*linuxUidOpt);
     user->role = std::make_shared<UserRole>();
+    user->last_modified_by = subcall.user->id;
 
     if (!AuthManager::isValidName(user->name))
         return invalid(
@@ -158,6 +160,62 @@ static CommandResult handleUserInfo(const CommandCall& subcall) {
     return ok(to_string(user));
 }
 
+static CommandResult handleUpdateUser(const CommandCall& subcall) {
+    if (subcall.positionals.empty()) return invalid("Usage: user update <name> [--name <new_name>] [--email <email>] [--role <role>] [--linux-uid <uid>]");
+
+    const auto name = subcall.positionals[0];
+    const auto user = UserQueries::getUserByName(name);
+    if (!user) return invalid("User not found: " + name);
+
+    if (!subcall.user->canManageUsers() && subcall.user->id != user->id)
+        return invalid("You do not have permission to update users.");
+
+    if (user->isSuperAdmin())
+        return invalid("Cannot update super admin user: " + user->name);
+
+    if (user->isAdmin() && !subcall.user->canManageAdmins())
+        return invalid("You do not have permission to update admin users.");
+
+    const auto newNameOpt = optVal(subcall, "name");
+    const auto newEmailOpt = optVal(subcall, "email");
+    const auto newRoleOpt = optVal(subcall, "role");
+    const auto newLinuxUidOpt = optVal(subcall, "linux-uid");
+
+    if (newNameOpt) {
+        if (!AuthManager::isValidName(*newNameOpt)) return invalid("Invalid new user name: " + *newNameOpt);
+        user->name = *newNameOpt;
+    }
+
+    if (newEmailOpt) {
+        if (!AuthManager::isValidEmail(*newEmailOpt)) return invalid("Invalid email address: " + *newEmailOpt);
+        user->email = *newEmailOpt;
+    }
+
+    if (newRoleOpt) {
+        if (const auto rInt = parseInt(*newRoleOpt)) {
+            const auto role = PermsQueries::getRole(*rInt);
+            if (!role) return invalid("Invalid role ID: " + std::to_string(*rInt));
+            user->role->id = role->id;
+        } else {
+            const auto role = PermsQueries::getRoleByName(std::string(*newRoleOpt));
+            if (!role) return invalid("Invalid role name: " + std::string(*newRoleOpt));
+            user->role->id = role->id;
+        }
+    }
+
+    if (newLinuxUidOpt) {
+        const auto linuxUid = parseInt(*newLinuxUidOpt);
+        if (!linuxUid) return invalid("Invalid Linux UID: " + *newLinuxUidOpt);
+        user->linux_uid = linuxUid;
+    }
+
+    user->last_modified_by = subcall.user->id;
+
+    UserQueries::updateUser(user);
+
+    return ok("User updated successfully: " + user->name + "\n" + to_string(user));
+}
+
 void vh::shell::registerUserCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand("users", "List users",
                        [](const CommandCall& call) -> CommandResult {
@@ -178,9 +236,10 @@ void vh::shell::registerUserCommands(const std::shared_ptr<Router>& r) {
                            CommandCall subcall = call;
                            subcall.positionals.erase(subcall.positionals.begin());
 
-                           if (sub == "create" || sub == "c") return createUser(subcall);
+                           if (sub == "create" || sub == "new") return createUser(subcall);
                            if (sub == "delete" || sub == "rm") return deleteUser(subcall);
                            if (sub == "info" || sub == "get") return handleUserInfo(subcall);
+                           if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
 
                            return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
                        }, {"u"});

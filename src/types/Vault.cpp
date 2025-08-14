@@ -3,6 +3,7 @@
 #include "util/timestamp.hpp"
 #include "util/cmdLineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
+#include "database/Queries/VaultQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -10,6 +11,7 @@
 
 using namespace vh::types;
 using namespace vh::shell;
+using namespace vh::database;
 
 std::string vh::types::to_string(const VaultType& type) {
     switch (type) {
@@ -71,20 +73,18 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vau
 }
 
 std::string vh::types::to_string(const Vault& v) {
-    if (v.quota == 0) return fmt::format("{} ({}): {} - {} at {}",
-                           v.name,
-                           to_string(v.type),
-                           v.description,
-                           "\u221E",  // ∞ symbol
-                           v.mount_point.string());
-
-    return fmt::format("{} ({}): {} - {} ({} bytes) at {}",
-                       v.name,
-                       to_string(v.type),
-                       v.description,
-                       human_bytes(v.quota),
-                       static_cast<unsigned long long>(v.quota),
-                       v.mount_point.string());
+    std::string out = "Name: " + v.name + "\n";
+    out += "ID: " + std::to_string(v.id) + "\n";
+    out += "Owner ID: " + std::to_string(v.owner_id) + "\n";
+    out += "Type: " + to_string(v.type) + "\n";
+    out += "Description: " + v.description + "\n";
+    out += "Mount Point: " + v.mount_point.string() + "\n";
+    out += "Quota: ";
+    if (v.quota == 0) out += "\u221E\n";  // ∞ symbol
+    else out += fmt::format("{} ({} bytes)\n", human_bytes(v.quota), static_cast<unsigned long long>(v.quota));
+    out += "Created At: " + util::timestampToString(v.created_at) + "\n";
+    out += "Is Active: " + std::string(v.is_active ? "true" : "false") + "\n";
+    return out;
 }
 
 std::string vh::types::to_string(const std::shared_ptr<Vault>& v) {
@@ -97,6 +97,8 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaul
     if (vaults.empty()) return "No vaults found\n";
 
     Table tbl({
+        {"ID",    Align::Right, 3, 8,   false, false },
+        { "OWNER", Align::Right, 4, 16,  false, false },
         { "NAME",  Align::Left,  4, 64,  false, false },
         { "TYPE",  Align::Left,  4, 24,  false, false },
         { "QUOTA", Align::Right, 5, 32,  false, false },
@@ -113,7 +115,13 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaul
             : fmt::format("{} ({})",
                           human_bytes(static_cast<uint64_t>(v.quota)),
                           static_cast<unsigned long long>(v.quota));
+
+        std::string owner = v.owner_id != 0 ?
+            VaultQueries::getVaultOwnersName(v.id) + " (ID: " + std::to_string(v.owner_id) + ")" : "N/A";
+
         tbl.add_row({
+            std::to_string(v.id),
+            owner,
             v.name,
             to_string(v.type),
             quota,

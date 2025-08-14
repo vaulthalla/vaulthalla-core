@@ -179,6 +179,12 @@ void DBConnection::initPreparedVaults() const {
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "WHERE v.id = $1");
 
+    conn_->prepare("get_vault_by_name_and_owner",
+        "SELECT v.*, s.* "
+        "FROM vault v "
+        "LEFT JOIN s3 s ON v.id = s.vault_id "
+        "WHERE v.name = $1 AND v.owner_id = $2");
+
     // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
     conn_->prepare(
         "list_vaults",
@@ -228,6 +234,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 
     conn_->prepare("get_vault_root_dir_id_by_vault_id", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = '/'");
+
+    conn_->prepare("vault_exists", "SELECT EXISTS(SELECT 1 FROM vault WHERE name = $1 AND owner_id = $2) AS exists");
 }
 
 void DBConnection::initPreparedFsEntries() const {

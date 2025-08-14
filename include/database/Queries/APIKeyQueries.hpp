@@ -17,6 +17,8 @@ struct APIKeyQueries {
     static std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys();
 
     static std::shared_ptr<types::api::APIKey> getAPIKey(unsigned int keyId);
+
+    static std::shared_ptr<types::api::APIKey> getAPIKey(const std::string& keyName);
 };
 
 } // namespace vh::database

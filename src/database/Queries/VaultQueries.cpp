@@ -75,6 +75,22 @@ std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
                               });
 }
 
+std::shared_ptr<Vault> VaultQueries::getVault(const std::string& name, unsigned int ownerId) {
+    return Transactions::exec("VaultQueries::getVaultByName", [&](pqxx::work& txn) -> std::shared_ptr<Vault> {
+        const auto res = txn.exec_prepared("get_vault_by_name_and_owner", pqxx::params{name, ownerId});
+        if (res.empty()) return nullptr;
+
+        const auto row = res.one_row();
+        const auto typeStr = row["type"].as<std::string>();
+
+        switch (from_string(typeStr)) {
+        case VaultType::Local: return std::make_shared<Vault>(row);
+        case VaultType::S3: return std::make_shared<S3Vault>(row);
+        default: throw std::runtime_error("Unsupported VaultType in getVaultByName(): " + typeStr);
+        }
+    });
+}
+
 std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(DBQueryParams&& params) {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
         pqxx::params p{params.sortBy, to_string(params.order), params.limit, params.offset};
@@ -139,5 +155,12 @@ std::string VaultQueries::getVaultOwnersName(const unsigned int vaultId) {
 unsigned int VaultQueries::maxVaultId() {
     return Transactions::exec("VaultQueries::maxVaultId", [](pqxx::work& txn) {
         return txn.exec_prepared("get_max_vault_id").one_field().as<unsigned int>();
+    });
+}
+
+bool VaultQueries::vaultExists(const std::string& name, const unsigned int ownerId) {
+    return Transactions::exec("VaultQueries::vaultExists", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("vault_exists", pqxx::params{name, ownerId});
+        return res.one_field().as<bool>();
     });
 }

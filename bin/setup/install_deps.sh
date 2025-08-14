@@ -28,10 +28,6 @@ check_pkg() {
     fi
 }
 
-# -- Vaulthalla maintained packages --
-check_pkg libpdfium-dev "libpdfium-dev"
-check_pkg libpqxx-dev "libpqxx-dev"
-
 # -- Build tools --
 if ! command -v meson &>/dev/null || ! command -v ninja &>/dev/null; then
     echo "🛠️ Installing Meson and Ninja build system..."
@@ -39,6 +35,10 @@ if ! command -v meson &>/dev/null || ! command -v ninja &>/dev/null; then
 else
     echo "✅ Meson and Ninja already installed."
 fi
+
+# -- Vaulthalla maintained packages --
+check_pkg libpdfium-dev "libpdfium-dev"
+check_pkg libpqxx-dev "libpqxx-dev"
 
 # -- Libraries --
 check_pkg pkg-config "pkg-config"

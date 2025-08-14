@@ -81,19 +81,6 @@ CREATE TABLE IF NOT EXISTS api_keys
         )");
 
         txn.exec(R"(
-CREATE TABLE IF NOT EXISTS s3_buckets
-(
-    id         SERIAL PRIMARY KEY,
-    api_key_id INTEGER REFERENCES api_keys (id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    enabled    BOOLEAN   DEFAULT TRUE,
-    UNIQUE (api_key_id, name)
-);
-        )");
-
-        txn.exec(R"(
 CREATE TABLE IF NOT EXISTS vault
 (
     id             SERIAL PRIMARY KEY,
@@ -124,10 +111,13 @@ CREATE TABLE IF NOT EXISTS vault_keys
         )");
 
         txn.exec(R"(
-CREATE TABLE IF NOT EXISTS s3
+CREATE TABLE s3
 (
-    vault_id  INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
-    bucket_id INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE
+    vault_id     INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    api_key_id   INTEGER REFERENCES api_keys (id) ON DELETE CASCADE,
+    bucket       TEXT NOT NULL,
+
+    UNIQUE (api_key_id, bucket) -- Ensure unique bucket per API key
 );
         )");
 
@@ -432,17 +422,6 @@ CREATE TABLE IF NOT EXISTS backup_policy (
     enabled         BOOLEAN NOT NULL DEFAULT FALSE,
     last_error      TEXT DEFAULT NULL,
     status          VARCHAR(12) DEFAULT 'idle' CHECK (status IN ('idle', 'syncing', 'error'))
-);
-        )");
-
-        txn.exec(R"(
-CREATE TABLE IF NOT EXISTS backup_targets (
-    id        SERIAL PRIMARY KEY,
-    backup_id INTEGER REFERENCES backup_policy (id) ON DELETE CASCADE,
-    type      VARCHAR(12) NOT NULL CHECK (type IN ('local', 's3')),
-    path      TEXT DEFAULT NULL,
-    bucket_id INTEGER REFERENCES s3_buckets (id) ON DELETE CASCADE,
-    prefix    TEXT DEFAULT NULL
 );
         )");
 

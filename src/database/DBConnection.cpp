@@ -164,28 +164,27 @@ void DBConnection::initPreparedVaults() const {
            mount_point = EXCLUDED.mount_point
        RETURNING id)");
 
-    conn_->prepare("upsert_s3_bucket",
-                   "INSERT INTO s3_buckets (name, api_key_id) VALUES ($1, $2) "
-                   "ON CONFLICT (name, api_key_id) DO UPDATE "
-                   "SET name = EXCLUDED.name, api_key_id = EXCLUDED.api_key_id "
-                   "RETURNING id");
+    conn_->prepare("upsert_s3_vault",
+                   "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "
+                   "ON CONFLICT (api_key_id, bucket) DO UPDATE "
+                   "SET bucket = EXCLUDED.bucket, api_key_id = EXCLUDED.api_key_id "
+                   "RETURNING vault_id");
 
-    conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, bucket_id) VALUES ($1, $2)");
+    conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "
+                   "ON CONFLICT (vault_id) DO NOTHING");
 
     conn_->prepare("get_vault",
-                   "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+                   "SELECT v.*, s.* "
                    "FROM vault v "
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
-                   "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
                    "WHERE v.id = $1");
 
     // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
     conn_->prepare(
         "list_vaults",
-        "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+        "SELECT v.*, s.* "
         "FROM vault v "
         "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
         "ORDER BY "
         "CASE WHEN $1::text IS NULL THEN v.id END ASC, "
         "CASE WHEN $1::text = 'id'         AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.id        END ASC, "
@@ -194,8 +193,8 @@ void DBConnection::initPreparedVaults() const {
         "CASE WHEN $1::text = 'name'       AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
         "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
         "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
-        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN s3b.name    END ASC, "
-        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'desc' THEN s3b.name    END DESC "
+        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN s.bucket    END ASC, "
+        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'desc' THEN s.bucket    END DESC "
         "LIMIT  COALESCE($3::bigint, 9223372036854775807) "
         "OFFSET COALESCE($4::bigint, 0)"
         );
@@ -203,10 +202,9 @@ void DBConnection::initPreparedVaults() const {
     // list_user_vaults(owner_id, SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
     conn_->prepare(
         "list_user_vaults",
-        "SELECT v.*, s.*, s3b.name AS bucket, s3b.api_key_id AS api_key_id "
+        "SELECT v.*, s.* "
         "FROM vault v "
         "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "LEFT JOIN s3_buckets s3b ON s.bucket_id = s3b.id "
         "WHERE v.owner_id = $1 "
         "ORDER BY "
         "CASE WHEN $2::text IS NULL THEN v.id END ASC, "
@@ -216,8 +214,8 @@ void DBConnection::initPreparedVaults() const {
         "CASE WHEN $2::text = 'name'       AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
         "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
         "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
-        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN s3b.name    END ASC, "
-        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'desc' THEN s3b.name    END DESC "
+        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN s.bucket    END ASC, "
+        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'desc' THEN s.bucket    END DESC "
         "LIMIT  COALESCE($4::bigint, 9223372036854775807) "
         "OFFSET COALESCE($5::bigint, 0)"
         );

@@ -38,15 +38,13 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 txn.exec_prepared("insert_sync_and_fsync", sync_params);
             } else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-                const auto bucketId = txn.exec_prepared("upsert_s3_bucket",
-                    pqxx::params{s3Vault->bucket, s3Vault->api_key_id}).one_field().as<unsigned int>();
 
                 const auto rSync = std::static_pointer_cast<RSync>(sync);
                 pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
                                          to_string(rSync->strategy)};
                 txn.exec_prepared("insert_sync_and_rsync", sync_params);
 
-                txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, bucketId});
+                txn.exec_prepared("upsert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
             }
         }
 

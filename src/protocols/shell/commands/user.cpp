@@ -129,14 +129,22 @@ static CommandResult deleteUser(const CommandCall& subcall) {
         const auto user = UserQueries::getUserByName(std::string(name));
         if (!user) return invalid("User not found: " + std::string(name));
 
-        if (!subcall.user->canManageUsers() && subcall.user->id != user->id)
-            return invalid("You do not have permission to delete users.");
-
-        if (user->isSuperAdmin())
+        if (user->isSuperAdmin()) {
+            LogRegistry::audit()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+                user->name, subcall.user->name);
+            LogRegistry::shell()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+                user->name, subcall.user->name);
+            LogRegistry::vaulthalla()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+                user->name, subcall.user->name);
             return invalid("Cannot delete super admin user: " + user->name);
+        }
 
-        if (user->isAdmin() && !subcall.user->canManageAdmins())
-            return invalid("You do not have permission to delete admin users.");
+        if (subcall.user->id != user->id) {
+            if (!subcall.user->canManageUsers())
+                return invalid("You do not have permission to delete users.");
+            if (user->isAdmin() && !subcall.user->canManageAdmins())
+                return invalid("You do not have permission to delete admin users.");
+        }
 
         UserQueries::deleteUser(user->id);
         return ok("User deleted successfully: " + user->name);

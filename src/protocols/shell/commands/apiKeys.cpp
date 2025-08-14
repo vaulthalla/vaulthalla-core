@@ -2,7 +2,6 @@
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "types/APIKey.hpp"
-#include "types/S3Bucket.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "keys/APIKeyManager.hpp"
@@ -36,12 +35,12 @@ static CommandResult usage_api_keys_root() {
     return {
         0,
         "Usage:\n"
-        "  api-keys create --name <name> --access <accessKey> --secret <secret> --region <region=auto> "
+        "  api-keys [create | new] --name <name> --access <accessKey> --secret <secret> --region <region=auto> "
         "--endpoint <endpoint> --provider <provider>\n"
-        "  api-keys create -n <name> -a <accessKey> -s <secret> -r <region=auto> -e <endpoint> -p <provider>\n"
+        "  api-keys [create | new] -n <name> -a <accessKey> -s <secret> -r <region=auto> -e <endpoint> -p <provider>\n"
         "    " + usage_provider() + "\n"
-        "  api-keys delete <id>\n"
-        "  api-keys info <id>\n"
+        "  api-keys [delete | rm] <id>\n"
+        "  api-keys [info | get] <id>\n"
         "  api-keys list [--json]\n",
         ""
     };

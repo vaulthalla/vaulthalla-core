@@ -10,7 +10,6 @@
 
 // Types
 #include "types/Permission.hpp"
-#include "types/S3Bucket.hpp"
 #include "types/S3Vault.hpp"
 #include "types/RSync.hpp"
 #include "types/FSync.hpp"
@@ -209,17 +208,13 @@ void vh::seed::initDevCloudVault() {
             return;
         }
 
-        const auto bucket = std::make_shared<api::S3Bucket>();
-        bucket->name = "vaulthalla-test";
-        bucket->api_key = key;
-
         const auto vault = std::make_shared<S3Vault>();
         vault->name = "R2 Test Vault";
         vault->description = "Test vault for Cloudflare R2 in development mode";
         vault->mount_point = "cloud/r2_test_vault";
         vault->api_key_id = key->id;
         vault->owner_id = 1;
-        vault->bucket = bucket->name;
+        vault->bucket = "vaulthalla-test";
         vault->type = VaultType::S3;
 
         const auto sync = std::make_shared<RSync>();

@@ -236,6 +236,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("get_vault_root_dir_id_by_vault_id", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = '/'");
 
     conn_->prepare("vault_exists", "SELECT EXISTS(SELECT 1 FROM vault WHERE name = $1 AND owner_id = $2) AS exists");
+
+    conn_->prepare("is_s3_vault", "SELECT EXISTS(SELECT 1 FROM s3 WHERE vault_id = $1) AS is_s3");
 }
 
 void DBConnection::initPreparedFsEntries() const {
@@ -781,20 +783,18 @@ void DBConnection::initPreparedSync() const {
 
     conn_->prepare("update_sync_and_fsync",
                    "WITH updated_sync AS ("
-                   "  UPDATE sync SET interval = $2, enabled = $3, "
-                   "      last_sync_at = $4, last_success_at = $5, updated_at = NOW() "
+                   "  UPDATE sync SET interval = $2, enabled = $3, updated_at = NOW() "
                    "  WHERE id = $1 RETURNING id"
                    ") "
-                   "UPDATE fsync SET conflict_policy = $6 "
+                   "UPDATE fsync SET conflict_policy = $4 "
                    "WHERE sync_id = (SELECT id FROM updated_sync)");
 
     conn_->prepare("update_sync_and_rsync",
                    "WITH updated_sync AS ("
-                   "  UPDATE sync SET interval = $2, enabled = $3, "
-                   "      last_sync_at = $4, last_success_at = $5, updated_at = NOW() "
+                   "  UPDATE sync SET interval = $2, enabled = $3, updated_at = NOW() "
                    "  WHERE id = $1 RETURNING id"
                    ") "
-                   "UPDATE rsync SET strategy = $6, conflict_policy = $7 "
+                   "UPDATE rsync SET strategy = $4, conflict_policy = $5 "
                    "WHERE sync_id = (SELECT id FROM updated_sync)");
 
     conn_->prepare("report_sync_started", "UPDATE sync SET last_sync_at = NOW() WHERE id = $1");
@@ -807,6 +807,13 @@ void DBConnection::initPreparedSync() const {
 
     conn_->prepare("get_rsync_config",
                    "SELECT rs.*, s.* FROM rsync rs JOIN sync s ON s.id = rs.sync_id WHERE vault_id = $1");
+
+    conn_->prepare("get_sync_config",
+        "SELECT s.*, rs.*, fs.* "
+        "FROM sync s "
+        "LEFT JOIN rsync rs ON s.id = rs.sync_id "
+        "LEFT JOIN fsync fs ON s.id = fs.sync_id "
+        "WHERE vault_id = $1");
 }
 
 void DBConnection::initPreparedCache() const {

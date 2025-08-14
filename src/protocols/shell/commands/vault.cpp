@@ -49,11 +49,25 @@ static CommandResult usage_vault_root() {
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
         "        [--owner-id <id>]\n"
         "\n"
+        "  Update existing vault (backend inferred; all params optional):\n"
+        "    vault (update | set) <id>\n"
+        "        [--mount <path>] [--api-key <name | id>] [--bucket <name>]\n"
+        "        [--sync-strategy <cache | sync | mirror>]\n"
+        "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
+        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+        "        [--owner-id <id>]\n"
+        "    vault (update | set) <name> <owner_id>\n"
+        "        [--mount <path>] [--api-key <name | id>] [--bucket <name>]\n"
+        "        [--sync-strategy <cache | sync | mirror>]\n"
+        "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
+        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+        "        [--owner-id <id>]\n"
+        "\n"
         "  Common commands:\n"
         "    vault delete <id>\n"
         "    vault delete <name> --owner-id <id>\n"
-        "    vault info <id>\n"
-        "    vault info <name> [--owner-id <id>]\n",
+        "    vault info   <id>\n"
+        "    vault info   <name> [--owner-id <id>]\n",
         ""
     };
 }
@@ -120,12 +134,8 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             vault = std::make_shared<Vault>();
             const auto fsync = std::make_shared<FSync>();
 
-            if (onSyncConflictOpt) {
-                if (*onSyncConflictOpt == "overwrite") fsync->conflict_policy = FSync::ConflictPolicy::Overwrite;
-                else if (*onSyncConflictOpt == "keep_both") fsync->conflict_policy = FSync::ConflictPolicy::KeepBoth;
-                else if (*onSyncConflictOpt == "ask") fsync->conflict_policy = FSync::ConflictPolicy::Ask;
-                else return invalid("vault create: invalid --on-sync-conflict value: " + *onSyncConflictOpt);
-            } else fsync->conflict_policy = FSync::ConflictPolicy::Overwrite; // Default
+            if (onSyncConflictOpt) fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
+            else fsync->conflict_policy = FSync::ConflictPolicy::Overwrite; // Default
 
             sync = fsync;
         } else if (f_s3) {
@@ -165,20 +175,11 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             s3Vault->bucket = *bucketOpt;
 
             const auto rsync = std::make_shared<RSync>();
-            if (syncStrategyOpt) {
-                if (*syncStrategyOpt == "cache") rsync->strategy = RSync::Strategy::Cache;
-                else if (*syncStrategyOpt == "sync") rsync->strategy = RSync::Strategy::Sync;
-                else if (*syncStrategyOpt == "mirror") rsync->strategy = RSync::Strategy::Mirror;
-                else return invalid("vault create: invalid --sync-strategy value: " + *syncStrategyOpt);
-            } else rsync->strategy = RSync::Strategy::Cache;
+            if (syncStrategyOpt) rsync->strategy = strategyFromString(*syncStrategyOpt);
+            else rsync->strategy = RSync::Strategy::Cache;
 
-            if (onSyncConflictOpt) {
-                if (*onSyncConflictOpt == "keep_local") rsync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
-                else if (*onSyncConflictOpt ==
-                         "keep_remote") rsync->conflict_policy = RSync::ConflictPolicy::KeepRemote;
-                else if (*onSyncConflictOpt == "ask") rsync->conflict_policy = RSync::ConflictPolicy::Ask;
-                else return invalid("vault create: invalid --on-sync-conflict value: " + *onSyncConflictOpt);
-            } else rsync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
+            if (onSyncConflictOpt) rsync->conflict_policy = rsConflictPolicyFromString(*onSyncConflictOpt);
+            else rsync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
 
             sync = rsync;
             vault = s3Vault;
@@ -284,12 +285,106 @@ static CommandResult handle_vaults_list(const CommandCall& call) {
     return ok(to_string(vaults));
 }
 
-// ---------- registration ----------
+static CommandResult handle_vault_update(const CommandCall& call) {
+    if (call.positionals.empty()) return invalid("vault update: missing <id> or <name>");
+    if (call.positionals.size() > 1) return invalid("vault update: too many arguments");
+
+    const auto nameOrId = call.positionals[0];
+    const auto idOpt = parseInt(nameOrId);
+
+    std::shared_ptr<Vault> vault;
+    if (idOpt) vault = VaultQueries::getVault(*idOpt);
+    else {
+        if (call.positionals.size() < 2)
+            return invalid("vault update: missing required <owner-id> for vault name update");
+
+        const auto ownerId = std::stoi(call.positionals[1]);
+        vault = VaultQueries::getVault(nameOrId, ownerId);
+    }
+
+    if (!vault) return invalid("vault update: vault with ID " + std::to_string(*idOpt) + " not found");
+
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
+        return invalid("vault update: you do not have permission to update this vault");
+
+    const auto mountOpt = optVal(call, "mount");
+    const auto descOpt = optVal(call, "desc");
+    const auto quotaOpt = optVal(call, "quota");
+    const auto ownerIdOpt = optVal(call, "owner-id");
+    const auto syncStrategyOpt = optVal(call, "sync-strategy");
+    const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
+    const auto apiKeyOpt = optVal(call, "api-key");
+    const auto bucketOpt = optVal(call, "bucket");
+
+    if (vault->type == VaultType::Local && (apiKeyOpt || bucketOpt))
+        return invalid("vault update: --api-key and --bucket are not valid for local vaults");
+
+    if (mountOpt) {
+        // TODO: handle mount migration
+    }
+
+    if (descOpt) vault->description = *descOpt;
+
+    if (quotaOpt) {
+        if (*quotaOpt == "unlimited") vault->quota = 0; // 0 means unlimited
+        else vault->quota = parseSize(*quotaOpt);
+    }
+
+    if (ownerIdOpt) {
+        const auto ownerId = parseInt(*ownerIdOpt);
+        if (!ownerId || *ownerId <= 0) return invalid("vault update: --owner-id must be a positive integer");
+        vault->owner_id = *ownerId;
+    }
+
+    std::shared_ptr<Sync> sync;
+    if (syncStrategyOpt || onSyncConflictOpt) {
+        sync = VaultQueries::getVaultSyncConfig(vault->id);
+        if (!sync) return invalid("vault update: vault does not have a sync configuration");
+
+        if (vault->type == VaultType::Local) {
+            if (syncStrategyOpt) return invalid("vault update: --sync-strategy is not valid for local vaults");
+            if (onSyncConflictOpt) {
+                const auto fsync = std::static_pointer_cast<FSync>(sync);
+                fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
+            }
+        }
+
+        if (syncStrategyOpt) {
+            const auto strategy = strategyFromString(*syncStrategyOpt);
+            if (vault->type == VaultType::S3) {
+                const auto rsync = std::static_pointer_cast<RSync>(sync);
+                rsync->strategy = strategy;
+            }
+        }
+    }
+
+    if (apiKeyOpt || bucketOpt) {
+        if (vault->type == VaultType::Local)
+            return invalid("vault update: --api-key and --bucket are not valid for local vaults");
+
+        const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+
+        if (apiKeyOpt) {
+            const auto apiKeyId = parseInt(*apiKeyOpt);
+            if (apiKeyId && APIKeyQueries::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
+            else {
+                const auto apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
+                if (!apiKey) return invalid("vault update: API key not found: " + *apiKeyOpt);
+                s3Vault->api_key_id = apiKey->id;
+            }
+        }
+
+        if (bucketOpt) s3Vault->bucket = *bucketOpt;
+    }
+
+    VaultQueries::upsertVault(vault, sync);
+
+    return ok("Successfully updated vault!\n" + to_string(vault));
+}
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
-    // Parent "vault" with subcommands
     r->registerCommand("vault", "Manage a single vault",
                        [](const CommandCall& call) -> CommandResult {
-                           // Expect: create/delete/info as first positional
                            if (call.positionals.empty()) return usage_vault_root();
 
                            const std::string_view sub = call.positionals[0];
@@ -297,32 +392,18 @@ void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
                            // shift subcommand off positionals
                            subcall.positionals.erase(subcall.positionals.begin());
 
-                           if (sub == "create" || sub == "new") {
-                               // Allowed flags: --local, --s3, --encrypt, --desc <text>
-                               // TODO: reject unknown flags for this subcommand (validate here if you want)
-                               return handle_vault_create(subcall);
-                           }
-                           if (sub == "delete" || sub == "rm") {
-                               // Allowed flags: --force
-                               return handle_vault_delete(subcall);
-                           }
-                           if (sub == "info" || sub == "get") {
-                               // Allowed flags: --json
-                               return handle_vault_info(subcall);
-                           }
+                           if (sub == "create" || sub == "new") return handle_vault_create(subcall);
+                           if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
+                           if (sub == "info" || sub == "get") return handle_vault_info(subcall);
+                           if (sub == "update" || sub == "set") return handle_vault_update(subcall);
 
                            return invalid(
                                "vault: unknown subcommand '" + std::string(sub) + "'. Use: create | delete | info");
-                       },
-                       /*aliases*/{"v"});
+                       }, {"v"});
 
-    // Top-level "vaults" (list)
     r->registerCommand("vaults", "List vaults",
                        [](const CommandCall& call) -> CommandResult {
-                           // Fast help
                            if (hasKey(call, "help") || hasKey(call, "h")) return usage_vaults_list();
-                           // Allowed flags: --local | --s3 (mutually exclusive), --limit <n>, --json
                            return handle_vaults_list(call);
-                       },
-                       /*aliases*/{"ls"});
+                       }, {"ls"});
 }

@@ -24,6 +24,8 @@ struct VaultQueries {
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, types::DBQueryParams&& params = {});
     static std::string getVaultOwnersName(unsigned int vaultId);
 
+    [[nodiscard]] static std::shared_ptr<types::Sync> getVaultSyncConfig(unsigned int vaultId);
+
     [[nodiscard]] static bool vaultExists(const std::string& name, unsigned int ownerId);
 
     [[nodiscard]] static unsigned int maxVaultId();

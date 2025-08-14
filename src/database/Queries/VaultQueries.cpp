@@ -43,9 +43,34 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
                                          to_string(rSync->strategy)};
                 txn.exec_prepared("insert_sync_and_rsync", sync_params);
-
-                txn.exec_prepared("upsert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
             }
+        } else if (sync) {  // exists and sync is provided
+            if (vault->type == VaultType::Local) {
+                const auto fsync = std::static_pointer_cast<FSync>(sync);
+                pqxx::params f{
+                    fsync->id,
+                    fsync->interval.count(),
+                    fsync->enabled,
+                    to_string(fsync->conflict_policy)
+                };
+                txn.exec_prepared("update_sync_and_fsync", f);
+            } else if (vault->type == VaultType::S3) {
+                const auto rsync = std::static_pointer_cast<RSync>(sync);
+
+                pqxx::params r{
+                    rsync->id,
+                    rsync->interval.count(),
+                    rsync->enabled,
+                    to_string(rsync->strategy),
+                    to_string(rsync->conflict_policy)
+                };
+                txn.exec_prepared("update_sync_and_rsync", r);
+            }
+        }
+
+        if (vault->type == VaultType::S3) {
+            const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+            txn.exec_prepared("upsert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
         }
 
         txn.commit();
@@ -162,5 +187,18 @@ bool VaultQueries::vaultExists(const std::string& name, const unsigned int owner
     return Transactions::exec("VaultQueries::vaultExists", [&](pqxx::work& txn) {
         const auto res = txn.exec_prepared("vault_exists", pqxx::params{name, ownerId});
         return res.one_field().as<bool>();
+    });
+}
+
+std::shared_ptr<Sync> VaultQueries::getVaultSyncConfig(const unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::getVaultSyncConfig", [&](pqxx::work& txn) -> std::shared_ptr<Sync> {
+        const auto res = txn.exec_prepared("get_vault_sync_config", pqxx::params{vaultId});
+        if (res.empty()) return nullptr;
+
+        const auto isS3 = txn.exec_prepared("is_s3_vault", vaultId).one_field().as<bool>();
+
+        const auto row = res.one_row();
+        if (isS3) return std::make_shared<RSync>(row);
+        return std::make_shared<FSync>(row);
     });
 }

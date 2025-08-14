@@ -26,6 +26,7 @@
 #include "keys/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "util/bitmask.hpp"
 
@@ -151,10 +152,10 @@ void vh::seed::initAdminDefaultVault() {
     const auto vault = std::make_shared<Vault>();
     vault->name = "Admin Default Vault";
     vault->description = "Default vault for the admin user";
-    vault->mount_point = "/users/admin";
     vault->type = VaultType::Local;
     vault->owner_id = 1;
     vault->quota = 0; // No quota for admin vault
+    vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
 
     const auto sync = std::make_shared<FSync>();
     sync->interval = std::chrono::minutes(10);
@@ -211,7 +212,7 @@ void vh::seed::initDevCloudVault() {
         const auto vault = std::make_shared<S3Vault>();
         vault->name = "R2 Test Vault";
         vault->description = "Test vault for Cloudflare R2 in development mode";
-        vault->mount_point = "/cloud/r2_test_vault";
+        vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
         vault->api_key_id = key->id;
         vault->owner_id = 1;
         vault->bucket = "vaulthalla-test";

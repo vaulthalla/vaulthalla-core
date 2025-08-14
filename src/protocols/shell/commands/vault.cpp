@@ -51,13 +51,13 @@ static CommandResult usage_vault_root() {
         "\n"
         "  Update existing vault (backend inferred; all params optional):\n"
         "    vault (update | set) <id>\n"
-        "        [--mount <path>] [--api-key <name | id>] [--bucket <name>]\n"
+        "        [--api-key <name | id>] [--bucket <name>]\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
         "        [--owner-id <id>]\n"
         "    vault (update | set) <name> <owner_id>\n"
-        "        [--mount <path>] [--api-key <name | id>] [--bucket <name>]\n"
+        "        [--api-key <name | id>] [--bucket <name>]\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
@@ -102,21 +102,11 @@ static CommandResult handle_vault_create(const CommandCall& call) {
         const bool f_s3 = hasFlag(call, "s3");
         if (f_local && f_s3) return invalid("vault create: --local and --s3 are mutually exclusive");
 
-        const auto mountOpt = optVal(call, "mount");
         const auto descOpt = optVal(call, "desc");
         const auto quotaOpt = optVal(call, "quota");
         const auto ownerIdOpt = optVal(call, "owner-id");
         const auto syncStrategyOpt = optVal(call, "sync-strategy");
         const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
-
-        if (!mountOpt || mountOpt->empty()) return invalid("vault create: missing required --mount <path>");
-        const auto mount = makeAbsolute(*mountOpt);
-
-        if (mount.string().starts_with("/mnt") ||
-            mount.string().starts_with(ConfigRegistry::get().fuse.root_mount_path.string()))
-            return invalid("vault create: mount path cannot start with /mnt or the configured root mount path");
-
-        if (FSEntryQueries::exists(mount)) return invalid("vault create: mount path already exists: " + mount.string());
 
         unsigned int ownerId = call.user->id;
         if (ownerIdOpt) {
@@ -186,7 +176,6 @@ static CommandResult handle_vault_create(const CommandCall& call) {
         }
 
         vault->name = name;
-        vault->mount_point = mount;
         vault->description = descOpt ? *descOpt : "";
         vault->owner_id = ownerId;
         vault->type = f_local ? VaultType::Local : VaultType::S3;
@@ -307,7 +296,6 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
         return invalid("vault update: you do not have permission to update this vault");
 
-    const auto mountOpt = optVal(call, "mount");
     const auto descOpt = optVal(call, "desc");
     const auto quotaOpt = optVal(call, "quota");
     const auto ownerIdOpt = optVal(call, "owner-id");
@@ -318,10 +306,6 @@ static CommandResult handle_vault_update(const CommandCall& call) {
 
     if (vault->type == VaultType::Local && (apiKeyOpt || bucketOpt))
         return invalid("vault update: --api-key and --bucket are not valid for local vaults");
-
-    if (mountOpt) {
-        // TODO: handle mount migration
-    }
 
     if (descOpt) vault->description = *descOpt;
 

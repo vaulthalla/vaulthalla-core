@@ -23,7 +23,6 @@ struct Directory;
 struct FSEntry {
     unsigned int id{};
     std::string name{};
-    boost::uuids::uuid uuid{};
     uintmax_t size_bytes{0};
     std::optional<unsigned int> parent_id{}, owner_uid{}, group_gid{}, vault_id{}, created_by{}, last_modified_by{};
     std::optional<ino_t> inode{};

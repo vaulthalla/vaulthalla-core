@@ -335,12 +335,12 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed",
                    "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.uuid, fs.vault_id "
+                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.vault_id "
                    "  FROM fs_entry fs "
                    "  WHERE fs.vault_id = $1 AND fs.path = $2"
                    "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, fuse_path, uuid, trashed_at, trashed_by) "
-                   "  SELECT vault_id, fuse_path, uuid, NOW(), $3 "
+                   "  INSERT INTO files_trashed (vault_id, fuse_path, trashed_at, trashed_by) "
+                   "  SELECT vault_id, fuse_path, NOW(), $3 "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -350,12 +350,12 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed_by_id",
                    "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.uuid, fs.vault_id "
+                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.vault_id "
                    "  FROM fs_entry fs "
                    "  WHERE fs.id = $1"
                    "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, fuse_path, uuid, trashed_at, trashed_by) "
-                   "  SELECT vault_id, fuse_path, uuid, NOW(), $2 "
+                   "  INSERT INTO files_trashed (vault_id, fuse_path, trashed_at, trashed_by) "
+                   "  SELECT vault_id, fuse_path, NOW(), $2 "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -366,15 +366,13 @@ void DBConnection::initPreparedFiles() const {
     conn_->prepare("list_trashed_files",
                    "SELECT * FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
 
-    conn_->prepare("mark_trashed_file_deleted_by_fuse_path_and_uuid",
+    conn_->prepare("mark_trashed_file_deleted_by_fuse_path",
                    "UPDATE files_trashed SET deleted_at = NOW() "
-                   "WHERE fuse_path = $1 AND uuid = $2 AND deleted_at IS NULL");
+                   "WHERE fuse_path = $1 AND deleted_at IS NULL");
 
     conn_->prepare("mark_trashed_file_deleted_by_id",
                    "UPDATE files_trashed SET deleted_at = NOW() "
                    "WHERE id = $1 AND deleted_at IS NULL");
-
-    conn_->prepare("get_file_uuid_by_path", "SELECT uuid FROM fs_entry WHERE vault_id = $1 AND path = $2");
 
     conn_->prepare("list_files_in_dir",
                    "SELECT f.*, fs.* "

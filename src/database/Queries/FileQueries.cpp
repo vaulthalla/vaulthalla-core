@@ -106,10 +106,7 @@ void FileQueries::deleteFile(const unsigned int userId, const std::shared_ptr<Fi
 
         updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
 
-        const auto uuid = std::string(file->uuid.begin(), file->uuid.end());
-
-        txn.exec_prepared("mark_trashed_file_deleted_fuse_path_and_uuid",
-            pqxx::params{to_utf8_string(file->fuse_path.u8string()), uuid});
+        txn.exec_prepared("mark_trashed_file_deleted_fuse_path", to_utf8_string(file->fuse_path.u8string()));
     });
 }
 

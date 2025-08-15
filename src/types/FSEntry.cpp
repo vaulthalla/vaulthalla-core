@@ -10,8 +10,6 @@
 #include <unordered_set>
 #include <sstream>
 #include <pugixml.hpp>
-#include <boost/uuid/nil_generator.hpp>
-#include <boost/uuid/string_generator.hpp>
 
 using namespace vh::types;
 using namespace vh::util;
@@ -20,7 +18,6 @@ using namespace vh::logging;
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
-      uuid(row["uuid"].is_null() ? boost::uuids::nil_uuid() : boost::uuids::string_generator()(row["uuid"].as<std::string>())),
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
       fuse_path(std::filesystem::path(row["fuse_path"].as<std::string>())),

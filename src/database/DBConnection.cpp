@@ -317,7 +317,7 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("upsert_file_full",
                    "WITH upsert_entry AS ("
-                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, base32_alias, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
+                   "  INSERT INTO fs_entry (vault_id, parent_id, name, base32_alias, created_by, last_modified_by, path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
                    "  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
                    "  ON CONFLICT (parent_id, name) DO UPDATE SET "
                    "    last_modified_by = EXCLUDED.last_modified_by, "

@@ -18,7 +18,7 @@ class DirectoryQueries {
 public:
     DirectoryQueries() = default;
 
-    static void upsertDirectory(const std::shared_ptr<types::Directory>& directory);
+    static unsigned int upsertDirectory(const std::shared_ptr<types::Directory>& directory);
 
     static void deleteDirectory(unsigned int directoryId);
 

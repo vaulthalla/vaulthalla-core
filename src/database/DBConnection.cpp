@@ -534,7 +534,7 @@ void DBConnection::initPreparedDirectories() const {
                    "  size_bytes = EXCLUDED.size_bytes, "
                    "  file_count = EXCLUDED.file_count, "
                    "  subdirectory_count = EXCLUDED.subdirectory_count, "
-                   "  last_modified = NOW()");
+                   "  last_modified = NOW() RETURNING fs_entry_id");
 
     conn_->prepare("list_directories_in_dir",
                    "SELECT fs.*, d.* "

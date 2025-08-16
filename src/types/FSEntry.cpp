@@ -60,12 +60,21 @@ FSEntry::FSEntry(const pqxx::row& row)
     else is_system = row["is_system"].as<bool>();
 
     if (parent_id) {
-        auto parents = DirectoryQueries::collectParents(*parent_id);
-        fuse_path = makeAbsolute(parents.back()->name) / stripLeadingSlash(path);
-
+        fuse_path = fs::path("/");
         backing_path = fs::path("/");
-        for (const auto& parent : parents | std::views::reverse)
-            backing_path /= parent->base32_alias;
+
+        for (const auto& p : DirectoryQueries::collectParents(*parent_id) | std::views::reverse) {
+            if (p->name == "/" && !p->parent_id) continue; // Skip root entry
+            fuse_path /= p->name;
+            backing_path /= p->base32_alias;
+        }
+
+        fuse_path /= name;
+        backing_path /= base32_alias;
+    } else {
+        // Root entry
+        fuse_path = name;
+        backing_path = name;
     }
 }
 

@@ -143,8 +143,9 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
             dir->fuse_path.string(), dir->parent_id ? std::to_string(*dir->parent_id) : "null", FSEntryQueries::rootExists() ? "yes" : "no",
             root->id, root->inode ? std::to_string(*root->inode) : "null");
 
-        ServiceDepsRegistry::instance().fsCache->cacheEntry(dir);
-        DirectoryQueries::upsertDirectory(dir);
+        dir->id = DirectoryQueries::upsertDirectory(dir);
+
+        ServiceDepsRegistry::instance().fsCache->cacheEntry(FSEntryQueries::getFSEntryById(dir->id));
 
         LogRegistry::fs()->debug("Successfully created vault directory at: {}", absPath.string());
     } catch (const std::exception& ex) {

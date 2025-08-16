@@ -170,6 +170,8 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
     inodeToEntry_[*entry->inode] = entry;
     pathToInode_[entry->fuse_path] = *entry->inode;
     pathToEntry_[entry->fuse_path] = entry;
+
+    LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 }
 
 bool FSCache::entryExists(const fs::path& absPath) const {
@@ -177,7 +179,7 @@ bool FSCache::entryExists(const fs::path& absPath) const {
     return pathToEntry_.contains(absPath);
 }
 
-std::shared_ptr<FSEntry> FSCache::getEntryFromInode(fuse_ino_t ino) const {
+std::shared_ptr<FSEntry> FSCache::getEntryFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(mutex_);
     auto it = inodeToEntry_.find(ino);
     if (it != inodeToEntry_.end()) return it->second;

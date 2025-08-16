@@ -14,9 +14,9 @@ using namespace vh::types;
 using namespace vh::logging;
 
 
-void DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directory) {
+unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
-    Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
+    return Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
         if (directory->inode) txn.exec_prepared("delete_fs_entry_by_inode", directory->inode);
 
         pqxx::params p;
@@ -37,7 +37,7 @@ void DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directo
         p.append(directory->file_count);
         p.append(directory->subdirectory_count);
 
-        txn.exec_prepared("upsert_directory", p);
+        return txn.exec_prepared("upsert_directory", p).one_field().as<unsigned int>();
     });
 }
 

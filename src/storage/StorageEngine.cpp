@@ -14,6 +14,7 @@
 #include "services/ThumbnailWorker.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "util/fsPath.hpp"
 
 using namespace vh::types;
 using namespace vh::database;
@@ -29,7 +30,7 @@ namespace vh::storage {
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
-      paths(std::make_shared<Path>(vault->mount_point)),
+      paths(std::make_shared<Path>(makeAbsolute(to_snake_case(vault->name)), vault->mount_point)),
       encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
     if (!FSEntryQueries::rootExists()) throw std::runtime_error("Root entry does not exist in the database. Please initialize the database first.");
     if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);

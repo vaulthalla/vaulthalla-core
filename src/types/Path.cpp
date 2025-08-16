@@ -1,21 +1,30 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::types;
 using namespace vh::config;
+using namespace vh::logging;
 
-Path::Path(const fs::path& vaultMountPoint)
+Path::Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount)
     : fuseRoot(ConfigRegistry::get().fuse.root_mount_path),
-      vaultRoot(fuseRoot / stripLeadingSlash(vaultMountPoint)),
+      vaultRoot(fuseRoot / stripLeadingSlash(vaultFuseMount)),
       cacheRoot(ConfigRegistry::get().fuse.backing_path /
                 stripLeadingSlash(ConfigRegistry::get().caching.path) /
-                stripLeadingSlash(vaultMountPoint)),
+                stripLeadingSlash(vaultBackingMount)),
       thumbnailRoot(cacheRoot / "thumbnails"),
       fileCacheRoot(cacheRoot / "files"),
       backingRoot(ConfigRegistry::get().fuse.backing_path),
       backingVaultRoot(ConfigRegistry::get().fuse.backing_path /
-                       stripLeadingSlash(vaultMountPoint)) {}
+                       stripLeadingSlash(vaultBackingMount)) {
+    LogRegistry::storage()->info("[Path] Initialized with vault mount point: {}", vaultFuseMount.string());
+    LogRegistry::storage()->info("[Path] fuseRoot: {}, vaultRoot: {}, cacheRoot: {}, "
+                                  "thumbnailRoot: {}, fileCacheRoot: {}, backingRoot: {}, backingVaultRoot: {}",
+                                  fuseRoot.string(), vaultRoot.string(), cacheRoot.string(),
+                                  thumbnailRoot.string(), fileCacheRoot.string(),
+                                  backingRoot.string(), backingVaultRoot.string());
+}
 
 fs::path Path::absPath(const fs::path& relPath, const PathType& type) const {
     switch (type) {

@@ -66,9 +66,9 @@ std::shared_ptr<StorageEngine> StorageManager::resolveStorageEngine(const fs::pa
     }
 
     LogRegistry::storage()->warn("[StorageManager] No storage engine found for path: {}", fusePath.string());
-    LogRegistry::storage()->debug("[StorageManager] Available storage engines:");
+    LogRegistry::storage()->info("[StorageManager] Available storage engines:");
     for (const auto& [path, engine] : engines_)
-        LogRegistry::storage()->debug(" - {} (Vault ID: {}, Type: {})", path, engine->vault->id, to_string(engine->vault->type));
+        LogRegistry::storage()->info(" - {} (Vault ID: {}, Type: {})", path, engine->vault->id, to_string(engine->vault->type));
 
     return nullptr;
 }

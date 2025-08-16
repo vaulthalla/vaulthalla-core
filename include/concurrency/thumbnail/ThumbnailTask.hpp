@@ -34,9 +34,10 @@ public:
 
         try {
             const auto& sizes = ConfigRegistry::get().caching.thumbnails.sizes;
+            const auto basePath = engine_->paths->thumbnailRoot / file_->base32_alias;
             for (const auto& size : sizes) {
-                fs::path cachePath = engine_->paths->thumbnailRoot / std::to_string(size);
-                if (cachePath.extension() != ".jpg" && cachePath.extension() != ".jpeg") cachePath += ".jpg";
+                const auto filename = std::to_string(size) + ".jpg";
+                fs::path cachePath = basePath / filename;
 
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
 

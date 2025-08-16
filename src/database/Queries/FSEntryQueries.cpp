@@ -129,7 +129,7 @@ std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const std::option
         return {};
     }
 
-    LogRegistry::db()->info("[FSEntryQueries::listDir] Listing directory with parent ID: {}, recursive: {}", *entryId, recursive);
+    LogRegistry::db()->debug("[FSEntryQueries::listDir] Listing directory with parent ID: {}, recursive: {}", *entryId, recursive);
 
     return Transactions::exec("FSEntryQueries::listDirById", [&](pqxx::work& txn) {
         const auto files = files_from_pq_res(
@@ -138,6 +138,7 @@ std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const std::option
                 : txn.exec_prepared("list_files_in_dir_by_parent_id", entryId)
             );
 
+        LogRegistry::db()->info("[FSEntryQueries::listDir] Executing queries for directories...");
         const auto directories = directories_from_pq_res(
             recursive
                 ? txn.exec_prepared("list_dirs_in_dir_by_parent_id_recursive", entryId)

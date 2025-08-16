@@ -332,7 +332,6 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     return f;
 }
 
-
 void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId,
                         std::shared_ptr<StorageEngine> engine) {
     LogRegistry::fs()->debug("Renaming {} to {}", oldPath.string(), newPath.string());

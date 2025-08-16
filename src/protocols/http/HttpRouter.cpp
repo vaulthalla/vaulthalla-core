@@ -10,12 +10,15 @@
 #include "util/files.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/File.hpp"
+#include "types/FSEntry.hpp"
 
 #include <ranges>
 
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
+using namespace vh::types;
 
 namespace vh::http {
 
@@ -62,16 +65,34 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
 
     const auto vault_id = std::stoi(vault_it->second);
     std::filesystem::path rel_path = path_it->second;
-    const std::string mime_type = database::FileQueries::getMimeType(vault_id, {rel_path});
 
     const auto size_it = params.find("size");
+
+    const auto engine = storageManager_->getEngine(vault_id);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vault_id));
+
+    const auto fusePath = engine->paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(fusePath);
+    if (!entry) throw std::runtime_error("File not found in cache: " + fusePath.string());
+    if (entry->isDirectory()) throw std::runtime_error("Cannot generate preview for directory: " + fusePath.string());
+    const auto file = std::static_pointer_cast<File>(entry);
+
+    if (!file->mime_type) {
+        LogRegistry::http()->error("[HttpRouter] File {} has no MIME type", rel_path.string());
+        http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
+        res.set(http::field::content_type, "text/plain");
+        res.body() = "File has no MIME type";
+        res.prepare_payload();
+        return res;
+    }
 
     if (size_it != params.end() && !size_it->second.empty()) {
         const auto thumbnail_sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
         const auto size = std::stoi(size_it->second);
         if (std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
             try {
-                return handleCachedPreview(vault_id, rel_path, mime_type, req, size);
+                return handleCachedPreview(engine, file, req, size);
             } catch (const std::exception& e) {
                 LogRegistry::http()->error("[HttpRouter] Error handling cached preview for {}: {}", rel_path.string(), e.what());
                 http::response<http::string_body> res{http::status::internal_server_error, req.version()};
@@ -83,31 +104,27 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
         }
     }
 
-    const auto filename = rel_path.filename().string();
-    if (mime_type.starts_with("image/" || filename.ends_with(".webp")))
+    if (file->mime_type->starts_with("image/"))
         return imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
 
-    if (mime_type.ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+    if (file->mime_type->ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
 
     http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
-    res.body() = "Unsupported preview type: " + mime_type;
+    res.body() = "Unsupported preview type: " + *file->mime_type;
     res.prepare_payload();
     return res;
 }
 
-PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, const std::filesystem::path& rel_path,
-                                     const std::string& mime_type, const http::request<http::string_body>& req,
+PreviewResponse HttpRouter::handleCachedPreview(const std::shared_ptr<storage::StorageEngine>& engine,
+                                     const std::shared_ptr<File>& file,
+                                     const http::request<http::string_body>& req,
                                      const unsigned int size) const {
-    const auto engine = storageManager_->getEngine(vaultId);
-    const auto pathToJpegCache = engine->paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+    const auto filename = std::to_string(size) + ".jpg";
+    const auto pathToJpegCache = engine->paths->thumbnailRoot / file->base32_alias / filename;
 
-    // Force `.jpg` extension if this is a PDF or image preview
-    if (mime_type.starts_with("image/") || mime_type.starts_with("application/")) {
-        std::filesystem::path jpegPath = pathToJpegCache;
-        if (jpegPath.extension() != ".jpg" && jpegPath.extension() != ".jpeg") jpegPath.append(".jpg");
-
-        if (std::filesystem::exists(jpegPath)) {
-            const auto data = util::readFileToVector(jpegPath);
+    if (file->mime_type && (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/"))) {
+        if (std::filesystem::exists(pathToJpegCache)) {
+            const auto data = util::readFileToVector(pathToJpegCache);
 
             // Return decrypted image in memory
             http::response<http::string_body> res{
@@ -120,9 +137,9 @@ PreviewResponse HttpRouter::handleCachedPreview(const unsigned int vaultId, cons
             return res;
         }
 
-        throw std::runtime_error("[PdfPreviewHandler] JPEG file does not exist: " + jpegPath.string());
+        throw std::runtime_error("[PdfPreviewHandler] JPEG file does not exist: " + pathToJpegCache.string());
     }
-    return makeErrorResponse(req, "Unsupported preview type: " + mime_type);
+    return makeErrorResponse(req, "Unsupported preview type: " + (file->mime_type ? *file->mime_type : "unknown"));
 }
 
 http::response<http::string_body> HttpRouter::makeErrorResponse(const http::request<http::string_body>& req,

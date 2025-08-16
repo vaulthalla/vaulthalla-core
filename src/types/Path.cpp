@@ -18,7 +18,6 @@ Path::Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount)
       backingRoot(ConfigRegistry::get().fuse.backing_path),
       backingVaultRoot(ConfigRegistry::get().fuse.backing_path /
                        stripLeadingSlash(vaultBackingMount)) {
-    LogRegistry::storage()->info("[Path] Initialized with vault mount point: {}", vaultFuseMount.string());
     LogRegistry::storage()->info("[Path] fuseRoot: {}, vaultRoot: {}, cacheRoot: {}, "
                                   "thumbnailRoot: {}, fileCacheRoot: {}, backingRoot: {}, backingVaultRoot: {}",
                                   fuseRoot.string(), vaultRoot.string(), cacheRoot.string(),

@@ -60,24 +60,6 @@ FSEntry::FSEntry(const pqxx::row& row)
 
     if (row["is_system"].is_null()) is_system = false;
     else is_system = row["is_system"].as<bool>();
-
-    if (parent_id) {
-        fuse_path = fs::path("/");
-        backing_path = ConfigRegistry::get().fuse.backing_path;
-
-        for (const auto& p : DirectoryQueries::collectParents(*parent_id) | std::views::reverse) {
-            if (p->name == "/" && !p->parent_id) continue; // Skip root entry
-            fuse_path /= p->name;
-            backing_path /= p->base32_alias;
-        }
-
-        fuse_path /= name;
-        backing_path /= base32_alias;
-    } else {
-        // Root entry
-        fuse_path = name;
-        backing_path = name;
-    }
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {

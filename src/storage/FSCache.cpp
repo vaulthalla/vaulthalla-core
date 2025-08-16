@@ -3,6 +3,7 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "storage/StorageManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 
@@ -123,6 +124,15 @@ fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
     return ino;
 }
 
+std::shared_ptr<FSEntry> FSCache::getEntryById(unsigned int id) {
+    std::shared_lock lock(mutex_);
+    auto it = idToEntry_.find(id);
+    if (it != idToEntry_.end()) return it->second;
+
+    LogRegistry::storage()->warn("[FSCache] No entry found for ID: {}", id);
+    return nullptr;
+}
+
 fuse_ino_t FSCache::assignInode(const fs::path& path) {
     std::unique_lock lock(mutex_);
     const auto it = pathToInode_.find(path);
@@ -164,28 +174,15 @@ fs::path FSCache::resolvePath(fuse_ino_t ino) {
 
 void FSCache::decrementInodeRef(const fuse_ino_t ino, const uint64_t nlookup) {
     std::unique_lock lock(mutex_);
-    auto it = inodeToPath_.find(ino);
-    if (it == inodeToPath_.end()) return; // No such inode
-
-    if (nlookup > 1) return;  // This is a no-op, but could be extended
+    if (!inodeToPath_.contains(ino)) return; // No-op if inode does not exist
+    if (nlookup > 1) return;  // This is also a no-op, but could be extended
 
     // If nlookup is 1, we can remove the inode
-    pathToInode_.erase(it->second);
-    inodeToPath_.erase(it);
+    const auto val = inodeToPath_.at(ino);
+    pathToInode_.erase(val);
+    inodeToPath_.erase(ino);
     inodeToEntry_.erase(ino);
-    pathToEntry_.erase(it->second);
-}
-
-void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
-    if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
-
-    std::unique_lock lock(mutex_);
-    inodeToPath_[*entry->inode] = entry->fuse_path;
-    inodeToEntry_[*entry->inode] = entry;
-    pathToInode_[entry->fuse_path] = *entry->inode;
-    pathToEntry_[entry->fuse_path] = entry;
-
-    LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
+    pathToEntry_.erase(val);
 }
 
 bool FSCache::entryExists(const fs::path& absPath) const {
@@ -195,19 +192,63 @@ bool FSCache::entryExists(const fs::path& absPath) const {
 
 std::shared_ptr<FSEntry> FSCache::getEntryFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(mutex_);
-    auto it = inodeToEntry_.find(ino);
-    if (it != inodeToEntry_.end()) return it->second;
+    if (inodeToEntry_.contains(ino)) return inodeToEntry_.at(ino);
+    LogRegistry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
     return nullptr;
+}
+
+void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
+    if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
+
+    if (*entry->inode != FUSE_ROOT_ID) {
+        if (!entry->vault_id) {
+            LogRegistry::storage()->error("[FSCache] Entry {} has no vault_id, cannot cache", entry->id);
+            throw std::runtime_error("Entry has no vault_id");
+        }
+
+        if (entry->fuse_path.empty() || entry->backing_path.empty()) {
+            if (!entry->parent_id) {
+                LogRegistry::storage()->error("[FSCache] Entry {} has no parent_id, cannot cache", entry->id);
+                throw std::runtime_error("Entry has no parent_id");
+            }
+
+            if (const auto parent = ServiceDepsRegistry::instance().fsCache->getEntryById(*entry->parent_id)) {
+                entry->fuse_path = parent->fuse_path / entry->name;
+                entry->backing_path = parent->backing_path / entry->base32_alias;
+            } else {
+                LogRegistry::storage()->error("[FSCache] No parent entry found for entry {}", entry->id);
+                throw std::runtime_error("No parent entry found");
+            }
+        }
+    }
+
+    std::unique_lock lock(mutex_);
+    inodeToPath_[*entry->inode] = entry->fuse_path;
+    inodeToEntry_[*entry->inode] = entry;
+    pathToInode_[entry->fuse_path] = *entry->inode;
+    pathToEntry_[entry->fuse_path] = entry;
+    inodeToId_[*entry->inode] = entry->id;
+    idToEntry_[entry->id] = entry;
+    if (entry->parent_id) idToParentId_[entry->id] = *entry->parent_id;
+
+    LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 }
 
 void FSCache::evictPath(const fs::path& path) {
     std::unique_lock lock(mutex_);
-    auto it = pathToInode_.find(path);
-    if (it != pathToInode_.end()) {
-        fuse_ino_t ino = it->second;
-        inodeToPath_.erase(ino);
-        inodeToEntry_.erase(ino);
-        pathToInode_.erase(path);
-        pathToEntry_.erase(path);
+    if (!pathToInode_.contains(path)) {
+        LogRegistry::fs()->warn("[FSCache] Attempted to evict non-existent path: {}", path.string());
+        return;
     }
+
+    const auto ino = pathToInode_[path];
+    const auto id = inodeToId_[ino];
+    inodeToPath_.erase(ino);
+    inodeToEntry_.erase(ino);
+    pathToInode_.erase(path);
+    pathToEntry_.erase(path);
+    inodeToId_.erase(ino);
+    idToEntry_.erase(id);
+    idToParentId_.erase(id);
+    LogRegistry::fs()->info("[FSCache] Evicted path: {} with inode {}",
 }

@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <filesystem>
 #include <optional>
+#include <vector>
 #include <fuse3/fuse_lowlevel.h>
 
 namespace vh::types {
@@ -30,6 +31,7 @@ public:
 
     [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath);
     [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(fuse_ino_t ino);
+    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntryById(unsigned int id);
 
     fuse_ino_t assignInode(const fs::path& path);
     fuse_ino_t getOrAssignInode(const fs::path& path);
@@ -50,6 +52,11 @@ private:
     std::unordered_map<fs::path, fuse_ino_t> pathToInode_;
     std::unordered_map<fuse_ino_t, std::shared_ptr<types::FSEntry>> inodeToEntry_;
     std::pmr::unordered_map<fs::path, std::shared_ptr<types::FSEntry>> pathToEntry_;
+    std::unordered_map<fuse_ino_t, unsigned int> inodeToId_;
+    std::unordered_map<unsigned int, std::shared_ptr<types::FSEntry>> idToEntry_;
+    std::unordered_map<unsigned int, unsigned int> idToParentId_;
+
+    void destroyMapReferences(unsigned int id, fuse_ino_t ino);
 
     void initRoot();
     void restoreCache();

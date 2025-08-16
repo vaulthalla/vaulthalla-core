@@ -309,8 +309,6 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : util::Magic::get_mime_type_from_buffer(ctx.buffer);
     f->size_bytes = ctx.buffer.size();
 
-    LogRegistry::fs()->info("[Filesystem] Creating file at path: {}, backingPath: {}", f->fuse_path.string(), f->backing_path.string());
-
     if (ctx.buffer.empty()) std::ofstream(f->backing_path).close();
     else {
         std::string iv_b64;

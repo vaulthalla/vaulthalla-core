@@ -69,3 +69,12 @@ inline std::string inferMimeTypeFromPath(const fs::path& path) {
     const auto it = mimeMap.find(ext);
     return it != mimeMap.end() ? it->second : "application/octet-stream";
 }
+
+inline std::string to_snake_case(const fs::path& path) {
+    std::string result = path.string();
+    std::ranges::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {
+        return std::tolower(c);
+    });
+    std::ranges::replace(result, ' ', '_');
+    return result;
+}

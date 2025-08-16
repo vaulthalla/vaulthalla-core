@@ -173,6 +173,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "
                    "ON CONFLICT (vault_id) DO NOTHING");
 
+    conn_->prepare("vault_root_exists", "SELECT EXISTS(SELECT 1 FROM fs_entry WHERE vault_id = $1 AND path = '/') AS exists");
+
     conn_->prepare("get_vault",
                    "SELECT v.*, s.* "
                    "FROM vault v "
@@ -180,10 +182,10 @@ void DBConnection::initPreparedVaults() const {
                    "WHERE v.id = $1");
 
     conn_->prepare("get_vault_by_name_and_owner",
-        "SELECT v.*, s.* "
-        "FROM vault v "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "WHERE v.name = $1 AND v.owner_id = $2");
+                   "SELECT v.*, s.* "
+                   "FROM vault v "
+                   "LEFT JOIN s3 s ON v.id = s.vault_id "
+                   "WHERE v.name = $1 AND v.owner_id = $2");
 
     // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
     conn_->prepare(
@@ -241,15 +243,25 @@ void DBConnection::initPreparedVaults() const {
 }
 
 void DBConnection::initPreparedFsEntries() const {
+    conn_->prepare("root_entry_exists",
+        "SELECT EXISTS(SELECT 1 FROM fs_entry "
+        "WHERE parent_id IS NULL AND vault_id IS NULL AND path = '/' AND name = '/') AS exists");
+
+    conn_->prepare("get_root_entry",
+        "SELECT fs.*, d.* "
+        "FROM fs_entry fs "
+        "JOIN directories d ON fs.id = d.fs_entry_id "
+        "WHERE fs.parent_id IS NULL AND fs.vault_id IS NULL AND fs.path = '/' AND fs.name = '/'");
+
     conn_->prepare("update_fs_entry_by_inode",
                    R"SQL(
     UPDATE fs_entry
     SET vault_id         = $2,
         parent_id        = $3,
         name             = $4,
-        last_modified_by = $5,
-        path             = $6,
-        fuse_path        = $7,
+        base32_alias     = $5,
+        last_modified_by = $6,
+        path             = $7,
         mode             = $8,
         owner_uid        = $9,
         group_gid        = $10,
@@ -266,14 +278,14 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("delete_fs_entry_by_inode", "DELETE FROM fs_entry WHERE inode = $1");
 
-    conn_->prepare("get_fs_entry_by_fuse_path", "SELECT * FROM fs_entry WHERE fuse_path = $1");
+    conn_->prepare("get_fs_entry_by_base32_alias", "SELECT * FROM fs_entry WHERE base32_alias = $1");
 
     conn_->prepare("get_fs_entry_by_id", "SELECT * FROM fs_entry WHERE id = $1");
 
-    conn_->prepare("get_fs_entry_id_by_fuse_path", "SELECT id FROM fs_entry WHERE fuse_path = $1");
+    conn_->prepare("get_fs_entry_id_by_base32_alias", "SELECT id FROM fs_entry WHERE base32_alias = $1");
 
     conn_->prepare("rename_fs_entry",
-                   "UPDATE fs_entry SET name = $2, path = $3, fuse_path = $4, parent_id = $5, updated_at = NOW() WHERE id = $1");
+                   "UPDATE fs_entry SET name = $2, path = $3, base32_alias = $4, parent_id = $5, updated_at = NOW() WHERE id = $1");
 
     conn_->prepare("get_fs_entry_parent_id", "SELECT parent_id FROM fs_entry WHERE id = $1");
 
@@ -287,7 +299,7 @@ void DBConnection::initPreparedFsEntries() const {
 
     conn_->prepare("get_next_inode", "SELECT MAX(inode) + 1 FROM fs_entry");
 
-    conn_->prepare("get_fuse_path_from_fs_entry", "SELECT fuse_path FROM fs_entry WHERE id = $1");
+    conn_->prepare("get_base32_alias_from_fs_entry", "SELECT base32_alias FROM fs_entry WHERE id = $1");
 }
 
 void DBConnection::initPreparedFiles() const {
@@ -305,7 +317,7 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("upsert_file_full",
                    "WITH upsert_entry AS ("
-                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, fuse_path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
+                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, base32_alias, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
                    "  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
                    "  ON CONFLICT (parent_id, name) DO UPDATE SET "
                    "    last_modified_by = EXCLUDED.last_modified_by, "
@@ -335,12 +347,12 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed",
                    "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.vault_id "
+                   "  SELECT fs.id AS fs_entry_id, fs.base32_alias, fs.vault_id "
                    "  FROM fs_entry fs "
                    "  WHERE fs.vault_id = $1 AND fs.path = $2"
                    "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, fuse_path, trashed_at, trashed_by) "
-                   "  SELECT vault_id, fuse_path, NOW(), $3 "
+                   "  INSERT INTO files_trashed (vault_id, base32_alias, trashed_at, trashed_by, backing_path) "
+                   "  SELECT vault_id, base32_alias, NOW(), $3, $4 "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -350,12 +362,12 @@ void DBConnection::initPreparedFiles() const {
 
     conn_->prepare("mark_file_trashed_by_id",
                    "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.fuse_path, fs.vault_id "
+                   "  SELECT fs.id AS fs_entry_id, fs.base32_alias, fs.vault_id "
                    "  FROM fs_entry fs "
                    "  WHERE fs.id = $1"
                    "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, fuse_path, trashed_at, trashed_by) "
-                   "  SELECT vault_id, fuse_path, NOW(), $2 "
+                   "  INSERT INTO files_trashed (vault_id, base32_alias, trashed_at, trashed_by, backing_path) "
+                   "  SELECT vault_id, base32_alias, NOW(), $2, $3 "
                    "  FROM target"
                    "), removed AS ("
                    "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
@@ -366,9 +378,9 @@ void DBConnection::initPreparedFiles() const {
     conn_->prepare("list_trashed_files",
                    "SELECT * FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
 
-    conn_->prepare("mark_trashed_file_deleted_by_fuse_path",
+    conn_->prepare("mark_trashed_file_deleted_by_base32_alias",
                    "UPDATE files_trashed SET deleted_at = NOW() "
-                   "WHERE fuse_path = $1 AND deleted_at IS NULL");
+                   "WHERE base32_alias = $1 AND deleted_at IS NULL");
 
     conn_->prepare("mark_trashed_file_deleted_by_id",
                    "UPDATE files_trashed SET deleted_at = NOW() "
@@ -398,11 +410,11 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("get_file_by_fuse_path",
+    conn_->prepare("get_file_by_base32_alias",
                    "SELECT f.*, fs.* "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.fuse_path = $1");
+                   "WHERE fs.base32_alias = $1");
 
     conn_->prepare("get_file_by_inode",
                    "SELECT f.*, fs.* "
@@ -410,25 +422,13 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.inode = $1");
 
-    conn_->prepare("list_files_in_dir_by_fuse_path",
-                   "SELECT f.*, fs.* "
-                   "FROM files f "
-                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.fuse_path LIKE $1 AND fs.fuse_path NOT LIKE $2 AND fs.fuse_path != '/'");
-
-    conn_->prepare("list_files_in_dir_by_fuse_path_recursive",
-                   "SELECT f.*, fs.* "
-                   "FROM files f "
-                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.fuse_path LIKE $1 AND fs.fuse_path != '/'");
-
     conn_->prepare("list_files_in_dir_by_parent_id",
                    "SELECT f.*, fs.* "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-                   "WHERE fs.parent_id = $1");
+                   "WHERE fs.parent_id = $1 AND fs.id != 1");
 
-    conn_->prepare("list_files_in_dir_recursive_by_parent_id",
+    conn_->prepare("list_files_in_dir_by_parent_id_recursive",
                    "WITH RECURSIVE dir_tree AS ("
                    "    SELECT fs.*, f.* "
                    "    FROM fs_entry fs "
@@ -515,11 +515,10 @@ void DBConnection::initPreparedDirectories() const {
 
     conn_->prepare("upsert_directory",
                    "WITH inserted AS ( "
-                   "  INSERT INTO fs_entry (vault_id, parent_id, name, created_by, last_modified_by, path, fuse_path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
+                   "  INSERT INTO fs_entry (vault_id, parent_id, name, base32_alias, created_by, last_modified_by, path, inode, mode, owner_uid, group_gid, is_hidden, is_system) "
                    "  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
                    "  ON CONFLICT (parent_id, name) DO UPDATE SET "
                    "    last_modified_by = EXCLUDED.last_modified_by, "
-                   "    parent_id = EXCLUDED.parent_id, "
                    "    inode = EXCLUDED.inode, "
                    "    mode = EXCLUDED.mode, "
                    "    owner_uid = EXCLUDED.owner_uid, "
@@ -549,25 +548,13 @@ void DBConnection::initPreparedDirectories() const {
                    "JOIN directories d ON fs.id = d.fs_entry_id "
                    "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
 
-    conn_->prepare("list_directories_in_dir_by_fuse_path",
-                   "SELECT fs.*, d.* "
-                   "FROM fs_entry fs "
-                   "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.fuse_path LIKE $1 AND fs.fuse_path NOT LIKE $2 AND fs.fuse_path != '/'");
-
-    conn_->prepare("list_directories_in_dir_by_fuse_path_recursive",
-                   "SELECT fs.*, d.* "
-                   "FROM fs_entry fs "
-                   "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.fuse_path LIKE $1 AND fs.fuse_path != '/'");
-
     conn_->prepare("list_dirs_in_dir_by_parent_id",
                    "SELECT fs.*, d.* "
                    "FROM fs_entry fs "
                    "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.parent_id = $1");
+                   "WHERE fs.parent_id = $1 AND fs.id != 1");
 
-    conn_->prepare("list_dirs_in_dir_recursive_by_parent_id",
+    conn_->prepare("list_dirs_in_dir_by_parent_id_recursive",
                    "WITH RECURSIVE dir_tree AS ("
                    "    SELECT fs.*, d.* "
                    "    FROM fs_entry fs "
@@ -593,11 +580,11 @@ void DBConnection::initPreparedDirectories() const {
                    "JOIN directories d ON fs.id = d.fs_entry_id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("get_dir_by_fuse_path",
+    conn_->prepare("get_dir_by_base32_alias",
                    "SELECT fs.*, d.* "
                    "FROM fs_entry fs "
                    "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.fuse_path = $1");
+                   "WHERE fs.base32_alias = $1");
 
     conn_->prepare("get_dir_by_inode",
                    "SELECT fs.*, d.* "
@@ -609,6 +596,25 @@ void DBConnection::initPreparedDirectories() const {
                    "SELECT EXISTS (SELECT 1 FROM directories d "
                    "JOIN fs_entry fs ON d.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
+
+    conn_->prepare("collect_parents", R"SQL(
+    WITH RECURSIVE parent_chain AS (
+        SELECT fe.*, d.*
+        FROM fs_entry fe
+        LEFT JOIN directories d ON fe.id = d.fs_entry_id
+        WHERE fe.id = $1
+
+        UNION ALL
+
+        SELECT fe.*, d.*
+        FROM fs_entry fe
+        JOIN parent_chain pc ON fe.id = pc.parent_id
+        LEFT JOIN directories d ON fe.id = d.fs_entry_id
+        WHERE fe.id != 1
+    )
+    SELECT * FROM parent_chain
+)SQL");
+
 }
 
 void DBConnection::initPreparedOperations() const {
@@ -807,11 +813,11 @@ void DBConnection::initPreparedSync() const {
                    "SELECT rs.*, s.* FROM rsync rs JOIN sync s ON s.id = rs.sync_id WHERE vault_id = $1");
 
     conn_->prepare("get_sync_config",
-        "SELECT s.*, rs.*, fs.* "
-        "FROM sync s "
-        "LEFT JOIN rsync rs ON s.id = rs.sync_id "
-        "LEFT JOIN fsync fs ON s.id = fs.sync_id "
-        "WHERE vault_id = $1");
+                   "SELECT s.*, rs.*, fs.* "
+                   "FROM sync s "
+                   "LEFT JOIN rsync rs ON s.id = rs.sync_id "
+                   "LEFT JOIN fsync fs ON s.id = fs.sync_id "
+                   "WHERE vault_id = $1");
 }
 
 void DBConnection::initPreparedCache() const {

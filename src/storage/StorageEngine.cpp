@@ -7,6 +7,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
+#include "database/Queries/VaultQueries.hpp"
 #include "keys/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
@@ -30,7 +31,8 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
       sync(SyncQueries::getSync(vault->id)),
       paths(std::make_shared<Path>(vault->mount_point)),
       encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
-    if (!FSEntryQueries::exists(paths->vaultRoot)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
+    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Root entry does not exist in the database. Please initialize the database first.");
+    if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }
 

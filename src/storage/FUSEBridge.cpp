@@ -135,7 +135,8 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     (void)fi;
 
     const auto path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
-    auto entries = FSEntryQueries::listDir(path, false);
+    const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(path));
+    auto entries = FSEntryQueries::listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
     size_t buf_used = 0;

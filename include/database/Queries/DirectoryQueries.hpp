@@ -41,12 +41,7 @@ public:
     static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
                                                                  bool recursive = false);
 
-    // FUSE
-    static std::shared_ptr<types::Directory> getDirectoryByInode(ino_t inode);
-
-    static std::shared_ptr<types::Directory> getDirectoryByAbsPath(const std::filesystem::path& absPath);
-
-    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesAbsPath(const std::filesystem::path& absPath, bool recursive = false);
+    [[nodiscard]] static std::vector<std::shared_ptr<types::Directory>> collectParents(unsigned int parentId);
 };
 
 } // namespace vh::database

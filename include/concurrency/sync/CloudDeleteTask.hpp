@@ -58,7 +58,7 @@ struct CloudTrashedDeleteTask final : PromisedTask {
 
     void operator()() override {
         try {
-            const auto vaultPath = engine->paths->absRelToAbsRel(file->fuse_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+            const auto vaultPath = engine->paths->absRelToAbsRel(file->backing_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             if (type == Type::PURGE) purge(vaultPath);
             else if (type == Type::LOCAL) handleLocalDelete();
             else if (type == Type::REMOTE) engine->removeRemotely(vaultPath);
@@ -76,7 +76,7 @@ struct CloudTrashedDeleteTask final : PromisedTask {
     }
 
     void handleLocalDelete() const {
-        auto absPath = engine->paths->absPath(file->fuse_path, PathType::BACKING_ROOT);
+        auto absPath = engine->paths->absPath(file->backing_path, PathType::BACKING_ROOT);
         if (fs::exists(absPath)) fs::remove(absPath);
 
         while (absPath.has_parent_path()) {
@@ -86,7 +86,7 @@ struct CloudTrashedDeleteTask final : PromisedTask {
             absPath = absPath.parent_path();
         }
 
-        const auto vaultPath = engine->paths->absRelToRoot(file->fuse_path, PathType::VAULT_ROOT);
+        const auto vaultPath = engine->paths->absRelToRoot(file->backing_path, PathType::VAULT_ROOT);
 
         for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
             const auto thumbPath = engine->paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);

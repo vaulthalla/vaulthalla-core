@@ -10,7 +10,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "util/fsPath.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
-#include "../../include/keys/VaultEncryptionManager.hpp"
+#include "keys/VaultEncryptionManager.hpp"
 #include "util/files.hpp"
 #include "crypto/Hash.hpp"
 #include "services/ThumbnailWorker.hpp"
@@ -19,6 +19,8 @@
 #include "database/Transactions.hpp"
 #include "util/fsDBHelpers.hpp"
 #include "logging/LogRegistry.hpp"
+#include "database/Queries/VaultQueries.hpp"
+#include "crypto/IdGenerator.hpp"
 
 #include <ranges>
 #include <vector>
@@ -76,9 +78,12 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
                 dir->path = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
             } else dir->path = path;
 
-            dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
+            const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(path));
+            dir->parent_id = parent->id;
             dir->fuse_path = path;
             dir->name = path.filename();
+            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+            dir->backing_path = parent->backing_path / dir->base32_alias;
             dir->mode = mode;
             dir->owner_uid = getuid();
             dir->group_gid = getgid();
@@ -111,50 +116,35 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
-    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+    if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
     try {
-        if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
+        const auto dir = std::make_shared<Directory>();
+        dir->vault_id = vaultId;
+        dir->path = "/";
+        dir->name = to_snake_case(VaultQueries::getVault(vaultId)->name);
+        dir->parent_id = FSEntryQueries::getRootEntry()->id;
+        dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+        dir->backing_path = makeAbsolute(dir->base32_alias);
+        dir->fuse_path = absPath;
+        dir->created_at = dir->updated_at = std::time(nullptr);
+        dir->mode = mode;
+        dir->owner_uid = getuid();
+        dir->group_gid = getgid();
+        dir->inode = ServiceDepsRegistry::instance().fsCache->assignInode(absPath);
+        dir->is_hidden = false;
+        dir->is_system = false;
 
-        std::vector<fs::path> toCreate;
-        fs::path cur = absPath;
+        const auto root = FSEntryQueries::getRootEntry();
 
-        while (!cur.empty() && !cache->entryExists(cur)) {
-            toCreate.push_back(cur);
-            if (cur.string() == "/") break; // stop at root
-            cur = cur.parent_path();
-        }
+        LogRegistry::fs()->info("[Filesystem] Creating directory: {}", dir->name);
 
-        std::ranges::reverse(toCreate);
+        LogRegistry::fs()->info("[Filesystem] Creating vault directory: {}, parent_id: {}, root_exists: {}, root_id: {}, root_inode: {}",
+            dir->fuse_path.string(), dir->parent_id ? std::to_string(*dir->parent_id) : "null", FSEntryQueries::rootExists() ? "yes" : "no",
+            root->id, root->inode ? std::to_string(*root->inode) : "null");
 
-        for (unsigned int i = 0; i < toCreate.size(); ++i) {
-            const auto& path = makeAbsolute(toCreate[i]);
-
-            if (FSEntryQueries::getEntryIdByPath(path)) continue;
-
-            auto dir = std::make_shared<Directory>();
-
-            if (i == toCreate.size() - 1) {
-                dir->vault_id = vaultId;
-                dir->path = "/";
-            } else dir->path = makeAbsolute(path);
-
-            dir->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
-            dir->fuse_path = makeAbsolute(path);
-            dir->name = path.filename();
-            dir->created_at = dir->updated_at = std::time(nullptr);
-            dir->mode = mode;
-            dir->owner_uid = getuid();
-            dir->group_gid = getgid();
-            dir->inode = cache->assignInode(path);
-            dir->is_hidden = false;
-            dir->is_system = false;
-
-            cache->cacheEntry(dir);
-            DirectoryQueries::upsertDirectory(dir);
-
-            LogRegistry::fs()->debug("Successfully created directory at: {}", absPath.string());
-        }
+        ServiceDepsRegistry::instance().fsCache->cacheEntry(dir);
+        DirectoryQueries::upsertDirectory(dir);
 
         LogRegistry::fs()->debug("Successfully created vault directory at: {}", absPath.string());
     } catch (const std::exception& ex) {
@@ -190,12 +180,16 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
 
     const auto entry = cache->getEntry(from);
 
+    const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(to));
+
     entry->id = 0;
     entry->path = toVaultPath;
     entry->fuse_path = to;
     entry->name = to.filename().string();
+    entry->base32_alias = ids::IdGenerator({ .namespace_token = entry->name }).generate();
+    entry->backing_path = parent->backing_path / entry->base32_alias;
     entry->created_by = entry->last_modified_by = userId;
-    entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(to));
+    entry->parent_id = parent->id;
     entry->inode = cache->getOrAssignInode(to);
     entry->is_hidden = entry->name.front() == '.' && !entry->name.starts_with("..");
     entry->is_system = false;
@@ -236,12 +230,16 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     const auto fullDiskPath = engine->paths->absPath(path, PathType::FUSE_ROOT);
     const auto fullBackingPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
 
+    const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(path));
+
     const auto f = std::make_shared<File>();
-    f->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(path));
+    f->parent_id = parent->id;
     f->vault_id = engine->vault->id;
     f->name = path.filename();
     f->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
     f->fuse_path = path;
+    f->base32_alias = ids::IdGenerator({ .namespace_token = f->name }).generate();
+    f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = mode;
     f->owner_uid = uid;
     f->group_gid = gid;
@@ -287,12 +285,16 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     const auto fullDiskPath = engine->paths->absPath(ctx.fuse_path, PathType::FUSE_ROOT);
     const auto fullBackingPath = engine->paths->absPath(ctx.fuse_path, PathType::BACKING_ROOT);
 
+    const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(ctx.path));
+
     const auto f = std::make_shared<File>();
-    f->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(ctx.path));
+    f->parent_id = parent->id;
     f->vault_id = engine->vault->id;
     f->name = ctx.path.filename();
     f->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
     f->fuse_path = ctx.fuse_path;
+    f->base32_alias = ids::IdGenerator({ .namespace_token = f->name }).generate();
+    f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = ctx.mode;
     f->owner_uid = ctx.linux_uid;
     f->group_gid = ctx.linux_gid;
@@ -345,7 +347,7 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
     Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
         std::vector<uint8_t> buffer;
         if (entry->isDirectory()) {
-            for (const auto& item : FSEntryQueries::listDir(oldPath, true)) {
+            for (const auto& item : FSEntryQueries::listDir(entry->parent_id, true)) {
                 handleRename({
                     .from = item->fuse_path,
                     .to = updateSubdirPath(oldPath, newPath, item->fuse_path),
@@ -405,14 +407,21 @@ void Filesystem::handleRename(const RenameContext& context) {
     }
 
     unsigned int id = 0;
-    if (entry->id == 0) id = FSEntryQueries::getEntryIdByPath(entry->fuse_path).value_or(0);
+    if (entry->id == 0) {
+        const auto e = ServiceDepsRegistry::instance().fsCache->getEntry(entry->fuse_path);
+        if (e) id = e->id;
+        else id = 0;
+    }
     else id = entry->id;
+
+    const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(newPath));
+    if (!parent) throw std::runtime_error("Parent directory does not exist: " + resolveParent(newPath).string());
 
     entry->id = id;
     entry->name = newPath.filename();
     entry->path = newVaultPath;
     entry->fuse_path = newPath;
-    entry->parent_id = FSEntryQueries::getEntryIdByPath(resolveParent(newPath));
+    entry->parent_id = parent->id;
     entry->created_by = entry->last_modified_by = userId;
 
     if (entry->isDirectory()) std::filesystem::create_directories(newAbsPath);

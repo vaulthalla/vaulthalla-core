@@ -4,9 +4,28 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "util/u8.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::logging;
+
+bool FSEntryQueries::rootExists() {
+    return Transactions::exec("FSEntryQueries::rootExists", [&](pqxx::work& txn) {
+        return txn.exec_prepared("root_entry_exists").one_field().as<bool>();
+    });
+}
+
+std::shared_ptr<FSEntry> FSEntryQueries::getRootEntry() {
+    return Transactions::exec("FSEntryQueries::getRootEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+        const auto res = txn.exec_prepared("get_root_entry");
+        if (res.empty()) {
+            LogRegistry::db()->warn("[FSEntryQueries::getRootEntry] No root entry found in the database");
+            return nullptr;
+        }
+        return std::make_shared<Directory>(res.one_row());
+    });
+}
 
 void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
     Transactions::exec("FSEntryQueries::updateFSEntry", [&](pqxx::work& txn) {
@@ -15,9 +34,9 @@ void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
         p.append(entry->vault_id);
         p.append(entry->parent_id);
         p.append(entry->name);
+        p.append(entry->base32_alias);
         p.append(entry->last_modified_by);
         p.append(to_utf8_string(entry->path.u8string()));
-        p.append(to_utf8_string(entry->fuse_path.u8string()));
         p.append(entry->mode);
         p.append(entry->owner_uid);
         p.append(entry->group_gid);
@@ -28,19 +47,30 @@ void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
     });
 }
 
-std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const fs::path& absPath) {
+std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const std::string& base32) {
     return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
-        const auto path_str = to_utf8_string(absPath.u8string());
+        const auto fileRes = txn.exec_prepared("get_file_by_base32_alias", base32);
+        if (!fileRes.empty()) return std::make_shared<File>(fileRes.one_row());
 
-        const auto fileRes = txn.exec_prepared("get_file_by_fuse_path", path_str);
-        if (!fileRes.empty()) return std::make_shared<File>(fileRes[0]);
-
-        const auto dirRes = txn.exec_prepared("get_dir_by_fuse_path", path_str);
-        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes[0]);
+        const auto dirRes = txn.exec_prepared("get_dir_by_base32_alias", base32);
+        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes.one_row());
 
         return nullptr;
     });
 }
+
+std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryByInode(const ino_t ino) {
+    return Transactions::exec("FSEntryQueries::getFSEntryByInode", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+        const auto fileRes = txn.exec_prepared("get_file_by_inode", ino);
+        if (!fileRes.empty()) return std::make_shared<File>(fileRes.one_row());
+
+        const auto dirRes = txn.exec_prepared("get_dir_by_inode", ino);
+        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes.one_row());
+
+        return nullptr;
+    });
+}
+
 
 std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
     return Transactions::exec("FSEntryQueries::getFSEntryById", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
@@ -54,16 +84,6 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
         if (!dirRes.empty()) return std::make_shared<Directory>(dirRes[0]);
 
         return nullptr;
-    });
-}
-
-std::optional<unsigned int> FSEntryQueries::getEntryIdByPath(const fs::path& absPath) {
-    return Transactions::exec("FSEntryQueries::getEntryIdByPath", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("get_fs_entry_id_by_fuse_path", to_utf8_string(absPath.u8string()));
-        std::optional<unsigned int> entryId;
-        if (res.empty()) entryId = std::nullopt;
-        else entryId = res.one_field().as<unsigned int>();
-        return entryId;
     });
 }
 
@@ -103,50 +123,26 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
             "FSEntryQueries::renameEntry: Failed to update entry in cache after rename operation");
 }
 
-std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const fs::path& absPath, bool recursive) {
-    return Transactions::exec("FSEntryQueries::listDir", [&](pqxx::work& txn) {
-        const auto patterns = computePatterns(to_utf8_string(absPath.u8string()), recursive);
-        pqxx::params p{patterns.like, patterns.not_like};
+std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const std::optional<unsigned int>& entryId, const bool recursive) {
+    if (!entryId) {
+        LogRegistry::db()->warn("[FSEntryQueries::listDir] entryId is null, returning empty list");
+        return {};
+    }
 
-        const auto files = files_from_pq_res(
-            recursive
-                ? txn.exec_prepared("list_files_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
-                : txn.exec_prepared("list_files_in_dir_by_fuse_path", p)
-            );
-
-        const auto directories = directories_from_pq_res(
-            recursive
-                ? txn.exec_prepared("list_directories_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
-                : txn.exec_prepared("list_directories_in_dir_by_fuse_path", p)
-            );
-
-        return merge_entries(files, directories);
-    });
-}
-
-std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(unsigned int entryId, bool recursive) {
     return Transactions::exec("FSEntryQueries::listDirById", [&](pqxx::work& txn) {
         const auto files = files_from_pq_res(
             recursive
-                ? txn.exec_prepared("list_files_in_dir_recursive_by_parent_id", entryId)
+                ? txn.exec_prepared("list_files_in_dir_by_parent_id_recursive", entryId)
                 : txn.exec_prepared("list_files_in_dir_by_parent_id", entryId)
             );
 
         const auto directories = directories_from_pq_res(
             recursive
-                ? txn.exec_prepared("list_dirs_in_dir_recursive_by_parent_id", entryId)
+                ? txn.exec_prepared("list_dirs_in_dir_by_parent_id_recursive", entryId)
                 : txn.exec_prepared("list_dirs_in_dir_by_parent_id", entryId)
             );
 
         return merge_entries(files, directories);
-    });
-}
-
-bool FSEntryQueries::exists(const fs::path& absPath) {
-    return Transactions::exec("FSEntryQueries::exists", [&](pqxx::work& txn) {
-        const auto path = to_utf8_string(absPath.u8string());
-        return txn.exec("SELECT EXISTS(SELECT 1 FROM fs_entry WHERE fuse_path = "
-                        + txn.quote(path) + ")").one_field().as<bool>();
     });
 }
 

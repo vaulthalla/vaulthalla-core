@@ -202,3 +202,10 @@ std::shared_ptr<Sync> VaultQueries::getVaultSyncConfig(const unsigned int vaultI
         return std::make_shared<FSync>(row);
     });
 }
+
+bool VaultQueries::vaultRootExists(const unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::vaultRootExists", [&](pqxx::work& txn) {
+        return txn.exec_prepared("vault_root_exists", vaultId).one_field().as<bool>();
+    });
+}
+

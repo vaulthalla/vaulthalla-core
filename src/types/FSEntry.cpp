@@ -3,6 +3,9 @@
 #include "types/Directory.hpp"
 #include "types/File.hpp"
 #include "logging/LogRegistry.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/VaultQueries.hpp"
+#include "util/fsPath.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -10,17 +13,20 @@
 #include <unordered_set>
 #include <sstream>
 #include <pugixml.hpp>
+#include <algorithm>
+#include <ranges>
 
 using namespace vh::types;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::database;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
+      base32_alias(row["base32_alias"].as<std::string>()),
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
-      fuse_path(std::filesystem::path(row["fuse_path"].as<std::string>())),
       created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
@@ -53,7 +59,14 @@ FSEntry::FSEntry(const pqxx::row& row)
     if (row["is_system"].is_null()) is_system = false;
     else is_system = row["is_system"].as<bool>();
 
-    if (fuse_path.empty()) throw std::runtime_error("FSEntry must have a non-empty abs_path");
+    if (parent_id) {
+        auto parents = DirectoryQueries::collectParents(*parent_id);
+        fuse_path = makeAbsolute(parents.back()->name) / stripLeadingSlash(path);
+
+        backing_path = fs::path("/");
+        for (const auto& parent : parents | std::views::reverse)
+            backing_path /= parent->base32_alias;
+    }
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {

@@ -28,6 +28,8 @@ struct VaultQueries {
 
     [[nodiscard]] static bool vaultExists(const std::string& name, unsigned int ownerId);
 
+    [[nodiscard]] static bool vaultRootExists(unsigned int vaultId);
+
     [[nodiscard]] static unsigned int maxVaultId();
 
     static bool localDiskVaultExists();

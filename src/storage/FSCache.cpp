@@ -4,6 +4,7 @@
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+#include "crypto/IdGenerator.hpp"
 
 #include <mutex>
 
@@ -16,8 +17,48 @@ using namespace vh::logging;
 FSCache::FSCache() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
-    cacheEntry(FSEntryQueries::getFSEntry("/"));
     nextInode_ = FSEntryQueries::getNextInode();
+    initRoot();
+    restoreCache();
+    LogRegistry::storage()->info("[FSCache] Initialized with next inode: {}", nextInode_);
+}
+
+void FSCache::initRoot() {
+    const auto rootEntry = FSEntryQueries::getRootEntry();
+    if (!rootEntry) {
+        LogRegistry::storage()->error("[FSCache] Root entry not found in the database");
+        throw std::runtime_error("Root entry not found in the database");
+    }
+
+    if (!rootEntry->inode) {
+        rootEntry->inode = std::make_optional(getOrAssignInode("/"));
+        FSEntryQueries::updateFSEntry(rootEntry);
+    } else if (rootEntry->inode != FUSE_ROOT_ID) {
+        LogRegistry::storage()->warn("[FSCache] Root entry inode is not FUSE_ROOT_ID, resetting to 1");
+        rootEntry->inode = FUSE_ROOT_ID;
+        FSEntryQueries::updateFSEntry(rootEntry);
+    }
+
+    cacheEntry(rootEntry);
+}
+
+void FSCache::restoreCache() {
+    const auto rootEntry = getEntry("/");
+    if (!rootEntry) throw std::runtime_error("[FSCache] Root entry not found, cannot restore cache");
+
+    for (const auto& entry : FSEntryQueries::listDir(rootEntry->id, true)) {
+        if (!entry) {
+            LogRegistry::storage()->warn("[FSCache] Null entry found in directory listing for root");
+            continue;
+        }
+
+        if (entry->inode) cacheEntry(entry);
+        else {
+            entry->inode = std::make_optional(getOrAssignInode(entry->fuse_path));
+            FSEntryQueries::updateFSEntry(entry);
+            cacheEntry(entry);
+        }
+    }
 }
 
 std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
@@ -27,7 +68,8 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
     if (it != pathToEntry_.end()) return it->second;
 
     try {
-        auto entry = FSEntryQueries::getFSEntry(path);
+        const auto ino = getOrAssignInode(path);
+        auto entry = FSEntryQueries::getFSEntryByInode(ino);
         if (!entry) {
             LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", path.string());
             return nullptr;
@@ -50,7 +92,7 @@ fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
     auto it = pathToInode_.find(absPath);
     if (it != pathToInode_.end()) return it->second;
 
-    const auto entry = FSEntryQueries::getFSEntry(absPath);
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(absPath);
     if (!entry) {
         LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
         return FUSE_ROOT_ID; // or some error code
@@ -132,7 +174,7 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
 
 bool FSCache::entryExists(const fs::path& absPath) const {
     std::shared_lock lock(mutex_);
-    return pathToEntry_.contains(absPath) || FSEntryQueries::exists(absPath);
+    return pathToEntry_.contains(absPath);
 }
 
 std::shared_ptr<FSEntry> FSCache::getEntryFromInode(fuse_ino_t ino) const {

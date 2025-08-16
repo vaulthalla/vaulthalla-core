@@ -9,6 +9,7 @@
 #include "types/Path.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "seed/include/seed_db.hpp"

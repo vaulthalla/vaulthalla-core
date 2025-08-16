@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS vault
     description    TEXT                         DEFAULT NULL,
     quota          BIGINT              NOT NULL DEFAULT (0),
     owner_id       INTEGER             REFERENCES users (id) ON DELETE SET NULL,
-    mount_point    TEXT                NOT NULL,
+    mount_point    CHAR(33)                NOT NULL,
     allow_fs_write BOOLEAN                      DEFAULT FALSE,
     is_active      BOOLEAN                      DEFAULT TRUE,
     created_at     TIMESTAMP                    DEFAULT CURRENT_TIMESTAMP,
@@ -145,26 +145,26 @@ CREATE TABLE IF NOT EXISTS usage_log
 
 inline void init_files() {
     Transactions::exec("init_db_tables::init_files", [&](pqxx::work& txn) {
-        // Core filesystem tables
+
         txn.exec(R"(
 CREATE TABLE IF NOT EXISTS fs_entry (
     id               SERIAL PRIMARY KEY,
     vault_id         INTEGER REFERENCES vault (id) ON DELETE CASCADE DEFAULT NULL,
     parent_id        INTEGER REFERENCES fs_entry (id) ON DELETE CASCADE DEFAULT NULL,
     name             VARCHAR(500) NOT NULL,
+    base32_alias     CHAR(33) UNIQUE,
+    inode            BIGINT UNIQUE,
     created_by       INTEGER REFERENCES users (id),
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified_by INTEGER REFERENCES users (id),
-    path             TEXT NOT NULL,
-    fuse_path        TEXT NOT NULL,
-    uuid             UUID DEFAULT gen_random_uuid(),
-    inode            BIGINT UNIQUE,
-    mode             INTEGER DEFAULT 0755,
+    path             TEXT         NOT NULL,
+    mode             INTEGER   DEFAULT 0755,
     owner_uid        INTEGER,
     group_gid        INTEGER,
-    is_hidden        BOOLEAN DEFAULT FALSE,
-    is_system        BOOLEAN DEFAULT FALSE,
+    is_hidden        BOOLEAN   DEFAULT FALSE,
+    is_system        BOOLEAN   DEFAULT FALSE,
+
     UNIQUE (parent_id, name)
 );
         )");
@@ -193,8 +193,8 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE TABLE IF NOT EXISTS files_trashed (
     id           SERIAL PRIMARY KEY,
     vault_id     INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    fuse_path    TEXT NOT NULL,
-    uuid         UUID,
+    backing_path TEXT NOT NULL,
+    base32_alias CHAR(33) NOT NULL,
     trashed_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     trashed_by   INTEGER REFERENCES users (id),
     deleted_at   TIMESTAMP
@@ -394,7 +394,7 @@ CREATE TABLE IF NOT EXISTS file_search_index (
         txn.exec(R"(
 CREATE INDEX IF NOT EXISTS idx_fs_entry_vault_path ON fs_entry (vault_id, path text_pattern_ops);
 CREATE INDEX IF NOT EXISTS idx_fs_entry_parent ON fs_entry (parent_id);
-CREATE INDEX IF NOT EXISTS idx_files_trashed_fuse_path_not_deleted ON files_trashed (fuse_path) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_files_trashed_backing_path_not_deleted ON files_trashed (backing_path) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_files_trashed_entry_not_deleted ON files_trashed (id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_files_trashed_deleted_at ON files_trashed (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_files_trashed_vault_trashed_at ON files_trashed (vault_id, trashed_at DESC) WHERE deleted_at IS NULL;

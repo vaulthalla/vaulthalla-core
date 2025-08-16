@@ -35,9 +35,9 @@ void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<types::F
     p.append(entry->vault_id);
     p.append(entry->parent_id);
     p.append(entry->name);
+    p.append(entry->base32_alias);
     p.append(entry->last_modified_by);
     p.append(to_utf8_string(entry->path.u8string()));
-    p.append(to_utf8_string(entry->fuse_path.u8string()));
     p.append(entry->mode);
     p.append(entry->owner_uid);
     p.append(entry->group_gid);

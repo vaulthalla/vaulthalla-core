@@ -6,6 +6,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 #include "database/Transactions.hpp"
 
 // Types
@@ -49,8 +50,8 @@ void vh::seed::init() {
     initRoles();
     initAdmin();
     initAdminGroup();
-    initAdminDefaultVault();
     initRoot();
+    initAdminDefaultVault();
 }
 
 void vh::seed::initPermissions() {
@@ -165,8 +166,11 @@ void vh::seed::initAdminDefaultVault() {
 }
 
 void vh::seed::initRoot() {
+    LogRegistry::vaulthalla()->info("[initdb] Initializing root directory...");
+
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
+    dir->base32_alias = ids::IdGenerator( { .namespace_token = "absroot" }).generate();
     dir->created_by = dir->last_modified_by = 1;
     dir->path = "/";
     dir->fuse_path = "/";
@@ -176,6 +180,11 @@ void vh::seed::initRoot() {
     dir->is_system = true;
 
     DirectoryQueries::upsertDirectory(dir);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Failed to create root directory in database");
+    LogRegistry::vaulthalla()->info("[initdb] Root directory initialized successfully");
 }
 
 void vh::seed::initDevCloudVault() {
@@ -224,6 +233,8 @@ void vh::seed::initDevCloudVault() {
         sync->strategy = RSync::Strategy::Sync;
 
         vault->id = VaultQueries::upsertVault(vault, sync);
+
+        LogRegistry::vaulthalla()->info("[initdb] Created R2 test vault");
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageManager] Error initializing dev Cloudflare R2 vault: {}", e.what());
     }

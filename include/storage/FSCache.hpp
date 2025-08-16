@@ -49,6 +49,9 @@ private:
     std::unordered_map<fs::path, fuse_ino_t> pathToInode_;
     std::unordered_map<fuse_ino_t, std::shared_ptr<types::FSEntry>> inodeToEntry_;
     std::pmr::unordered_map<fs::path, std::shared_ptr<types::FSEntry>> pathToEntry_;
+
+    void initRoot();
+    void restoreCache();
 };
 
 }

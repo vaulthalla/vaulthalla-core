@@ -231,7 +231,7 @@ std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntr
 }
 
 void FSEntry::print() const {
-    LogRegistry::types()->debug("[FSEntry]\n"
+    LogRegistry::types()->info("[FSEntry]\n"
                                 "  ID: {}\n"
                                 "  Name: {}\n"
                                 "  Size: {} bytes\n"

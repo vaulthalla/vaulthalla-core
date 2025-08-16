@@ -135,7 +135,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     (void)fi;
 
     const auto path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
-    const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(path));
+    const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(path);
     auto entries = FSEntryQueries::listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
@@ -187,6 +187,8 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const auto parentPath = cache->resolvePath(parent);
     const auto path = parentPath / name;
     const fuse_ino_t ino = cache->getOrAssignInode(path);
+
+    LogRegistry::fuse()->info("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
 
     const auto entry = cache->getEntry(path);
     if (!entry) {

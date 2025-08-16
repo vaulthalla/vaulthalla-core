@@ -29,6 +29,7 @@ public:
     FSCache();
 
     [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(const fs::path& absPath);
+    [[nodiscard]] std::shared_ptr<types::FSEntry> getEntry(fuse_ino_t ino);
 
     fuse_ino_t assignInode(const fs::path& path);
     fuse_ino_t getOrAssignInode(const fs::path& path);

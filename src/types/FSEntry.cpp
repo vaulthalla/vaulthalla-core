@@ -6,6 +6,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "util/fsPath.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -20,6 +21,7 @@ using namespace vh::types;
 using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::database;
+using namespace vh::config;
 
 FSEntry::FSEntry(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
@@ -61,7 +63,7 @@ FSEntry::FSEntry(const pqxx::row& row)
 
     if (parent_id) {
         fuse_path = fs::path("/");
-        backing_path = fs::path("/");
+        backing_path = ConfigRegistry::get().fuse.backing_path;
 
         for (const auto& p : DirectoryQueries::collectParents(*parent_id) | std::views::reverse) {
             if (p->name == "/" && !p->parent_id) continue; // Skip root entry
@@ -231,7 +233,7 @@ std::unordered_map<std::u8string, std::shared_ptr<FSEntry>> vh::types::groupEntr
 }
 
 void FSEntry::print() const {
-    LogRegistry::types()->info("[FSEntry]\n"
+    LogRegistry::types()->debug("[FSEntry]\n"
                                 "  ID: {}\n"
                                 "  Name: {}\n"
                                 "  Size: {} bytes\n"

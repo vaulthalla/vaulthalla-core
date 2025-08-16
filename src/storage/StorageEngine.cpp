@@ -32,7 +32,6 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
       sync(SyncQueries::getSync(vault->id)),
       paths(std::make_shared<Path>(makeAbsolute(to_snake_case(vault->name)), vault->mount_point)),
       encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
-    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Root entry does not exist in the database. Please initialize the database first.");
     if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }

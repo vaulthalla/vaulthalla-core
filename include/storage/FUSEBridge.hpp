@@ -57,6 +57,8 @@ void fsync(fuse_req_t req, fuse_ino_t ino, int datasync, fuse_file_info* fi);
 
 void statfs(fuse_req_t req, fuse_ino_t ino);
 
+void utimens(fuse_req_t req, fuse_ino_t ino, const timespec tv[2]);
+
 fuse_lowlevel_ops getOperations();
 
 struct stat statFromEntry(const std::shared_ptr<types::FSEntry>& entry, const fuse_ino_t& ino);

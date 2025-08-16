@@ -125,7 +125,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
         dir->name = to_snake_case(VaultQueries::getVault(vaultId)->name);
         dir->parent_id = FSEntryQueries::getRootEntry()->id;
         dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
-        dir->backing_path = makeAbsolute(dir->base32_alias);
+        dir->backing_path = ConfigRegistry::get().fuse.backing_path / dir->base32_alias;
         dir->fuse_path = absPath;
         dir->created_at = dir->updated_at = std::time(nullptr);
         dir->mode = mode;
@@ -137,15 +137,11 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
         const auto root = FSEntryQueries::getRootEntry();
 
-        LogRegistry::fs()->info("[Filesystem] Creating directory: {}", dir->name);
-
-        LogRegistry::fs()->info("[Filesystem] Creating vault directory: {}, parent_id: {}, root_exists: {}, root_id: {}, root_inode: {}",
-            dir->fuse_path.string(), dir->parent_id ? std::to_string(*dir->parent_id) : "null", FSEntryQueries::rootExists() ? "yes" : "no",
-            root->id, root->inode ? std::to_string(*root->inode) : "null");
-
         dir->id = DirectoryQueries::upsertDirectory(dir);
 
         ServiceDepsRegistry::instance().fsCache->cacheEntry(FSEntryQueries::getFSEntryById(dir->id));
+
+        if (!fs::exists(dir->backing_path)) fs::create_directories(dir->backing_path);
 
         LogRegistry::fs()->debug("Successfully created vault directory at: {}", absPath.string());
     } catch (const std::exception& ex) {
@@ -228,16 +224,13 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
 
     LogRegistry::fs()->debug("Creating file at path: {}", path.string());
 
-    const auto fullDiskPath = engine->paths->absPath(path, PathType::FUSE_ROOT);
-    const auto fullBackingPath = engine->paths->absPath(path, PathType::BACKING_ROOT);
-
     const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(path));
 
     const auto f = std::make_shared<File>();
     f->parent_id = parent->id;
     f->vault_id = engine->vault->id;
     f->name = path.filename();
-    f->path = engine->paths->absRelToRoot(fullDiskPath, PathType::VAULT_ROOT);
+    f->path = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     f->fuse_path = path;
     f->base32_alias = ids::IdGenerator({ .namespace_token = f->name }).generate();
     f->backing_path = parent->backing_path / f->base32_alias;
@@ -251,13 +244,16 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     f->mime_type = inferMimeTypeFromPath(path.filename());
     f->size_bytes = 0;
 
-    if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
-    std::filesystem::create_directories(fullBackingPath.parent_path());
-    std::ofstream(fullBackingPath).close(); // create empty file
-    if (!std::filesystem::exists(fullBackingPath))
-        throw std::runtime_error("[Filesystem] Failed to create real file at: " + fullDiskPath.string());
+    LogRegistry::fs()->info("[Filesystem] Creating file at path: {}, backingPath: {}", f->fuse_path.string(), f->backing_path.string());
 
-    FileQueries::upsertFile(f);
+    const auto fullDiskPath = engine->paths->absPath(f->fuse_path, PathType::FUSE_ROOT);
+    if (!fs::exists(fullDiskPath.parent_path())) fs::create_directories(fullDiskPath.parent_path());
+    std::filesystem::create_directories(f->backing_path.parent_path());
+    std::ofstream(f->backing_path).close(); // create empty file
+    if (!std::filesystem::exists(f->backing_path))
+        throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
+
+    f->id = FileQueries::upsertFile(f);
     cache->cacheEntry(f);
 
     LogRegistry::fs()->debug("Successfully created file at path: {}", path.string());

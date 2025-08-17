@@ -250,5 +250,5 @@ void FSCache::evictPath(const fs::path& path) {
     inodeToId_.erase(ino);
     idToEntry_.erase(id);
     idToParentId_.erase(id);
-    LogRegistry::fs()->info("[FSCache] Evicted path: {} with inode {}",
+    LogRegistry::fs()->info("[FSCache] Evicted path: {} with inode {}", path.string(), ino);
 }

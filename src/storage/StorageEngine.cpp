@@ -87,7 +87,7 @@ void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std:
         }
 
         Filesystem::mkdir(toPath.parent_path());
-        fs::rename(fromPath, toPath); // TODO: Handle rename properly
+        fs::rename(fromPath, toPath);
     }
 }
 
@@ -107,7 +107,7 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
         }
 
         Filesystem::mkdir(toPath.parent_path());
-        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);  // TODO: Handle copy properly
+        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
     }
 }
 

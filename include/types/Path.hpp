@@ -19,7 +19,7 @@ enum class PathType {
 struct Path {
     const fs::path fuseRoot, vaultRoot, cacheRoot, thumbnailRoot, fileCacheRoot, backingRoot, backingVaultRoot;
 
-    explicit Path(const fs::path& vaultMountPoint);
+    explicit Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount);
 
     [[nodiscard]] fs::path absPath(const fs::path& relPath, const PathType& type) const;
     [[nodiscard]] fs::path relPath(const fs::path& absPath, const PathType& type) const;

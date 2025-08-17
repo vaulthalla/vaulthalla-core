@@ -57,7 +57,7 @@ private:
     inline static std::mutex mutex_;
     inline static std::shared_ptr<StorageManager> storageManager_ = nullptr;
 
-    static void handleRename(const RenameContext& context);
+    static void handleRename(const RenameContext& ctx);
 
     static bool canFastPath(const std::shared_ptr<types::FSEntry>& entry, const std::shared_ptr<StorageEngine>& engine);
 };

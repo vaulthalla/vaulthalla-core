@@ -1,7 +1,6 @@
 #include "storage/FUSEBridge.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
@@ -12,6 +11,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "storage/FSCache.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -33,7 +33,7 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     try {
         const auto& cache = ServiceDepsRegistry::instance().fsCache;
         if (ino == FUSE_ROOT_ID) {
-            const auto entry = cache->getEntry("/");
+            const auto entry = cache->getEntry(FUSE_ROOT_ID);
             if (!entry) {
                 LogRegistry::fuse()->error("[getattr] No entry found for inode {}, resolved path: /", ino);
                 fuse_reply_err(req, ENOENT);
@@ -48,17 +48,10 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
             return;
         }
 
-        const auto path = cache->resolvePath(ino);
-        if (path.empty()) {
-            LogRegistry::fuse()->error("[getattr] No path resolved for inode {}, returning ENOENT", ino);
-            fuse_reply_err(req, ENOENT);
-            return;
-        }
-
-        const auto entry = cache->getEntry(path);
+        const auto entry = cache->getEntry(ino);
 
         if (!entry) {
-            LogRegistry::fuse()->error("[getattr] No entry found for inode {}, resolved path: {}", ino, path.string());
+            LogRegistry::fuse()->error("[getattr] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -97,14 +90,12 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
     }
 
     try {
-        const auto& cache = ServiceDepsRegistry::instance().fsCache;
-        const auto path   = cache->resolvePath(ino);
-        if (path.empty()) {
+        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+        if (!entry) {
+            LogRegistry::fuse()->error("[setattr] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
-
-        const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
 
         timespec times[2];
         if (to_set & FUSE_SET_ATTR_ATIME) times[0] = attr->st_atim;
@@ -112,14 +103,14 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
         if (to_set & FUSE_SET_ATTR_MTIME) times[1] = attr->st_mtim;
         else times[1].tv_nsec = UTIME_OMIT;
 
-        if (::utimensat(AT_FDCWD, backingPath.c_str(), times, 0) < 0) {
+        if (::utimensat(AT_FDCWD, entry->backing_path.c_str(), times, 0) < 0) {
             fuse_reply_err(req, errno);
             return;
         }
 
         // Re-stat file so kernel gets fresh info
-        struct stat st;
-        if (::stat(backingPath.c_str(), &st) < 0) {
+        struct stat st = {};
+        if (::stat(entry->backing_path.c_str(), &st) < 0) {
             fuse_reply_err(req, errno);
             return;
         }
@@ -134,8 +125,8 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
-    const auto path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
-    auto entries = FSEntryQueries::listDir(path, false);
+    const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto entries = ServiceDepsRegistry::instance().fsCache->listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
     size_t buf_used = 0;
@@ -187,6 +178,8 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const auto path = parentPath / name;
     const fuse_ino_t ino = cache->getOrAssignInode(path);
 
+    LogRegistry::fuse()->info("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
+
     const auto entry = cache->getEntry(path);
     if (!entry) {
         LogRegistry::fuse()->error("[lookup] Entry not found for path: {}", path.string());
@@ -206,7 +199,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 }
 
 void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
+    LogRegistry::fuse()->info("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 
     if (!name || strlen(name) == 0) {
@@ -214,29 +207,26 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         return;
     }
 
-    const auto& cache = ServiceDepsRegistry::instance().fsCache;
-
     try {
-        fs::path parentPath = cache->resolvePath(parent);
-        fs::path fullPath   = parentPath / name;
+        const auto parentPath = ServiceDepsRegistry::instance().fsCache->resolvePath(parent);
+        const auto fullPath = parentPath / name;
 
-        if (cache->entryExists(fullPath)) {
+        if (ServiceDepsRegistry::instance().fsCache->entryExists(fullPath)) {
             fuse_reply_err(req, EEXIST);
             return;
         }
 
-        auto newEntry = Filesystem::createFile(fullPath, getuid(), getgid(), mode);
-        auto st       = statFromEntry(newEntry, *newEntry->inode);
+        const auto newEntry = Filesystem::createFile(fullPath, getuid(), getgid(), mode);
+        const auto st       = statFromEntry(newEntry, *newEntry->inode);
 
         // open backing file immediately
-        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
-        int fd = ::open(backingPath.c_str(), O_CREAT | O_RDWR, mode);
+        const int fd = ::open(newEntry->backing_path.c_str(), O_CREAT | O_RDWR, mode);
         if (fd < 0) {
             fuse_reply_err(req, errno);
             return;
         }
 
-        auto* fh = new FileHandle{backingPath.string(), fd};
+        auto* fh = new FileHandle{newEntry->backing_path.string(), fd};
         fi->fh = reinterpret_cast<uint64_t>(fh);
 
         fi->direct_io = 1;

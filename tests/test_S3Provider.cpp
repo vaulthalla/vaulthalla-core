@@ -1,5 +1,5 @@
 #include "types/APIKey.hpp"
-#include "storage/cloud/S3Provider.hpp"
+#include "storage/cloud/S3Controller.hpp"
 #include "util/imageUtil.hpp"
 #include "types/FSEntry.hpp"
 
@@ -15,7 +15,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
   protected:
     std::shared_ptr<vh::types::api::APIKey> apiKey_;
     std::string bucket_;
-    std::shared_ptr<vh::cloud::S3Provider> s3Provider_;
+    std::shared_ptr<vh::cloud::S3Controller> s3Provider_;
     std::filesystem::path test_dir;
     bool skipTests = false;
 
@@ -42,7 +42,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
 
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
-        s3Provider_ = std::make_shared<vh::cloud::S3Provider>(apiKey_, bucket_);
+        s3Provider_ = std::make_shared<vh::cloud::S3Controller>(apiKey_, bucket_);
 
         FPDF_LIBRARY_CONFIG config;
         config.version = 3;

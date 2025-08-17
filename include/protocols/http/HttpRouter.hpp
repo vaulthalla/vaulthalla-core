@@ -12,6 +12,11 @@ class AuthManager;
 
 namespace vh::storage {
 class StorageManager;
+class StorageEngine;
+}
+
+namespace vh::types {
+struct File;
 }
 
 namespace vh::http {
@@ -38,9 +43,9 @@ private:
     std::shared_ptr<ImagePreviewHandler> imagePreviewHandler_;
     std::shared_ptr<PdfPreviewHandler> pdfPreviewHandler_;
 
-    PreviewResponse handleCachedPreview(unsigned int vaultId, const std::filesystem::path& rel_path,
-                             const std::string& mime_type, const http::request<http::string_body>& req,
-                             unsigned int size) const;
+    PreviewResponse handleCachedPreview(const std::shared_ptr<storage::StorageEngine>& engine,
+                             const std::shared_ptr<types::File>& file,
+                             const http::request<http::string_body>& req, unsigned int size) const;
 };
 
 }

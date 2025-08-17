@@ -50,3 +50,13 @@ std::shared_ptr<APIKey> APIKeyQueries::getAPIKey(const unsigned int keyId) {
         return std::make_shared<APIKey>(res.one_row());
     });
 }
+
+std::shared_ptr<APIKey> APIKeyQueries::getAPIKey(const std::string& keyName) {
+    if (keyName.empty()) return nullptr;
+
+    return Transactions::exec("APIKeyQueries::getAPIKeyByName", [&](pqxx::work& txn) -> std::shared_ptr<APIKey> {
+        const auto res = txn.exec_prepared("get_api_key_by_name", keyName);
+        if (res.empty()) return nullptr;
+        return std::make_shared<APIKey>(res.one_row());
+    });
+}

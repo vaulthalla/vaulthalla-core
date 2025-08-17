@@ -1,6 +1,8 @@
 #include "crypto/PasswordHash.hpp"
+
 #include <sodium.h>
 #include <stdexcept>
+#include <vector>
 
 namespace vh::crypto {
 
@@ -20,4 +22,19 @@ bool verifyPassword(const std::string& password, const std::string& hash) {
     return crypto_pwhash_str_verify(hash.c_str(), password.c_str(), password.size()) == 0;
 }
 
-} // namespace vh::crypto
+std::string generate_secure_password(const size_t length) {
+    if (sodium_init() < 0) throw std::runtime_error("libsodium failed to initialize");
+
+    constexpr std::string_view alphabet =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789"
+        "!@#$%^&*()-_=+[]{}<>?/|\\:;,.~";
+
+    std::string password;
+    password.reserve(length);
+    for (size_t i = 0; i < length; ++i) password.push_back(alphabet[randombytes_uniform(alphabet.size())]);
+    return password;
+}
+
+}

@@ -1,4 +1,8 @@
 #include "types/APIKey.hpp"
+#include "database/Queries/UserQueries.hpp"
+#include "types/User.hpp"
+#include "protocols/shell/Table.hpp"
+#include "util/cmdLineHelpers.hpp"
 
 #include <unordered_map>
 #include <stdexcept>
@@ -6,6 +10,8 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::types::api;
+using namespace vh::database;
+using namespace vh::shell;
 
 // --- S3Provider helpers ---
 std::string vh::types::api::to_string(S3Provider provider) {
@@ -110,4 +116,40 @@ void vh::types::api::to_json(nlohmann::json& j, const std::shared_ptr<APIKey>& k
 void vh::types::api::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<APIKey>>& k) {
     j = nlohmann::json::array();
     for (const auto& key : k) j.push_back(key);
+}
+
+std::string vh::types::api::to_string(const std::shared_ptr<APIKey>& key) {
+    std::string out = key->name + " (ID: " + std::to_string(key->id) + ")\n";
+    out += "  User: " + UserQueries::getUserById(key->user_id)->name + "\n";
+    out += "  Created: " + util::timestampToString(key->created_at) + "\n";
+    out += "  Provider: " + to_string(key->provider) + "\n";
+    out += "  Access Key: " + key->access_key + "\n";
+    out += "  Region: " + key->region + "\n";
+    out += "  Endpoint: " + key->endpoint + "\n";
+    return out;
+}
+
+std::string vh::types::api::to_string(const std::vector<std::shared_ptr<APIKey>>& keys) {
+    if (keys.empty()) return "No API keys found.\n";
+
+    Table tbl({
+        {"ID", Align::Right, 4, 10, false, false},
+        {"Name", Align::Left, 4, 32, false, false},
+        {"User", Align::Left, 4, 20, false, false},
+        {"Provider", Align::Left, 4, 20, false, false},
+        {"Created At", Align::Left, 4, 20, false, false}
+    }, term_width());
+
+    for (const auto& key : keys) {
+        if (!key) continue; // Skip null pointers
+        tbl.add_row({
+            std::to_string(key->id),
+            key->name,
+            UserQueries::getUserById(key->user_id)->name,
+            to_string(key->provider),
+            util::timestampToString(key->created_at)
+        });
+    }
+
+    return "API Keys:\n" + tbl.render();
 }

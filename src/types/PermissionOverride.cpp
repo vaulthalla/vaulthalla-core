@@ -1,10 +1,13 @@
 #include "types/PermissionOverride.hpp"
+#include "protocols/shell/Table.hpp"
+#include "util/cmdLineHelpers.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::shell;
 
 PermissionOverride::PermissionOverride(const pqxx::row& row)
     : permission(row),
@@ -58,4 +61,26 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Per
         to_json(overrideJson, *overridePtr);
         j.push_back(overrideJson);
     }
+}
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<PermissionOverride>>& overrides) {
+    if (overrides.empty()) return "No overrides";
+
+    Table tbl({
+        {"Name", Align::Left, 4, 32, false, false},
+        {"Description", Align::Left, 4, 64, false, false},
+        {"Value", Align::Left, 4, 8, false, false},
+        {"Regex", Align::Left, 4, 64, false, false}
+    }, term_width());
+
+    for (const auto& ovr : overrides) {
+        tbl.add_row({
+            ovr->permission.name,
+            ovr->permission.description,
+            ovr->enabled ? "On" : "Off",
+            ovr->patternStr
+        });
+    }
+
+    return tbl.render();
 }

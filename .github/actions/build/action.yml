@@ -12,6 +12,11 @@ runs:
   steps:
     - uses: actions/checkout@v4
 
+    - name: Make clean
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: make clean || true
+
     - name: Set PATH
       shell: bash
       run: echo "PATH=$HOME/.local/bin:$PATH" >> $GITHUB_ENV

@@ -10,8 +10,9 @@ using namespace vh::types;
 TrashedFile::TrashedFile(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       vault_id(row["vault_id"].as<unsigned int>()),
-      fuse_path(row["fuse_path"].as<std::string>()),
-      uuid(row["uuid"].is_null() ? boost::uuids::nil_uuid() : boost::uuids::string_generator()(row["uuid"].as<std::string>())),
+      base32_alias(row["base32_alias"].as<std::string>()),
+      path(row["path"].as<std::string>()),
+      backing_path(row["backing_path"].as<std::string>()),
       trashed_at(util::parsePostgresTimestamp(row["trashed_at"].as<std::string>())),
       trashed_by(row["trashed_by"].as<unsigned int>()) {
     if (row["deleted_at"].is_null()) deleted_at = std::nullopt;

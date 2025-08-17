@@ -1,6 +1,6 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "keys/VaultEncryptionManager.hpp"
-#include "storage/cloud/S3Provider.hpp"
+#include "storage/cloud/S3Controller.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
@@ -25,7 +25,7 @@ using namespace vh::services;
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
       key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
-      s3Provider_(std::make_shared<cloud::S3Provider>(key_, vault->bucket)) {}
+      s3Provider_(std::make_shared<cloud::S3Controller>(key_, vault->bucket)) {}
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);

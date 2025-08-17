@@ -12,17 +12,17 @@ struct File;
 struct Directory;
 }
 
+namespace pqxx {
+class result;
+}
+
 namespace vh::database {
 
 class DirectoryQueries {
 public:
     DirectoryQueries() = default;
 
-    static void upsertDirectory(const std::shared_ptr<types::Directory>& directory);
-
-    static void deleteDirectory(unsigned int directoryId);
-
-    static void deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath);
+    static unsigned int upsertDirectory(const std::shared_ptr<types::Directory>& directory);
 
     [[nodiscard]] static bool isDirectory(unsigned int vaultId, const std::filesystem::path& relPath);
 
@@ -36,17 +36,9 @@ public:
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);
 
-    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int vaultId, const std::filesystem::path& path, bool recursive = true);
+    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int parentId, bool recursive = false);
 
-    static std::vector<std::shared_ptr<types::FSEntry> > listDir(unsigned int vaultId, const std::string& absPath,
-                                                                 bool recursive = false);
-
-    // FUSE
-    static std::shared_ptr<types::Directory> getDirectoryByInode(ino_t inode);
-
-    static std::shared_ptr<types::Directory> getDirectoryByAbsPath(const std::filesystem::path& absPath);
-
-    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesAbsPath(const std::filesystem::path& absPath, bool recursive = false);
+    [[nodiscard]] static pqxx::result collectParentStats(unsigned int parentId);
 };
 
 } // namespace vh::database

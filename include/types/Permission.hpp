@@ -97,4 +97,7 @@ nlohmann::json jsonFromVaultMask(uint16_t mask);
 uint16_t adminMaskFromJson(const nlohmann::json& j);
 uint16_t vaultMaskFromJson(const nlohmann::json& j);
 
+std::string admin_perms_to_string(uint16_t mask, unsigned short indent = 4);
+std::string vault_perms_to_string(uint16_t mask, unsigned short indent = 4);
+
 } // namespace vh::types

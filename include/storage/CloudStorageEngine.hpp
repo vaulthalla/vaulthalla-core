@@ -14,7 +14,7 @@ struct APIKey;
 }}
 
 namespace vh::cloud {
-class S3Provider;
+class S3Controller;
 }
 
 namespace vh::storage {
@@ -48,7 +48,7 @@ public:
 
 private:
     std::shared_ptr<types::api::APIKey> key_;
-    std::shared_ptr<cloud::S3Provider> s3Provider_;
+    std::shared_ptr<cloud::S3Controller> s3Provider_;
 
     std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 

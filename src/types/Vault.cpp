@@ -1,13 +1,19 @@
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
 #include "util/timestamp.hpp"
+#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/Table.hpp"
+#include "database/Queries/VaultQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
+#include <fmt/core.h>
 
 using namespace vh::types;
+using namespace vh::shell;
+using namespace vh::database;
 
-std::string vh::types::to_string(const VaultType type) {
+std::string vh::types::to_string(const VaultType& type) {
     switch (type) {
         case VaultType::Local: return "local";
         case VaultType::S3: return "s3";
@@ -64,4 +70,68 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vau
         if (const auto* s3 = dynamic_cast<const S3Vault*>(vault.get())) j.push_back(*s3);
         else j.push_back(*vault);
     }
+}
+
+std::string vh::types::to_string(const Vault& v) {
+    std::string out = "Name: " + v.name + "\n";
+    out += "ID: " + std::to_string(v.id) + "\n";
+    out += "Owner ID: " + std::to_string(v.owner_id) + "\n";
+    out += "Type: " + to_string(v.type) + "\n";
+    out += "Description: " + v.description + "\n";
+    out += "Mount Point: " + v.mount_point.string() + "\n";
+    out += "Quota: ";
+    if (v.quota == 0) out += "\u221E\n";  // ∞ symbol
+    else out += fmt::format("{} ({} bytes)\n", human_bytes(v.quota), static_cast<unsigned long long>(v.quota));
+    out += "Created At: " + util::timestampToString(v.created_at) + "\n";
+    out += "Is Active: " + std::string(v.is_active ? "true" : "false") + "\n";
+    return out;
+}
+
+std::string vh::types::to_string(const std::shared_ptr<Vault>& v) {
+    if (!v) return "null";
+    return to_string(*v);
+}
+
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaults) {
+    if (vaults.empty()) return "No vaults found\n";
+
+    Table tbl({
+        {"ID",    Align::Right, 3, 8,   false, false },
+        { "OWNER", Align::Right, 4, 16,  false, false },
+        { "NAME",  Align::Left,  4, 64,  false, false },
+        { "TYPE",  Align::Left,  4, 24,  false, false },
+        { "QUOTA", Align::Right, 5, 32,  false, false },
+        // keep mount reasonable; ellipsize middle for deep paths
+        { "MOUNT", Align::Left,  5, 48,  false, true  },
+        // description wraps, effectively acts as flex column
+        { "DESCRIPTION", Align::Left, 11, 2000, true, false },
+    }, /*term_width*/ term_width());
+
+    for (const auto& vp : vaults) {
+        const auto& v = *vp;
+        const std::string quota = (v.quota == 0)
+            ? "∞"
+            : fmt::format("{} ({})",
+                          human_bytes(static_cast<uint64_t>(v.quota)),
+                          static_cast<unsigned long long>(v.quota));
+
+        std::string owner = v.owner_id != 0 ?
+            VaultQueries::getVaultOwnersName(v.id) + " (ID: " + std::to_string(v.owner_id) + ")" : "N/A";
+
+        tbl.add_row({
+            std::to_string(v.id),
+            owner,
+            v.name,
+            to_string(v.type),
+            quota,
+            v.mount_point.string(),
+            v.description
+        });
+    }
+
+    std::string out;
+    out += "vaulthalla vaults:\n";
+    out += tbl.render();
+    return out;
 }

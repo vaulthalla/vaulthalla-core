@@ -5,25 +5,29 @@
 #include "types/Directory.hpp"
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <optional>
 
 using namespace vh::database;
+using namespace vh::types;
+using namespace vh::logging;
 
 
-void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& directory) {
+unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
-    Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
+    return Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
+        const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", directory->inode).one_field().as<bool>();
         if (directory->inode) txn.exec_prepared("delete_fs_entry_by_inode", directory->inode);
 
         pqxx::params p;
         p.append(directory->vault_id);
         p.append(directory->parent_id);
         p.append(directory->name);
+        p.append(directory->base32_alias);
         p.append(directory->created_by);
         p.append(directory->last_modified_by);
         p.append(to_utf8_string(directory->path.u8string()));
-        p.append(to_utf8_string(directory->fuse_path.u8string()));
         p.append(directory->inode);
         p.append(directory->mode);
         p.append(directory->owner_uid);
@@ -34,23 +38,24 @@ void DirectoryQueries::upsertDirectory(const std::shared_ptr<types::Directory>& 
         p.append(directory->file_count);
         p.append(directory->subdirectory_count);
 
-        txn.exec_prepared("upsert_directory", p);
+        const auto id = txn.exec_prepared("upsert_directory", p).one_field().as<unsigned int>();
+
+        if (directory->parent_id) {
+            std::optional<unsigned int> parentId = directory->parent_id;
+            while (parentId) {
+                pqxx::params stats_params{parentId, 0, 0, exists ? 0 : 1}; // Increment subdir count
+                txn.exec_prepared("update_dir_stats", stats_params);
+                const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
+                if (res.empty()) break;
+                parentId = res.one_field().as<std::optional<unsigned int>>();
+            }
+        }
+
+        return id;
     });
 }
 
-void DirectoryQueries::deleteDirectory(const unsigned int directoryId) {
-    Transactions::exec("DirectoryQueries::deleteDirectory", [&](pqxx::work& txn) {
-        txn.exec_prepared("delete_fs_entry", directoryId);
-    });
-}
-
-void DirectoryQueries::deleteDirectory(unsigned int vaultId, const std::filesystem::path& relPath) {
-    Transactions::exec("DirectoryQueries::deleteDirectoryByPath", [&](pqxx::work& txn) {
-        txn.exec_prepared("delete_fs_entry_by_path", pqxx::params{vaultId, relPath.string()});
-    });
-}
-
-void DirectoryQueries::moveDirectory(const std::shared_ptr<types::Directory>& directory, const std::filesystem::path& newPath, unsigned int userId) {
+void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory, const std::filesystem::path& newPath, unsigned int userId) {
     if (!directory) throw std::invalid_argument("Directory cannot be null");
     if (!newPath.string().starts_with("/")) throw std::invalid_argument("New path must start with '/'");
 
@@ -100,10 +105,11 @@ void DirectoryQueries::moveDirectory(const std::shared_ptr<types::Directory>& di
     });
 }
 
-std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
+std::shared_ptr<Directory> DirectoryQueries::getDirectoryByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("DirectoryQueries::getDirectoryByPath", [&](pqxx::work& txn) {
         const auto row = txn.exec_prepared("get_dir_by_path", pqxx::params{vaultId, relPath.string()}).one_row();
-        return std::make_shared<types::Directory>(row);
+        const auto parentRows = txn.exec_prepared("collect_parent_chain", row["parent_id"].as<std::optional<unsigned int>>());
+        return std::make_shared<Directory>(row, parentRows);
     });
 }
 
@@ -134,62 +140,18 @@ bool DirectoryQueries::directoryExists(const unsigned int vaultId, const std::fi
     return isDirectory(vaultId, relPath);
 }
 
-std::vector<std::shared_ptr<vh::types::Directory>> DirectoryQueries::listDirectoriesInDir(const unsigned int vaultId, const std::filesystem::path& path, const bool recursive) {
+std::vector<std::shared_ptr<Directory>> DirectoryQueries::listDirectoriesInDir(const unsigned int parentId, const bool recursive) {
     return Transactions::exec("DirectoryQueries::listDirectoriesInDir", [&](pqxx::work& txn) {
-        const auto patterns = computePatterns(path.string(), recursive);
         const auto res = recursive
-            ? txn.exec_prepared("list_directories_in_dir_recursive", pqxx::params{vaultId, patterns.like})
-            : txn.exec_prepared("list_directories_in_dir", pqxx::params{vaultId, patterns.like, patterns.not_like});
+            ? txn.exec_prepared("list_dirs_in_dir_by_parent_id_recursive", parentId)
+            : txn.exec_prepared("list_dirs_in_dir_by_parent_id", parentId);
 
-        return types::directories_from_pq_res(res);
+        return directories_from_pq_res(res);
     });
 }
 
-std::vector<std::shared_ptr<vh::types::FSEntry>> DirectoryQueries::listDir(const unsigned int vaultId, const std::string& absPath, const bool recursive) {
-    return Transactions::exec("DirectoryQueries::listDir", [&](pqxx::work& txn) {
-        const auto patterns = computePatterns(absPath, recursive);
-        pqxx::params p{vaultId, patterns.like, patterns.not_like};
-
-        const auto files = types::files_from_pq_res(
-            recursive
-            ? txn.exec_prepared("list_files_in_dir_recursive", pqxx::params{vaultId, patterns.like})
-            : txn.exec_prepared("list_files_in_dir", p)
-        );
-
-        const auto directories = types::directories_from_pq_res(
-            recursive
-            ? txn.exec_prepared("list_directories_in_dir_recursive", pqxx::params{vaultId, patterns.like})
-            : txn.exec_prepared("list_directories_in_dir", p)
-        );
-
-        return types::merge_entries(files, directories);
-    });
-}
-
-
-// FUSE
-
-std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByInode(ino_t inode) {
-    return Transactions::exec("DirectoryQueries::getDirectoryByInode", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_dir_by_inode", inode).one_row();
-        return std::make_shared<types::Directory>(row);
-    });
-}
-
-std::shared_ptr<vh::types::Directory> DirectoryQueries::getDirectoryByAbsPath(const std::filesystem::path& absPath) {
-    return Transactions::exec("DirectoryQueries::getDirectoryByAbsPath", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_dir_by_fuse_path", absPath.string()).one_row();
-        return std::make_shared<types::Directory>(row);
-    });
-}
-
-std::vector<std::shared_ptr<vh::types::Directory>> DirectoryQueries::listDirectoriesAbsPath(const std::filesystem::path& absPath, const bool recursive) {
-    return Transactions::exec("DirectoryQueries::listDirectoriesAbsPath", [&](pqxx::work& txn) {
-        const auto patterns = computePatterns(absPath.string(), recursive);
-        const auto res = recursive
-            ? txn.exec_prepared("list_directories_in_dir_by_fuse_path_recursive", pqxx::params{patterns.like})
-            : txn.exec_prepared("list_directories_in_dir_by_fuse_path", pqxx::params{patterns.like, patterns.not_like});
-
-        return types::directories_from_pq_res(res);
+pqxx::result DirectoryQueries::collectParentStats(unsigned int parentId) {
+    return Transactions::exec("DirectoryQueries::collectParentStats", [&](pqxx::work& txn) {
+        return txn.exec_prepared("collect_parent_dir_stats", parentId);
     });
 }

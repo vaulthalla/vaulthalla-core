@@ -3,27 +3,32 @@
 #include "types/Directory.hpp"
 #include "types/File.hpp"
 #include "logging/LogRegistry.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/VaultQueries.hpp"
+#include "util/fsPath.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <nlohmann/json.hpp>
-#include <pqxx/row>
+#include <pqxx/result>
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
 #include <pugixml.hpp>
-#include <boost/uuid/nil_generator.hpp>
-#include <boost/uuid/string_generator.hpp>
+#include <algorithm>
+#include <ranges>
 
 using namespace vh::types;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::database;
+using namespace vh::config;
 
-FSEntry::FSEntry(const pqxx::row& row)
+FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
-      uuid(row["uuid"].is_null() ? boost::uuids::nil_uuid() : boost::uuids::string_generator()(row["uuid"].as<std::string>())),
+      base32_alias(row["base32_alias"].as<std::string>()),
       size_bytes(row["size_bytes"].as<uintmax_t>()),
       path(std::filesystem::path(row["path"].as<std::string>())),
-      fuse_path(std::filesystem::path(row["fuse_path"].as<std::string>())),
       created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
       updated_at(parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
     if (row["parent_id"].is_null()) parent_id = std::nullopt;
@@ -56,7 +61,22 @@ FSEntry::FSEntry(const pqxx::row& row)
     if (row["is_system"].is_null()) is_system = false;
     else is_system = row["is_system"].as<bool>();
 
-    if (fuse_path.empty()) throw std::runtime_error("FSEntry must have a non-empty abs_path");
+    fuse_path = fs::path("/");
+    backing_path = ConfigRegistry::get().fuse.backing_path;
+
+    for (const auto& r : parentRows) {
+        const auto name = r["name"].as<std::string>();
+        const auto base32_alias = r["base32_alias"].as<std::string>();
+        std::optional<unsigned int> parentId;
+        if (r["parent_id"].is_null()) parentId = std::nullopt; // Root directory
+        else parentId = r["parent_id"].as<unsigned int>();
+
+        if (name == "/" && !parent_id) continue; // Skip root slash, prevents // in path
+
+        fuse_path /= name;
+        backing_path /= base32_alias;
+    }
+
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {

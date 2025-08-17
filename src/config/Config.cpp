@@ -103,7 +103,8 @@ void to_json(nlohmann::json& j, const Config& c) {
             {"backing_path", c.fuse.backing_path},
              {"mount_per_user", c.fuse.mount_per_user},
              {"fuse_timeout_seconds", c.fuse.fuse_timeout_seconds},
-             {"allow_other", c.fuse.allow_other}
+             {"allow_other", c.fuse.allow_other},
+            {"admin_linux_uid", c.fuse.admin_linux_uid}
          }},
         {"logging", {
              {"log_dir", c.logging.log_dir},
@@ -195,6 +196,7 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.fuse.mount_per_user = j.at("fuse").at("mount_per_user").get<bool>();
     c.fuse.fuse_timeout_seconds = j.at("fuse").at("fuse_timeout_seconds").get<int>();
     c.fuse.allow_other = j.at("fuse").at("allow_other").get<bool>();
+    c.fuse.admin_linux_uid = j.at("fuse").at("admin_linux_uid").get<unsigned int>();
 
     c.logging.log_dir = j.at("logging").at("log_dir").get<std::string>();
     c.logging.log_rotation_days = std::chrono::days(j.at("logging").at("log_rotation_days").get<unsigned int>());

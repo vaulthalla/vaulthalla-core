@@ -3,11 +3,15 @@
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 #include "util/timestamp.hpp"
+#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/Table.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
 #include <ranges>
+
+using namespace vh::shell;
 
 namespace vh::types {
 
@@ -27,12 +31,15 @@ User::User(const pqxx::row& row)
       name(row["name"].as<std::string>()),
       password_hash(row["password_hash"].as<std::string>()),
       created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())),
       is_active(row["is_active"].as<bool>()),
       role(nullptr) {
     if (row["last_login"].is_null()) last_login = std::nullopt;
     else last_login = std::make_optional(util::parsePostgresTimestamp(row["last_login"].as<std::string>()));
     if (row["email"].is_null()) email = std::nullopt;
     else email = std::make_optional(row["email"].as<std::string>());
+    if (row["last_modified_by"].is_null()) last_modified_by = std::nullopt;
+    else last_modified_by = std::make_optional(row["last_modified_by"].as<unsigned int>());
 }
 
 User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides)
@@ -178,6 +185,49 @@ bool User::canMoveVaultData(const unsigned int vaultId, const std::filesystem::p
 bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::List, path);
+}
+
+std::string to_string(const std::shared_ptr<User>& user) {
+    if (!user) return "No user found\n";
+
+    std::string out = "User: " + user->name + "\n";
+    out += "Email: " + user->email.value_or("N/A") + "\n";
+    if (user->linux_uid) out += "Linux UID: " + std::to_string(*user->linux_uid) + "\n";
+    else out += "Linux UID: Not set\n";
+    out += "Created At: " + util::timestampToString(user->created_at) + "\n";
+    out += "Last Login: " + (user->last_login ? util::timestampToString(*user->last_login) : "Never") + "\n";
+    out += "Active: " + std::string(user->is_active ? "Yes" : "No") + "\n";
+    out += "Role: " + to_string(user->role);
+    out += "Vault Roles: " + to_string(user->roles);
+
+    return out;
+}
+
+std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
+    if (users.empty()) return "No users found\n";
+
+    Table tbl({
+        {"Name", Align::Left, 4, 32, false, false},
+        {"Email", Align::Left, 4, 32, false, false},
+        {"Role", Align::Left, 4, 16, false, false},
+        {"Created At", Align::Left, 4, 20, false, false},
+        {"Last Login", Align::Left, 4, 20, false, false},
+        {"Active", Align::Left, 4, 8, false, false}
+    }, term_width());
+
+    for (const auto& user : users) {
+        if (!user) continue; // Skip null pointers
+        tbl.add_row({
+            user->name,
+            user->email.value_or("N/A"),
+            user->role ? snake_case_to_title(user->role->name) : "No Role",
+            util::timestampToString(user->created_at),
+            user->last_login ? util::timestampToString(*user->last_login) : "Never",
+            user->is_active ? "Yes" : "No"
+        });
+    }
+
+    return "Vaulthalla users:\n" + tbl.render();
 }
 
 } // namespace vh::types

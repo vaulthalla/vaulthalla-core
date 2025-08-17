@@ -2,6 +2,9 @@
 
 #include "storage/StorageEngine.hpp"
 #include "types/Path.hpp"
+#include "types/FSEntry.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -10,6 +13,8 @@
 #include <random>
 
 using namespace vh::types;
+using namespace vh::services;
+using namespace vh::logging;
 
 namespace vh::util {
 
@@ -69,24 +74,29 @@ inline std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
                                                   const std::shared_ptr<storage::StorageEngine>& engine) {
     namespace fs = std::filesystem;
 
-    const auto abs_path = engine->paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
+    const auto abs_path = engine->paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(abs_path);
+    if (!entry) {
+        LogRegistry::storage()->error("[decrypt_file_to_temp] Entry not found for path: {}", abs_path.string());
+        throw std::runtime_error("Entry not found for path: " + abs_path.string());
+    }
 
     // Read encrypted file into memory
-    std::ifstream in(abs_path, std::ios::binary | std::ios::ate);
-    if (!in) throw std::runtime_error("Failed to open encrypted file: " + abs_path.string());
+    std::ifstream in(entry->backing_path, std::ios::binary | std::ios::ate);
+    if (!in) throw std::runtime_error("Failed to open encrypted file: " + entry->backing_path.string());
 
     std::streamsize size = in.tellg();
     in.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> ciphertext(size);
     if (!in.read(reinterpret_cast<char*>(ciphertext.data()), size))
-        throw std::runtime_error("Failed to read encrypted file: " + abs_path.string());
+        throw std::runtime_error("Failed to read encrypted file: " + entry->backing_path.string());
 
     // Decrypt
     const auto plaintext = engine->decrypt(vault_id, rel_path, ciphertext);
 
     if (plaintext.empty())
-        throw std::runtime_error("Decryption failed or returned empty data for file: " + abs_path.string());
+        throw std::runtime_error("Decryption failed or returned empty data for file: " + entry->backing_path.string());
 
     // Write to temp file
     fs::path tmp_dir = fs::temp_directory_path();

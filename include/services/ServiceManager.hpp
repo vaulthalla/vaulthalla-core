@@ -3,6 +3,7 @@
 #include "services/SyncController.hpp"
 #include "services/FUSE.hpp"
 #include "services/Vaulthalla.hpp"
+#include "services/CtlServerService.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <csignal>
@@ -45,6 +46,8 @@ private:
     std::shared_ptr<SyncController> syncController;
     std::shared_ptr<FUSE> fuseService;
     std::shared_ptr<Vaulthalla> vaulthallaService;
+    std::shared_ptr<CtlServerService> ctlServerService;
+
 
     mutable std::mutex mutex_;
     std::map<std::string, std::shared_ptr<AsyncService>> services_;

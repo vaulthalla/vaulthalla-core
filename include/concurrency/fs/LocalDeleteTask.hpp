@@ -30,7 +30,7 @@ struct LocalDeleteTask : PromisedTask {
 
     void operator()() override {
         try {
-            auto absPath = engine->paths->absPath(file->fuse_path, PathType::BACKING_ROOT);
+            auto absPath = engine->paths->absPath(file->backing_path, PathType::BACKING_ROOT);
             if (fs::exists(absPath)) fs::remove(absPath);
 
             while (absPath.has_parent_path()) {
@@ -40,7 +40,7 @@ struct LocalDeleteTask : PromisedTask {
                 absPath = absPath.parent_path();
             }
 
-            const auto vaultPath = engine->paths->absRelToRoot(file->fuse_path, PathType::VAULT_ROOT);
+            const auto vaultPath = engine->paths->absRelToRoot(file->backing_path, PathType::VAULT_ROOT);
 
             for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
                 const auto thumbPath = engine->paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);

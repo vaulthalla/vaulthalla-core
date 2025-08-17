@@ -1,0 +1,12 @@
+[Unit]
+Description=Vaulthalla control socket
+
+[Socket]
+ListenStream=/run/vaulthalla/cli.sock
+SocketMode=0660
+SocketUser=vaulthalla
+SocketGroup=vaulthalla
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

@@ -1,4 +1,6 @@
 #include "types/Permission.hpp"
+
+#include <fmt/format.h>
 #include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
 
@@ -144,6 +146,32 @@ uint16_t vaultMaskFromJson(const nlohmann::json& j) {
     if (j.at("move").get<bool>()) mask |= (1 << 12);
     if (j.at("list").get<bool>()) mask |= (1 << 13);
     return mask;
+}
+
+std::string admin_perms_to_string(const uint16_t mask, const unsigned short indent) {
+    const auto perms = permsFromBitmask<AdminPermission>(mask);
+    if (perms.empty()) return "No admin permissions";
+
+    std::string out;
+    out.reserve(64 + perms.size() * 16);
+
+    const std::string prefix(indent, ' ');
+    for (const auto& p : perms) out += prefix + to_string(p) + '\n';
+
+    return out;
+}
+
+std::string vault_perms_to_string(const uint16_t mask, const unsigned short indent) {
+    const auto perms = permsFromBitmask<VaultPermission>(mask);
+    if (perms.empty()) return "No vault permissions";
+
+    std::string out;
+    out.reserve(64 + perms.size() * 16);
+
+    const std::string prefix(indent, ' ');
+    for (const auto& p : perms) out += prefix + to_string(p) + '\n';
+
+    return out;
 }
 
 }

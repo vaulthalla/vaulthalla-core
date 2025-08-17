@@ -11,7 +11,7 @@ struct Directory : FSEntry {
     std::time_t last_modified{0};
 
     Directory() = default;
-    explicit Directory(const pqxx::row& row);
+    Directory(const pqxx::row& row, const pqxx::result& parentRows);
     [[nodiscard]] bool isDirectory() const override { return true; }
 };
 

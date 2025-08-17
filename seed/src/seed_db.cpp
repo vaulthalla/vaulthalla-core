@@ -6,11 +6,11 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 #include "database/Transactions.hpp"
 
 // Types
 #include "types/Permission.hpp"
-#include "types/S3Bucket.hpp"
 #include "types/S3Vault.hpp"
 #include "types/RSync.hpp"
 #include "types/FSync.hpp"
@@ -27,6 +27,7 @@
 #include "keys/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "util/bitmask.hpp"
 
@@ -49,8 +50,8 @@ void vh::seed::init() {
     initRoles();
     initAdmin();
     initAdminGroup();
-    initAdminDefaultVault();
     initRoot();
+    initAdminDefaultVault();
 }
 
 void vh::seed::initPermissions() {
@@ -123,6 +124,8 @@ void vh::seed::initAdmin() {
     user->name = "admin";
     user->email = "";
     user->setPasswordHash(hashPassword("vh!adm1n"));
+    user->linux_uid = ConfigRegistry::get().fuse.admin_linux_uid;
+
     const auto role = PermsQueries::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;
@@ -150,10 +153,10 @@ void vh::seed::initAdminDefaultVault() {
     const auto vault = std::make_shared<Vault>();
     vault->name = "Admin Default Vault";
     vault->description = "Default vault for the admin user";
-    vault->mount_point = "users/admin";
     vault->type = VaultType::Local;
     vault->owner_id = 1;
     vault->quota = 0; // No quota for admin vault
+    vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
 
     const auto sync = std::make_shared<FSync>();
     sync->interval = std::chrono::minutes(10);
@@ -163,8 +166,11 @@ void vh::seed::initAdminDefaultVault() {
 }
 
 void vh::seed::initRoot() {
+    LogRegistry::vaulthalla()->info("[initdb] Initializing root directory...");
+
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
+    dir->base32_alias = ids::IdGenerator( { .namespace_token = "absroot" }).generate();
     dir->created_by = dir->last_modified_by = 1;
     dir->path = "/";
     dir->fuse_path = "/";
@@ -174,6 +180,11 @@ void vh::seed::initRoot() {
     dir->is_system = true;
 
     DirectoryQueries::upsertDirectory(dir);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Failed to create root directory in database");
+    LogRegistry::vaulthalla()->info("[initdb] Root directory initialized successfully");
 }
 
 void vh::seed::initDevCloudVault() {
@@ -207,17 +218,13 @@ void vh::seed::initDevCloudVault() {
             return;
         }
 
-        const auto bucket = std::make_shared<api::S3Bucket>();
-        bucket->name = "vaulthalla-test";
-        bucket->api_key = key;
-
         const auto vault = std::make_shared<S3Vault>();
         vault->name = "R2 Test Vault";
         vault->description = "Test vault for Cloudflare R2 in development mode";
-        vault->mount_point = "cloud/r2_test_vault";
+        vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
         vault->api_key_id = key->id;
         vault->owner_id = 1;
-        vault->bucket = bucket->name;
+        vault->bucket = "vaulthalla-test";
         vault->type = VaultType::S3;
 
         const auto sync = std::make_shared<RSync>();
@@ -226,6 +233,8 @@ void vh::seed::initDevCloudVault() {
         sync->strategy = RSync::Strategy::Sync;
 
         vault->id = VaultQueries::upsertVault(vault, sync);
+
+        LogRegistry::vaulthalla()->info("[initdb] Created R2 test vault");
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageManager] Error initializing dev Cloudflare R2 vault: {}", e.what());
     }

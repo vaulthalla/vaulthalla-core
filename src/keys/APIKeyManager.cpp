@@ -53,7 +53,7 @@ unsigned int APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
     return key->id;
 }
 
-void APIKeyManager::removeAPIKey(unsigned int keyId, unsigned int userId) {
+void APIKeyManager::removeAPIKey(const unsigned int keyId, const unsigned int userId) {
     std::lock_guard lock(apiKeysMutex_);
 
     auto it = apiKeys_.find(keyId);

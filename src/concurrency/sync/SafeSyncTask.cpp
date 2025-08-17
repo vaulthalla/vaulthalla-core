@@ -10,6 +10,7 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "logging/LogRegistry.hpp"
+#include "crypto/IdGenerator.hpp"
 
 #include <optional>
 
@@ -47,6 +48,7 @@ void SafeSyncTask::sync() {
         if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
             dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
             if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
+            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
             DirectoryQueries::upsertDirectory(dir);
         }
     }

@@ -40,12 +40,11 @@ struct APIKey {
     std::string secret_access_key;
 
     APIKey() = default;
+    explicit APIKey(const pqxx::row& row);
     APIKey(unsigned int userId, std::string name,
            S3Provider provider, std::string accessKey,
            std::string secretAccessKey,
            std::string region, std::string endpoint);
-
-    explicit APIKey(const pqxx::row& row);
 };
 
 // JSON
@@ -55,5 +54,8 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<APIKey>>& k);
 void from_json(const nlohmann::json& j, APIKey& key);
 
 std::vector<std::shared_ptr<APIKey>> api_keys_from_pq_res(const pqxx::result& res);
+
+std::string to_string(const std::shared_ptr<APIKey>& key);
+std::string to_string(const std::vector<std::shared_ptr<APIKey>>& keys);
 
 } // namespace vh::types::api

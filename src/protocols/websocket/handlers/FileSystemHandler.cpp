@@ -8,7 +8,9 @@
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "storage/Filesystem.hpp"
 
 using namespace vh::types;
 using namespace vh::services;
@@ -25,6 +27,7 @@ FileSystemHandler::FileSystemHandler()
 
 void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& session) {
     try {
+        LogRegistry::ws()->info("[FileSystemHandler] handleUploadStart called.");
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
@@ -243,6 +246,7 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
 
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
+        LogRegistry::ws()->info("[FileSystemHandler] handleListDir called");
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         auto path = fs::path(payload.value("path", "/"));
@@ -252,10 +256,21 @@ void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session
 
         const auto& vaultName = storageManager_->getVault(vaultId)->name;
 
+        const auto engine = storageManager_->getEngine(vaultId);
+        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
+        const auto fusePath = engine->paths->absRelToAbsRel(path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+        if (!Filesystem::exists(fusePath)) throw std::runtime_error("Path does not exist: " + fusePath.string());
+
+        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(fusePath);
+        if (!entry) throw std::runtime_error("No entry found for path: " + fusePath.string());
+
+        const auto entries = ServiceDepsRegistry::instance().fsCache->listDir(entry->id, false);
+
         const json data = {
             {"vault", vaultName},
             {"path", path},
-            {"files", DirectoryQueries::listDir(vaultId, path, false)}
+            {"files", entries}
         };
 
         const json response = {{"command", "fs.dir.list.response"},

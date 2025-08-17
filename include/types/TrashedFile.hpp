@@ -16,8 +16,8 @@ namespace vh::types {
 
 struct TrashedFile {
     unsigned int id{}, vault_id{};
-    fs::path fuse_path;
-    boost::uuids::uuid uuid{};
+    std::string base32_alias{};
+    fs::path path{}, backing_path{};
     std::time_t trashed_at{}, trashed_by{};
     std::optional<std::time_t> deleted_at{};
 

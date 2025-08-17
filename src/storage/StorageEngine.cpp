@@ -7,12 +7,14 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
+#include "database/Queries/VaultQueries.hpp"
 #include "keys/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "util/fsPath.hpp"
 
 using namespace vh::types;
 using namespace vh::database;
@@ -28,9 +30,9 @@ namespace vh::storage {
 StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
-      paths(std::make_shared<Path>(vault->mount_point)),
+      paths(std::make_shared<Path>(makeAbsolute(to_snake_case(vault->name)), vault->mount_point)),
       encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
-    if (!FSEntryQueries::exists(paths->vaultRoot)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
+    if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }
 
@@ -58,9 +60,7 @@ uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {
 uintmax_t StorageEngine::getVaultSize() const { return getDirectorySize(paths->backingRoot); }
 uintmax_t StorageEngine::getCacheSize() const { return getDirectorySize(paths->cacheRoot); }
 uintmax_t StorageEngine::getVaultAndCacheTotalSize() const { return getVaultSize() + getCacheSize(); }
-uintmax_t StorageEngine::freeSpace() const {
-    return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE;
-}
+uintmax_t StorageEngine::freeSpace() const { return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE; }
 
 void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
     for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
@@ -85,7 +85,7 @@ void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std:
         }
 
         Filesystem::mkdir(toPath.parent_path());
-        fs::rename(fromPath, toPath); // TODO: Handle rename properly
+        fs::rename(fromPath, toPath);
     }
 }
 
@@ -105,7 +105,7 @@ void StorageEngine::copyThumbnails(const std::filesystem::path& from, const std:
         }
 
         Filesystem::mkdir(toPath.parent_path());
-        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);  // TODO: Handle copy properly
+        fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
     }
 }
 

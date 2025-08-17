@@ -1,6 +1,7 @@
 #include "types/VaultRole.hpp"
 #include "types/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
+#include "util/cmdLineHelpers.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>
@@ -161,4 +162,26 @@ bool VaultRole::canMove(const std::filesystem::path& path) const {
 bool VaultRole::canList(const std::filesystem::path& path) const {
     if (path.empty()) return true; // If no path is specified, assume listing is allowed at the top level
     return validatePermission(permissions, VaultPermission::List, path);
+}
+
+std::string vh::types::to_string(const std::shared_ptr<VaultRole>& role) {
+    std::string out = shell::snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
+    out += " - Description: " + role->description + "\n";
+    out += " - Type: " + role->type + "\n";
+    out += " - Subject Type: " + role->subject_type + "\n";
+    out += " - Subject ID: " + std::to_string(role->subject_id) + "\n";
+    out += " - Vault ID: " + std::to_string(role->vault_id) + "\n";
+    out += " - Created at: " + util::timestampToString(role->created_at) + "\n";
+    out += " - Assigned at: " + util::timestampToString(role->assigned_at) + "\n";
+    out += " - Permissions:\n" + admin_perms_to_string(role->permissions, 12) + "\n";
+    out += " - Permission Overrides: " + to_string(role->permission_overrides) + "\n";
+    return out;
+}
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<VaultRole>>& roles) {
+    if (roles.empty()) return "No vault roles found\n";
+
+    std::string out;
+    for (const auto& role : roles) out += to_string(role) + "\n";
+    return out;
 }

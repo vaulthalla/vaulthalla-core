@@ -23,6 +23,7 @@ struct FuseConfig {
     bool mount_per_user = true;
     int fuse_timeout_seconds = 60;
     bool allow_other = true;
+    unsigned int admin_linux_uid = 0;
 };
 
 struct LoggingConfig {

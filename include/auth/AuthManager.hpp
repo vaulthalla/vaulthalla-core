@@ -52,11 +52,6 @@ public:
     static std::pair<std::string, std::shared_ptr<RefreshToken> >
     createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session);
 
-private:
-    std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
-    std::shared_ptr<SessionManager> sessionManager_;
-    std::shared_ptr<storage::StorageManager> storageManager_;
-
     static bool isValidRegistration(const std::shared_ptr<types::User>& user,
                                     const std::string& password);
 
@@ -65,6 +60,11 @@ private:
     static bool isValidEmail(const std::string& email);
 
     static bool isValidPassword(const std::string& password);
+
+private:
+    std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
+    std::shared_ptr<SessionManager> sessionManager_;
+    std::shared_ptr<storage::StorageManager> storageManager_;
 };
 
 } // namespace vh::auth

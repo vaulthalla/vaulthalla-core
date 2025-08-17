@@ -1,13 +1,15 @@
 #include "types/Directory.hpp"
 #include "util/timestamp.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
 
 using namespace vh::types;
+using namespace vh::database;
 
-Directory::Directory(const pqxx::row& row)
-    : FSEntry(row),
+Directory::Directory(const pqxx::row& row, const pqxx::result& parentRows)
+    : FSEntry(row, parentRows),
       file_count(row["file_count"].as<unsigned int>()),
       subdirectory_count(row["subdirectory_count"].as<unsigned int>()),
       last_modified(util::parsePostgresTimestamp(row["last_modified"].as<std::string>())) {}
@@ -29,6 +31,11 @@ void vh::types::from_json(const nlohmann::json& j, Directory& d) {
 
 std::vector<std::shared_ptr<Directory>> vh::types::directories_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<Directory>> directories;
-    for (const auto& row : res) directories.push_back(std::make_shared<Directory>(row));
+    for (const auto& row : res) {
+        if (const auto parentId = row["parent_id"].as<std::optional<unsigned int>>()) {
+            const auto parentChain = FSEntryQueries::collectParentChain(*parentId);
+            directories.push_back(std::make_shared<Directory>(row, parentChain));
+        } else directories.push_back(std::make_shared<Directory>(row, pqxx::result{}));
+    }
     return directories;
 }

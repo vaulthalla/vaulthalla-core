@@ -16,8 +16,10 @@ using namespace vh::logging;
 UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}
 
 void UploadHandler::startUpload(const UploadArgs& args) {
-    LogRegistry::ws()->debug("[UploadHandler] Starting upload (uploadId: {}, tmpPath: {}, finalPath: {}, expectedSize: {})",
-                             args.uploadId, args.tmpPath.string(), args.finalPath.string(), args.expectedSize);
+    LogRegistry::ws()->info("[UploadHandler] Starting upload (uploadId: {}, tmpPath: {}, finalPath: {}, "
+                            "fuseFrom: {}, fuseTo: {}, expectedSize: {})",
+                             args.uploadId, args.tmpPath.string(), args.finalPath.string(),
+                             args.fuseFrom.string(), args.fuseTo.string(), args.expectedSize);
 
     if (currentUpload_) throw std::runtime_error("Upload already in progress");
 

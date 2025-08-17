@@ -38,16 +38,39 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 txn.exec_prepared("insert_sync_and_fsync", sync_params);
             } else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-                const auto bucketId = txn.exec_prepared("upsert_s3_bucket",
-                    pqxx::params{s3Vault->bucket, s3Vault->api_key_id}).one_field().as<unsigned int>();
 
                 const auto rSync = std::static_pointer_cast<RSync>(sync);
                 pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
                                          to_string(rSync->strategy)};
                 txn.exec_prepared("insert_sync_and_rsync", sync_params);
-
-                txn.exec_prepared("insert_s3_vault", pqxx::params{vaultId, bucketId});
             }
+        } else if (sync) {  // exists and sync is provided
+            if (vault->type == VaultType::Local) {
+                const auto fsync = std::static_pointer_cast<FSync>(sync);
+                pqxx::params f{
+                    fsync->id,
+                    fsync->interval.count(),
+                    fsync->enabled,
+                    to_string(fsync->conflict_policy)
+                };
+                txn.exec_prepared("update_sync_and_fsync", f);
+            } else if (vault->type == VaultType::S3) {
+                const auto rsync = std::static_pointer_cast<RSync>(sync);
+
+                pqxx::params r{
+                    rsync->id,
+                    rsync->interval.count(),
+                    rsync->enabled,
+                    to_string(rsync->strategy),
+                    to_string(rsync->conflict_policy)
+                };
+                txn.exec_prepared("update_sync_and_rsync", r);
+            }
+        }
+
+        if (vault->type == VaultType::S3) {
+            const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+            txn.exec_prepared("upsert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
         }
 
         txn.commit();
@@ -77,9 +100,26 @@ std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
                               });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
+std::shared_ptr<Vault> VaultQueries::getVault(const std::string& name, unsigned int ownerId) {
+    return Transactions::exec("VaultQueries::getVaultByName", [&](pqxx::work& txn) -> std::shared_ptr<Vault> {
+        const auto res = txn.exec_prepared("get_vault_by_name_and_owner", pqxx::params{name, ownerId});
+        if (res.empty()) return nullptr;
+
+        const auto row = res.one_row();
+        const auto typeStr = row["type"].as<std::string>();
+
+        switch (from_string(typeStr)) {
+        case VaultType::Local: return std::make_shared<Vault>(row);
+        case VaultType::S3: return std::make_shared<S3Vault>(row);
+        default: throw std::runtime_error("Unsupported VaultType in getVaultByName(): " + typeStr);
+        }
+    });
+}
+
+std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(DBQueryParams&& params) {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_vaults");
+        pqxx::params p{params.sortBy, to_string(params.order), params.limit, params.offset};
+        const auto res = txn.exec_prepared("list_vaults", p);
 
         std::vector<std::shared_ptr<Vault> > vaults;
 
@@ -101,9 +141,11 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults() {
     });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId) {
+std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId, DBQueryParams&& params) {
     return Transactions::exec("VaultQueries::listUserVaults", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_user_vaults", pqxx::params{userId});
+        pqxx::params p{userId, params.sortBy, to_string(params.order), params.limit, params.offset};
+
+        const auto res = txn.exec_prepared("list_user_vaults", p);
 
         std::vector<std::shared_ptr<Vault> > vaults;
         for (const auto& row : res) {
@@ -140,3 +182,30 @@ unsigned int VaultQueries::maxVaultId() {
         return txn.exec_prepared("get_max_vault_id").one_field().as<unsigned int>();
     });
 }
+
+bool VaultQueries::vaultExists(const std::string& name, const unsigned int ownerId) {
+    return Transactions::exec("VaultQueries::vaultExists", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("vault_exists", pqxx::params{name, ownerId});
+        return res.one_field().as<bool>();
+    });
+}
+
+std::shared_ptr<Sync> VaultQueries::getVaultSyncConfig(const unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::getVaultSyncConfig", [&](pqxx::work& txn) -> std::shared_ptr<Sync> {
+        const auto res = txn.exec_prepared("get_vault_sync_config", pqxx::params{vaultId});
+        if (res.empty()) return nullptr;
+
+        const auto isS3 = txn.exec_prepared("is_s3_vault", vaultId).one_field().as<bool>();
+
+        const auto row = res.one_row();
+        if (isS3) return std::make_shared<RSync>(row);
+        return std::make_shared<FSync>(row);
+    });
+}
+
+bool VaultQueries::vaultRootExists(const unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::vaultRootExists", [&](pqxx::work& txn) {
+        return txn.exec_prepared("vault_root_exists", vaultId).one_field().as<bool>();
+    });
+}
+

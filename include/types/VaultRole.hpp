@@ -95,4 +95,7 @@ std::vector<std::shared_ptr<VaultRole> > vault_roles_from_json(const nlohmann::j
 std::vector<std::shared_ptr<VaultRole> > vault_roles_from_pq_result(const pqxx::result& res,
                                                                           const pqxx::result& overrides);
 
+std::string to_string(const std::shared_ptr<VaultRole>& role);
+std::string to_string(const std::vector<std::shared_ptr<VaultRole>>& roles);
+
 } // namespace vh::types

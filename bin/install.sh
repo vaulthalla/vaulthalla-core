@@ -50,6 +50,24 @@ else
     echo "👤 System user 'vaulthalla' already exists."
 fi
 
+# Create 'vaulthalla' group if it doesn't exist
+if ! getent group vaulthalla > /dev/null; then
+    echo "👥 Creating 'vaulthalla' group..."
+    sudo groupadd --system vaulthalla
+else
+    echo "👥 'vaulthalla' group already exists."
+fi
+
+# === 10) Add current user to vaulthalla group ===
+SUDO_USER=$(who -m | awk '{print $1}')
+if [[ -n "$SUDO_USER" ]]; then
+    echo "👤 Adding current user '$SUDO_USER' to 'vaulthalla' group..."
+    sudo usermod -aG vaulthalla "$SUDO_USER"
+    echo "Please log out and back in for group changes to take effect."
+else
+    echo "⚠️  No SUDO_USER found, skipping user group addition."
+fi
+
 # Check if 'tss' group exists and add 'vaulthalla' to it
 if getent group tss > /dev/null; then
     echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
@@ -139,9 +157,10 @@ sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config
 
 # === 9) Install systemd service ===
 echo "🛠️  Installing systemd service..."
-sudo install -m 644 deploy/systemd/vaulthalla.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now vaulthalla.service
+sudo systemctl enable --now vaulthalla-cli.socket
+sudo systemctl enable --now vaulthalla-cli.service
 
 echo ""
 echo "🏁 Vaulthalla installed successfully!"

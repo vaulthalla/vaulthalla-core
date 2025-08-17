@@ -26,9 +26,12 @@ public:
     static std::shared_ptr<spdlog::logger> auth()        { return get("auth"); }
     static std::shared_ptr<spdlog::logger> ws()          { return get("ws"); }
     static std::shared_ptr<spdlog::logger> http()        { return get("http"); }
+    static std::shared_ptr<spdlog::logger> shell()       { return get("shell"); }
     static std::shared_ptr<spdlog::logger> db()          { return get("db"); }
     static std::shared_ptr<spdlog::logger> types()       { return get("types"); }
     static std::shared_ptr<spdlog::logger> audit()       { return get("audit"); }
+
+    [[nodiscard]] static bool isInitialized();
 
 private:
     static inline bool initialized_ = false;

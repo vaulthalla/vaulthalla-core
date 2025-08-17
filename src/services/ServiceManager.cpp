@@ -11,11 +11,13 @@ ServiceManager& ServiceManager::instance() {
 ServiceManager::ServiceManager()
     : syncController(std::make_shared<SyncController>()),
       fuseService(std::make_shared<FUSE>()),
-      vaulthallaService(std::make_shared<Vaulthalla>())
+      vaulthallaService(std::make_shared<Vaulthalla>()),
+      ctlServerService(std::make_shared<CtlServerService>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;
     services_["Vaulthalla"] = vaulthallaService;
+    services_["CtlServer"] = ctlServerService;
 }
 
 void ServiceManager::startAll() {
@@ -24,6 +26,7 @@ void ServiceManager::startAll() {
     tryStart("Vaulthalla", vaulthallaService);
     tryStart("FUSE", fuseService);
     tryStart("SyncController", syncController);
+    tryStart("CtlServer", ctlServerService);
     LogRegistry::vaulthalla()->debug("[ServiceManager] All services started.");
 
     startWatchdog();
@@ -36,6 +39,7 @@ void ServiceManager::stopAll(int signal) {
         stopService("SyncController", syncController, signal);
         stopService("FUSE", fuseService, signal);
         stopService("Vaulthalla", vaulthallaService, signal);
+        stopService("CtlServer", ctlServerService, signal);
     }
 
     stopWatchdog();
@@ -56,9 +60,8 @@ void ServiceManager::restartService(const std::string& name) {
 }
 
 bool ServiceManager::allRunning() const {
-    return vaulthallaService->isRunning() &&
-           fuseService->isRunning() &&
-           syncController->isRunning();
+    return vaulthallaService->isRunning() && fuseService->isRunning() &&
+        syncController->isRunning();
 }
 
 void ServiceManager::tryStart(const std::string& name, const std::shared_ptr<AsyncService>& svc) {

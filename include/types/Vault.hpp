@@ -15,7 +15,7 @@ namespace vh::types {
 
 enum class VaultType { Local, S3 };
 
-std::string to_string(VaultType type);
+std::string to_string(const VaultType& type);
 VaultType from_string(const std::string& type);
 
 struct Vault {
@@ -30,7 +30,6 @@ struct Vault {
 
     Vault() = default;
     virtual ~Vault() = default;
-
     explicit Vault(const pqxx::row& row);
 };
 
@@ -38,5 +37,9 @@ void to_json(nlohmann::json& j, const Vault& v);
 void from_json(const nlohmann::json& j, Vault& v);
 
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& vaults);
+
+std::string to_string(const Vault& v);
+std::string to_string(const std::shared_ptr<Vault>& v);
+std::string to_string(const std::vector<std::shared_ptr<Vault>>& vaults);
 
 }

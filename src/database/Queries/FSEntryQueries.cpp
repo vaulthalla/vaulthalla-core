@@ -23,7 +23,7 @@ std::shared_ptr<FSEntry> FSEntryQueries::getRootEntry() {
             LogRegistry::db()->warn("[FSEntryQueries::getRootEntry] No root entry found in the database");
             return nullptr;
         }
-        return std::make_shared<Directory>(res.one_row());
+        return std::make_shared<Directory>(res.one_row(), pqxx::result{});
     });
 }
 
@@ -50,10 +50,16 @@ void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
 std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const std::string& base32) {
     return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
         const auto fileRes = txn.exec_prepared("get_file_by_base32_alias", base32);
-        if (!fileRes.empty()) return std::make_shared<File>(fileRes.one_row());
+        if (!fileRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<File>(fileRes.one_row(), parentRows);
+        }
 
         const auto dirRes = txn.exec_prepared("get_dir_by_base32_alias", base32);
-        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes.one_row());
+        if (!dirRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", dirRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<Directory>(dirRes.one_row(), parentRows);
+        }
 
         return nullptr;
     });
@@ -62,10 +68,16 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const std::string& base32) {
 std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryByInode(const ino_t ino) {
     return Transactions::exec("FSEntryQueries::getFSEntryByInode", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
         const auto fileRes = txn.exec_prepared("get_file_by_inode", ino);
-        if (!fileRes.empty()) return std::make_shared<File>(fileRes.one_row());
+        if (!fileRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<File>(fileRes.one_row(), parentRows);
+        }
 
         const auto dirRes = txn.exec_prepared("get_dir_by_inode", ino);
-        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes.one_row());
+        if (!dirRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", dirRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<Directory>(dirRes.one_row(), parentRows);
+        }
 
         return nullptr;
     });
@@ -78,10 +90,16 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
         if (res.empty()) return nullptr;
 
         const auto fileRes = txn.exec_prepared("get_file_by_id", entryId);
-        if (!fileRes.empty()) return std::make_shared<File>(fileRes[0]);
+        if (!fileRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<File>(fileRes.one_row(), parentRows);
+        }
 
         const auto dirRes = txn.exec_prepared("get_dir_by_id", entryId);
-        if (!dirRes.empty()) return std::make_shared<Directory>(dirRes[0]);
+        if (!dirRes.empty()) {
+            const auto parentRows = txn.exec_prepared("collect_parent_chain", dirRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
+            return std::make_shared<Directory>(dirRes.one_row(), parentRows);
+        }
 
         return nullptr;
     });
@@ -96,31 +114,6 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
                        entry->parent_id};
         txn.exec_prepared("rename_fs_entry", p);
     });
-
-    const auto cached = getFSEntryById(entry->id);
-
-    const auto didUpdate = [&]() {
-        if (!cached) return false;
-        if (cached->id != entry->id) return false;
-
-        const bool changed =
-            cached->name != entry->name ||
-            cached->path != entry->path ||
-            cached->fuse_path != entry->fuse_path ||
-            cached->parent_id != entry->parent_id;
-
-        if (!changed) return false;
-
-        cached->name = entry->name;
-        cached->path = entry->path;
-        cached->fuse_path = entry->fuse_path;
-        cached->parent_id = entry->parent_id;
-        return true;
-    };
-
-    if (!didUpdate())
-        throw std::runtime_error(
-            "FSEntryQueries::renameEntry: Failed to update entry in cache after rename operation");
 }
 
 std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const std::optional<unsigned int>& entryId, const bool recursive) {
@@ -156,3 +149,10 @@ ino_t FSEntryQueries::getNextInode() {
         return res.one_field().as<ino_t>();
     });
 }
+
+pqxx::result FSEntryQueries::collectParentChain(unsigned int parentId) {
+    return Transactions::exec("FSEntryQueries::collectParentChain", [&](pqxx::work& txn) {
+        return txn.exec_prepared("collect_parent_chain", parentId);
+    });
+}
+

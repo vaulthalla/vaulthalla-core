@@ -130,3 +130,21 @@ TEST_F(PathTest, AbsRelToAbsOther_ReduceFuseToVault) {
     fs::path out = p.absRelToAbsRel("" + vaultFuseMount.string() + "/sample_data/Invoice-102-Cooper-Larson.pdf", PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     EXPECT_EQ(out, "/sample_data/Invoice-102-Cooper-Larson.pdf");  // should treat as absolute under vault root
 }
+
+TEST_F(PathTest, AbsRelToRoot_VaultToFuse) {
+    Path p(vaultFuseMount, vaultBackingMount);
+    fs::path out = p.absRelToRoot(p.vaultRoot, PathType::FUSE_ROOT);
+    EXPECT_EQ(out, vaultFuseMount.string());
+}
+
+TEST_F(PathTest, AbsRelToAbsRel_VaultToFuse) {
+    Path p(vaultFuseMount, vaultBackingMount);
+    fs::path out = p.absRelToAbsRel("/docs/report.txt", PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+    EXPECT_EQ(out, vaultFuseMount.string() + "/docs/report.txt");
+}
+
+TEST_F(PathTest, AbsRelToAbsRel_VaultBaseToFuse) {
+    Path p(vaultFuseMount, vaultBackingMount);
+    fs::path out = p.absRelToAbsRel("/", PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+    EXPECT_EQ(out, vaultFuseMount.string());
+}

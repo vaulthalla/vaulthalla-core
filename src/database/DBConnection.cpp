@@ -173,7 +173,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "
                    "ON CONFLICT (vault_id) DO NOTHING");
 
-    conn_->prepare("vault_root_exists", "SELECT EXISTS(SELECT 1 FROM fs_entry WHERE vault_id = $1 AND path = '/') AS exists");
+    conn_->prepare("vault_root_exists",
+                   "SELECT EXISTS(SELECT 1 FROM fs_entry WHERE vault_id = $1 AND path = '/') AS exists");
 
     conn_->prepare("get_vault",
                    "SELECT v.*, s.* "
@@ -244,14 +245,23 @@ void DBConnection::initPreparedVaults() const {
 
 void DBConnection::initPreparedFsEntries() const {
     conn_->prepare("root_entry_exists",
-        "SELECT EXISTS(SELECT 1 FROM fs_entry "
-        "WHERE parent_id IS NULL AND vault_id IS NULL AND path = '/' AND name = '/') AS exists");
+                   "SELECT EXISTS(SELECT 1 FROM fs_entry "
+                   "WHERE parent_id IS NULL AND vault_id IS NULL AND path = '/' AND name = '/') AS exists");
 
     conn_->prepare("get_root_entry",
-        "SELECT fs.*, d.* "
-        "FROM fs_entry fs "
-        "JOIN directories d ON fs.id = d.fs_entry_id "
-        "WHERE fs.parent_id IS NULL AND fs.vault_id IS NULL AND fs.path = '/' AND fs.name = '/'");
+                   "SELECT fs.*, d.* "
+                   "FROM fs_entry fs "
+                   "JOIN directories d ON fs.id = d.fs_entry_id "
+                   "WHERE fs.parent_id IS NULL AND fs.vault_id IS NULL AND fs.path = '/' AND fs.name = '/'");
+
+    conn_->prepare("collect_parent_chain",
+                   "WITH RECURSIVE parent_chain AS ("
+                   "    SELECT id, parent_id, name, base32_alias FROM fs_entry WHERE id = $1 "
+                   "    UNION ALL "
+                   "    SELECT f.id, f.parent_id, f.name, f.base32_alias FROM fs_entry f "
+                   "    JOIN parent_chain pc ON f.id = pc.parent_id"
+                   ") "
+                   "SELECT * FROM parent_chain ORDER BY parent_id NULLS FIRST");
 
     conn_->prepare("update_fs_entry_by_inode",
                    R"SQL(
@@ -300,6 +310,8 @@ void DBConnection::initPreparedFsEntries() const {
     conn_->prepare("get_next_inode", "SELECT MAX(inode) + 1 FROM fs_entry");
 
     conn_->prepare("get_base32_alias_from_fs_entry", "SELECT base32_alias FROM fs_entry WHERE id = $1");
+
+    conn_->prepare("get_fs_entry_inode", "SELECT inode FROM fs_entry WHERE id = $1");
 }
 
 void DBConnection::initPreparedFiles() const {
@@ -536,18 +548,6 @@ void DBConnection::initPreparedDirectories() const {
                    "  subdirectory_count = EXCLUDED.subdirectory_count, "
                    "  last_modified = NOW() RETURNING fs_entry_id");
 
-    conn_->prepare("list_directories_in_dir",
-                   "SELECT fs.*, d.* "
-                   "FROM fs_entry fs "
-                   "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2 AND fs.path NOT LIKE $3 AND fs.path != '/'");
-
-    conn_->prepare("list_directories_in_dir_recursive",
-                   "SELECT fs.*, d.* "
-                   "FROM fs_entry fs "
-                   "JOIN directories d ON fs.id = d.fs_entry_id "
-                   "WHERE fs.vault_id = $1 AND fs.path LIKE $2");
-
     conn_->prepare("list_dirs_in_dir_by_parent_id",
                    "SELECT fs.*, d.* "
                    "FROM fs_entry fs "
@@ -597,24 +597,35 @@ void DBConnection::initPreparedDirectories() const {
                    "JOIN fs_entry fs ON d.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
 
-    conn_->prepare("collect_parents", R"SQL(
-    WITH RECURSIVE parent_chain AS (
-        SELECT fe.*, d.*
-        FROM fs_entry fe
-        LEFT JOIN directories d ON fe.id = d.fs_entry_id
-        WHERE fe.id = $1
-
-        UNION ALL
-
-        SELECT fe.*, d.*
-        FROM fs_entry fe
-        JOIN parent_chain pc ON fe.id = pc.parent_id
-        LEFT JOIN directories d ON fe.id = d.fs_entry_id
-        WHERE fe.id != 1
-    )
-    SELECT * FROM parent_chain
-)SQL");
-
+    conn_->prepare("collect_parent_dir_stats",
+                   "WITH RECURSIVE parent_chain AS ( "
+                   "  SELECT "
+                   "    d.fs_entry_id        AS id, "
+                   "    f.parent_id, "
+                   "    f.name, "
+                   "    f.base32_alias, "
+                   "    d.size_bytes, "
+                   "    d.file_count, "
+                   "    d.subdirectory_count "
+                   "  FROM directories d "
+                   "  JOIN fs_entry f ON f.id = d.fs_entry_id "
+                   "  WHERE d.fs_entry_id = $1 "
+                   "  UNION ALL "
+                   "  SELECT "
+                   "    d.fs_entry_id        AS id, "
+                   "    f.parent_id, "
+                   "    f.name, "
+                   "    f.base32_alias, "
+                   "    d.size_bytes, "
+                   "    d.file_count, "
+                   "    d.subdirectory_count "
+                   "  FROM directories d "
+                   "  JOIN fs_entry f ON f.id = d.fs_entry_id "
+                   "  JOIN parent_chain pc ON d.fs_entry_id = pc.parent_id "
+                   "  WHERE pc.parent_id IS NOT NULL "
+                   ") "
+                   "SELECT * FROM parent_chain "
+                   "ORDER BY parent_id NULLS FIRST");
 }
 
 void DBConnection::initPreparedOperations() const {

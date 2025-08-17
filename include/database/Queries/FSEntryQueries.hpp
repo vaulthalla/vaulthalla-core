@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <pqxx/result>
 
 namespace fs = std::filesystem;
 
@@ -31,6 +32,8 @@ struct FSEntryQueries {
     [[nodiscard]] static bool rootExists();
 
     [[nodiscard]] static std::shared_ptr<types::FSEntry> getRootEntry();
+
+    [[nodiscard]] static pqxx::result collectParentChain(unsigned int parentId);
 };
 
 }

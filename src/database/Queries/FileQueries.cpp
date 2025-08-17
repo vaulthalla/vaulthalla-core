@@ -160,7 +160,8 @@ std::shared_ptr<File> FileQueries::getFileByPath(const unsigned int vaultId, con
     return Transactions::exec("FileQueries::getFileByPath", [&](pqxx::work& txn) -> std::shared_ptr<File> {
         const auto res = txn.exec_prepared("get_file_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
         if (res.empty()) return nullptr;
-        return std::make_shared<File>(res.one_row());
+        const auto parentRows = txn.exec_prepared("collect_parent_chain", res.one_row()["parent_id"].as<std::optional<unsigned int>>());
+        return std::make_shared<File>(res.one_row(), parentRows);
     });
 }
 
@@ -168,7 +169,8 @@ std::shared_ptr<File> FileQueries::getFileById(unsigned int id) {
     return Transactions::exec("FileQueries::getFileById", [&](pqxx::work& txn) -> std::shared_ptr<File> {
         const auto res = txn.exec_prepared("get_file_by_id", id);
         if (res.empty()) return nullptr; // No file found with the given ID
-        return std::make_shared<File>(res.one_row());
+        const auto parentRows = txn.exec_prepared("collect_parent_chain", res.one_row()["parent_id"].as<std::optional<unsigned int>>());
+        return std::make_shared<File>(res.one_row(), parentRows);
     });
 }
 
@@ -253,18 +255,17 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     txn.exec_prepared("get_vault_root_dir_id_by_vault_id", *vaultId).one_field().as<unsigned int>()
     : txn.exec_prepared("get_fs_entry_id_by_path", pqxx::params{vaultId, "/"}).one_field().as<unsigned int>();
 
-    // TODO: Fix decrement
-    int subDirsDeleted = 0; // TODO: track subdirs
+    int subDirsDeleted = 0;
     bool deleteDirs = true;
     while (parentId) {
-        pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, 0};
+        pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, subDirsDeleted};
         const auto fsCount = txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
         const auto parentRes = txn.exec_prepared("get_fs_entry_parent_id", *parentId);
         if (*parentId == stopAt) deleteDirs = false;
         if (deleteDirs && fsCount == 0) {
-            const auto fusePath = txn.exec_prepared("get_fuse_path_from_fs_entry", *parentId).one_field().as<std::string>();
+            const auto inode = txn.exec_prepared("get_fs_entry_inode", *parentId).one_field().as<fuse_ino_t>();
             txn.exec_prepared("delete_fs_entry", *parentId);
-            ServiceDepsRegistry::instance().fsCache->evictPath(fusePath);
+            ServiceDepsRegistry::instance().fsCache->evictIno(inode);
             --subDirsDeleted;
         }
         if (parentRes.empty()) break;

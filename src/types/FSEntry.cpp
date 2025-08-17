@@ -9,7 +9,7 @@
 #include "config/ConfigRegistry.hpp"
 
 #include <nlohmann/json.hpp>
-#include <pqxx/row>
+#include <pqxx/result>
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
@@ -23,7 +23,7 @@ using namespace vh::logging;
 using namespace vh::database;
 using namespace vh::config;
 
-FSEntry::FSEntry(const pqxx::row& row)
+FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
     : id(row["id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
       base32_alias(row["base32_alias"].as<std::string>()),
@@ -60,6 +60,23 @@ FSEntry::FSEntry(const pqxx::row& row)
 
     if (row["is_system"].is_null()) is_system = false;
     else is_system = row["is_system"].as<bool>();
+
+    fuse_path = fs::path("/");
+    backing_path = ConfigRegistry::get().fuse.backing_path;
+
+    for (const auto& r : parentRows) {
+        const auto name = r["name"].as<std::string>();
+        const auto base32_alias = r["base32_alias"].as<std::string>();
+        std::optional<unsigned int> parentId;
+        if (r["parent_id"].is_null()) parentId = std::nullopt; // Root directory
+        else parentId = r["parent_id"].as<unsigned int>();
+
+        if (name == "/" && !parent_id) continue; // Skip root slash, prevents // in path
+
+        fuse_path /= name;
+        backing_path /= base32_alias;
+    }
+
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {

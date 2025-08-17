@@ -1,7 +1,6 @@
 #include "storage/FUSEBridge.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
@@ -12,6 +11,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "storage/FSCache.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -126,7 +126,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     (void)fi;
 
     const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
-    auto entries = FSEntryQueries::listDir(listDirEntry->id, false);
+    const auto entries = ServiceDepsRegistry::instance().fsCache->listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
     size_t buf_used = 0;

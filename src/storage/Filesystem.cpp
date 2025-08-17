@@ -146,7 +146,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
         dir->id = DirectoryQueries::upsertDirectory(dir);
 
-        ServiceDepsRegistry::instance().fsCache->cacheEntry(FSEntryQueries::getFSEntryById(dir->id));
+        ServiceDepsRegistry::instance().fsCache->cacheEntry(dir);
 
         if (!fs::exists(dir->backing_path)) fs::create_directories(dir->backing_path);
 
@@ -348,7 +348,12 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
     Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
         std::vector<uint8_t> buffer;
         if (entry->isDirectory()) {
-            for (const auto& item : FSEntryQueries::listDir(entry->parent_id, true)) {
+            if (!entry->parent_id) {
+                LogRegistry::fs()->error("Cannot rename root directory: {}", oldPath.string());
+                throw std::runtime_error("[Filesystem] Cannot rename root directory");
+            }
+
+            for (const auto& item : ServiceDepsRegistry::instance().fsCache->listDir(*entry->parent_id, true)) {
                 handleRename({
                     .from = item->fuse_path,
                     .to = updateSubdirPath(oldPath, newPath, item->fuse_path),

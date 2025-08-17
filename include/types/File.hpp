@@ -9,7 +9,7 @@ struct File : FSEntry {
     std::optional<std::string> mime_type, content_hash;
 
     File() = default;
-    explicit File(const pqxx::row& row);
+    File(const pqxx::row& row, const pqxx::result& parentRows);
     File(const std::string& s3_key, uint64_t size, const std::optional<std::time_t>& updated = {});
 
     [[nodiscard]] bool isDirectory() const override { return false; }

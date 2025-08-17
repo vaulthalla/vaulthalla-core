@@ -34,7 +34,7 @@ struct FSEntry {
     FSEntry() = default;
     virtual ~FSEntry() = default;
     explicit FSEntry(const std::string& s3_key);
-    explicit FSEntry(const pqxx::row& row);
+    FSEntry(const pqxx::row& row, const pqxx::result& parentRows);
 
     [[nodiscard]] virtual bool isDirectory() const = 0;
 

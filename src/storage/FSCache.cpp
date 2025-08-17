@@ -1,6 +1,8 @@
 #include "storage/FSCache.hpp"
 #include "types/FSEntry.hpp"
+#include "types/Directory.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
@@ -167,22 +169,13 @@ void FSCache::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
 
 fs::path FSCache::resolvePath(fuse_ino_t ino) {
     std::shared_lock lock(mutex_);
-    auto it = inodeToPath_.find(ino);
-    if (it == inodeToPath_.end()) throw std::runtime_error("No path for inode");
-    return it->second;
+    if (!inodeToPath_.contains(ino)) throw std::runtime_error("[FSCache] Inode not found: " + std::to_string(ino));
+    return inodeToPath_.at(ino);
 }
 
 void FSCache::decrementInodeRef(const fuse_ino_t ino, const uint64_t nlookup) {
-    std::unique_lock lock(mutex_);
-    if (!inodeToPath_.contains(ino)) return; // No-op if inode does not exist
     if (nlookup > 1) return;  // This is also a no-op, but could be extended
-
-    // If nlookup is 1, we can remove the inode
-    const auto val = inodeToPath_.at(ino);
-    pathToInode_.erase(val);
-    inodeToPath_.erase(ino);
-    inodeToEntry_.erase(ino);
-    pathToEntry_.erase(val);
+    evictIno(ino);
 }
 
 bool FSCache::entryExists(const fs::path& absPath) const {
@@ -197,7 +190,7 @@ std::shared_ptr<FSEntry> FSCache::getEntryFromInode(const fuse_ino_t ino) const 
     return nullptr;
 }
 
-void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
+void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFirstSeeding) {
     if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
 
     if (*entry->inode != FUSE_ROOT_ID) {
@@ -222,33 +215,133 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry) {
         }
     }
 
+    const pqxx::result parentStats = !isFirstSeeding && entry->parent_id && !entry->isDirectory() ?
+            DirectoryQueries::collectParentStats(*entry->parent_id) : pqxx::result{};
+
     std::unique_lock lock(mutex_);
-    inodeToPath_[*entry->inode] = entry->fuse_path;
-    inodeToEntry_[*entry->inode] = entry;
-    pathToInode_[entry->fuse_path] = *entry->inode;
-    pathToEntry_[entry->fuse_path] = entry;
-    inodeToId_[*entry->inode] = entry->id;
-    idToEntry_[entry->id] = entry;
-    if (entry->parent_id) idToParentId_[entry->id] = *entry->parent_id;
+
+    auto insert = [&](const std::shared_ptr<FSEntry>& e) {
+        if (!e) {
+            LogRegistry::fs()->error("[FSCache] Attempted to cache a null entry");
+            return;
+        }
+
+        if (!e->inode) {
+            LogRegistry::fs()->error("[FSCache] Entry {} has no inode, cannot cache", e->id);
+            throw std::runtime_error("Entry has no inode");
+        }
+
+        inodeToPath_[*e->inode] = e->fuse_path;
+        inodeToEntry_[*e->inode] = e;
+        pathToInode_[e->fuse_path] = *e->inode;
+        pathToEntry_[e->fuse_path] = e;
+        inodeToId_[*e->inode] = e->id;
+        idToEntry_[e->id] = e;
+        if (e->parent_id) childToParent_[e->id] = *e->parent_id;
+    };
+
+    insert(entry);
+
+    // Ensure upstream directories stats are updated
+    if (!parentStats.empty()) {
+        for (const auto& s : parentStats) {
+            const auto id = s["id"].as<unsigned int>();
+            if (idToEntry_.contains(id)) {
+                const auto dir = std::static_pointer_cast<Directory>(idToEntry_[id]);
+                dir->size_bytes = s["size_bytes"].as<uintmax_t>();
+                dir->file_count = s["file_count"].as<unsigned int>();
+                dir->subdirectory_count = s["subdirectory_count"].as<unsigned int>();
+            } else insert(FSEntryQueries::getFSEntryById(id));
+        }
+    }
 
     LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 }
 
-void FSCache::evictPath(const fs::path& path) {
+void FSCache::evictIno(fuse_ino_t ino) {
     std::unique_lock lock(mutex_);
-    if (!pathToInode_.contains(path)) {
-        LogRegistry::fs()->warn("[FSCache] Attempted to evict non-existent path: {}", path.string());
+
+    if (!inodeToPath_.contains(ino) || !inodeToId_.contains(ino)) {
+        LogRegistry::fs()->warn("[FSCache] Attempted to destroy references for non-existent inode: {}", ino);
         return;
     }
 
-    const auto ino = pathToInode_[path];
-    const auto id = inodeToId_[ino];
+    const auto path = inodeToPath_.at(ino);
+    const auto id = inodeToId_.at(ino);
     inodeToPath_.erase(ino);
-    inodeToEntry_.erase(ino);
     pathToInode_.erase(path);
+    inodeToEntry_.erase(ino);
     pathToEntry_.erase(path);
     inodeToId_.erase(ino);
     idToEntry_.erase(id);
-    idToParentId_.erase(id);
-    LogRegistry::fs()->info("[FSCache] Evicted path: {} with inode {}", path.string(), ino);
+    if (childToParent_.contains(ino)) childToParent_.erase(ino);
+}
+
+
+void FSCache::evictPath(const fs::path& path) {
+    fuse_ino_t ino;
+
+    {
+        std::unique_lock lock(mutex_);
+        if (!pathToInode_.contains(path)) {
+            LogRegistry::fs()->warn("[FSCache] Attempted to evict non-existent path: {}", path.string());
+            return;
+        }
+        ino = pathToInode_[path];
+    }
+
+    evictIno(ino);
+}
+
+std::vector<std::shared_ptr<FSEntry>> FSCache::listDir(const unsigned int parentId, const bool recursive) const {
+    const auto parent = FSEntryQueries::getFSEntryById(parentId);
+    if (!parent->isDirectory()) throw std::runtime_error("Parent ID is not a directory");
+    const auto parentDir = std::static_pointer_cast<Directory>(parent);
+    unsigned int numEntries = parentDir->file_count + parentDir->subdirectory_count;
+    if (!recursive)
+        for (const auto& subdir : DirectoryQueries::listDirectoriesInDir(parentId))
+            numEntries -= subdir->file_count + subdir->subdirectory_count;
+
+    std::vector<std::shared_ptr<FSEntry>> entries;
+    entries.reserve(childToParent_.size()); // cheap upper bound
+
+    auto append_children = [&](const unsigned int pid) {
+        for (const auto& [childId, pId] : childToParent_) {
+            if (pId == pid) {
+                if (auto it = idToEntry_.find(childId); it != idToEntry_.end()) {
+                    entries.push_back(it->second);
+                }
+            }
+        }
+    };
+
+    append_children(parentId);
+
+    if (recursive) {
+        // BFS over 'entries' as it grows. Track visited to guard against bad cycles.
+        std::unordered_set<unsigned int> visited;
+        visited.reserve(childToParent_.size());
+
+        for (const auto & e : entries) {
+            if (!e) continue;
+
+            const unsigned int eid = e->id;
+            if (!visited.insert(eid).second) continue;
+
+            append_children(eid);
+        }
+    }
+
+    if (entries.size() != numEntries) {
+        LogRegistry::fs()->warn("[FSCache] Expected {} entries, but found {}", numEntries, entries.size());
+        const auto expected = FSEntryQueries::listDir(parentId, recursive);
+        if (expected.size() != numEntries) {
+            if (expected.size() == entries.size()) LogRegistry::fs()->warn("Computed number of entries mismatch with actual");
+            throw std::runtime_error(fmt::format("[FSCache] Inconsistent entry count for parent ID {}: expected: {}, found {}, actual: {}",
+                                                  parentId, numEntries, entries.size(), expected.size()));
+        }
+        return expected;
+    }
+
+    return entries;
 }

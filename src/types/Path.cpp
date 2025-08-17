@@ -28,18 +28,25 @@ Path::Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount)
 fs::path Path::absPath(const fs::path& relPath, const PathType& type) const {
     switch (type) {
     case PathType::FUSE_ROOT:
+        if (relPath.string() == "/") return fuseRoot;
         return fuseRoot / stripLeadingSlash(relPath);
     case PathType::VAULT_ROOT:
+        if (relPath.string() == "/") return vaultRoot;
         return vaultRoot / stripLeadingSlash(relPath);
     case PathType::CACHE_ROOT:
+        if (relPath.string() == "/") return cacheRoot;
         return cacheRoot / stripLeadingSlash(relPath);
     case PathType::THUMBNAIL_ROOT:
+        if (relPath.string() == "/") return thumbnailRoot;
         return thumbnailRoot / stripLeadingSlash(relPath);
     case PathType::FILE_CACHE_ROOT:
+        if (relPath.string() == "/") return fileCacheRoot;
         return fileCacheRoot / stripLeadingSlash(relPath);
     case PathType::BACKING_ROOT:
+        if (relPath.string() == "/") return backingRoot;
         return backingRoot / stripLeadingSlash(relPath);
     case PathType::BACKING_VAULT_ROOT:
+        if (relPath.string() == "/") return backingVaultRoot;
         return backingVaultRoot / stripLeadingSlash(relPath);
     default:
         throw std::invalid_argument("Invalid PathType");

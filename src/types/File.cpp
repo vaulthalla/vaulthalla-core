@@ -1,6 +1,7 @@
 #include "types/File.hpp"
 #include "util/timestamp.hpp"
 #include "logging/LogRegistry.hpp"
+#include "database/Queries/FSEntryQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -9,9 +10,10 @@
 
 using namespace vh::types;
 using namespace vh::logging;
+using namespace vh::database;
 
-File::File(const pqxx::row& row)
-    : FSEntry(row),
+File::File(const pqxx::row& row, const pqxx::result& parentRows)
+    : FSEntry(row, parentRows),
       encryption_iv(row.at("encryption_iv").as<std::string>()),
       mime_type(row.at("mime_type").as<std::optional<std::string>>()),
       content_hash(row.at("content_hash").as<std::optional<std::string>>()) {}
@@ -43,7 +45,12 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Fil
 
 std::vector<std::shared_ptr<File>> vh::types::files_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<File>> files;
-    for (const auto& row : res) files.push_back(std::make_shared<File>(row));
+    for (const auto& row : res) {
+        if (const auto parentId = row["parent_id"].as<std::optional<unsigned int>>()) {
+            const auto parentChain = FSEntryQueries::collectParentChain(*parentId);
+            files.push_back(std::make_shared<File>(row, parentChain));
+        } else files.push_back(std::make_shared<File>(row, pqxx::result{}));
+    }
     return files;
 }
 

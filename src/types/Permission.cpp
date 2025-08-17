@@ -156,11 +156,7 @@ std::string admin_perms_to_string(const uint16_t mask, const unsigned short inde
     out.reserve(64 + perms.size() * 16);
 
     const std::string prefix(indent, ' ');
-    for (const auto& p : perms) {
-        out += prefix;
-        out += to_string(p);
-        out += '\n';
-    }
+    for (const auto& p : perms) out += prefix + to_string(p) + '\n';
 
     return out;
 }

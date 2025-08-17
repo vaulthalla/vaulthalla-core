@@ -60,9 +60,7 @@ uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {
 uintmax_t StorageEngine::getVaultSize() const { return getDirectorySize(paths->backingRoot); }
 uintmax_t StorageEngine::getCacheSize() const { return getDirectorySize(paths->cacheRoot); }
 uintmax_t StorageEngine::getVaultAndCacheTotalSize() const { return getVaultSize() + getCacheSize(); }
-uintmax_t StorageEngine::freeSpace() const {
-    return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE;
-}
+uintmax_t StorageEngine::freeSpace() const { return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE; }
 
 void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
     for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {

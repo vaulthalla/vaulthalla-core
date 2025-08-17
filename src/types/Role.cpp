@@ -67,6 +67,17 @@ std::vector<std::shared_ptr<Role> > vh::types::roles_from_pq_res(const pqxx::res
     return roles;
 }
 
+std::string vh::types::to_string(const std::shared_ptr<Role>& r) {
+    std::string out = "Role:\n";
+    out += "ID: " + std::to_string(r->id) + "\n";
+    out += "Name: " + r->name + "\n";
+    out += "Type: " + r->type + "\n";
+    out += "Description: " + r->description + "\n";
+    out += "Permissions: " + (r->type == "user" ? admin_perms_to_string(r->permissions) : vault_perms_to_string(r->permissions)) + "\n";
+    out += "Created At: " + util::timestampToString(r->created_at) + "\n";
+    return out;
+}
+
 std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles) {
     if (roles.empty()) return "No roles assigned";
 
@@ -75,7 +86,6 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles
         {"Name", Align::Left, 4, 32, false, false},
         {"Type", Align::Left, 4, 16, false, false},
         {"Description", Align::Left, 4, 64, false, false},
-        {"Permissions", Align::Left, 4, 32, false, false},
         {"Created At", Align::Left, 4, 20, false, false}
     }, term_width());
 
@@ -86,7 +96,6 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles
             role->name,
             role->type,
             role->description,
-            role->type == "user" ? admin_perms_to_string(role->permissions) : vault_perms_to_string(role->permissions),
             util::timestampToString(role->created_at)
         });
     }

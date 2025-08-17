@@ -1,4 +1,4 @@
-#include "protocols/shell/commands/system.hpp"
+#include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 
 namespace vh::shell {

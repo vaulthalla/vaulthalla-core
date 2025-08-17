@@ -1,4 +1,4 @@
-#include "protocols/shell/commands/user.hpp"
+#include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"

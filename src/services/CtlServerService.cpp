@@ -1,11 +1,7 @@
 #include "services/CtlServerService.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Parser.hpp"
-#include "protocols/shell/Token.hpp"
-#include "protocols/shell/commands/system.hpp"
-#include "protocols/shell/commands/vault.hpp"
-#include "protocols/shell/commands/user.hpp"
-#include "protocols/shell/commands/apiKeys.hpp"
+#include "protocols/shell/commands.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -94,10 +90,7 @@ CtlServerService::CtlServerService()
       router_(std::make_shared<shell::Router>()),
       socketPath_("/run/vaulthalla/cli.sock"),
       adminGid_(getgrnam("vaulthalla")->gr_gid) {
-    shell::registerSystemCommands(router_);
-    shell::registerVaultCommands(router_);
-    shell::registerUserCommands(router_);
-    shell::registerAPIKeyCommands(router_);
+    shell::registerAllCommands(router_);
 }
 
 CtlServerService::~CtlServerService() { closeListener(); }

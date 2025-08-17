@@ -1,4 +1,4 @@
-#include "protocols/shell/commands/vault.hpp"
+#include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 

@@ -1,4 +1,4 @@
-#include "protocols/shell/commands/apiKeys.hpp"
+#include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "types/APIKey.hpp"

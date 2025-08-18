@@ -564,19 +564,12 @@ static CommandResult handle_export_all_vault_keys(const CommandCall& call) {
     const auto engines = ServiceDepsRegistry::instance().storageManager->getEngines();
     if (engines.empty()) return invalid("vault keys export: no vaults found");
 
-    nlohmann::json out = {
-        {"meta",
-            {"exported_by", call.user->name},
-            {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
-        },
-        {"keys", nlohmann::json::array()}
-    };
+    nlohmann::json out = nlohmann::json::array();
 
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     for (const auto& engine : engines) {
-
         const auto& key = engine->encryptionManager->get_key(context);
-        out["keys"].push_back(generate_json_key_object(engine->vault, key, call.user->name));
+        out.push_back(generate_json_key_object(engine->vault, key, call.user->name));
     }
 
     return handle_key_encrypt_and_response(call, out);

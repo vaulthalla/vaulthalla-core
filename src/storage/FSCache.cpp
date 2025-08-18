@@ -6,7 +6,7 @@
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 
 #include <mutex>

@@ -1,7 +1,7 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "util/cmdLineHelpers.hpp"
 #include "types/User.hpp"
 
@@ -24,7 +24,6 @@ void Router::registerCommand(const std::string& name,
 
     CommandInfo info{std::string(desc), std::move(handler), {}};
 
-    // record aliases
     for (const std::string& alias : aliases) {
         std::string a = normalize_alias(alias);
 
@@ -60,11 +59,7 @@ CommandResult Router::execute(const CommandCall& call) const {
 
 CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const {
     LogRegistry::shell()->info("[Router] Executing line: '{}'", line);
-    // Tokenizer expects a string that lives while tokens/views are used.
-    // We keep it local so Token/CommandCall views remain valid through execute().
-    const auto tokens = tokenize(line);   // your tokenize returns Token views into 'owned'
-    LogRegistry::shell()->info("[Router] Parsed tokens:\n{}", to_string(tokens));
-    auto call   = parseTokens(tokens);
+    auto call   = parseTokens(tokenize(line));
     call.user = user;
 
     if (call.name.empty()) return CommandResult{1, "", "no command provided"};
@@ -105,7 +100,7 @@ std::string Router::listCommands() const {
 
     std::string out;
     out.reserve(64 + rows.size() * 64);
-    out += "vaulthalla commands:\n";
+    out += "Vaulthalla commands:\n";
     out += fmt::format("  {:{}}  {:{}}  {}\n", "NAME", name_w, "ALIASES", alias_w, "DESCRIPTION");
     out += fmt::format("  {:-<{}}  {:-<{}}  {}\n", "", name_w, "", alias_w, "-----------");
 
@@ -128,13 +123,14 @@ std::string Router::listCommands() const {
         }
     }
 
-    return out;
+    return out + "\n" + fmt::format("Use 'vh <command> --help' for more information on any command.\n"
+                         "Use 'vh <alias> --help' for more information on any alias.\n");
 }
 
 std::string Router::normalize(const std::string& s) {
     std::string out;
     out.reserve(s.size());
-    for (unsigned char c : s) out.push_back(static_cast<char>(std::tolower(c)));
+    for (const unsigned char c : s) out.push_back(static_cast<char>(std::tolower(c)));
     return out;
 }
 

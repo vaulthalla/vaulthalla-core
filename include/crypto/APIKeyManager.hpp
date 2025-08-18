@@ -1,13 +1,13 @@
 #pragma once
 
 #include "types/APIKey.hpp"
-#include "keys/TPMKeyProvider.hpp"
+#include "TPMKeyProvider.hpp"
 #include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
 
-namespace vh::keys {
+namespace vh::crypto {
 
 class APIKeyManager {
 public:

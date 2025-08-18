@@ -9,7 +9,7 @@
 #include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <sodium.h>

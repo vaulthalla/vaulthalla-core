@@ -9,7 +9,7 @@
 #include "types/File.hpp"
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
-#include "logging/LogRegistry.hpp"
+#include "../../services/LogRegistry.hpp"
 
 #include <memory>
 #include <string>

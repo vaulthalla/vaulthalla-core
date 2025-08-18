@@ -6,7 +6,7 @@
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FUSERequestTask.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <cstring>
 #include <thread>

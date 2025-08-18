@@ -9,7 +9,7 @@
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 
 #include <optional>

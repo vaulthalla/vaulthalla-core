@@ -4,14 +4,14 @@
 #include "types/APIKey.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "keys/APIKeyManager.hpp"
+#include "crypto/APIKeyManager.hpp"
 #include "storage/cloud/S3Controller.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::services;
-using namespace vh::keys;
+using namespace vh::crypto;
 using namespace vh::types::api;
 using namespace vh::cloud;
 

@@ -4,7 +4,7 @@
 #include "types/Path.hpp"
 #include "types/FSEntry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "../services/LogRegistry.hpp"
 
 #include <fstream>
 #include <filesystem>

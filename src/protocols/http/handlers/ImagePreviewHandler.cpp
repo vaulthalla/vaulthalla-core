@@ -3,8 +3,7 @@
 #include "util/files.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <boost/beast/http/file_body.hpp>
 

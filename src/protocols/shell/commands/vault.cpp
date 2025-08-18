@@ -1,7 +1,6 @@
 #include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
-
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -20,10 +19,10 @@
 #include "database/Queries/GroupQueries.hpp"
 #include "types/VaultRole.hpp"
 #include "storage/StorageEngine.hpp"
-#include "keys/VaultEncryptionManager.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
-#include "keys/GPGEncryptor.hpp"
-#include "logging/LogRegistry.hpp"
+#include "crypto/GPGEncryptor.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -338,7 +337,7 @@ static CommandResult handle_vault_update(const CommandCall& call) {
 
     if (ownerIdOpt) {
         const auto ownerId = parseInt(*ownerIdOpt);
-        if (!ownerId || *ownerId <= 0) return invalid("vault update: --owner-id must be a positive integer");
+        if (!ownerId || *ownerId <= 0) return invalid("vault update: --owner <id> must be a positive integer");
         vault->owner_id = *ownerId;
     }
 
@@ -408,7 +407,7 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
         const auto ownerOpt = optVal(call, "owner");
         if (!ownerOpt) return invalid("vault assign: vault does not have a owner");
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner-id must be a positive integer");
+            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner must be a positive integer");
             ownerId = *ownerIdOpt;
         } else if (ownerOpt) {
             if (ownerOpt->empty()) return invalid("vault assign: --owner requires a value");
@@ -548,7 +547,7 @@ static CommandResult handle_export_vault_key(const CommandCall& call) {
         const auto ownerOpt = optVal(call, "owner");
         unsigned int ownerId;
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner-id must be a positive integer");
+            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner <id> must be a positive integer");
             ownerId = *ownerIdOpt;
         } else if (ownerOpt) {
             if (ownerOpt->empty()) return invalid("vault assign: --owner requires a value");

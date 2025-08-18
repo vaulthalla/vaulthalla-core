@@ -1,4 +1,4 @@
-#include "keys/GPGEncryptor.hpp"
+#include "crypto/GPGEncryptor.hpp"
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>

@@ -10,7 +10,7 @@
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "storage/FSCache.hpp"
 
 #include <cerrno>

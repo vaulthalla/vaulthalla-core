@@ -8,17 +8,16 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "keys/VaultEncryptionManager.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "util/fsPath.hpp"
 
+using namespace vh::crypto;
 using namespace vh::types;
 using namespace vh::database;
-using namespace vh::keys;
 using namespace vh::config;
 using namespace vh::storage;
 using namespace vh::services;

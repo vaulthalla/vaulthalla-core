@@ -1,6 +1,5 @@
 #include "types/Permission.hpp"
 
-#include <fmt/format.h>
 #include "util/timestamp.hpp"
 #include <nlohmann/json.hpp>
 

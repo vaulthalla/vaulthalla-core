@@ -1,5 +1,4 @@
 #include "types/TrashedFile.hpp"
-#include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
 
 #include "util/timestamp.hpp"

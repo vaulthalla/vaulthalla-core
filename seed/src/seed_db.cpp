@@ -24,8 +24,8 @@
 
 // Misc
 #include "config/ConfigRegistry.hpp"
-#include "keys/APIKeyManager.hpp"
-#include "logging/LogRegistry.hpp"
+#include "../../include/crypto/APIKeyManager.hpp"
+#include "../../include/services/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"
@@ -37,7 +37,7 @@
 using namespace vh::seed;
 using namespace vh::config;
 using namespace vh::database;
-using namespace vh::keys;
+using namespace vh::crypto;
 using namespace vh::types;
 using namespace vh::logging;
 using namespace vh::services;

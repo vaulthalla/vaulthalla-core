@@ -4,7 +4,7 @@
 #include "services/FUSE.hpp"
 #include "services/Vaulthalla.hpp"
 #include "services/CtlServerService.hpp"
-#include "logging/LogRegistry.hpp"
+#include "LogRegistry.hpp"
 
 #include <csignal>
 #include <cstdlib>

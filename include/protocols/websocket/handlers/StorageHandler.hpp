@@ -7,7 +7,7 @@ namespace vh::storage {
 class StorageManager;
 }
 
-namespace vh::keys {
+namespace vh::crypto {
 class APIKeyManager;
 }
 
@@ -38,7 +38,7 @@ class StorageHandler {
 
   private:
     std::shared_ptr<storage::StorageManager> storageManager_;
-    std::shared_ptr<keys::APIKeyManager> apiKeyManager_;
+    std::shared_ptr<crypto::APIKeyManager> apiKeyManager_;
 };
 
 } // namespace vh::websocket

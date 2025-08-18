@@ -1,13 +1,12 @@
-#include "keys/VaultEncryptionManager.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "types/VaultKey.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
 
-using namespace vh::keys;
 using namespace vh::crypto;
 using namespace vh::logging;
 using namespace vh::database;

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "keys/TPMKeyProvider.hpp"
+#include "TPMKeyProvider.hpp"
 
 #include <string>
 #include <vector>
 #include <filesystem>
 
-namespace vh::keys {
+namespace vh::crypto {
 
 class VaultEncryptionManager {
 public:

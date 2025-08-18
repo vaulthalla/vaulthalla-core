@@ -1,5 +1,5 @@
-#include "keys/TPMKeyProvider.hpp"
-#include "logging/LogRegistry.hpp"
+#include "crypto/TPMKeyProvider.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <tss2/tss2_esys.h>
 #include <fstream>

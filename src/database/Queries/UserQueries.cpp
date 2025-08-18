@@ -4,7 +4,7 @@
 #include "types/RefreshToken.hpp"
 #include "database/Transactions.hpp"
 #include "types/VaultRole.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "crypto/PasswordHash.hpp"
 
 #include <pqxx/pqxx>

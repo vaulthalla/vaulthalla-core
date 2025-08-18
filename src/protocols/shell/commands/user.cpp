@@ -7,7 +7,7 @@
 #include "auth/AuthManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "crypto/PasswordHash.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "types/UserRole.hpp"
 
 using namespace vh::shell;

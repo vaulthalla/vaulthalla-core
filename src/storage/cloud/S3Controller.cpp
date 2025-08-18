@@ -3,7 +3,7 @@
 #include "util/timestamp.hpp"
 #include "util/u8.hpp"
 #include "util/s3Helpers.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <ctime>
 #include <curl/curl.h>

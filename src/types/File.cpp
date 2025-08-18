@@ -1,6 +1,6 @@
 #include "types/File.hpp"
 #include "util/timestamp.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 
 #include <nlohmann/json.hpp>

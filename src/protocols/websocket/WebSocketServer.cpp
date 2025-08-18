@@ -2,7 +2,7 @@
 #include "auth/AuthManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::logging;

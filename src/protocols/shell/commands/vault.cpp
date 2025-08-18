@@ -222,12 +222,13 @@ static CommandResult handle_vault_delete(const CommandCall& call) {
 
     if (idOpt) vault = VaultQueries::getVault(*idOpt);
     else {
-        const auto ownerIdOpt = optVal(call, "owner-id");
-        if (!ownerIdOpt) return invalid("vault delete: missing required --owner-id <id> for vault name deletion");
-        const auto ownerId = parseInt(*ownerIdOpt);
-        if (!ownerId || *ownerId <= 0) return invalid("vault delete: --owner-id must be a positive integer");
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault delete: missing required --owner <id | name> for vault name lookup");
 
-        vault = VaultQueries::getVault(name, *ownerId);
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
+        else if (const auto owner = UserQueries::getUserByName(*ownerOpt))
+            vault = VaultQueries::getVault(name, call.user->id);
+        else return invalid("vault delete: owner '" + *ownerOpt + "' not found");
     }
 
     if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
@@ -477,17 +478,25 @@ static nlohmann::json generate_json_key_object(const std::shared_ptr<Vault>& v,
                                                const std::vector<uint8_t>& key,
                                                const std::string& exportedBy) {
     return {
-        {"vault_id", v->id},
-        {"vault_name", v->name},
-        {"key", b64_encode(key)},
-        {"key_info",
-            {
-                {"size", key.size()},
-                {"type", "AES-256-GCM"},
-                {"exported_by", exportedBy},
-                {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+            {"vault_id", v->id},
+            {"vault_name", v->name},
+            {"key", b64_encode(key)},
+            {"key_info",
+                {
+                    {"type", "AES-256-GCM"},
+                    {"key_size", key.size()},
+                    {"iv_size", 12},
+                    {"tag_size", 16},
+                    {"iv_gen", "libsodium::randombytes_buf"},
+                    {"cipher_impl", "libsodium::crypto_aead_aes256gcm"},
+                    {"hardware_accel", "AES-NI (runtime checked)"},
+                    {"aad", false},
+                    {"files_hashed_with", "libsodium"},
+                    {"sealed_by", "Vaulthalla v0.9.0"},
+                    {"exported_by", exportedBy},
+                    {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+                }
             }
-        }
     };
 }
 
@@ -515,8 +524,8 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
             outFile << output.dump(4);
             outFile.close();
             return {0, "Vault key(s) successfully saved to " + *outputOpt,
-                "WARNING: No recipient specified, key(s) are unencrypted.\n"
-                "         Consider using --recipient with a GPG fingerprint to encrypt the key(s) before saving."};
+                "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
+                "\nConsider using --recipient with a GPG fingerprint to encrypt the key(s) before saving."};
         } catch (const std::exception& e) {
             return invalid("vault keys export: failed to write to output file: " + std::string(e.what()));
         }
@@ -524,8 +533,8 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
 
     LogRegistry::audit()->warn("[shell::handle_key_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
     return {0, output.dump(4),
-        "WARNING: No recipient specified, key(s) are unencrypted.\n"
-        "         Consider using --recipient with a GPG fingerprint along with --output to securely encrypt the key(s) to an output file."};
+        "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
+        "\nConsider using --recipient with a GPG fingerprint along with --output\nto securely encrypt the key(s) to an output file."};
 }
 
 static CommandResult handle_export_vault_key(const CommandCall& call) {
@@ -598,7 +607,17 @@ void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
                            if (sub == "info" || sub == "get") return handle_vault_info(subcall);
                            if (sub == "update" || sub == "set") return handle_vault_update(subcall);
                            if (sub == "assign" || sub == "role") return handle_vault_role_assign(subcall);
-                           if (sub == "keys") return handle_export_vault_keys(subcall);
+                           if (sub == "keys") {
+                               if (call.positionals.size() == 1)
+                                   return invalid("Usage: vault keys <export | rotate | inspect> <vault_id | name | all> [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]");
+
+                               const auto sub2 = subcall.positionals[0];
+                               subcall.positionals.erase(subcall.positionals.begin());
+
+                               if (sub2 == "export") return handle_export_vault_keys(subcall);
+                               return invalid("vault keys: unknown subcommand '" + std::string(subcall.positionals[1]) +
+                                   "'. Use: export | rotate | inspect");
+                           }
 
                            return invalid(
                                "vault: unknown subcommand '" + std::string(sub) + "'. Use: create | delete | info");

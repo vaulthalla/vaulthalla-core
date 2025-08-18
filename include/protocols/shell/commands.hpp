@@ -18,7 +18,7 @@ inline void registerAllCommands(const std::shared_ptr<Router>& r) {
     registerSystemCommands(r);
     registerUserCommands(r);
     registerVaultCommands(r);
-    // registerGroupCommands(r);
+    registerGroupCommands(r);
     registerRoleCommands(r);
 }
 

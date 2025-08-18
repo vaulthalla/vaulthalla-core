@@ -5,7 +5,7 @@
 #include "types/Directory.hpp"
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <optional>
 

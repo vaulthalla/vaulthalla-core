@@ -16,6 +16,7 @@ static std::string usage_user_permissions() {
     os << "Permission Flags:\n"
        << "  --manage-admins     | --set-manage-admins     | --unset-manage-admins\n"
        << "  --manage-users      | --set-manage-users      | --unset-manage-users\n"
+       << "  --manage-groups     | --set-manage-groups     | --unset-manage-groups\n"
        << "  --manage-vaults     | --set-manage-vaults     | --unset-manage-vaults\n"
        << "  --manage-groups     | --set-manage-groups     | --unset-manage-groups\n"
        << "  --manage-roles      | --set-manage-roles      | --unset-manage-roles\n"
@@ -57,8 +58,6 @@ static CommandResult usage_roles_root() {
         "  roles info <name> [--user | --vault]\n"
         "  roles create <name> --type <user | vault> [--from <id | name>] [<permission_flags>]\n"
         "  roles update <id> [--name <new_name>] [<permission_flag>]\n"
-        "  roles assign user <username | user_id> <role_id>\n "
-        "  roles assign vault <vault_id> <role_id> --[uid | gid] <id>\n"
         "  roles delete <id>\n",
         ""
     };
@@ -71,17 +70,20 @@ static uint16_t parseUserRolePermissions(const CommandCall& call, uint16_t permi
     if (hasFlag(call, "manage-users") || hasFlag(call, "set-manage-users")) permissions |= (1 << 1);
     else if (hasFlag(call, "unset-manage-users")) permissions &= ~(1 << 1);
 
-    if (hasFlag(call, "manage-vaults") || hasFlag(call, "set-manage-vaults")) permissions |= (1 << 2);
-    else if (hasFlag(call, "unset-manage-vaults")) permissions &= ~(1 << 2);
+    if (hasFlag(call, "manage-groups") || hasFlag(call, "set-manage-groups")) permissions |= (1 << 2);
+    else if (hasFlag(call, "unset-manage-groups")) permissions &= ~(1 << 2);
 
-    if (hasFlag(call, "manage-groups") || hasFlag(call, "set-manage-groups")) permissions |= (1 << 3);
-    else if (hasFlag(call, "unset-manage-groups")) permissions &= ~(1 << 3);
+    if (hasFlag(call, "manage-vaults") || hasFlag(call, "set-manage-vaults")) permissions |= (1 << 3);
+    else if (hasFlag(call, "unset-manage-vaults")) permissions &= ~(1 << 3);
 
-    if (hasFlag(call, "manage-roles") || hasFlag(call, "set-manage-roles")) permissions |= (1 << 4);
-    else if (hasFlag(call, "unset-manage-roles")) permissions &= ~(1 << 4);
+    if (hasFlag(call, "manage-groups") || hasFlag(call, "set-manage-groups")) permissions |= (1 << 4);
+    else if (hasFlag(call, "unset-manage-groups")) permissions &= ~(1 << 4);
 
-    if (hasFlag(call, "manage-api-keys") || hasFlag(call, "set-manage-api-keys")) permissions |= (1 << 5);
-    else if (hasFlag(call, "unset-manage-api-keys")) permissions &= ~(1 << 5);
+    if (hasFlag(call, "manage-roles") || hasFlag(call, "set-manage-roles")) permissions |= (1 << 5);
+    else if (hasFlag(call, "unset-manage-roles")) permissions &= ~(1 << 5);
+
+    if (hasFlag(call, "manage-api-keys") || hasFlag(call, "set-manage-api-keys")) permissions |= (1 << 6);
+    else if (hasFlag(call, "unset-manage-api-keys")) permissions &= ~(1 << 6);
 
     return permissions;
 }

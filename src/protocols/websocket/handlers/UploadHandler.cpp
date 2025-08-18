@@ -2,7 +2,7 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "types/User.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
 
 #include <filesystem>

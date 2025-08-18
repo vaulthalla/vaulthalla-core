@@ -31,6 +31,7 @@ class DBConnection {
     void initPreparedPermOverrides() const;
     void initPreparedSync() const;
     void initPreparedCache() const;
+    void initPreparedGroups() const;
 };
 
 struct PathPatterns {

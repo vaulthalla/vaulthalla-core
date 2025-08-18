@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-#include "logging/LogRegistry.hpp"
+#include "../include/services/LogRegistry.hpp"
 
 namespace fs = std::filesystem;
 using namespace vh::types;

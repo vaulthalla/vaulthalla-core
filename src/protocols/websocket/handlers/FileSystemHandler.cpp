@@ -8,8 +8,7 @@
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
 
 using namespace vh::types;

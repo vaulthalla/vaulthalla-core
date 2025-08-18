@@ -4,7 +4,6 @@
 #include "protocols/shell/Table.hpp"
 #include "util/cmdLineHelpers.hpp"
 
-#include <pqxx/row>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 

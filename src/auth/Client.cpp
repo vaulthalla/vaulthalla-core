@@ -1,5 +1,5 @@
 #include "auth/Client.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <chrono>
 #include <jwt-cpp/jwt.h>

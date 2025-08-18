@@ -5,11 +5,11 @@
 #include "types/S3Vault.hpp"
 #include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "keys/APIKeyManager.hpp"
+#include "crypto/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <boost/algorithm/string.hpp>

@@ -5,7 +5,7 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "types/User.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 using namespace vh::websocket;
 using namespace vh::auth;

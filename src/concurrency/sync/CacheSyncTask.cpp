@@ -1,7 +1,6 @@
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
 #include "storage/StorageManager.hpp"
@@ -11,7 +10,7 @@
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
-#include "logging/LogRegistry.hpp"
+#include "include/services/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 
 #include <optional>

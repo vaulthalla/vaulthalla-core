@@ -18,7 +18,7 @@
 // Misc
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "logging/LogRegistry.hpp"
+#include "include/services/LogRegistry.hpp"
 
 // Libraries
 #include <csignal>

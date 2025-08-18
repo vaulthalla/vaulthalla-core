@@ -27,7 +27,7 @@ class AuthManager {
 public:
     explicit AuthManager(const std::shared_ptr<storage::StorageManager>& storageManager = nullptr);
 
-    void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session);
+    void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
     std::shared_ptr<Client> registerUser(std::shared_ptr<types::User> user,
                                          const std::string& password,
@@ -60,6 +60,8 @@ public:
     static bool isValidEmail(const std::string& email);
 
     static bool isValidPassword(const std::string& password);
+
+    static bool isValidGroup(const std::string& group);
 
 private:
     std::unordered_map<std::string, std::shared_ptr<types::User>> users_;

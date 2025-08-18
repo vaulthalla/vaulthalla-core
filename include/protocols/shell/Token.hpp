@@ -2,10 +2,11 @@
 #include <string>
 #include <vector>
 #include <string_view>
+#include <cctype>
 
 namespace vh::shell {
 
-enum class TokenType { Word, Flag, Value };
+enum class TokenType { Word, Flag /*, Value (unused) */ };
 
 struct Token {
     TokenType type;
@@ -24,114 +25,184 @@ inline bool looks_negative_number(std::string_view s) {
     return digit;
 }
 
-// Expand short bundles: "-abc" -> "-a" "-b" "-c"
-inline void expandShortBundle(const std::string& word, std::vector<Token>& out) {
-    // word starts with '-' and word.size()>2 and not "-k=value"
-    // We generate Flag tokens with names without dashes ("a","b","c")
-    for (size_t i = 1; i < word.size(); ++i) {
-        if (word[i] == '=') {
-            // Treat "-a=val" as "-a" "val"
-            out.push_back({TokenType::Flag, std::string(1, word[1])});
-            out.push_back({TokenType::Word, word.substr(i+1)});
-            return;
-        }
-        out.push_back({TokenType::Flag, std::string(1, word[i])});
-    }
+static inline void pushFlag(std::vector<Token>& out, std::string k) {
+    // Strip leading '-' if present (callers usually pass already-stripped)
+    if (!k.empty() && k[0] == '-') k.erase(k.begin());
+    out.push_back({TokenType::Flag, std::move(k)});
+}
+static inline void pushWord(std::vector<Token>& out, std::string v) {
+    out.push_back({TokenType::Word, std::move(v)});
 }
 
-// Push a single token or split key=value; strips dashes from Flag token text
-inline void pushFlagOrWord(std::vector<Token>& tokens, const std::string& word) {
-    if (word == "--") {
-        // Represent sentinel as a Word so parseTokens can flip into positional-only
-        tokens.push_back({TokenType::Word, "--"});
-        return;
-    }
-
-    if (word.rfind("--", 0) == 0) {
-        // Long flag: --key or --key=value
-        auto eq = word.find('=');
-        if (eq != std::string::npos) {
-            tokens.push_back({TokenType::Flag, word.substr(2, eq - 2)}); // key w/o dashes
-            tokens.push_back({TokenType::Word, word.substr(eq + 1)});    // value
-        } else {
-            tokens.push_back({TokenType::Flag, word.substr(2)});
-        }
-        return;
-    }
-
-    if (word.size() > 1 && word[0] == '-') {
-        // Negative numbers should be words, not flags
-        if (looks_negative_number(word)) {
-            tokens.push_back({TokenType::Word, word});
-            return;
-        }
-
-        // Short flag: -k, -k=value, -abc bundle, or -pVALUE (handled later)
-        auto eq = word.find('=');
-        if (eq != std::string::npos) {
-            tokens.push_back({TokenType::Flag, word.substr(1, eq - 1)});
-            tokens.push_back({TokenType::Word, word.substr(eq + 1)});
-            return;
-        }
-
-        if (word.size() > 2) {
-            // Could be bundle or -pVALUE; we emit bundle of flags here.
-            // If -p takes a value and was glued (e.g., -pVALUE), your validator can reattach VALUE.
-            expandShortBundle(word, tokens);
-            return;
-        }
-
-        // Simple short flag: -k
-        tokens.push_back({TokenType::Flag, word.substr(1)});
-        return;
-    }
-
-    // Plain word
-    tokens.push_back({TokenType::Word, word});
+static inline void skip_ws(const char*& p, const char* e) {
+    while (p < e && (*p == ' ' || *p == '\t')) ++p;
 }
 
-// Tokenize with basic quoting and \-escapes (spaces inside quotes preserved)
+static inline std::string read_quoted(const char*& p, const char* e, char quote) {
+    // p is at the opening quote; consume it
+    ++p;
+    std::string buf;
+    buf.reserve(32);
+    while (p < e) {
+        if (*p == quote) { ++p; break; }
+        if (quote == '"' && *p == '\\' && p + 1 < e) {
+            // In double quotes, honor \" and \\ escapes
+            ++p;
+            buf.push_back(*p++);
+            continue;
+        }
+        buf.push_back(*p++);
+    }
+    return buf; // no outer quotes, escapes resolved for double quotes
+}
+
+static inline std::string read_unquoted_atom(const char*& p, const char* e) {
+    // Read until whitespace or quote (we stop before quote to let caller handle it)
+    const char* b = p;
+    while (p < e && *p != ' ' && *p != '\t' && *p != '"' && *p != '\'') ++p;
+    return {b, static_cast<std::string::size_type>(p - b)};
+}
+
+// Heuristic: decide if "-XYZ" is a bundle or "-X<value>".
+// If tail contains obvious value chars (/, ., :, =), treat as glued value.
+static inline bool looks_glued_value(std::string_view tail) {
+    return std::ranges::any_of(tail, [](char c) { return c == '/' || c == '.' || c == ':' || c == '='; });
+}
+
+// Expand short bundle "-abc" -> flags a,b,c
+static inline void expand_bundle(std::string_view bundle, std::vector<Token>& out) {
+    for (const char c : bundle) pushFlag(out, std::string(1, c));
+}
+
 inline std::vector<Token> tokenize(const std::string& line) {
-    std::vector<Token> tokens;
-    tokens.reserve(16);
+    std::vector<Token> out;
+    out.reserve(16);
 
     const char* s = line.c_str();
     const char* e = s + line.size();
     const char* p = s;
 
-    auto skip_ws = [&](const char*& q){ while (q < e && (*q == ' ' || *q == '\t')) ++q; };
-
-    skip_ws(p);
+    skip_ws(p, e);
     while (p < e) {
-        if (*p == '"') { // double-quoted
-            ++p;
-            std::string buf;
-            buf.reserve(32);
-            while (p < e && *p != '"') {
-                if (*p == '\\' && p + 1 < e) { ++p; } // keep next char verbatim
-                buf.push_back(*p++);
-            }
-            if (p < e && *p == '"') ++p;
-            // Quoted token is always a Word (could be a value to a flag)
-            tokens.push_back({TokenType::Word, std::move(buf)});
-        } else if (*p == '\'') { // single-quoted
-            ++p;
-            std::string buf;
-            buf.reserve(32);
-            while (p < e && *p != '\'') buf.push_back(*p++);
-            if (p < e && *p == '\'') ++p;
-            tokens.push_back({TokenType::Word, std::move(buf)});
-        } else {
-            // unquoted: read until space
-            const char* b = p;
-            while (p < e && *p != ' ' && *p != '\t' && *p != '"' && *p != '\'') ++p;
-            std::string word(b, p - b);
-            pushFlagOrWord(tokens, word);
+        // Handle sentinel "--" exactly
+        if (*p == '-' && (p + 1) < e && p[1] == '-' && (p + 2 == e || p[2] == ' ' || p[2] == '\t')) {
+            p += 2;
+            pushWord(out, "--");
+            skip_ws(p, e);
+            continue;
         }
-        skip_ws(p);
+
+        if (*p == '"' || *p == '\'') {
+            // Bare quoted atom -> Word
+            char q = *p;
+            auto val = read_quoted(p, e, q);
+            pushWord(out, std::move(val));
+            skip_ws(p, e);
+            continue;
+        }
+
+        if (*p == '-') {
+            const char* start = p;
+            // Long or short flag
+            // Peek ahead to distinguish "--" vs "-"* and guard negative numbers.
+            // If it's a negative number, treat as Word.
+            // (We need the full atom to check; read a provisional unquoted chunk first, but also allow inline quotes after '='.)
+            std::string pre = read_unquoted_atom(p, e); // may be "-k", "-abc", "--key", "--key=", "-I/usr"
+            // If we stopped due to a quote right after '=', fold quoted value inline
+            if (p < e && (*p == '"' || *p == '\'')) {
+                // Only makes sense if pre ends with '=' or is "-k" (glued form -k"value")
+                if (!pre.empty() && (pre.back() == '=' || (pre.size() == 2 && pre[0] == '-' && pre[1] != '-'))) {
+                    char q = *p;
+                    auto val = read_quoted(p, e, q);
+                    pre += val; // pre now has `--key=val` OR `-kval`
+                }
+            }
+
+            // Negative number? (e.g., "-1.5")
+            if (looks_negative_number(pre)) {
+                pushWord(out, std::move(pre));
+                skip_ws(p, e);
+                continue;
+            }
+
+            // Long flag forms: --key or --key=value
+            if (pre.rfind("--", 0) == 0) {
+                auto eq = pre.find('=');
+                if (eq == std::string::npos) {
+                    pushFlag(out, pre.substr(2));
+                } else {
+                    pushFlag(out, pre.substr(2, eq - 2));
+                    pushWord(out, pre.substr(eq + 1)); // value (already dequoted if we folded)
+                }
+                skip_ws(p, e);
+                continue;
+            }
+
+            // Short flag(s)
+            // pre starts with '-' and not '--'
+            if (pre.size() >= 2 && pre[0] == '-' && pre[1] != '-') {
+                if (pre.size() == 2) {
+                    // Simple "-k"
+                    pushFlag(out, pre.substr(1));
+                } else {
+                    // Could be bundle "-abc" or glued "-kVALUE"
+                    std::string_view tail = std::string_view(pre).substr(2);
+                    if (looks_glued_value(tail)) {
+                        // Emit "-k" + value (strip any '=' if user wrote -k=value)
+                        pushFlag(out, std::string(1, pre[1]));
+                        std::string value = std::string(tail);
+                        if (!value.empty() && value[0] == '=') value.erase(value.begin());
+                        pushWord(out, std::move(value));
+                    } else {
+                        // Pure bundle
+                        expand_bundle(tail, out); // emits a,b,c…
+                    }
+                }
+                skip_ws(p, e);
+                continue;
+            }
+
+            // Fallback (shouldn’t hit): treat as word
+            pushWord(out, std::move(pre));
+            skip_ws(p, e);
+            continue;
+        }
+
+        // Unquoted atom (could be plain word or key=value with no leading dashes)
+        std::string atom = read_unquoted_atom(p, e);
+        // If we stopped on a quote, fold it immediately (handles foo="bar baz")
+        if (p < e && (*p == '"' || *p == '\'')) {
+            if (!atom.empty() && atom.back() == '=') {
+                char q = *p;
+                auto val = read_quoted(p, e, q);
+                atom += val;
+            }
+        }
+        // No leading dashes here: always a Word
+        pushWord(out, std::move(atom));
+        skip_ws(p, e);
     }
 
-    return tokens;
+    return out;
+}
+
+inline std::string to_string(const Token& t) {
+    switch (t.type) {
+    case TokenType::Word: return "Word(" + t.text + ")";
+    case TokenType::Flag: return "Flag(" + t.text + ")";
+        // case TokenType::Value: return "Value(" + t.text + ")"; // unused
+    }
+    return "UnknownToken";
+}
+
+inline std::string to_string(const std::vector<Token>& tokens) {
+    std::string out;
+    out.reserve(64 + tokens.size() * 16);
+    for (const auto& t : tokens) {
+        if (!out.empty()) out += " ";
+        out += to_string(t);
+    }
+    return out;
 }
 
 }

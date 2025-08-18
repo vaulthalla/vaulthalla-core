@@ -25,7 +25,6 @@ struct Role {
     Role(std::string name, std::string description, std::string type, uint16_t permissions);
 };
 
-// JSON + DB helpers
 void to_json(nlohmann::json& j, const Role& r);
 void from_json(const nlohmann::json& j, Role& r);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles);
@@ -35,4 +34,4 @@ std::vector<std::shared_ptr<Role>> roles_from_pq_res(const pqxx::result& res);
 std::string to_string(const std::shared_ptr<Role>& r);
 std::string to_string(const std::vector<std::shared_ptr<Role>>& roles);
 
-} // namespace vh::types
+}

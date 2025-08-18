@@ -42,7 +42,7 @@ std::string hmacSha256HexFromRaw(const std::string& rawKey, const std::string& d
          reinterpret_cast<const unsigned char*>(data.data()), data.size(), sig, nullptr);
 
     std::ostringstream oss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) oss << std::hex << std::setw(2) << std::setfill('0') << (int)sig[i];
+    for (unsigned char i : sig) oss << std::hex << std::setw(2) << std::setfill('0') << (int)i;
     return oss.str();
 }
 
@@ -122,7 +122,7 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& 
     const std::string service = "s3";
     const std::string algorithm = "AWS4-HMAC-SHA256";
     const std::string amzDate = headers.at("x-amz-date");
-    const std::string dateStamp = util::getDate();
+    const std::string dateStamp = getDate();
 
     // Headers
     std::string canonicalHeaders, signedHeaders;
@@ -151,13 +151,13 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& 
     const std::string stringToSign = stringToSignStream.str();
 
     // Signing key
-    std::string kDate    = util::hmacSha256Raw("AWS4" + api_key->secret_access_key, dateStamp);
-    std::string kRegion  = util::hmacSha256Raw(kDate, api_key->region);
-    std::string kService = util::hmacSha256Raw(kRegion, service);
-    std::string kSigning = util::hmacSha256Raw(kService, "aws4_request");
+    std::string kDate    = hmacSha256Raw("AWS4" + api_key->secret_access_key, dateStamp);
+    std::string kRegion  = hmacSha256Raw(kDate, api_key->region);
+    std::string kService = hmacSha256Raw(kRegion, service);
+    std::string kSigning = hmacSha256Raw(kService, "aws4_request");
 
     // Signature
-    const std::string signature = util::hmacSha256HexFromRaw(kSigning, stringToSign);
+    const std::string signature = hmacSha256HexFromRaw(kSigning, stringToSign);
 
     // Final header
     std::ostringstream authHeader;

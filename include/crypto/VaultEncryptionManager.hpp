@@ -1,12 +1,12 @@
 #pragma once
 
-#include "keys/TPMKeyProvider.hpp"
+#include "TPMKeyProvider.hpp"
 
 #include <string>
 #include <vector>
 #include <filesystem>
 
-namespace vh::keys {
+namespace vh::crypto {
 
 class VaultEncryptionManager {
 public:
@@ -23,6 +23,8 @@ public:
     // Decrypt using base64-encoded IV and ciphertext
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,
                                  const std::string& b64_iv) const;
+
+    [[nodiscard]] std::vector<uint8_t> get_key(const std::string& callingFunctionName) const;
 
 private:
     std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;

@@ -4,7 +4,7 @@
 #include "storage/StorageEngine.hpp"
 #include "types/Sync.hpp"
 #include "types/Vault.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::database;

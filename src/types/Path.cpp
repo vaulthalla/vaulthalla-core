@@ -1,7 +1,7 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 using namespace vh::types;
 using namespace vh::config;

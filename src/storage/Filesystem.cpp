@@ -10,7 +10,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "util/fsPath.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
-#include "keys/VaultEncryptionManager.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
 #include "util/files.hpp"
 #include "crypto/Hash.hpp"
 #include "services/ThumbnailWorker.hpp"
@@ -18,7 +18,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Transactions.hpp"
 #include "util/fsDBHelpers.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/IdGenerator.hpp"
 

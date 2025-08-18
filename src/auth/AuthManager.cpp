@@ -8,7 +8,7 @@
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <chrono>
 #include <sodium.h>
@@ -28,7 +28,7 @@ AuthManager::AuthManager(const std::shared_ptr<StorageManager>& storageManager)
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
 
-void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) {
+void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const {
     std::shared_ptr<Client> client;
 
     if (!session->getRefreshToken().empty()) {
@@ -246,6 +246,10 @@ bool AuthManager::isValidPassword(const std::string& password) {
     return !password.empty() && password.size() >= 8 && password.size() <= 128 &&
            std::ranges::any_of(password.begin(), password.end(), ::isdigit) && // At least one digit
            std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
+}
+
+bool AuthManager::isValidGroup(const std::string& group) {
+    return !group.empty() && group.size() >= 3 && group.size() <= 50;
 }
 
 std::shared_ptr<User> AuthManager::findUser(const std::string& name) {

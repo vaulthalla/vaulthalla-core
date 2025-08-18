@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <variant>
 
 namespace vh::types {
     struct Group;
@@ -13,18 +14,17 @@ namespace vh::database {
 struct GroupQueries {
     GroupQueries() = default;
 
-    static unsigned int createGroup(const std::string& name, const std::string& description = "");
+    static unsigned int createGroup(const std::shared_ptr<types::Group>& group);
+    static void updateGroup(const std::shared_ptr<types::Group>& group);
     static void deleteGroup(unsigned int groupId);
-    static void addMemberToGroup(unsigned int groupId, const std::string& name);
-    static void removeMemberFromGroup(unsigned int groupId, unsigned int userId);
-    static void updateGroup(unsigned int groupId, const std::string& newName);
-    static std::vector<std::shared_ptr<types::Group>> listGroups();
+    static void addMemberToGroup(unsigned int group, unsigned int member);
+    static void addMembersToGroup(unsigned int group, const std::vector<unsigned int>& members);
+    static void removeMemberFromGroup(unsigned int group, unsigned int member);
+    static void removeMembersFromGroup(unsigned int group, const std::vector<unsigned int>& members);
     static std::shared_ptr<types::Group> getGroup(unsigned int groupId);
     static std::shared_ptr<types::Group> getGroupByName(const std::string& name);
-    static void addStorageVolumeToGroup(unsigned int groupId, unsigned int volumeId);
-    static void removeStorageVolumeFromGroup(unsigned int groupId, unsigned int volumeId);
-    static std::vector<std::shared_ptr<types::Group>> listGroupsByUser(unsigned int userId);
-    static std::vector<std::shared_ptr<types::Group>> listGroupsByStorageVolume(unsigned int volumeId);
+    static std::vector<std::shared_ptr<types::Group>> listGroups(unsigned int userId = 0);
+    [[nodiscard]] static bool groupExists(const std::string& name);
 };
 
 }

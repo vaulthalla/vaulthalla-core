@@ -6,6 +6,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include "auth/AuthManager.hpp"
+#include "database/Queries/UserQueries.hpp"
+
 using namespace vh::websocket;
 
 void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session) {
@@ -18,7 +21,17 @@ void GroupHandler::handleCreateGroup(const json& msg, WebSocketSession& session)
         const std::string groupName = payload.at("name").get<std::string>();
         const std::string groupDescription = payload.value("description", "");
 
-        database::GroupQueries::createGroup(groupName, groupDescription);
+        const auto group = std::make_shared<types::Group>();
+        group->name = groupName;
+        group->description = groupDescription;
+        if (payload.contains("linux_gid")) {
+            const auto linuxGid = payload.at("linux_gid").get<unsigned int>();
+            if (linuxGid <= 0)
+                throw std::runtime_error("Invalid Linux GID: must be a positive integer");
+            group->linux_gid = linuxGid;
+        }
+
+        database::GroupQueries::createGroup(group);
 
         const json response = {
             {"command", "group.add.response"},
@@ -76,7 +89,10 @@ void GroupHandler::handleAddMemberToGroup(const json& msg, WebSocketSession& ses
         const unsigned int groupId = payload.at("groupId").get<unsigned int>();
         const std::string memberName = payload.at("memberName").get<std::string>();
 
-        database::GroupQueries::addMemberToGroup(groupId, memberName);
+        const auto member = database::UserQueries::getUserByName(memberName);
+        if (!member) throw std::runtime_error("User not found: " + memberName);
+
+        database::GroupQueries::addMemberToGroup(groupId, member->id);
 
         const json response = {
             {"command", "group.member.add.response"},
@@ -103,7 +119,7 @@ void GroupHandler::handleRemoveMemberFromGroup(const json& msg, WebSocketSession
         if (!user || !user->canManageRoles())
             throw std::runtime_error("Permission denied: Only admins can remove members from groups");
 
-        const auto payload = msg.at("payload");
+        const auto& payload = msg.at("payload");
         const unsigned int groupId = payload.at("groupId").get<unsigned int>();
         const unsigned int userId = payload.at("userId").get<unsigned int>();
 
@@ -232,7 +248,22 @@ void GroupHandler::handleUpdateGroup(const json& msg, WebSocketSession& session)
         const unsigned int groupId = payload.at("id").get<unsigned int>();
         const std::string newName = payload.at("name").get<std::string>();
 
-        database::GroupQueries::updateGroup(groupId, newName);
+        if (!auth::AuthManager::isValidGroup(newName))
+            throw std::runtime_error("Invalid group name: " + newName);
+
+        const auto group = database::GroupQueries::getGroup(groupId);
+        if (!group) throw std::runtime_error("Group not found");
+
+        group->name = newName;
+
+        if (payload.contains("linux_gid")) {
+            const auto linux_gid = payload.at("linux_gid").get<unsigned int>();
+            if (linux_gid <= 0)
+                throw std::runtime_error("Invalid Linux GID: must be a positive integer");
+            group->linux_gid = linux_gid;
+        }
+
+        database::GroupQueries::updateGroup(group);
 
         const json response = {
             {"command", "group.update.response"},
@@ -260,7 +291,7 @@ void GroupHandler::handleListGroupsByUser(const json& msg, WebSocketSession& ses
             throw std::runtime_error("Permission denied: Only admins can list groups by user");
 
         const auto userId = msg.at("payload").at("userId").get<unsigned int>();
-        const auto groups = database::GroupQueries::listGroupsByUser(userId);
+        const auto groups = database::GroupQueries::listGroups(userId);
 
         const json data = {{"groups", groups}};
 

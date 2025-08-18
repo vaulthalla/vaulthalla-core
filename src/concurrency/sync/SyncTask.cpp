@@ -9,7 +9,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
-#include "logging/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <utility>
 

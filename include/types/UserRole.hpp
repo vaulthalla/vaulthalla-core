@@ -14,7 +14,7 @@ class result;
 
 namespace vh::types {
 
-struct UserRole : Role {
+struct UserRole final : Role {
     unsigned int assignment_id, user_id;
     std::time_t assigned_at;
 

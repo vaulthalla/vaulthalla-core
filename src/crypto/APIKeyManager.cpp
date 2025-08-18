@@ -1,4 +1,4 @@
-#include "keys/APIKeyManager.hpp"
+#include "crypto/APIKeyManager.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "crypto/encrypt.hpp"
 #include "types/APIKey.hpp"
@@ -6,7 +6,7 @@
 #include <sodium.h>
 #include <stdexcept>
 
-using namespace vh::keys;
+using namespace vh::crypto;
 using namespace vh::types::api;
 
 APIKeyManager::APIKeyManager() {

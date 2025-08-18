@@ -48,20 +48,20 @@ void VaultEncryptionManager::load_key() {
         throw std::runtime_error("Vault key must be 32 bytes (AES-256)");
 }
 
-std::vector<uint8_t> VaultEncryptionManager::encrypt(
-    const std::vector<uint8_t>& plaintext,
-    std::string& out_b64_iv) const
-{
+std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const {
     std::vector<uint8_t> iv;
     auto ciphertext = encrypt_aes256_gcm(plaintext, key_, iv);
     out_b64_iv = b64_encode(iv);
     return ciphertext;
 }
 
-std::vector<uint8_t> VaultEncryptionManager::decrypt(
-    const std::vector<uint8_t>& ciphertext,
-    const std::string& b64_iv) const
-{
-    auto iv = b64_decode(b64_iv);
-    return decrypt_aes256_gcm(ciphertext, key_, iv);
+std::vector<uint8_t> VaultEncryptionManager::decrypt(const std::vector<uint8_t>& ciphertext, const std::string& b64_iv) const {
+    return decrypt_aes256_gcm(ciphertext, key_, b64_decode(b64_iv));
 }
+
+std::vector<uint8_t> VaultEncryptionManager::get_key(const std::string& callingFunctionName) const {
+    LogRegistry::audit()->info("[VaultEncryptionManager] Accessing vault key for vault ID: {} in function: {}",
+                                               vault_id_, callingFunctionName);
+    return key_;
+}
+

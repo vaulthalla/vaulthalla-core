@@ -24,6 +24,8 @@ public:
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,
                                  const std::string& b64_iv) const;
 
+    [[nodiscard]] std::vector<uint8_t> get_key(const std::string& callingFunctionName) const;
+
 private:
     std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
     unsigned int vault_id_;

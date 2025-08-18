@@ -14,12 +14,16 @@
 #include "types/DBQueryParams.hpp"
 #include "types/APIKey.hpp"
 #include "types/Group.hpp"
-#include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "types/VaultRole.hpp"
+#include "storage/StorageEngine.hpp"
+#include "keys/VaultEncryptionManager.hpp"
+#include "crypto/encrypt.hpp"
+#include "keys/GPGEncryptor.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -33,48 +37,61 @@ using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
+using namespace vh::crypto;
+using namespace vh::util;
+using namespace vh::logging;
 
-static CommandResult usage_vault_root() {
-    return {
-        0,
+static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
+    const std::string encryption_section =
+        "  === Encryption Key Management ===\n"
+        "    vault keys export  <vault_id | name | all>  [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]\n"
+        "    vault keys rotate  <vault_id | name | all>  [--owner <id | name>]\n"
+        "    vault keys inspect <vault_id | name>        [--owner <id | name>]\n";
+
+    const std::string general_usage_section =
         "Usage:\n"
-        "  Local vault:\n"
+        "\n"
+        "  === Vault Creation ===\n"
         "    vault create <name> --local\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner-id <id>]\n"
+        "        [--owner <id | name>]\n"
         "\n"
-        "  S3-backed vault:\n"
         "    vault create <name> --s3\n"
-        "         --api-key <name | id> --bucket <name>\n"
+        "        --api-key <name | id> --bucket <name>\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <keep_local | keep_remote | ask>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner-id <id>]\n"
+        "        [--owner <id | name>]\n"
         "\n"
-        "  Update existing vault (backend inferred; all params optional):\n"
+        "  === Vault Update ===\n"
         "    vault (update | set) <id>\n"
         "        [--api-key <name | id>] [--bucket <name>]\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner-id <id>]\n"
-        "    vault (update | set) <name> <owner_id>\n"
+        "        [--owner <id | name>]\n"
+        "\n"
+        "    vault (update | set) <name> <owner>\n"
         "        [--api-key <name | id>] [--bucket <name>]\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner-id <id>]\n"
+        "        [--owner <id | name>]\n"
         "\n"
-        "  Common commands:\n"
+        "  === Common Commands ===\n"
         "    vault delete <id>\n"
-        "    vault delete <name> --owner-id <id>\n"
+        "    vault delete <name> --owner <id | name>\n"
         "    vault info   <id>\n"
-        "    vault info   <name> [--owner-id <id>]\n"
+        "    vault info   <name> [--owner <id | name>]\n"
         "    vault assign <id> <role_id> --[uid | gid | user | group] <id | name>\n"
-        "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner-id <id>\n",
-        ""
-    };
+        "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner <id | name>\n"
+        "\n"
+        "  Use 'vh vault <command> --help' for more information on any subcommand.\n";
+
+    if (isSuperAdmin)
+        return {0, general_usage_section + "\n" + encryption_section, ""};
+    return {0, general_usage_section, ""};
 }
 
 static CommandResult usage_vaults_list() {
@@ -95,7 +112,6 @@ static uintmax_t parseSize(const std::string& s) {
     }
 }
 
-// ---------- handlers ----------
 static CommandResult handle_vault_create(const CommandCall& call) {
     try {
         if (call.positionals.empty()) return invalid("vault create: missing <name>");
@@ -233,10 +249,10 @@ static CommandResult handle_vault_info(const CommandCall& call) {
     std::shared_ptr<Vault> vault;
     if (idOpt) vault = VaultQueries::getVault(*idOpt);
     else {
-        const auto ownerIdOpt = optVal(call, "owner-id");
-        if (!ownerIdOpt) vault = VaultQueries::getVault(name, call.user->id);
-        const auto ownerId = parseInt(*ownerIdOpt);
-        vault = VaultQueries::getVault(name, *ownerId);
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault info: missing required --owner <id | name> for vault name lookup");
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
+        else vault = VaultQueries::getVault(name, call.user->id);
     }
 
     if (!vault) return invalid("vault info: vault with arg '" + name + "' not found");
@@ -387,13 +403,18 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
         if (*vaultIdOpt <= 0) return invalid("vault assign: vault ID must be a positive integer");
         vault = VaultQueries::getVault(*vaultIdOpt);
     } else {
-        const auto ownerIdOpt = optVal(call, "owner-id");
         unsigned int ownerId;
-        if (ownerIdOpt) {
-            const auto parsed = parseInt(*ownerIdOpt);
-            if (!parsed || *parsed <= 0) return invalid("vault assign: --owner-id must be a positive integer");
-            ownerId = *parsed;
-        } else ownerId = call.user->id; // Default to current user
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault assign: vault does not have a owner");
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner-id must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault assign: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault assign: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
         vault = VaultQueries::getVault(vaultArg, ownerId);
     }
 
@@ -452,10 +473,127 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     return ok("Successfully assigned role '" + role->name + "' to vault '" + vault->name + "'");
 }
 
+static nlohmann::json generate_json_key_object(const std::shared_ptr<Vault>& v,
+                                               const std::vector<uint8_t>& key,
+                                               const std::string& exportedBy) {
+    return {
+        {"vault_id", v->id},
+        {"vault_name", v->name},
+        {"key", b64_encode(key)},
+        {"key_info",
+            {
+                {"size", key.size()},
+                {"type", "AES-256-GCM"},
+                {"exported_by", exportedBy},
+                {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+            }
+        }
+    };
+}
+
+static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
+                                                     const nlohmann::json& output) {
+    const auto outputOpt = optVal(call, "output");
+
+    if (const auto recipientOpt = optVal(call, "recipient")) {
+        if (recipientOpt->empty()) return invalid("vault keys export: --recipient requires a value");
+        if (!outputOpt) return invalid("vault keys export: --recipient requires --output to specify the output file");
+
+        try {
+            GPGEncryptor::encryptToFile(output, *recipientOpt, *outputOpt);
+            return ok("Vault key successfully encrypted and saved to " + *outputOpt);
+        } catch (const std::exception& e) {
+            return invalid("vault keys export: failed to encrypt vault key: " + std::string(e.what()));
+        }
+    }
+
+    if (outputOpt) {
+        LogRegistry::audit()->warn("[shell::handle_key_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *outputOpt);
+        try {
+            std::ofstream outFile(*outputOpt);
+            if (!outFile) return invalid("vault keys export: failed to open output file " + *outputOpt);
+            outFile << output.dump(4);
+            outFile.close();
+            return {0, "Vault key(s) successfully saved to " + *outputOpt,
+                "WARNING: No recipient specified, key(s) are unencrypted.\n"
+                "         Consider using --recipient with a GPG fingerprint to encrypt the key(s) before saving."};
+        } catch (const std::exception& e) {
+            return invalid("vault keys export: failed to write to output file: " + std::string(e.what()));
+        }
+    }
+
+    LogRegistry::audit()->warn("[shell::handle_key_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
+    return {0, output.dump(4),
+        "WARNING: No recipient specified, key(s) are unencrypted.\n"
+        "         Consider using --recipient with a GPG fingerprint along with --output to securely encrypt the key(s) to an output file."};
+}
+
+static CommandResult handle_export_vault_key(const CommandCall& call) {
+    const auto vaultArg = call.positionals[0];
+    std::shared_ptr<StorageEngine> engine;
+
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) return invalid("vault keys export: vault ID must be a positive integer");
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
+    } else {
+        const auto ownerOpt = optVal(call, "owner");
+        unsigned int ownerId;
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner-id must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault assign: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault assign: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
+        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
+        if (!vault) return invalid("vault keys export: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    }
+
+    if (!engine) return invalid("vault keys export: no storage engine found for vault '" + vaultArg + "'");
+    const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
+    const auto& key = engine->encryptionManager->get_key(context);
+
+    const auto out = generate_json_key_object(engine->vault, key, call.user->name);
+    return handle_key_encrypt_and_response(call, out);
+}
+
+static CommandResult handle_export_all_vault_keys(const CommandCall& call) {
+    const auto engines = ServiceDepsRegistry::instance().storageManager->getEngines();
+    if (engines.empty()) return invalid("vault keys export: no vaults found");
+
+    nlohmann::json out = {
+        {"meta",
+            {"exported_by", call.user->name},
+            {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+        },
+        {"keys", nlohmann::json::array()}
+    };
+
+    const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
+    for (const auto& engine : engines) {
+
+        const auto& key = engine->encryptionManager->get_key(context);
+        out["keys"].push_back(generate_json_key_object(engine->vault, key, call.user->name));
+    }
+
+    return handle_key_encrypt_and_response(call, out);
+}
+
+static CommandResult handle_export_vault_keys(const CommandCall& call) {
+    if (!call.user->isSuperAdmin()) return invalid("vault keys export: only super admins can export vault keys");
+    if (call.positionals.empty()) return invalid("vault keys export: missing <vault_id | name | all> <output_file>");
+    if (call.positionals.size() > 2) return invalid("vault keys export: too many arguments");
+    if (call.positionals[0] == "all") return handle_export_all_vault_keys(call);
+    return handle_export_vault_key(call);
+}
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand("vault", "Manage a single vault",
                        [](const CommandCall& call) -> CommandResult {
-                           if (call.positionals.empty()) return usage_vault_root();
+                           if (call.positionals.empty()) return usage_vault_root(call.user->isSuperAdmin());
 
                            const std::string_view sub = call.positionals[0];
                            CommandCall subcall = call;
@@ -466,6 +604,8 @@ void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
                            if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
                            if (sub == "info" || sub == "get") return handle_vault_info(subcall);
                            if (sub == "update" || sub == "set") return handle_vault_update(subcall);
+                           if (sub == "assign" || sub == "role") return handle_vault_role_assign(subcall);
+                           if (sub == "keys") return handle_export_vault_keys(subcall);
 
                            return invalid(
                                "vault: unknown subcommand '" + std::string(sub) + "'. Use: create | delete | info");

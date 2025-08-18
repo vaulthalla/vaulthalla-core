@@ -37,37 +37,147 @@ static std::string ensureNewLine(const std::string& s) {
     return s;
 }
 
+/* ---------- robust argv → normalized argv + quoted line ---------- */
+
+static bool needs_quotes(std::string_view s) {
+    if (s.empty()) return true;
+    for (char c : s) {
+        if (c == ' ' || c == '\t' || c == '"' || c == '\\') return true;
+    }
+    return false;
+}
+
+static std::string dq_quote(std::string_view s) {
+    std::string out;
+    out.reserve(s.size() + 2);
+    out.push_back('"');
+    for (char c : s) {
+        if (c == '"' || c == '\\') out.push_back('\\');
+        out.push_back(c);
+    }
+    out.push_back('"');
+    return out;
+}
+
+// Heuristic: if tail has obvious "value" chars, treat "-Xtail" as glued value
+static bool looks_glued_value(std::string_view tail) {
+    if (tail.empty()) return false;
+    return std::ranges::any_of(tail, [](const char c) {
+        return c == '/' || c == '.' || c == ':' || c == '=';
+    });
+}
+
+// Normalize argv: split --key=value and -Xvalue (heuristic), keep -abc bundles as-is
+static std::vector<std::string> normalize_args(int argc, char** argv, int start_index) {
+    std::vector<std::string> out;
+    out.reserve((size_t)(argc - start_index + 4));
+    for (int i = start_index; i < argc; ++i) {
+        std::string a = argv[i];
+
+        if (a == "--") { out.emplace_back("--"); continue; }
+
+        if (a.rfind("--", 0) == 0) {
+            auto eq = a.find('=');
+            if (eq != std::string::npos) {
+                out.emplace_back(a.substr(0, eq));          // --key
+                out.emplace_back(a.substr(eq + 1));         // value
+            } else {
+                out.emplace_back(std::move(a));
+            }
+            continue;
+        }
+
+        if (a.size() > 2 && a[0] == '-' && a[1] != '-') {
+            // Could be -abc bundle OR -Xvalue
+            std::string tail = a.substr(2);
+            if (!tail.empty() && looks_glued_value(tail)) {
+                out.emplace_back(std::string("-") + a[1]);  // -X
+                if (tail[0] == '=') tail.erase(tail.begin());
+                out.emplace_back(std::move(tail));          // value
+            } else {
+                out.emplace_back(std::move(a));             // keep bundle as-is
+            }
+            continue;
+        }
+
+        out.emplace_back(std::move(a)); // plain arg
+    }
+    return out;
+}
+
+static std::string build_line_from_tokens(const std::vector<std::string>& tokens) {
+    std::string line;
+    for (const auto& t : tokens) {
+        if (!line.empty()) line.push_back(' ');
+        line += needs_quotes(t) ? dq_quote(t) : t;
+    }
+    return line;
+}
+
+/* ----------------------------------------------------------------- */
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: vhctl-uds <cmd> [args...]\n";
         return 2;
     }
+
+    // Build normalized argv: [cmd, args...], with --key=value and -Xvalue split
+    std::vector<std::string> argv_norm;
+    argv_norm.reserve((size_t)argc - 1);
+    argv_norm.emplace_back(argv[1]); // cmd
+    {
+        auto tail = normalize_args(argc, argv, /*start_index=*/2);
+        argv_norm.insert(argv_norm.end(), tail.begin(), tail.end());
+    }
+
+    // Quoted line for legacy servers (e.g., "group create \"Mile High Club\"")
+    std::string line = build_line_from_tokens(argv_norm);
+
     int s = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (s < 0) { perror("socket"); return 1; }
+
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     std::snprintf(addr.sun_path, sizeof(addr.sun_path), "/run/vaulthalla/cli.sock");
     if (::connect(s, (sockaddr*)&addr, sizeof(sa_family_t) + std::strlen(addr.sun_path) + 1) != 0) {
         perror("connect");
+        ::close(s);
         return 1;
     }
 
+    // Back-compat fields + richer payload
     nlohmann::json j;
-    j["cmd"] = argv[1];
-    std::vector<std::string> args;
-    for (int i = 2; i < argc; ++i) args.emplace_back(argv[i]);
-    j["args"] = args;
-    auto req = j.dump();
+    j["cmd"] = argv_norm.front();
+    if (argv_norm.size() > 1) {
+        std::vector<std::string> args(argv_norm.begin() + 1, argv_norm.end());
+        j["args"] = args;        // old shape
+    } else {
+        j["args"] = nlohmann::json::array();
+    }
+    j["argv"] = argv_norm;       // full normalized argv (cmd-first)
+    j["line"] = line;            // canonical quoted line (for string parsers)
+
+    const auto req = j.dump();
     uint32_t n = htonl(static_cast<uint32_t>(req.size()));
-    writen(s, &n, 4);
-    writen(s, req.data(), req.size());
+    if (!writen(s, &n, 4) || !writen(s, req.data(), req.size())) {
+        ::close(s);
+        return 1;
+    }
 
     uint32_t len_be;
-    if (!readn(s, &len_be, 4)) return 1;
-    uint32_t len = ntohl(len_be);
+    if (!readn(s, &len_be, 4)) { ::close(s); return 1; }
+    const uint32_t len = ntohl(len_be);
     std::string resp(len, '\0');
-    if (!readn(s, resp.data(), len)) return 1;
+    if (!readn(s, resp.data(), len)) { ::close(s); return 1; }
+    ::close(s);
 
-    auto r = nlohmann::json::parse(resp);
+    auto r = nlohmann::json::parse(resp, nullptr, /*allow_exceptions=*/false);
+    if (r.is_discarded()) {
+        fmt::print(stderr, "{}", "Invalid JSON response\n");
+        return 1;
+    }
+
     if (r.contains("stdout")) fmt::print("{}", ensureNewLine(r["stdout"].get<std::string>()));
     if (r.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(r["stderr"].get<std::string>()));
     return r.value("exit_code", 0);

@@ -63,6 +63,7 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     // Tokenizer expects a string that lives while tokens/views are used.
     // We keep it local so Token/CommandCall views remain valid through execute().
     const auto tokens = tokenize(line);   // your tokenize returns Token views into 'owned'
+    LogRegistry::shell()->info("[Router] Parsed tokens:\n{}", to_string(tokens));
     auto call   = parseTokens(tokens);
     call.user = user;
 

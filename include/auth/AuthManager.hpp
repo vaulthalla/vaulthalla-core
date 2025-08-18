@@ -27,7 +27,7 @@ class AuthManager {
 public:
     explicit AuthManager(const std::shared_ptr<storage::StorageManager>& storageManager = nullptr);
 
-    void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session);
+    void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
     std::shared_ptr<Client> registerUser(std::shared_ptr<types::User> user,
                                          const std::string& password,

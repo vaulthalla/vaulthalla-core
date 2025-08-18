@@ -10,10 +10,10 @@
 #include <cstring>
 #include <fmt/core.h>
 
-static bool readn(int fd, void* b, size_t n) {
+static bool readn(const int fd, void* b, size_t n) {
     auto* p = (uint8_t*)b;
     while (n) {
-        ssize_t r = ::read(fd, p, n);
+        const ssize_t r = ::read(fd, p, n);
         if (r <= 0) return false;
         p += r;
         n -= r;
@@ -21,10 +21,10 @@ static bool readn(int fd, void* b, size_t n) {
     return true;
 }
 
-static bool writen(int fd, const void* b, size_t n) {
-    auto* p = (const uint8_t*)b;
+static bool writen(const int fd, const void* b, size_t n) {
+    const auto* p = (const uint8_t*)b;
     while (n) {
-        ssize_t w = ::write(fd, p, n);
+        const ssize_t w = ::write(fd, p, n);
         if (w <= 0) return false;
         p += w;
         n -= w;
@@ -37,21 +37,16 @@ static std::string ensureNewLine(const std::string& s) {
     return s;
 }
 
-/* ---------- robust argv → normalized argv + quoted line ---------- */
-
 static bool needs_quotes(std::string_view s) {
     if (s.empty()) return true;
-    for (char c : s) {
-        if (c == ' ' || c == '\t' || c == '"' || c == '\\') return true;
-    }
-    return false;
+    return std::ranges::any_of(s, [](const auto c) { return c == ' ' || c == '\t' || c == '"' || c == '\\'; });
 }
 
 static std::string dq_quote(std::string_view s) {
     std::string out;
     out.reserve(s.size() + 2);
     out.push_back('"');
-    for (char c : s) {
+    for (const char c : s) {
         if (c == '"' || c == '\\') out.push_back('\\');
         out.push_back(c);
     }
@@ -68,9 +63,9 @@ static bool looks_glued_value(std::string_view tail) {
 }
 
 // Normalize argv: split --key=value and -Xvalue (heuristic), keep -abc bundles as-is
-static std::vector<std::string> normalize_args(int argc, char** argv, int start_index) {
+static std::vector<std::string> normalize_args(const int argc, char** argv, const int start_index) {
     std::vector<std::string> out;
-    out.reserve((size_t)(argc - start_index + 4));
+    out.reserve(static_cast<size_t>(argc) - start_index + 4);
     for (int i = start_index; i < argc; ++i) {
         std::string a = argv[i];
 
@@ -116,7 +111,7 @@ static std::string build_line_from_tokens(const std::vector<std::string>& tokens
 
 /* ----------------------------------------------------------------- */
 
-int main(int argc, char** argv) {
+int main(const int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: vhctl-uds <cmd> [args...]\n";
         return 2;
@@ -124,7 +119,7 @@ int main(int argc, char** argv) {
 
     // Build normalized argv: [cmd, args...], with --key=value and -Xvalue split
     std::vector<std::string> argv_norm;
-    argv_norm.reserve((size_t)argc - 1);
+    argv_norm.reserve(static_cast<size_t>(argc) - 1);
     argv_norm.emplace_back(argv[1]); // cmd
     {
         auto tail = normalize_args(argc, argv, /*start_index=*/2);
@@ -134,7 +129,7 @@ int main(int argc, char** argv) {
     // Quoted line for legacy servers (e.g., "group create \"Mile High Club\"")
     std::string line = build_line_from_tokens(argv_norm);
 
-    int s = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    const int s = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (s < 0) { perror("socket"); return 1; }
 
     sockaddr_un addr{};
@@ -150,7 +145,7 @@ int main(int argc, char** argv) {
     nlohmann::json j;
     j["cmd"] = argv_norm.front();
     if (argv_norm.size() > 1) {
-        std::vector<std::string> args(argv_norm.begin() + 1, argv_norm.end());
+        std::vector args(argv_norm.begin() + 1, argv_norm.end());
         j["args"] = args;        // old shape
     } else {
         j["args"] = nlohmann::json::array();

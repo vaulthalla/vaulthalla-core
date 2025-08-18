@@ -58,10 +58,6 @@ static CommandResult usage_roles_root() {
         "  roles info <name> [--user | --vault]\n"
         "  roles create <name> --type <user | vault> [--from <id | name>] [<permission_flags>]\n"
         "  roles update <id> [--name <new_name>] [<permission_flag>]\n"
-        "  roles assign user <username | user_id> <role_id>\n "
-        "  roles assign vault <vault_id> <role_id> --[uid | gid <id>]\n"
-        "  roles unassign user <username | user_id> <role_id>\n"
-        "  roles unassign vault <vault_id> <role_id> --[uid | gid <id>]\n"
         "  roles delete <id>\n",
         ""
     };

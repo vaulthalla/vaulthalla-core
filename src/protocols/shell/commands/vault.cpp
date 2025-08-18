@@ -8,14 +8,18 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "database/Queries/PermsQueries.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
 #include "types/DBQueryParams.hpp"
 #include "types/APIKey.hpp"
+#include "types/Group.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
+#include "database/Queries/GroupQueries.hpp"
+#include "types/VaultRole.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -30,19 +34,18 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 
-// ---------- pretty/usage ----------
 static CommandResult usage_vault_root() {
     return {
         0,
         "Usage:\n"
         "  Local vault:\n"
-        "    vault create <name> --local --mount <path>\n"
+        "    vault create <name> --local\n"
         "        [--on-sync-conflict <overwrite | keep_both | ask>]\n"
         "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
         "        [--owner-id <id>]\n"
         "\n"
         "  S3-backed vault:\n"
-        "    vault create <name> --s3 --mount <path>\n"
+        "    vault create <name> --s3\n"
         "         --api-key <name | id> --bucket <name>\n"
         "        [--sync-strategy <cache | sync | mirror>]\n"
         "        [--on-sync-conflict <keep_local | keep_remote | ask>]\n"
@@ -67,7 +70,9 @@ static CommandResult usage_vault_root() {
         "    vault delete <id>\n"
         "    vault delete <name> --owner-id <id>\n"
         "    vault info   <id>\n"
-        "    vault info   <name> [--owner-id <id>]\n",
+        "    vault info   <name> [--owner-id <id>]\n"
+        "    vault assign <id> <role_id> --[uid | gid | user | group] <id | name>\n"
+        "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner-id <id>\n",
         ""
     };
 }
@@ -364,6 +369,87 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     VaultQueries::upsertVault(vault, sync);
 
     return ok("Successfully updated vault!\n" + to_string(vault));
+}
+
+static CommandResult handle_vault_role_assign(const CommandCall& call) {
+    if (call.positionals.size() < 2) return invalid("vault assign: missing <vault_id> and <role_id>");
+    if (call.positionals.size() > 2) return invalid("vault assign: too many arguments");
+
+    const auto vaultArg = call.positionals.at(0);
+    const auto vaultIdOpt = parseInt(vaultArg);
+
+    const auto roleArg = call.positionals.at(1);
+    const auto roleIdOpt = parseInt(roleArg);
+
+    std::shared_ptr<Vault> vault;
+
+    if (vaultIdOpt) {
+        if (*vaultIdOpt <= 0) return invalid("vault assign: vault ID must be a positive integer");
+        vault = VaultQueries::getVault(*vaultIdOpt);
+    } else {
+        const auto ownerIdOpt = optVal(call, "owner-id");
+        unsigned int ownerId;
+        if (ownerIdOpt) {
+            const auto parsed = parseInt(*ownerIdOpt);
+            if (!parsed || *parsed <= 0) return invalid("vault assign: --owner-id must be a positive integer");
+            ownerId = *parsed;
+        } else ownerId = call.user->id; // Default to current user
+        vault = VaultQueries::getVault(vaultArg, ownerId);
+    }
+
+    if (!vault) return invalid("vault assign: vault with arg " + vaultArg + " not found");
+
+    if (vault->owner_id != call.user->id) {
+        if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id))
+            return invalid("vault assign: you do not have permission to assign roles to this vault");
+
+        if (!call.user->canManageRoles())
+            return invalid("vault assign: you do not have permission to manage roles");
+    }
+
+    std::shared_ptr<Role> role;
+
+    if (roleIdOpt) {
+        if (*roleIdOpt <= 0) return invalid("vault assign: role ID must be a positive integer");
+        role = PermsQueries::getRole(*roleIdOpt);
+    } else role = PermsQueries::getRoleByName(roleArg);
+
+    if (!role) return invalid("vault assign: role with arg " + roleArg + " not found");
+
+    std::string subjectType;
+    unsigned int subjectId;
+
+    if (const auto userOpt = optVal(call, "uid")) {
+        subjectType = "user";
+        if (const auto uidOpt = parseInt(*userOpt)) {
+            if (*uidOpt <= 0) return invalid("vault assign: user ID must be a positive integer");
+            subjectId = *uidOpt;
+        } else {
+            const auto user = UserQueries::getUserByName(*userOpt);
+            if (!user) return invalid("vault assign: user not found: " + *userOpt);
+            subjectId = user->id;
+        }
+    } else if (const auto groupOpt = optVal(call, "gid")) {
+        subjectType = "group";
+        if (const auto gidOpt = parseInt(*groupOpt)) {
+            if (*gidOpt <= 0) return invalid("vault assign: group ID must be a positive integer");
+            subjectId = *gidOpt;
+        } else {
+            const auto group = GroupQueries::getGroupByName(*groupOpt);
+            if (!group) return invalid("vault assign: group not found: " + *groupOpt);
+            subjectId = group->id;
+        }
+    } else return invalid("vault assign: must specify either --uid or --gid");
+
+    const auto vr = std::make_shared<VaultRole>();
+    vr->role_id = role->id;
+    vr->vault_id = vault->id;
+    vr->subject_type = subjectType;
+    vr->subject_id = subjectId;
+
+    PermsQueries::assignVaultRole(vr);
+
+    return ok("Successfully assigned role '" + role->name + "' to vault '" + vault->name + "'");
 }
 
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {

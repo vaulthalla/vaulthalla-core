@@ -4,160 +4,87 @@
 
 using namespace vh::database;
 
-unsigned int GroupQueries::createGroup(const std::string& name, const std::string& description) {
-    return Transactions::exec("GroupQueries::createGroup",
-        [&](pqxx::work& txn) {
-            return txn.exec("INSERT INTO groups (name, description) VALUES ("
-                + txn.quote(name) + ", " + txn.quote(description) + ") RETURNING id").one_field().as<unsigned int>();
+unsigned int GroupQueries::createGroup(const std::shared_ptr<types::Group>& group) {
+    return Transactions::exec("GroupQueries::createGroup", [&](pqxx::work& txn) {
+        pqxx::params p{group->name, group->description, group->linux_gid};
+        const auto res = txn.exec_prepared("insert_group", p);
+        if (res.empty()) throw std::runtime_error("Failed to create group: " + group->name);
+        return res.one_field().as<unsigned int>();
+    });
+}
+
+void GroupQueries::updateGroup(const std::shared_ptr<types::Group>& group) {
+    Transactions::exec("GroupQueries::updateGroup", [&](pqxx::work& txn) {
+        pqxx::params p{group->id, group->name, group->description, group->linux_gid};
+        txn.exec_prepared("update_group", p);
     });
 }
 
 void GroupQueries::deleteGroup(const unsigned int groupId) {
-    Transactions::exec("GroupQueries::deleteGroup",
-        [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM groups WHERE id = " + txn.quote(groupId));
-        });
+    Transactions::exec("GroupQueries::deleteGroup", [&](pqxx::work& txn) {
+        txn.exec_prepared("delete_group", groupId);
+    });
 }
 
-void GroupQueries::addMemberToGroup(const unsigned int groupId, const std::string& name) {
-    Transactions::exec("GroupQueries::addMemberToGroup",
-        [&](pqxx::work& txn) {
-            txn.exec(
-                "INSERT INTO group_members (group_id, user_id, joined_at) "
-                "VALUES (" + txn.quote(groupId) + ", (SELECT id FROM users WHERE name = " + txn.quote(name) + "), NOW())");
-        });
+void GroupQueries::addMemberToGroup(const unsigned int group, const unsigned int member) {
+    Transactions::exec("GroupQueries::addMemberToGroup", [&](pqxx::work& txn) {
+        txn.exec_prepared("add_member_to_group", pqxx::params{group, member});
+    });
 }
 
-void GroupQueries::removeMemberFromGroup(const unsigned int groupId, const unsigned int userId) {
-    Transactions::exec("GroupQueries::removeMemberFromGroup",
-        [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM group_members WHERE group_id = " + txn.quote(groupId) +
-                     " AND user_id = " + txn.quote(userId));
-        });
+void GroupQueries::addMembersToGroup(const unsigned int group, const std::vector<unsigned int>& members) {
+    Transactions::exec("GroupQueries::addMembersToGroup", [&](pqxx::work& txn) {
+        for (const auto& member : members)
+            txn.exec_prepared("add_member_to_group", pqxx::params{group, member});
+    });
 }
 
-void GroupQueries::updateGroup(const unsigned int groupId, const std::string& newName) {
-    Transactions::exec("GroupQueries::updateGroup",
-        [&](pqxx::work& txn) {
-            txn.exec("UPDATE groups SET name = " + txn.quote(newName) + " WHERE id = " + txn.quote(groupId));
-        });
+void GroupQueries::removeMemberFromGroup(const unsigned int group, const unsigned int member) {
+    Transactions::exec("GroupQueries::removeMemberFromGroup", [&](pqxx::work& txn) {
+        txn.exec_prepared("remove_member_from_group", pqxx::params{group, member});
+    });
 }
 
-std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups() {
-    return Transactions::exec("GroupQueries::listGroups",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Group>> {
-            const auto res = txn.exec("SELECT * FROM groups");
+void GroupQueries::removeMembersFromGroup(const unsigned int group, const std::vector<unsigned int>& members) {
+    Transactions::exec("GroupQueries::removeMembersFromGroup", [&](pqxx::work& txn) {
+        for (const auto& member : members)
+            txn.exec_prepared("remove_member_from_group", pqxx::params{group, member});
+    });
+}
 
-            std::vector<std::shared_ptr<types::Group>> groups;
-            for (const auto& group : res) {
-                const auto groupId = group["id"].as<unsigned int>();
+std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups(unsigned int userId) {
+    return Transactions::exec("GroupQueries::listGroups", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Group>> {
+        pqxx::result res;
+        if (userId == 0) res = txn.exec_prepared("list_all_groups");
+        else res = txn.exec_prepared("list_groups_by_user", userId);
 
-                const auto members = txn.exec(
-                    "SELECT u.*, gm.joined_at "
-                    "FROM users u "
-                    "JOIN group_members gm ON u.id = gm.user_id "
-                    "WHERE gm.group_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members));
-            }
-            return groups;
-        });
+        std::vector<std::shared_ptr<types::Group>> groups;
+        for (const auto& group : res) {
+            const auto groupId = group["id"].as<unsigned int>();
+            const auto members = txn.exec_prepared("list_group_members", groupId);
+            groups.push_back(std::make_shared<types::Group>(group, members));
+        }
+        return groups;
+    });
 }
 
 std::shared_ptr<vh::types::Group> GroupQueries::getGroup(const unsigned int groupId) {
-    return Transactions::exec("GroupQueries::getGroup",
-        [&](pqxx::work& txn) -> std::shared_ptr<vh::types::Group> {
-            const auto groupRow = txn.exec("SELECT * FROM groups WHERE id = " + txn.quote(groupId)).one_row();
-
-            const auto members = txn.exec(
-                "SELECT u.*, gm.joined_at "
-                "FROM users u "
-                "JOIN group_members gm ON u.id = gm.user_id "
-                "WHERE gm.group_id = " + txn.quote(groupId));
-
-            return std::make_shared<types::Group>(groupRow, members);
-        });
+    return Transactions::exec("GroupQueries::getGroup", [&](pqxx::work& txn) -> std::shared_ptr<types::Group> {
+        const auto res = txn.exec_prepared("get_group", groupId);
+        if (res.empty()) return nullptr;
+        const auto members = txn.exec_prepared("list_group_members", groupId);
+        return std::make_shared<types::Group>(res.one_row(), members);
+    });
 }
 
 std::shared_ptr<vh::types::Group> GroupQueries::getGroupByName(const std::string& name) {
     return Transactions::exec("GroupQueries::getGroupByName",
-        [&](pqxx::work& txn) -> std::shared_ptr<vh::types::Group> {
-            const auto groupRow = txn.exec(
-                "SELECT * FROM groups WHERE name = " + txn.quote(name)).one_row();
-
+        [&](pqxx::work& txn) -> std::shared_ptr<types::Group> {
+            const auto res = txn.exec_prepared("get_group_by_name", name);
+            if (res.empty()) return nullptr;
+            const auto groupRow = res.one_row();
             const auto groupId = groupRow["id"].as<unsigned int>();
-
-            const auto members = txn.exec(
-                "SELECT u.*, gm.joined_at "
-                "FROM users u "
-                "JOIN group_members gm ON u.id = gm.user_id "
-                "WHERE gm.group_id = " + txn.quote(groupId));
-
+            const auto members = txn.exec_prepared("list_group_members", groupId);
             return std::make_shared<types::Group>(groupRow, members);
-        });
-}
-
-void GroupQueries::addStorageVolumeToGroup(const unsigned int groupId, const unsigned int volumeId) {
-    Transactions::exec("GroupQueries::addStorageVolumeToGroup",
-        [&](pqxx::work& txn) {
-            txn.exec(
-                "INSERT INTO volumes (group_id, volume_id, assigned_at) "
-                "VALUES (" + txn.quote(groupId) + ", " + txn.quote(volumeId) + ", NOW())");
-        });
-}
-
-void GroupQueries::removeStorageVolumeFromGroup(const unsigned int groupId, const unsigned int volumeId) {
-    Transactions::exec("GroupQueries::removeStorageVolumeFromGroup",
-        [&](pqxx::work& txn) {
-            txn.exec("DELETE FROM volumes WHERE group_id = " + txn.quote(groupId) +
-                     " AND volume_id = " + txn.quote(volumeId));
-        });
-}
-
-std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByUser(const unsigned int userId) {
-    return Transactions::exec("GroupQueries::listGroupsByUser",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<vh::types::Group>> {
-            const auto res = txn.exec(
-                "SELECT g.* FROM groups g "
-                "JOIN group_members gm ON g.id = gm.group_id "
-                "WHERE gm.user_id = " + txn.quote(userId));
-
-            std::vector<std::shared_ptr<types::Group>> groups;
-            for (const auto& group : res) {
-                const auto groupId = group["id"].as<unsigned int>();
-
-                const auto members = txn.exec(
-                    "SELECT u.*, gm.joined_at "
-                    "FROM users u "
-                    "JOIN group_members gm ON u.id = gm.user_id "
-                    "WHERE gm.group_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members));
-            }
-            return groups;
-        });
-}
-
-std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroupsByStorageVolume(const unsigned int volumeId) {
-    return Transactions::exec("GroupQueries::listGroupsByStorageVolume",
-        [&](pqxx::work& txn) -> std::vector<std::shared_ptr<vh::types::Group>> {
-            const auto res = txn.exec(
-                "SELECT g.* FROM groups g "
-                "JOIN volumes vs ON g.id = vs.subject_id "
-                "WHERE vs.volume_id = " + txn.quote(volumeId));
-
-            std::vector<std::shared_ptr<types::Group>> groups;
-            for (const auto& group : res) {
-                const auto groupId = group["id"].as<unsigned int>();
-
-                const auto members = txn.exec(
-                    "SELECT u.*, gm.joined_at "
-                    "FROM users u "
-                    "JOIN group_members gm ON u.id = gm.user_id "
-                    "WHERE gm.group_id = " + txn.quote(groupId));
-
-                groups.push_back(std::make_shared<types::Group>(group, members));
-            }
-            return groups;
         });
 }

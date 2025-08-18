@@ -248,6 +248,11 @@ bool AuthManager::isValidPassword(const std::string& password) {
            std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
 }
 
+bool AuthManager::isValidGroup(const std::string& group) {
+    return !group.empty() && group.size() >= 3 && group.size() <= 50 &&
+           std::ranges::all_of(group, [](char c) { return std::isalnum(c) || c == '-' || c == '_'; });
+}
+
 std::shared_ptr<User> AuthManager::findUser(const std::string& name) {
     const auto it = users_.find(name);
     if (it != users_.end()) return it->second;

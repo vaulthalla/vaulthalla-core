@@ -108,6 +108,7 @@ bool User::isAdmin() const { return isSuperAdmin() || role->permissions == ADMIN
 // --- Admin checks ---
 bool User::canManageAdmins() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
 bool User::canManageUsers() const { return hasPermission(role->permissions, AdminPermission::ManageUsers); }
+bool User::canManageGroups() const { return hasPermission(role->permissions, AdminPermission::ManageGroups); }
 bool User::canManageRoles() const { return hasPermission(role->permissions, AdminPermission::ManageRoles); }
 bool User::canManageSettings() const { return hasPermission(role->permissions, AdminPermission::ManageSettings); }
 bool User::canManageVaults() const { return hasPermission(role->permissions, AdminPermission::ManageVaults); }

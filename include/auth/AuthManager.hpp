@@ -61,6 +61,8 @@ public:
 
     static bool isValidPassword(const std::string& password);
 
+    static bool isValidGroup(const std::string& group);
+
 private:
     std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
     std::shared_ptr<SessionManager> sessionManager_;

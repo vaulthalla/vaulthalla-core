@@ -33,6 +33,7 @@ std::string to_string(const AdminPermission p) {
     switch (p) {
     case AdminPermission::ManageAdmins: return "Manage Admins";
     case AdminPermission::ManageUsers: return "Manage Users";
+    case AdminPermission::ManageGroups: return "Manage Groups";
     case AdminPermission::ManageRoles: return "Manage Roles";
     case AdminPermission::ManageSettings: return "Manage Settings";
     case AdminPermission::ManageVaults: return "Manage Vaults";
@@ -90,11 +91,12 @@ nlohmann::json jsonFromAdminMask(const uint16_t mask) {
     return {
         {"manage_admins", (mask & (1 << 0)) != 0},
         {"manage_users", (mask & (1 << 1)) != 0},
-        {"manage_roles", (mask & (1 << 2)) != 0},
-        {"manage_settings", (mask & (1 << 3)) != 0},
-        {"manage_vaults", (mask & (1 << 4)) != 0},
-        {"audit_log_access", (mask & (1 << 5)) != 0},
-        {"full_api_key_access", (mask & (1 << 6)) != 0}
+        {"manage_groups", (mask & (1 << 2)) != 0},
+        {"manage_roles", (mask & (1 << 3)) != 0},
+        {"manage_settings", (mask & (1 << 4)) != 0},
+        {"manage_vaults", (mask & (1 << 5)) != 0},
+        {"audit_log_access", (mask & (1 << 6)) != 0},
+        {"full_api_key_access", (mask & (1 << 7)) != 0}
     };
 }
 
@@ -121,11 +123,12 @@ uint16_t adminMaskFromJson(const nlohmann::json& j) {
     uint16_t mask = 0;
     if (j.at("manage_admins").get<bool>()) mask |= (1 << 0);
     if (j.at("manage_users").get<bool>()) mask |= (1 << 1);
-    if (j.at("manage_roles").get<bool>()) mask |= (1 << 2);
-    if (j.at("manage_settings").get<bool>()) mask |= (1 << 3);
-    if (j.at("manage_vaults").get<bool>()) mask |= (1 << 4);
-    if (j.at("audit_log_access").get<bool>()) mask |= (1 << 5);
-    if (j.at("full_api_key_access").get<bool>()) mask |= (1 << 6);
+    if (j.at("manage_groups").get<bool>()) mask |= (1 << 2);
+    if (j.at("manage_roles").get<bool>()) mask |= (1 << 3);
+    if (j.at("manage_settings").get<bool>()) mask |= (1 << 4);
+    if (j.at("manage_vaults").get<bool>()) mask |= (1 << 5);
+    if (j.at("audit_log_access").get<bool>()) mask |= (1 << 6);
+    if (j.at("full_api_key_access").get<bool>()) mask |= (1 << 7);
     return mask;
 }
 

@@ -140,10 +140,16 @@ void vh::seed::initAdmin() {
 void vh::seed::initAdminGroup() {
     LogRegistry::vaulthalla()->info("[initdb] Initializing admin group...");
 
-    const auto gid = GroupQueries::createGroup("admin", "Core administrative group for system management");
-    GroupQueries::addMemberToGroup(gid, "admin");
-    const auto group = GroupQueries::getGroupByName("admin");
+    auto group = std::make_shared<Group>();
+    group->name = "admin";
+    group->description = "Core administrative group for system management";
+    group->id = GroupQueries::createGroup(group);
+
+    GroupQueries::addMemberToGroup(group->id, UserQueries::getUserByName("admin")->id);
+
+    group = GroupQueries::getGroupByName("admin");
     if (!group) throw std::runtime_error("Failed to create admin group");
+
     if (group->members.front()->user->name != "admin") throw std::runtime_error("Admin user not added to admin group");
 }
 

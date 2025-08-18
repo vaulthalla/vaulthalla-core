@@ -22,7 +22,7 @@ namespace vh::types {
 
 struct PermissionOverride;
 
-struct VaultRole : Role {
+struct VaultRole final : Role {
     unsigned int assignment_id, subject_id, role_id, vault_id;
     std::string subject_type; // 'user' or 'group'
     std::time_t assigned_at;

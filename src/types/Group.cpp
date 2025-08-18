@@ -1,12 +1,14 @@
 #include "types/Group.hpp"
 #include "util/timestamp.hpp"
 #include "types/User.hpp"
+#include "protocols/shell/Table.hpp"
+#include "util/cmdLineHelpers.hpp"
 
-#include <pqxx/row>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::shell;
 
 GroupMember::GroupMember(const pqxx::row& row)
     : user(std::make_shared<User>(row)),
@@ -99,4 +101,53 @@ void vh::types::to_json(nlohmann::json& j, const GroupMember& gm) {
         {"user", *gm.user},
         {"joined_at", util::timestampToString(gm.joined_at)}
     };
+}
+
+std::string vh::types::to_string(const std::shared_ptr<Group>& g) {
+    std::string out = "Group: " + g->name + " (ID: " + std::to_string(g->id) + ")";
+    if (g->description) out += "\nDescription: " + *g->description;
+    out += "\nCreated at: " + util::timestampToString(g->created_at);
+    if (g->updated_at) out += "\nUpdated at: " + util::timestampToString(*g->updated_at);
+
+    out += "\nMembers:\n";
+    for (const auto& member : g->members)
+        out += "  - " + member->user->name + " (ID: " + std::to_string(member->user->id) + "), Joined at: " + util::timestampToString(member->joined_at) + "\n";
+
+    return out;
+}
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<Group>>& groups) {
+    if (groups.empty()) return "No groups found";
+
+    Table tbl({
+        {"ID", Align::Left, 4, 8, false, false},
+        {"Name", Align::Left, 8, 30, true, true},
+        {"Description", Align::Left, 30, 50, true, true},
+        {"Created At", Align::Left, 20, 30, true, true},
+        {"Members", Align::Left, 4, 10, false, false}
+    }, term_width());
+
+    for (const auto& g : groups) {
+        tbl.add_row({
+            std::to_string(g->id),
+            g->name,
+            g->description.value_or(""),
+            util::timestampToString(g->created_at),
+            std::to_string(g->members.size())
+        });
+    }
+
+    return tbl.render();
+}
+
+std::string vh::types::to_string(const std::shared_ptr<GroupMember>& gm) {
+    return "Member: " + gm->user->name + " (ID: " + std::to_string(gm->user->id) + "), Joined at: " + util::timestampToString(gm->joined_at);
+}
+
+std::string vh::types::to_string(const std::vector<std::shared_ptr<GroupMember>>& members) {
+    if (members.empty()) return "No members found";
+
+    std::string out = "Group Members:\n";
+    for (const auto& member : members) out += "  - " + to_string(member) + "\n";
+    return out;
 }

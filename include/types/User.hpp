@@ -51,6 +51,7 @@ struct User {
     // Admin checks
     [[nodiscard]] bool canManageAdmins() const;
     [[nodiscard]] bool canManageUsers() const;
+    [[nodiscard]] bool canManageGroups() const;
     [[nodiscard]] bool canManageRoles() const;
     [[nodiscard]] bool canManageSettings() const;
     [[nodiscard]] bool canManageVaults() const;

@@ -113,6 +113,10 @@ static uintmax_t parseSize(const std::string& s) {
 
 static CommandResult handle_vault_create(const CommandCall& call) {
     try {
+        if (!call.user->canCreateVaults()) return invalid(
+            "vault create: user ID " + std::to_string(call.user->id) +
+            " does not have permission to create vaults");
+
         if (call.positionals.empty()) return invalid("vault create: missing <name>");
         if (call.positionals.size() > 1) return invalid("vault create: too many arguments");
 
@@ -163,7 +167,7 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             if (!apiKey) return invalid("vault create: API key not found: " + *apiKeyOpt);
 
             if (ownerId != call.user->id) {
-                if (!call.user->canAccessAnyAPIKey())
+                if (!call.user->canManageAPIKeys())
                     return invalid(
                         "vault create: user ID " + std::to_string(call.user->id) +
                         " does not have permission to assign API keys to other users vaults"
@@ -171,7 +175,7 @@ static CommandResult handle_vault_create(const CommandCall& call) {
 
                 const auto owner = UserQueries::getUserById(ownerId);
 
-                if (ownerId != apiKey->user_id && !owner->canAccessAnyAPIKey())
+                if (ownerId != apiKey->user_id && !owner->canManageAPIKeys())
                     return invalid("vault create: API key '" + *apiKeyOpt + "' does not belong to user ID " +
                                    std::to_string(ownerId));
             }
@@ -231,8 +235,14 @@ static CommandResult handle_vault_delete(const CommandCall& call) {
     }
 
     if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
-        return invalid("vault delete: you do not have permission to delete this vault");
+
+    if (!call.user->canManageVaults()) {
+        if (call.user->id != vault->owner_id)
+            return invalid("vault delete: you do not have permission to delete this vault");
+
+        if (!call.user->canDeleteVaultData(vault->id))
+            return invalid("vault delete: you do not have permission to delete this vault's data");
+    }
 
     ServiceDepsRegistry::instance().storageManager->removeVault(*idOpt);
 
@@ -259,6 +269,9 @@ static CommandResult handle_vault_info(const CommandCall& call) {
 
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
         return invalid("vault info: you do not have permission to view this vault");
+
+    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id))
+        return invalid("vault info: you do not have permission to view this vault's data");
 
     return ok(to_string(vault));
 }
@@ -288,9 +301,25 @@ static CommandResult handle_vaults_list(const CommandCall& call) {
         .offset = 0, // TODO: handle pagination if needed
     };
 
-    const auto vaults = listAll
+    auto vaults = listAll
                             ? VaultQueries::listVaults(std::move(p))
                             : VaultQueries::listUserVaults(user->id, std::move(p));
+
+    if (!listAll) {
+        for (const auto& r : call.user->roles) {
+            if (r->canList({})) {
+                const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
+                if (!vault) continue;
+                if (vault->owner_id == user->id) continue; // Already added
+                vaults.push_back(vault);
+            }
+        }
+    } else {
+        for (const auto& v : vaults)
+            if (!call.user->canListVaultData(v->id)) std::ranges::remove_if(vaults, [&](const std::shared_ptr<Vault>& vault) {
+                return vault->id == v->id;
+            });
+    }
 
     return ok(to_string(vaults));
 }
@@ -584,7 +613,13 @@ static CommandResult handle_export_all_vault_keys(const CommandCall& call) {
 }
 
 static CommandResult handle_export_vault_keys(const CommandCall& call) {
-    if (!call.user->isSuperAdmin()) return invalid("vault keys export: only super admins can export vault keys");
+    if (!call.user->isSuperAdmin()) {
+        if (!call.user->canManageEncryptionKeys()) return invalid("vault keys export: only super admins can export vault keys");
+
+        LogRegistry::audit()->warn("\n[shell::handle_export_vault_keys] User {} called to export vault keys without super admin privileges\n"
+                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+                                       call.user->name);
+    }
     if (call.positionals.empty()) return invalid("vault keys export: missing <vault_id | name | all> <output_file>");
     if (call.positionals.size() > 2) return invalid("vault keys export: too many arguments");
     if (call.positionals[0] == "all") return handle_export_all_vault_keys(call);

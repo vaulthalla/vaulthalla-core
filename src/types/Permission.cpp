@@ -30,6 +30,7 @@ Permission::Permission(const unsigned int bitPos, std::string name, std::string 
 
 std::string to_string(const AdminPermission p) {
     switch (p) {
+    case AdminPermission::ManageEncryptionKeys: return "Export Encryption Keys";
     case AdminPermission::ManageAdmins: return "Manage Admins";
     case AdminPermission::ManageUsers: return "Manage Users";
     case AdminPermission::ManageGroups: return "Manage Groups";
@@ -37,7 +38,8 @@ std::string to_string(const AdminPermission p) {
     case AdminPermission::ManageSettings: return "Manage Settings";
     case AdminPermission::ManageVaults: return "Manage Vaults";
     case AdminPermission::AuditLogAccess: return "Audit Log Access";
-    case AdminPermission::FullAPIKeyAccess: return "Full API Key Access";
+    case AdminPermission::ManageAPIKeys: return "Manage API Keys";
+    case AdminPermission::CreateVaults: return "Create Vaults";
     default: return "Unknown Admin Permission";
     }
 }
@@ -88,14 +90,16 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission> >&
 
 nlohmann::json jsonFromAdminMask(const uint16_t mask) {
     return {
-        {"manage_admins", (mask & (1 << 0)) != 0},
-        {"manage_users", (mask & (1 << 1)) != 0},
-        {"manage_groups", (mask & (1 << 2)) != 0},
-        {"manage_roles", (mask & (1 << 3)) != 0},
-        {"manage_settings", (mask & (1 << 4)) != 0},
-        {"manage_vaults", (mask & (1 << 5)) != 0},
-        {"audit_log_access", (mask & (1 << 6)) != 0},
-        {"full_api_key_access", (mask & (1 << 7)) != 0}
+        {"export_encryption_keys", (mask & (1 << 0)) != 0},
+        {"manage_admins", (mask & (1 << 1)) != 0},
+        {"manage_users", (mask & (1 << 2)) != 0},
+        {"manage_groups", (mask & (1 << 3)) != 0},
+        {"manage_roles", (mask & (1 << 4)) != 0},
+        {"manage_settings", (mask & (1 << 5)) != 0},
+        {"manage_vaults", (mask & (1 << 6)) != 0},
+        {"manage_api_keys", (mask & (1 << 7)) != 0},
+        {"audit_log_access", (mask & (1 << 8)) != 0},
+        {"create_vaults", (mask & (1 << 9)) != 0}
     };
 }
 
@@ -120,14 +124,16 @@ nlohmann::json jsonFromVaultMask(const uint16_t mask) {
 
 uint16_t adminMaskFromJson(const nlohmann::json& j) {
     uint16_t mask = 0;
-    if (j.at("manage_admins").get<bool>()) mask |= (1 << 0);
-    if (j.at("manage_users").get<bool>()) mask |= (1 << 1);
-    if (j.at("manage_groups").get<bool>()) mask |= (1 << 2);
-    if (j.at("manage_roles").get<bool>()) mask |= (1 << 3);
-    if (j.at("manage_settings").get<bool>()) mask |= (1 << 4);
-    if (j.at("manage_vaults").get<bool>()) mask |= (1 << 5);
-    if (j.at("audit_log_access").get<bool>()) mask |= (1 << 6);
-    if (j.at("full_api_key_access").get<bool>()) mask |= (1 << 7);
+    if (j.at("export_encryption_keys").get<bool>()) mask |= (1 << 0);
+    if (j.at("manage_admins").get<bool>()) mask |= (1 << 1);
+    if (j.at("manage_users").get<bool>()) mask |= (1 << 2);
+    if (j.at("manage_groups").get<bool>()) mask |= (1 << 3);
+    if (j.at("manage_roles").get<bool>()) mask |= (1 << 4);
+    if (j.at("manage_settings").get<bool>()) mask |= (1 << 5);
+    if (j.at("manage_vaults").get<bool>()) mask |= (1 << 6);
+    if (j.at("manage_api_keys").get<bool>()) mask |= (1 << 7);
+    if (j.at("audit_log_access").get<bool>()) mask |= (1 << 8);
+    if (j.at("create_vaults").get<bool>()) mask |= (1 << 9);
     return mask;
 }
 

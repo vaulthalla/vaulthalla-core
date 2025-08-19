@@ -11,14 +11,16 @@
 namespace vh::types {
 
 enum class AdminPermission : uint16_t {
-    ManageAdmins            = 1ULL << 0,
-    ManageUsers             = 1ULL << 1,
-    ManageGroups            = 1ULL << 2,
-    ManageRoles             = 1ULL << 3,
-    ManageSettings          = 1ULL << 4,
-    ManageVaults            = 1ULL << 5,   // create, delete, adjust settings of any vault
-    AuditLogAccess          = 1ULL << 6 ,
-    FullAPIKeyAccess        = 1ULL << 7,   // manage API keys, create, delete, list - users may only see their own keys
+    ManageEncryptionKeys    = 1ULL << 0, // export vault encryption keys for backup or migration
+    ManageAdmins            = 1ULL << 1, // manage admin users, create, delete, update admin accounts
+    ManageUsers             = 1ULL << 2, // manage user accounts, create, delete, update user accounts
+    ManageGroups            = 1ULL << 3, // manage groups, create, delete, update groups
+    ManageRoles             = 1ULL << 4, // manage roles, create, delete, update roles
+    ManageSettings          = 1ULL << 5, // manage system settings, configuration, and policies
+    ManageVaults            = 1ULL << 6, // manage vaults, create, delete, update vault settings
+    ManageAPIKeys           = 1ULL << 7,
+    AuditLogAccess          = 1ULL << 8, // access audit logs for monitoring
+    CreateVaults            = 1ULL << 9,
 };
 
 enum class VaultPermission : uint16_t {

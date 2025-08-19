@@ -36,7 +36,7 @@ struct VaultRole final : Role {
 
     explicit VaultRole(const nlohmann::json& j);
 
-    std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
+    [[nodiscard]] std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
 
     template <typename T> bool validatePermission(const uint16_t mask, T perm,
                                                   const std::filesystem::path& path = {}) const {

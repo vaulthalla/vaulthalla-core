@@ -49,6 +49,7 @@ struct User {
     [[nodiscard]] bool isSuperAdmin() const;
 
     // Admin checks
+    [[nodiscard]] bool canManageEncryptionKeys() const;
     [[nodiscard]] bool canManageAdmins() const;
     [[nodiscard]] bool canManageUsers() const;
     [[nodiscard]] bool canManageGroups() const;
@@ -56,7 +57,8 @@ struct User {
     [[nodiscard]] bool canManageSettings() const;
     [[nodiscard]] bool canManageVaults() const;
     [[nodiscard]] bool canAccessAuditLog() const;
-    [[nodiscard]] bool canAccessAnyAPIKey() const;
+    [[nodiscard]] bool canManageAPIKeys() const;
+    [[nodiscard]] bool canCreateVaults() const;
 
     // Vault permissions
     [[nodiscard]] bool canMigrateVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;

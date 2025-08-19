@@ -58,13 +58,16 @@ void vh::seed::initPermissions() {
     LogRegistry::vaulthalla()->info("[initdb] Initializing permissions...");
 
     const std::vector<Permission> userPerms{
-        {0, "manage_admins", "Can manage admin users (create, deactivate, modify)"},
-        {1, "manage_users", "Can manage regular users"},
-        {2, "manage_roles", "Can create, modify, delete roles"},
-        {3, "manage_settings", "Can modify system-wide settings"},
-        {4, "manage_vaults", "Can create, delete, modify any vault settings"},
-        {5, "access_audit_logs", "Can view system audit logs"},
-        {6, "manage_api_keys", "Can manage API keys globally"}
+        {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
+        {1, "manage_admins", "Can manage admin users (create, deactivate, modify)"},
+        {2, "manage_users", "Can manage regular users"},
+        {3, "manage_groups", "Can create, modify, delete groups"},
+        {4, "manage_roles", "Can create, modify, delete roles"},
+        {5, "manage_settings", "Can modify system-wide settings"},
+        {6, "manage_vaults", "Can create, delete, modify any vault settings"},
+        {7, "manage_api_keys", "Can manage API keys globally"},
+        {8, "access_audit_logs", "Can view system audit logs"},
+        {9, "create_vaults", "Can create new vaults"}
     };
 
     const std::vector<Permission> vaultPerms{
@@ -99,8 +102,8 @@ void vh::seed::initRoles() {
     LogRegistry::vaulthalla()->info("[initdb] Initializing roles...");
 
     std::vector<Role> roles{
-        {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000000001111111},
-        {"admin", "System administrator with all non-root administrative powers", "user", 0b0000000001111110},
+        {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
+        {"admin", "System administrator with all non-root administrative powers", "user", 0b0000001111111100},
         {"power_user", "Advanced user with full vault control but no admin authority", "vault", 0b0011111111111111},
         {"user", "Standard user with basic file operations", "vault", 0b0000000111101000},
         {"guest", "Minimal access: can download files and list directories", "vault", 0b0000000000101000}

@@ -106,6 +106,7 @@ bool User::isAdmin() const { return isSuperAdmin() || role->permissions == ADMIN
 
 
 // --- Admin checks ---
+bool User::canManageEncryptionKeys() const { return hasPermission(role->permissions, AdminPermission::ManageEncryptionKeys); }
 bool User::canManageAdmins() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
 bool User::canManageUsers() const { return hasPermission(role->permissions, AdminPermission::ManageUsers); }
 bool User::canManageGroups() const { return hasPermission(role->permissions, AdminPermission::ManageGroups); }
@@ -113,7 +114,8 @@ bool User::canManageRoles() const { return hasPermission(role->permissions, Admi
 bool User::canManageSettings() const { return hasPermission(role->permissions, AdminPermission::ManageSettings); }
 bool User::canManageVaults() const { return hasPermission(role->permissions, AdminPermission::ManageVaults); }
 bool User::canAccessAuditLog() const { return hasPermission(role->permissions, AdminPermission::AuditLogAccess); }
-bool User::canAccessAnyAPIKey() const { return hasPermission(role->permissions, AdminPermission::FullAPIKeyAccess); }
+bool User::canManageAPIKeys() const { return hasPermission(role->permissions, AdminPermission::ManageAPIKeys); }
+bool User::canCreateVaults() const { return hasPermission(role->permissions, AdminPermission::CreateVaults); }
 
 
 // --- Vault role->permissions ---

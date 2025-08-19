@@ -67,7 +67,7 @@ static CommandResult handleListAPIKeys(const CommandCall& call) {
         if (!user) return invalid("You must be logged in to list API keys.");
 
         std::vector<std::shared_ptr<APIKey>> keys;
-        if (user->canAccessAnyAPIKey()) keys = APIKeyQueries::listAPIKeys();
+        if (user->canManageAPIKeys()) keys = APIKeyQueries::listAPIKeys();
         else keys = APIKeyQueries::listAPIKeys(user->id);
 
         if (json) {
@@ -137,7 +137,7 @@ static CommandResult handleDeleteAPIKey(const CommandCall& call) {
         const auto key = APIKeyQueries::getAPIKey(std::stoi(id));
         if (!key) return invalid("API key not found: " + id);
 
-        if (!call.user->canAccessAnyAPIKey() && key->user_id != call.user->id)
+        if (!call.user->canManageAPIKeys() && key->user_id != call.user->id)
             return invalid("You do not have permission to delete this API key.");
 
         ServiceDepsRegistry::instance().apiKeyManager->removeAPIKey(key->id, key->user_id);
@@ -156,7 +156,7 @@ static CommandResult handleAPIKeyInfo(const CommandCall& call) {
         const auto key = APIKeyQueries::getAPIKey(std::stoi(id));
         if (!key) return invalid("API key not found: " + id);
 
-        if (!call.user->canAccessAnyAPIKey() && key->user_id != call.user->id)
+        if (!call.user->canManageAPIKeys() && key->user_id != call.user->id)
             return invalid("You do not have permission to access this API key.");
 
         return ok(to_string(key));

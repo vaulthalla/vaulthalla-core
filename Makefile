@@ -32,7 +32,7 @@ deb:
 
 release:
 	@echo "🔧 Building release package..."
-	./bin/install_release.sh
+	./bin/install_release.sh --push
 
 ## 🧼 Uninstall everything
 clean uninstall:

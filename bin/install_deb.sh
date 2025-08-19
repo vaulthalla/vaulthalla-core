@@ -58,6 +58,7 @@ require dpkg-buildpackage
 require dpkg-parsechangelog
 require sed
 require awk
+require pandoc
 [[ $PUSH -eq 1 ]] && require curl
 
 # Ensure we’re in a git repo and on correct branch
@@ -77,6 +78,9 @@ MESON_VERSION="$(grep -Po "(?<=version:\s*')[^']+" meson.build | head -1 || true
 export DEBEMAIL="${DEBEMAIL:-$(git config --get user.email || true)}"
 export DEBFULLNAME="${DEBFULLNAME:-$(git config --get user.name || true)}"
 [[ -n "$DEBEMAIL" && -n "$DEBFULLNAME" ]] || die "Set DEBEMAIL/DEBFULLNAME or configure git user.name/user.email"
+
+# =====================[ MANPAGE ]=====================
+pandoc -s -t man deploy/vh.md -o debian/vh.1
 
 # ===================[ UPDATE CHANGELOG ]=====================
 if [[ $RUN_DCH -eq 1 ]]; then

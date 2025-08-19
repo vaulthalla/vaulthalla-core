@@ -128,14 +128,16 @@ static CommandResult handle_vault_create(const CommandCall& call) {
 
         const auto descOpt = optVal(call, "desc");
         const auto quotaOpt = optVal(call, "quota");
-        const auto ownerIdOpt = optVal(call, "owner-id");
+        const auto ownerOpt = optVal(call, "owner");
         const auto syncStrategyOpt = optVal(call, "sync-strategy");
         const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
 
+        if (!ownerOpt) return invalid("vault create: invalid owner");
+
         unsigned int ownerId = call.user->id;
-        if (ownerIdOpt) {
-            const auto parsed = parseInt(*ownerIdOpt);
-            if (parsed && *parsed > 0) ownerId = *parsed;
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault create: --owner <id> must be a positive integer");
+            ownerId = *ownerIdOpt;
         }
 
         if (VaultQueries::vaultExists(name, ownerId)) return invalid(

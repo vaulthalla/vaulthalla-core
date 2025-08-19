@@ -3,8 +3,10 @@ project('vaulthalla', 'cpp',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
-            'warning_level=3',
-            'cpp_std=c++23'
+            'warning_level=2',
+            'cpp_std=c++23',
+            'unity=on',
+            'unity_size=8'
         ]
 )
 
@@ -83,39 +85,6 @@ lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed
     link_with: lib_core)
 
 
-# ╭──────────────────── PKGCONFIG GENERATION ─────────────────────╮
-
-pkg = import('pkgconfig')
-pkg.generate(
-    name: 'vaulthalla-server',
-    description: 'Vaulthalla Server - A decentralized file storage server',
-    version: meson.project_version(),
-    libraries: [lib_core, lib_seed, lib_version],
-    requires: [
-        'libsodium',
-        'libcurl',
-        'boost-filesystem',
-        'boost-system',
-        'libpqxx',
-        'pdfium',
-        'libmagic',
-        'fuse3',
-        'yaml-cpp',
-        'libjpeg',
-        'pugixml',
-        'uuid',
-        'threads',
-        'spdlog',
-        'libturbojpeg',
-        'tss2-esys',
-        'tss2-tctildr',
-        'openssl >= 3.0',
-        'zlib',
-        'fmt'
-    ]
-)
-
-
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 
 dep = declare_dependency(
@@ -138,7 +107,7 @@ executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
 
 # ╭──────────────────── INSTALLATION ────────────────────╮
 
-license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'licenses', 'vaulthalla')
+license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', 'vaulthalla')
 install_data('LICENSE', install_dir: license_dir)
 install_data('debian/copyright', install_dir: license_dir, rename: 'copyright')
 

@@ -26,6 +26,14 @@ dev:
 	@echo "🛡️  Running install script..."
 	./bin/install.sh -d
 
+deb:
+	@echo "🔧 Building Debian package..."
+	./bin/install_deb.sh
+
+release:
+	@echo "🔧 Building release package..."
+	./bin/install_release.sh
+
 ## 🧼 Uninstall everything
 clean uninstall:
 	@echo "💣 Running uninstall script..."

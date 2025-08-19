@@ -11,6 +11,7 @@
 
 # Production
 /dist/
+/version/*.(hpp|cpp|h|c)
 
 # Debian
 /debian/**/*debhelper*

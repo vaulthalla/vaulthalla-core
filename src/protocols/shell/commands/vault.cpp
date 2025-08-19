@@ -29,6 +29,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <version.h>
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -522,7 +523,7 @@ static nlohmann::json generate_json_key_object(const std::shared_ptr<Vault>& v,
                     {"hardware_accel", "AES-NI (runtime checked)"},
                     {"aad", false},
                     {"files_hashed_with", "libsodium"},
-                    {"sealed_by", "Vaulthalla v0.9.0"},
+                    {"sealed_by", "Vaulthalla v" + std::string(VH_VERSION)},
                     {"exported_by", exportedBy},
                     {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
                 }

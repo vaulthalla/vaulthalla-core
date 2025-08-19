@@ -1,25 +1,29 @@
-project('vaulthalla-server', 'cpp',
-        version: '0.9.0',
-        license: 'AGPLv3',
+project('vaulthalla', 'cpp',
+        version: '0.9.1',
+        license: 'AGPL-3.0-or-later',
+        license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
-            'cpp_std=c++23',
-        ])
+            'cpp_std=c++23'
+        ]
+)
 
-if get_option('buildtype') == 'debug'
-    add_project_arguments(['-g', '-O0', '-fsanitize=address,undefined'], language: 'cpp')
-    add_project_link_arguments(['-g', '-O0', '-fsanitize=address,undefined'], language: 'cpp')
+# ╭──────────────────── VERSION HEADER ─────────────────────╮
 
-elif get_option('buildtype') == 'release'
-    add_project_arguments(['-O3', '-DNDEBUG'], language: 'cpp')
-    add_project_link_arguments(['-O3'], language: 'cpp')
-    # lower warnings in release
-    add_project_arguments('-Wno-unused-variable', language: 'cpp')  # optional
+conf = configuration_data()
+conf.set_quoted('VH_VERSION', meson.project_version())
+conf.set_quoted('VH_VERSION_MAJOR', meson.project_version().split('.')[0])
+conf.set_quoted('VH_VERSION_MINOR', meson.project_version().split('.')[1])
+conf.set_quoted('VH_VERSION_PATCH', meson.project_version().split('.')[2])
 
-else
-    add_project_arguments(['-O2', '-DNDEBUG'], language: 'cpp')
-    add_project_link_arguments(['-O2'], language: 'cpp')
-endif
+vh_version_header = configure_file(
+    output: 'version.h',
+    configuration: conf,
+    install: true,
+    install_dir: get_option('includedir') / 'vaulthalla'
+)
+
+lib_version = static_library('vhversion', include_directories: '.')
 
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
@@ -47,6 +51,7 @@ deps = [
 
 test_deps = deps + dependency('gtest', required: true, main: true)
 
+
 # ╭──────────────────── SOURCE DIRS ─────────────────────╮
 
 source_root = meson.project_source_root()
@@ -69,27 +74,59 @@ endforeach
 
 # ╭──────────────────── LIBRARIES ───────────────────────╮
 
-lib_core = static_library('core', sources,
+lib_core = static_library('vaulthalla', sources,
                      include_directories: inc,
                      dependencies: deps)
 
-lib_seed = static_library('seed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
+lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
     include_directories: include_directories('seed/include', 'include', 'vendor'),
     link_with: lib_core)
+
+
+# ╭──────────────────── PKGCONFIG GENERATION ─────────────────────╮
+
+pkg = import('pkgconfig')
+pkg.generate(
+    name: 'vaulthalla-server',
+    description: 'Vaulthalla Server - A decentralized file storage server',
+    version: meson.project_version(),
+    libraries: [lib_core, lib_seed, lib_version],
+    requires: [
+        'libsodium',
+        'libcurl',
+        'boost-filesystem',
+        'boost-system',
+        'libpqxx',
+        'pdfium',
+        'libmagic',
+        'fuse3',
+        'yaml-cpp',
+        'libjpeg',
+        'pugixml',
+        'uuid',
+        'threads',
+        'spdlog',
+        'libturbojpeg',
+        'tss2-esys',
+        'tss2-tctildr',
+        'openssl >= 3.0',
+        'zlib',
+        'fmt'
+    ]
+)
 
 
 # ╭──────────────────── DEPENDENCIES ────────────────────╮
 
 dep = declare_dependency(
     include_directories: inc,
-    link_with: lib_core,
+    link_with: [lib_core, lib_seed, lib_version],
     dependencies: deps)
 
 
 # ╭──────────────────── EXECUTABLES ─────────────────────╮
 
 executable('vaulthalla-server', main,
-           link_with: [lib_seed],
            include_directories: inc,
            dependencies: dep,
            install: true)
@@ -100,6 +137,10 @@ executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
            install: true)
 
 # ╭──────────────────── INSTALLATION ────────────────────╮
+
+license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'licenses', 'vaulthalla')
+install_data('LICENSE', install_dir: license_dir)
+install_data('debian/copyright', install_dir: license_dir, rename: 'copyright')
 
 install_dir = join_paths(get_option('prefix'), get_option('bindir'))
 install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')

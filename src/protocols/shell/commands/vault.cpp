@@ -41,15 +41,24 @@ using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 
-static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
-    const std::string encryption_section =
+static const std::string VAULT_SYNC_USAGE = "Vault Sync Commands:\n"
+        "  vault sync <id | name> [--owner <id | name>]\n"
+        "  vault sync <id | name> --local [--on-sync-conflict <overwrite | keep_both | ask>]\n"
+        "  vault sync <id | name> --s3 [--sync-strategy <cache | sync | mirror>] "
+        "[--on-sync-conflict <keep-local | keep-remote | ask>]\n"
+        "  vault sync info <name>\n"
+        "  vault sync set <id | name> --local [--on-sync-conflict <overwrite | keep_both | ask>] "
+        "[--interval <num<s | m | h | d>>]\n"
+        "  vault sync set <id | name> --s3 [--sync-strategy <cache | sync | mirror>] "
+        "[--on-sync-conflict <keep-local | keep-remote | ask>] [--interval <num<s | m | h | d>>]\n";
+
+static const std::string ENCRYPTION_SECTION =
         "  === Encryption Key Management ===\n"
         "    vault keys export  <vault_id | name | all>  [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]\n"
         "    vault keys rotate  <vault_id | name | all>  [--owner <id | name>]\n"
         "    vault keys inspect <vault_id | name>        [--owner <id | name>]\n";
 
-    const std::string general_usage_section =
-        "Usage:\n"
+static const std::string GENERAL_USAGE = "Usage:\n"
         "\n"
         "  === Vault Creation ===\n"
         "    vault create <name> --local\n"
@@ -89,9 +98,10 @@ static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
         "\n"
         "  Use 'vh vault <command> --help' for more information on any subcommand.\n";
 
-    if (isSuperAdmin)
-        return {0, general_usage_section + "\n" + encryption_section, ""};
-    return {0, general_usage_section, ""};
+static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
+    const auto std_out = GENERAL_USAGE + "\n" + VAULT_SYNC_USAGE;
+    if (isSuperAdmin) return {0, std_out + "\n" + ENCRYPTION_SECTION, ""};
+    return {0, GENERAL_USAGE, ""};
 }
 
 static CommandResult usage_vaults_list() {
@@ -629,6 +639,16 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
     return handle_export_vault_key(call);
 }
 
+static CommandResult handle_vault_sync(const CommandCall& call) {
+    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
+
+    const auto arg = call.positionals[0];
+    if (call.positionals.size() > 1) {
+        // TODO: handle set and info
+    }
+    return invalid("this feature is not implemented yet");
+}
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand("vault", "Manage a single vault",
                        [](const CommandCall& call) -> CommandResult {
@@ -639,6 +659,7 @@ void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
                            // shift subcommand off positionals
                            subcall.positionals.erase(subcall.positionals.begin());
 
+                           if (sub == "sync") return handle_vault_sync(subcall);
                            if (sub == "create" || sub == "new") return handle_vault_create(subcall);
                            if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
                            if (sub == "info" || sub == "get") return handle_vault_info(subcall);

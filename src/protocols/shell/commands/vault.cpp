@@ -23,6 +23,8 @@
 #include "crypto/encrypt.hpp"
 #include "crypto/GPGEncryptor.hpp"
 #include "services/LogRegistry.hpp"
+#include "services/SyncController.hpp"
+#include "util/interval.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -41,15 +43,15 @@ using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 
-static const std::string VAULT_SYNC_USAGE = "Vault Sync Commands:\n"
-        "  vault sync <id | name> [--owner <id | name>]\n"
-        "  vault sync <id | name> --local [--on-sync-conflict <overwrite | keep_both | ask>]\n"
-        "  vault sync <id | name> --s3 [--sync-strategy <cache | sync | mirror>] "
+static const std::string VAULT_SYNC_USAGE = "  === Vault Sync Commands ===\n"
+        "    vault sync <id | name> [--owner <id | name>]\n"
+        "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>]\n"
+        "    vault sync <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
         "[--on-sync-conflict <keep-local | keep-remote | ask>]\n"
-        "  vault sync info <name>\n"
-        "  vault sync set <id | name> --local [--on-sync-conflict <overwrite | keep_both | ask>] "
+        "    vault sync info <name>\n"
+        "    vault sync set <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] "
         "[--interval <num<s | m | h | d>>]\n"
-        "  vault sync set <id | name> --s3 [--sync-strategy <cache | sync | mirror>] "
+        "    vault sync set <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
         "[--on-sync-conflict <keep-local | keep-remote | ask>] [--interval <num<s | m | h | d>>]\n";
 
 static const std::string ENCRYPTION_SECTION =
@@ -640,13 +642,171 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
+    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VAULT_SYNC_USAGE);
+
+    const auto vaultArg = call.positionals[0];
+    std::shared_ptr<Vault> vault;
+
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) return invalid("vault sync: vault ID must be a positive integer");
+        vault = VaultQueries::getVault(*vaultIdOpt);
+    } else {
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault sync: missing required --owner <id | name> for vault name lookup");
+
+        unsigned int ownerId = call.user->id;
+
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault sync: --owner <id> must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else {
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault sync: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        }
+        vault = VaultQueries::getVault(vaultArg, ownerId);
+    }
+
+    if (!vault) return invalid("vault sync: vault with arg '" + vaultArg + "' not found");
+
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->canSyncVaultData(vault->id))
+        return invalid("vault sync: you do not have permission to manage this vault");
+
+    ServiceDepsRegistry::instance().syncController->runNow(vault->id);
+
+    return ok("Vault sync initiated for '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")");
+}
+
+static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& call, const std::string& vaultArg) {
+    std::shared_ptr<StorageEngine> engine;
+
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) throw std::invalid_argument("vault sync update: vault ID must be a positive integer");
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
+    } else {
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) throw std::invalid_argument("vault sync update: missing required --owner <id | name> for vault name lookup");
+        unsigned int ownerId = call.user->id;
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) throw std::invalid_argument("vault sync update: --owner <id> must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else {
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) throw std::invalid_argument("vault sync update: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        }
+        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
+        if (!vault) throw std::invalid_argument("vault sync update: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    }
+
+    if (!engine) throw std::invalid_argument("vault sync update: no storage engine found for vault '" + vaultArg + "'");
+
+    return engine;
+}
+
+static CommandResult handle_vault_sync_update(const CommandCall& call) {
     if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
+    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VAULT_SYNC_USAGE);
+
+    const auto engine = extractEngineFromArgs(call, call.positionals[0]);
+
+    if (!engine) return invalid("vault sync update: no storage engine found for vault '" + call.positionals[0] + "'");
+
+    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
+        !call.user->canSyncVaultData(engine->vault->id))
+        return invalid("vault sync update: you do not have permission to manage this vault");
+
+    const auto& sync = engine->sync;
+
+    if (const auto intervalOpt = optVal(call, "interval")) {
+        try {
+            sync->interval = parseSyncInterval(*intervalOpt);
+        } catch (const std::exception& e) {
+            return invalid("vault sync update: " + std::string(e.what()));
+        }
+    }
+
+    if (engine->vault->type == VaultType::Local) {
+        if (hasFlag(call, "sync-strategy")) return invalid("vault sync update: --sync-strategy is not valid for local vaults");
+        if (const auto onSyncConflictOpt = optVal(call, "on-sync-conflict")) {
+            const auto fsync = std::static_pointer_cast<FSync>(sync);
+
+            try {
+                fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
+            } catch (const std::exception& e) {
+                return invalid("vault sync update: " + std::string(e.what()));
+            }
+        }
+    } else if (engine->vault->type == VaultType::S3) {
+        const auto rsync = std::static_pointer_cast<RSync>(sync);
+
+        if (const auto syncStrategyOpt = optVal(call, "sync-strategy")) {
+            try {
+                rsync->strategy = strategyFromString(*syncStrategyOpt);
+            } catch (const std::exception& e) {
+                return invalid("vault sync update: " + std::string(e.what()));
+            }
+        }
+
+        if (const auto onSyncConflictOpt = optVal(call, "on-sync-conflict")) {
+            try {
+                rsync->conflict_policy = rsConflictPolicyFromString(*onSyncConflictOpt);
+            } catch (const std::exception& e) {
+                return invalid("vault sync update: " + std::string(e.what()));
+            }
+        }
+    }
+
+    if (engine->vault->type == VaultType::Local) {
+        const auto fsync = std::static_pointer_cast<FSync>(sync);
+        return ok("Successfully updated local vault sync configuration!\n" + to_string(fsync));
+    }
+
+    if (engine->vault->type == VaultType::S3) {
+        const auto rsync = std::static_pointer_cast<RSync>(sync);
+        return ok("Successfully updated S3 vault sync configuration!\n" + to_string(rsync));
+    }
+
+    return invalid("vault sync update: invalid sync configuration");
+}
+
+static CommandResult handle_vault_sync_info(const CommandCall& call) {
+    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
+    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VAULT_SYNC_USAGE);
+
+    try {
+        const auto engine = extractEngineFromArgs(call, call.positionals[0]);
+
+        if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
+            !call.user->canSyncVaultData(engine->vault->id))
+            return invalid("vault sync info: you do not have permission to view this vault's sync configuration");
+
+        if (!engine->sync) return invalid("vault sync info: vault does not have a sync configuration");
+
+        return ok(to_string(engine->sync));
+
+    } catch (const std::invalid_argument& e) {
+        return invalid("vault sync info: " + std::string(e.what()));
+    }
+}
+
+static CommandResult handle_sync(const CommandCall& call) {
+    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
+    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VAULT_SYNC_USAGE);
 
     const auto arg = call.positionals[0];
+
     if (call.positionals.size() > 1) {
-        // TODO: handle set and info
+        CommandCall subcall = call;
+        subcall.positionals.erase(subcall.positionals.begin());
+        if (arg == "set" || arg == "update") return handle_vault_sync_update(subcall);
+        if (arg == "info" || arg == "get") return handle_vault_sync_info(subcall);
     }
-    return invalid("this feature is not implemented yet");
+
+    if (call.positionals.size() == 1) return handle_vault_sync(call);
+
+    return ok("Unrecognized command: " + arg + "\n" + VAULT_SYNC_USAGE);
 }
 
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
@@ -659,7 +819,7 @@ void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
                            // shift subcommand off positionals
                            subcall.positionals.erase(subcall.positionals.begin());
 
-                           if (sub == "sync") return handle_vault_sync(subcall);
+                           if (sub == "sync") return handle_sync(subcall);
                            if (sub == "create" || sub == "new") return handle_vault_create(subcall);
                            if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
                            if (sub == "info" || sub == "get") return handle_vault_info(subcall);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/shellArgsHelpers.hpp"
+
 #include <string>
 #include <chrono>
 #include <sstream>
@@ -28,18 +30,44 @@ inline std::chrono::seconds parsePostgresInterval(const std::string& s) {
 }
 
 inline std::string intervalToString(const std::chrono::seconds& interval) {
-    auto total_seconds = interval.count();
-    const int days = static_cast<int>(total_seconds) / 86400;
-    total_seconds %= 86400;
-    const int hours = static_cast<int>(total_seconds) / 3600;
-    total_seconds %= 3600;
-    const int minutes = static_cast<int>(total_seconds) / 60;
-    const int seconds = static_cast<int>(total_seconds) % 60;
+    const auto days = std::chrono::duration_cast<std::chrono::days>(interval);
+    const auto hours = std::chrono::duration_cast<std::chrono::hours>(interval - days);
+    const auto minutes = std::chrono::duration_cast<std::chrono::minutes>(interval - days - hours);
+    const auto seconds = interval.count() % 60;
 
     std::ostringstream oss;
-    if (days > 0) oss << days << " day ";
-    oss << hours << ":" << minutes << ":" << seconds;
+    if (days.count() > 0) oss << days.count() << "d ";
+    if (hours.count() > 0 || days.count() > 0) oss << hours.count() << "h ";
+    if (minutes.count() > 0 || hours.count() > 0 || days.count() > 0) oss << minutes.count() << "m ";
+    oss << seconds << "s";
+
     return oss.str();
+}
+
+inline std::chrono::seconds parseSyncInterval(const std::string& intervalStr) {
+    if (intervalStr.empty()) return std::chrono::seconds(0); // No interval set
+
+    if (!std::isalpha(intervalStr.back())) {
+        // If the last character is not a letter, assume it's a number of seconds
+        const auto parsed = shell::parseInt(intervalStr);
+        if (!parsed || *parsed <= 0) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
+        return std::chrono::seconds(*parsed);
+    }
+
+    const char unit = std::tolower(intervalStr.back());
+    const std::string numStr = intervalStr.substr(0, intervalStr.size() - 1);
+    if (numStr.empty()) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
+
+    if (const auto numOpt = shell::parseInt(numStr)) {
+        if (*numOpt <= 0) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
+        if (unit == 's') return std::chrono::seconds(*numOpt);
+        if (unit == 'm') return std::chrono::minutes(*numOpt);
+        if (unit == 'h') return std::chrono::hours(*numOpt);
+        if (unit == 'd') return std::chrono::days(*numOpt);
+        throw std::invalid_argument("vault sync update: --interval must be a valid time unit (s, m, h, d)");
+    }
+
+    throw std::invalid_argument("vault sync update: --interval must be a positive integer");
 }
 
 }

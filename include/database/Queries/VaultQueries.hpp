@@ -8,6 +8,7 @@
 namespace vh::types {
     struct Vault;
     struct Sync;
+    enum class VaultType;
 }
 
 namespace vh::database {
@@ -23,6 +24,8 @@ struct VaultQueries {
     static std::vector<std::shared_ptr<types::Vault>> listVaults(types::DBQueryParams&& params = {});
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, types::DBQueryParams&& params = {});
     static std::string getVaultOwnersName(unsigned int vaultId);
+
+    static void updateVaultSync(const std::shared_ptr<types::Sync>& sync, const types::VaultType& type);
 
     [[nodiscard]] static std::shared_ptr<types::Sync> getVaultSyncConfig(unsigned int vaultId);
 

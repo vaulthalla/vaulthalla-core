@@ -27,4 +27,6 @@ std::string to_string(const FSync::ConflictPolicy& cp);
 
 FSync::ConflictPolicy fsConflictPolicyFromString(const std::string& str);
 
+std::string to_string(const std::shared_ptr<FSync>& sync);
+
 }

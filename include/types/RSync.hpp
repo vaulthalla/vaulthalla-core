@@ -36,4 +36,6 @@ std::string to_string(const RSync::ConflictPolicy& cp);
 RSync::Strategy strategyFromString(const std::string& str);
 RSync::ConflictPolicy rsConflictPolicyFromString(const std::string& str);
 
+std::string to_string(const std::shared_ptr<RSync>& sync);
+
 }

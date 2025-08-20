@@ -209,3 +209,19 @@ bool VaultQueries::vaultRootExists(const unsigned int vaultId) {
     });
 }
 
+void VaultQueries::updateVaultSync(const std::shared_ptr<Sync>& sync, const VaultType& type) {
+    if (!sync) throw std::invalid_argument("Sync cannot be null on vault sync update.");
+
+    Transactions::exec("VaultQueries::updateVaultSync", [&](pqxx::work& txn) {
+        if (type == VaultType::Local) {
+            const auto fsync = std::static_pointer_cast<FSync>(sync);
+            pqxx::params p{fsync->id, fsync->interval.count(), fsync->enabled, to_string(fsync->conflict_policy)};
+            txn.exec_prepared("update_fsync", p);
+        } else if (type == VaultType::S3) {
+            const auto rsync = std::static_pointer_cast<RSync>(sync);
+            pqxx::params p{rsync->id, rsync->interval.count(), rsync->enabled, to_string(rsync->strategy),
+                           to_string(rsync->conflict_policy)};
+            txn.exec_prepared("update_rsync", p);
+        } else throw std::runtime_error("Unsupported VaultType in updateVaultSync(): " + to_string(type));
+    });
+}

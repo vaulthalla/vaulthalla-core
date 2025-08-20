@@ -1,9 +1,12 @@
 #include "types/FSync.hpp"
+#include "util/timestamp.hpp"
+#include "util/interval.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::util;
 
 FSync::FSync(const pqxx::row& row)
     : Sync(row),
@@ -33,4 +36,17 @@ FSync::ConflictPolicy vh::types::fsConflictPolicyFromString(const std::string& s
     if (str == "keep_both") return FSync::ConflictPolicy::KeepBoth;
     if (str == "ask") return FSync::ConflictPolicy::Ask;
     throw std::invalid_argument("Unknown conflict policy: " + str);
+}
+
+std::string vh::types::to_string(const std::shared_ptr<FSync>& sync) {
+    if (!sync) return "null";
+    return "Local Vault Sync Configuration:\n"
+           "  Vault ID: " + std::to_string(sync->vault_id) + "\n"
+           "  Interval: " + intervalToString(sync->interval) + "\n"
+           "  Enabled: " + (sync->enabled ? "true" : "false") + "\n"
+           "  Conflict Policy: " + to_string(sync->conflict_policy) + "\n"
+           "  Last Sync At: " + timestampToString(sync->last_sync_at) + "\n"
+           "  Last Success At: " + timestampToString(sync->last_success_at) + "\n"
+           "  Created At: " + timestampToString(sync->created_at) + "\n"
+           "  Updated At: " + timestampToString(sync->updated_at);
 }

@@ -24,4 +24,6 @@ struct Sync {
 void to_json(nlohmann::json& j, const Sync& s);
 void from_json(const nlohmann::json& j, Sync& s);
 
+std::string to_string(const std::shared_ptr<Sync>& sync);
+
 }

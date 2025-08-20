@@ -6,28 +6,29 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::util;
 
 Sync::Sync(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),
       vault_id(row.at("vault_id").as<unsigned int>()),
       interval(std::chrono::seconds(row.at("interval").as<uint64_t>())),
       enabled(row.at("enabled").as<bool>()),
-      created_at(util::parsePostgresTimestamp(row.at("created_at").as<std::string>())),
-      updated_at(util::parsePostgresTimestamp(row.at("updated_at").as<std::string>())) {
-    if (!row["last_sync_at"].is_null()) last_sync_at = util::parsePostgresTimestamp(row["last_sync_at"].as<std::string>());
-    if (!row["last_success_at"].is_null()) last_success_at = util::parsePostgresTimestamp(row["last_success_at"].as<std::string>());
+      created_at(parsePostgresTimestamp(row.at("created_at").as<std::string>())),
+      updated_at(parsePostgresTimestamp(row.at("updated_at").as<std::string>())) {
+    if (!row["last_sync_at"].is_null()) last_sync_at = parsePostgresTimestamp(row["last_sync_at"].as<std::string>());
+    if (!row["last_success_at"].is_null()) last_success_at = parsePostgresTimestamp(row["last_success_at"].as<std::string>());
 }
 
 void vh::types::to_json(nlohmann::json& j, const Sync& s) {
     j = nlohmann::json{
         {"id", s.id},
         {"vault_id", s.vault_id},
-        {"interval", util::intervalToString(s.interval)},
+        {"interval", intervalToString(s.interval)},
         {"enabled", s.enabled},
-        {"last_sync_at", util::timestampToString(s.last_sync_at)},
-        {"last_success_at", util::timestampToString(s.last_success_at)},
-        {"created_at", util::timestampToString(s.created_at)},
-        {"updated_at", util::timestampToString(s.updated_at)}
+        {"last_sync_at", timestampToString(s.last_sync_at)},
+        {"last_success_at", timestampToString(s.last_success_at)},
+        {"created_at", timestampToString(s.created_at)},
+        {"updated_at", timestampToString(s.updated_at)}
     };
 }
 
@@ -36,8 +37,20 @@ void vh::types::from_json(const nlohmann::json& j, Sync& s) {
     if (j.contains("vault_id")) s.vault_id = j.at("vault_id").get<unsigned int>();
     s.interval = std::chrono::seconds(j.at("interval").get<uint64_t>());
     s.enabled = j.value("enabled", true);
-    if (j.contains("last_sync_at")) s.last_sync_at = util::parseTimestampFromString(j.at("last_sync_at").get<std::string>());
-    if (j.contains("last_success_at")) s.last_success_at = util::parseTimestampFromString(j.at("last_success_at").get<std::string>());
-    if (j.contains("created_at")) s.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
-    if (j.contains("updated_at")) s.updated_at = util::parseTimestampFromString(j.at("updated_at").get<std::string>());
+    if (j.contains("last_sync_at")) s.last_sync_at = parseTimestampFromString(j.at("last_sync_at").get<std::string>());
+    if (j.contains("last_success_at")) s.last_success_at = parseTimestampFromString(j.at("last_success_at").get<std::string>());
+    if (j.contains("created_at")) s.created_at = parseTimestampFromString(j.at("created_at").get<std::string>());
+    if (j.contains("updated_at")) s.updated_at = parseTimestampFromString(j.at("updated_at").get<std::string>());
+}
+
+std::string vh::types::to_string(const std::shared_ptr<Sync>& sync) {
+    if (!sync) return "null";
+    return "Vault Sync Configuration:\n"
+           "  Vault ID: " + std::to_string(sync->vault_id) + "\n"
+           "  Interval: " + intervalToString(sync->interval) + "\n"
+           "  Enabled: " + (sync->enabled ? "true" : "false") + "\n"
+           "  Last Sync At: " + timestampToString(sync->last_sync_at) + "\n"
+           "  Last Success At: " + timestampToString(sync->last_success_at) + "\n"
+           "  Created At: " + timestampToString(sync->created_at) + "\n"
+           "  Updated At: " + timestampToString(sync->updated_at);
 }

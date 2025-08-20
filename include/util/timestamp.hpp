@@ -45,4 +45,5 @@ inline std::string getDate() {
     strftime(buffer, sizeof(buffer), "%Y%m%d", &tm);
     return {buffer};
 }
+
 } // namespace vh::util

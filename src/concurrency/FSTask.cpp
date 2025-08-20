@@ -24,9 +24,8 @@ using namespace vh::logging;
 using namespace std::chrono;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
-: next_run(system_clock::from_time_t(engine->sync->last_sync_at)
-           + seconds(engine->sync->interval.count())),
-    engine_(engine) {}
+: next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
+  engine_(engine) {}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 

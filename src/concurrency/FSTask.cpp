@@ -6,6 +6,7 @@
 #include "types/Sync.hpp"
 #include "types/Operation.hpp"
 #include "types/Vault.hpp"
+#include "types/File.hpp"
 #include "types/Path.hpp"
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"

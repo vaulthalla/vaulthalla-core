@@ -32,6 +32,7 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::util;
 
 void Filesystem::init(std::shared_ptr<StorageManager> manager) {
     std::lock_guard lock(mutex_);

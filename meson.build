@@ -12,11 +12,16 @@ project('vaulthalla', 'cpp',
 
 # ╭──────────────────── VERSION HEADER ─────────────────────╮
 
+version_split = meson.project_version().split('.')
+if version_split.length() < 3
+    error('Project version must be in the format X.Y.Z (e.g., 0.9.2)')
+endif
+
 conf = configuration_data()
 conf.set_quoted('VH_VERSION', meson.project_version())
-conf.set_quoted('VH_VERSION_MAJOR', meson.project_version().split('.')[0])
-conf.set_quoted('VH_VERSION_MINOR', meson.project_version().split('.')[1])
-conf.set_quoted('VH_VERSION_PATCH', meson.project_version().split('.')[2])
+conf.set_quoted('VH_VERSION_MAJOR', version_split[0])
+conf.set_quoted('VH_VERSION_MINOR', version_split[1])
+conf.set_quoted('VH_VERSION_PATCH', version_split[2])
 
 vh_version_header = configure_file(
     output: 'version.h',
@@ -78,7 +83,7 @@ lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed
     link_with: lib_core)
 
 
-# ╭──────────────────── DEPENDENCIES ────────────────────╮
+# ╭─────────────────────────────────── DEPENDENCIES ───────────────────────────────────╮
 
 dep = declare_dependency(
     include_directories: inc,
@@ -86,7 +91,7 @@ dep = declare_dependency(
     dependencies: deps)
 
 
-# ╭──────────────────── EXECUTABLES ─────────────────────╮
+# ╭─────────────────────────────────── EXECUTABLES ────────────────────────────────────╮
 
 executable('vaulthalla-server', main,
            include_directories: inc,
@@ -98,7 +103,8 @@ executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
            dependencies: [dependency('fmt', required: true)],
            install: true)
 
-# ╭──────────────────── INSTALLATION ────────────────────╮
+
+# ╭─────────────────────────────────── INSTALLATION ───────────────────────────────────╮
 
 license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', 'vaulthalla')
 install_data('LICENSE', install_dir: license_dir)
@@ -127,7 +133,7 @@ configure_file(
 )
 
 
-# ╭──────────────────── TESTS ───────────────────────────╮
+# ╭────────────────────────────────────── TESTS ────────────────────────────────────────╮
 
 configure_file(input: 'test-assets/sample.jpg', output: 'sample.jpg', copy: true)
 configure_file(input: 'test-assets/sample.pdf', output: 'sample.pdf', copy: true)

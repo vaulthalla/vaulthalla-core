@@ -12,7 +12,7 @@ namespace pqxx {
 namespace vh::types {
 
 struct VaultKey {
-    unsigned int vaultId{};
+    unsigned int vaultId{}, version{};
     std::vector<uint8_t> key, encrypted_key, iv;
     std::time_t created_at{}, updated_at{};
 

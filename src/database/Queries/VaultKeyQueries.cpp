@@ -5,12 +5,14 @@
 using namespace vh::database;
 using namespace vh::types;
 
-void VaultKeyQueries::addVaultKey(const std::shared_ptr<VaultKey>& key) {
-    Transactions::exec("VaultKeyQueries::addVaultKey", [&](pqxx::work& txn) {
+unsigned int VaultKeyQueries::addVaultKey(const std::shared_ptr<VaultKey>& key) {
+    return Transactions::exec("VaultKeyQueries::addVaultKey", [&](pqxx::work& txn) {
         pqxx::binarystring enc_key(key->encrypted_key.data(), key->encrypted_key.size());
         pqxx::binarystring iv(key->iv.data(), key->iv.size());
         pqxx::params p{key->vaultId, enc_key, iv};
-        txn.exec_prepared("insert_vault_key", p);
+        const auto res = txn.exec_prepared("insert_vault_key", p);
+        if (res.empty()) throw std::runtime_error("Failed to add vault key: no result returned");
+        return res.one_field().as<unsigned int>();
     });
 }
 
@@ -31,8 +33,39 @@ void VaultKeyQueries::updateVaultKey(const std::shared_ptr<VaultKey>& key) {
 
 std::shared_ptr<VaultKey> VaultKeyQueries::getVaultKey(unsigned int vaultId) {
     return Transactions::exec("VaultKeyQueries::getVaultKey", [&](pqxx::work& txn) -> std::shared_ptr<VaultKey> {
-        auto res = txn.exec_prepared("get_vault_key", vaultId);
+        const auto res = txn.exec_prepared("get_vault_key", vaultId);
         if (res.empty()) return nullptr;
+        return std::make_shared<VaultKey>(res[0]);
+    });
+}
+
+unsigned int VaultKeyQueries::rotateVaultKey(const std::shared_ptr<VaultKey>& newKey) {
+    return Transactions::exec("VaultKeyQueries::rotateVaultKey", [&](pqxx::work& txn) {
+        pqxx::binarystring enc_key(newKey->encrypted_key.data(), newKey->encrypted_key.size());
+        pqxx::binarystring iv(newKey->iv.data(), newKey->iv.size());
+        pqxx::params p{newKey->vaultId, enc_key, iv};
+        const auto res = txn.exec_prepared("rotate_vault_key", p);
+        if (res.empty()) throw std::runtime_error("Failed to rotate vault key: no result returned");
+        return res.one_field().as<unsigned int>();
+    });
+}
+
+void VaultKeyQueries::markKeyRotationFinished(unsigned int vaultId) {
+    Transactions::exec("VaultKeyQueries::markKeyRotationFinished", [&](pqxx::work& txn) {
+        txn.exec_prepared("mark_vault_key_rotation_finished", vaultId);
+    });
+}
+
+bool VaultKeyQueries::keyRotationInProgress(unsigned int vaultId) {
+    return Transactions::exec("VaultKeyQueries::keyRotationInProgress", [&](pqxx::work& txn) {
+        return txn.exec_prepared("vault_key_rotation_in_progress", vaultId).one_field().as<bool>();
+    });
+}
+
+std::shared_ptr<VaultKey> VaultKeyQueries::getRotationInProgressOldKey(unsigned int vaultId) {
+    return Transactions::exec("VaultKeyQueries::getRotationInProgressOldKey", [&](pqxx::work& txn) -> std::shared_ptr<VaultKey> {
+        const auto res = txn.exec_prepared("get_rotation_old_vault_key", vaultId);
+        if (res.empty()) throw std::runtime_error("No old vault key found for rotation in progress");
         return std::make_shared<VaultKey>(res[0]);
     });
 }

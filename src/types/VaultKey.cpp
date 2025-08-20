@@ -7,6 +7,7 @@ using namespace vh::types;
 
 VaultKey::VaultKey(const pqxx::row &row)
     : vaultId(row["vault_id"].as<unsigned int>()),
+      version(row["version"].as<unsigned int>()),
       created_at(row["created_at"].as<std::time_t>()),
       updated_at(row["updated_at"].as<std::time_t>()) {
 

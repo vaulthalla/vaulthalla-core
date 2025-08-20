@@ -16,7 +16,8 @@ File::File(const pqxx::row& row, const pqxx::result& parentRows)
     : FSEntry(row, parentRows),
       encryption_iv(row.at("encryption_iv").as<std::string>()),
       mime_type(row.at("mime_type").as<std::optional<std::string>>()),
-      content_hash(row.at("content_hash").as<std::optional<std::string>>()) {}
+      content_hash(row.at("content_hash").as<std::optional<std::string>>()),
+      encrypted_with_key_version(row.at("encrypted_with_key_version").as<unsigned int>()) {}
 
 File::File(const std::string& s3_key, const uint64_t size, const std::optional<std::time_t>& updated)
     : FSEntry(s3_key) {

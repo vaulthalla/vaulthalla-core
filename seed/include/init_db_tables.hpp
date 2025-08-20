@@ -106,7 +106,24 @@ CREATE TABLE IF NOT EXISTS vault_keys
     iv            BYTEA NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    version       INTEGER NOT NULL DEFAULT 1,
+
     UNIQUE (vault_id)
+);
+        )");
+
+        txn.exec(R"(
+CREATE TABLE vault_keys_trashed
+(
+    vault_id               INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    version                INTEGER NOT NULL DEFAULT 1,
+    encrypted_key          BYTEA NOT NULL,
+    iv                     BYTEA NOT NULL,
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    trashed_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    rotation_completed_at  TIMESTAMP DEFAULT NULL,
+
+    UNIQUE (vault_id, version)
 );
         )");
 
@@ -185,7 +202,8 @@ CREATE TABLE IF NOT EXISTS files (
     size_bytes    BIGINT DEFAULT 0,
     mime_type     VARCHAR(255),
     content_hash  VARCHAR(128),
-    encryption_iv TEXT
+    encryption_iv TEXT,
+    encrypted_with_key_version INTEGER DEFAULT 1
 );
         )");
 

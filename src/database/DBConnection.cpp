@@ -93,11 +93,12 @@ void DBConnection::initPreparedUsers() const {
 }
 
 void DBConnection::initPreparedGroups() const {
-    conn_->prepare("insert_group", "INSERT INTO groups (name, description, linux_gid) VALUES ($1, $2, $3) RETURNING id");
+    conn_->prepare("insert_group",
+                   "INSERT INTO groups (name, description, linux_gid) VALUES ($1, $2, $3) RETURNING id");
 
     conn_->prepare("update_group",
-        "UPDATE groups SET name = $2, description = $3, linux_gid = $4, updated_at = NOW() "
-        "WHERE id = $1");
+                   "UPDATE groups SET name = $2, description = $3, linux_gid = $4, updated_at = NOW() "
+                   "WHERE id = $1");
 
     conn_->prepare("delete_group", "DELETE FROM groups WHERE id = $1");
 
@@ -108,22 +109,22 @@ void DBConnection::initPreparedGroups() const {
     conn_->prepare("list_all_groups", "SELECT * FROM groups");
 
     conn_->prepare("list_groups_by_user",
-        "SELECT g.* FROM groups g "
-        "JOIN group_members gm ON g.id = gm.group_id "
-        "WHERE gm.user_id = $1");
+                   "SELECT g.* FROM groups g "
+                   "JOIN group_members gm ON g.id = gm.group_id "
+                   "WHERE gm.user_id = $1");
 
     conn_->prepare("add_member_to_group",
-        "INSERT INTO group_members (group_id, user_id, joined_at) "
-        "VALUES ($1, $2, NOW()) "
-        "ON CONFLICT (group_id, user_id) DO NOTHING");
+                   "INSERT INTO group_members (group_id, user_id, joined_at) "
+                   "VALUES ($1, $2, NOW()) "
+                   "ON CONFLICT (group_id, user_id) DO NOTHING");
 
     conn_->prepare("remove_member_from_group", "DELETE FROM group_members WHERE group_id = $1 AND user_id = $2");
 
     conn_->prepare("list_group_members",
-        "SELECT u.*, gm.joined_at "
-        "FROM users u "
-        "JOIN group_members gm ON u.id = gm.user_id "
-        "WHERE gm.group_id = $1");
+                   "SELECT u.*, gm.joined_at "
+                   "FROM users u "
+                   "JOIN group_members gm ON u.id = gm.user_id "
+                   "WHERE gm.group_id = $1");
 }
 
 void DBConnection::initPreparedAPIKeys() const {
@@ -156,7 +157,7 @@ void DBConnection::initPreparedAPIKeys() const {
 void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("insert_vault_key",
                    "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
-                   "VALUES ($1, $2, $3)");
+                   "VALUES ($1, $2, $3) RETURNING version");
 
     conn_->prepare("update_vault_key",
                    "UPDATE vault_keys "
@@ -166,6 +167,40 @@ void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("get_vault_key", "SELECT * FROM vault_keys WHERE vault_id = $1");
 
     conn_->prepare("delete_vault_key", "DELETE FROM vault_keys WHERE vault_id = $1");
+
+    conn_->prepare("rotate_vault_key",
+                   "WITH moved AS ("
+                   "    DELETE FROM vault_keys "
+                   "    WHERE vault_id = $1 "
+                   "    RETURNING vault_id, encrypted_key, iv, created_at"
+                   "), "
+                   "versioned AS ("
+                   "    SELECT COALESCE(MAX(version), 0) + 1 AS next_version "
+                   "    FROM vault_keys_trashed "
+                   "    WHERE vault_id = $1"
+                   "), "
+                   "trashed AS ("
+                   "    INSERT INTO vault_keys_trashed (vault_id, encrypted_key, iv, created_at, trashed_at, version) "
+                   "    SELECT m.vault_id, m.encrypted_key, m.iv, m.created_at, CURRENT_TIMESTAMP, v.next_version "
+                   "    FROM moved m, versioned v"
+                   "), "
+                   "inserted AS ("
+                   "    INSERT INTO vault_keys (vault_id, encrypted_key, iv, version) "
+                   "    SELECT $1, $2, $3, v.next_version "
+                   "    FROM versioned v "
+                   "    RETURNING version"
+                   ") "
+                   "SELECT version FROM inserted;"
+        );
+
+    conn_->prepare("mark_vault_key_rotation_finished",
+                   "UPDATE vault_keys_trashed SET rotation_completed_at = NOW() "
+                   "WHERE vault_id = $1 AND rotation_completed_at IS NULL");
+
+    conn_->prepare("vault_key_rotation_in_progress",
+                   "SELECT EXISTS(SELECT 1 FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL) AS in_progress");
+
+    conn_->prepare("get_rotation_old_vault_key", "SELECT * FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL");
 }
 
 void DBConnection::initPreparedUserRoles() const {

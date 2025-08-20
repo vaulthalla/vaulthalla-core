@@ -4,9 +4,10 @@
 
 namespace vh::types {
 
-struct File : FSEntry {
+struct File final : FSEntry {
     std::string encryption_iv;
     std::optional<std::string> mime_type, content_hash;
+    unsigned int encrypted_with_key_version{};
 
     File() = default;
     File(const pqxx::row& row, const pqxx::result& parentRows);

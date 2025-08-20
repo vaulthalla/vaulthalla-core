@@ -256,7 +256,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
 
-    f->content_hash = crypto::Hash::blake2b(f->backing_path);
+    f->content_hash = Hash::blake2b(f->backing_path);
     f->id = FileQueries::upsertFile(f);
     cache->cacheEntry(f);
 
@@ -306,18 +306,19 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     f->is_hidden = ctx.path.filename().string().starts_with('.');
     f->created_by = f->last_modified_by = ctx.userId;
     f->inode = std::make_optional(cache->getOrAssignInode(ctx.fuse_path));
-    f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : util::Magic::get_mime_type_from_buffer(ctx.buffer);
+    f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : Magic::get_mime_type_from_buffer(ctx.buffer);
     f->size_bytes = ctx.buffer.size();
 
     if (ctx.buffer.empty()) std::ofstream(f->backing_path).close();
     else {
         std::string iv_b64;
-        const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, iv_b64);
+        const auto [ciphertext, keyVersion] = engine->encryptionManager->encrypt(ctx.buffer, iv_b64);
         f->encryption_iv = iv_b64;
-        util::writeFile(f->backing_path, ciphertext);
+        f->encrypted_with_key_version = keyVersion;
+        writeFile(f->backing_path, ciphertext);
     }
 
-    f->content_hash = crypto::Hash::blake2b(f->backing_path);
+    f->content_hash = Hash::blake2b(f->backing_path);
 
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
@@ -445,20 +446,21 @@ void Filesystem::handleRename(const RenameContext& ctx) {
         auto buffer = ctx.buffer;
 
         if (!f->encryption_iv.empty()) {
-            const auto tmp = util::decrypt_file_to_temp(ctx.engine->vault->id, oldVaultPath, ctx.engine);
-            buffer = util::readFileToVector(tmp);
-        } else buffer = util::readFileToVector(oldBackingPath);
+            const auto tmp = decrypt_file_to_temp(ctx.engine->vault->id, oldVaultPath, ctx.engine);
+            buffer = readFileToVector(tmp);
+        } else buffer = readFileToVector(oldBackingPath);
 
         if (!buffer.empty()) {
             std::string iv_b64;
-            const auto ciphertext = ctx.engine->encryptionManager->encrypt(buffer, iv_b64);
+            const auto [ciphertext, keyVersion] = ctx.engine->encryptionManager->encrypt(buffer, iv_b64);
             if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldBackingPath.string());
-            util::writeFile(newBackingPath, ciphertext);
+            writeFile(newBackingPath, ciphertext);
 
             f->encryption_iv = iv_b64;
+            f->encrypted_with_key_version = keyVersion;
             f->size_bytes = std::filesystem::file_size(newBackingPath);
-            f->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
-            f->content_hash = crypto::Hash::blake2b(newBackingPath);
+            f->mime_type = Magic::get_mime_type_from_buffer(buffer);
+            f->content_hash = Hash::blake2b(newBackingPath);
 
             if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
                 ThumbnailWorker::enqueue(ctx.engine, buffer, f);

@@ -70,10 +70,10 @@ void FSTask::processOperations() const {
             const auto buffer = util::readFileToVector(tmpPath);
 
             std::string iv_b64;
-            const auto ciphertext = engine_->encryptionManager->encrypt(buffer, iv_b64);
+            const auto [ciphertext, version] = engine_->encryptionManager->encrypt(buffer, iv_b64);
 
             util::writeFile(absDest, ciphertext);
-            FileQueries::setEncryptionIV(vaultId(), op->destination_path, iv_b64);
+            FileQueries::setEncryptionIVAndVersion(vaultId(), op->destination_path, std::make_pair(iv_b64, version));
         }
 
         const auto& move = [&]() {

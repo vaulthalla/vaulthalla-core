@@ -23,8 +23,7 @@ public:
 
     // Encrypt data with vault key, returns ciphertext.
     // Populates out_b64_iv with base64-encoded IV.
-    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext,
-                                 std::string& out_b64_iv, unsigned int keyVersion) const;
+    [[nodiscard]] std::pair<std::vector<uint8_t>, unsigned int> encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const;
 
     // Decrypt using base64-encoded IV and ciphertext
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,
@@ -38,7 +37,7 @@ private:
     std::unique_ptr<TPMKeyProvider> tpmKeyProvider_;
     std::atomic<bool> rotation_in_progress_;
     unsigned int vault_id_, version_{};
-    std::vector<uint8_t> key_, new_key_;
+    std::vector<uint8_t> key_, old_key_;
 };
 
 }

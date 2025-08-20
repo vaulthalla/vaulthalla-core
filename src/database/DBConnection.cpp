@@ -561,8 +561,8 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
 
-    conn_->prepare("get_file_encryption_iv",
-                   "SELECT f.encryption_iv "
+    conn_->prepare("get_file_encryption_iv_and_version",
+                   "SELECT f.encryption_iv, f.encrypted_with_key_version "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
@@ -572,9 +572,9 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("set_file_encryption_iv",
+    conn_->prepare("set_file_encryption_iv_and_version",
                    R"(UPDATE files f
-       SET encryption_iv = $3
+       SET encryption_iv = $3, encrypted_with_key_version = $4
        FROM fs_entry fs
        WHERE f.fs_entry_id = fs.id
          AND fs.vault_id = $1

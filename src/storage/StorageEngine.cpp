@@ -44,9 +44,10 @@ bool StorageEngine::isFile(const fs::path& rel_path) const {
 }
 
 std::vector<uint8_t> StorageEngine::decrypt(const unsigned int vaultId, const fs::path& relPath, const std::vector<uint8_t>& payload) const {
-    const auto iv = FileQueries::getEncryptionIV(vaultId, relPath);
-    if (!iv || iv->empty()) throw std::runtime_error("No encryption IV found for file: " + relPath.string());
-    return encryptionManager->decrypt(payload, *iv);
+    const auto context = FileQueries::getEncryptionIVAndVersion(vaultId, relPath);
+    if (!context) throw std::runtime_error("No encryption IV found for file: " + relPath.string());
+    const auto& [iv_b64, key_version] = *context;
+    return encryptionManager->decrypt(payload, iv_b64, key_version);
 }
 
 uintmax_t StorageEngine::getDirectorySize(const fs::path& path) {

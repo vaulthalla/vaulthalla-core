@@ -54,7 +54,7 @@ private:
 
     [[nodiscard]] bool remoteFileIsEncrypted(const std::filesystem::path& rel_path) const;
 
-    std::optional<std::string> getRemoteIVBase64(const std::filesystem::path& rel_path) const;
+    std::optional<std::pair<std::string, unsigned int>> getRemoteIVBase64AndVersion(const std::filesystem::path& rel_path) const;
 };
 
 } // namespace vh::storage

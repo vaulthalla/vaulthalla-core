@@ -61,8 +61,11 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const
 
     s3Provider_->setObjectContentHash(s3Key, FileQueries::getContentHash(vault->id, rel_path));
 
-    if (const auto iv = FileQueries::getEncryptionIV(vault->id, rel_path))
-        s3Provider_->setObjectEncryptionMetadata(s3Key, *iv);
+    if (const auto payload = FileQueries::getEncryptionIVAndVersion(vault->id, rel_path)) {
+        const auto& [iv_b64, key_version] = *payload;
+        if (!s3Provider_->setObjectEncryptionMetadata(s3Key, iv_b64, key_version))
+            throw std::runtime_error("[CloudStorageEngine] Failed to set encryption metadata for file: " + rel_path.string());
+    }
 }
 
 std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
@@ -81,10 +84,11 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
     std::shared_ptr<File> file;
 
     if (remoteFileIsEncrypted(rel_path)) {
-        auto iv_b64 = getRemoteIVBase64(rel_path);
-        if (!iv_b64) iv_b64 = FileQueries::getEncryptionIV(vault->id, rel_path);
-        if (!iv_b64) throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
-        buffer = encryptionManager->decrypt(buffer, *iv_b64);
+        auto payload = getRemoteIVBase64AndVersion(rel_path);
+        if (!payload) payload = FileQueries::getEncryptionIVAndVersion(vault->id, rel_path);
+        if (!payload) throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
+        const auto& [iv_b64, key_version] = *payload;
+        buffer = encryptionManager->decrypt(buffer, iv_b64, key_version);;
     }
 
     Filesystem::createFile({
@@ -176,13 +180,23 @@ std::vector<std::shared_ptr<Directory>> CloudStorageEngine::extractDirectories(
     return result;
 }
 
-std::optional<std::string> CloudStorageEngine::getRemoteIVBase64(const std::filesystem::path& rel_path) const {
+std::optional<std::pair<std::string, unsigned int>> CloudStorageEngine::getRemoteIVBase64AndVersion(const std::filesystem::path& rel_path) const {
     const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
+
+    std::string iv_b64;
+    unsigned int key_version = 0;
 
     if (const auto head = s3Provider_->getHeadObject(s3Key)) {
         const auto it = head->find("x-amz-meta-vh-iv");
-        if (it != head->end()) return it->second;
+        if (it != head->end()) iv_b64 = it->second;
+        const auto versionIt = head->find("x-amz-meta-vh-key-version");
+        if (versionIt != head->end()) key_version = std::stoul(versionIt->second);
     }
 
-    return std::nullopt;
+    if (iv_b64.empty() || key_version == 0) {
+        LogRegistry::cloud()->error("[CloudStorageEngine] No IV or key version found for encrypted file: {}", rel_path.string());
+        return std::nullopt;
+    }
+
+    return std::make_pair(iv_b64, key_version);
 }

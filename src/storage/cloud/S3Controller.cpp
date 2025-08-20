@@ -565,7 +565,7 @@ bool S3Controller::setObjectContentHash(const std::filesystem::path& key, const 
     return resp.ok();
 }
 
-bool S3Controller::setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64) const {
+bool S3Controller::setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const {
     CurlEasy curl;
     const auto [canonicalPath, url] = constructPaths(static_cast<CURL*>(curl), key);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
@@ -586,6 +586,7 @@ bool S3Controller::setObjectEncryptionMetadata(const std::string& key, const std
     headers.add("x-amz-meta-vh-encrypted: true");
     headers.add("x-amz-meta-vh-iv: " + iv_b64);
     headers.add("x-amz-meta-vh-algo: aes256gcm");
+    headers.add("x-amz-meta-vh-key-version: " + std::to_string(key_version));
 
     HttpResponse resp = performCurl([&](CURL* h) {
         curl_easy_setopt(h, CURLOPT_URL, url.c_str());

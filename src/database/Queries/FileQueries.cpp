@@ -273,19 +273,21 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     }
 }
 
-std::optional<std::string> FileQueries::getEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath) {
-    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::string> {
+std::optional<std::pair<std::string, unsigned int>>  FileQueries::getEncryptionIVAndVersion(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::pair<std::string, unsigned int>> {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
         const auto res = txn.exec_prepared("get_file_encryption_iv", p);
         if (res.empty()) return std::nullopt;
-        return res.one_field().as<std::string>();
+        const auto row = res.one_row();
+        return std::make_pair(row["encryption_iv"].as<std::string>(), row["encrypted_with_key_version"].as<unsigned int>());
     });
 }
 
-void FileQueries::setEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv) {
-    Transactions::exec("FileQueries::setEncryptionIV", [&](pqxx::work& txn) {
-        pqxx::params p{vaultId, to_utf8_string(relPath.u8string()), iv};
-        txn.exec_prepared("set_file_encryption_iv", p);
+void FileQueries::setEncryptionIVAndVersion(const unsigned int vaultId, const std::filesystem::path& relPath, const std::pair<std::string, unsigned int>& ivAndVersion) {
+    const auto& [iv, keyVersion] = ivAndVersion;
+    Transactions::exec("FileQueries::setEncryptionIVAndVersion", [&](pqxx::work& txn) {
+        pqxx::params p{vaultId, to_utf8_string(relPath.u8string()), iv, keyVersion};
+        txn.exec_prepared("set_file_encryption_iv_and_version", p);
     });
 }
 

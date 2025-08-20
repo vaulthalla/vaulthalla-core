@@ -51,9 +51,9 @@ public:
                                                std::optional<unsigned int> parentId,
                                                unsigned int sizeBytes);
 
-    [[nodiscard]] static std::optional<std::string> getEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath);
+    [[nodiscard]] static std::optional<std::pair<std::string, unsigned int>> getEncryptionIVAndVersion(unsigned int vaultId, const std::filesystem::path& relPath);
 
-    static void setEncryptionIV(unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv);
+    static void setEncryptionIVAndVersion(unsigned int vaultId, const std::filesystem::path& relPath, const std::pair<std::string, unsigned int>& ivAndVersion);
 
     [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
 };

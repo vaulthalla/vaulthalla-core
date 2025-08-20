@@ -2,9 +2,11 @@
 #include "concurrency/fs/LocalDeleteTask.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/Sync.hpp"
 #include "types/Vault.hpp"
 #include "services/LogRegistry.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
+#include "util/task.hpp"
+#include "concurrency/fs/LocalRotateKeyTask.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::database;
@@ -31,6 +33,8 @@ void LocalFSTask::operator()() {
         handleInterrupt();
         removeTrashedFiles();
         handleInterrupt();
+        handleVaultKeyRotation();
+        handleInterrupt();
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[LocalFSTask] Exception during sync: {}", e.what());
         isRunning_ = false;
@@ -48,6 +52,28 @@ void LocalFSTask::operator()() {
     const auto duration = duration_cast<milliseconds>(end - start);
     LogRegistry::sync()->info("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
     requeue();
+}
+
+void LocalFSTask::handleVaultKeyRotation() {
+    if (!engine_->encryptionManager->rotation_in_progress()) return;
+
+    const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
+    const auto ranges = getTaskOperationRanges(filesToRotate.size(), std::thread::hardware_concurrency());
+
+    for (const auto& [begin, end] : ranges) {
+        if (begin >= end || end > filesToRotate.size()) {
+            LogRegistry::sync()->warn("[LocalFSTask] Invalid range for LocalRotateKeyTask: {}-{}", begin, end);
+            continue;
+        }
+        push(std::make_shared<LocalRotateKeyTask>(localEngine(), filesToRotate, begin, end));
+    }
+
+    processFutures();
+
+    engine_->encryptionManager->finish_key_rotation();
+
+    LogRegistry::sync()->info("[LocalFSTask] Vault key rotation completed for vault '{}'", engine_->vault->id);
+    LogRegistry::audit()->info("[LocalFSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
 }
 
 void LocalFSTask::removeTrashedFiles() {

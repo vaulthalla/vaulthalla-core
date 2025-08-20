@@ -30,6 +30,8 @@ protected:
     void removeTrashedFiles() override;
 
     std::shared_ptr<storage::StorageEngine> localEngine() const;
+
+    void handleVaultKeyRotation() override;
 };
 
 }

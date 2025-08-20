@@ -1,9 +1,9 @@
 project('vaulthalla', 'cpp',
-        version: '0.9.1',
+        version: '0.9.2',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
-            'warning_level=2',
+            'warning_level=3',
             'cpp_std=c++23',
             'unity=on',
             'unity_size=8'
@@ -25,19 +25,19 @@ vh_version_header = configure_file(
     install_dir: get_option('includedir') / 'vaulthalla'
 )
 
-lib_version = static_library('vhversion', include_directories: '.')
+lib_version = static_library('vaulthalla-version', include_directories: '.')
 
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
 
 deps = [
+    dependency('fuse3', required: true),
     dependency('libsodium', required: true),
     dependency('libcurl', required: true),
     dependency('boost', modules: ['filesystem', 'system'], required: true),
     dependency('libpqxx', required: true),
     dependency('pdfium', required: true),
     dependency('libmagic', required: true),
-    dependency('fuse3', required: true),
     dependency('yaml-cpp', required: true),
     dependency('libjpeg', required: true),
     dependency('pugixml', required: true),
@@ -48,25 +48,20 @@ deps = [
     dependency('tss2-esys', required: true),
     dependency('tss2-tctildr', required: true),
     dependency('openssl', version: '>=3.0', required: true),
-    dependency('zlib', required: true)
+    dependency('zlib', required: true),
+    dependency('fmt', required: true)
 ]
 
 test_deps = deps + dependency('gtest', required: true, main: true)
 
 
-# ╭──────────────────── SOURCE DIRS ─────────────────────╮
+# ╭────────────────────   FILES   ──────────────────────╮
 
+inc         = include_directories('include', 'vendor')
 source_root = meson.project_source_root()
 src         = join_paths(source_root, 'src')
 tests_src   = join_paths(source_root, 'tests')
 main        = files(join_paths(source_root, 'main.cpp'))
-
-# ╭──────────────────── INCLUDE DIRS ─────────────────────╮
-
-inc       = include_directories('include', 'vendor')
-
-
-# ╭──────────────────── SOURCE COLLECTION ───────────────╮
 
 sources = []
 foreach f : run_command('find', src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
@@ -76,9 +71,7 @@ endforeach
 
 # ╭──────────────────── LIBRARIES ───────────────────────╮
 
-lib_core = static_library('vaulthalla', sources,
-                     include_directories: inc,
-                     dependencies: deps)
+lib_core = static_library('vaulthalla', sources, include_directories: inc, dependencies: deps)
 
 lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
     include_directories: include_directories('seed/include', 'include', 'vendor'),

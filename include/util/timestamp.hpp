@@ -15,7 +15,7 @@ inline std::time_t parsePostgresTimestamp(const std::string& timestampStr) {
     return timegm(&tm); // returns UTC-based time_t
 }
 
-inline std::string timestampToString(std::time_t ts) {
+inline std::string timestampToString(const std::time_t ts) {
     std::ostringstream oss;
     oss << std::put_time(std::gmtime(&ts), "%Y-%m-%dT%H:%M:%SZ"); // ISO 8601 UTC
     return oss.str();

@@ -1,17 +1,25 @@
 #include "types/APIKey.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "types/User.hpp"
+#include "types/Vault.hpp"
+#include "types/VaultKey.hpp"
 #include "protocols/shell/Table.hpp"
 #include "util/cmdLineHelpers.hpp"
+#include "util/timestamp.hpp"
+#include "crypto/encrypt.hpp"
 
 #include <unordered_map>
 #include <stdexcept>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
+#include <version.h>
+#include <chrono>
+#include <ctime>
 
 using namespace vh::types::api;
 using namespace vh::database;
 using namespace vh::shell;
+using namespace vh::util;
 
 // --- S3Provider helpers ---
 std::string vh::types::api::to_string(S3Provider provider) {
@@ -152,4 +160,60 @@ std::string vh::types::api::to_string(const std::vector<std::shared_ptr<APIKey>>
     }
 
     return "API Keys:\n" + tbl.render();
+}
+
+nlohmann::json vh::types::api::generate_json_key_object(const std::shared_ptr<Vault>& v,
+                                               const std::vector<uint8_t>& key,
+                                               const std::shared_ptr<VaultKey>& vk,
+                                               const std::string& exportedBy) {
+    return {
+            {"vault_id", v->id},
+            {"vault_name", v->name},
+            {"key", crypto::b64_encode(key)},
+            {"key_info",
+                {
+                    {"type", "AES-256-GCM"},
+                    {"key_size", key.size()},
+                    {"key_version", vk->version},
+                    {"iv_size", 12},
+                    {"tag_size", 16},
+                    {"iv_gen", "libsodium::randombytes_buf"},
+                    {"cipher_impl", "libsodium::crypto_aead_aes256gcm"},
+                    {"hardware_accel", "AES-NI (runtime checked)"},
+                    {"aad", false},
+                    {"files_hashed_with", "libsodium"},
+                    {"sealed_by", "Vaulthalla v" + std::string(VH_VERSION)},
+                    {"created_at", timestampToString(vk->created_at)},
+                    {"exported_by", exportedBy},
+                    {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+                }
+            }
+    };
+}
+
+nlohmann::json vh::types::api::generate_json_key_info_object(const std::shared_ptr<Vault>& v,
+                                               const std::shared_ptr<VaultKey>& vk,
+                                               const std::string& exportedBy) {
+    return {
+                {"vault_id", v->id},
+                {"vault_name", v->name},
+                {"key_info",
+                    {
+                        {"type", "AES-256-GCM"},
+                        {"key_size", crypto::AES_KEY_SIZE},
+                        {"key_version", vk->version},
+                        {"iv_size", 12},
+                        {"tag_size", 16},
+                        {"iv_gen", "libsodium::randombytes_buf"},
+                        {"cipher_impl", "libsodium::crypto_aead_aes256gcm"},
+                        {"hardware_accel", "AES-NI (runtime checked)"},
+                        {"aad", false},
+                        {"files_hashed_with", "libsodium"},
+                        {"sealed_by", "Vaulthalla v" + std::string(VH_VERSION)},
+                        {"created_at", timestampToString(vk->created_at)},
+                        {"exported_by", exportedBy},
+                        {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
+                    }
+                }
+    };
 }

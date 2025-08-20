@@ -43,6 +43,8 @@ protected:
 
     void removeTrashedFiles() override;
 
+    void handleVaultKeyRotation() override;
+
     virtual void ensureFreeSpace(uintmax_t size) const;
 
     static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File>>& files);

@@ -4,7 +4,6 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
@@ -20,7 +19,6 @@
 #include "types/VaultRole.hpp"
 #include "storage/StorageEngine.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
-#include "crypto/encrypt.hpp"
 #include "crypto/GPGEncryptor.hpp"
 #include "services/LogRegistry.hpp"
 #include "services/SyncController.hpp"
@@ -31,7 +29,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <version.h>
+
+#include "database/Queries/VaultKeyQueries.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -43,11 +42,16 @@ using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 
+
+// ################################################################################
+// ########################## 🧱 Vault Commands Usage #############################
+// ################################################################################
+
 static const std::string VAULT_SYNC_USAGE = "  === Vault Sync Commands ===\n"
-        "    vault sync <id | name> [--owner <id | name>]\n"
-        "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>]\n"
+        "    vault sync <id | name> [--owner <id | name>] [--now]\n"
+        "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] [--now]\n"
         "    vault sync <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
-        "[--on-sync-conflict <keep-local | keep-remote | ask>]\n"
+        "[--on-sync-conflict <keep-local | keep-remote | ask>] [--now]\n"
         "    vault sync info <name>\n"
         "    vault sync set <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] "
         "[--interval <num<s | m | h | d>>]\n"
@@ -115,14 +119,12 @@ static CommandResult usage_vaults_list() {
     };
 }
 
-static uintmax_t parseSize(const std::string& s) {
-    switch (std::toupper(s.back())) {
-    case 'T': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024 * 1024 * 1024; // TiB
-    case 'G': return std::stoull(s.substr(0, s.size() - 1)) * 1024;                      // GiB
-    case 'M': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024;               // MiB
-    default: return std::stoull(s);                                                      // Assume bytes if no suffix
-    }
-}
+
+
+// ################################################################################
+// #################### 🧱 Vault Lifecycle (create/delete) ########################
+// ################################################################################
+
 
 static CommandResult handle_vault_create(const CommandCall& call) {
     try {
@@ -229,115 +231,6 @@ static CommandResult handle_vault_create(const CommandCall& call) {
     }
 }
 
-static CommandResult handle_vault_delete(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault delete: missing <name>");
-    if (call.positionals.size() > 1) return invalid("vault delete: too many arguments");
-
-    const std::string name = call.positionals[0];
-    const auto idOpt = parseInt(name);
-
-    std::shared_ptr<Vault> vault;
-
-    if (idOpt) vault = VaultQueries::getVault(*idOpt);
-    else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) return invalid("vault delete: missing required --owner <id | name> for vault name lookup");
-
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
-        else if (const auto owner = UserQueries::getUserByName(*ownerOpt))
-            vault = VaultQueries::getVault(name, call.user->id);
-        else return invalid("vault delete: owner '" + *ownerOpt + "' not found");
-    }
-
-    if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
-
-    if (!call.user->canManageVaults()) {
-        if (call.user->id != vault->owner_id)
-            return invalid("vault delete: you do not have permission to delete this vault");
-
-        if (!call.user->canDeleteVaultData(vault->id))
-            return invalid("vault delete: you do not have permission to delete this vault's data");
-    }
-
-    ServiceDepsRegistry::instance().storageManager->removeVault(*idOpt);
-
-    return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
-}
-
-static CommandResult handle_vault_info(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault info: missing <name>");
-    if (call.positionals.size() > 1) return invalid("vault info: too many arguments");
-
-    const std::string name = call.positionals[0];
-    const auto idOpt = parseInt(name);
-
-    std::shared_ptr<Vault> vault;
-    if (idOpt) vault = VaultQueries::getVault(*idOpt);
-    else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) return invalid("vault info: missing required --owner <id | name> for vault name lookup");
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
-        else vault = VaultQueries::getVault(name, call.user->id);
-    }
-
-    if (!vault) return invalid("vault info: vault with arg '" + name + "' not found");
-
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
-        return invalid("vault info: you do not have permission to view this vault");
-
-    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id))
-        return invalid("vault info: you do not have permission to view this vault's data");
-
-    return ok(to_string(vault));
-}
-
-static CommandResult handle_vaults_list(const CommandCall& call) {
-    // Validate options
-    const bool f_local = hasFlag(call, "local");
-    const bool f_s3 = hasFlag(call, "s3");
-    if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");
-    if (!call.positionals.empty()) return invalid("vaults: unexpected positional arguments");
-
-    int limit = 100;
-    if (auto lim = optVal(call, "limit")) {
-        if (lim->empty()) return invalid("vaults: --limit requires a value");
-        auto parsed = parseInt(*lim);
-        if (!parsed || *parsed <= 0) return invalid("vaults: --limit must be a positive integer");
-        limit = *parsed;
-    }
-
-    const auto user = call.user;
-    const bool listAll = user->isAdmin() || user->canManageVaults();
-
-    DBQueryParams p{
-        .sortBy = "created_at",
-        .order = SortOrder::DESC,
-        .limit = limit,
-        .offset = 0, // TODO: handle pagination if needed
-    };
-
-    auto vaults = listAll
-                            ? VaultQueries::listVaults(std::move(p))
-                            : VaultQueries::listUserVaults(user->id, std::move(p));
-
-    if (!listAll) {
-        for (const auto& r : call.user->roles) {
-            if (r->canList({})) {
-                const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
-                if (!vault) continue;
-                if (vault->owner_id == user->id) continue; // Already added
-                vaults.push_back(vault);
-            }
-        }
-    } else {
-        for (const auto& v : vaults)
-            if (!call.user->canListVaultData(v->id)) std::ranges::remove_if(vaults, [&](const std::shared_ptr<Vault>& vault) {
-                return vault->id == v->id;
-            });
-    }
-
-    return ok(to_string(vaults));
-}
 
 static CommandResult handle_vault_update(const CommandCall& call) {
     if (call.positionals.empty()) return invalid("vault update: missing <id> or <name>");
@@ -431,6 +324,130 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     return ok("Successfully updated vault!\n" + to_string(vault));
 }
 
+
+static CommandResult handle_vault_delete(const CommandCall& call) {
+    if (call.positionals.empty()) return invalid("vault delete: missing <name>");
+    if (call.positionals.size() > 1) return invalid("vault delete: too many arguments");
+
+    const std::string name = call.positionals[0];
+    const auto idOpt = parseInt(name);
+
+    std::shared_ptr<Vault> vault;
+
+    if (idOpt) vault = VaultQueries::getVault(*idOpt);
+    else {
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault delete: missing required --owner <id | name> for vault name lookup");
+
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
+        else if (const auto owner = UserQueries::getUserByName(*ownerOpt))
+            vault = VaultQueries::getVault(name, call.user->id);
+        else return invalid("vault delete: owner '" + *ownerOpt + "' not found");
+    }
+
+    if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
+
+    if (!call.user->canManageVaults()) {
+        if (call.user->id != vault->owner_id)
+            return invalid("vault delete: you do not have permission to delete this vault");
+
+        if (!call.user->canDeleteVaultData(vault->id))
+            return invalid("vault delete: you do not have permission to delete this vault's data");
+    }
+
+    ServiceDepsRegistry::instance().storageManager->removeVault(*idOpt);
+
+    return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
+}
+
+
+
+// ################################################################################
+// #################### 📦 Vault Info and Listing Commands ########################
+// ################################################################################
+
+static CommandResult handle_vault_info(const CommandCall& call) {
+    if (call.positionals.empty()) return invalid("vault info: missing <name>");
+    if (call.positionals.size() > 1) return invalid("vault info: too many arguments");
+
+    const std::string name = call.positionals[0];
+    const auto idOpt = parseInt(name);
+
+    std::shared_ptr<Vault> vault;
+    if (idOpt) vault = VaultQueries::getVault(*idOpt);
+    else {
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault info: missing required --owner <id | name> for vault name lookup");
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
+        else vault = VaultQueries::getVault(name, call.user->id);
+    }
+
+    if (!vault) return invalid("vault info: vault with arg '" + name + "' not found");
+
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
+        return invalid("vault info: you do not have permission to view this vault");
+
+    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id))
+        return invalid("vault info: you do not have permission to view this vault's data");
+
+    return ok(to_string(vault));
+}
+
+
+static CommandResult handle_vaults_list(const CommandCall& call) {
+    // Validate options
+    const bool f_local = hasFlag(call, "local");
+    const bool f_s3 = hasFlag(call, "s3");
+    if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");
+    if (!call.positionals.empty()) return invalid("vaults: unexpected positional arguments");
+
+    int limit = 100;
+    if (auto lim = optVal(call, "limit")) {
+        if (lim->empty()) return invalid("vaults: --limit requires a value");
+        auto parsed = parseInt(*lim);
+        if (!parsed || *parsed <= 0) return invalid("vaults: --limit must be a positive integer");
+        limit = *parsed;
+    }
+
+    const auto user = call.user;
+    const bool listAll = user->isAdmin() || user->canManageVaults();
+
+    DBQueryParams p{
+        .sortBy = "created_at",
+        .order = SortOrder::DESC,
+        .limit = limit,
+        .offset = 0, // TODO: handle pagination if needed
+    };
+
+    auto vaults = listAll
+                            ? VaultQueries::listVaults(std::move(p))
+                            : VaultQueries::listUserVaults(user->id, std::move(p));
+
+    if (!listAll) {
+        for (const auto& r : call.user->roles) {
+            if (r->canList({})) {
+                const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
+                if (!vault) continue;
+                if (vault->owner_id == user->id) continue; // Already added
+                vaults.push_back(vault);
+            }
+        }
+    } else {
+        for (const auto& v : vaults)
+            if (!call.user->canListVaultData(v->id)) std::ranges::remove_if(vaults, [&](const std::shared_ptr<Vault>& vault) {
+                return vault->id == v->id;
+            });
+    }
+
+    return ok(to_string(vaults));
+}
+
+
+
+// ################################################################################
+// #################### 🔑 Vault Role Assignment Commands ########################
+// ################################################################################
+
 static CommandResult handle_vault_role_assign(const CommandCall& call) {
     if (call.positionals.size() < 2) return invalid("vault assign: missing <vault_id> and <role_id>");
     if (call.positionals.size() > 2) return invalid("vault assign: too many arguments");
@@ -517,31 +534,11 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     return ok("Successfully assigned role '" + role->name + "' to vault '" + vault->name + "'");
 }
 
-static nlohmann::json generate_json_key_object(const std::shared_ptr<Vault>& v,
-                                               const std::vector<uint8_t>& key,
-                                               const std::string& exportedBy) {
-    return {
-            {"vault_id", v->id},
-            {"vault_name", v->name},
-            {"key", b64_encode(key)},
-            {"key_info",
-                {
-                    {"type", "AES-256-GCM"},
-                    {"key_size", key.size()},
-                    {"iv_size", 12},
-                    {"tag_size", 16},
-                    {"iv_gen", "libsodium::randombytes_buf"},
-                    {"cipher_impl", "libsodium::crypto_aead_aes256gcm"},
-                    {"hardware_accel", "AES-NI (runtime checked)"},
-                    {"aad", false},
-                    {"files_hashed_with", "libsodium"},
-                    {"sealed_by", "Vaulthalla v" + std::string(VH_VERSION)},
-                    {"exported_by", exportedBy},
-                    {"exported_at", timestampToString(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))}
-                }
-            }
-    };
-}
+
+
+// ################################################################################
+// #################### 🔑 Vault Key Management Commands ########################
+// ################################################################################
 
 static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
                                                      const nlohmann::json& output) {
@@ -580,7 +577,8 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
         "\nConsider using --recipient with a GPG fingerprint along with --output\nto securely encrypt the key(s) to an output file."};
 }
 
-static CommandResult handle_export_vault_key(const CommandCall& call) {
+
+static CommandResult export_one_key(const CommandCall& call) {
     const auto vaultArg = call.positionals[0];
     std::shared_ptr<StorageEngine> engine;
 
@@ -607,12 +605,14 @@ static CommandResult handle_export_vault_key(const CommandCall& call) {
     if (!engine) return invalid("vault keys export: no storage engine found for vault '" + vaultArg + "'");
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     const auto& key = engine->encryptionManager->get_key(context);
+    const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
 
-    const auto out = generate_json_key_object(engine->vault, key, call.user->name);
+    const auto out = api::generate_json_key_object(engine->vault, key, vaultKey, call.user->name);
     return handle_key_encrypt_and_response(call, out);
 }
 
-static CommandResult handle_export_all_vault_keys(const CommandCall& call) {
+
+static CommandResult export_all_keys(const CommandCall& call) {
     const auto engines = ServiceDepsRegistry::instance().storageManager->getEngines();
     if (engines.empty()) return invalid("vault keys export: no vaults found");
 
@@ -621,11 +621,13 @@ static CommandResult handle_export_all_vault_keys(const CommandCall& call) {
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     for (const auto& engine : engines) {
         const auto& key = engine->encryptionManager->get_key(context);
-        out.push_back(generate_json_key_object(engine->vault, key, call.user->name));
+        const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
+        out.push_back(api::generate_json_key_object(engine->vault, key, vaultKey, call.user->name));
     }
 
     return handle_key_encrypt_and_response(call, out);
 }
+
 
 static CommandResult handle_export_vault_keys(const CommandCall& call) {
     if (!call.user->isSuperAdmin()) {
@@ -637,9 +639,134 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
     }
     if (call.positionals.empty()) return invalid("vault keys export: missing <vault_id | name | all> <output_file>");
     if (call.positionals.size() > 2) return invalid("vault keys export: too many arguments");
-    if (call.positionals[0] == "all") return handle_export_all_vault_keys(call);
-    return handle_export_vault_key(call);
+    if (call.positionals[0] == "all") return export_all_keys(call);
+    return export_one_key(call);
 }
+
+
+static CommandResult handle_inspect_vault_key(const CommandCall& call) {
+    if (!call.user->isSuperAdmin()) {
+        if (!call.user->canManageEncryptionKeys()) return invalid("vault keys inspect: only super admins can inspect vault keys");
+
+        LogRegistry::audit()->warn("\n[shell::handle_inspect_vault_key] User {} called to inspect vault keys without super admin privileges\n"
+                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+                                       call.user->name);
+    }
+
+    if (call.positionals.size() != 1) return invalid("vault keys inspect: expected exactly one argument <vault_id | name>");
+
+    const auto vaultArg = call.positionals[0];
+    if (vaultArg.empty()) return invalid("vault keys inspect: missing <vault_id | name>");
+
+    std::shared_ptr<StorageEngine> engine;
+
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) return invalid("vault keys inspect: vault ID must be a positive integer");
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
+    } else {
+        const auto ownerOpt = optVal(call, "owner");
+        unsigned int ownerId;
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault keys inspect: --owner <id> must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault keys inspect: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault keys inspect: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
+        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
+        if (!vault) return invalid("vault keys inspect: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    }
+
+    if (!engine) return invalid("vault keys inspect: no storage engine found for vault '" + vaultArg + "'");
+
+    const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
+
+    return ok(api::generate_json_key_info_object(engine->vault, vaultKey, call.user->name).dump(4));
+}
+
+
+static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
+    if (!call.user->isSuperAdmin()) {
+        if (!call.user->canManageEncryptionKeys())
+            return invalid("vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
+
+        LogRegistry::audit()->warn("\n[shell::handle_rotate_vault_keys] User {} called to rotate vault keys without super admin privileges\n"
+                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+                                       call.user->name);
+    }
+
+    if (call.positionals.size() != 1) return invalid("vault keys rotate: expected exactly one argument <vault_id | name>");
+
+    const auto vaultArg = call.positionals[0];
+    if (vaultArg.empty()) return invalid("vault keys rotate: missing <vault_id | name>");
+
+    const bool syncNow = hasFlag(call, "now");
+
+    if (vaultArg == "all") {
+        for (const auto& engine : ServiceDepsRegistry::instance().storageManager->getEngines()) {
+            engine->encryptionManager->prepare_key_rotation();
+            if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
+        }
+
+        return ok("Vault keys for all vaults have been rotated successfully.\n"
+                    "If you have --now flag set, the sync will be triggered immediately.");
+    }
+
+    std::shared_ptr<StorageEngine> engine;
+
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) return invalid("vault keys rotate: vault ID must be a positive integer");
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
+    } else {
+        const auto ownerOpt = optVal(call, "owner");
+        unsigned int ownerId;
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault keys rotate: --owner <id> must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault keys rotate: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault keys rotate: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
+        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
+        if (!vault) return invalid("vault keys rotate: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    }
+
+    if (!engine) return invalid("vault keys rotate: no storage engine found for vault '" + vaultArg + "'");
+
+    engine->encryptionManager->prepare_key_rotation();
+    if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
+
+    return ok("Vault key for '" + engine->vault->name + "' (ID: " + std::to_string(engine->vault->id) +
+              ") has been rotated successfully.\n"
+              "If you have --now flag set, the sync will be triggered immediately.");
+}
+
+
+static CommandResult handle_vault_keys(const CommandCall& call) {
+    if (call.positionals.empty()) return invalid("vault keys: missing <export | rotate | inspect> <vault_id | name | all> [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]");
+
+    const auto subcommand = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (subcommand == "export") return handle_export_vault_keys(subcall);
+    if (subcommand == "rotate") return handle_rotate_vault_keys(subcall);
+    if (subcommand == "inspect") return handle_inspect_vault_key(subcall);
+
+    return invalid("vault keys: unknown subcommand '" + std::string(subcommand) + "'. Use: export | rotate | inspect");
+}
+
+
+
+// ################################################################################
+// ######################### 🔄 Vault Sync Commands ###############################
+// ################################################################################
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VAULT_SYNC_USAGE);
@@ -654,7 +781,7 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
         const auto ownerOpt = optVal(call, "owner");
         if (!ownerOpt) return invalid("vault sync: missing required --owner <id | name> for vault name lookup");
 
-        unsigned int ownerId = call.user->id;
+        unsigned int ownerId;
 
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
             if (*ownerIdOpt <= 0) return invalid("vault sync: --owner <id> must be a positive integer");
@@ -809,41 +936,36 @@ static CommandResult handle_sync(const CommandCall& call) {
     return ok("Unrecognized command: " + arg + "\n" + VAULT_SYNC_USAGE);
 }
 
+
+
+// ################################################################################
+// ######################### 📦 Vault Command Registration ########################
+// ################################################################################
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("vault", "Manage a single vault",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (call.positionals.empty()) return usage_vault_root(call.user->isSuperAdmin());
+    const auto vaultHandler = [](const CommandCall& call) -> CommandResult {
+        if (call.positionals.empty()) return usage_vault_root(call.user->isSuperAdmin());
 
-                           const std::string_view sub = call.positionals[0];
-                           CommandCall subcall = call;
-                           // shift subcommand off positionals
-                           subcall.positionals.erase(subcall.positionals.begin());
+        const std::string_view sub = call.positionals[0];
+        CommandCall subcall = call;
+        subcall.positionals.erase(subcall.positionals.begin());
 
-                           if (sub == "sync") return handle_sync(subcall);
-                           if (sub == "create" || sub == "new") return handle_vault_create(subcall);
-                           if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
-                           if (sub == "info" || sub == "get") return handle_vault_info(subcall);
-                           if (sub == "update" || sub == "set") return handle_vault_update(subcall);
-                           if (sub == "assign" || sub == "role") return handle_vault_role_assign(subcall);
-                           if (sub == "keys") {
-                               if (call.positionals.size() == 1)
-                                   return invalid("Usage: vault keys <export | rotate | inspect> <vault_id | name | all> [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]");
+        if (sub == "sync") return handle_sync(subcall);
+        if (sub == "create" || sub == "new") return handle_vault_create(subcall);
+        if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
+        if (sub == "info" || sub == "get") return handle_vault_info(subcall);
+        if (sub == "update" || sub == "set") return handle_vault_update(subcall);
+        if (sub == "assign" || sub == "role") return handle_vault_role_assign(subcall);
+        if (sub == "keys") return handle_vault_keys(subcall);
 
-                               const auto sub2 = subcall.positionals[0];
-                               subcall.positionals.erase(subcall.positionals.begin());
+        return usage_vault_root(call.user->isSuperAdmin());
+    };
 
-                               if (sub2 == "export") return handle_export_vault_keys(subcall);
-                               return invalid("vault keys: unknown subcommand '" + std::string(subcall.positionals[1]) +
-                                   "'. Use: export | rotate | inspect");
-                           }
+    const auto vaultsHandler = [](const CommandCall& call) -> CommandResult {
+        if (hasKey(call, "help") || hasKey(call, "h")) return usage_vaults_list();
+        return handle_vaults_list(call);
+    };
 
-                           return invalid(
-                               "vault: unknown subcommand '" + std::string(sub) + "'. Use: create | delete | info");
-                       }, {"v"});
-
-    r->registerCommand("vaults", "List vaults",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (hasKey(call, "help") || hasKey(call, "h")) return usage_vaults_list();
-                           return handle_vaults_list(call);
-                       }, {"ls"});
+    r->registerCommand("vault", "Manage a single vault", vaultHandler, {"v"});
+    r->registerCommand("vaults", "List vaults", vaultsHandler, {"ls"});
 }

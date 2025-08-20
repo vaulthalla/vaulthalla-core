@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS vault_keys
         )");
 
         txn.exec(R"(
-CREATE TABLE vault_keys_trashed
+CREATE TABLE IF NOT EXISTS vault_keys_trashed
 (
     vault_id               INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
     version                INTEGER NOT NULL DEFAULT 1,
@@ -128,7 +128,7 @@ CREATE TABLE vault_keys_trashed
         )");
 
         txn.exec(R"(
-CREATE TABLE s3
+CREATE TABLE IF NOT EXISTS s3
 (
     vault_id     INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
     api_key_id   INTEGER REFERENCES api_keys (id) ON DELETE CASCADE,

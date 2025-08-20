@@ -7,6 +7,7 @@
 #include <future>
 #include <atomic>
 #include <vector>
+#include <utility>
 
 namespace vh::storage {
 class StorageEngine;
@@ -55,6 +56,7 @@ protected:
 
     void processOperations() const;
 
+    virtual void handleVaultKeyRotation() = 0;
     virtual void processFutures();
 };
 

@@ -19,7 +19,7 @@ VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
 }
 
 unsigned int VaultEncryptionManager::get_key_version() const { return version_; }
-
+bool VaultEncryptionManager::rotation_in_progress() const { return rotation_in_progress_.load(); }
 
 void VaultEncryptionManager::load_key() {
     rotation_in_progress_.store(VaultKeyQueries::keyRotationInProgress(vault_id_));
@@ -90,7 +90,9 @@ void VaultEncryptionManager::prepare_key_rotation() {
     key->encrypted_key = encrypt_aes256_gcm(key_, tpmKeyProvider_->getMasterKey(), iv);
     key->iv = std::move(iv);
     key->version = VaultKeyQueries::rotateVaultKey(key);
+
     version_ = key->version;
+    rotation_in_progress_.store(true);
 
     LogRegistry::crypto()->info("[VaultEncryptionManager] Prepared new key for vault {}", vault_id_);
 }
@@ -109,7 +111,13 @@ void VaultEncryptionManager::finish_key_rotation() {
     LogRegistry::crypto()->info("[VaultEncryptionManager] Finished key rotation for vault {}", vault_id_);
 }
 
-std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref) const {
+std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref, unsigned int keyVersion) const {
+    if (keyVersion > version_ || keyVersion < version_ - 1) {
+        LogRegistry::crypto()->warn("[VaultEncryptionManager] Key version {} is not valid for vault {}, using new key",
+                                    keyVersion, vault_id_);
+        keyVersion = version_;
+    }
+
     const auto decrypted = decrypt_aes256_gcm(ciphertext, old_key_, b64_decode(b64_iv_ref));
     std::vector<uint8_t> iv;
     const auto encrypted = encrypt_aes256_gcm(decrypted, key_, iv);
@@ -119,7 +127,7 @@ std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vec
     }
     b64_iv_ref = b64_encode(iv);
     LogRegistry::crypto()->info("[VaultEncryptionManager] Successfully rotated key for vault {}", vault_id_);
-    return encrypted;
+    return {encrypted, keyVersion};
 }
 
 std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const {

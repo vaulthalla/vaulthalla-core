@@ -19,7 +19,7 @@ public:
     void prepare_key_rotation();
     void finish_key_rotation();
 
-    [[nodiscard]] std::vector<uint8_t> rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref) const;
+    [[nodiscard]] std::pair<std::vector<uint8_t>, unsigned int> rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref, unsigned int keyVersion) const;
 
     // Encrypt data with vault key, returns ciphertext.
     // Populates out_b64_iv with base64-encoded IV.
@@ -32,6 +32,8 @@ public:
     [[nodiscard]] std::vector<uint8_t> get_key(const std::string& callingFunctionName) const;
 
     [[nodiscard]] unsigned int get_key_version() const;
+
+    [[nodiscard]] bool rotation_in_progress() const;
 
 private:
     std::unique_ptr<TPMKeyProvider> tpmKeyProvider_;

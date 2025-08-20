@@ -276,17 +276,16 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
 std::optional<std::pair<std::string, unsigned int>>  FileQueries::getEncryptionIVAndVersion(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::pair<std::string, unsigned int>> {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
-        const auto res = txn.exec_prepared("get_file_encryption_iv", p);
+        const auto res = txn.exec_prepared("get_file_encryption_iv_and_version", p);
         if (res.empty()) return std::nullopt;
         const auto row = res.one_row();
         return std::make_pair(row["encryption_iv"].as<std::string>(), row["encrypted_with_key_version"].as<unsigned int>());
     });
 }
 
-void FileQueries::setEncryptionIVAndVersion(const unsigned int vaultId, const std::filesystem::path& relPath, const std::pair<std::string, unsigned int>& ivAndVersion) {
-    const auto& [iv, keyVersion] = ivAndVersion;
+void FileQueries::setEncryptionIVAndVersion(const std::shared_ptr<File>& f) {
     Transactions::exec("FileQueries::setEncryptionIVAndVersion", [&](pqxx::work& txn) {
-        pqxx::params p{vaultId, to_utf8_string(relPath.u8string()), iv, keyVersion};
+        pqxx::params p{f->vault_id, to_utf8_string(f->path.u8string()), f->encryption_iv, f->encrypted_with_key_version};
         txn.exec_prepared("set_file_encryption_iv_and_version", p);
     });
 }
@@ -297,3 +296,12 @@ std::string FileQueries::getContentHash(const unsigned int vaultId, const std::f
         return txn.exec_prepared("get_file_content_hash", p).one_field().as<std::string>();
     });
 }
+
+std::vector<std::shared_ptr<File>> FileQueries::getFilesOlderThanKeyVersion(unsigned int vaultId, unsigned int keyVersion) {
+    return Transactions::exec("FileQueries::getFilesOlderThanKeyVersion", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("get_files_older_than_key_version", pqxx::params{vaultId, keyVersion});
+        if (res.empty()) return std::vector<std::shared_ptr<File>>();
+        return files_from_pq_res(res);
+    });
+}
+

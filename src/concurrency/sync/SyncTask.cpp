@@ -10,6 +10,9 @@
 #include "types/Directory.hpp"
 #include "types/Sync.hpp"
 #include "services/LogRegistry.hpp"
+#include "crypto/VaultEncryptionManager.hpp"
+#include "util/task.hpp"
+#include "concurrency/sync/CloudRotateKeyTask.hpp"
 
 #include <utility>
 
@@ -37,6 +40,8 @@ void SyncTask::operator()() {
         processOperations();
         handleInterrupt();
         removeTrashedFiles();
+        handleInterrupt();
+        handleVaultKeyRotation();
         handleInterrupt();
 
         s3Map_ = cloudEngine()->getGroupedFilesFromS3();
@@ -88,6 +93,28 @@ void SyncTask::operator()() {
     const auto duration = duration_cast<milliseconds>(end - start);
     LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms",
                               engine_->vault->id, duration.count());
+}
+
+void SyncTask::handleVaultKeyRotation() {
+    if (!engine_->encryptionManager->rotation_in_progress()) return;
+
+    const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
+    const auto ranges = getTaskOperationRanges(filesToRotate.size(), std::thread::hardware_concurrency());
+
+    for (const auto& [begin, end] : ranges) {
+        if (begin >= end || end > filesToRotate.size()) {
+            LogRegistry::sync()->warn("[SyncTask] Invalid range for LocalRotateKeyTask: {}-{}", begin, end);
+            continue;
+        }
+        push(std::make_shared<CloudRotateKeyTask>(cloudEngine(), filesToRotate, begin, end));
+    }
+
+    processFutures();
+
+    engine_->encryptionManager->finish_key_rotation();
+
+    LogRegistry::sync()->info("[SyncTask] Vault key rotation completed for vault '{}'", engine_->vault->id);
+    LogRegistry::audit()->info("[SyncTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
 }
 
 void SyncTask::removeTrashedFiles() {

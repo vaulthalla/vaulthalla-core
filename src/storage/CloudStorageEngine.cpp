@@ -68,6 +68,25 @@ void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const
     }
 }
 
+void CloudStorageEngine::uploadFileBuffer(const std::shared_ptr<File>& f, const std::vector<uint8_t>& buffer) const {
+    if (buffer.empty())
+        throw std::invalid_argument("[CloudStorageEngine] Buffer for upload cannot be empty");
+
+    if (!f || f->path.empty())
+        throw std::invalid_argument("[CloudStorageEngine] Invalid file or buffer for upload");
+
+    const auto s3Key = stripLeadingSlash(f->path);
+    const std::unordered_map<std::string, std::string> meta{
+        {"vh-encrypted", f->encryption_iv == "" ? "false" : "true"},
+        {"vh-key-version", std::to_string(f->encrypted_with_key_version)},
+        {"vh-iv", f->encryption_iv},
+        {"content-hash", *f->content_hash}
+    };
+
+    if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
+        throw std::runtime_error("[CloudStorageEngine] Failed to upload file buffer: " + f->path.string());
+}
+
 std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
     std::vector<uint8_t> buffer;
     if (!s3Provider_->downloadToBuffer(stripLeadingSlash(rel_path), buffer))
@@ -99,8 +118,10 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
             .userId = vault->owner_id
         });
 
-    std::unordered_map<std::string, std::string> meta{
+    const std::unordered_map<std::string, std::string> meta{
             {"vh-encrypted", "true"},
+            {"vh-key-version", std::to_string(file->encrypted_with_key_version)},
+            {"vh-iv", file->encryption_iv},
             {"content-hash", *file->content_hash}
     };
 

@@ -169,28 +169,46 @@ void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("delete_vault_key", "DELETE FROM vault_keys WHERE vault_id = $1");
 
     conn_->prepare("rotate_vault_key",
-                   "WITH moved AS ("
-                   "    DELETE FROM vault_keys "
-                   "    WHERE vault_id = $1 "
-                   "    RETURNING vault_id, encrypted_key, iv, created_at"
-                   "), "
-                   "versioned AS ("
-                   "    SELECT COALESCE(MAX(version), 0) + 1 AS next_version "
-                   "    FROM vault_keys_trashed "
-                   "    WHERE vault_id = $1"
-                   "), "
-                   "trashed AS ("
+                   "WITH "
+                   "  _lock AS ( "
+                   "    SELECT pg_advisory_xact_lock($1::bigint) "
+                   "  ), "
+                   "  current AS ( "
+                   "    SELECT vk.vault_id, vk.encrypted_key, vk.iv, vk.created_at, vk.version "
+                   "    FROM vault_keys vk "
+                   "    WHERE vk.vault_id = $1 "
+                   "    FOR UPDATE "
+                   "  ), "
+                   "  versioned AS ( "
+                   "    SELECT COALESCE( "
+                   "      (SELECT version FROM current), "
+                   "      (SELECT MAX(version) FROM vault_keys_trashed WHERE vault_id = $1), "
+                   "      0 "
+                   "    ) + 1 AS next_version "
+                   "  ), "
+                   "  trashed AS ( "
                    "    INSERT INTO vault_keys_trashed (vault_id, encrypted_key, iv, created_at, trashed_at, version) "
-                   "    SELECT m.vault_id, m.encrypted_key, m.iv, m.created_at, CURRENT_TIMESTAMP, v.next_version "
-                   "    FROM moved m, versioned v"
-                   "), "
-                   "inserted AS ("
-                   "    INSERT INTO vault_keys (vault_id, encrypted_key, iv, version) "
-                   "    SELECT $1, $2, $3, v.next_version "
-                   "    FROM versioned v "
-                   "    RETURNING version"
-                   ") "
-                   "SELECT version FROM inserted;"
+                   "    SELECT c.vault_id, c.encrypted_key, c.iv, c.created_at, CURRENT_TIMESTAMP, v.next_version "
+                   "    FROM current c, versioned v "
+                   "    RETURNING 1 "
+                   "  ), "
+                   "  updated AS ( "
+                   "    UPDATE vault_keys vk "
+                   "    SET encrypted_key = $2, "
+                   "        iv            = $3, "
+                   "        version       = (SELECT next_version FROM versioned), "
+                   "        created_at    = CURRENT_TIMESTAMP "
+                   "    WHERE vk.vault_id = $1 "
+                   "    RETURNING version "
+                   "  ), "
+                   "  inserted AS ( "
+                   "    INSERT INTO vault_keys (vault_id, encrypted_key, iv, version, created_at) "
+                   "    SELECT $1, $2, $3, (SELECT next_version FROM versioned), CURRENT_TIMESTAMP "
+                   "    WHERE NOT EXISTS (SELECT 1 FROM current) "
+                   "    RETURNING version "
+                   "  ) "
+                   "SELECT COALESCE((SELECT version FROM updated), "
+                   "                (SELECT version FROM inserted)) AS version;"
         );
 
     conn_->prepare("mark_vault_key_rotation_finished",
@@ -200,7 +218,8 @@ void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("vault_key_rotation_in_progress",
                    "SELECT EXISTS(SELECT 1 FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL) AS in_progress");
 
-    conn_->prepare("get_rotation_old_vault_key", "SELECT * FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL");
+    conn_->prepare("get_rotation_old_vault_key",
+                   "SELECT * FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL");
 }
 
 void DBConnection::initPreparedUserRoles() const {
@@ -579,6 +598,12 @@ void DBConnection::initPreparedFiles() const {
        WHERE f.fs_entry_id = fs.id
          AND fs.vault_id = $1
          AND fs.path = $2)");
+
+    conn_->prepare("get_files_older_than_key_version",
+                   "SELECT fs.*, f.* "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND f.encrypted_with_key_version < $2");
 }
 
 void DBConnection::initPreparedDirectories() const {

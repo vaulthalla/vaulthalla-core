@@ -53,7 +53,9 @@ public:
 
     [[nodiscard]] static std::optional<std::pair<std::string, unsigned int>> getEncryptionIVAndVersion(unsigned int vaultId, const std::filesystem::path& relPath);
 
-    static void setEncryptionIVAndVersion(unsigned int vaultId, const std::filesystem::path& relPath, const std::pair<std::string, unsigned int>& ivAndVersion);
+    static void setEncryptionIVAndVersion(const std::shared_ptr<types::File>& f);
+
+    static std::vector<std::shared_ptr<types::File>> getFilesOlderThanKeyVersion(unsigned int vaultId, unsigned int keyVersion);
 
     [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
 };

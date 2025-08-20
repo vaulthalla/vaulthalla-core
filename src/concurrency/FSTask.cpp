@@ -65,15 +65,21 @@ void FSTask::processOperations() const {
         const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
+        const auto f = FileQueries::getFileByPath(engine_->vault->id, op->destination_path);
+        if (!f) {
+            LogRegistry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
+            continue;
+        }
+
         {
             const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
             const auto buffer = util::readFileToVector(tmpPath);
 
-            std::string iv_b64;
-            const auto [ciphertext, version] = engine_->encryptionManager->encrypt(buffer, iv_b64);
+            const auto [ciphertext, version] = engine_->encryptionManager->encrypt(buffer, f->encryption_iv);
+            f->encrypted_with_key_version = version;
 
             util::writeFile(absDest, ciphertext);
-            FileQueries::setEncryptionIVAndVersion(vaultId(), op->destination_path, std::make_pair(iv_b64, version));
+            FileQueries::setEncryptionIVAndVersion(f);
         }
 
         const auto& move = [&]() {

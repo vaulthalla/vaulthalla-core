@@ -7,6 +7,10 @@
 #include <memory>
 #include <atomic>
 
+namespace vh::types {
+    struct File;
+}
+
 namespace vh::crypto {
 
 class VaultEncryptionManager {
@@ -19,11 +23,12 @@ public:
     void prepare_key_rotation();
     void finish_key_rotation();
 
-    [[nodiscard]] std::pair<std::vector<uint8_t>, unsigned int> rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref, unsigned int keyVersion) const;
+    [[nodiscard]] std::vector<uint8_t>
+    rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<types::File>& f) const;
 
     // Encrypt data with vault key, returns ciphertext.
     // Populates out_b64_iv with base64-encoded IV.
-    [[nodiscard]] std::pair<std::vector<uint8_t>, unsigned int> encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const;
+    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<types::File>& f) const;
 
     // Decrypt using base64-encoded IV and ciphertext
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,

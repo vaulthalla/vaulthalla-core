@@ -14,6 +14,7 @@
 #include <sstream>
 #include <utility>
 #include <vector>
+#include <fmt/format.h>
 
 using namespace vh::cloud;
 using namespace vh::types;
@@ -158,31 +159,62 @@ bool S3Controller::uploadBufferWithMetadata(
     const std::vector<uint8_t>& buffer,
     const std::unordered_map<std::string, std::string>& metadata) const
 {
-    const std::string payloadHash = sha256Hex({buffer.begin(), buffer.end()});
+    LogRegistry::cloud()->debug("[S3Provider] Uploading buffer to S3 key: {}, buffer_size: {}",
+                               key.string(), buffer.size());
 
-    CurlEasy tmpHandle;
+    // Hash the raw bytes for SigV4
+    const std::string payloadHash = sha256Hex(std::string(buffer.begin(), buffer.end()));
+
+    const CurlEasy tmpHandle;
     const auto [canonical, url] = constructPaths(static_cast<CURL*>(tmpHandle), key);
 
     SList hdrs = makeSigHeaders("PUT", canonical, payloadHash);
     hdrs.add("Content-Type: application/octet-stream");
+    // (Optional) avoid Expect: 100-continue stalls on small uploads
+    hdrs.add("Expect:");
 
-    // Add x-amz-meta-* headers
-    for (const auto& [k, v] : metadata)
-        hdrs.add("x-amz-meta-" + k + ": " + v);
+    for (const auto& [k, v] : metadata) {
+        hdrs.add(fmt::format("x-amz-meta-{}: {}", k, v));
+    }
 
-    HttpResponse resp = performCurl([&](CURL* h) {
+    struct ReadCtx {
+        const uint8_t* data{nullptr};
+        size_t size{0};
+        size_t off{0};
+    } ctx{ buffer.data(), buffer.size(), 0 };
+
+    const HttpResponse resp = performCurl([&](CURL* h) {
         curl_easy_setopt(h, CURLOPT_URL, url.c_str());
         curl_easy_setopt(h, CURLOPT_UPLOAD, 1L);
         curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
-        curl_easy_setopt(h, CURLOPT_READDATA, &buffer);
-        curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(buffer.size()));
+        curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(ctx.size));
+        curl_easy_setopt(h, CURLOPT_READDATA, &ctx);
         curl_easy_setopt(h, CURLOPT_READFUNCTION,
             +[](char* out, size_t size, size_t nmemb, void* userdata) -> size_t {
-                auto* src = static_cast<std::string*>(userdata);
-                size_t to_copy = std::min(size * nmemb, src->size());
-                std::memcpy(out, src->data(), to_copy);
-                src->erase(0, to_copy);  // consume
-                return to_copy;
+                auto* c = static_cast<ReadCtx*>(userdata);
+                if (!c || !c->data) return 0;
+
+                const size_t max_bytes = size * nmemb;
+                const size_t remaining = (c->off < c->size) ? (c->size - c->off) : 0;
+                const size_t to_copy = (remaining < max_bytes) ? remaining : max_bytes;
+
+                if (to_copy) {
+                    std::memcpy(out, c->data + c->off, to_copy);
+                    c->off += to_copy;
+                }
+                return to_copy; // 0 signals EOF
+            });
+
+        // Support rewinds (auth retries, redirects)
+        curl_easy_setopt(h, CURLOPT_SEEKDATA, &ctx);
+        curl_easy_setopt(h, CURLOPT_SEEKFUNCTION,
+            +[](void* userdata, curl_off_t offset, int origin) -> int {
+                auto* c = static_cast<ReadCtx*>(userdata);
+                if (!c || origin != SEEK_SET || offset < 0) return CURL_SEEKFUNC_CANTSEEK;
+                const size_t off = static_cast<size_t>(offset);
+                if (off > c->size) return CURL_SEEKFUNC_CANTSEEK;
+                c->off = off;
+                return CURL_SEEKFUNC_OK;
             });
     });
 
@@ -211,7 +243,7 @@ bool S3Controller::downloadObject(const std::filesystem::path& key,
     for (const auto& [k, v] : hdrMap) headers.add(k + ": " + v);
 
     auto writeFn = +[](const char* ptr, const size_t size, const size_t nmemb, void* userdata) -> size_t {
-        std::ofstream* fout = static_cast<std::ofstream*>(userdata);
+        auto* fout = static_cast<std::ofstream*>(userdata);
         fout->write(ptr, size * nmemb);
         return size * nmemb;
     };
@@ -233,7 +265,7 @@ bool S3Controller::deleteObject(const std::filesystem::path& key) const {
     const auto [canonical, url] = constructPaths(static_cast<CURL*>(tmpHandle), key);
 
     const std::string payloadHash = sha256Hex("");
-    SList hdrs = makeSigHeaders("DELETE", canonical, payloadHash);
+    const SList hdrs = makeSigHeaders("DELETE", canonical, payloadHash);
 
     HttpResponse resp = performCurl([&](CURL* h){
         curl_easy_setopt(h, CURLOPT_URL, url.c_str());

@@ -20,7 +20,7 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
     return Transactions::exec("FileQueries::addFile", [&](pqxx::work& txn) {
         const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
         const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
-        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<uintmax_t>();
         if (file->inode) txn.exec_prepared("delete_fs_entry_by_inode", file->inode);
 
         pqxx::params p;
@@ -46,7 +46,8 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
-            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
+            int64_t size_delta = static_cast<int64_t>(file->size_bytes) - static_cast<int64_t>(existingSize);
+            pqxx::params stats_params{parentId, size_delta, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
             txn.exec_prepared("update_dir_stats", stats_params);
             const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
             if (res.empty()) break;
@@ -65,7 +66,7 @@ void FileQueries::updateFile(const std::shared_ptr<File>& file) {
     Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
         const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
         const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
-        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<uintmax_t>();
 
         pqxx::params p;
         p.append(file->id);
@@ -78,7 +79,8 @@ void FileQueries::updateFile(const std::shared_ptr<File>& file) {
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
-            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
+            int64_t size_delta = static_cast<int64_t>(file->size_bytes) - static_cast<int64_t>(existingSize);
+            pqxx::params stats_params{parentId, size_delta, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
             txn.exec_prepared("update_dir_stats", stats_params);
             const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
             if (res.empty()) break;

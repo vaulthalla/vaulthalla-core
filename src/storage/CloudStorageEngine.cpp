@@ -72,12 +72,14 @@ void CloudStorageEngine::uploadFileBuffer(const std::shared_ptr<File>& f, const 
         throw std::invalid_argument("[CloudStorageEngine] Invalid file or buffer for upload");
 
     const auto s3Key = stripLeadingSlash(f->path);
-    const std::unordered_map<std::string, std::string> meta{
-        {"vh-encrypted", f->encryption_iv == "" ? "false" : "true"},
-        {"vh-key-version", std::to_string(f->encrypted_with_key_version)},
-        {"vh-iv", f->encryption_iv},
-        {"content-hash", *f->content_hash}
-    };
+    std::unordered_map<std::string, std::string> meta;
+
+    meta["vh-encrypted"] = f->encryption_iv.empty() ? "false" : "true";
+    if (f->content_hash) meta["content-hash"] = *f->content_hash;
+    if (!f->encryption_iv.empty()) {
+        meta["vh-key-version"] = std::to_string(f->encrypted_with_key_version);
+        meta["vh-iv"] = f->encryption_iv;
+    }
 
     if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
         throw std::runtime_error("[CloudStorageEngine] Failed to upload file buffer: " + f->path.string());
@@ -93,10 +95,7 @@ std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem:
 
 std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::path& rel_path) {
     auto buffer = downloadToBuffer(rel_path);
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
-    const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
-
-    std::shared_ptr<File> file;
+    const auto s3Key = stripLeadingSlash(rel_path);
 
     if (remoteFileIsEncrypted(rel_path)) {
         auto payload = getRemoteIVBase64AndVersion(rel_path);
@@ -106,27 +105,29 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
         buffer = encryptionManager->decrypt(buffer, iv_b64, key_version);;
     }
 
-    Filesystem::createFile({
+    const auto f = Filesystem::createFile({
             .path = makeAbsolute(rel_path),
-            .fuse_path = paths->absRelToAbsRel(absPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+            .fuse_path = paths->absRelToAbsRel(makeAbsolute(rel_path), PathType::VAULT_ROOT, PathType::FUSE_ROOT),
             .buffer = buffer,
             .engine = shared_from_this(),
-            .userId = vault->owner_id
+            .userId = vault->owner_id,
+            .overwrite = true
         });
 
-    const std::unordered_map<std::string, std::string> meta{
-            {"vh-encrypted", "true"},
-            {"vh-key-version", std::to_string(file->encrypted_with_key_version)},
-            {"vh-iv", file->encryption_iv},
-            {"content-hash", *file->content_hash}
-    };
+    std::unordered_map<std::string, std::string> meta;
+    meta["vh-encrypted"] = f->encryption_iv.empty() ? "false" : "true";
+    if (f->content_hash) meta["content-hash"] = *f->content_hash;
+    if (!f->encryption_iv.empty()) {
+        meta["vh-key-version"] = std::to_string(f->encrypted_with_key_version);
+        meta["vh-iv"] = f->encryption_iv;
+    }
 
     if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
         throw std::runtime_error("[CloudStorageEngine] Failed to reupload new file with enhanced metadata: " + rel_path.string());
 
-    ThumbnailWorker::enqueue(shared_from_this(), buffer, file);
+    ThumbnailWorker::enqueue(shared_from_this(), buffer, f);
 
-    return file;
+    return f;
 }
 
 void CloudStorageEngine::indexAndDeleteFile(const std::filesystem::path& rel_path) {

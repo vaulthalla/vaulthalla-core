@@ -22,7 +22,7 @@ using namespace std::chrono;
 using namespace vh::logging;
 
 void SyncTask::operator()() {
-    LogRegistry::sync()->info("[SyncTask] Starting sync for vault '{}'", engine_->vault->id);
+    LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);
     const auto start = steady_clock::now();
 
     try {
@@ -56,13 +56,8 @@ void SyncTask::operator()() {
 
         sync();
 
-        LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}'", engine_->vault->id);
-
         SyncQueries::reportSyncSuccess(engine_->sync->id);
         next_run = system_clock::now() + seconds(engine_->sync->interval.count());
-
-        LogRegistry::sync()->debug("[SyncTask] Next sync for vault '{}' scheduled at {}",
-                                   engine_->vault->id, next_run.time_since_epoch().count());
 
         handleInterrupt();
 
@@ -90,8 +85,8 @@ void SyncTask::operator()() {
 
     const auto end = steady_clock::now();
     const auto duration = duration_cast<milliseconds>(end - start);
-    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms",
-                              engine_->vault->id, duration.count());
+    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms. Next run at {} (epoch: {})",
+                              engine_->vault->id, duration.count(), next_run.time_since_epoch().count(), next_run.time_since_epoch());
 }
 
 void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {

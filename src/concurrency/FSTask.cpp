@@ -72,16 +72,22 @@ void FSTask::processOperations() const {
             continue;
         }
 
-        {
-            const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
-            const auto buffer = util::readFileToVector(tmpPath);
-
-            const auto [ciphertext, version] = engine_->encryptionManager->encrypt(buffer, f->encryption_iv);
-            f->encrypted_with_key_version = version;
-
-            util::writeFile(absDest, ciphertext);
-            FileQueries::setEncryptionIVAndVersion(f);
+        if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
+            LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
+            continue;
         }
+
+        const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
+        const auto buffer = util::readFileToVector(tmpPath);
+
+        if (buffer.empty()) {
+            LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
+            continue;
+        }
+
+        const auto ciphertext = engine_->encryptionManager->encrypt(buffer, f);
+        util::writeFile(absDest, ciphertext);
+        FileQueries::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {
             if (fs::exists(absSrc)) fs::remove(absSrc);
@@ -95,29 +101,29 @@ void FSTask::processOperations() const {
 }
 
 void FSTask::handleVaultKeyRotation() {
-    if (!engine_->encryptionManager->rotation_in_progress()) return;
+    try {
+        if (!engine_->encryptionManager->rotation_in_progress()) return;
 
-    const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
-    if (filesToRotate.empty()) {
-        LogRegistry::sync()->info("[FSTask] No files to rotate for vault '{}'", engine_->vault->id);
-        engine_->encryptionManager->finish_key_rotation();
-        return;
-    }
-
-    const auto ranges = getTaskOperationRanges(filesToRotate.size());
-
-    for (const auto& [begin, end] : ranges) {
-        if (begin >= end || end > filesToRotate.size()) {
-            LogRegistry::sync()->warn("[FSTask] Invalid range for LocalRotateKeyTask: {}-{}", begin, end);
-            continue;
+        const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
+        if (filesToRotate.empty()) {
+            LogRegistry::audit()->info("[FSTask] No files to rotate for vault '{}'", engine_->vault->id);
+            engine_->encryptionManager->finish_key_rotation();
+            return;
         }
-        pushKeyRotationTask(filesToRotate, begin, end);
+
+        for (const auto& [begin, end] : getTaskOperationRanges(filesToRotate.size()))
+            pushKeyRotationTask(filesToRotate, begin, end);
+
+        processFutures();
+
+        engine_->encryptionManager->finish_key_rotation();
+
+        LogRegistry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
+    } catch (const std::exception& e) {
+        LogRegistry::sync()->error("[FSTask] Exception during vault key rotation for vault '{}': {}", engine_->vault->id, e.what());
+        isRunning_ = false;
+    } catch (...) {
+        LogRegistry::sync()->error("[FSTask] Unknown exception during vault key rotation for vault '{}'", engine_->vault->id);
+        isRunning_ = false;
     }
-
-    processFutures();
-
-    engine_->encryptionManager->finish_key_rotation();
-
-    LogRegistry::sync()->info("[FSTask] Vault key rotation completed for vault '{}'", engine_->vault->id);
-    LogRegistry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
 }

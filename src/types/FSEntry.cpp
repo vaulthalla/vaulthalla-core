@@ -6,6 +6,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "util/fsPath.hpp"
+#include "util/u8.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -70,8 +71,8 @@ FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {
-    name = std::filesystem::path(s3_key).filename().string();
-    path = s3_key;
+    path = makeAbsolute(s3_key);
+    name = to_utf8_string(path.filename().u8string());
     created_at = updated_at = std::time(nullptr); // default timestamp (can override)
 }
 

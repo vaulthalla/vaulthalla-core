@@ -2,26 +2,32 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/StorageManager.hpp"
+
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
+#include "database/Queries/GroupQueries.hpp"
+
+#include "services/LogRegistry.hpp"
+#include "services/SyncController.hpp"
+
+#include "storage/StorageManager.hpp"
+#include "storage/StorageEngine.hpp"
+
+#include "crypto/VaultEncryptionManager.hpp"
+#include "crypto/GPGEncryptor.hpp"
+
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
 #include "types/DBQueryParams.hpp"
 #include "types/APIKey.hpp"
 #include "types/Group.hpp"
-#include "config/ConfigRegistry.hpp"
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
-#include "database/Queries/GroupQueries.hpp"
 #include "types/VaultRole.hpp"
-#include "storage/StorageEngine.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
-#include "crypto/GPGEncryptor.hpp"
-#include "services/LogRegistry.hpp"
-#include "services/SyncController.hpp"
+
+#include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
 
 #include <algorithm>
@@ -48,61 +54,61 @@ using namespace vh::logging;
 // ################################################################################
 
 static const std::string VAULT_SYNC_USAGE = "  === Vault Sync Commands ===\n"
-        "    vault sync <id | name> [--owner <id | name>] [--now]\n"
-        "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] [--now]\n"
-        "    vault sync <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
-        "[--on-sync-conflict <keep-local | keep-remote | ask>] [--now]\n"
-        "    vault sync info <name>\n"
-        "    vault sync set <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] "
-        "[--interval <num<s | m | h | d>>]\n"
-        "    vault sync set <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
-        "[--on-sync-conflict <keep-local | keep-remote | ask>] [--interval <num<s | m | h | d>>]\n";
+    "    vault sync <id | name> [--owner <id | name>] [--now]\n"
+    "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] [--now]\n"
+    "    vault sync <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
+    "[--on-sync-conflict <keep-local | keep-remote | ask>] [--now]\n"
+    "    vault sync info <name>\n"
+    "    vault sync set <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] "
+    "[--interval <num<s | m | h | d>>]\n"
+    "    vault sync set <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
+    "[--on-sync-conflict <keep-local | keep-remote | ask>] [--interval <num<s | m | h | d>>]\n";
 
 static const std::string ENCRYPTION_SECTION =
-        "  === Encryption Key Management ===\n"
-        "    vault keys export  <vault_id | name | all>  [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]\n"
-        "    vault keys rotate  <vault_id | name | all>  [--owner <id | name>]\n"
-        "    vault keys inspect <vault_id | name>        [--owner <id | name>]\n";
+    "  === Encryption Key Management ===\n"
+    "    vault keys export  <vault_id | name | all>  [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]\n"
+    "    vault keys rotate  <vault_id | name | all>  [--owner <id | name>]\n"
+    "    vault keys inspect <vault_id | name>        [--owner <id | name>]\n";
 
 static const std::string GENERAL_USAGE = "Usage:\n"
-        "\n"
-        "  === Vault Creation ===\n"
-        "    vault create <name> --local\n"
-        "        [--on-sync-conflict <overwrite | keep_both | ask>]\n"
-        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner <id | name>]\n"
-        "\n"
-        "    vault create <name> --s3\n"
-        "        --api-key <name | id> --bucket <name>\n"
-        "        [--sync-strategy <cache | sync | mirror>]\n"
-        "        [--on-sync-conflict <keep_local | keep_remote | ask>]\n"
-        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner <id | name>]\n"
-        "\n"
-        "  === Vault Update ===\n"
-        "    vault (update | set) <id>\n"
-        "        [--api-key <name | id>] [--bucket <name>]\n"
-        "        [--sync-strategy <cache | sync | mirror>]\n"
-        "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
-        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner <id | name>]\n"
-        "\n"
-        "    vault (update | set) <name> <owner>\n"
-        "        [--api-key <name | id>] [--bucket <name>]\n"
-        "        [--sync-strategy <cache | sync | mirror>]\n"
-        "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
-        "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-        "        [--owner <id | name>]\n"
-        "\n"
-        "  === Common Commands ===\n"
-        "    vault delete <id>\n"
-        "    vault delete <name> --owner <id | name>\n"
-        "    vault info   <id>\n"
-        "    vault info   <name> [--owner <id | name>]\n"
-        "    vault assign <id> <role_id> --[uid | gid | user | group] <id | name>\n"
-        "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner <id | name>\n"
-        "\n"
-        "  Use 'vh vault <command> --help' for more information on any subcommand.\n";
+    "\n"
+    "  === Vault Creation ===\n"
+    "    vault create <name> --local\n"
+    "        [--on-sync-conflict <overwrite | keep_both | ask>]\n"
+    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+    "        [--owner <id | name>]\n"
+    "\n"
+    "    vault create <name> --s3\n"
+    "        --api-key <name | id> --bucket <name>\n"
+    "        [--sync-strategy <cache | sync | mirror>]\n"
+    "        [--on-sync-conflict <keep_local | keep_remote | ask>]\n"
+    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+    "        [--owner <id | name>]\n"
+    "\n"
+    "  === Vault Update ===\n"
+    "    vault (update | set) <id>\n"
+    "        [--api-key <name | id>] [--bucket <name>]\n"
+    "        [--sync-strategy <cache | sync | mirror>]\n"
+    "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
+    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+    "        [--owner <id | name>]\n"
+    "\n"
+    "    vault (update | set) <name> <owner>\n"
+    "        [--api-key <name | id>] [--bucket <name>]\n"
+    "        [--sync-strategy <cache | sync | mirror>]\n"
+    "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
+    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
+    "        [--owner <id | name>]\n"
+    "\n"
+    "  === Common Commands ===\n"
+    "    vault delete <id>\n"
+    "    vault delete <name> --owner <id | name>\n"
+    "    vault info   <id>\n"
+    "    vault info   <name> [--owner <id | name>]\n"
+    "    vault assign <id> <role_id> --[uid | gid | user | group] <id | name>\n"
+    "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner <id | name>\n"
+    "\n"
+    "  Use 'vh vault <command> --help' for more information on any subcommand.\n";
 
 static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
     const auto std_out = GENERAL_USAGE + "\n" + VAULT_SYNC_USAGE;
@@ -120,7 +126,6 @@ static CommandResult usage_vaults_list() {
 }
 
 
-
 // ################################################################################
 // #################### 🧱 Vault Lifecycle (create/delete) ########################
 // ################################################################################
@@ -128,9 +133,10 @@ static CommandResult usage_vaults_list() {
 
 static CommandResult handle_vault_create(const CommandCall& call) {
     try {
-        if (!call.user->canCreateVaults()) return invalid(
-            "vault create: user ID " + std::to_string(call.user->id) +
-            " does not have permission to create vaults");
+        if (!call.user->canCreateVaults())
+            return invalid(
+                "vault create: user ID " + std::to_string(call.user->id) +
+                " does not have permission to create vaults");
 
         if (call.positionals.empty()) return invalid("vault create: missing <name>");
         if (call.positionals.size() > 1) return invalid("vault create: too many arguments");
@@ -155,8 +161,9 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             ownerId = *ownerIdOpt;
         }
 
-        if (VaultQueries::vaultExists(name, ownerId)) return invalid(
-            "vault create: vault with name '" + name + "' already exists for user ID " + std::to_string(ownerId));
+        if (VaultQueries::vaultExists(name, ownerId))
+            return invalid(
+                "vault create: vault with name '" + name + "' already exists for user ID " + std::to_string(ownerId));
 
         std::shared_ptr<Vault> vault;
         std::shared_ptr<Sync> sync;
@@ -173,8 +180,9 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             const auto s3Vault = std::make_shared<S3Vault>();
 
             const auto apiKeyOpt = optVal(call, "api-key");
-            if (!apiKeyOpt || apiKeyOpt->empty()) return invalid(
-                "vault create: missing required --api-key <name | id> for S3 vault");
+            if (!apiKeyOpt || apiKeyOpt->empty())
+                return invalid(
+                    "vault create: missing required --api-key <name | id> for S3 vault");
 
             std::shared_ptr<api::APIKey> apiKey;
             const auto apiKeyIdOpt = parseInt(*apiKeyOpt);
@@ -200,8 +208,9 @@ static CommandResult handle_vault_create(const CommandCall& call) {
             s3Vault->api_key_id = apiKey->id;
 
             const auto bucketOpt = optVal(call, "bucket");
-            if (!bucketOpt || bucketOpt->empty()) return invalid(
-                "vault create: missing required --bucket <name> for S3 vault");
+            if (!bucketOpt || bucketOpt->empty())
+                return invalid(
+                    "vault create: missing required --bucket <name> for S3 vault");
 
             s3Vault->bucket = *bucketOpt;
 
@@ -242,8 +251,8 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     std::shared_ptr<Vault> vault;
     if (idOpt) vault = VaultQueries::getVault(*idOpt);
     else {
-        if (call.positionals.size() < 2)
-            return invalid("vault update: missing required <owner-id> for vault name update");
+        if (call.positionals.size() < 2) return invalid(
+            "vault update: missing required <owner-id> for vault name update");
 
         const auto ownerId = std::stoi(call.positionals[1]);
         vault = VaultQueries::getVault(nameOrId, ownerId);
@@ -251,8 +260,8 @@ static CommandResult handle_vault_update(const CommandCall& call) {
 
     if (!vault) return invalid("vault update: vault with ID " + std::to_string(*idOpt) + " not found");
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
-        return invalid("vault update: you do not have permission to update this vault");
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
+        "vault update: you do not have permission to update this vault");
 
     const auto descOpt = optVal(call, "desc");
     const auto quotaOpt = optVal(call, "quota");
@@ -262,8 +271,8 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     const auto apiKeyOpt = optVal(call, "api-key");
     const auto bucketOpt = optVal(call, "bucket");
 
-    if (vault->type == VaultType::Local && (apiKeyOpt || bucketOpt))
-        return invalid("vault update: --api-key and --bucket are not valid for local vaults");
+    if (vault->type == VaultType::Local && (apiKeyOpt || bucketOpt)) return invalid(
+        "vault update: --api-key and --bucket are not valid for local vaults");
 
     if (descOpt) vault->description = *descOpt;
 
@@ -301,8 +310,8 @@ static CommandResult handle_vault_update(const CommandCall& call) {
     }
 
     if (apiKeyOpt || bucketOpt) {
-        if (vault->type == VaultType::Local)
-            return invalid("vault update: --api-key and --bucket are not valid for local vaults");
+        if (vault->type == VaultType::Local) return invalid(
+            "vault update: --api-key and --bucket are not valid for local vaults");
 
         const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
 
@@ -340,26 +349,25 @@ static CommandResult handle_vault_delete(const CommandCall& call) {
         if (!ownerOpt) return invalid("vault delete: missing required --owner <id | name> for vault name lookup");
 
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
-        else if (const auto owner = UserQueries::getUserByName(*ownerOpt))
-            vault = VaultQueries::getVault(name, call.user->id);
+        else if (const auto owner =
+            UserQueries::getUserByName(*ownerOpt)) vault = VaultQueries::getVault(name, call.user->id);
         else return invalid("vault delete: owner '" + *ownerOpt + "' not found");
     }
 
     if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
 
     if (!call.user->canManageVaults()) {
-        if (call.user->id != vault->owner_id)
-            return invalid("vault delete: you do not have permission to delete this vault");
+        if (call.user->id != vault->owner_id) return invalid(
+            "vault delete: you do not have permission to delete this vault");
 
-        if (!call.user->canDeleteVaultData(vault->id))
-            return invalid("vault delete: you do not have permission to delete this vault's data");
+        if (!call.user->canDeleteVaultData(vault->id)) return invalid(
+            "vault delete: you do not have permission to delete this vault's data");
     }
 
     ServiceDepsRegistry::instance().storageManager->removeVault(*idOpt);
 
     return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
 }
-
 
 
 // ################################################################################
@@ -384,11 +392,11 @@ static CommandResult handle_vault_info(const CommandCall& call) {
 
     if (!vault) return invalid("vault info: vault with arg '" + name + "' not found");
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
-        return invalid("vault info: you do not have permission to view this vault");
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
+        "vault info: you do not have permission to view this vault");
 
-    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id))
-        return invalid("vault info: you do not have permission to view this vault's data");
+    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id)) return invalid(
+        "vault info: you do not have permission to view this vault's data");
 
     return ok(to_string(vault));
 }
@@ -420,8 +428,8 @@ static CommandResult handle_vaults_list(const CommandCall& call) {
     };
 
     auto vaults = listAll
-                            ? VaultQueries::listVaults(std::move(p))
-                            : VaultQueries::listUserVaults(user->id, std::move(p));
+                      ? VaultQueries::listVaults(std::move(p))
+                      : VaultQueries::listUserVaults(user->id, std::move(p));
 
     if (!listAll) {
         for (const auto& r : call.user->roles) {
@@ -434,14 +442,14 @@ static CommandResult handle_vaults_list(const CommandCall& call) {
         }
     } else {
         for (const auto& v : vaults)
-            if (!call.user->canListVaultData(v->id)) std::ranges::remove_if(vaults, [&](const std::shared_ptr<Vault>& vault) {
-                return vault->id == v->id;
-            });
+            if (!call.user->canListVaultData(v->id))
+                std::ranges::remove_if(vaults, [&](const std::shared_ptr<Vault>& vault) {
+                    return vault->id == v->id;
+                });
     }
 
     return ok(to_string(vaults));
 }
-
 
 
 // ################################################################################
@@ -482,11 +490,10 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     if (!vault) return invalid("vault assign: vault with arg " + vaultArg + " not found");
 
     if (vault->owner_id != call.user->id) {
-        if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id))
-            return invalid("vault assign: you do not have permission to assign roles to this vault");
+        if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id)) return invalid(
+            "vault assign: you do not have permission to assign roles to this vault");
 
-        if (!call.user->canManageRoles())
-            return invalid("vault assign: you do not have permission to manage roles");
+        if (!call.user->canManageRoles()) return invalid("vault assign: you do not have permission to manage roles");
     }
 
     std::shared_ptr<Role> role;
@@ -535,7 +542,6 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
 }
 
 
-
 // ################################################################################
 // #################### 🔑 Vault Key Management Commands ########################
 // ################################################################################
@@ -557,24 +563,27 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
     }
 
     if (outputOpt) {
-        LogRegistry::audit()->warn("[shell::handle_key_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *outputOpt);
+        LogRegistry::audit()->warn(
+            "[shell::handle_key_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *
+            outputOpt);
         try {
             std::ofstream outFile(*outputOpt);
             if (!outFile) return invalid("vault keys export: failed to open output file " + *outputOpt);
             outFile << output.dump(4);
             outFile.close();
             return {0, "Vault key(s) successfully saved to " + *outputOpt,
-                "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
-                "\nConsider using --recipient with a GPG fingerprint to encrypt the key(s) before saving."};
+                    "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
+                    "\nConsider using --recipient with a GPG fingerprint to encrypt the key(s) before saving."};
         } catch (const std::exception& e) {
             return invalid("vault keys export: failed to write to output file: " + std::string(e.what()));
         }
     }
 
-    LogRegistry::audit()->warn("[shell::handle_key_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
+    LogRegistry::audit()->warn(
+        "[shell::handle_key_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
     return {0, output.dump(4),
-        "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
-        "\nConsider using --recipient with a GPG fingerprint along with --output\nto securely encrypt the key(s) to an output file."};
+            "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
+            "\nConsider using --recipient with a GPG fingerprint along with --output\nto securely encrypt the key(s) to an output file."};
 }
 
 
@@ -598,7 +607,8 @@ static CommandResult export_one_key(const CommandCall& call) {
             ownerId = owner->id;
         } else ownerId = call.user->id;
         const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid("vault keys export: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        if (!vault) return invalid(
+            "vault keys export: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
     }
 
@@ -631,11 +641,13 @@ static CommandResult export_all_keys(const CommandCall& call) {
 
 static CommandResult handle_export_vault_keys(const CommandCall& call) {
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys()) return invalid("vault keys export: only super admins can export vault keys");
+        if (!call.user->canManageEncryptionKeys()) return invalid(
+            "vault keys export: only super admins can export vault keys");
 
-        LogRegistry::audit()->warn("\n[shell::handle_export_vault_keys] User {} called to export vault keys without super admin privileges\n"
-                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
-                                       call.user->name);
+        LogRegistry::audit()->warn(
+            "\n[shell::handle_export_vault_keys] User {} called to export vault keys without super admin privileges\n"
+            "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+            call.user->name);
     }
     if (call.positionals.empty()) return invalid("vault keys export: missing <vault_id | name | all> <output_file>");
     if (call.positionals.size() > 2) return invalid("vault keys export: too many arguments");
@@ -646,14 +658,17 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
 
 static CommandResult handle_inspect_vault_key(const CommandCall& call) {
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys()) return invalid("vault keys inspect: only super admins can inspect vault keys");
+        if (!call.user->canManageEncryptionKeys()) return invalid(
+            "vault keys inspect: only super admins can inspect vault keys");
 
-        LogRegistry::audit()->warn("\n[shell::handle_inspect_vault_key] User {} called to inspect vault keys without super admin privileges\n"
-                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
-                                       call.user->name);
+        LogRegistry::audit()->warn(
+            "\n[shell::handle_inspect_vault_key] User {} called to inspect vault keys without super admin privileges\n"
+            "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+            call.user->name);
     }
 
-    if (call.positionals.size() != 1) return invalid("vault keys inspect: expected exactly one argument <vault_id | name>");
+    if (call.positionals.size() != 1) return invalid(
+        "vault keys inspect: expected exactly one argument <vault_id | name>");
 
     const auto vaultArg = call.positionals[0];
     if (vaultArg.empty()) return invalid("vault keys inspect: missing <vault_id | name>");
@@ -676,7 +691,8 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
             ownerId = owner->id;
         } else ownerId = call.user->id;
         const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid("vault keys inspect: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        if (!vault) return invalid(
+            "vault keys inspect: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
     }
 
@@ -690,15 +706,17 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
 
 static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys())
-            return invalid("vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
+        if (!call.user->canManageEncryptionKeys()) return invalid(
+            "vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
 
-        LogRegistry::audit()->warn("\n[shell::handle_rotate_vault_keys] User {} called to rotate vault keys without super admin privileges\n"
-                                       "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
-                                       call.user->name);
+        LogRegistry::audit()->warn(
+            "\n[shell::handle_rotate_vault_keys] User {} called to rotate vault keys without super admin privileges\n"
+            "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
+            call.user->name);
     }
 
-    if (call.positionals.size() != 1) return invalid("vault keys rotate: expected exactly one argument <vault_id | name>");
+    if (call.positionals.size() != 1) return invalid(
+        "vault keys rotate: expected exactly one argument <vault_id | name>");
 
     const auto vaultArg = call.positionals[0];
     if (vaultArg.empty()) return invalid("vault keys rotate: missing <vault_id | name>");
@@ -712,7 +730,7 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
         }
 
         return ok("Vault keys for all vaults have been rotated successfully.\n"
-                    "If you have --now flag set, the sync will be triggered immediately.");
+            "If you have --now flag set, the sync will be triggered immediately.");
     }
 
     std::shared_ptr<StorageEngine> engine;
@@ -733,7 +751,8 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
             ownerId = owner->id;
         } else ownerId = call.user->id;
         const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid("vault keys rotate: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        if (!vault) return invalid(
+            "vault keys rotate: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
     }
 
@@ -749,7 +768,8 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
 
 
 static CommandResult handle_vault_keys(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault keys: missing <export | rotate | inspect> <vault_id | name | all> [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]");
+    if (call.positionals.empty()) return invalid(
+        "vault keys: missing <export | rotate | inspect> <vault_id | name | all> [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]");
 
     const auto subcommand = call.positionals[0];
     CommandCall subcall = call;
@@ -761,7 +781,6 @@ static CommandResult handle_vault_keys(const CommandCall& call) {
 
     return invalid("vault keys: unknown subcommand '" + std::string(subcommand) + "'. Use: export | rotate | inspect");
 }
-
 
 
 // ################################################################################
@@ -796,8 +815,8 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
 
     if (!vault) return invalid("vault sync: vault with arg '" + vaultArg + "' not found");
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->canSyncVaultData(vault->id))
-        return invalid("vault sync: you do not have permission to manage this vault");
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->
+        canSyncVaultData(vault->id)) return invalid("vault sync: you do not have permission to manage this vault");
 
     ServiceDepsRegistry::instance().syncController->runNow(vault->id);
 
@@ -812,10 +831,12 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
     } else {
         const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) throw std::invalid_argument("vault sync update: missing required --owner <id | name> for vault name lookup");
+        if (!ownerOpt) throw std::invalid_argument(
+            "vault sync update: missing required --owner <id | name> for vault name lookup");
         unsigned int ownerId = call.user->id;
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) throw std::invalid_argument("vault sync update: --owner <id> must be a positive integer");
+            if (*ownerIdOpt <= 0) throw std::invalid_argument(
+                "vault sync update: --owner <id> must be a positive integer");
             ownerId = *ownerIdOpt;
         } else {
             const auto owner = UserQueries::getUserByName(*ownerOpt);
@@ -823,7 +844,8 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
             ownerId = owner->id;
         }
         const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) throw std::invalid_argument("vault sync update: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
+        if (!vault) throw std::invalid_argument(
+            "vault sync update: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
     }
 
@@ -855,7 +877,8 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     }
 
     if (engine->vault->type == VaultType::Local) {
-        if (hasFlag(call, "sync-strategy")) return invalid("vault sync update: --sync-strategy is not valid for local vaults");
+        if (hasFlag(call, "sync-strategy")) return invalid(
+            "vault sync update: --sync-strategy is not valid for local vaults");
         if (const auto onSyncConflictOpt = optVal(call, "on-sync-conflict")) {
             const auto fsync = std::static_pointer_cast<FSync>(sync);
 
@@ -935,7 +958,6 @@ static CommandResult handle_sync(const CommandCall& call) {
 
     return ok("Unrecognized command: " + arg + "\n" + VAULT_SYNC_USAGE);
 }
-
 
 
 // ################################################################################

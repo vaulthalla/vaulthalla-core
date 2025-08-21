@@ -26,14 +26,9 @@ void LocalRotateKeyTask::operator()() {
             if (!file || !file->vault_id) continue;
 
             const auto encryptedBuffer = readFileToVector(file->backing_path);
-            const auto [ciphertext, keyVersion] =
-                engine->encryptionManager->rotateDecryptEncrypt(encryptedBuffer, file->encryption_iv, file->encrypted_with_key_version);
-
+            const auto ciphertext = engine->encryptionManager->rotateDecryptEncrypt(encryptedBuffer, file);
             if (ciphertext.empty()) throw std::runtime_error("Failed to rotate key for file: " + file->backing_path.string());
             writeFile(file->backing_path, ciphertext);
-
-            // encryption iv is already updated in the encrypt method
-            file->encrypted_with_key_version = keyVersion;
             FileQueries::setEncryptionIVAndVersion(file);
         }
         promise.set_value(true);

@@ -15,7 +15,7 @@ using namespace vh::database;
 using namespace vh::util;
 
 CloudRotateKeyTask::CloudRotateKeyTask(std::shared_ptr<CloudStorageEngine> eng,
-                                       const std::vector<std::shared_ptr<File> >& f,
+                                       const std::vector<std::shared_ptr<File>>& f,
                                        const unsigned int begin, const unsigned int end)
     : engine(std::move(eng)), files(f), begin(begin), end(end) {
     if (begin >= end || end > files.size()) throw std::invalid_argument("Invalid range for CloudRotateKeyTask");
@@ -32,7 +32,7 @@ void CloudRotateKeyTask::operator()() {
                 const auto buffer = engine->downloadToBuffer(file->path);
                 if (buffer.empty()) throw std::runtime_error("Failed to download file: " + file->backing_path.string());
 
-                std::pair<std::vector<uint8_t>, unsigned int> cipherVersionPair;
+                std::vector<uint8_t> ciphertext;
 
                 if (engine->remoteFileIsEncrypted(file->path)) {
                     auto payload = engine->getRemoteIVBase64AndVersion(file->path);
@@ -42,16 +42,12 @@ void CloudRotateKeyTask::operator()() {
                     const auto& [iv_b64, key_version] = *payload;
                     file->encryption_iv = iv_b64;
                     file->encrypted_with_key_version = key_version;
-                    cipherVersionPair = engine->encryptionManager->rotateDecryptEncrypt(
-                        buffer, file->encryption_iv, file->encrypted_with_key_version);
-                } else cipherVersionPair = engine->encryptionManager->encrypt(buffer, file->encryption_iv);
+                    ciphertext = engine->encryptionManager->rotateDecryptEncrypt(buffer, file);
+                } else ciphertext = engine->encryptionManager->encrypt(buffer, file);
 
-                const auto& [ciphertext, keyVersion] = cipherVersionPair;
-                if (ciphertext.empty()) throw std::runtime_error(
-                    "Failed to rotate key for file: " + file->backing_path.string());
+                if (ciphertext.empty())
+                    throw std::runtime_error("Failed to encrypt file: " + file->backing_path.string());
 
-                // encryption iv is already updated in the encrypt method
-                file->encrypted_with_key_version = keyVersion;
                 engine->uploadFileBuffer(file, ciphertext);
                 FileQueries::setEncryptionIVAndVersion(file);
 
@@ -61,14 +57,16 @@ void CloudRotateKeyTask::operator()() {
             }
 
             const auto encryptedBuffer = readFileToVector(file->backing_path);
-            const auto [ciphertext, keyVersion] = engine->encryptionManager->rotateDecryptEncrypt(
-                encryptedBuffer, file->encryption_iv, file->encrypted_with_key_version);
-            if (ciphertext.empty()) throw std::runtime_error("Failed to rotate key for file: " + file->backing_path.string());
+            if (encryptedBuffer.empty()) {
+                LogRegistry::sync()->warn("[CloudRotateKeyTask] Empty file buffer for: {}", file->backing_path.string());
+                continue;
+            }
+
+            const auto ciphertext = engine->encryptionManager->rotateDecryptEncrypt(encryptedBuffer, file);
+            if (ciphertext.empty())
+                throw std::runtime_error("Failed to rotate key for file: " + file->backing_path.string());
 
             engine->uploadFileBuffer(file, ciphertext);
-
-            // encryption iv is already updated in the encrypt method
-            file->encrypted_with_key_version = keyVersion;
             FileQueries::setEncryptionIVAndVersion(file);
 
             if (rsync->strategy == RSync::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;

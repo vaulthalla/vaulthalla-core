@@ -34,6 +34,7 @@ struct NewFileContext {
     std::shared_ptr<StorageEngine> engine = nullptr;
     std::optional<unsigned int> userId{}, linux_uid{}, linux_gid{};
     mode_t mode = 0644;
+    bool overwrite = false;
 };
 
 class Filesystem {

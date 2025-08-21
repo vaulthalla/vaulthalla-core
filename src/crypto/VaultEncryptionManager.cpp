@@ -3,6 +3,7 @@
 #include "services/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "types/VaultKey.hpp"
+#include "types/File.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -10,6 +11,7 @@
 using namespace vh::crypto;
 using namespace vh::logging;
 using namespace vh::database;
+using namespace vh::types;
 
 VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
     : vault_id_(vault_id) {
@@ -111,35 +113,54 @@ void VaultEncryptionManager::finish_key_rotation() {
     LogRegistry::crypto()->info("[VaultEncryptionManager] Finished key rotation for vault {}", vault_id_);
 }
 
-std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref, unsigned int keyVersion) const {
+std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<File>& f) const {
     try {
-        if (keyVersion > version_ || keyVersion < version_ - 1) {
-            LogRegistry::crypto()->warn("[VaultEncryptionManager] Key version {} is not valid for vault {}, using new key",
-                                        keyVersion, vault_id_);
-            keyVersion = version_;
+        if (f->encrypted_with_key_version == version_) {
+            LogRegistry::crypto()->debug("[VaultEncryptionManager] Key version {} is current for vault {}, no rotation needed",
+                                         f->encrypted_with_key_version, vault_id_);
+            return ciphertext;
         }
 
-        const auto decrypted = decrypt_aes256_gcm(ciphertext, old_key_, b64_decode(b64_iv_ref));
+        if (!rotation_in_progress_.load()) {
+            const auto msg = fmt::format(
+                "[VaultEncryptionManager] Key rotation not in progress for vault {}, but key version {} is not current",
+                vault_id_, f->encrypted_with_key_version);
+            LogRegistry::audit()->warn(msg);
+            LogRegistry::crypto()->warn(msg);
+            throw std::runtime_error("Key rotation not in progress, cannot rotate key");
+        }
+
+        if (f->encrypted_with_key_version != version_ - 1)
+            LogRegistry::crypto()->warn("[VaultEncryptionManager] Key version {} is not the previous version {}, using new key",
+                                        f->encrypted_with_key_version, version_);
+
+        const auto decrypted = decrypt_aes256_gcm(ciphertext, old_key_, b64_decode(f->encryption_iv));
+
         std::vector<uint8_t> iv;
         const auto encrypted = encrypt_aes256_gcm(decrypted, key_, iv);
+
         if (encrypted.size() != ciphertext.size()) {
             LogRegistry::crypto()->error("[VaultEncryptionManager] Encrypted data size mismatch after key rotation");
             throw std::runtime_error("Encrypted data size mismatch after key rotation");
         }
-        b64_iv_ref = b64_encode(iv);
-        return {encrypted, keyVersion};
+
+        f->encryption_iv = b64_encode(iv);
+        f->encrypted_with_key_version = version_;
+
+        return encrypted;
     } catch (const std::exception& e) {
         LogRegistry::crypto()->error("[VaultEncryptionManager] Exception during key rotation: {}", e.what());
         throw std::runtime_error("Key rotation failed: " + std::string(e.what()));
     }
 }
 
-std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const {
+std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<types::File>& f) const {
     std::vector<uint8_t> iv;
 
     auto ciphertext = encrypt_aes256_gcm(plaintext, key_, iv);
-    out_b64_iv = b64_encode(iv);
-    return std::make_pair(ciphertext, version_);
+    f->encryption_iv = b64_encode(iv);
+    f->encrypted_with_key_version = version_;
+    return ciphertext;
 }
 
 std::vector<uint8_t> VaultEncryptionManager::decrypt(const std::vector<uint8_t>& ciphertext, const std::string& b64_iv, const unsigned int keyVersion) const {

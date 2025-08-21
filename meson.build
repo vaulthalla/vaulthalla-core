@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.9.2',
+        version: '0.9.3',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [

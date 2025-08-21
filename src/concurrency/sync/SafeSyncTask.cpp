@@ -1,9 +1,6 @@
 #include "concurrency/sync/SafeSyncTask.hpp"
-#include "concurrency/sync/DownloadTask.hpp"
-#include "concurrency/ThreadPool.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"
@@ -20,8 +17,21 @@ using namespace vh::types;
 using namespace vh::database;
 using namespace vh::logging;
 
+SafeSyncTask::SafeSyncTask(const std::shared_ptr<CloudStorageEngine>& engine)
+    : SyncTask(engine) {}
+
 void SafeSyncTask::sync() {
     LogRegistry::sync()->info("[SafeSyncTask] Starting sync for vault '{}'", engine_->vault->id);
+
+    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
+        if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
+            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
+            if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
+            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+            DirectoryQueries::upsertDirectory(dir);
+        }
+    }
+
     for (const auto& file : localFiles_) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
         auto match = s3Map_.find(strippedPath);
@@ -43,15 +53,6 @@ void SafeSyncTask::sync() {
     }
 
     processFutures();
-
-    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
-        if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
-            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
-            if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
-            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
-            DirectoryQueries::upsertDirectory(dir);
-        }
-    }
 
     const auto filesToDownload = uMap2Vector(s3Map_);
     futures_.reserve(filesToDownload.size());

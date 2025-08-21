@@ -225,3 +225,11 @@ void VaultQueries::updateVaultSync(const std::shared_ptr<Sync>& sync, const Vaul
         } else throw std::runtime_error("Unsupported VaultType in updateVaultSync(): " + to_string(type));
     });
 }
+
+std::string VaultQueries::getVaultMountPoint(unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::getVaultMountPoint", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("get_vault_mount_point", pqxx::params{vaultId});
+        if (res.empty()) throw std::runtime_error("Vault not found for ID: " + std::to_string(vaultId));
+        return res.one_field().as<std::string>();
+    });
+}

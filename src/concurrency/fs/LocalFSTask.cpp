@@ -2,9 +2,9 @@
 #include "concurrency/fs/LocalDeleteTask.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/Sync.hpp"
 #include "types/Vault.hpp"
 #include "services/LogRegistry.hpp"
+#include "concurrency/fs/LocalRotateKeyTask.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::database;
@@ -31,6 +31,8 @@ void LocalFSTask::operator()() {
         handleInterrupt();
         removeTrashedFiles();
         handleInterrupt();
+        handleVaultKeyRotation();
+        handleInterrupt();
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[LocalFSTask] Exception during sync: {}", e.what());
         isRunning_ = false;
@@ -48,6 +50,10 @@ void LocalFSTask::operator()() {
     const auto duration = duration_cast<milliseconds>(end - start);
     LogRegistry::sync()->info("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
     requeue();
+}
+
+void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
+    push(std::make_shared<LocalRotateKeyTask>(localEngine(), files, begin, end));
 }
 
 void LocalFSTask::removeTrashedFiles() {

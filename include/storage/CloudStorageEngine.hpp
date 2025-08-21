@@ -3,6 +3,8 @@
 #include "storage/StorageEngine.hpp"
 
 #include <unordered_map>
+#include <memory>
+#include <vector>
 
 namespace vh::types {
 struct File;
@@ -34,7 +36,9 @@ public:
 
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
 
-    void uploadFile(const std::filesystem::path& rel_path) const;
+    void uploadFile(const std::shared_ptr<types::File>& f) const;
+
+    void uploadFileBuffer(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& buffer) const;
 
     std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
 
@@ -46,15 +50,15 @@ public:
 
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
 
-private:
-    std::shared_ptr<types::api::APIKey> key_;
-    std::shared_ptr<cloud::S3Controller> s3Provider_;
-
     std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] bool remoteFileIsEncrypted(const std::filesystem::path& rel_path) const;
 
-    std::optional<std::string> getRemoteIVBase64(const std::filesystem::path& rel_path) const;
+    std::optional<std::pair<std::string, unsigned int>> getRemoteIVBase64AndVersion(const std::filesystem::path& rel_path) const;
+
+private:
+    std::shared_ptr<types::api::APIKey> key_;
+    std::shared_ptr<cloud::S3Controller> s3Provider_;
 };
 
 } // namespace vh::storage

@@ -6,6 +6,7 @@
 #include "types/Sync.hpp"
 #include "types/Operation.hpp"
 #include "types/Vault.hpp"
+#include "types/File.hpp"
 #include "types/Path.hpp"
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"
@@ -14,6 +15,7 @@
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/LogRegistry.hpp"
+#include "util/task.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -23,9 +25,8 @@ using namespace vh::logging;
 using namespace std::chrono;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
-: next_run(system_clock::from_time_t(engine->sync->last_sync_at)
-           + seconds(engine->sync->interval.count())),
-    engine_(engine) {}
+: next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
+  engine_(engine) {}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 
@@ -65,16 +66,28 @@ void FSTask::processOperations() const {
         const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
-        {
-            const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
-            const auto buffer = util::readFileToVector(tmpPath);
-
-            std::string iv_b64;
-            const auto ciphertext = engine_->encryptionManager->encrypt(buffer, iv_b64);
-
-            util::writeFile(absDest, ciphertext);
-            FileQueries::setEncryptionIV(vaultId(), op->destination_path, iv_b64);
+        const auto f = FileQueries::getFileByPath(engine_->vault->id, op->destination_path);
+        if (!f) {
+            LogRegistry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
+            continue;
         }
+
+        if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
+            LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
+            continue;
+        }
+
+        const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine());
+        const auto buffer = util::readFileToVector(tmpPath);
+
+        if (buffer.empty()) {
+            LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
+            continue;
+        }
+
+        const auto ciphertext = engine_->encryptionManager->encrypt(buffer, f);
+        util::writeFile(absDest, ciphertext);
+        FileQueries::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {
             if (fs::exists(absSrc)) fs::remove(absSrc);
@@ -87,3 +100,30 @@ void FSTask::processOperations() const {
     }
 }
 
+void FSTask::handleVaultKeyRotation() {
+    try {
+        if (!engine_->encryptionManager->rotation_in_progress()) return;
+
+        const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
+        if (filesToRotate.empty()) {
+            LogRegistry::audit()->info("[FSTask] No files to rotate for vault '{}'", engine_->vault->id);
+            engine_->encryptionManager->finish_key_rotation();
+            return;
+        }
+
+        for (const auto& [begin, end] : getTaskOperationRanges(filesToRotate.size()))
+            pushKeyRotationTask(filesToRotate, begin, end);
+
+        processFutures();
+
+        engine_->encryptionManager->finish_key_rotation();
+
+        LogRegistry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
+    } catch (const std::exception& e) {
+        LogRegistry::sync()->error("[FSTask] Exception during vault key rotation for vault '{}': {}", engine_->vault->id, e.what());
+        isRunning_ = false;
+    } catch (...) {
+        LogRegistry::sync()->error("[FSTask] Unknown exception during vault key rotation for vault '{}'", engine_->vault->id);
+        isRunning_ = false;
+    }
+}

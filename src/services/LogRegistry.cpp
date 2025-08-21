@@ -43,18 +43,18 @@ void LogRegistry::init(const std::string& logDir) {
 
     makeLogger("vaulthalla", spdlog::level::info);
     makeLogger("fuse", spdlog::level::debug);  // FUSE layer is chatty
-    makeLogger("filesystem", spdlog::level::debug);
-    makeLogger("cloud", spdlog::level::debug);
-    makeLogger("crypto", spdlog::level::debug);
+    makeLogger("filesystem", spdlog::level::info);
+    makeLogger("cloud", spdlog::level::info);
+    makeLogger("crypto", spdlog::level::info);
     makeLogger("auth", spdlog::level::info);
-    makeLogger("ws", spdlog::level::debug);
-    makeLogger("http", spdlog::level::debug);
+    makeLogger("ws", spdlog::level::info);
+    makeLogger("http", spdlog::level::info);
     makeLogger("shell", spdlog::level::info);
-    makeLogger("db", spdlog::level::debug);
+    makeLogger("db", spdlog::level::info);
     makeLogger("sync", spdlog::level::info);
-    makeLogger("thumb", spdlog::level::debug);
+    makeLogger("thumb", spdlog::level::info);
     makeLogger("storage", spdlog::level::info);
-    makeLogger("types", spdlog::level::debug);
+    makeLogger("types", spdlog::level::info);
 
     // Audit logger (special: append-only file sink, no rotation)
     {

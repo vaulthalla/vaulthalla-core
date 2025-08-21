@@ -55,7 +55,7 @@ public:
 
     bool setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const;
 
-    bool setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64) const;
+    bool setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const;
 
     bool downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
 

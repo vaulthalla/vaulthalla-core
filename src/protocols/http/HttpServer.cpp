@@ -31,8 +31,9 @@ HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
 }
 
 void HttpServer::run() {
-    LogRegistry::http()->info("[HttpServer] Starting HTTP preview server on {}",
-                              acceptor_.local_endpoint().address().to_string());
+    LogRegistry::http()->info("[HttpServer] Starting HTTP preview server at {}",
+                              acceptor_.local_endpoint().address().to_string() + ":" +
+                              std::to_string(acceptor_.local_endpoint().port()));
     do_accept();
 }
 

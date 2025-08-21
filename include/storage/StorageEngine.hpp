@@ -50,6 +50,8 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
     void copy(const fs::path& from, const fs::path& to, unsigned int userId);
     void remove(const fs::path& rel_path, unsigned int userId);
 
+    void rotateEncryptionKey();
+
     [[nodiscard]] static uintmax_t getDirectorySize(const fs::path& path);
     [[nodiscard]] uintmax_t getVaultSize() const;
     [[nodiscard]] uintmax_t getCacheSize() const;

@@ -33,4 +33,13 @@ inline std::optional<int> parseInt(const std::string& sv) {
     return neg ? -v : v;
 }
 
+inline uintmax_t parseSize(const std::string& s) {
+    switch (std::toupper(s.back())) {
+    case 'T': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024 * 1024 * 1024; // TiB
+    case 'G': return std::stoull(s.substr(0, s.size() - 1)) * 1024;                      // GiB
+    case 'M': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024;               // MiB
+    default: return std::stoull(s);                                                      // Assume bytes if no suffix
+    }
+}
+
 }

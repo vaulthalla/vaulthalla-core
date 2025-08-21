@@ -11,6 +11,11 @@ namespace pqxx {
     class result;
 }
 
+namespace vh::types {
+    class Vault;
+    class VaultKey;
+}
+
 namespace vh::types::api {
 
 enum class S3Provider {
@@ -57,5 +62,14 @@ std::vector<std::shared_ptr<APIKey>> api_keys_from_pq_res(const pqxx::result& re
 
 std::string to_string(const std::shared_ptr<APIKey>& key);
 std::string to_string(const std::vector<std::shared_ptr<APIKey>>& keys);
+
+nlohmann::json generate_json_key_object(const std::shared_ptr<Vault>& v,
+                                               const std::vector<uint8_t>& key,
+                                               const std::shared_ptr<VaultKey>& vk,
+                                               const std::string& exportedBy);
+
+nlohmann::json generate_json_key_info_object(const std::shared_ptr<Vault>& v,
+                                               const std::shared_ptr<VaultKey>& vk,
+                                               const std::string& exportedBy);
 
 } // namespace vh::types::api

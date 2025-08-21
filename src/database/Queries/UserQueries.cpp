@@ -45,7 +45,7 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
     return Transactions::exec("UserQueries::getUserByRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<User> {
         const auto res = txn.exec_prepared("get_user_by_refresh_token", pqxx::params{jti});
         if (res.empty()) {
-            LogRegistry::db()->error("[UserQueries] No user found for refresh token JTI: {}", jti);
+            LogRegistry::db()->debug("[UserQueries] No user found for refresh token JTI: {}", jti);
             return nullptr;
         }
 
@@ -204,9 +204,7 @@ std::vector<std::shared_ptr<auth::RefreshToken> > UserQueries::listRefreshTokens
     return Transactions::exec("UserQueries::listRefreshTokens", [&](pqxx::work& txn) {
         const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " + txn.quote(userId));
         std::vector<std::shared_ptr<auth::RefreshToken> > tokens;
-        for (const auto& row : res) {
-            tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
-        }
+        for (const auto& row : res) tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
         return tokens;
     });
 }

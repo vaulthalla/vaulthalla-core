@@ -3,29 +3,33 @@
 #include "concurrency/Task.hpp"
 
 #include <memory>
+#include <filesystem>
 
 namespace vh::storage {
 class CloudStorageEngine;
 }
 
 namespace vh::types {
-struct File;
+struct TrashedFile;
 }
 
 namespace vh::concurrency {
 
-struct CloudDeleteTask final : PromisedTask {
+struct CloudTrashedDeleteTask final : PromisedTask {
     enum class Type { PURGE, LOCAL, REMOTE };
 
     std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<types::File> file;
+    std::shared_ptr<types::TrashedFile> file;
     Type type{Type::PURGE};
 
-    CloudDeleteTask(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<types::File> f,
+    CloudTrashedDeleteTask(std::shared_ptr<storage::CloudStorageEngine> eng,
+                 std::shared_ptr<types::TrashedFile> f,
                  const Type& type = Type::PURGE);
 
     void operator()() override;
+
+    void purge(const std::filesystem::path& path) const;
+    void handleLocalDelete() const;
 };
 
 }

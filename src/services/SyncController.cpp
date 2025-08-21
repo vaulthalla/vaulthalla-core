@@ -1,5 +1,4 @@
 #include "services/SyncController.hpp"
-#include "services/ServiceManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FSTask.hpp"
@@ -11,7 +10,6 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "types/Sync.hpp"
-#include "types/FSync.hpp"
 #include "types/RSync.hpp"
 #include "types/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -24,6 +22,7 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::concurrency;
 using namespace vh::logging;
+using namespace vh::types;
 
 bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shared_ptr<FSTask>& b) const {
     return a->next_run > b->next_run; // Min-heap based on next_run time
@@ -169,5 +168,3 @@ std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<Storage
     } else throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
     return task;
 }
-
-

@@ -4,13 +4,13 @@
 
 namespace vh::concurrency {
 
-class SafeSyncTask : public SyncTask {
+class SafeSyncTask final : public SyncTask {
 public:
     using SyncTask::SyncTask;
 
     ~SafeSyncTask() override = default;
 
-    explicit SafeSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine) : SyncTask(engine) {}
+    explicit SafeSyncTask(const std::shared_ptr<storage::CloudStorageEngine>& engine);
 
     void sync() override;
 };

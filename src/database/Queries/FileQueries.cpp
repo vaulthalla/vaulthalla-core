@@ -20,7 +20,7 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
     return Transactions::exec("FileQueries::addFile", [&](pqxx::work& txn) {
         const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
         const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
-        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<uintmax_t>();
         if (file->inode) txn.exec_prepared("delete_fs_entry_by_inode", file->inode);
 
         pqxx::params p;
@@ -46,7 +46,8 @@ unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
-            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
+            int64_t size_delta = static_cast<int64_t>(file->size_bytes) - static_cast<int64_t>(existingSize);
+            pqxx::params stats_params{parentId, size_delta, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
             txn.exec_prepared("update_dir_stats", stats_params);
             const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
             if (res.empty()) break;
@@ -65,7 +66,7 @@ void FileQueries::updateFile(const std::shared_ptr<File>& file) {
     Transactions::exec("FileQueries::updateFile", [&](pqxx::work& txn) {
         const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
         const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
-        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
+        const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<uintmax_t>();
 
         pqxx::params p;
         p.append(file->id);
@@ -78,7 +79,8 @@ void FileQueries::updateFile(const std::shared_ptr<File>& file) {
 
         std::optional<unsigned int> parentId = file->parent_id;
         while (parentId) {
-            pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
+            int64_t size_delta = static_cast<int64_t>(file->size_bytes) - static_cast<int64_t>(existingSize);
+            pqxx::params stats_params{parentId, size_delta, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
             txn.exec_prepared("update_dir_stats", stats_params);
             const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
             if (res.empty()) break;
@@ -273,19 +275,20 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
     }
 }
 
-std::optional<std::string> FileQueries::getEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath) {
-    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::string> {
+std::optional<std::pair<std::string, unsigned int>>  FileQueries::getEncryptionIVAndVersion(const unsigned int vaultId, const std::filesystem::path& relPath) {
+    return Transactions::exec("FileQueries::getEncryptionIV", [&](pqxx::work& txn) -> std::optional<std::pair<std::string, unsigned int>> {
         pqxx::params p{vaultId, to_utf8_string(relPath.u8string())};
-        const auto res = txn.exec_prepared("get_file_encryption_iv", p);
+        const auto res = txn.exec_prepared("get_file_encryption_iv_and_version", p);
         if (res.empty()) return std::nullopt;
-        return res.one_field().as<std::string>();
+        const auto row = res.one_row();
+        return std::make_pair(row["encryption_iv"].as<std::string>(), row["encrypted_with_key_version"].as<unsigned int>());
     });
 }
 
-void FileQueries::setEncryptionIV(const unsigned int vaultId, const std::filesystem::path& relPath, const std::string& iv) {
-    Transactions::exec("FileQueries::setEncryptionIV", [&](pqxx::work& txn) {
-        pqxx::params p{vaultId, to_utf8_string(relPath.u8string()), iv};
-        txn.exec_prepared("set_file_encryption_iv", p);
+void FileQueries::setEncryptionIVAndVersion(const std::shared_ptr<File>& f) {
+    Transactions::exec("FileQueries::setEncryptionIVAndVersion", [&](pqxx::work& txn) {
+        pqxx::params p{f->vault_id, to_utf8_string(f->path.u8string()), f->encryption_iv, f->encrypted_with_key_version};
+        txn.exec_prepared("set_file_encryption_iv_and_version", p);
     });
 }
 
@@ -295,3 +298,12 @@ std::string FileQueries::getContentHash(const unsigned int vaultId, const std::f
         return txn.exec_prepared("get_file_content_hash", p).one_field().as<std::string>();
     });
 }
+
+std::vector<std::shared_ptr<File>> FileQueries::getFilesOlderThanKeyVersion(unsigned int vaultId, unsigned int keyVersion) {
+    return Transactions::exec("FileQueries::getFilesOlderThanKeyVersion", [&](pqxx::work& txn) {
+        const auto res = txn.exec_prepared("get_files_older_than_key_version", pqxx::params{vaultId, keyVersion});
+        if (res.empty()) return std::vector<std::shared_ptr<File>>();
+        return files_from_pq_res(res);
+    });
+}
+

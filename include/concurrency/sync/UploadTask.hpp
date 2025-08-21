@@ -1,29 +1,27 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
-#include "storage/CloudStorageEngine.hpp"
-#include "types/File.hpp"
 
 #include <memory>
 
+namespace vh::storage {
+class CloudStorageEngine;
+}
+
+namespace vh::types {
+struct File;
+}
+
 namespace vh::concurrency {
 
-struct UploadTask : PromisedTask {
+struct UploadTask final : PromisedTask {
     std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<File> file;
+    std::shared_ptr<types::File> file;
 
     UploadTask(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<File> f)
-        : engine(std::move(eng)), file(std::move(f)) {}
+                 std::shared_ptr<types::File> f);
 
-    void operator()() override {
-        try {
-            engine->uploadFile(file->path);
-            promise.set_value(true);
-        } catch (const std::exception& e) {
-            promise.set_value(false);
-        }
-    }
+    void operator()() override;
 };
 
 }

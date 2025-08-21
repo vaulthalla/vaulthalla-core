@@ -51,14 +51,14 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
 
 CommandResult Router::execute(const CommandCall& call) const {
     const auto canonical = canonicalFor(call.name); // call.name is string_view
-    LogRegistry::shell()->info("[Router] Executing command: '{}'", canonical);
+    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
     if (!commands_.contains(canonical))
         throw std::invalid_argument(fmt::format("Unknown command or alias: {}", call.name));
     return commands_.at(canonical).handler(call);
 }
 
 CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const {
-    LogRegistry::shell()->info("[Router] Executing line: '{}'", line);
+    LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;
 

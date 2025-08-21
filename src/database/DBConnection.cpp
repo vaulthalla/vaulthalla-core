@@ -93,11 +93,12 @@ void DBConnection::initPreparedUsers() const {
 }
 
 void DBConnection::initPreparedGroups() const {
-    conn_->prepare("insert_group", "INSERT INTO groups (name, description, linux_gid) VALUES ($1, $2, $3) RETURNING id");
+    conn_->prepare("insert_group",
+                   "INSERT INTO groups (name, description, linux_gid) VALUES ($1, $2, $3) RETURNING id");
 
     conn_->prepare("update_group",
-        "UPDATE groups SET name = $2, description = $3, linux_gid = $4, updated_at = NOW() "
-        "WHERE id = $1");
+                   "UPDATE groups SET name = $2, description = $3, linux_gid = $4, updated_at = NOW() "
+                   "WHERE id = $1");
 
     conn_->prepare("delete_group", "DELETE FROM groups WHERE id = $1");
 
@@ -108,22 +109,22 @@ void DBConnection::initPreparedGroups() const {
     conn_->prepare("list_all_groups", "SELECT * FROM groups");
 
     conn_->prepare("list_groups_by_user",
-        "SELECT g.* FROM groups g "
-        "JOIN group_members gm ON g.id = gm.group_id "
-        "WHERE gm.user_id = $1");
+                   "SELECT g.* FROM groups g "
+                   "JOIN group_members gm ON g.id = gm.group_id "
+                   "WHERE gm.user_id = $1");
 
     conn_->prepare("add_member_to_group",
-        "INSERT INTO group_members (group_id, user_id, joined_at) "
-        "VALUES ($1, $2, NOW()) "
-        "ON CONFLICT (group_id, user_id) DO NOTHING");
+                   "INSERT INTO group_members (group_id, user_id, joined_at) "
+                   "VALUES ($1, $2, NOW()) "
+                   "ON CONFLICT (group_id, user_id) DO NOTHING");
 
     conn_->prepare("remove_member_from_group", "DELETE FROM group_members WHERE group_id = $1 AND user_id = $2");
 
     conn_->prepare("list_group_members",
-        "SELECT u.*, gm.joined_at "
-        "FROM users u "
-        "JOIN group_members gm ON u.id = gm.user_id "
-        "WHERE gm.group_id = $1");
+                   "SELECT u.*, gm.joined_at "
+                   "FROM users u "
+                   "JOIN group_members gm ON u.id = gm.user_id "
+                   "WHERE gm.group_id = $1");
 }
 
 void DBConnection::initPreparedAPIKeys() const {
@@ -156,7 +157,7 @@ void DBConnection::initPreparedAPIKeys() const {
 void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("insert_vault_key",
                    "INSERT INTO vault_keys (vault_id, encrypted_key, iv) "
-                   "VALUES ($1, $2, $3)");
+                   "VALUES ($1, $2, $3) RETURNING version");
 
     conn_->prepare("update_vault_key",
                    "UPDATE vault_keys "
@@ -166,6 +167,55 @@ void DBConnection::initPreparedVaultKeys() const {
     conn_->prepare("get_vault_key", "SELECT * FROM vault_keys WHERE vault_id = $1");
 
     conn_->prepare("delete_vault_key", "DELETE FROM vault_keys WHERE vault_id = $1");
+
+    conn_->prepare("rotate_vault_key",
+                   "WITH "
+                   "  _lock AS ( "
+                   "    SELECT pg_advisory_xact_lock($1::bigint) "
+                   "  ), "
+                   "  current AS ( "
+                   "    SELECT vk.vault_id, vk.encrypted_key, vk.iv, vk.created_at, vk.version "
+                   "    FROM vault_keys vk "
+                   "    WHERE vk.vault_id = $1 "
+                   "    FOR UPDATE "
+                   "  ), "
+                   "  trashed AS ( "
+                   "    INSERT INTO vault_keys_trashed (vault_id, encrypted_key, iv, created_at, trashed_at, version) "
+                   "    SELECT c.vault_id, c.encrypted_key, c.iv, c.created_at, CURRENT_TIMESTAMP, c.version "
+                   "    FROM current c "
+                   "    RETURNING version "
+                   "  ), "
+                   "  next_version AS ( "
+                   "    SELECT COALESCE((SELECT version FROM current), -1) + 1 AS version "
+                   "  ), "
+                   "  updated AS ( "
+                   "    UPDATE vault_keys "
+                   "    SET encrypted_key = $2, "
+                   "        iv            = $3, "
+                   "        version       = (SELECT version FROM next_version), "
+                   "        created_at    = CURRENT_TIMESTAMP "
+                   "    WHERE vault_id = $1 "
+                   "    RETURNING version "
+                   "  ), "
+                   "  inserted AS ( "
+                   "    INSERT INTO vault_keys (vault_id, encrypted_key, iv, version, created_at) "
+                   "    SELECT $1, $2, $3, (SELECT version FROM next_version), CURRENT_TIMESTAMP "
+                   "    WHERE NOT EXISTS (SELECT 1 FROM current) "
+                   "    RETURNING version "
+                   "  ) "
+                   "SELECT COALESCE((SELECT version FROM updated), "
+                   "                (SELECT version FROM inserted)) AS version;"
+        );
+
+    conn_->prepare("mark_vault_key_rotation_finished",
+                   "UPDATE vault_keys_trashed SET rotation_completed_at = NOW() "
+                   "WHERE vault_id = $1 AND rotation_completed_at IS NULL");
+
+    conn_->prepare("vault_key_rotation_in_progress",
+                   "SELECT EXISTS(SELECT 1 FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL) AS in_progress");
+
+    conn_->prepare("get_rotation_old_vault_key",
+                   "SELECT * FROM vault_keys_trashed WHERE vault_id = $1 AND rotation_completed_at IS NULL");
 }
 
 void DBConnection::initPreparedUserRoles() const {
@@ -276,6 +326,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("vault_exists", "SELECT EXISTS(SELECT 1 FROM vault WHERE name = $1 AND owner_id = $2) AS exists");
 
     conn_->prepare("is_s3_vault", "SELECT EXISTS(SELECT 1 FROM s3 WHERE vault_id = $1) AS is_s3");
+
+    conn_->prepare("get_vault_mount_point", "SELECT mount_point FROM vault WHERE id = $1");
 }
 
 void DBConnection::initPreparedFsEntries() const {
@@ -294,7 +346,8 @@ void DBConnection::initPreparedFsEntries() const {
                    "    SELECT id, parent_id, name, base32_alias FROM fs_entry WHERE id = $1 "
                    "    UNION ALL "
                    "    SELECT f.id, f.parent_id, f.name, f.base32_alias FROM fs_entry f "
-                   "    JOIN parent_chain pc ON f.id = pc.parent_id"
+                   "    JOIN parent_chain pc ON f.id = pc.parent_id "
+                   "    WHERE f.parent_id IS NOT NULL "
                    ") "
                    "SELECT * FROM parent_chain ORDER BY parent_id NULLS FIRST");
 
@@ -526,8 +579,8 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2)");
 
-    conn_->prepare("get_file_encryption_iv",
-                   "SELECT f.encryption_iv "
+    conn_->prepare("get_file_encryption_iv_and_version",
+                   "SELECT f.encryption_iv, f.encrypted_with_key_version "
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
@@ -537,13 +590,19 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("set_file_encryption_iv",
+    conn_->prepare("set_file_encryption_iv_and_version",
                    R"(UPDATE files f
-       SET encryption_iv = $3
+       SET encryption_iv = $3, encrypted_with_key_version = $4
        FROM fs_entry fs
        WHERE f.fs_entry_id = fs.id
          AND fs.vault_id = $1
          AND fs.path = $2)");
+
+    conn_->prepare("get_files_older_than_key_version",
+                   "SELECT fs.*, f.* "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 AND f.encrypted_with_key_version < $2");
 }
 
 void DBConnection::initPreparedDirectories() const {

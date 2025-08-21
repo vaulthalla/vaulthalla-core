@@ -2,12 +2,14 @@
 #include "storage/CloudStorageEngine.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/sync/UploadTask.hpp"
+#include "concurrency/sync/CloudDeleteTask.hpp"
+#include "concurrency/sync/CloudTrashedDeleteTask.hpp"
+#include "concurrency/sync/CloudRotateKeyTask.hpp"
 #include "types/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "services/SyncController.hpp"
 #include "types/File.hpp"
-#include "types/Directory.hpp"
 #include "types/Sync.hpp"
 #include "services/LogRegistry.hpp"
 
@@ -20,7 +22,7 @@ using namespace std::chrono;
 using namespace vh::logging;
 
 void SyncTask::operator()() {
-    LogRegistry::sync()->info("[SyncTask] Starting sync for vault '{}'", engine_->vault->id);
+    LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);
     const auto start = steady_clock::now();
 
     try {
@@ -38,6 +40,8 @@ void SyncTask::operator()() {
         handleInterrupt();
         removeTrashedFiles();
         handleInterrupt();
+        handleVaultKeyRotation();
+        handleInterrupt();
 
         s3Map_ = cloudEngine()->getGroupedFilesFromS3();
         s3Files_ = uMap2Vector(s3Map_);
@@ -52,13 +56,8 @@ void SyncTask::operator()() {
 
         sync();
 
-        LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}'", engine_->vault->id);
-
         SyncQueries::reportSyncSuccess(engine_->sync->id);
         next_run = system_clock::now() + seconds(engine_->sync->interval.count());
-
-        LogRegistry::sync()->debug("[SyncTask] Next sync for vault '{}' scheduled at {}",
-                                   engine_->vault->id, next_run.time_since_epoch().count());
 
         handleInterrupt();
 
@@ -90,6 +89,10 @@ void SyncTask::operator()() {
                               engine_->vault->id, duration.count());
 }
 
+void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
+    push(std::make_shared<CloudRotateKeyTask>(cloudEngine(), files, begin, end));
+}
+
 void SyncTask::removeTrashedFiles() {
     const auto files = FileQueries::listTrashedFiles(vaultId());
     futures_.reserve(files.size());
@@ -116,7 +119,7 @@ uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared
     return totalSize;
 }
 
-std::shared_ptr<vh::storage::CloudStorageEngine> SyncTask::cloudEngine() const { return std::static_pointer_cast<storage::CloudStorageEngine>(engine_); }
+std::shared_ptr<CloudStorageEngine> SyncTask::cloudEngine() const { return std::static_pointer_cast<storage::CloudStorageEngine>(engine_); }
 
 std::vector<std::shared_ptr<File> > SyncTask::uMap2Vector(
     std::unordered_map<std::u8string, std::shared_ptr<File> >& map) {

@@ -36,6 +36,8 @@ struct VaultQueries {
     [[nodiscard]] static unsigned int maxVaultId();
 
     static bool localDiskVaultExists();
+
+    [[nodiscard]] static std::string getVaultMountPoint(unsigned int vaultId);
 };
 
 } // namespace vh::database

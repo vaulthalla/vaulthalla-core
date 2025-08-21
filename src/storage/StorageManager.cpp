@@ -26,7 +26,7 @@ void StorageManager::initStorageEngines() {
     LogRegistry::storage()->debug("[StorageManager] Initializing storage engines...");
     std::scoped_lock lock(mutex_);
 
-    if (ConfigRegistry::get().advanced.dev_mode) seed::initDevCloudVault();
+    if (ConfigRegistry::get().advanced.dev_mode && !UserQueries::adminUserExists()) seed::initDevCloudVault();
 
     engines_.clear();
 

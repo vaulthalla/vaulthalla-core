@@ -24,8 +24,8 @@
 
 // Misc
 #include "config/ConfigRegistry.hpp"
-#include "../../include/crypto/APIKeyManager.hpp"
-#include "../../include/services/LogRegistry.hpp"
+#include "crypto/APIKeyManager.hpp"
+#include "services/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"
@@ -33,6 +33,7 @@
 
 // Libraries
 #include <memory>
+#include <version.h>
 
 using namespace vh::seed;
 using namespace vh::config;
@@ -44,7 +45,8 @@ using namespace vh::services;
 using namespace vh::crypto;
 
 void vh::seed::init() {
-    LogRegistry::vaulthalla()->info("[initdb] Starting database initialization...");
+    LogRegistry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);
+    LogRegistry::vaulthalla()->debug("Initializing database for Vaulthalla v{}", VH_VERSION);
 
     initPermissions();
     initRoles();
@@ -52,10 +54,13 @@ void vh::seed::init() {
     initAdminGroup();
     initRoot();
     initAdminDefaultVault();
+
+    LogRegistry::vaulthalla()->debug("[initdb] Database initialization complete");
+    LogRegistry::audit()->info("Database initialization complete for Vaulthalla v{}", VH_VERSION);
 }
 
 void vh::seed::initPermissions() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing permissions...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing permissions...");
 
     const std::vector<Permission> userPerms{
         {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
@@ -99,7 +104,7 @@ void vh::seed::initPermissions() {
 }
 
 void vh::seed::initRoles() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing roles...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing roles...");
 
     std::vector<Role> roles{
         {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
@@ -121,7 +126,7 @@ void vh::seed::initRoles() {
 }
 
 void vh::seed::initAdmin() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing admin user...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin user...");
 
     const auto user = std::make_shared<User>();
     user->name = "admin";
@@ -141,7 +146,7 @@ void vh::seed::initAdmin() {
 }
 
 void vh::seed::initAdminGroup() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing admin group...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin group...");
 
     auto group = std::make_shared<Group>();
     group->name = "admin";
@@ -157,7 +162,7 @@ void vh::seed::initAdminGroup() {
 }
 
 void vh::seed::initAdminDefaultVault() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing admin default vault...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin default vault...");
 
     const auto vault = std::make_shared<Vault>();
     vault->name = "Admin Default Vault";
@@ -175,7 +180,7 @@ void vh::seed::initAdminDefaultVault() {
 }
 
 void vh::seed::initRoot() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing root directory...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing root directory...");
 
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
@@ -197,7 +202,7 @@ void vh::seed::initRoot() {
 }
 
 void vh::seed::initDevCloudVault() {
-    LogRegistry::vaulthalla()->info("[initdb] Initializing development Cloudflare R2 vault...");
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing development Cloudflare R2 vault...");
 
     try {
         const std::string prefix = "VAULTHALLA_TEST_R2_";

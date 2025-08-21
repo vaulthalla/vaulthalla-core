@@ -4,7 +4,12 @@
 
 #include <string>
 #include <vector>
-#include <filesystem>
+#include <memory>
+#include <atomic>
+
+namespace vh::types {
+    struct File;
+}
 
 namespace vh::crypto {
 
@@ -15,21 +20,31 @@ public:
     // Must be called before encrypt/decrypt
     void load_key();
 
+    void prepare_key_rotation();
+    void finish_key_rotation();
+
+    [[nodiscard]] std::vector<uint8_t>
+    rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<types::File>& f) const;
+
     // Encrypt data with vault key, returns ciphertext.
     // Populates out_b64_iv with base64-encoded IV.
-    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext,
-                                 std::string& out_b64_iv) const;
+    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<types::File>& f) const;
 
     // Decrypt using base64-encoded IV and ciphertext
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,
-                                 const std::string& b64_iv) const;
+                                 const std::string& b64_iv, unsigned int keyVersion) const;
 
     [[nodiscard]] std::vector<uint8_t> get_key(const std::string& callingFunctionName) const;
 
+    [[nodiscard]] unsigned int get_key_version() const;
+
+    [[nodiscard]] bool rotation_in_progress() const;
+
 private:
-    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
-    unsigned int vault_id_;
-    std::vector<uint8_t> key_;
+    std::unique_ptr<TPMKeyProvider> tpmKeyProvider_;
+    std::atomic<bool> rotation_in_progress_;
+    unsigned int vault_id_, version_{};
+    std::vector<uint8_t> key_, old_key_;
 };
 
 }

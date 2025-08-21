@@ -32,6 +32,8 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::util;
+using namespace vh::crypto;
 
 void Filesystem::init(std::shared_ptr<StorageManager> manager) {
     std::lock_guard lock(mutex_);
@@ -68,7 +70,7 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
 
         for (const auto& p : toCreate) {
             const auto path = makeAbsolute(p);
-            LogRegistry::fs()->info("[Filesystem::mkdir] Creating directory at: {}", path.string());
+            LogRegistry::fs()->debug("[Filesystem::mkdir] Creating directory at: {}", path.string());
 
             auto dir = std::make_shared<Directory>();
 
@@ -125,13 +127,16 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
     if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
+    const auto vault = VaultQueries::getVault(vaultId);
+    if (!vault) throw std::runtime_error("Vault with ID " + std::to_string(vaultId) + " does not exist");
+
     try {
         const auto dir = std::make_shared<Directory>();
         dir->vault_id = vaultId;
         dir->path = "/";
-        dir->name = to_snake_case(VaultQueries::getVault(vaultId)->name);
+        dir->name = to_snake_case(vault->name);
         dir->parent_id = FSEntryQueries::getRootEntry()->id;
-        dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+        dir->base32_alias = vault->mount_point;
         dir->backing_path = ConfigRegistry::get().fuse.backing_path / dir->base32_alias;
         dir->fuse_path = absPath;
         dir->created_at = dir->updated_at = std::time(nullptr);
@@ -256,7 +261,7 @@ std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid,
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
 
-    f->content_hash = crypto::Hash::blake2b(f->backing_path);
+    f->content_hash = Hash::blake2b(f->backing_path);
     f->id = FileQueries::upsertFile(f);
     cache->cacheEntry(f);
 
@@ -268,19 +273,49 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     const auto engine = ctx.engine ? ctx.engine : storageManager_->resolveStorageEngine(ctx.path);
     if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for file creation");
 
-    LogRegistry::fs()->info("Creating file at path: {}, fuse_path: {}", ctx.path.string(), ctx.fuse_path.string());
+    LogRegistry::fs()->debug("Creating file at path: {}, fuse_path: {}", ctx.path.string(), ctx.fuse_path.string());
 
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
     if (ctx.path.empty()) throw std::runtime_error("Cannot create file at empty path");
     if (cache->entryExists(ctx.fuse_path)) {
-        LogRegistry::fs()->error("File already exists at path: {}", ctx.fuse_path.string());
-        const auto entry = cache->getEntry(ctx.fuse_path);
-        if (entry->isDirectory()) throw std::filesystem::filesystem_error(
-            "[Filesystem] Cannot create file at path, a directory already exists",
-            ctx.fuse_path,
-            std::make_error_code(std::errc::file_exists));
-        return std::static_pointer_cast<File>(entry);
+        if (!ctx.overwrite) {
+            LogRegistry::fs()->warn("File already exists at path: {}", ctx.fuse_path.string());
+            const auto entry = cache->getEntry(ctx.fuse_path);
+            if (entry->isDirectory()) throw std::filesystem::filesystem_error(
+                "[Filesystem] Cannot create file at path, a directory already exists",
+                ctx.fuse_path,
+                std::make_error_code(std::errc::file_exists));
+            return std::static_pointer_cast<File>(entry);
+        }
+
+        LogRegistry::fs()->debug("File already exists at path: {}, overwriting", ctx.fuse_path.string());
+        auto entry = cache->getEntry(ctx.fuse_path);
+        if (entry->isDirectory()) {
+            LogRegistry::fs()->error("Cannot overwrite directory with file at path: {}", ctx.fuse_path.string());
+            throw std::filesystem::filesystem_error(
+                "[Filesystem] Cannot overwrite directory with file",
+                ctx.fuse_path,
+                std::make_error_code(std::errc::file_exists));
+        }
+
+        const auto f = std::static_pointer_cast<File>(entry);
+
+        f->content_hash = Hash::blake2b(entry->backing_path);
+
+        if (!ctx.buffer.empty()) {
+            const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, f);
+            writeFile(entry->backing_path, ciphertext);
+            f->size_bytes = ctx.buffer.size();
+            f->mime_type = Magic::get_mime_type_from_buffer(ctx.buffer);
+        } else {
+            f->size_bytes = std::filesystem::file_size(entry->backing_path);
+            f->mime_type = inferMimeTypeFromPath(ctx.path);
+        }
+
+        FileQueries::updateFile(f);
+
+        return f;
     }
 
     const auto parent = ServiceDepsRegistry::instance().fsCache->getEntry(resolveParent(ctx.fuse_path));
@@ -306,18 +341,17 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     f->is_hidden = ctx.path.filename().string().starts_with('.');
     f->created_by = f->last_modified_by = ctx.userId;
     f->inode = std::make_optional(cache->getOrAssignInode(ctx.fuse_path));
-    f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : util::Magic::get_mime_type_from_buffer(ctx.buffer);
+    f->mime_type = ctx.buffer.empty() ? inferMimeTypeFromPath(ctx.path) : Magic::get_mime_type_from_buffer(ctx.buffer);
     f->size_bytes = ctx.buffer.size();
 
     if (ctx.buffer.empty()) std::ofstream(f->backing_path).close();
     else {
         std::string iv_b64;
-        const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, iv_b64);
-        f->encryption_iv = iv_b64;
-        util::writeFile(f->backing_path, ciphertext);
+        const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, f);
+        writeFile(f->backing_path, ciphertext);
     }
 
-    f->content_hash = crypto::Hash::blake2b(f->backing_path);
+    f->content_hash = Hash::blake2b(f->backing_path);
 
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
@@ -445,20 +479,18 @@ void Filesystem::handleRename(const RenameContext& ctx) {
         auto buffer = ctx.buffer;
 
         if (!f->encryption_iv.empty()) {
-            const auto tmp = util::decrypt_file_to_temp(ctx.engine->vault->id, oldVaultPath, ctx.engine);
-            buffer = util::readFileToVector(tmp);
-        } else buffer = util::readFileToVector(oldBackingPath);
+            const auto tmp = decrypt_file_to_temp(ctx.engine->vault->id, oldVaultPath, ctx.engine);
+            buffer = readFileToVector(tmp);
+        } else buffer = readFileToVector(oldBackingPath);
 
         if (!buffer.empty()) {
-            std::string iv_b64;
-            const auto ciphertext = ctx.engine->encryptionManager->encrypt(buffer, iv_b64);
+            const auto ciphertext = ctx.engine->encryptionManager->encrypt(buffer, f);
             if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldBackingPath.string());
-            util::writeFile(newBackingPath, ciphertext);
+            writeFile(newBackingPath, ciphertext);
 
-            f->encryption_iv = iv_b64;
             f->size_bytes = std::filesystem::file_size(newBackingPath);
-            f->mime_type = util::Magic::get_mime_type_from_buffer(buffer);
-            f->content_hash = crypto::Hash::blake2b(newBackingPath);
+            f->mime_type = Magic::get_mime_type_from_buffer(buffer);
+            f->content_hash = Hash::blake2b(newBackingPath);
 
             if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
                 ThumbnailWorker::enqueue(ctx.engine, buffer, f);

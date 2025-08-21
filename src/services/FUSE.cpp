@@ -21,7 +21,7 @@ FUSE::FUSE()
     : AsyncService("FUSE") {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
-    LogRegistry::fuse()->info("[FUSE] Initializing FUSE connection...");
+    LogRegistry::fuse()->debug("[FUSE] Initializing FUSE connection...");
 
     constexpr uintmax_t MB = 1024 * 1024;
 
@@ -30,7 +30,7 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     conn->max_readahead = MB;
     conn->max_write = MB;
 
-    LogRegistry::fuse()->info("[FUSE] Connection initialized with max_readahead={} bytes, max_write={} bytes",
+    LogRegistry::fuse()->debug("[FUSE] Connection initialized with max_readahead={} bytes, max_write={} bytes",
                               conn->max_readahead, conn->max_write);
 }
 
@@ -58,7 +58,7 @@ void FUSE::stop() {
 }
 
 void FUSE::runLoop() {
-    LogRegistry::fuse()->info("[FUSE] Running FUSE service");
+    LogRegistry::fuse()->debug("[FUSE] Running FUSE service");
 
     std::vector<std::string> argsStr = {
         "vaulthalla-fuse",

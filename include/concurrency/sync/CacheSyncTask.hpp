@@ -10,13 +10,13 @@ namespace vh::types {
 
 namespace vh::concurrency {
 
-class CacheSyncTask : public SyncTask {
+class CacheSyncTask final : public SyncTask {
 public:
     using SyncTask::SyncTask;
 
     ~CacheSyncTask() override = default;
 
-    CacheSyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : SyncTask(engine) {}
+    CacheSyncTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
     void sync() override;
 

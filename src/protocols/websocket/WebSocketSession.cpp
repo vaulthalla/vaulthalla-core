@@ -33,7 +33,7 @@ WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& route
 
 WebSocketSession::~WebSocketSession() {
     close();
-    LogRegistry::ws()->info("[WebSocketSession] Session destroyed for IP: {}", getClientIp());
+    LogRegistry::ws()->debug("[WebSocketSession] Session destroyed for IP: {}", getClientIp());
 }
 
 std::string WebSocketSession::getClientIp() const {
@@ -80,7 +80,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
         }
 
         self->isRegistered_ = true;
-        LogRegistry::ws()->info("[Session] Handshake accepted from IP: {}", self->getClientIp());
+        LogRegistry::ws()->debug("[Session] Handshake accepted from IP: {}", self->getClientIp());
 
         self->doRead();
     };
@@ -124,7 +124,7 @@ void WebSocketSession::close() {
 
     ws_.reset(); // release FD
     buffer_.consume(buffer_.size());
-    LogRegistry::ws()->info("[WebSocketSession] Closed session for IP: {}", getClientIp());
+    LogRegistry::ws()->debug("[WebSocketSession] Closed session for IP: {}", getClientIp());
 }
 
 void WebSocketSession::send(const json& message) {
@@ -202,16 +202,16 @@ void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
             router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
         } catch (const std::exception& ex) {
             LogRegistry::ws()->error("[Session] Error parsing message: {}", ex.what());
-            json errorResponse = {{"command", "error"},
-                                  {"status", "parse_error"},
-                                  {"message", "Failed to parse message: " + std::string(ex.what())}};
+            const json errorResponse = {{"command", "error"},
+                                    {"status", "parse_error"},
+                                    {"message", "Failed to parse message: " + std::string(ex.what())}};
             send(errorResponse);
             return;
         } catch (...) {
             LogRegistry::ws()->error("[Session] Unknown error while processing message");
-            json errorResponse = {{"command", "error"},
-                                  {"status", "internal_error"},
-                                  {"message", "An internal error occurred while processing your request."}};
+            const json errorResponse = {{"command", "error"},
+                                    {"status", "internal_error"},
+                                    {"message", "An internal error occurred while processing your request."}};
             send(errorResponse);
             return;
         }

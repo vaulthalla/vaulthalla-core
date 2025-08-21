@@ -42,9 +42,7 @@ void AsyncService::stop() {
     interruptFlag_.store(true);
 
     // Only join if we’re not calling stop() from the same thread
-    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) {
-        worker_.join();
-    }
+    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) worker_.join();
 
     running_.store(false);
     interruptFlag_.store(false);

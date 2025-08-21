@@ -85,8 +85,8 @@ void SyncTask::operator()() {
 
     const auto end = steady_clock::now();
     const auto duration = duration_cast<milliseconds>(end - start);
-    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms. Next run at {} (epoch: {})",
-                              engine_->vault->id, duration.count(), next_run.time_since_epoch().count(), next_run.time_since_epoch());
+    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms",
+                              engine_->vault->id, duration.count());
 }
 
 void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {

@@ -30,8 +30,9 @@ WebSocketServer::WebSocketServer(asio::io_context& ioc, const tcp::endpoint& end
 }
 
 void WebSocketServer::run() {
-    LogRegistry::ws()->info("[WebSocketServer] Starting WebSocket server on {}",
-                            acceptor_.local_endpoint().address().to_string());
+    LogRegistry::ws()->info("[WebSocketServer] Starting WebSocket server at {}",
+                            acceptor_.local_endpoint().address().to_string() + ":" +
+                            std::to_string(acceptor_.local_endpoint().port()));
     doAccept();
 }
 

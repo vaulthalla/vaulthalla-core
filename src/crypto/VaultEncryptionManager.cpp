@@ -7,6 +7,7 @@
 
 #include <sodium.h>
 #include <stdexcept>
+#include <fmt/format.h>
 
 using namespace vh::crypto;
 using namespace vh::logging;
@@ -44,7 +45,10 @@ void VaultEncryptionManager::load_key() {
         version_ = key->version;
 
         key_ = std::move(vaultKey);
-        LogRegistry::crypto()->info("[VaultEncryptionManager] Created new sealed key for vault {}", vault_id_);
+        const auto msg = fmt::format("[VaultEncryptionManager] Created new sealed AES256-GCM key for vault {} with version {}",
+                                     vault_id_, version_);
+        LogRegistry::audit()->info(msg);
+        LogRegistry::crypto()->info(msg);
         return;
     }
 
@@ -70,7 +74,7 @@ void VaultEncryptionManager::load_key() {
             throw std::runtime_error("Old vault key must be 32 bytes (AES-256)");
         }
 
-        LogRegistry::crypto()->info("[VaultEncryptionManager] Loaded old key for vault {} during rotation", vault_id_);
+        LogRegistry::crypto()->debug("[VaultEncryptionManager] Loaded old key for vault {} during rotation", vault_id_);
     }
 }
 
@@ -80,7 +84,8 @@ void VaultEncryptionManager::prepare_key_rotation() {
         return;
     }
 
-    LogRegistry::crypto()->info("[VaultEncryptionManager] Preparing key rotation for vault {}", vault_id_);
+    LogRegistry::crypto()->debug("[VaultEncryptionManager] Preparing key rotation for vault {}", vault_id_);
+
     old_key_ = std::move(key_);
     key_.clear();
     key_.resize(AES_KEY_SIZE);
@@ -96,7 +101,10 @@ void VaultEncryptionManager::prepare_key_rotation() {
     version_ = key->version;
     rotation_in_progress_.store(true);
 
-    LogRegistry::crypto()->info("[VaultEncryptionManager] Prepared new key for vault {}", vault_id_);
+    const auto msg = fmt::format("[VaultEncryptionManager] Prepared key rotation for vault {} with new version {}",
+                                         vault_id_, version_);
+    LogRegistry::audit()->info(msg);
+    LogRegistry::crypto()->info(msg);
 }
 
 void VaultEncryptionManager::finish_key_rotation() {
@@ -110,7 +118,10 @@ void VaultEncryptionManager::finish_key_rotation() {
     VaultKeyQueries::markKeyRotationFinished(vault_id_);
     rotation_in_progress_.store(false);
 
-    LogRegistry::crypto()->info("[VaultEncryptionManager] Finished key rotation for vault {}", vault_id_);
+    const auto msg = fmt::format("[VaultEncryptionManager] Finished key rotation for vault {} with version {}",
+                                         vault_id_, version_);
+    LogRegistry::audit()->info(msg);
+    LogRegistry::crypto()->info(msg);
 }
 
 std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<File>& f) const {
@@ -190,8 +201,16 @@ std::vector<uint8_t> VaultEncryptionManager::decrypt(const std::vector<uint8_t>&
 }
 
 std::vector<uint8_t> VaultEncryptionManager::get_key(const std::string& callingFunctionName) const {
-    LogRegistry::audit()->info("[VaultEncryptionManager] Accessing vault key for vault ID: {} in function: {}",
-                                               vault_id_, callingFunctionName);
+    if (key_.empty()) {
+        LogRegistry::crypto()->error("[VaultEncryptionManager] Key is empty in function: {}", callingFunctionName);
+        throw std::runtime_error("Vault key is not initialized");
+    }
+
+    const auto msg = fmt::format("[VaultEncryptionManager] Returning key for vault {} in function: {}",
+                           vault_id_, callingFunctionName);
+    LogRegistry::crypto()->debug(msg);
+    LogRegistry::audit()->debug(msg);
+
     return key_;
 }
 

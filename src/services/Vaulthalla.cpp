@@ -21,13 +21,13 @@ using namespace vh::logging;
 Vaulthalla::Vaulthalla() : AsyncService("Vaulthalla") {}
 
 void Vaulthalla::runLoop() {
-    LogRegistry::vaulthalla()->info("[Vaulthalla] Starting service...");
+    LogRegistry::vaulthalla()->info("[Vaulthalla] Starting Vaulthalla - The Final Cloud...");
 
     try {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initThreatIntelligence();
         initProtocols();
-        LogRegistry::vaulthalla()->info("[Vaulthalla] Protocols initialized successfully");
+        LogRegistry::vaulthalla()->debug("[Vaulthalla] Protocols initialized successfully");
 
         while (!interruptFlag_.load()) std::this_thread::sleep_for(std::chrono::seconds(1));
 

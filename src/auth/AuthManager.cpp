@@ -34,7 +34,7 @@ void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSo
     if (!session->getRefreshToken().empty()) {
         LogRegistry::auth()->debug("[AuthManager] Attempting to rehydrate session from provided refresh token.");
         const auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
-        if (!validatedClient) LogRegistry::auth()->error("[AuthManager] Failed to rehydrate session: invalid refresh token.");
+        if (!validatedClient) LogRegistry::auth()->debug("[AuthManager] Failed to rehydrate session: invalid refresh token.");
         else {
             client = validatedClient;
             LogRegistry::auth()->debug("[AuthManager] Successfully rehydrated session for user: {}", client->getUserName());
@@ -160,7 +160,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
         // 3. Lookup refresh token by jti
         auto storedToken = UserQueries::getRefreshToken(tokenJti);
         if (!storedToken) {
-            LogRegistry::auth()->error("[AuthManager] Refresh token not found: {}", tokenJti);
+            LogRegistry::auth()->debug("[AuthManager] Refresh token not found: {}", tokenJti);
             return nullptr;
         }
 
@@ -175,7 +175,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
 
         auto user = UserQueries::getUserByRefreshToken(tokenJti);
         if (!user) {
-            LogRegistry::auth()->error("[AuthManager] User not found for refresh token: {}", tokenJti);
+            LogRegistry::auth()->debug("[AuthManager] User not found for refresh token: {}", tokenJti);
             return nullptr;
         }
 
@@ -184,7 +184,8 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
 
         return client;
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthManager] validateRefreshToken failed: {}", e.what());
+        // making this debug to avoid flooding logs with errors
+        LogRegistry::auth()->debug("[AuthManager] validateRefreshToken failed: {}", e.what());
         return nullptr;
     }
 }
@@ -199,6 +200,7 @@ void AuthManager::changePassword(const std::string& name, const std::string& old
 
     user->setPasswordHash(hashPassword(newPassword));
 
+    LogRegistry::audit()->info("[AuthManager] User {} is changing password", user->name);
     LogRegistry::auth()->info("[AuthManager] Changing password for user: {}", user->name);
 }
 

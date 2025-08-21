@@ -28,7 +28,7 @@ void WebSocketHandler::registerAllHandlers() const {
     registerSettingsHandlers();
     registerGroupHandlers();
 
-    LogRegistry::ws()->info("[WebSocketHandler] All handlers registered successfully.");
+    LogRegistry::ws()->debug("[WebSocketHandler] All handlers registered successfully.");
 }
 
 void WebSocketHandler::registerAuthHandlers() const {

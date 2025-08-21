@@ -178,7 +178,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const auto path = parentPath / name;
     const fuse_ino_t ino = cache->getOrAssignInode(path);
 
-    LogRegistry::fuse()->info("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
+    LogRegistry::fuse()->debug("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
 
     const auto entry = cache->getEntry(path);
     if (!entry) {
@@ -199,7 +199,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 }
 
 void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode, fuse_file_info* fi) {
-    LogRegistry::fuse()->info("[create] Called for parent: {}, name: {}, mode: {}",
+    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 
     if (!name || strlen(name) == 0) {

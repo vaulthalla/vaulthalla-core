@@ -15,6 +15,7 @@
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/LogRegistry.hpp"
+#include "util/task.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -93,3 +94,30 @@ void FSTask::processOperations() const {
     }
 }
 
+void FSTask::handleVaultKeyRotation() {
+    if (!engine_->encryptionManager->rotation_in_progress()) return;
+
+    const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
+    if (filesToRotate.empty()) {
+        LogRegistry::sync()->info("[FSTask] No files to rotate for vault '{}'", engine_->vault->id);
+        engine_->encryptionManager->finish_key_rotation();
+        return;
+    }
+
+    const auto ranges = getTaskOperationRanges(filesToRotate.size());
+
+    for (const auto& [begin, end] : ranges) {
+        if (begin >= end || end > filesToRotate.size()) {
+            LogRegistry::sync()->warn("[FSTask] Invalid range for LocalRotateKeyTask: {}-{}", begin, end);
+            continue;
+        }
+        pushKeyRotationTask(filesToRotate, begin, end);
+    }
+
+    processFutures();
+
+    engine_->encryptionManager->finish_key_rotation();
+
+    LogRegistry::sync()->info("[FSTask] Vault key rotation completed for vault '{}'", engine_->vault->id);
+    LogRegistry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
+}

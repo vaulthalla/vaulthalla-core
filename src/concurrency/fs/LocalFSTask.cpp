@@ -4,8 +4,6 @@
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
 #include "services/LogRegistry.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
-#include "util/task.hpp"
 #include "concurrency/fs/LocalRotateKeyTask.hpp"
 
 using namespace vh::concurrency;
@@ -54,26 +52,8 @@ void LocalFSTask::operator()() {
     requeue();
 }
 
-void LocalFSTask::handleVaultKeyRotation() {
-    if (!engine_->encryptionManager->rotation_in_progress()) return;
-
-    const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine_->vault->id, engine_->encryptionManager->get_key_version());
-    const auto ranges = getTaskOperationRanges(filesToRotate.size(), std::thread::hardware_concurrency());
-
-    for (const auto& [begin, end] : ranges) {
-        if (begin >= end || end > filesToRotate.size()) {
-            LogRegistry::sync()->warn("[LocalFSTask] Invalid range for LocalRotateKeyTask: {}-{}", begin, end);
-            continue;
-        }
-        push(std::make_shared<LocalRotateKeyTask>(localEngine(), filesToRotate, begin, end));
-    }
-
-    processFutures();
-
-    engine_->encryptionManager->finish_key_rotation();
-
-    LogRegistry::sync()->info("[LocalFSTask] Vault key rotation completed for vault '{}'", engine_->vault->id);
-    LogRegistry::audit()->info("[LocalFSTask] Vault key rotation finished for vault '{}'", engine_->vault->id);
+void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
+    push(std::make_shared<LocalRotateKeyTask>(localEngine(), files, begin, end));
 }
 
 void LocalFSTask::removeTrashedFiles() {

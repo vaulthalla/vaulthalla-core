@@ -6,8 +6,6 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
-#include <filesystem>
-#include <future>
 #include <vector>
 
 namespace vh::types {
@@ -24,7 +22,7 @@ class SyncTask : public FSTask {
 public:
     ~SyncTask() override = default;
 
-    SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
+    explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
 
     void operator()() override;
 
@@ -43,7 +41,8 @@ protected:
 
     void removeTrashedFiles() override;
 
-    void handleVaultKeyRotation() override;
+    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
+                                     unsigned int begin, unsigned int end) override;
 
     virtual void ensureFreeSpace(uintmax_t size) const;
 

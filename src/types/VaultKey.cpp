@@ -1,9 +1,11 @@
 #include "types/VaultKey.hpp"
+#include "util/timestamp.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::util;
 
 VaultKey::VaultKey(const pqxx::row &row)
     : vaultId(row["vault_id"].as<unsigned int>()),

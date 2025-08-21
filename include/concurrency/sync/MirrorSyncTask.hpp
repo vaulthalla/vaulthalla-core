@@ -4,13 +4,13 @@
 
 namespace vh::concurrency {
 
-class MirrorSyncTask : public SyncTask {
+class MirrorSyncTask final : public SyncTask {
 public:
     using SyncTask::SyncTask;
 
     ~MirrorSyncTask() override = default;
 
-    MirrorSyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : SyncTask(engine) {}
+    MirrorSyncTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
     void sync() override;
 

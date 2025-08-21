@@ -12,17 +12,13 @@ namespace vh::types {
 struct Operation;
 }
 
-namespace vh::services {
-class SyncController;
-}
-
 namespace vh::concurrency {
 
-class LocalFSTask : public FSTask {
+class LocalFSTask final : public FSTask {
 public:
     ~LocalFSTask() override = default;
 
-    LocalFSTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
+    explicit LocalFSTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
 
     void operator()() override;
 
@@ -31,7 +27,8 @@ protected:
 
     std::shared_ptr<storage::StorageEngine> localEngine() const;
 
-    void handleVaultKeyRotation() override;
+    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
+                                     unsigned int begin, unsigned int end) override;
 };
 
 }

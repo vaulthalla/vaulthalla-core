@@ -127,13 +127,16 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
 
     if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
+    const auto vault = VaultQueries::getVault(vaultId);
+    if (!vault) throw std::runtime_error("Vault with ID " + std::to_string(vaultId) + " does not exist");
+
     try {
         const auto dir = std::make_shared<Directory>();
         dir->vault_id = vaultId;
         dir->path = "/";
-        dir->name = to_snake_case(VaultQueries::getVault(vaultId)->name);
+        dir->name = to_snake_case(vault->name);
         dir->parent_id = FSEntryQueries::getRootEntry()->id;
-        dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+        dir->base32_alias = vault->mount_point;
         dir->backing_path = ConfigRegistry::get().fuse.backing_path / dir->base32_alias;
         dir->fuse_path = absPath;
         dir->created_at = dir->updated_at = std::time(nullptr);

@@ -17,6 +17,10 @@ namespace vh::services {
 class SyncController;
 }
 
+namespace vh::types {
+struct File;
+}
+
 namespace vh::concurrency {
 
 class FSTask : public Task, public std::enable_shared_from_this<FSTask> {
@@ -48,16 +52,15 @@ protected:
     bool isRunning_ = false;
     std::atomic<bool> interruptFlag_{false};
 
-    void push(const std::shared_ptr<Task>& task);
-
-    void handleInterrupt() const;
-
     virtual void removeTrashedFiles() = 0;
-
-    void processOperations() const;
-
-    virtual void handleVaultKeyRotation() = 0;
     virtual void processFutures();
+    virtual void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
+                                     unsigned int begin, unsigned int end) = 0;
+
+    void push(const std::shared_ptr<Task>& task);
+    void handleInterrupt() const;
+    void processOperations() const;
+    void handleVaultKeyRotation();
 };
 
 }

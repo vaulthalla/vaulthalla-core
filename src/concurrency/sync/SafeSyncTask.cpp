@@ -1,9 +1,6 @@
 #include "concurrency/sync/SafeSyncTask.hpp"
-#include "concurrency/sync/DownloadTask.hpp"
-#include "concurrency/ThreadPool.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"
@@ -19,6 +16,9 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::logging;
+
+SafeSyncTask::SafeSyncTask(const std::shared_ptr<CloudStorageEngine>& engine)
+    : SyncTask(engine) {}
 
 void SafeSyncTask::sync() {
     LogRegistry::sync()->info("[SafeSyncTask] Starting sync for vault '{}'", engine_->vault->id);

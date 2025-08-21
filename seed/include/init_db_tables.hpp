@@ -115,7 +115,8 @@ CREATE TABLE IF NOT EXISTS vault_keys
         txn.exec(R"(
 CREATE TABLE IF NOT EXISTS vault_keys_trashed
 (
-    vault_id               INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
+    id                     SERIAL PRIMARY KEY,
+    vault_id               INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
     version                INTEGER NOT NULL DEFAULT 1,
     encrypted_key          BYTEA NOT NULL,
     iv                     BYTEA NOT NULL,
@@ -278,7 +279,11 @@ CREATE TABLE IF NOT EXISTS file_versions (
         )");
 
         txn.exec(R"(
-CREATE TYPE file_metadata_type AS ENUM ('string', 'integer', 'boolean', 'timestamp', 'float');
+DO $$ BEGIN
+    CREATE TYPE file_metadata_type AS ENUM ('string', 'integer', 'boolean', 'timestamp', 'float');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
         )");
 
         txn.exec(R"(
@@ -487,19 +492,23 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 
         txn.exec(R"(
 CREATE OR REPLACE FUNCTION update_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
         )");
 
         txn.exec(R"(
-CREATE TRIGGER update_sync_timestamp
-BEFORE UPDATE ON sync
-FOR EACH ROW
-EXECUTE FUNCTION update_timestamp();
+DO $$ BEGIN
+    CREATE TRIGGER update_sync_timestamp
+    BEFORE UPDATE ON sync
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
         )");
     });
 }
@@ -582,7 +591,7 @@ CREATE TABLE IF NOT EXISTS vault_permission_overrides (
 
         // Indexes
         txn.exec(R"(
-CREATE UNIQUE INDEX idx_permission_name_category
+CREATE UNIQUE INDEX IF NOT EXISTS idx_permission_name_category
     ON permission (LOWER(name), category);
         )");
 

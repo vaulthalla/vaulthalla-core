@@ -179,31 +179,27 @@ void DBConnection::initPreparedVaultKeys() const {
                    "    WHERE vk.vault_id = $1 "
                    "    FOR UPDATE "
                    "  ), "
-                   "  versioned AS ( "
-                   "    SELECT COALESCE( "
-                   "      (SELECT version FROM current), "
-                   "      (SELECT MAX(version) FROM vault_keys_trashed WHERE vault_id = $1), "
-                   "      0 "
-                   "    ) + 1 AS next_version "
-                   "  ), "
                    "  trashed AS ( "
                    "    INSERT INTO vault_keys_trashed (vault_id, encrypted_key, iv, created_at, trashed_at, version) "
-                   "    SELECT c.vault_id, c.encrypted_key, c.iv, c.created_at, CURRENT_TIMESTAMP, v.next_version "
-                   "    FROM current c, versioned v "
-                   "    RETURNING 1 "
+                   "    SELECT c.vault_id, c.encrypted_key, c.iv, c.created_at, CURRENT_TIMESTAMP, c.version "
+                   "    FROM current c "
+                   "    RETURNING version "
+                   "  ), "
+                   "  next_version AS ( "
+                   "    SELECT COALESCE((SELECT version FROM current), -1) + 1 AS version "
                    "  ), "
                    "  updated AS ( "
-                   "    UPDATE vault_keys vk "
+                   "    UPDATE vault_keys "
                    "    SET encrypted_key = $2, "
                    "        iv            = $3, "
-                   "        version       = (SELECT next_version FROM versioned), "
+                   "        version       = (SELECT version FROM next_version), "
                    "        created_at    = CURRENT_TIMESTAMP "
-                   "    WHERE vk.vault_id = $1 "
+                   "    WHERE vault_id = $1 "
                    "    RETURNING version "
                    "  ), "
                    "  inserted AS ( "
                    "    INSERT INTO vault_keys (vault_id, encrypted_key, iv, version, created_at) "
-                   "    SELECT $1, $2, $3, (SELECT next_version FROM versioned), CURRENT_TIMESTAMP "
+                   "    SELECT $1, $2, $3, (SELECT version FROM next_version), CURRENT_TIMESTAMP "
                    "    WHERE NOT EXISTS (SELECT 1 FROM current) "
                    "    RETURNING version "
                    "  ) "
@@ -330,6 +326,8 @@ void DBConnection::initPreparedVaults() const {
     conn_->prepare("vault_exists", "SELECT EXISTS(SELECT 1 FROM vault WHERE name = $1 AND owner_id = $2) AS exists");
 
     conn_->prepare("is_s3_vault", "SELECT EXISTS(SELECT 1 FROM s3 WHERE vault_id = $1) AS is_s3");
+
+    conn_->prepare("get_vault_mount_point", "SELECT mount_point FROM vault WHERE id = $1");
 }
 
 void DBConnection::initPreparedFsEntries() const {
@@ -348,7 +346,8 @@ void DBConnection::initPreparedFsEntries() const {
                    "    SELECT id, parent_id, name, base32_alias FROM fs_entry WHERE id = $1 "
                    "    UNION ALL "
                    "    SELECT f.id, f.parent_id, f.name, f.base32_alias FROM fs_entry f "
-                   "    JOIN parent_chain pc ON f.id = pc.parent_id"
+                   "    JOIN parent_chain pc ON f.id = pc.parent_id "
+                   "    WHERE f.parent_id IS NOT NULL "
                    ") "
                    "SELECT * FROM parent_chain ORDER BY parent_id NULLS FIRST");
 

@@ -3,14 +3,13 @@
 #include "types/Directory.hpp"
 #include "types/File.hpp"
 #include "services/LogRegistry.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "database/Queries/VaultQueries.hpp"
+#include "util/fsPath.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
 #include <unordered_map>
-#include <unordered_set>
 #include <sstream>
 #include <pugixml.hpp>
 #include <algorithm>
@@ -62,20 +61,12 @@ FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
 
     fuse_path = fs::path("/");
     backing_path = ConfigRegistry::get().fuse.backing_path;
-
     for (const auto& r : parentRows) {
-        const auto name = r["name"].as<std::string>();
-        const auto base32_alias = r["base32_alias"].as<std::string>();
-        std::optional<unsigned int> parentId;
-        if (r["parent_id"].is_null()) parentId = std::nullopt; // Root directory
-        else parentId = r["parent_id"].as<unsigned int>();
-
-        if (name == "/" && !parent_id) continue; // Skip root slash, prevents // in path
-
-        fuse_path /= name;
-        backing_path /= base32_alias;
+        fuse_path /= r["name"].as<std::string>();
+        backing_path /= r["base32_alias"].as<std::string>();
     }
-
+    fuse_path /= name;
+    backing_path /= base32_alias;
 }
 
 FSEntry::FSEntry(const std::string& s3_key) {

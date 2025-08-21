@@ -4,7 +4,6 @@
 
 #include <memory>
 #include <queue>
-#include <thread>
 #include <unordered_map>
 #include <mutex>
 #include <shared_mutex>
@@ -14,9 +13,8 @@ class StorageEngine;
 }
 
 namespace vh::concurrency {
-class ThreadPool;
-struct SyncTask;
-struct FSTask;
+class SyncTask;
+class FSTask;
 }
 
 namespace vh::services {

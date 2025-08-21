@@ -112,22 +112,26 @@ void VaultEncryptionManager::finish_key_rotation() {
 }
 
 std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, std::string& b64_iv_ref, unsigned int keyVersion) const {
-    if (keyVersion > version_ || keyVersion < version_ - 1) {
-        LogRegistry::crypto()->warn("[VaultEncryptionManager] Key version {} is not valid for vault {}, using new key",
-                                    keyVersion, vault_id_);
-        keyVersion = version_;
-    }
+    try {
+        if (keyVersion > version_ || keyVersion < version_ - 1) {
+            LogRegistry::crypto()->warn("[VaultEncryptionManager] Key version {} is not valid for vault {}, using new key",
+                                        keyVersion, vault_id_);
+            keyVersion = version_;
+        }
 
-    const auto decrypted = decrypt_aes256_gcm(ciphertext, old_key_, b64_decode(b64_iv_ref));
-    std::vector<uint8_t> iv;
-    const auto encrypted = encrypt_aes256_gcm(decrypted, key_, iv);
-    if (encrypted.size() != ciphertext.size()) {
-        LogRegistry::crypto()->error("[VaultEncryptionManager] Encrypted data size mismatch after key rotation");
-        throw std::runtime_error("Encrypted data size mismatch after key rotation");
+        const auto decrypted = decrypt_aes256_gcm(ciphertext, old_key_, b64_decode(b64_iv_ref));
+        std::vector<uint8_t> iv;
+        const auto encrypted = encrypt_aes256_gcm(decrypted, key_, iv);
+        if (encrypted.size() != ciphertext.size()) {
+            LogRegistry::crypto()->error("[VaultEncryptionManager] Encrypted data size mismatch after key rotation");
+            throw std::runtime_error("Encrypted data size mismatch after key rotation");
+        }
+        b64_iv_ref = b64_encode(iv);
+        return {encrypted, keyVersion};
+    } catch (const std::exception& e) {
+        LogRegistry::crypto()->error("[VaultEncryptionManager] Exception during key rotation: {}", e.what());
+        throw std::runtime_error("Key rotation failed: " + std::string(e.what()));
     }
-    b64_iv_ref = b64_encode(iv);
-    LogRegistry::crypto()->info("[VaultEncryptionManager] Successfully rotated key for vault {}", vault_id_);
-    return {encrypted, keyVersion};
 }
 
 std::pair<std::vector<uint8_t>, unsigned int> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, std::string& out_b64_iv) const {

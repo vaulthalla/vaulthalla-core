@@ -1,10 +1,7 @@
 #include "concurrency/sync/CacheSyncTask.hpp"
-#include "concurrency/sync/DownloadTask.hpp"
-#include "concurrency/ThreadPool.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"
@@ -20,6 +17,9 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::logging;
+
+CacheSyncTask::CacheSyncTask(const std::shared_ptr<StorageEngine>& engine)
+    : SyncTask(engine) {}
 
 void CacheSyncTask::sync() {
     for (const auto& file : localFiles_) {

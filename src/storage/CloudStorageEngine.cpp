@@ -44,28 +44,24 @@ void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, c
     if (rmThumbnails) purgeThumbnails(rel_path);
 }
 
-void CloudStorageEngine::uploadFile(const std::filesystem::path& rel_path) const {
-    const auto absPath = paths->absPath(rel_path, PathType::BACKING_VAULT_ROOT);
-    if (!std::filesystem::exists(absPath) || !std::filesystem::is_regular_file(absPath))
-        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + absPath.string());
+void CloudStorageEngine::uploadFile(const std::shared_ptr<File>& f) const {
+    if (!std::filesystem::exists(f->backing_path) || !std::filesystem::is_regular_file(f->backing_path))
+        throw std::runtime_error("[CloudStorageEngine] Invalid file: " + f->path.string());
 
-    const std::filesystem::path s3Key = stripLeadingSlash(rel_path);
+    const std::filesystem::path s3Key = stripLeadingSlash(f->path);
 
-    if (std::filesystem::file_size(absPath) < 5 * 1024 * 1024)
-        s3Provider_->uploadObject(stripLeadingSlash(rel_path), absPath);
-    else s3Provider_->uploadLargeObject(stripLeadingSlash(rel_path), absPath);
+    if (std::filesystem::file_size(f->backing_path) < 5 * 1024 * 1024)
+        s3Provider_->uploadObject(s3Key, f->backing_path);
+    else s3Provider_->uploadLargeObject(s3Key, f->backing_path);
 
     std::vector<uint8_t> buffer;
     if (!s3Provider_->downloadToBuffer(s3Key, buffer))
         throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key.string());
 
-    s3Provider_->setObjectContentHash(s3Key, FileQueries::getContentHash(vault->id, rel_path));
+    s3Provider_->setObjectContentHash(s3Key, f->content_hash ? *f->content_hash : FileQueries::getContentHash(vault->id, f->path));
 
-    if (const auto payload = FileQueries::getEncryptionIVAndVersion(vault->id, rel_path)) {
-        const auto& [iv_b64, key_version] = *payload;
-        if (!s3Provider_->setObjectEncryptionMetadata(s3Key, iv_b64, key_version))
-            throw std::runtime_error("[CloudStorageEngine] Failed to set encryption metadata for file: " + rel_path.string());
-    }
+    if (!s3Provider_->setObjectEncryptionMetadata(s3Key, f->encryption_iv, f->encrypted_with_key_version))
+        throw std::runtime_error("[CloudStorageEngine] Failed to set encryption metadata for file: " + f->path.string());
 }
 
 void CloudStorageEngine::uploadFileBuffer(const std::shared_ptr<File>& f, const std::vector<uint8_t>& buffer) const {

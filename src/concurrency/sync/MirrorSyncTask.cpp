@@ -1,8 +1,8 @@
 #include "concurrency/sync/MirrorSyncTask.hpp"
-#include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
+#include "storage/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/RSync.hpp"
@@ -14,6 +14,9 @@ using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
+
+MirrorSyncTask::MirrorSyncTask(const std::shared_ptr<StorageEngine>& engine)
+    : SyncTask(engine) {}
 
 void MirrorSyncTask::sync() {
     const auto sync = std::static_pointer_cast<RSync>(engine_->sync);

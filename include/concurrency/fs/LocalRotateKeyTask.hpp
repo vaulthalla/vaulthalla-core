@@ -1,55 +1,31 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
-#include "storage/StorageEngine.hpp"
-#include "types/File.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "util/files.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
 
 #include <memory>
-#include <filesystem>
+#include <vector>
 
-using namespace vh::types;
-using namespace vh::database;
-using namespace vh::util;
+namespace vh::storage {
+    class StorageEngine;
+}
+
+namespace vh::types {
+    struct File;
+}
 
 namespace vh::concurrency {
 
 struct LocalRotateKeyTask final : PromisedTask {
 
     std::shared_ptr<storage::StorageEngine> engine;
-    std::vector<std::shared_ptr<File> > files;
+    std::vector<std::shared_ptr<types::File>> files;
     unsigned int begin, end;
 
     LocalRotateKeyTask(std::shared_ptr<storage::StorageEngine> eng,
-                       const std::vector<std::shared_ptr<File>>& f,
-                       const unsigned int begin, const unsigned int end)
-        : engine(std::move(eng)), files(f), begin(begin), end(end) {
-        if (begin >= end || end > files.size())
-            throw std::invalid_argument("Invalid range for LocalRotateKeyTask");
-    }
+                       const std::vector<std::shared_ptr<types::File>>& f,
+                       unsigned int begin, unsigned int end);
 
-    void operator()() override {
-        try {
-            for (unsigned int i = begin; i <= end; ++i) {
-                const auto& file = files[i];
-                if (!file || !file->vault_id) continue;
-
-                const auto encryptedBuffer = readFileToVector(file->backing_path);
-                const auto [ciphertext, keyVersion] = engine->encryptionManager->rotateDecryptEncrypt(encryptedBuffer, file->encryption_iv, file->encrypted_with_key_version);
-                if (ciphertext.empty()) throw std::runtime_error("Failed to rotate key for file: " + file->backing_path.string());
-                writeFile(file->backing_path, ciphertext);
-
-                // encryption iv is already updated in the encrypt method
-                file->encrypted_with_key_version = keyVersion;
-                FileQueries::setEncryptionIVAndVersion(file);
-            }
-            promise.set_value(true);
-        } catch (const std::exception& e) {
-            promise.set_value(false);
-        }
-    }
+    void operator()() override;
 };
 
 }

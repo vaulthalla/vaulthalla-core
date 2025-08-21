@@ -36,7 +36,7 @@ public:
 
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
 
-    void uploadFile(const std::filesystem::path& rel_path) const;
+    void uploadFile(const std::shared_ptr<types::File>& f) const;
 
     void uploadFileBuffer(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& buffer) const;
 

@@ -2,6 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/usage/SystemUsage.hpp"
 #include "protocols/shell/usage/ShellUsage.hpp"
+#include "util/shellArgsHelpers.hpp"
 
 #include <version.h>
 

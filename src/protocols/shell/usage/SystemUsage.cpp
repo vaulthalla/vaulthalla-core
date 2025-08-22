@@ -13,7 +13,7 @@ CommandBook SystemUsage::all() {
 }
 
 CommandUsage SystemUsage::help() {
-    CommandUsage cmd = buildBaseUsage_();
+    CommandUsage cmd;
     cmd.ns = "help";
     cmd.ns_aliases = {"h", "?", "--help", "-h"};
     cmd.description = "Explicitly show help about a command or namespace (optional).";
@@ -29,17 +29,10 @@ CommandUsage SystemUsage::help() {
 }
 
 CommandUsage SystemUsage::version() {
-    CommandUsage cmd = buildBaseUsage_();
+    CommandUsage cmd;
     cmd.ns = "version";
-    cmd.ns_aliases = {"v, -v, --version"};
+    cmd.ns_aliases = {"-v", "--v", "--version"};
     cmd.description = "Show version information about Vaulthalla.";
     cmd.examples.push_back({"vh version", "Show the current version of Vaulthalla."});
-    return cmd;
-}
-
-CommandUsage SystemUsage::buildBaseUsage_() {
-    CommandUsage cmd;
-    cmd.ns = "system";
-    cmd.ns_aliases = {"sys"};
     return cmd;
 }

@@ -12,11 +12,25 @@ struct Entry {
     std::string label;
     std::string desc;
     std::vector<std::string> aliases;
+
+    // Constructors to support brace-initialization with or without aliases
+    Entry(std::string l, std::string d)
+        : label(std::move(l)), desc(std::move(d)), aliases{} {}
+
+    Entry(std::string l, std::string d, std::vector<std::string> a)
+        : label(std::move(l)), desc(std::move(d)), aliases(std::move(a)) {}
+
+    Entry() = default;
 };
 
 struct GroupedOptions {
     std::string title;
     std::vector<Entry> items;
+
+    GroupedOptions(std::string t, std::vector<Entry> i)
+        : title(std::move(t)), items(std::move(i)) {}
+
+    GroupedOptions() = default;
 };
 
 struct Example {

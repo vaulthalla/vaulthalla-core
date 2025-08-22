@@ -12,32 +12,26 @@ CommandBook SystemUsage::all() {
     return book;
 }
 
-CommandUsage SystemUsage::system() {
-    auto cmd = buildBaseUsage_();
-    cmd.description = "General system commands.";
-    cmd.positionals = {{"<subcommand>", "Subcommand to execute (help, version)"}};
-    cmd.examples.push_back({"vh help", "Show general help information."});
-    cmd.examples.push_back({"vh version", "Show the current version of Vaulthalla."});
-    return cmd;
-}
-
 CommandUsage SystemUsage::help() {
     CommandUsage cmd = buildBaseUsage_();
-    cmd.command = "help";
-    cmd.command_aliases = {"h", "?", "--help", "-h"};
-    cmd.description = "Show help information about commands.";
+    cmd.ns = "help";
+    cmd.ns_aliases = {"h", "?", "--help", "-h"};
+    cmd.description = "Explicitly show help about a command or namespace (optional).";
     cmd.optional = {
         {"<command>", "Optional command name to get detailed help"}
     };
-    cmd.examples.push_back({"vh help", "Show general help information."});
-    cmd.examples.push_back({"vh help api-keys", "Show detailed help for the 'api-keys' command."});
+    cmd.examples = {
+        {"vh help", "Show general help information."},
+        {"vh help api-keys", "Show detailed help for the 'api-keys' command."},
+        {"vh vault", "Call a command namespace with no args to show its help."}
+    };
     return cmd;
 }
 
 CommandUsage SystemUsage::version() {
     CommandUsage cmd = buildBaseUsage_();
-    cmd.command = "version";
-    cmd.command_aliases = {"v", "--version", "-v"};
+    cmd.ns = "version";
+    cmd.ns_aliases = {"v, -v, --version"};
     cmd.description = "Show version information about Vaulthalla.";
     cmd.examples.push_back({"vh version", "Show the current version of Vaulthalla."});
     return cmd;

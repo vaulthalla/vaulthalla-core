@@ -232,7 +232,7 @@ static CommandResult handle_group_list_users(const CommandCall& call) {
 }
 
 static CommandResult handle_group(const CommandCall& call) {
-    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::all().toText());
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::all().str());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;

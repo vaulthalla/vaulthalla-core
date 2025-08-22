@@ -55,7 +55,7 @@ std::vector<std::string> wrap(const std::string& s, int width) {
         if (break_pos < n && s[break_pos] == ' ') i = break_pos + 1;
         else i = break_pos;
     }
-    if (out.empty()) out.push_back("");
+    if (out.empty()) out.emplace_back("");
     return out;
 }
 
@@ -163,7 +163,7 @@ void emitMarkdownTable(std::ostringstream& md, const std::vector<Entry>& items, 
 }
 
 std::string shortOr(const std::string& s, const std::string& fallback) {
-    for (char c : s) if (!std::isspace(static_cast<unsigned char>(c))) return s;
+    for (const char c : s) if (!std::isspace(static_cast<unsigned char>(c))) return s;
     return fallback;
 }
 
@@ -240,62 +240,16 @@ std::string CommandUsage::buildSynopsis_() const {
 
 std::string CommandUsage::str() const {
     const int tw = term_width > 40 ? term_width : 100;
-    const std::size_t indent = 2;
-    const std::size_t gap = 2;
+    constexpr std::size_t indent = 2;
+    constexpr std::size_t gap = 2;
 
     std::ostringstream out;
 
-    // Header line: "<ns> <command> - desc"
-    {
-        std::ostringstream head;
-        head << ns;
-        if (!command.empty()) head << " " << command;
-        out << theme.C() << head.str() << theme.R();
-        if (!description.empty()) out << " - " << shortOr(description, "");
-        out << "\n";
-
-        // Alias lines
-        if (show_aliases && !ns_aliases.empty()) {
-            out << theme.D() << "Namespace aliases: ";
-            for (std::size_t i = 0; i < ns_aliases.size(); ++i) {
-                if (i) out << ", ";
-                out << ns_aliases[i];
-            }
-            out << theme.R() << "\n";
-        }
-        if (show_aliases && !command_aliases.empty()) {
-            out << theme.D() << "Command aliases: ";
-            for (std::size_t i = 0; i < command_aliases.size(); ++i) {
-                if (i) out << ", ";
-                out << command_aliases[i];
-            }
-            out << theme.R() << "\n";
-        }
-    }
-
-    // Synopsis
-    out << theme.H() << "Usage:" << theme.R() << "\n";
-    {
-        const auto syn = buildSynopsis_();
-        emitWrapped(out, syn, indent, tw);
-        out << "\n";
-    }
-
-    // Description (full)
-    if (!description.empty()) {
-        out << theme.H() << "Description:" << theme.R() << "\n";
-        emitWrapped(out, description, indent, tw);
-        out << "\n";
-    }
-
-    // Sections
     emitTwoColSection(out, "Required:", required, indent, gap, tw, max_key_col, theme, show_aliases);
     emitTwoColSection(out, "Optional:", optional, indent, gap, tw, max_key_col, theme, show_aliases);
-    for (const auto& g : groups) {
+    for (const auto& g : groups)
         emitTwoColSection(out, g.title + ":", g.items, indent, gap, tw, max_key_col, theme, show_aliases);
-    }
 
-    // Examples
     if (!examples.empty()) {
         out << theme.H() << "Examples:" << theme.R() << "\n";
         for (const auto& ex : examples) {
@@ -303,6 +257,41 @@ std::string CommandUsage::str() const {
             if (!ex.note.empty()) emitWrapped(out, ex.note, indent + 2, tw);
             out << "\n";
         }
+    }
+
+    return basicStr(true) + out.str();
+}
+
+std::string CommandUsage::basicStr(const bool splitHeader) const {
+    const int tw = term_width > 40 ? term_width : 100;
+
+    std::ostringstream out;
+
+    {
+        std::ostringstream head;
+
+        if (!show_aliases || ns_aliases.empty()) head << ns;
+        else head << "[" << joinAliasesInline_(ns, ns_aliases, " | ") << "]";
+
+        if (!command.empty()) {
+            head << " ";
+            if (!show_aliases || command_aliases.empty()) head << command;
+            else head << "[" << joinAliasesInline_(command, command_aliases, " | ") << "]";
+        }
+
+        out << theme.C() << head.str() << theme.R();
+        if (!description.empty()) out << " - " << shortOr(description, "");
+        out << "\n";
+    }
+
+    if (splitHeader) out << "\n";
+    out << theme.H() << "Usage:" << theme.R();
+    {
+        const auto syn = buildSynopsis_();
+        const bool needsSpace = syn.contains("\n");
+        if (needsSpace) out << "\n";
+        emitWrapped(out, syn, needsSpace ? 2 : 1, tw);
+        out << "\n";
     }
 
     return out.str();
@@ -378,7 +367,7 @@ std::string CommandUsage::markdown() const {
 
 // ---------- CommandBook impl ----------
 
-std::string CommandBook::toText() const {
+std::string CommandBook::str() const {
     std::ostringstream out;
     if (!title.empty()) out << title << "\n\n";
     for (std::size_t i = 0; i < commands.size(); ++i) {
@@ -390,7 +379,14 @@ std::string CommandBook::toText() const {
     return out.str();
 }
 
-std::string CommandBook::toMarkdown() const {
+std::string CommandBook::basicStr() const {
+    std::ostringstream out;
+    if (!title.empty()) out << title << "\n\n";
+    for (const auto & c : commands) out << c.basicStr();
+    return out.str();
+}
+
+std::string CommandBook::markdown() const {
     std::ostringstream md;
     if (!title.empty()) md << "# " << title << "\n\n";
     for (auto c : commands) {

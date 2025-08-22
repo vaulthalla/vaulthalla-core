@@ -946,7 +946,7 @@ static CommandResult handle_sync(const CommandCall& call) {
 // ################################################################################
 
 static CommandResult handle_vault(const CommandCall& call) {
-    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::all().toText());
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::all().str());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -960,7 +960,7 @@ static CommandResult handle_vault(const CommandCall& call) {
     if (sub == "role" || sub == "r") return handle_vault_role(subcall);
     if (sub == "keys") return handle_vault_keys(subcall);
 
-    return ok(VaultUsage::all().toText());
+    return ok(VaultUsage::all().str());
 }
 
 static CommandResult handle_vaults(const CommandCall& call) {

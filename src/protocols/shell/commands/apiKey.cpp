@@ -83,7 +83,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         key->user_id = call.user->id;
         key->name = *nameOpt;
         key->access_key = *accessKeyOpt;
-        key->secret_access_key = *secretOpt; // This will be encrypted later
+        key->secret_access_key = *secretOpt;
         key->region = *regionOpt;
         key->endpoint = *endpointOpt;
         key->provider = s3_provider_from_shell_input(*providerOpt);
@@ -137,7 +137,7 @@ static CommandResult handleAPIKeyInfo(const CommandCall& call) {
 }
 
 static CommandResult handle_key(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(APIKeyUsage::all().toText());
+    if (call.positionals.empty()) return ok(APIKeyUsage::all().str());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -147,7 +147,7 @@ static CommandResult handle_key(const CommandCall& call) {
     if (sub == "delete" || sub == "rm") return handleDeleteAPIKey(subcall);
     if (sub == "info" || sub == "get") return handleAPIKeyInfo(subcall);
     if (sub == "list") return handleListAPIKeys(subcall);
-    return ok(APIKeyUsage::all().toText());
+    return ok(APIKeyUsage::all().str());
 }
 
 static CommandResult handle_keys(const CommandCall& call) {

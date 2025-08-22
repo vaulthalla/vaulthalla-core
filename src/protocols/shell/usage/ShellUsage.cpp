@@ -4,6 +4,8 @@
 #include "protocols/shell/usage/GroupUsage.hpp"
 #include "protocols/shell/usage/RoleUsage.hpp"
 #include "protocols/shell/usage/VaultUsage.hpp"
+#include "protocols/shell/usage/APIKeyUsage.hpp"
+#include "protocols/shell/usage/PermissionUsage.hpp"
 
 using namespace vh::shell;
 
@@ -15,5 +17,7 @@ CommandBook ShellUsage::all() {
     book << GroupUsage::all();
     book << RoleUsage::all();
     book << VaultUsage::all();
+    book << APIKeyUsage::all();
+    book << PermissionUsage::all();
     return book;
 }

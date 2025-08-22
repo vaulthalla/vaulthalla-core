@@ -22,9 +22,11 @@ CommandUsage UserUsage::users_list() {
     cmd.ns_aliases = {"user", "u"};
     cmd.command = "[list]";
     cmd.description = "List all users in the system.";
-    cmd.examples.push_back({"vh users", "List all users."});
-    cmd.examples.push_back({"vh user list", "List all users (using alias)."});
-    cmd.examples.push_back({"vh u list", "List all users (using shortest alias)."});
+    cmd.examples = {
+        {"vh users", "List all users in the system."},
+        {"vh user", "List all users in the system (using alias)."},
+        {"vh u", "List all users in the system (using shortest alias)."}
+    };
     return cmd;
 }
 
@@ -32,12 +34,14 @@ CommandUsage UserUsage::user() {
     auto cmd = buildBaseUsage_();
     cmd.description = "Manage a single user.";
     cmd.positionals = {{"<subcommand>", "Subcommand to execute (create, delete, info, update)"}};
-    cmd.examples.push_back({"vh user create --name alice --role admin --email test123@gmail.com --linux-uid 1001",
-                           "Create a new user named 'alice' with admin role, email, and Linux UID."});
-    cmd.examples.push_back({"vh user delete alice", "Delete the user named 'alice'."});
-    cmd.examples.push_back({"vh user info alice", "Get information about the user named 'alice'."});
-    cmd.examples.push_back({"vh user update alice --email alice123@gmail --role user",
-                           "Update user 'alice' with a new email and role."});
+    cmd.examples = {
+        {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
+         "Create a new user named 'alice' with admin role, email, and Linux UID."},
+        {"vh user delete alice", "Delete the user named 'alice'."},
+        {"vh user info alice", "Get information about the user named 'alice'."},
+        {"vh user update alice --email alice123@icann.org --role user",
+         "Update user 'alice' with a new email and role."}
+    };
     return cmd;
 }
 
@@ -54,10 +58,13 @@ CommandUsage UserUsage::user_create() {
         {"--email <email>", "Email address of the new user"},
         {"--linux-uid <uid>", "Linux UID for system integration"}
     };
-    cmd.examples.push_back({"vh user create --name alice --role admin --email test123@gmail.com --linux-uid 1001",
-                           "Create a new user named 'alice' with admin role, email, and Linux UID."});
-    cmd.examples.push_back({"vh user new --name bob --role 2", "Create a new user named 'bob' with role ID 2."});
-    cmd.examples.push_back({"vh u mk --name charlie --role user", "Create a new user named 'charlie' with 'user' role (using shortest alias)."});
+    cmd.examples = {
+        {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
+         "Create a new user named 'alice' with admin role, email, and Linux UID."},
+        {"vh user new --name bob --role user --email bon@icann.org --linux-uid 1002",
+         "Create a new user named 'bob' with user role, email, and Linux UID (using alias)."},
+        {"vh u mk --name charlie --role 2", "Create a new user named 'charlie' with role ID 2 (using shortest alias)."}
+    };
     return cmd;
 }
 
@@ -67,9 +74,11 @@ CommandUsage UserUsage::user_delete() {
     cmd.command_aliases = {"remove", "del", "rm"};
     cmd.description = "Delete an existing user by username.";
     cmd.positionals = {{"<name>", "Username of the user to delete"}};
-    cmd.examples.push_back({"vh user delete alice", "Delete the user named 'alice'."});
-    cmd.examples.push_back({"vh user rm bob", "Delete the user named 'bob' (using alias)."});
-    cmd.examples.push_back({"vh u del charlie", "Delete the user named 'charlie' (using shortest alias)."});
+    cmd.examples = {
+        {"vh user delete alice", "Delete the user named 'alice'."},
+        {"vh user remove bob", "Delete the user named 'bob' (using alias)."},
+        {"vh u rm charlie", "Delete the user named 'charlie' (using shortest alias)."}
+    };
     return cmd;
 }
 
@@ -79,9 +88,11 @@ CommandUsage UserUsage::user_info() {
     cmd.command_aliases = {"get", "show"};
     cmd.description = "Get information about a specific user by username.";
     cmd.positionals = {{"<name>", "Username of the user to retrieve"}};
-    cmd.examples.push_back({"vh user info alice", "Get information about the user named 'alice'."});
-    cmd.examples.push_back({"vh user get bob", "Get information about the user named 'bob' (using alias)."});
-    cmd.examples.push_back({"vh u show charlie", "Get information about the user named 'charlie' (using shortest alias)."});
+    cmd.examples = {
+        {"vh user info alice", "Get information about the user named 'alice'."},
+        {"vh user get bob", "Get information about the user named 'bob' (using alias)."},
+        {"vh u show charlie", "Get information about the user named 'charlie' (using shortest alias)."}
+    };
     return cmd;
 }
 
@@ -97,11 +108,14 @@ CommandUsage UserUsage::user_update() {
         {"--role <role>", "New role name or ID"},
         {"--linux-uid <uid>", "New Linux UID"}
     };
-    cmd.examples.push_back({"vh user update alice --email alice123@gmail.com --role user",
-                           "Update user 'alice' with a new email and role."});
-    cmd.examples.push_back({"vh user set bob --name robert --linux-uid 2002",
-                           "Update user 'bob' to 'robert' with a new Linux UID (using alias)."});
-    cmd.examples.push_back({"vh u edit charlie --role 3", "Update user 'charlie' to role ID 3 (using shortest alias)."});
+    cmd.examples = {
+        {"vh user update alice --email alice123@icann.org --role user",
+         "Update user 'alice' with a new email and role."},
+        {"vh user set bob --name robert --linux-uid 2002",
+         "Change username of 'bob' to 'robert' and update Linux UID (using alias)."},
+        {"vh u edit charlie --email charlie@limewire.net --role 3",
+         "Update user 'charlie' with a new email and role ID (using shortest alias)."}
+    };
     return cmd;
 }
 

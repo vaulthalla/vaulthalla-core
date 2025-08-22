@@ -45,10 +45,18 @@ std::string PermissionUsage::usage_vault_permissions() {
     return os.str();
 }
 
+CommandBook PermissionUsage::all() {
+    CommandBook book;
+    book.title = "Vaulthalla Permission Commands";
+    book.commands = {permissions()};
+    return book;
+}
+
+
 CommandUsage PermissionUsage::permissions() {
     CommandUsage cmd;
     cmd.ns = "permissions";
-    cmd.ns_aliases = {"perms", "perm", "permission-flags", "role-flags", "permission"};
+    cmd.ns_aliases = {"permission", "p"};
     cmd.optional = {{"<type>", "Type of permissions to display: 'user'/'u' or 'vault'/'v' (default: both)"}};
     cmd.description = "Display available permission flags for user and vault roles.";
     cmd.examples.push_back({"vh permissions", "Show all available permission flags."});

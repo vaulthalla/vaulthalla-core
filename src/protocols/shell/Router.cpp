@@ -51,7 +51,10 @@ CommandResult Router::execute(const CommandCall& call) const {
     const auto canonical = canonicalFor(call.name);
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
     if (!commands_.contains(canonical))
-        return {2, ShellUsage::all().filterTopLevelOnly().toText(), fmt::format("Unknown command or alias: {}", call.name)};
+        return {2,
+            ShellUsage::all().filterTopLevelOnly().basicStr(),
+            fmt::format("Unknown command or alias: {}",
+                call.name)};
     return commands_.at(canonical).handler(call);
 }
 

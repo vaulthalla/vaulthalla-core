@@ -57,6 +57,7 @@ public:
     ColorTheme theme{};
 
     [[nodiscard]] std::string str() const;
+    [[nodiscard]] std::string basicStr(bool splitHeader = false) const;
     [[nodiscard]] std::string markdown() const;
 
 private:
@@ -77,8 +78,9 @@ public:
     std::vector<CommandUsage> commands;
     std::optional<ColorTheme> book_theme;
 
-    [[nodiscard]] std::string toText() const;
-    [[nodiscard]] std::string toMarkdown() const;
+    [[nodiscard]] std::string str() const;
+    [[nodiscard]] std::string basicStr() const;
+    [[nodiscard]] std::string markdown() const;
 
     void operator<<(const CommandBook& other);
 

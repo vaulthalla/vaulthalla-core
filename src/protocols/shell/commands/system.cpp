@@ -8,7 +8,7 @@
 namespace vh::shell {
 
 static CommandResult handle_help(const CommandCall& call) {
-    return ok(ShellUsage::all().filterTopLevelOnly().toText());
+    return ok(ShellUsage::all().filterTopLevelOnly().basicStr());
 }
 
 static CommandResult handle_version(const CommandCall& call) {

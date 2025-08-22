@@ -247,7 +247,7 @@ static CommandResult handle_list_users(const CommandCall& call) {
 }
 
 static CommandResult handle_user(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(UserUsage::all().toText());
+    if (call.positionals.empty()) return ok(UserUsage::all().str());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;

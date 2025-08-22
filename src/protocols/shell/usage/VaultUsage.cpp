@@ -7,6 +7,7 @@ CommandBook VaultUsage::all() {
     CommandBook book;
     book.title = "Vaulthalla Vault Commands";
     book.commands = {
+        vault(),
         vaults_list(),
         vault_create(),
         vault_delete(),
@@ -19,8 +20,22 @@ CommandBook VaultUsage::all() {
     return book;
 }
 
+CommandUsage VaultUsage::vault() {
+    auto cmd = buildBaseUsage_();
+    cmd.description = "Manage a single vault.";
+    cmd.positionals = {{"<subcommand>", "Subcommand to execute (create, delete, info, update, role, keys, sync)"}};
+    cmd.examples.push_back({"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G", "Create a local vault with a 10GB quota."});
+    cmd.examples.push_back({"vh vault delete myvault --owner alice", "Delete the vault named 'myvault' owned by user 'alice'."});
+    cmd.examples.push_back({"vh vault info myvault --owner alice", "Show information for the vault named 'myvault' owned by user 'alice'."});
+    cmd.examples.push_back({"vh vault update myvault --desc \"Updated Description\" --quota 20G", "Update the description and quota of the vault named 'myvault'."});
+    cmd.examples.push_back({"vh vault role add myvault read-only bob", "Add user 'bob' to the 'read-only' role for the vault named 'myvault'."});
+    cmd.examples.push_back({"vh vault keys myvault", "List all API keys associated with the vault named 'myvault'."});
+    cmd.examples.push_back({"vh vault sync info myvault", "Show sync configuration for the vault named 'myvault'."});
+    return cmd;
+}
+
 CommandUsage VaultUsage::vault_create() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "create";
     cmd.command_aliases = {"new", "add", "mk"};
     cmd.description = "Create a new vault. Supports local and S3-backed vaults.";
@@ -51,7 +66,7 @@ CommandUsage VaultUsage::vault_create() {
 }
 
 CommandUsage VaultUsage::vault_delete() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "delete";
     cmd.command_aliases = {"remove", "del", "rm"};
     cmd.description = "Delete an existing vault by ID or name.";
@@ -65,7 +80,7 @@ CommandUsage VaultUsage::vault_delete() {
 }
 
 CommandUsage VaultUsage::vault_info() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "info";
     cmd.command_aliases = {"show", "get"};
     cmd.description = "Display detailed information about a vault.";
@@ -96,7 +111,7 @@ CommandUsage VaultUsage::vaults_list() {
 }
 
 CommandUsage VaultUsage::vault_update() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "update";
     cmd.command_aliases = {"set", "modify", "edit"};
     cmd.description = "Update properties of an existing vault.";
@@ -118,7 +133,7 @@ CommandUsage VaultUsage::vault_update() {
 }
 
 CommandUsage VaultUsage::vault_role() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "role";
     cmd.command_aliases = {"r"};
     cmd.description = "Manage vault roles and permissions.";
@@ -142,7 +157,7 @@ CommandUsage VaultUsage::vault_role() {
 }
 
 CommandUsage VaultUsage::vault_keys() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "keys";
     cmd.command_aliases = {"k"};
     cmd.description = "Manage API keys for accessing S3-backed vaults.";
@@ -154,7 +169,7 @@ CommandUsage VaultUsage::vault_keys() {
 }
 
 CommandUsage VaultUsage::vault_sync() {
-    auto cmd = buildVaultBaseUsage_();
+    auto cmd = buildBaseUsage_();
     cmd.command = "sync";
     cmd.command_aliases = {"s"};
     cmd.description = "Manage vault synchronization settings and operations.";
@@ -165,7 +180,7 @@ CommandUsage VaultUsage::vault_sync() {
     return cmd;
 }
 
-CommandUsage VaultUsage::buildVaultBaseUsage_() {
+CommandUsage VaultUsage::buildBaseUsage_() {
     CommandUsage cmd;
     cmd.ns = "vault";
     cmd.ns_aliases = {"v"};

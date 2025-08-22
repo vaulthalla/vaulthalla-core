@@ -37,7 +37,7 @@ std::vector<std::string> wrap(const std::string& s, int width) {
 
         if (i >= n) break;
 
-        std::size_t end = std::min<std::size_t>(i + W, n);
+        const std::size_t end = std::min<std::size_t>(i + W, n);
         std::size_t break_pos = end;
 
         // prefer last space before end
@@ -238,7 +238,7 @@ std::string CommandUsage::buildSynopsis_() const {
 
 // ---------- CommandUsage impl ----------
 
-std::string CommandUsage::toText() const {
+std::string CommandUsage::str() const {
     const int tw = term_width > 40 ? term_width : 100;
     const std::size_t indent = 2;
     const std::size_t gap = 2;
@@ -308,7 +308,7 @@ std::string CommandUsage::toText() const {
     return out.str();
 }
 
-std::string CommandUsage::toMarkdown() const {
+std::string CommandUsage::markdown() const {
     std::ostringstream md;
 
     // Title
@@ -384,7 +384,7 @@ std::string CommandBook::toText() const {
     for (std::size_t i = 0; i < commands.size(); ++i) {
         CommandUsage c = commands[i];
         if (book_theme) c.theme = *book_theme;
-        out << c.toText();
+        out << c.str();
         if (i + 1 < commands.size()) out << "\n";
     }
     return out.str();
@@ -395,9 +395,57 @@ std::string CommandBook::toMarkdown() const {
     if (!title.empty()) md << "# " << title << "\n\n";
     for (auto c : commands) {
         if (book_theme) c.theme = *book_theme;
-        md << c.toMarkdown() << "\n";
+        md << c.markdown() << "\n";
     }
     return md.str();
+}
+
+void CommandBook::operator<<(const CommandBook& other) {
+    std::unordered_set<std::string> existing;
+    for (const auto& cmd : commands) {
+        const auto key = cmd.command.empty() ? cmd.ns + "_" + "__default" : cmd.ns + "_" + cmd.command;
+        existing.insert(key);
+    }
+
+    for (const auto& cmd : other.commands) {
+        const auto key = cmd.command.empty() ? cmd.ns + "_" + "__default" : cmd.ns + "_" + cmd.command;
+        if (!existing.contains(key)) {
+            commands.push_back(cmd);
+            existing.insert(key);
+        }
+    }
+}
+
+std::unordered_map<std::string, CommandBook> CommandBook::splitByNamespace() const {
+    std::unordered_map<std::string, CommandBook> books;
+    for (const auto& cmd : commands) {
+        if (!books.contains(cmd.ns)) {
+            CommandBook book;
+            book.title = cmd.ns + " Commands";
+            if (book_theme) book.book_theme = *book_theme;
+            books[cmd.ns] = book;
+        }
+        books[cmd.ns].commands.push_back(cmd);
+    }
+    return books;
+}
+
+CommandBook CommandBook::filterByNamespace(const std::string& ns) const {
+    CommandBook book;
+    book.title = ns + " Commands";
+    if (book_theme) book.book_theme = *book_theme;
+    for (const auto& cmd : commands) {
+        if (cmd.ns == ns) book.commands.push_back(cmd);
+    }
+    return book;
+}
+
+CommandBook CommandBook::filterTopLevelOnly() const {
+    CommandBook book;
+    book.title = "Top-Level Commands";
+    if (book_theme) book.book_theme = *book_theme;
+    for (const auto& cmd : commands) if (cmd.command.empty()) book.commands.push_back(cmd);
+    return book;
 }
 
 }

@@ -769,7 +769,7 @@ static CommandResult handle_vault_keys(const CommandCall& call) {
 // ################################################################################
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
-    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().toText());
+    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto vaultArg = call.positionals[0];
     std::shared_ptr<Vault> vault;
@@ -836,8 +836,8 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
 }
 
 static CommandResult handle_vault_sync_update(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().toText(), ""};
-    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VaultUsage::vault_sync().toText());
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto engine = extractEngineFromArgs(call, call.positionals[0]);
 
@@ -903,8 +903,8 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_sync_info(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().toText(), ""};
-    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VaultUsage::vault_sync().toText());
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     try {
         const auto engine = extractEngineFromArgs(call, call.positionals[0]);
@@ -923,8 +923,8 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
 }
 
 static CommandResult handle_sync(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().toText(), ""};
-    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().toText());
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto arg = call.positionals[0];
 
@@ -937,7 +937,7 @@ static CommandResult handle_sync(const CommandCall& call) {
 
     if (call.positionals.size() == 1) return handle_vault_sync(call);
 
-    return ok("Unrecognized command: " + arg + "\n" + VaultUsage::vault_sync().toText());
+    return ok("Unrecognized command: " + arg + "\n" + VaultUsage::vault_sync().str());
 }
 
 
@@ -945,30 +945,30 @@ static CommandResult handle_sync(const CommandCall& call) {
 // ######################### 📦 Vault Command Registration ########################
 // ################################################################################
 
+static CommandResult handle_vault(const CommandCall& call) {
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::all().toText());
+
+    const std::string_view sub = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (sub == "sync") return handle_sync(subcall);
+    if (sub == "create" || sub == "new") return handle_vault_create(subcall);
+    if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
+    if (sub == "info" || sub == "get") return handle_vault_info(subcall);
+    if (sub == "update" || sub == "set") return handle_vault_update(subcall);
+    if (sub == "role" || sub == "r") return handle_vault_role(subcall);
+    if (sub == "keys") return handle_vault_keys(subcall);
+
+    return ok(VaultUsage::all().toText());
+}
+
+static CommandResult handle_vaults(const CommandCall& call) {
+    if (hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::vaults_list().str());
+    return handle_vaults_list(call);
+}
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
-    const auto vaultHandler = [](const CommandCall& call) -> CommandResult {
-        if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::all().toText());
-
-        const std::string_view sub = call.positionals[0];
-        CommandCall subcall = call;
-        subcall.positionals.erase(subcall.positionals.begin());
-
-        if (sub == "sync") return handle_sync(subcall);
-        if (sub == "create" || sub == "new") return handle_vault_create(subcall);
-        if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
-        if (sub == "info" || sub == "get") return handle_vault_info(subcall);
-        if (sub == "update" || sub == "set") return handle_vault_update(subcall);
-        if (sub == "role" || sub == "r") return handle_vault_role(subcall);
-        if (sub == "keys") return handle_vault_keys(subcall);
-
-        return ok(VaultUsage::all().toText());
-    };
-
-    const auto vaultsHandler = [](const CommandCall& call) -> CommandResult {
-        if (hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::vaults_list().toText());
-        return handle_vaults_list(call);
-    };
-
-    r->registerCommand("vault", "Manage a single vault", vaultHandler, {"v"});
-    r->registerCommand("vaults", "List vaults", vaultsHandler, {"ls"});
+    r->registerCommand(VaultUsage::vault(), handle_vault);
+    r->registerCommand(VaultUsage::vaults_list(), handle_vaults);
 }

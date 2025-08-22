@@ -9,6 +9,7 @@ public:
     [[nodiscard]] static CommandBook all();
 
     [[nodiscard]] static CommandUsage vaults_list();
+    [[nodiscard]] static CommandUsage vault();
     [[nodiscard]] static CommandUsage vault_create();
     [[nodiscard]] static CommandUsage vault_delete();
     [[nodiscard]] static CommandUsage vault_info();
@@ -18,7 +19,7 @@ public:
     [[nodiscard]] static CommandUsage vault_sync();
 
 private:
-    [[nodiscard]] static CommandUsage buildVaultBaseUsage_();
+    [[nodiscard]] static CommandUsage buildBaseUsage_();
 };
 
 }

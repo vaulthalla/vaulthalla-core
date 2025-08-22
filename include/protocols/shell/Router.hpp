@@ -4,7 +4,6 @@
 
 #include <functional>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -17,19 +16,15 @@ namespace vh::types {
 
 namespace vh::shell {
 
+class CommandUsage;
+
 class Router {
 public:
-    // Views in, storage owns copies
-    void registerCommand(const std::string& name,
-                         const std::string& desc,
-                         CommandHandler handler,
-                         std::initializer_list<std::string> aliases = {});
+    void registerCommand(const CommandUsage& usage, CommandHandler handler);
     CommandResult execute(const CommandCall& call) const;
 
     // Accept a view; we'll copy only once if needed
     CommandResult executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const;
-
-    std::string listCommands() const;
 
 private:
     std::unordered_map<std::string, CommandInfo> commands_;

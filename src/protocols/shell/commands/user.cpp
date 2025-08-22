@@ -5,10 +5,10 @@
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
-#include "storage/StorageEngine.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "services/LogRegistry.hpp"
 #include "types/UserRole.hpp"
+#include "protocols/shell/usage/UserUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -17,17 +17,6 @@ using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
 
-static CommandResult usage_user_root() {
-    return {
-        0,
-        "Usage:\n"
-        "  user [create | new] --name <name> --role <role> [--email <email>] [--linux-uid <uid>]\n"
-        "  user [delete | rm] <name>\n"
-        "  user [info | get] <name> \n"
-        "  user [update | set] <name> [--name <name>] [--email <email>] [--role <role>] [--linux-uid <uid>]\n",
-        ""
-    };
-}
 
 static CommandResult createUser(const CommandCall& subcall) {
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
@@ -252,30 +241,27 @@ static CommandResult handleUpdateUser(const CommandCall& subcall) {
     return ok("User updated successfully: " + user->name + "\n" + to_string(user));
 }
 
+static CommandResult handle_list_users(const CommandCall& call) {
+    if (!call.user->canManageUsers()) return invalid("You do not have permission to list users.");
+    return ok(to_string(UserQueries::listUsers()));
+}
+
+static CommandResult handle_user(const CommandCall& call) {
+    if (call.positionals.empty()) return ok(UserUsage::all().toText());
+
+    const std::string_view sub = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (sub == "create" || sub == "new") return createUser(subcall);
+    if (sub == "delete" || sub == "rm") return deleteUser(subcall);
+    if (sub == "info" || sub == "get") return handleUserInfo(subcall);
+    if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
+
+    return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
+}
+
 void vh::shell::registerUserCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("users", "List users",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (!call.user) return invalid("You must be logged in to list users.");
-
-                           if (!call.user->isAdmin() || !call.user->canManageUsers())
-                               return invalid("You do not have permission to list users.");
-
-                           return ok(to_string(UserQueries::listUsers()));
-                       }, {});
-
-    r->registerCommand("user", "Manage a single user",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (call.positionals.empty()) return usage_user_root();
-
-                           const std::string_view sub = call.positionals[0];
-                           CommandCall subcall = call;
-                           subcall.positionals.erase(subcall.positionals.begin());
-
-                           if (sub == "create" || sub == "new") return createUser(subcall);
-                           if (sub == "delete" || sub == "rm") return deleteUser(subcall);
-                           if (sub == "info" || sub == "get") return handleUserInfo(subcall);
-                           if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
-
-                           return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
-                       }, {"u"});
+    r->registerCommand(UserUsage::users_list(), handle_list_users);
+    r->registerCommand(UserUsage::user(), handle_user);
 }

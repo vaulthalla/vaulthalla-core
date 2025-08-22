@@ -8,6 +8,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
+#include "database/Queries/VaultKeyQueries.hpp"
 
 #include "services/LogRegistry.hpp"
 #include "services/SyncController.hpp"
@@ -29,14 +30,13 @@
 
 #include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
+#include "protocols/shell/usage/VaultUsage.hpp"
 
 #include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include "database/Queries/VaultKeyQueries.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -47,83 +47,6 @@ using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
-
-
-// ################################################################################
-// ########################## 🧱 Vault Commands Usage #############################
-// ################################################################################
-
-static const std::string VAULT_SYNC_USAGE = "  === Vault Sync Commands ===\n"
-    "    vault sync <id | name> [--owner <id | name>] [--now]\n"
-    "    vault sync <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] [--now]\n"
-    "    vault sync <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
-    "[--on-sync-conflict <keep-local | keep-remote | ask>] [--now]\n"
-    "    vault sync info <name>\n"
-    "    vault sync set <id | name> [--local] [--on-sync-conflict <overwrite | keep_both | ask>] "
-    "[--interval <num<s | m | h | d>>]\n"
-    "    vault sync set <id | name> [--s3] [--sync-strategy <cache | sync | mirror>] "
-    "[--on-sync-conflict <keep-local | keep-remote | ask>] [--interval <num<s | m | h | d>>]\n";
-
-static const std::string ENCRYPTION_SECTION =
-    "  === Encryption Key Management ===\n"
-    "    vault keys export  <vault_id | name | all>  [--recipient <fingerprint>] [--output <file>] [--owner <id | name>]\n"
-    "    vault keys rotate  <vault_id | name | all>  [--owner <id | name>]\n"
-    "    vault keys inspect <vault_id | name>        [--owner <id | name>]\n";
-
-static const std::string GENERAL_USAGE = "Usage:\n"
-    "\n"
-    "  === Vault Creation ===\n"
-    "    vault create <name> --local\n"
-    "        [--on-sync-conflict <overwrite | keep_both | ask>]\n"
-    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-    "        [--owner <id | name>]\n"
-    "\n"
-    "    vault create <name> --s3\n"
-    "        --api-key <name | id> --bucket <name>\n"
-    "        [--sync-strategy <cache | sync | mirror>]\n"
-    "        [--on-sync-conflict <keep_local | keep_remote | ask>]\n"
-    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-    "        [--owner <id | name>]\n"
-    "\n"
-    "  === Vault Update ===\n"
-    "    vault (update | set) <id>\n"
-    "        [--api-key <name | id>] [--bucket <name>]\n"
-    "        [--sync-strategy <cache | sync | mirror>]\n"
-    "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
-    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-    "        [--owner <id | name>]\n"
-    "\n"
-    "    vault (update | set) <name> <owner>\n"
-    "        [--api-key <name | id>] [--bucket <name>]\n"
-    "        [--sync-strategy <cache | sync | mirror>]\n"
-    "        [--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>]\n"
-    "        [--desc <text>] [--quota <size(T | G | M | B)> | unlimited]\n"
-    "        [--owner <id | name>]\n"
-    "\n"
-    "  === Common Commands ===\n"
-    "    vault delete <id>\n"
-    "    vault delete <name> --owner <id | name>\n"
-    "    vault info   <id>\n"
-    "    vault info   <name> [--owner <id | name>]\n"
-    "    vault assign <id> <role_id> --[uid | gid | user | group] <id | name>\n"
-    "    vault assign <name> <role_id> --[uid | gid | user | group] <id | name> --owner <id | name>\n"
-    "\n"
-    "  Use 'vh vault <command> --help' for more information on any subcommand.\n";
-
-static CommandResult usage_vault_root(const bool isSuperAdmin = false) {
-    const auto std_out = GENERAL_USAGE + "\n" + VAULT_SYNC_USAGE;
-    if (isSuperAdmin) return {0, std_out + "\n" + ENCRYPTION_SECTION, ""};
-    return {0, GENERAL_USAGE, ""};
-}
-
-static CommandResult usage_vaults_list() {
-    return {
-        0,
-        "Usage:\n"
-        "  vaults [--local|--s3] [--limit <n>]\n",
-        ""
-    };
-}
 
 
 // ################################################################################
@@ -542,6 +465,64 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
 }
 
 
+static CommandResult handle_vault_role_override(const CommandCall& call) {
+    if (call.positionals.size() < 2) return invalid("vault override: missing <vault_id> and <role_id>");
+    if (call.positionals.size() > 2) return invalid("vault override: too many arguments");
+
+    const auto vaultArg = call.positionals.at(0);
+    const auto vaultIdOpt = parseInt(vaultArg);
+
+    const auto roleArg = call.positionals.at(1);
+    const auto roleIdOpt = parseInt(roleArg);
+
+    std::shared_ptr<Vault> vault;
+
+    if (vaultIdOpt) {
+        if (*vaultIdOpt <= 0) return invalid("vault override: vault ID must be a positive integer");
+        vault = VaultQueries::getVault(*vaultIdOpt);
+    } else {
+        unsigned int ownerId;
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault override: vault does not have a owner");
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault override: --owner must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault override: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault override: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
+        vault = VaultQueries::getVault(vaultArg, ownerId);
+    }
+
+    if (!vault) return invalid("vault override: vault with arg " + vaultArg + " not found");
+
+    if (vault->owner_id != call.user->id) {
+        if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id)) return invalid(
+            "vault override: you do not have permission to override roles for this vault");
+
+        if (!call.user->canManageRoles()) return invalid("vault override: you do not have permission to manage roles");
+    }
+
+    std::shared_ptr<Role> role;
+}
+
+
+static CommandResult handle_vault_role(const CommandCall& call) {
+    if (call.positionals.empty()) return invalid("vault role: missing subcommand");
+    if (call.positionals.size() > 1) return invalid("vault role: too many arguments");
+
+    const auto subcommand = call.positionals[0];
+    auto subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (subcommand == "assign") return handle_vault_role_assign(subcall);
+    if (subcommand == "override") return handle_vault_role_override(subcall);
+    return invalid("vault role: unknown subcommand: " + subcommand);
+}
+
+
 // ################################################################################
 // #################### 🔑 Vault Key Management Commands ########################
 // ################################################################################
@@ -788,7 +769,7 @@ static CommandResult handle_vault_keys(const CommandCall& call) {
 // ################################################################################
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
-    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VAULT_SYNC_USAGE);
+    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto vaultArg = call.positionals[0];
     std::shared_ptr<Vault> vault;
@@ -855,8 +836,8 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
 }
 
 static CommandResult handle_vault_sync_update(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
-    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VAULT_SYNC_USAGE);
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto engine = extractEngineFromArgs(call, call.positionals[0]);
 
@@ -922,8 +903,8 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_sync_info(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
-    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VAULT_SYNC_USAGE);
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     try {
         const auto engine = extractEngineFromArgs(call, call.positionals[0]);
@@ -942,8 +923,8 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
 }
 
 static CommandResult handle_sync(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VAULT_SYNC_USAGE, ""};
-    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VAULT_SYNC_USAGE);
+    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
+    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
 
     const auto arg = call.positionals[0];
 
@@ -956,7 +937,7 @@ static CommandResult handle_sync(const CommandCall& call) {
 
     if (call.positionals.size() == 1) return handle_vault_sync(call);
 
-    return ok("Unrecognized command: " + arg + "\n" + VAULT_SYNC_USAGE);
+    return ok("Unrecognized command: " + arg + "\n" + VaultUsage::vault_sync().str());
 }
 
 
@@ -964,30 +945,30 @@ static CommandResult handle_sync(const CommandCall& call) {
 // ######################### 📦 Vault Command Registration ########################
 // ################################################################################
 
+static CommandResult handle_vault(const CommandCall& call) {
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::all().str());
+
+    const std::string_view sub = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (sub == "sync") return handle_sync(subcall);
+    if (sub == "create" || sub == "new") return handle_vault_create(subcall);
+    if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
+    if (sub == "info" || sub == "get") return handle_vault_info(subcall);
+    if (sub == "update" || sub == "set") return handle_vault_update(subcall);
+    if (sub == "role" || sub == "r") return handle_vault_role(subcall);
+    if (sub == "keys") return handle_vault_keys(subcall);
+
+    return ok(VaultUsage::all().str());
+}
+
+static CommandResult handle_vaults(const CommandCall& call) {
+    if (hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::vaults_list().str());
+    return handle_vaults_list(call);
+}
+
 void vh::shell::registerVaultCommands(const std::shared_ptr<Router>& r) {
-    const auto vaultHandler = [](const CommandCall& call) -> CommandResult {
-        if (call.positionals.empty()) return usage_vault_root(call.user->isSuperAdmin());
-
-        const std::string_view sub = call.positionals[0];
-        CommandCall subcall = call;
-        subcall.positionals.erase(subcall.positionals.begin());
-
-        if (sub == "sync") return handle_sync(subcall);
-        if (sub == "create" || sub == "new") return handle_vault_create(subcall);
-        if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
-        if (sub == "info" || sub == "get") return handle_vault_info(subcall);
-        if (sub == "update" || sub == "set") return handle_vault_update(subcall);
-        if (sub == "assign" || sub == "role") return handle_vault_role_assign(subcall);
-        if (sub == "keys") return handle_vault_keys(subcall);
-
-        return usage_vault_root(call.user->isSuperAdmin());
-    };
-
-    const auto vaultsHandler = [](const CommandCall& call) -> CommandResult {
-        if (hasKey(call, "help") || hasKey(call, "h")) return usage_vaults_list();
-        return handle_vaults_list(call);
-    };
-
-    r->registerCommand("vault", "Manage a single vault", vaultHandler, {"v"});
-    r->registerCommand("vaults", "List vaults", vaultsHandler, {"ls"});
+    r->registerCommand(VaultUsage::vault(), handle_vault);
+    r->registerCommand(VaultUsage::vaults_list(), handle_vaults);
 }

@@ -1,19 +1,24 @@
 #include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
+#include "protocols/shell/usage/SystemUsage.hpp"
+#include "protocols/shell/usage/ShellUsage.hpp"
+#include "util/shellArgsHelpers.hpp"
 
 #include <version.h>
 
 namespace vh::shell {
 
-void registerSystemCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("help", "Show help info",
-        [&r](auto&) -> CommandResult { return {0, r->listCommands(), ""}; },
-        {"-h", "--help", "?"});
+static CommandResult handle_help(const CommandCall& call) {
+    return ok(ShellUsage::all().filterTopLevelOnly().basicStr());
+}
 
-    r->registerCommand("version", "Show version information",
-        [&r](const CommandCall& call) -> CommandResult {
-            return {0, "Vaulthalla v" + std::string(VH_VERSION), ""};
-        }, {"-v", "--version"});
+static CommandResult handle_version(const CommandCall& call) {
+    return {0, "Vaulthalla v" + std::string(VH_VERSION), ""};
+}
+
+void registerSystemCommands(const std::shared_ptr<Router>& r) {
+    r->registerCommand(SystemUsage::help(), handle_help);
+    r->registerCommand(SystemUsage::version(), handle_version);
 }
 
 }

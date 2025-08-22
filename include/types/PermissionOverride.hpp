@@ -12,8 +12,14 @@ namespace pqxx {
 
 namespace vh::types {
 
+enum class OverrideOpt { ALLOW, DENY };
+
+std::string to_string(const OverrideOpt& opt);
+OverrideOpt overrideOptFromString(const std::string& str);
+
 struct PermissionOverride {
     Permission permission;
+    OverrideOpt effect{OverrideOpt::ALLOW};
     bool is_file{false}, enabled{false};
     std::string patternStr;
     std::regex pattern;

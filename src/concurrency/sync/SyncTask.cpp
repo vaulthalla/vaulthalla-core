@@ -8,7 +8,6 @@
 #include "types/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
-#include "services/SyncController.hpp"
 #include "types/File.hpp"
 #include "types/Sync.hpp"
 #include "services/LogRegistry.hpp"
@@ -20,6 +19,7 @@ using namespace vh::types;
 using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::logging;
+using namespace vh::storage;
 
 void SyncTask::operator()() {
     LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);

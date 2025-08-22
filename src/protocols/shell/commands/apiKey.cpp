@@ -6,6 +6,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "storage/cloud/S3Controller.hpp"
+#include "protocols/shell/usage/APIKeyUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -15,36 +16,6 @@ using namespace vh::crypto;
 using namespace vh::types::api;
 using namespace vh::cloud;
 
-static std::vector<std::string> getProviderOptions() {
-    return {
-        "aws", "cloudflare-r2", "wasabi", "backblaze-b2",
-        "digitalocean", "minio", "ceph", "storj", "other"
-    };
-}
-
-static std::string usage_provider() {
-    std::string options = "provider options: [";
-    for (const auto& opt : getProviderOptions()) options += opt + " | ";
-    options.pop_back(); // remove last space
-    options.pop_back(); // remove last '|'
-    options += "]";
-    return options;
-}
-
-static CommandResult usage_api_keys_root() {
-    return {
-        0,
-        "Usage:\n"
-        "  api-keys [create | new] --name <name> --access <accessKey> --secret <secret> --region <region=auto> "
-        "--endpoint <endpoint> --provider <provider>\n"
-        "  api-keys [create | new] -n <name> -a <accessKey> -s <secret> -r <region=auto> -e <endpoint> -p <provider>\n"
-        "    " + usage_provider() + "\n"
-        "  api-keys [delete | rm] <id>\n"
-        "  api-keys [info | get] <id>\n"
-        "  api-keys list [--json]\n",
-        ""
-    };
-}
 
 static S3Provider s3_provider_from_shell_input(const std::string& str) {
     if (str == "aws") return S3Provider::AWS;
@@ -99,7 +70,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         if (!endpointOpt || endpointOpt->empty()) errors.emplace_back("Missing required option: --endpoint");
         if (!providerOpt || providerOpt->empty()) {
             errors.emplace_back("Missing required option: --provider");
-            errors.push_back(usage_provider());
+            errors.push_back(APIKeyUsage::usage_provider());
         }
 
         if (!errors.empty()) {
@@ -112,7 +83,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         key->user_id = call.user->id;
         key->name = *nameOpt;
         key->access_key = *accessKeyOpt;
-        key->secret_access_key = *secretOpt; // This will be encrypted later
+        key->secret_access_key = *secretOpt;
         key->region = *regionOpt;
         key->endpoint = *endpointOpt;
         key->provider = s3_provider_from_shell_input(*providerOpt);
@@ -165,26 +136,25 @@ static CommandResult handleAPIKeyInfo(const CommandCall& call) {
     }
 }
 
+static CommandResult handle_key(const CommandCall& call) {
+    if (call.positionals.empty()) return ok(APIKeyUsage::all().str());
+
+    const std::string_view sub = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (sub == "create" || sub == "new") return handleCreateAPIKey(subcall);
+    if (sub == "delete" || sub == "rm") return handleDeleteAPIKey(subcall);
+    if (sub == "info" || sub == "get") return handleAPIKeyInfo(subcall);
+    if (sub == "list") return handleListAPIKeys(subcall);
+    return ok(APIKeyUsage::all().str());
+}
+
+static CommandResult handle_keys(const CommandCall& call) {
+    return handleListAPIKeys(call);
+}
 
 void vh::shell::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("api-keys", "List API Keys",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (!call.user) return invalid("You must be logged in to list API keys.");
-                           return handleListAPIKeys(call);
-                       }, {});
-
-    r->registerCommand("api-key", "Manage a single API key",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (call.positionals.empty()) return usage_api_keys_root();
-
-                           const std::string_view sub = call.positionals[0];
-                           CommandCall subcall = call;
-                           subcall.positionals.erase(subcall.positionals.begin());
-
-                           if (sub == "create" || sub == "new") return handleCreateAPIKey(subcall);
-                           if (sub == "delete" || sub == "rm") return handleDeleteAPIKey(subcall);
-                           if (sub == "info" || sub == "get") return handleAPIKeyInfo(subcall);
-                           if (sub == "list") return handleListAPIKeys(subcall);
-                           return usage_api_keys_root();
-                       }, {"api", "ak"});
+    r->registerCommand(APIKeyUsage::apikeys_list(), handle_keys);
+    r->registerCommand(APIKeyUsage::apikey(), handle_key);
 }

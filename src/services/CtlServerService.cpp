@@ -4,6 +4,8 @@
 #include "protocols/shell/commands.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "services/LogRegistry.hpp"
+#include "protocols/shell/CommandUsage.hpp"
+#include "protocols/shell/usage/ShellUsage.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>

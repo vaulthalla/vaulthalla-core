@@ -6,63 +6,12 @@
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/UserRole.hpp"
+#include "protocols/shell/usage/PermissionUsage.hpp"
+#include "protocols/shell/usage/RoleUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
-
-static std::string usage_user_permissions() {
-    std::ostringstream os;
-    os << "Permission Flags:\n"
-       << "  --manage-encryption-keys   | --set-manage-encryption-keys  | --unset-manage-encryption-keys\n"
-       << "  --manage-admins            | --set-manage-admins           | --unset-manage-admins\n"
-       << "  --manage-users             | --set-manage-users            | --unset-manage-users\n"
-       << "  --manage-groups            | --set-manage-groups           | --unset-manage-groups\n"
-       << "  --manage-vaults            | --set-manage-vaults           | --unset-manage-vaults\n"
-       << "  --manage-groups            | --set-manage-groups           | --unset-manage-groups\n"
-       << "  --manage-roles             | --set-manage-roles            | --unset-manage-roles\n"
-       << "  --manage-api-keys          | --set-manage-api-keys         | --unset-manage-api-keys\n"
-       << "  --audit-log-access         | --set-audit-log-access        | --unset-audit-log-access\n"
-       << "  --create-vaults            | --set-create-vaults           | --unset-create-vaults\n"
-       << "\n"
-       << "You can use either the --manage-* shorthand to set, or explicitly use --set/--unset.\n";
-    return os.str();
-}
-
-static std::string usage_vault_permissions() {
-    std::ostringstream os;
-    os << "Vault Permissions Flags:\n"
-       << "  --migrate-data        | --set-migrate-data        | --unset-migrate-data\n"
-       << "  --manage-access       | --set-manage-access       | --unset-manage-access\n"
-       << "  --manage-tags         | --set-manage-tags         | --unset-manage-tags\n"
-       << "  --manage-metadata     | --set-manage-metadata     | --unset-manage-metadata\n"
-       << "  --manage-versions     | --set-manage-versions     | --unset-manage-versions\n"
-       << "  --manage-file-locks   | --set-manage-file-locks   | --unset-manage-file-locks\n"
-       << "  --share               | --set-share               | --unset-share\n"
-       << "  --sync                | --set-sync                | --unset-sync\n"
-       << "  --create              | --set-create              | --unset-create\n"
-       << "  --download            | --set-download            | --unset-download\n"
-       << "  --delete              | --set-delete              | --unset-delete\n"
-       << "  --rename              | --set-rename              | --unset-rename\n"
-       << "  --move                | --set-move                | --unset-move\n"
-       << "  --list                | --set-list                | --unset-list\n"
-       << "\n"
-       << "Use --set-* or --unset-* to modify permissions individually,\n"
-       << "or use the shorthand (e.g. --share) to enable directly.\n";
-    return os.str();
-}
-
-static CommandResult usage_roles_root() {
-    const std::string usage = "Usage:\n"
-        "  roles list [--user | --vault] [--json] [--limit <n>]\n"
-        "  roles info <id>\n"
-        "  roles info <name> [--user | --vault]\n"
-        "  roles create <name> --type <user | vault> [--from <id | name>] [<permission_flags>]\n"
-        "  roles update <id> [--name <new_name>] [<permission_flag>]\n"
-        "  roles delete <id>\n";
-
-    return {0, usage + "\n" + usage_user_permissions() + "\n" + usage_vault_permissions(), ""};
-}
 
 static uint16_t parseUserRolePermissions(const CommandCall& call, uint16_t permissions = 0) {
     if (hasFlag(call, "manage-encryption-keys") || hasFlag(call, "set-manage-encryption-keys")) permissions |= (1 << 0);
@@ -340,18 +289,26 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
     }
 }
 
+static CommandResult handle_role(const CommandCall& call) {
+    if (call.positionals.empty()) return {0, RoleUsage::role().str(), ""};
+    const std::string_view sub = call.positionals[0];
+    CommandCall subcall = call;
+    subcall.positionals.erase(subcall.positionals.begin());
+
+    if (sub == "create") return handleRoleCreate(subcall);
+    if (sub == "delete") return handleRoleDelete(subcall);
+    if (sub == "info") return handleRoleInfo(subcall);
+    if (sub == "update") return handleRoleUpdate(subcall);
+
+    return invalid("role: unknown subcommand '" + std::string(sub) + "'");
+}
+
+static CommandResult handle_roles(const CommandCall& call) {
+    if (hasKey(call, "help") || hasKey(call, "h")) return {0, RoleUsage::roles_list().str(), ""};
+    return handleRolesList(call);
+}
+
 void vh::shell::registerRoleCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand("roles", "Manage roles",
-                       [](const CommandCall& call) -> CommandResult {
-                           if (call.positionals.empty()) return usage_roles_root();
-                           const std::string_view sub = call.positionals[0];
-
-                           if (sub == "list") return handleRolesList(call);
-                           if (sub == "info") return handleRoleInfo(call);
-                           if (sub == "create") return handleRoleCreate(call);
-                           if (sub == "update") return handleRoleUpdate(call);
-                           if (sub == "delete") return handleRoleDelete(call);
-
-                           return invalid("Unknown roles command: " + std::string(sub));
-                       }, {});
+    r->registerCommand(RoleUsage::role(), handle_role);
+    r->registerCommand(RoleUsage::roles_list(), handle_roles);
 }

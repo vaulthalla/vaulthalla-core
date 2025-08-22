@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
-#include <iostream>
 #include <arpa/inet.h>
 #include <cstring>
 #include <fmt/core.h>
@@ -112,16 +111,20 @@ static std::string build_line_from_tokens(const std::vector<std::string>& tokens
 /* ----------------------------------------------------------------- */
 
 int main(const int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "usage: vhctl-uds <cmd> [args...]\n";
-        return 2;
-    }
+    auto cstr_or = [](const char* p, const char* fallback) -> const char* {
+        return p ? p : fallback;
+    };
+
+    // Decide the "command" token up front (safe even if argv[1] is nullptr)
+    const std::string cmd = (argc >= 2 && argv[1] && argv[1][0] != '\0')
+                            ? std::string(argv[1])
+                            : std::string("help");
 
     // Build normalized argv: [cmd, args...], with --key=value and -Xvalue split
     std::vector<std::string> argv_norm;
-    argv_norm.reserve(static_cast<size_t>(argc) - 1);
-    argv_norm.emplace_back(argv[1]); // cmd
-    {
+    argv_norm.emplace_back(cmd);
+
+    if (argc >= 3) {
         auto tail = normalize_args(argc, argv, /*start_index=*/2);
         argv_norm.insert(argv_norm.end(), tail.begin(), tail.end());
     }
@@ -143,15 +146,15 @@ int main(const int argc, char** argv) {
 
     // Back-compat fields + richer payload
     nlohmann::json j;
-    j["cmd"] = argv_norm.front();
+    j["cmd"]  = argv_norm.front();
     if (argv_norm.size() > 1) {
-        std::vector args(argv_norm.begin() + 1, argv_norm.end());
-        j["args"] = args;        // old shape
+        std::vector<std::string> args(argv_norm.begin() + 1, argv_norm.end());
+        j["args"] = args;                    // old shape
     } else {
         j["args"] = nlohmann::json::array();
     }
-    j["argv"] = argv_norm;       // full normalized argv (cmd-first)
-    j["line"] = line;            // canonical quoted line (for string parsers)
+    j["argv"] = argv_norm;                   // full normalized argv (cmd-first)
+    j["line"] = line;                        // canonical quoted line (for string parsers)
 
     const auto req = j.dump();
     uint32_t n = htonl(static_cast<uint32_t>(req.size()));

@@ -4,6 +4,7 @@
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
+#include <cctype>
 
 using namespace vh::types;
 using namespace vh::shell;
@@ -82,4 +83,21 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<PermissionOve
     }
 
     return tbl.render();
+}
+
+std::string vh::types::to_string(const OverrideOpt& opt) {
+    switch (opt) {
+        case OverrideOpt::ALLOW: return "allow";
+        case OverrideOpt::DENY: return "deny";
+        default: return "unknown";
+    }
+}
+
+OverrideOpt vh::types::overrideOptFromString(const std::string& str) {
+    auto lwr = str;
+    std::ranges::transform(lwr.begin(), lwr.end(), lwr.begin(),
+        [](const unsigned char c) { return std::tolower(c); });
+    if (lwr == "allow") return OverrideOpt::ALLOW;
+    if (lwr == "deny") return OverrideOpt::DENY;
+    throw std::invalid_argument("Invalid OverrideOpt string: " + lwr);
 }

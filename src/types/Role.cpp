@@ -9,12 +9,13 @@
 
 using namespace vh::types;
 using namespace vh::shell;
+using namespace vh::util;
 
 Role::Role(const pqxx::row& row)
     : name(row["name"].as<std::string>()),
       description(row["description"].as<std::string>()),
       type(row["type"].as<std::string>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
       permissions(static_cast<uint16_t>(row["permissions"].as<int64_t>())) {
     if (!row["role_id"].is_null()) id = row["role_id"].as<unsigned int>();
     else if (!row["id"].is_null()) id = row["id"].as<unsigned int>();
@@ -42,7 +43,7 @@ void vh::types::to_json(nlohmann::json& j, const Role& r) {
         {"description", r.description},
         {"type", r.type},
         {"permissions", r.type == "user" ? jsonFromAdminMask(r.permissions) : jsonFromVaultMask(r.permissions)},
-        {"created_at", util::timestampToString(r.created_at)}
+        {"created_at", timestampToString(r.created_at)}
     };
 }
 
@@ -52,7 +53,7 @@ void vh::types::from_json(const nlohmann::json& j, Role& r) {
     r.description = j.at("description").get<std::string>();
     r.type = j.at("type").get<std::string>();
     r.permissions = r.type == "user" ? adminMaskFromJson(j.at("permissions")) : vaultMaskFromJson(j.at("permissions"));
-    r.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
+    r.created_at = parsePostgresTimestamp(j.at("created_at").get<std::string>());
 }
 
 void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles) {
@@ -60,7 +61,7 @@ void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Rol
     for (const auto& role : roles) j.push_back(*role);
 }
 
-std::vector<std::shared_ptr<Role> > vh::types::roles_from_pq_res(const pqxx::result& res) {
+std::vector<std::shared_ptr<Role>> vh::types::roles_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<Role> > roles;
     for (const auto& item : res) roles.push_back(std::make_shared<Role>(item));
     return roles;
@@ -73,7 +74,7 @@ std::string vh::types::to_string(const std::shared_ptr<Role>& r) {
     out += "Type: " + r->type + "\n";
     out += "Description: " + r->description + "\n";
     out += "Permissions: " + (r->type == "user" ? admin_perms_to_string(r->permissions) : vault_perms_to_string(r->permissions)) + "\n";
-    out += "Created At: " + util::timestampToString(r->created_at) + "\n";
+    out += "Created At: " + timestampToString(r->created_at) + "\n";
     return out;
 }
 
@@ -95,7 +96,7 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles
             role->name,
             role->type,
             role->description,
-            util::timestampToString(role->created_at)
+            timestampToString(role->created_at)
         });
     }
 

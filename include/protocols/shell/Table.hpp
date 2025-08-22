@@ -142,7 +142,7 @@ private:
         std::vector<std::string> out;
         std::size_t i = 0;
         while (i < s.size()) {
-            std::size_t end = std::min(i + width, s.size());
+            const std::size_t end = std::min(i + width, s.size());
             // try to break on space
             std::size_t break_pos = end;
             if (end < s.size() && s[end] != ' ') {

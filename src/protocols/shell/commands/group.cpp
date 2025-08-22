@@ -12,6 +12,8 @@ using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::auth;
+using namespace vh::util;
+using namespace vh::types;
 
 static CommandResult usage_group_root() {
     return {

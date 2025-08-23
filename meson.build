@@ -32,7 +32,7 @@ vh_version_header = configure_file(
 
 lib_version = static_library(
     'vaulthalla-version',
-    join_paths(meson.project_source_root(), 'version.cpp'),
+    join_paths(meson.project_source_root(), 'main/version.cpp'),
     include_directories: include_directories('.')
 )
 
@@ -72,7 +72,7 @@ inc         = include_directories('include', 'vendor', 'usage/include')
 source_root = meson.project_source_root()
 src         = join_paths(source_root, 'src')
 tests_src   = join_paths(source_root, 'tests')
-main        = files(join_paths(source_root, 'main.cpp'))
+main        = files(join_paths(source_root, 'main/main.cpp'))
 
 sources = []
 foreach f : run_command('find', src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
@@ -81,7 +81,7 @@ endforeach
 
 usage_inc = include_directories('usage/include')
 usage_src = join_paths(source_root, 'usage/src')
-main_usage = files(join_paths(source_root, 'usage/vh_usage_main.cpp'))
+main_usage = files(join_paths(source_root, 'main/usage.cpp'))
 
 usage_sources = []
 foreach f : run_command('find', usage_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
@@ -135,7 +135,7 @@ executable('vaulthalla-server', main,
            dependencies: dep,
            install: true)
 
-executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
+executable('vaulthalla-cli', files(join_paths(source_root, 'main/cli.cpp')),
            include_directories: include_directories('vendor'),
            dependencies: fmt_dep,
            install: true)

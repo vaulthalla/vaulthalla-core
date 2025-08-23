@@ -12,13 +12,13 @@
 #include "storage/Filesystem.hpp"
 
 // Seed
-#include "seed/include/seed_db.hpp"
-#include "seed/include/init_db_tables.hpp"
+#include "../seed/include/seed_db.hpp"
+#include "../seed/include/init_db_tables.hpp"
 
 // Misc
 #include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "include/services/LogRegistry.hpp"
+#include "../include/services/LogRegistry.hpp"
 
 // Libraries
 #include <csignal>

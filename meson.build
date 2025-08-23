@@ -30,7 +30,11 @@ vh_version_header = configure_file(
     install_dir: get_option('includedir') / 'vaulthalla'
 )
 
-lib_version = static_library('vaulthalla-version', include_directories: '.')
+lib_version = static_library(
+    'vaulthalla-version',
+    join_paths(meson.project_source_root(), 'version.cpp'),
+    include_directories: include_directories('.')
+)
 
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
@@ -99,7 +103,21 @@ lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed
                           include_directories: include_directories('seed/include', 'include', 'vendor'),
                           link_with: lib_core)
 
-lib_usage = static_library('vhusage', usage_sources, include_directories: usage_inc, dependencies: fmt_dep, install: true)
+lib_usage = static_library('vhusage',
+                           usage_sources,
+                           include_directories: usage_inc,
+                           dependencies: fmt_dep,
+                           install: true
+)
+
+lib_usage_native = static_library('vhusage-native',
+                                  usage_sources,
+                                  include_directories: usage_inc,
+                                  dependencies: fmt_dep,
+                                  native: true,
+                                  install: false,
+                                  override_options: ['unity=on', 'b_pch=true']
+)
 
 
 # ╭─────────────────────────────────── DEPENDENCIES ───────────────────────────────────╮
@@ -124,7 +142,7 @@ executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
 
 vh_usage = executable('vh_usage', main_usage,
                       include_directories: usage_inc,
-                      link_with: lib_usage,
+                      link_with: lib_usage_native,
                       native: true,
                       install: false
 )

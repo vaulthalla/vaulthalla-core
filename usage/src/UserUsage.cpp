@@ -1,4 +1,4 @@
-#include "protocols/shell/usage/UserUsage.hpp"
+#include "UserUsage.hpp"
 
 using namespace vh::shell;
 

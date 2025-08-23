@@ -1,6 +1,6 @@
 #pragma once
 
-#include "protocols/shell/CommandUsage.hpp"
+#include "CommandUsage.hpp"
 
 namespace vh::shell {
 

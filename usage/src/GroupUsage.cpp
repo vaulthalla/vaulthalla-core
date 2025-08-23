@@ -1,4 +1,4 @@
-#include "protocols/shell/usage/GroupUsage.hpp"
+#include "GroupUsage.hpp"
 
 using namespace vh::shell;
 

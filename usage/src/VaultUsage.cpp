@@ -1,5 +1,5 @@
-#include "protocols/shell/usage/VaultUsage.hpp"
-#include "protocols/shell/CommandUsage.hpp"
+#include "VaultUsage.hpp"
+#include "CommandUsage.hpp"
 
 using namespace vh::shell;
 

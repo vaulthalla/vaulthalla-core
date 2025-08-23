@@ -4,3 +4,5 @@ option(
     value: '/lib/systemd/system',
     description: 'Directory for systemd service files'
 )
+
+option('manpage', type: 'boolean', value: true, description: 'Build and install manpage via pandoc')

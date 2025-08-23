@@ -4,8 +4,8 @@
 #include "services/LogRegistry.hpp"
 #include "util/cmdLineHelpers.hpp"
 #include "types/User.hpp"
-#include "protocols/shell/CommandUsage.hpp"
-#include "protocols/shell/usage/ShellUsage.hpp"
+#include "CommandUsage.hpp"
+#include "ShellUsage.hpp"
 
 #include <fmt/core.h>
 #include <cctype>

@@ -8,7 +8,7 @@
 #include "crypto/PasswordHash.hpp"
 #include "services/LogRegistry.hpp"
 #include "types/UserRole.hpp"
-#include "protocols/shell/usage/UserUsage.hpp"
+#include "UserUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;

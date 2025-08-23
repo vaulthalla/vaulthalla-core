@@ -1,7 +1,7 @@
 #include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
-#include "protocols/shell/usage/SystemUsage.hpp"
-#include "protocols/shell/usage/ShellUsage.hpp"
+#include "SystemUsage.hpp"
+#include "ShellUsage.hpp"
 #include "util/shellArgsHelpers.hpp"
 
 #include <version.h>

@@ -26,6 +26,12 @@ dev:
 	@echo "🛡️  Running install script..."
 	./bin/install.sh -d
 
+dev -m:
+	./bin/uninstall.sh -d
+	./bin/setup/install_guard.sh
+	@echo "🛡️  Running install script..."
+	./bin/install.sh -d -m
+
 deb:
 	@echo "🔧 Building Debian package..."
 	./bin/install_deb.sh

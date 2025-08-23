@@ -7,7 +7,7 @@
 #include "types/Group.hpp"
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
-#include "protocols/shell/usage/GroupUsage.hpp"
+#include "GroupUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;

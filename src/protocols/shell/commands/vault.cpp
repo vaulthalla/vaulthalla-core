@@ -30,7 +30,7 @@
 
 #include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
-#include "protocols/shell/usage/VaultUsage.hpp"
+#include "VaultUsage.hpp"
 
 #include <algorithm>
 #include <optional>

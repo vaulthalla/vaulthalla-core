@@ -7,6 +7,7 @@ set -euo pipefail
 # ═══════════════════════════════════════════════════════
 
 DEV_MODE=false
+BUILD_MANPAGE=false
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -15,12 +16,42 @@ while [[ $# -gt 0 ]]; do
             DEV_MODE=true
             shift
             ;;
+        -m|--manpage)
+            BUILD_MANPAGE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [options]"
+            echo "  -d, --dev        Enable dev mode (e.g., debug build)"
+            echo "  -m, --manpage    Build and install manpage"
+            echo "  -h, --help       Show this help"
+            exit 0
+            ;;
         *)
             echo "Unknown option: $1"
+            echo "Use --help to see available options."
             exit 1
             ;;
     esac
 done
+
+# Construct Meson setup args
+MESON_ARGS=()
+
+if [[ "$DEV_MODE" == true ]]; then
+    MESON_ARGS+=("-Dbuildtype=debug")
+else
+    MESON_ARGS+=("-Dbuildtype=release")
+fi
+
+if [[ "$BUILD_MANPAGE" == true ]]; then
+    MESON_ARGS+=("-Dmanpage=true")
+else
+    MESON_ARGS+=("-Dmanpage=false")
+fi
+
+echo "Setting up build with:"
+printf '  %s\n' "${MESON_ARGS[@]}"
 
 
 # Check if we're root OR have passwordless sudo
@@ -107,7 +138,7 @@ fi
 # === 3) Build Project ===
 echo "🏗️  Starting Vaulthalla build..."
 
-meson setup build
+meson setup build "${MESON_ARGS[@]}" --reconfigure
 meson compile -C build
 sudo meson install -C build
 sudo ldconfig

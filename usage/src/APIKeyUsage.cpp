@@ -1,4 +1,4 @@
-#include "protocols/shell/usage/APIKeyUsage.hpp"
+#include "APIKeyUsage.hpp"
 
 using namespace vh::shell;
 

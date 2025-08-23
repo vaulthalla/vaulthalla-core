@@ -1,4 +1,4 @@
-#include "protocols/shell/CommandUsage.hpp"
+#include "CommandUsage.hpp"
 
 #include <algorithm>
 #include <cctype>

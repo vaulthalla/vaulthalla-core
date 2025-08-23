@@ -1,5 +1,5 @@
-#include "protocols/shell/usage/RoleUsage.hpp"
-#include "protocols/shell/usage/PermissionUsage.hpp"
+#include "RoleUsage.hpp"
+#include "PermissionUsage.hpp"
 
 using namespace vh::shell;
 

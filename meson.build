@@ -1,12 +1,12 @@
 project('vaulthalla', 'cpp',
-        version: '0.9.3',
+        version: '0.9.4',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
             'cpp_std=c++23',
             'unity=on',
-            'unity_size=8'
+            'unity_size=9'
         ]
 )
 
@@ -30,10 +30,16 @@ vh_version_header = configure_file(
     install_dir: get_option('includedir') / 'vaulthalla'
 )
 
-lib_version = static_library('vaulthalla-version', include_directories: '.')
+lib_version = static_library(
+    'vaulthalla-version',
+    join_paths(meson.project_source_root(), 'main/version.cpp'),
+    include_directories: include_directories('.')
+)
 
 
 # ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
+
+fmt_dep = dependency('fmt', required: true)
 
 deps = [
     dependency('fuse3', required: true),
@@ -54,7 +60,7 @@ deps = [
     dependency('tss2-tctildr', required: true),
     dependency('openssl', version: '>=3.0', required: true),
     dependency('zlib', required: true),
-    dependency('fmt', required: true)
+    fmt_dep
 ]
 
 test_deps = deps + dependency('gtest', required: true, main: true)
@@ -62,32 +68,63 @@ test_deps = deps + dependency('gtest', required: true, main: true)
 
 # ╭────────────────────   FILES   ──────────────────────╮
 
-inc         = include_directories('include', 'vendor')
+inc         = include_directories('include', 'vendor', 'usage/include')
 source_root = meson.project_source_root()
 src         = join_paths(source_root, 'src')
 tests_src   = join_paths(source_root, 'tests')
-main        = files(join_paths(source_root, 'main.cpp'))
+main        = files(join_paths(source_root, 'main/main.cpp'))
 
 sources = []
 foreach f : run_command('find', src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
     sources += files(f)
 endforeach
 
+usage_inc = include_directories('usage/include')
+usage_src = join_paths(source_root, 'usage/src')
+main_usage = files(join_paths(source_root, 'main/usage.cpp'))
+
+usage_sources = []
+foreach f : run_command('find', usage_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    usage_sources += files(f)
+endforeach
+
 
 # ╭──────────────────── LIBRARIES ───────────────────────╮
 
-lib_core = static_library('vaulthalla', sources, include_directories: inc, dependencies: deps)
+lib_core = static_library(
+    'vaulthalla',
+    sources,
+    include_directories: inc,
+    dependencies: deps,
+    install: true
+)
 
 lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
-    include_directories: include_directories('seed/include', 'include', 'vendor'),
-    link_with: lib_core)
+                          include_directories: include_directories('seed/include', 'include', 'vendor'),
+                          link_with: lib_core)
+
+lib_usage = static_library('vhusage',
+                           usage_sources,
+                           include_directories: usage_inc,
+                           dependencies: fmt_dep,
+                           install: true
+)
+
+lib_usage_native = static_library('vhusage-native',
+                                  usage_sources,
+                                  include_directories: usage_inc,
+                                  dependencies: fmt_dep,
+                                  native: true,
+                                  install: false,
+                                  override_options: ['unity=on', 'b_pch=true']
+)
 
 
 # ╭─────────────────────────────────── DEPENDENCIES ───────────────────────────────────╮
 
 dep = declare_dependency(
     include_directories: inc,
-    link_with: [lib_core, lib_seed, lib_version],
+    link_with: [lib_core, lib_seed, lib_version, lib_usage],
     dependencies: deps)
 
 
@@ -98,10 +135,38 @@ executable('vaulthalla-server', main,
            dependencies: dep,
            install: true)
 
-executable('vaulthalla-cli', files(join_paths(source_root, 'cli_main.cpp')),
+executable('vaulthalla-cli', files(join_paths(source_root, 'main/cli.cpp')),
            include_directories: include_directories('vendor'),
-           dependencies: [dependency('fmt', required: true)],
+           dependencies: fmt_dep,
            install: true)
+
+vh_usage = executable('vh_usage', main_usage,
+                      include_directories: usage_inc,
+                      link_with: lib_usage_native,
+                      native: true,
+                      install: false
+)
+
+
+# ╭──────────────────── MANPAGE GENERATION ────────────────────╮
+
+pandoc = find_program('pandoc', required: get_option('manpage'))
+
+vh_md = custom_target('vh-md',
+                      output: 'vh.md',
+                      command: [vh_usage, '--out', '@OUTPUT@'],
+                      build_by_default: true
+)
+
+if get_option('manpage')
+    man1 = custom_target('vh-man',
+                         input: vh_md,
+                         output: 'vh.1',
+                         command: [pandoc, '-s', '-t', 'man', '@INPUT@', '-o', '@OUTPUT@'],
+                         install: true,
+                         install_dir: get_option('mandir') / 'man1'
+    )
+endif
 
 
 # ╭─────────────────────────────────── INSTALLATION ───────────────────────────────────╮
@@ -150,6 +215,6 @@ endforeach
 
 test('test_all',
      executable('test_all', all_test_sources,
-                link_with: [lib_core, lib_seed],
+                link_with: [lib_core, lib_seed, lib_usage],
                 include_directories: inc,
                 dependencies: test_deps))

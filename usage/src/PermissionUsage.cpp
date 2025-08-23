@@ -1,4 +1,4 @@
-#include "protocols/shell/usage/PermissionUsage.hpp"
+#include "PermissionUsage.hpp"
 
 #include <sstream>
 

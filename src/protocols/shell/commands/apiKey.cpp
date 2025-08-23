@@ -6,7 +6,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "storage/cloud/S3Controller.hpp"
-#include "protocols/shell/usage/APIKeyUsage.hpp"
+#include "APIKeyUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;

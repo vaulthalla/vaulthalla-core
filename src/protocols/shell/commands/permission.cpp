@@ -1,7 +1,7 @@
 #include "protocols/shell/commands.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "protocols/shell/usage/PermissionUsage.hpp"
+#include "PermissionUsage.hpp"
 
 using namespace vh::shell;
 

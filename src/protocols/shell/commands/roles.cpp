@@ -6,8 +6,7 @@
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/UserRole.hpp"
-#include "protocols/shell/usage/PermissionUsage.hpp"
-#include "protocols/shell/usage/RoleUsage.hpp"
+#include "RoleUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;

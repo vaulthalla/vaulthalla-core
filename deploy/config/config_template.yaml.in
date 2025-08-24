@@ -5,31 +5,30 @@
 # ═══════════════════════════════════════════════════════
 
 # === 🧠 CORE SERVER SETTINGS ===
-server: {}
+websocket_server: {}
 
-# === 🪓 FUSE MOUNT SETTINGS ===
-fuse: {}
+http_preview_server: {}
 
-# === Caching & Previews ===
-caching: {}
 
 # === 🐘 DATABASE SETTINGS ===
 database: {}
 
+
 # === 🔐 AUTHENTICATION SETTINGS ===
 auth: {}
 
-# === 📜 TLS / HTTPS SETTINGS ===
-tls: {}
 
-# === 📊 METRICS / MONITORING ===
-metrics: {}
+# === 🤝 SHARING SETTINGS ===
+sharing: {}
 
-# === 🛡️ ADMIN UI / DASHBOARD ===
-admin_ui: {}
 
-# === 🧼 BACKGROUND TASKS ===
-scheduler: {}
+# === Caching & Previews ===
+caching: {}
 
-# === ⚙️ ADVANCED FEATURES ===
-advanced: {}
+
+# === 📜 LOGGING SETTINGS ===
+logging: {}
+
+
+# === 🛠️ DEVELOPMENT SETTINGS ===
+dev: {}

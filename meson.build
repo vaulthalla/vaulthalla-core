@@ -11,7 +11,7 @@ project('vaulthalla', 'cpp',
         ]
 )
 
-# ╭──────────────────── VERSION HEADER ─────────────────────╮
+# ╭──────────────────────────────── VERSION HEADER ─────────────────────────────────╮
 
 version_split = meson.project_version().split('.')
 if version_split.length() < 3
@@ -32,7 +32,7 @@ vh_version_header = configure_file(
 )
 
 
-# ╭──────────────────── PATH HEADER ─────────────────────╮
+# ╭──────────────────────────────── PATH HEADER ─────────────────────────────────╮
 
 config_dir = join_paths('/', get_option('sysconfdir'), meson.project_name())
 log_dir = join_paths(get_option('localstatedir'), 'log', meson.project_name())
@@ -56,7 +56,7 @@ vh_paths_header = configure_file(
 )
 
 
-# ╭──────────────────── DEFINE DEPENDENCIES ────────────────────╮
+# ╭──────────────────────────── DEFINE DEPENDENCIES ────────────────────────────╮
 
 fmt_dep = dependency('fmt', required: true)
 
@@ -85,7 +85,7 @@ deps = [
 test_deps = deps + dependency('gtest', required: true, main: true)
 
 
-# ╭────────────────────   FILES   ──────────────────────╮
+# ╭────────────────────────────────   FILES   ──────────────────────────────────╮
 
 inc         = include_directories('include', 'vendor', 'usage/include')
 source_root = meson.project_source_root()
@@ -108,7 +108,7 @@ foreach f : run_command('find', usage_src, '-type', 'f', '-name', '*.cpp', check
 endforeach
 
 
-# ╭──────────────────── LIBRARIES ───────────────────────╮
+# ╭──────────────────────────────── LIBRARIES ───────────────────────────────────╮
 
 lib_core = static_library(
     'vaulthalla',
@@ -140,7 +140,7 @@ lib_usage_native = static_library('vhusage-native',
 )
 
 
-# ╭─────────────────────────────────── DEPENDENCIES ───────────────────────────────────╮
+# ╭──────────────────────────────── DEPENDENCIES ────────────────────────────────╮
 
 dep = declare_dependency(
     include_directories: inc,
@@ -149,7 +149,7 @@ dep = declare_dependency(
 )
 
 
-# ╭─────────────────────────────────── EXECUTABLES ────────────────────────────────────╮
+# ╭───────────────────────────────── EXECUTABLES ─────────────────────────────────╮
 
 executable('vaulthalla-server', main,
            include_directories: inc,
@@ -171,7 +171,7 @@ vh_usage = executable('vh_usage', main_usage,
 )
 
 
-# ╭──────────────────── MANPAGE GENERATION ────────────────────╮
+# ╭──────────────────────────────── MANPAGE GENERATION ───────────────────────────────╮
 
 pandoc = find_program('pandoc', required: get_option('manpage'))
 

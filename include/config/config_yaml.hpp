@@ -53,21 +53,6 @@ struct convert<HttpPreviewConfig> {
     }
 };
 
-template<>
-struct convert<FuseConfig> {
-    static Node encode(const FuseConfig& rhs) {
-        Node node;
-        node["admin_linux_uid"] = rhs.admin_linux_uid;
-        return node;
-    }
-
-    static bool decode(const Node& node, FuseConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.admin_linux_uid = node["admin_linux_uid"].as<unsigned int>(0); // Default to root
-        return true;
-    }
-};
-
 static std::string to_std_string(const spdlog::string_view_t sv) { return {sv.data(), sv.size()}; }
 
 template<>

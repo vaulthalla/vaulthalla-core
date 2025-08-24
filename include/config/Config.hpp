@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -26,11 +25,6 @@ struct HttpPreviewConfig {
     uint16_t port = 33370;
     unsigned int max_connections = 512;
     uintmax_t max_preview_size_bytes = MAX_PREVIEW_SIZE_BYTES;
-};
-
-struct FuseConfig {
-    // TODO: handle this properly
-    unsigned int admin_linux_uid = 0;
 };
 
 struct SubsystemLogLevelsConfig {
@@ -135,7 +129,6 @@ struct DevConfig {
 struct Config {
     WebsocketConfig websocket;
     HttpPreviewConfig http_preview;
-    FuseConfig fuse;
     LoggingConfig logging;
     CachingConfig caching;
     DatabaseConfig database;
@@ -149,13 +142,10 @@ struct Config {
 Config loadConfig(const std::string& path);
 void to_json(nlohmann::json& j, const Config& c);
 void from_json(const nlohmann::json& j, Config& c);
-
 void to_json(nlohmann::json& j, const WebsocketConfig& c);
 void from_json(const nlohmann::json& j, WebsocketConfig& c);
 void to_json(nlohmann::json& j, const HttpPreviewConfig& c);
 void from_json(const nlohmann::json& j, HttpPreviewConfig& c);
-void to_json(nlohmann::json& j, const FuseConfig& c);
-void from_json(const nlohmann::json& j, FuseConfig& c);
 void to_json(nlohmann::json& j, const LogLevelsConfig& c);
 void from_json(const nlohmann::json& j, LogLevelsConfig& c);
 void to_json(nlohmann::json& j, const SubsystemLogLevelsConfig& c);

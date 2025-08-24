@@ -20,7 +20,6 @@ Config loadConfig(const std::string& path) {
 
     if (auto node = root["websocket_server"]) YAML::convert<WebsocketConfig>::decode(node, cfg.websocket);
     if (auto node = root["http_preview_server"]) YAML::convert<HttpPreviewConfig>::decode(node, cfg.http_preview);
-    if (auto node = root["fuse"]) YAML::convert<FuseConfig>::decode(node, cfg.fuse);
     if (auto node = root["logging"]) YAML::convert<LoggingConfig>::decode(node, cfg.logging);
     if (auto node = root["caching"]) YAML::convert<CachingConfig>::decode(node, cfg.caching);
     if (auto node = root["database"]) YAML::convert<DatabaseConfig>::decode(node, cfg.database);
@@ -59,7 +58,6 @@ void Config::save() const {
     unordered_map<string, string> sectionMap = {
         {"websocket_server", encode(websocket)},
         {"http_preview_server", encode(http_preview)},
-        {"fuse", encode(fuse)},
         {"logging", encode(logging)},
         {"caching", encode(caching)},
         {"database", encode(database)},
@@ -90,7 +88,6 @@ void to_json(nlohmann::json& j, const Config& c) {
     j = {
         {"websocket_server", c.websocket},
         {"http_preview_server", c.http_preview},
-        {"fuse", c.fuse},
         {"logging", c.logging},
         {"caching", c.caching},
         {"database", c.database},
@@ -103,7 +100,6 @@ void to_json(nlohmann::json& j, const Config& c) {
 void from_json(const nlohmann::json& j, Config& c) {
     j.at("websocket_server").get_to(c.websocket);
     j.at("http_preview_server").get_to(c.http_preview);
-    j.at("fuse").get_to(c.fuse);
     j.at("logging").get_to(c.logging);
     j.at("caching").get_to(c.caching);
     j.at("database").get_to(c.database);
@@ -146,16 +142,6 @@ void from_json(const nlohmann::json& j, HttpPreviewConfig& c) {
     c.max_preview_size_bytes = j.value("max_preview_size_bytes", MAX_PREVIEW_SIZE_BYTES);
 }
 
-void to_json(nlohmann::json& j, const FuseConfig& c) {
-    j = {
-        {"admin_linux_uid", c.admin_linux_uid}
-    };
-}
-
-void from_json(const nlohmann::json& j, FuseConfig& c) {
-    c.admin_linux_uid = j.value("admin_linux_uid", 0);
-}
-
 void to_json(nlohmann::json& j, const LoggingConfig& c) {
     j = {
         {"log_rotation_days", c.log_rotation_days.count()},
@@ -187,7 +173,6 @@ void from_json(const nlohmann::json& j, LogLevelsConfig& c) {
 void to_json(nlohmann::json& j, const SubsystemLogLevelsConfig& c) {
     j = {
         {"vaulthalla", c.vaulthalla},
-        {"fuse", c.fuse},
         {"filesystem", c.filesystem},
         {"crypto", c.crypto},
         {"cloud", c.cloud},
@@ -205,7 +190,6 @@ void to_json(nlohmann::json& j, const SubsystemLogLevelsConfig& c) {
 
 void from_json(const nlohmann::json& j, SubsystemLogLevelsConfig& c) {
     c.vaulthalla = j.value("vaulthalla", spdlog::level::debug);
-    c.fuse = j.value("fuse", spdlog::level::debug);
     c.filesystem = j.value("filesystem", spdlog::level::info);
     c.crypto = j.value("crypto", spdlog::level::info);
     c.cloud = j.value("cloud", spdlog::level::info);

@@ -125,14 +125,52 @@ void vh::seed::initRoles() {
     });
 }
 
-void vh::seed::initAdmin() {
+#include <optional>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include <spdlog/spdlog.h>
+
+namespace vh::seed {
+
+static std::optional<unsigned int> loadPendingSuperAdminUid() {
+    const std::filesystem::path uidFile{"/run/vaulthalla/superadmin_uid"};
+
+    if (!std::filesystem::exists(uidFile)) {
+        LogRegistry::vaulthalla()->debug("[seed] No pending super-admin UID file at {}", uidFile.string());
+        return std::nullopt;
+    }
+
+    std::ifstream in(uidFile);
+    if (!in.is_open()) {
+        LogRegistry::vaulthalla()->warn("[seed] Failed to open super-admin UID file: {}", uidFile.string());
+        return std::nullopt;
+    }
+
+    unsigned int uid{};
+    if (!(in >> uid)) {
+        LogRegistry::vaulthalla()->warn("[seed] Invalid contents in {}", uidFile.string());
+        return std::nullopt;
+    }
+
+    try {
+        std::filesystem::remove(uidFile);
+        LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending super-admin UID file (uid={})", uid);
+    } catch (const std::exception& e) {
+        LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", uidFile.string(), e.what());
+    }
+
+    return uid;
+}
+
+void initAdmin() {
     LogRegistry::vaulthalla()->debug("[initdb] Initializing admin user...");
 
     const auto user = std::make_shared<User>();
     user->name = "admin";
     user->email = "";
     user->setPasswordHash(hashPassword("vh!adm1n"));
-    user->linux_uid = ConfigRegistry::get().fuse.admin_linux_uid;
+    user->linux_uid = loadPendingSuperAdminUid();
 
     const auto role = PermsQueries::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
@@ -144,6 +182,9 @@ void vh::seed::initAdmin() {
 
     UserQueries::createUser(user);
 }
+
+} // namespace vh::seed
+
 
 void vh::seed::initAdminGroup() {
     LogRegistry::vaulthalla()->debug("[initdb] Initializing admin group...");

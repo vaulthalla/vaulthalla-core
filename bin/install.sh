@@ -182,6 +182,34 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'"
 
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaulthalla;"
 
+# === 7.5) Seed pending super-admin UID (for runtime assignment) ===
+echo "🧑‍💻 Seeding current user as Vaulthalla super-admin (pending runtime init)..."
+
+SUPER_UID=$(id -u)
+SUPER_USER=$(id -un)
+PENDING_UID_FILE="/run/vaulthalla/superadmin_uid"
+
+if [ "$SUPER_UID" -eq 0 ]; then
+  echo "⚠️ Refusing to set linux_uid=0 (root) — skipping seed"
+else
+  echo "$SUPER_UID" | sudo tee "$PENDING_UID_FILE" >/dev/null
+  sudo chown vaulthalla:vaulthalla "$PENDING_UID_FILE"
+  sudo chmod 600 "$PENDING_UID_FILE"
+  echo "✅ Wrote super-admin UID seed to $PENDING_UID_FILE"
+fi
+
+# === 7.6) Optional: Add current user to 'vaulthalla' group ===
+if getent group vaulthalla >/dev/null; then
+  if id -nG "$SUPER_USER" | grep -qw vaulthalla; then
+    echo "👥 User '$SUPER_USER' already in group 'vaulthalla'"
+  else
+    echo "➕ Adding '$SUPER_USER' to group 'vaulthalla'..."
+    sudo usermod -a -G vaulthalla "$SUPER_USER"
+  fi
+else
+  echo "⚠️ Group 'vaulthalla' not found — skipping usermod"
+fi
+
 # === 8) Inject DB Password into Config ===
 echo "✍️  Updating config with DB password..."
 sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml

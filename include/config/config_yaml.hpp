@@ -7,56 +7,125 @@ namespace YAML {
 
 using namespace vh::config;
 
-// ServerConfig
-
 template<>
-struct convert<ServerConfig> {
-    static Node encode(const ServerConfig& rhs) {
+struct convert<WebsocketConfig> {
+    static Node encode(const WebsocketConfig& rhs) {
         Node node;
+        node["enabled"] = rhs.enabled;
         node["host"] = rhs.host;
         node["port"] = rhs.port;
-        node["uds_socket"] = rhs.uds_socket;
-        node["log_level"] = rhs.log_level;
         node["max_connections"] = rhs.max_connections;
+        node["max_upload_size_bytes"] = rhs.max_upload_size_bytes;
         return node;
     }
 
-    static bool decode(const Node& node, ServerConfig& rhs) {
+    static bool decode(const Node& node, WebsocketConfig& rhs) {
         if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(true);
         rhs.host = node["host"].as<std::string>("0.0.0.0");
         rhs.port = node["port"].as<uint16_t>(8080);
-        rhs.uds_socket = node["uds_socket"].as<std::string>("/tmp/vaulthalla.sock");
-        rhs.log_level = node["log_level"].as<std::string>("info");
-        rhs.max_connections = node["max_connections"].as<int>(1024);
+        rhs.max_connections = node["max_connections"].as<unsigned int>(1024);
+        rhs.max_upload_size_bytes = node["max_upload_size_mb"].as<uintmax_t>(2048) * 1024 * 1024; // Default 2GB
         return true;
     }
 };
 
-// FuseConfig
+template<>
+struct convert<HttpPreviewConfig> {
+    static Node encode(const HttpPreviewConfig& rhs) {
+        Node node;
+        node["enabled"] = rhs.enabled;
+        node["host"] = rhs.host;
+        node["port"] = rhs.port;
+        node["max_connections"] = rhs.max_connections;
+        node["max_preview_size_bytes"] = rhs.max_preview_size_bytes;
+        return node;
+    }
+
+    static bool decode(const Node& node, HttpPreviewConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(true);
+        rhs.host = node["host"].as<std::string>("0.0.0.0");
+        rhs.port = node["port"].as<uint16_t>(8081);
+        rhs.max_connections = node["max_connections"].as<unsigned int>(512);
+        rhs.max_preview_size_bytes = node["max_preview_size_mb"].as<uintmax_t>(100) * 1024 * 1024; // Default 100MB
+        return true;
+    }
+};
 
 template<>
 struct convert<FuseConfig> {
     static Node encode(const FuseConfig& rhs) {
         Node node;
-        node["enabled"] = rhs.enabled;
-        node["root_mount_path"] = rhs.root_mount_path;
-        node["backing_path"] = rhs.backing_path;
-        node["mount_per_user"] = rhs.mount_per_user;
-        node["fuse_timeout_seconds"] = rhs.fuse_timeout_seconds;
-        node["allow_other"] = rhs.allow_other;
         node["admin_linux_uid"] = rhs.admin_linux_uid;
         return node;
     }
 
     static bool decode(const Node& node, FuseConfig& rhs) {
         if (!node.IsMap()) return false;
-        rhs.enabled = node["enabled"].as<bool>(true);
-        rhs.root_mount_path = node["root_mount_path"].as<std::string>("/mnt/vaulthalla");
-        rhs.backing_path = node["backing_path"].as<std::string>("/var/lib/vaulthalla");
-        rhs.mount_per_user = node["mount_per_user"].as<bool>(true);
-        rhs.fuse_timeout_seconds = node["fuse_timeout_seconds"].as<int>(60);
-        rhs.allow_other = node["allow_other"].as<bool>(true);
         rhs.admin_linux_uid = node["admin_linux_uid"].as<unsigned int>(0); // Default to root
+        return true;
+    }
+};
+
+static std::string to_std_string(const spdlog::string_view_t sv) { return {sv.data(), sv.size()}; }
+
+template<>
+struct convert<SubsystemLogLevelsConfig> {
+    static Node encode(const SubsystemLogLevelsConfig& rhs) {
+        Node node;
+        node["vaulthalla"]  = to_std_string(spdlog::level::to_string_view(rhs.vaulthalla));
+        node["fuse"]        = to_std_string(spdlog::level::to_string_view(rhs.fuse));
+        node["filesystem"]  = to_std_string(spdlog::level::to_string_view(rhs.filesystem));
+        node["crypto"]      = to_std_string(spdlog::level::to_string_view(rhs.crypto));
+        node["cloud"]       = to_std_string(spdlog::level::to_string_view(rhs.cloud));
+        node["auth"]        = to_std_string(spdlog::level::to_string_view(rhs.auth));
+        node["websocket"]   = to_std_string(spdlog::level::to_string_view(rhs.websocket));
+        node["http"]        = to_std_string(spdlog::level::to_string_view(rhs.http));
+        node["shell"]       = to_std_string(spdlog::level::to_string_view(rhs.shell));
+        node["db"]          = to_std_string(spdlog::level::to_string_view(rhs.db));
+        node["sync"]        = to_std_string(spdlog::level::to_string_view(rhs.sync));
+        node["thumb"]       = to_std_string(spdlog::level::to_string_view(rhs.thumb));
+        node["storage"]     = to_std_string(spdlog::level::to_string_view(rhs.storage));
+        node["types"]       = to_std_string(spdlog::level::to_string_view(rhs.types));
+        return node;
+    }
+
+    static bool decode(const Node& node, SubsystemLogLevelsConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.vaulthalla = spdlog::level::from_str(node["vaulthalla"].as<std::string>("debug"));
+        rhs.fuse = spdlog::level::from_str(node["fuse"].as<std::string>("debug"));
+        rhs.filesystem = spdlog::level::from_str(node["filesystem"].as<std::string>("info"));
+        rhs.crypto = spdlog::level::from_str(node["crypto"].as<std::string>("info"));
+        rhs.cloud = spdlog::level::from_str(node["cloud"].as<std::string>("info"));
+        rhs.auth = spdlog::level::from_str(node["auth"].as<std::string>("info"));
+        rhs.websocket = spdlog::level::from_str(node["websocket"].as<std::string>("info"));
+        rhs.http = spdlog::level::from_str(node["http"].as<std::string>("info"));
+        rhs.shell = spdlog::level::from_str(node["shell"].as<std::string>("info"));
+        rhs.db = spdlog::level::from_str(node["db"].as<std::string>("warn"));
+        rhs.sync = spdlog::level::from_str(node["sync"].as<std::string>("info"));
+        rhs.thumb = spdlog::level::from_str(node["thumb"].as<std::string>("info"));
+        rhs.storage = spdlog::level::from_str(node["storage"].as<std::string>("info"));
+        rhs.types = spdlog::level::from_str(node["types"].as<std::string>("info"));
+        return true;
+    }
+};
+
+template<>
+struct convert<LogLevelsConfig> {
+    static Node encode(const LogLevelsConfig& rhs) {
+        Node node;
+        node["console_log_level"] = to_std_string(spdlog::level::to_string_view(rhs.console_log_level));
+        node["file_log_level"]    = to_std_string(spdlog::level::to_string_view(rhs.file_log_level));
+        node["subsystem_levels"]  = rhs.subsystem_levels;
+        return node;
+    }
+
+    static bool decode(const Node& node, LogLevelsConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.console_log_level = spdlog::level::from_str(node["console_log_level"].as<std::string>("info"));
+        rhs.file_log_level = spdlog::level::from_str(node["file_log_level"].as<std::string>("debug"));
+        rhs.subsystem_levels = node["subsystem_levels"].as<SubsystemLogLevelsConfig>();
         return true;
     }
 };
@@ -66,15 +135,17 @@ template<>
 struct convert<LoggingConfig> {
     static Node encode(const LoggingConfig& rhs) {
         Node node;
-        node["log_dir"] = rhs.log_dir.string();
         node["log_rotation_days"] = rhs.log_rotation_days.count();
+        node["audit_log_rotation_days"] = rhs.audit_log_rotation_days.count();
+        node["log_levels"] = rhs.levels;
         return node;
     }
 
     static bool decode(const Node& node, LoggingConfig& rhs) {
         if (!node.IsMap()) return false;
-        rhs.log_dir = node["log_dir"].as<std::string>("/var/log/vaulthalla");
-        rhs.log_rotation_days = std::chrono::days(node["log_rotation_days"].as<int>(30));
+        rhs.log_rotation_days = std::chrono::days(node["log_rotation_days"].as<unsigned int>(7));
+        rhs.audit_log_rotation_days = std::chrono::days(node["audit_log_rotation_days"].as<unsigned int>(30));
+        rhs.levels = node["log_levels"].as<LogLevelsConfig>();
         return true;
     }
 };
@@ -184,9 +255,7 @@ struct convert<SourceCacheFlags> {
     static bool decode(const Node& node, SourceCacheFlags& rhs) {
         if (!node.IsMap()) return false;
         rhs.thumbnails = node["thumbnails"].as<bool>(true);
-        if (const auto docs = node["documents"]) {
-            rhs.documents.pdf = docs["pdf"].as<bool>(true);
-        }
+        if (const auto docs = node["documents"]) rhs.documents.pdf = docs["pdf"].as<bool>(true);
         return true;
     }
 };
@@ -252,8 +321,6 @@ struct convert<AuthConfig> {
         Node node;
         node["token_expiry_minutes"] = rhs.token_expiry_minutes;
         node["refresh_token_expiry_days"] = rhs.refresh_token_expiry_days;
-        node["jwt_secret"] = rhs.jwt_secret;
-        node["allow_signup"] = rhs.allow_signup;
         return node;
     }
 
@@ -261,98 +328,40 @@ struct convert<AuthConfig> {
         if (!node.IsMap()) return false;
         rhs.token_expiry_minutes = node["token_expiry_minutes"].as<int>(60);
         rhs.refresh_token_expiry_days = node["refresh_token_expiry_days"].as<int>(7);
-        rhs.jwt_secret = node["jwt_secret"].as<std::string>("changeme-very-secret");
-        rhs.allow_signup = node["allow_signup"].as<bool>(false);
         return true;
     }
 };
 
-// MetricsConfig
-
 template<>
-struct convert<MetricsConfig> {
-    static Node encode(const MetricsConfig& rhs) {
+struct convert<SharingConfig> {
+    static Node encode(const SharingConfig& rhs) {
         Node node;
         node["enabled"] = rhs.enabled;
-        node["port"] = rhs.port;
-        return node;
-    }
-
-    static bool decode(const Node& node, MetricsConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.enabled = node["enabled"].as<bool>(true);
-        rhs.port = node["port"].as<uint16_t>(9100);
-        return true;
-    }
-};
-
-// AdminUIConfig
-
-template<>
-struct convert<AdminUIConfig> {
-    static Node encode(const AdminUIConfig& rhs) {
-        Node node;
-        node["enabled"] = rhs.enabled;
-        node["bind_port"] = rhs.bind_port;
-        node["allowed_ips"] = rhs.allowed_ips;
-        return node;
-    }
-
-    static bool decode(const Node& node, AdminUIConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.enabled = node["enabled"].as<bool>(true);
-        rhs.bind_port = node["bind_port"].as<uint16_t>(9090);
-        if (node["allowed_ips"]) rhs.allowed_ips = node["allowed_ips"].as<std::vector<std::string>>();
-        return true;
-    }
-};
-
-// SchedulerConfig
-
-template<>
-struct convert<SchedulerConfig> {
-    static Node encode(const SchedulerConfig& rhs) {
-        Node node;
-        node["cleanup_interval_hours"] = rhs.cleanup_interval_hours;
-        node["audit_prune_days"] = rhs.audit_prune_days;
-        node["usage_refresh_minutes"] = rhs.usage_refresh_minutes;
-        return node;
-    }
-
-    static bool decode(const Node& node, SchedulerConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.cleanup_interval_hours = node["cleanup_interval_hours"].as<int>(24);
-        rhs.audit_prune_days = node["audit_prune_days"].as<int>(90);
-        rhs.usage_refresh_minutes = node["usage_refresh_minutes"].as<int>(10);
-        return true;
-    }
-};
-
-// AdvancedConfig
-
-template<>
-struct convert<AdvancedConfig> {
-    static Node encode(const AdvancedConfig& rhs) {
-        Node node;
-        node["enable_file_versioning"] = rhs.enable_file_versioning;
-        node["max_upload_size_mb"] = rhs.max_upload_size_mb;
-        node["enable_sharing"] = rhs.enable_sharing;
         node["enable_public_links"] = rhs.enable_public_links;
-        node["rate_limit_per_ip_per_minute"] = rhs.rate_limit_per_ip_per_minute;
-        node["dev_mode"] = rhs.dev_mode;
-        node["init_dev_r2_test_vault"] = rhs.init_dev_r2_test_vault;
         return node;
     }
 
-    static bool decode(const Node& node, AdvancedConfig& rhs) {
+    static bool decode(const Node& node, SharingConfig& rhs) {
         if (!node.IsMap()) return false;
-        rhs.enable_file_versioning = node["enable_file_versioning"].as<bool>(true);
-        rhs.max_upload_size_mb = node["max_upload_size_mb"].as<int>(2048);
-        rhs.enable_sharing = node["enable_sharing"].as<bool>(true);
+        rhs.enabled = node["enabled"].as<bool>(true);
         rhs.enable_public_links = node["enable_public_links"].as<bool>(true);
-        rhs.rate_limit_per_ip_per_minute = node["rate_limit_per_ip_per_minute"].as<int>(60);
-        rhs.dev_mode = node["dev_mode"].as<bool>(false);
-        rhs.init_dev_r2_test_vault = node["init_dev_r2_test_vault"].as<bool>(false);
+        return true;
+    }
+};
+
+template<>
+struct convert<DevConfig> {
+    static Node encode(const DevConfig& rhs) {
+        Node node;
+        node["enabled"] = rhs.enabled;
+        node["init_r2_test_vault"] = rhs.init_r2_test_vault;
+        return node;
+    }
+
+    static bool decode(const Node& node, DevConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(false);
+        rhs.init_r2_test_vault = node["init_r2_test_vault"].as<bool>(false);
         return true;
     }
 };

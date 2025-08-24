@@ -25,6 +25,7 @@
 #include <ranges>
 #include <vector>
 #include <algorithm>
+#include <paths.h>
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -137,7 +138,7 @@ void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t m
         dir->name = to_snake_case(vault->name);
         dir->parent_id = FSEntryQueries::getRootEntry()->id;
         dir->base32_alias = vault->mount_point;
-        dir->backing_path = ConfigRegistry::get().fuse.backing_path / dir->base32_alias;
+        dir->backing_path = paths::getBackingPath() / dir->base32_alias;
         dir->fuse_path = absPath;
         dir->created_at = dir->updated_at = std::time(nullptr);
         dir->mode = mode;

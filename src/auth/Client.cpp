@@ -36,20 +36,20 @@ std::shared_ptr<WebSocketSession> Client::getSession() const {
 
 void Client::setSession(const std::shared_ptr<WebSocketSession>& session) {
     if (!session) {
-        LogRegistry::ws()->error("[Client] Cannot set session: session is null.");
+        LogRegistry::ws()->debug("[Client] Cannot set session: session is null.");
         return;
     }
     session_ = session;
     if (user_) session_->setAuthenticatedUser(user_);
     else {
-        LogRegistry::ws()->warn("[Client] Session set without user. User must be set before session.");
+        LogRegistry::ws()->debug("[Client] Session set without user. User must be set before session.");
         session_->setAuthenticatedUser(nullptr);
     }
 }
 
 void Client::setUser(const std::shared_ptr<User>& user) {
     if (!user) {
-        LogRegistry::ws()->error("[Client] Cannot set user: user is null.");
+        LogRegistry::ws()->debug("[Client] Cannot set user: user is null.");
         return;
     }
     user_ = user;
@@ -83,22 +83,22 @@ bool Client::isAuthenticated() const {
 
 void Client::refreshToken() {
     if (user_) token_ = std::make_shared<Token>(generateToken(user_->name), user_->id);
-    else LogRegistry::ws()->error("[Client] Cannot refresh token: user is not set.");
+    else LogRegistry::ws()->debug("[Client] Cannot refresh token: user is not set.");
 }
 
 void Client::invalidateToken() {
     if (token_) {
         token_->revoke();
-        LogRegistry::ws()->info("[Client] Token invalidated for user: {}", user_ ? user_->name : "unknown");
-    } else LogRegistry::ws()->error("[Client] Cannot invalidate token: token is not set.");
+        LogRegistry::ws()->debug("[Client] Token invalidated for user: {}", user_ ? user_->name : "unknown");
+    } else LogRegistry::ws()->debug("[Client] Cannot invalidate token: token is not set.");
 }
 
 void Client::closeConnection() {
     if (session_) {
         invalidateToken();
         session_->close();
-        LogRegistry::ws()->info("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
-    } else LogRegistry::ws()->error("[Client] Cannot close connection: session is not set.");
+        LogRegistry::ws()->debug("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
+    } else LogRegistry::ws()->debug("[Client] Cannot close connection: session is not set.");
 }
 
 bool Client::validateToken(const std::string& token) const {
@@ -113,21 +113,21 @@ bool Client::validateToken(const std::string& token) const {
 
         return true;
     } catch (const std::exception& e) {
-        LogRegistry::ws()->error("[Client] Token validation failed: {}", e.what());
+        LogRegistry::ws()->debug("[Client] Token validation failed: {}", e.what());
         return false;
     }
 }
 
 void Client::sendControlMessage(const std::string& type, const nlohmann::json& payload) const {
     if (!isAuthenticated()) {
-        LogRegistry::ws()->error("[Client] Cannot send control message: client is not authenticated.");
+        LogRegistry::ws()->debug("[Client] Cannot send control message: client is not authenticated.");
         return;
     }
 
     const nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
 
     if (session_) session_->send(msg);
-    else LogRegistry::ws()->error("[Client] Cannot send control message: session is not set.");
+    else LogRegistry::ws()->debug("[Client] Cannot send control message: session is not set.");
 }
 
 std::string Client::generateToken(const std::string& name) const {

@@ -17,6 +17,7 @@
 #include <cstring>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#include <paths.h>
 
 using namespace vh::database;
 using namespace vh::types;
@@ -252,7 +253,7 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
     try {
         const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
-        const auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(path);
+        const auto backingPath = paths::getBackingPath() / stripLeadingSlash(path);
 
         const int fd = ::open(backingPath.c_str(), fi->flags & O_ACCMODE);
         if (fd < 0) {
@@ -410,7 +411,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
+        auto backingPath = paths::getBackingPath() / stripLeadingSlash(fullPath);
         if (::unlink(backingPath.c_str()) < 0) {
             LogRegistry::fuse()->error("[unlink] Failed to remove backing file: {}: {}", backingPath.string(), strerror(errno));
             fuse_reply_err(req, errno);
@@ -449,7 +450,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        auto backingPath = ConfigRegistry::get().fuse.backing_path / stripLeadingSlash(fullPath);
+        auto backingPath = paths::getBackingPath() / stripLeadingSlash(fullPath);
         if (::rmdir(backingPath.c_str()) < 0) {
             LogRegistry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", backingPath.string(), strerror(errno));
             fuse_reply_err(req, errno);
@@ -518,7 +519,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
     LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
     try {
         struct statvfs st{};
-        auto backingPath = ConfigRegistry::get().fuse.backing_path;
+        auto backingPath = paths::getBackingPath();
 
         if (::statvfs(backingPath.c_str(), &st) < 0) {
             LogRegistry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", backingPath.string(), strerror(errno));

@@ -6,7 +6,8 @@ project('vaulthalla', 'cpp',
             'warning_level=3',
             'cpp_std=c++23',
             'unity=on',
-            'unity_size=9'
+            'unity_size=9',
+            'prefix=/usr'
         ]
 )
 
@@ -30,10 +31,28 @@ vh_version_header = configure_file(
     install_dir: get_option('includedir') / 'vaulthalla'
 )
 
-lib_version = static_library(
-    'vaulthalla-version',
-    join_paths(meson.project_source_root(), 'main/version.cpp'),
-    include_directories: include_directories('.')
+
+# ╭──────────────────── PATH HEADER ─────────────────────╮
+
+config_dir = join_paths('/', get_option('sysconfdir'), meson.project_name())
+log_dir = join_paths(get_option('localstatedir'), 'log', meson.project_name())
+state_dir = join_paths(get_option('localstatedir'), 'lib', meson.project_name())
+runtime_dir = join_paths(get_option('localstatedir'), 'run', meson.project_name())
+
+conf = configuration_data()
+conf.set_quoted('VH_MOUNT_PATH', join_paths('/mnt', meson.project_name()))
+conf.set_quoted('VH_CONFIG_PATH', join_paths(config_dir, 'config.yaml'))
+conf.set_quoted('VH_LOG_PATH', log_dir)
+conf.set_quoted('VH_BACKING_PATH', state_dir)
+conf.set_quoted('VH_RUNTIME_PATH', runtime_dir)
+conf.set_quoted('VH_CACHE_PATH', '/.cache')
+
+vh_paths_header = configure_file(
+    input: 'deploy/path/paths.h.in',
+    output: 'paths.h',
+    configuration: conf,
+    install: true,
+    install_dir: get_option('includedir') / 'vaulthalla'
 )
 
 
@@ -125,7 +144,7 @@ lib_usage_native = static_library('vhusage-native',
 
 dep = declare_dependency(
     include_directories: inc,
-    link_with: [lib_core, lib_seed, lib_version, lib_usage],
+    link_with: [lib_core, lib_seed, lib_usage],
     dependencies: deps
 )
 
@@ -183,8 +202,8 @@ install_dir = join_paths(get_option('prefix'), get_option('bindir'))
 install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
-install_data('deploy/config/config.yaml', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
-install_data('deploy/config/config_template.yaml.in', install_dir: join_paths(get_option('sysconfdir'), 'vaulthalla'))
+install_data('deploy/config/config.yaml', install_dir: config_dir)
+install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
 install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
 
 configure_file(

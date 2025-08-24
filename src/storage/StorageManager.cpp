@@ -26,7 +26,7 @@ void StorageManager::initStorageEngines() {
     std::scoped_lock lock(mutex_);
 
 
-    if (const auto& config = ConfigRegistry::get().advanced; config.dev_mode && config.init_dev_r2_test_vault)
+    if (const auto& config = ConfigRegistry::get().dev; config.enabled && config.init_r2_test_vault)
         if (const auto admin = UserQueries::getUserByName("admin");
             !VaultQueries::vaultExists("R2 Test Vault", admin->id)) seed::initDevCloudVault();
 

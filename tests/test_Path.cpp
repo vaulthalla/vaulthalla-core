@@ -4,8 +4,9 @@
 #include "util/fsPath.hpp"
 
 #include <filesystem>
+#include <paths.h>
 
-#include "../include/services/LogRegistry.hpp"
+#include "services/LogRegistry.hpp"
 
 namespace fs = std::filesystem;
 using namespace vh::types;
@@ -15,7 +16,7 @@ class PathTest : public ::testing::Test {
 protected:
     fs::path vaultFuseMount = "/admin", vaultBackingMount = "/QQQAF9_HWXSAFJXY6NH6EESSHVFN05RPC";
     void SetUp() override {
-        ConfigRegistry::init({"/etc/vaulthalla/config.yaml"});
+        ConfigRegistry::init();
         vh::logging::LogRegistry::init(fs::temp_directory_path() / "vaulthalla");
     }
 };

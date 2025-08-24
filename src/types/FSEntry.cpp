@@ -15,6 +15,7 @@
 #include <pugixml.hpp>
 #include <algorithm>
 #include <ranges>
+#include <paths.h>
 
 using namespace vh::types;
 using namespace vh::util;
@@ -61,7 +62,7 @@ FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
     else is_system = row["is_system"].as<bool>();
 
     fuse_path = fs::path("/");
-    backing_path = ConfigRegistry::get().fuse.backing_path;
+    backing_path = paths::getBackingPath();
     for (const auto& r : parentRows) {
         fuse_path /= r["name"].as<std::string>();
         backing_path /= r["base32_alias"].as<std::string>();

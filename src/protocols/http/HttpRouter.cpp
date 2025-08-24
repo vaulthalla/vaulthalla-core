@@ -40,7 +40,7 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
         return res;
     }
 
-    if (!ConfigRegistry::get().advanced.dev_mode) {
+    if (!ConfigRegistry::get().dev.enabled) {
         try {
             const auto refresh_token = util::extractCookie(req, "refresh");
             authManager_->validateRefreshToken(refresh_token);

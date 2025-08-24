@@ -31,7 +31,7 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         const auto token = client->getToken();
 
         if (client->connOpenedAt() + UNAUTHENTICATED_SESSION_TIMEOUT < std::chrono::system_clock::now() && !token) {
-            LogRegistry::ws()->info("[LifecycleManager] Closing unauthenticated session (no token) opened at {}",
+            LogRegistry::ws()->debug("[LifecycleManager] Closing unauthenticated session (no token) opened at {}",
                                     std::chrono::system_clock::to_time_t(client->connOpenedAt()));
             client->sendControlMessage("unauthenticated_session_timeout", {});
             client->closeConnection();
@@ -40,9 +40,10 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         }
 
         if (!token || token->revoked) {
-            if (const auto user = client->getUser())
-                LogRegistry::ws()->info("[LifecycleManager] Token revoked. Closing session for user {}", user->id);
-            client->sendControlMessage("token_revoked", {});
+            if (const auto user = client->getUser()) {
+                LogRegistry::ws()->debug("[LifecycleManager] Token revoked. Closing session for user {}", user->id);
+                client->sendControlMessage("token_revoked", {});
+            }
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
             continue;
@@ -51,17 +52,21 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         const auto secondsLeft = token->getTimeLeft();
 
         if (secondsLeft <= 0) {
-            if (const auto user = client->getUser())
-                LogRegistry::ws()->info("[LifecycleManager] Token expired. Closing session for user {}", user->id);
-            client->sendControlMessage("token_expired", {});
+            if (const auto user = client->getUser()) {
+                LogRegistry::ws()->debug("[LifecycleManager] Token expired. Closing session for user {}", user->id);
+                client->sendControlMessage("token_expired", {});
+            }
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
             continue;
         }
 
-        if (secondsLeft <= 10)
-            client->sendControlMessage("token_refresh_urgent", {{"deadline_ms", 10000}});
-        else if (secondsLeft <= 300)
-            client->sendControlMessage("token_refresh_requested", {{"deadline_ms", 300000}});
+        // sendControlMessage requires a user to be set
+        if (client->getUser()) {
+            if (secondsLeft <= 10)
+                client->sendControlMessage("token_refresh_urgent", {{"deadline_ms", 10000}});
+            else if (secondsLeft <= 300)
+                client->sendControlMessage("token_refresh_requested", {{"deadline_ms", 300000}});
+        }
     }
 }

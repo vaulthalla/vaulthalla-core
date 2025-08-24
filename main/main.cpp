@@ -42,8 +42,8 @@ void signalHandler(const int signum) {
 
 int main() {
     try {
-        ConfigRegistry::init(loadConfig("/etc/vaulthalla/config.yaml"));
-        LogRegistry::init(ConfigRegistry::get().logging.log_dir);
+        ConfigRegistry::init();
+        LogRegistry::init();
 
         FPDF_LIBRARY_CONFIG config;
         config.version = 3;

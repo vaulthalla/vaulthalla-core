@@ -5,59 +5,20 @@
 # ═══════════════════════════════════════════════════════
 
 # === 🧠 CORE SERVER SETTINGS ===
-server:
-  host: 0.0.0.0                     # Bind address for API/WebSocket daemon
-  port: 36969                       # Main API listener port
-  uds_socket: /tmp/vaulthalla.sock  # Unix domain socket for internal IPC
-  log_level: info                   # debug | info | warn | error
-  max_connections: 1024             # Max concurrent API connections
+websocket_server:
+  enabled: true                     # Enable WebSocket server for frontend communication
+  host: 0.0.0.0
+  port: 36969
+  max_connections: 1024
+  max_upload_size_mb: 2048
 
-# === 🪓 FUSE MOUNT SETTINGS ===
-fuse:
-  enabled: true                      # Mounting enabled
-  root_mount_path: /mnt/vaulthalla   # Base mountpoint for all volumes
-  backing_path: /var/lib/vaulthalla  # Backing store for FUSE mounts
-  mount_per_user: true               # Isolate each user's mount
-  fuse_timeout_seconds: 60           # Idle timeout for auto-unmount
-  allow_other: true                  # Allow access by non-calling users (e.g. Nextcloud)
-  admin_linux_uid: 1000              # UID for admin user (Linux) to allow full access
+http_preview_server:
+  enabled: true                     # Enable HTTP server for file previews
+  host: 0.0.0.0
+  port: 36970
+  max_connections: 512
+  max_preview_size_mb: 512
 
-# === Caching & Previews ===
-caching:
-  path: ".cache"               # Local cache directory (relative to root_mount_path)
-  max_size_mb: 10240           # Max size for full-size cache (10 GB)
-
-  # Cloud caching settings
-  cloud:
-    thumbnails: true
-    full_size: true
-    documents:
-      pdf: true
-  # Local caching settings
-  local:
-    thumbnails: true
-    documents:
-      pdf: true
-
-  # Cloud preview settings
-  cloud_preview:
-    expiry_days: 7
-    mirror: true               # Mirror full-size files to local storage, false = on demand caching of cloud files
-
-  # Thumbnail settings
-  thumbnails:
-    formats: [jpg, jpeg, png, webp, pdf]
-    sizes: [128, 256, 512]                    # Thumbnail sizes in pixels
-    expiry_days: 30
-
-  # Document previews
-  previews:
-    # General document preview settings
-    documents:
-      # PDF preview settings
-      pdf:
-        max_pages: 0                  # Max pages to generate previews for (0 = all)
-        expiry_days: 15               # How long to keep PDF previews
 
 # === 🐘 DATABASE SETTINGS ===
 database:
@@ -69,37 +30,76 @@ database:
   password: changeme
   pool_size: 10                # Max DB connection pool size
 
+
 # === 🔐 AUTHENTICATION SETTINGS ===
 auth:
   token_expiry_minutes: 60          # JWT access token TTL
   refresh_token_expiry_days: 7      # Refresh token TTL
-  jwt_secret: changeme-very-secret  # 🔐 Override with VAULTHALLA_JWT_SECRET
-  allow_signup: false               # Enable/disable open registration
 
-# === 📊 METRICS / MONITORING ===
-metrics:
-  enabled: true                # Enable Prometheus metrics
-  port: 9100                   # Metrics endpoint port
 
-# === 🛡️ ADMIN UI / DASHBOARD ===
-admin_ui:
-  enabled: true                # Enable embedded UI
-  bind_port: 9090              # Port to serve UI
-  allowed_ips:                 # Whitelisted IPs for access
-    - 127.0.0.1
-    - "::1"
+# === 🤝 SHARING SETTINGS ===
+sharing:
+  enabled: true                # Enable internal sharing features
+  enable_public_links: true    # Enable public share links
 
-# === 🧼 BACKGROUND TASKS ===
-scheduler:
-  cleanup_interval_hours: 24   # Cleanup cycle frequency
-  audit_prune_days: 90         # Audit log TTL
-  usage_refresh_minutes: 10    # How often to refresh user usage stats
 
-# === ⚙️ ADVANCED FEATURES ===
-advanced:
-  max_upload_size_mb: 2048          # Upload limit per file
-  enable_sharing: true              # Allow internal file sharing
-  enable_public_links: true         # Allow external share links
-  rate_limit_per_ip_per_minute: 60  # API request limiter
-  dev_mode: false                   # Enable development features (not for production)
-  init_dev_r2_test_vault: false     # Initialize a test R2 vault in dev mode
+# === Caching & Previews ===
+caching:
+  max_size_mb: 10240           # Max size for full-size cache (10 GB)
+
+  cloud:
+    thumbnails: true
+    full_size: true
+    documents:
+      pdf: true
+
+  local:
+    thumbnails: true
+    documents:
+      pdf: true
+
+  # Cloud preview settings
+  cloud_preview:
+    expiry_days: 7
+    mirror: true               # Mirror full-size files to local storage, false = on demand caching of cloud files
+
+  thumbnails:
+    formats: [jpg, jpeg, png, webp, pdf]
+    sizes: [128, 256, 512]
+    expiry_days: 30
+
+  previews:
+    documents:
+      pdf:
+        max_pages: 0
+        expiry_days: 15
+
+
+# === 📜 LOGGING SETTINGS ===
+logging:
+  log_rotation_days: 7
+  audit_log_rotation_days: 30
+  log_levels:
+    console_log_level: info
+    file_log_level: debug
+    subsystem_levels:
+      vaulthalla: info
+      fuse: info
+      filesystem: info
+      cloud: info
+      crypto: info
+      auth: info
+      websocket: info
+      http: info
+      shell: warn
+      db: info
+      sync: info
+      thumb: info
+      storage: info
+      types: info
+
+
+# === 🛠️ DEVELOPMENT SETTINGS ===
+dev:
+  enabled: false                    # Enable dev mode features
+  init_r2_test_vault: false         # Initialize a test R2 vault in dev mode

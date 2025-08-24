@@ -3,9 +3,10 @@
 
 #include <cstdlib>
 #include <yaml-cpp/yaml.h>
-#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
+#include <paths.h>
+#include <nlohmann/json.hpp>
 
 namespace vh::config {
 
@@ -17,20 +18,18 @@ Config loadConfig(const std::string& path) {
     Config cfg;
     YAML::Node root = YAML::LoadFile(path);
 
-    if (auto node = root["server"]) YAML::convert<ServerConfig>::decode(node, cfg.server);
+    if (auto node = root["websocket_server"]) YAML::convert<WebsocketConfig>::decode(node, cfg.websocket);
+    if (auto node = root["http_preview_server"]) YAML::convert<HttpPreviewConfig>::decode(node, cfg.http_preview);
     if (auto node = root["fuse"]) YAML::convert<FuseConfig>::decode(node, cfg.fuse);
     if (auto node = root["logging"]) YAML::convert<LoggingConfig>::decode(node, cfg.logging);
     if (auto node = root["caching"]) YAML::convert<CachingConfig>::decode(node, cfg.caching);
     if (auto node = root["database"]) YAML::convert<DatabaseConfig>::decode(node, cfg.database);
     if (auto node = root["auth"]) YAML::convert<AuthConfig>::decode(node, cfg.auth);
-    if (auto node = root["metrics"]) YAML::convert<MetricsConfig>::decode(node, cfg.metrics);
-    if (auto node = root["admin_ui"]) YAML::convert<AdminUIConfig>::decode(node, cfg.admin_ui);
-    if (auto node = root["scheduler"]) YAML::convert<SchedulerConfig>::decode(node, cfg.scheduler);
-    if (auto node = root["advanced"]) YAML::convert<AdvancedConfig>::decode(node, cfg.advanced);
+    if (auto node = root["sharing"]) YAML::convert<SharingConfig>::decode(node, cfg.sharing);
+    if (auto node = root["dev"]) YAML::convert<DevConfig>::decode(node, cfg.dev);
 
     // 👇 Handle ENV overrides separately
     if (const char* pw = std::getenv("VAULTHALLA_DB_PASSWORD")) cfg.database.password = pw;
-    if (const char* jwt = std::getenv("VAULTHALLA_JWT_SECRET")) cfg.auth.jwt_secret = jwt;
 
     return cfg;
 }
@@ -39,8 +38,8 @@ void Config::save() const {
     using namespace std;
     namespace fs = std::filesystem;
 
-    const fs::path configFile = CONFIG_FILE_PATH / "config.yaml";
-    const fs::path templateFile = CONFIG_FILE_PATH / "config_template.yaml.in";
+    const fs::path configFile = paths::getConfigPath();
+    const fs::path templateFile = paths::getConfigPath().parent_path() / "config_template.yaml.in";
 
     // Read in the static template with comments
     ifstream templateIn(templateFile);
@@ -54,20 +53,19 @@ void Config::save() const {
     const auto encode = []<typename T>(const T& section) -> std::string {
         YAML::Emitter out;
         out << YAML::convert<T>::encode(section);
-        return std::string(out.c_str());
+        return {out.c_str()};
     };
 
     unordered_map<string, string> sectionMap = {
-        {"server", encode(server)},
+        {"websocket_server", encode(websocket)},
+        {"http_preview_server", encode(http_preview)},
         {"fuse", encode(fuse)},
         {"logging", encode(logging)},
         {"caching", encode(caching)},
         {"database", encode(database)},
         {"auth", encode(auth)},
-        {"metrics", encode(metrics)},
-        {"admin_ui", encode(admin_ui)},
-        {"scheduler", encode(scheduler)},
-        {"advanced", encode(advanced)}
+        {"sharing", encode(sharing)},
+        {"dev", encode(dev)}
     };
 
     // Replace section stubs
@@ -89,176 +87,294 @@ void Config::save() const {
 }
 
 void to_json(nlohmann::json& j, const Config& c) {
-    j = nlohmann::json{
-        {"server", {
-             {"host", c.server.host},
-             {"port", c.server.port},
-             {"uds_socket", c.server.uds_socket},
-             {"log_level", c.server.log_level},
-             {"max_connections", c.server.max_connections}
-         }},
-        {"fuse", {
-             {"enabled", c.fuse.enabled},
-             {"root_mount_path", c.fuse.root_mount_path},
-            {"backing_path", c.fuse.backing_path},
-             {"mount_per_user", c.fuse.mount_per_user},
-             {"fuse_timeout_seconds", c.fuse.fuse_timeout_seconds},
-             {"allow_other", c.fuse.allow_other},
-            {"admin_linux_uid", c.fuse.admin_linux_uid}
-         }},
-        {"logging", {
-             {"log_dir", c.logging.log_dir},
-             {"log_rotation_days", c.logging.log_rotation_days.count()}
-         }},
-        {"caching", {
-             {"path", c.caching.path},
-             {"max_size_mb", c.caching.max_size_mb},
-             {"cloud", {
-                  {"thumbnails", c.caching.cloud.thumbnails},
-                  {"documents", {
-                       {"pdf", c.caching.cloud.documents.pdf}
-                   }}
-              }},
-             {"local", {
-                  {"thumbnails", c.caching.local.thumbnails},
-                  {"documents", {
-                       {"pdf", c.caching.local.documents.pdf}
-                   }}
-              }},
-             {"cloud_preview", {
-                  {"expiry_days", c.caching.cloud_preview.expiry_days},
-                  {"mirror", c.caching.cloud_preview.mirror}
-              }},
-             {"thumbnails", {
-                  {"formats", c.caching.thumbnails.formats},
-                  {"sizes", c.caching.thumbnails.sizes},
-                  {"expiry_days", c.caching.thumbnails.expiry_days}
-              }},
-             {"previews", {
-                  {"documents", {
-                       {"pdf", {
-                            {"enabled", c.caching.previews.documents.pdf.enabled},
-                            {"max_pages", c.caching.previews.documents.pdf.max_pages},
-                            {"expiry_days", c.caching.previews.documents.pdf.expiry_days}
-                        }}
-                   }}
-              }}
-         }},
-        {"database", {
-             {"host", c.database.host},
-             {"port", c.database.port},
-             {"name", c.database.name},
-             {"user", c.database.user},
-             {"password", c.database.password}, // Sensitive, handle with care
-             {"pool_size", c.database.pool_size}
-         }},
-        {"auth", {
-             {"token_expiry_minutes", c.auth.token_expiry_minutes},
-             {"refresh_token_expiry_days", c.auth.refresh_token_expiry_days},
-             {"jwt_secret", c.auth.jwt_secret}, // Sensitive, handle with care
-             {"allow_signup", c.auth.allow_signup}
-         }},
-        {"metrics", {
-             {"enabled", c.metrics.enabled},
-             {"port", c.metrics.port}
-         }},
-        {"admin_ui", {
-             {"enabled", c.admin_ui.enabled},
-             {"bind_port", c.admin_ui.bind_port},
-             {"allowed_ips", c.admin_ui.allowed_ips}
-         }},
-        {"scheduler", {
-             {"cleanup_interval_hours", c.scheduler.cleanup_interval_hours},
-             {"audit_prune_days", c.scheduler.audit_prune_days},
-             {"usage_refresh_minutes", c.scheduler.usage_refresh_minutes}
-         }},
-        {"advanced", {
-             {"enable_file_versioning", c.advanced.enable_file_versioning},
-             {"max_upload_size_mb", c.advanced.max_upload_size_mb},
-             {"enable_sharing", c.advanced.enable_sharing},
-             {"enable_public_links", c.advanced.enable_public_links},
-             {"rate_limit_per_ip_per_minute", c.advanced.rate_limit_per_ip_per_minute},
-             {"dev_mode", c.advanced.dev_mode},
-            {"init_dev_r2_test_vault", c.advanced.init_dev_r2_test_vault}
-         }}
+    j = {
+        {"websocket_server", c.websocket},
+        {"http_preview_server", c.http_preview},
+        {"fuse", c.fuse},
+        {"logging", c.logging},
+        {"caching", c.caching},
+        {"database", c.database},
+        {"auth", c.auth},
+        {"sharing", c.sharing},
+        {"dev", c.dev}
     };
 }
 
 void from_json(const nlohmann::json& j, Config& c) {
-    c.server.host = j.at("server").at("host").get<std::string>();
-    c.server.port = j.at("server").at("port").get<uint16_t>();
-    c.server.uds_socket = j.at("server").at("uds_socket").get<std::string>();
-    c.server.log_level = j.at("server").at("log_level").get<std::string>();
-    c.server.max_connections = j.at("server").at("max_connections").get<uint16_t>();
+    j.at("websocket_server").get_to(c.websocket);
+    j.at("http_preview_server").get_to(c.http_preview);
+    j.at("fuse").get_to(c.fuse);
+    j.at("logging").get_to(c.logging);
+    j.at("caching").get_to(c.caching);
+    j.at("database").get_to(c.database);
+    j.at("auth").get_to(c.auth);
+    j.at("sharing").get_to(c.sharing);
+    j.at("dev").get_to(c.dev);
+}
 
-    c.fuse.enabled = j.at("fuse").at("enabled").get<bool>();
-    c.fuse.root_mount_path = j.at("fuse").at("root_mount_path").get<std::string>();
-    c.fuse.backing_path = j.at("fuse").at("backing_path").get<std::string>();
-    c.fuse.mount_per_user = j.at("fuse").at("mount_per_user").get<bool>();
-    c.fuse.fuse_timeout_seconds = j.at("fuse").at("fuse_timeout_seconds").get<int>();
-    c.fuse.allow_other = j.at("fuse").at("allow_other").get<bool>();
-    c.fuse.admin_linux_uid = j.at("fuse").at("admin_linux_uid").get<unsigned int>();
+void to_json(nlohmann::json& j, const WebsocketConfig& c) {
+    j = {
+        {"enabled", c.enabled},
+        {"host", c.host},
+        {"port", c.port},
+        {"max_connections", c.max_connections},
+        {"max_upload_size_bytes", c.max_upload_size_bytes}
+    };
+}
 
-    c.logging.log_dir = j.at("logging").at("log_dir").get<std::string>();
-    c.logging.log_rotation_days = std::chrono::days(j.at("logging").at("log_rotation_days").get<unsigned int>());
+void from_json(const nlohmann::json& j, WebsocketConfig& c) {
+    c.enabled = j.value("enabled", true);
+    c.host = j.value("host", "0.0.0.0");
+    c.port = j.value("port", 33369);
+    c.max_connections = j.value("max_connections", 10000);
+    c.max_upload_size_bytes = j.value("max_upload_size_bytes", MAX_UPLOAD_SIZE_BYTES);
+}
 
-    // Add inside from_json(const nlohmann::json& j, Config& c)
-    const auto& cache = j.at("caching");
-    c.caching.path = cache.at("path").get<std::string>();
-    c.caching.max_size_mb = cache.at("max_size_mb").get<unsigned int>();
+void to_json(nlohmann::json& j, const HttpPreviewConfig& c) {
+    j = {
+        {"enabled", c.enabled},
+        {"host", c.host},
+        {"port", c.port}
+    };
+}
 
-    const auto& cloud = cache.at("cloud");
-    c.caching.cloud.thumbnails = cloud.at("thumbnails").get<bool>();
-    c.caching.cloud.documents.pdf = cloud.at("documents").at("pdf").get<bool>();
+void from_json(const nlohmann::json& j, HttpPreviewConfig& c) {
+    c.enabled = j.value("enabled", true);
+    c.host = j.value("host", "0.0.0.0");
+    c.port = j.value("port", 33370);
+    c.max_connections = j.value("max_connections", 512);
+    c.max_preview_size_bytes = j.value("max_preview_size_bytes", MAX_PREVIEW_SIZE_BYTES);
+}
 
-    const auto& local = cache.at("local");
-    c.caching.local.thumbnails = local.at("thumbnails").get<bool>();
-    c.caching.local.documents.pdf = local.at("documents").at("pdf").get<bool>();
+void to_json(nlohmann::json& j, const FuseConfig& c) {
+    j = {
+        {"admin_linux_uid", c.admin_linux_uid}
+    };
+}
 
-    const auto& cp = cache.at("cloud_preview");
-    c.caching.cloud_preview.expiry_days = cp.at("expiry_days").get<unsigned int>();
-    c.caching.cloud_preview.mirror = cp.at("mirror").get<bool>();
+void from_json(const nlohmann::json& j, FuseConfig& c) {
+    c.admin_linux_uid = j.value("admin_linux_uid", 0);
+}
 
-    const auto& thumbs = cache.at("thumbnails");
-    c.caching.thumbnails.formats = thumbs.at("formats").get<std::vector<std::string> >();
-    c.caching.thumbnails.sizes = thumbs.at("sizes").get<std::vector<unsigned int> >();
-    c.caching.thumbnails.expiry_days = thumbs.at("expiry_days").get<unsigned int>();
+void to_json(nlohmann::json& j, const LoggingConfig& c) {
+    j = {
+        {"log_rotation_days", c.log_rotation_days.count()},
+        {"audit_log_rotation_days", c.audit_log_rotation_days.count()},
+        {"levels", c.levels}
+    };
+}
 
-    const auto& previews = cache.at("previews").at("documents").at("pdf");
-    c.caching.previews.documents.pdf.enabled = previews.at("enabled").get<bool>();
-    c.caching.previews.documents.pdf.max_pages = previews.at("max_pages").get<unsigned int>();
-    c.caching.previews.documents.pdf.expiry_days = previews.at("expiry_days").get<unsigned int>();
+void from_json(const nlohmann::json& j, LoggingConfig& c) {
+    c.log_rotation_days = std::chrono::days(j.value("log_rotation_days", 7));
+    c.audit_log_rotation_days = std::chrono::days(j.value("audit_log_rotation_days", 30));
+    j.at("levels").get_to(c.levels);
+}
 
-    c.database.host = j.at("database").at("host").get<std::string>();
-    c.database.port = j.at("database").at("port").get<uint16_t>();
-    c.database.name = j.at("database").at("name").get<std::string>();
-    c.database.user = j.at("database").at("user").get<std::string>();
-    c.database.password = j.at("database").at("password").get<std::string>(); // Sensitive, handle with care
-    c.database.pool_size = j.at("database").at("pool_size").get<uint16_t>();
+void to_json(nlohmann::json& j, const LogLevelsConfig& c) {
+    j = {
+        {"console_log_level", c.console_log_level},
+        {"file_log_level", c.file_log_level},
+        {"subsystem_levels", c.subsystem_levels}
+    };
+}
 
-    c.auth.token_expiry_minutes = j.at("auth").at("token_expiry_minutes").get<int>();
-    c.auth.refresh_token_expiry_days = j.at("auth").at("refresh_token_expiry_days").get<int>();
-    c.auth.jwt_secret = j.at("auth").at("jwt_secret").get<std::string>(); // Sensitive, handle with care
-    c.auth.allow_signup = j.at("auth").at("allow_signup").get<bool>();
+void from_json(const nlohmann::json& j, LogLevelsConfig& c) {
+    c.console_log_level = j.value("console_log_level", spdlog::level::info);
+    c.file_log_level = j.value("file_log_level", spdlog::level::debug);
+    j.at("subsystem_levels").get_to(c.subsystem_levels);
+}
 
-    c.metrics.enabled = j.at("metrics").at("enabled").get<bool>();
-    c.metrics.port = j.at("metrics").at("port").get<uint16_t>();
+void to_json(nlohmann::json& j, const SubsystemLogLevelsConfig& c) {
+    j = {
+        {"vaulthalla", c.vaulthalla},
+        {"fuse", c.fuse},
+        {"filesystem", c.filesystem},
+        {"crypto", c.crypto},
+        {"cloud", c.cloud},
+        {"auth", c.auth},
+        {"websocket", c.websocket},
+        {"http", c.http},
+        {"shell", c.shell},
+        {"db", c.db},
+        {"sync", c.sync},
+        {"thumb", c.thumb},
+        {"storage", c.storage},
+        {"types", c.types}
+    };
+}
 
-    c.admin_ui.enabled = j.at("admin_ui").at("enabled").get<bool>();
-    c.admin_ui.bind_port = j.at("admin_ui").at("bind_port").get<uint16_t>();
-    c.admin_ui.allowed_ips = j.at("admin_ui").at("allowed_ips").get<std::vector<std::string> >();
+void from_json(const nlohmann::json& j, SubsystemLogLevelsConfig& c) {
+    c.vaulthalla = j.value("vaulthalla", spdlog::level::debug);
+    c.fuse = j.value("fuse", spdlog::level::debug);
+    c.filesystem = j.value("filesystem", spdlog::level::info);
+    c.crypto = j.value("crypto", spdlog::level::info);
+    c.cloud = j.value("cloud", spdlog::level::info);
+    c.auth = j.value("auth", spdlog::level::info);
+    c.websocket = j.value("websocket", spdlog::level::info);
+    c.http = j.value("http", spdlog::level::info);
+    c.shell = j.value("shell", spdlog::level::info);
+    c.db = j.value("db", spdlog::level::warn);
+    c.sync = j.value("sync", spdlog::level::info);
+    c.thumb = j.value("thumb", spdlog::level::info);
+    c.storage = j.value("storage", spdlog::level::info);
+    c.types = j.value("types", spdlog::level::info);
+}
 
-    c.scheduler.cleanup_interval_hours = j.at("scheduler").at("cleanup_interval_hours").get<int>();
-    c.scheduler.audit_prune_days = j.at("scheduler").at("audit_prune_days").get<int>();
-    c.scheduler.usage_refresh_minutes = j.at("scheduler").at("usage_refresh_minutes").get<int>();
+void to_json(nlohmann::json& j, const PDFDocumentConfig& c) {
+    j = {
+        {"enabled", c.enabled},
+        {"max_pages", c.max_pages},
+        {"expiry_days", c.expiry_days}
+    };
+}
 
-    c.advanced.enable_file_versioning = j.at("advanced").at("enable_file_versioning").get<bool>();
-    c.advanced.max_upload_size_mb = j.at("advanced").at("max_upload_size_mb").get<int>();
-    c.advanced.enable_sharing = j.at("advanced").at("enable_sharing").get<bool>();
-    c.advanced.enable_public_links = j.at("advanced").at("enable_public_links").get<bool>();
-    c.advanced.rate_limit_per_ip_per_minute = j.at("advanced").at("rate_limit_per_ip_per_minute").get<int>();
-    c.advanced.dev_mode = j.at("advanced").at("dev_mode").get<bool>();
-    c.advanced.init_dev_r2_test_vault = j.at("advanced").at("init_dev_r2_test_vault").get<bool>();
+void from_json(const nlohmann::json& j, PDFDocumentConfig& c) {
+    c.enabled = j.value("enabled", true);
+    c.max_pages = j.value("max_pages", 0);
+    c.expiry_days = j.value("expiry_days", 15);
+}
+
+void to_json(nlohmann::json& j, const DocumentPreviewConfig& c) {
+    j = {
+        {"pdf", c.pdf}
+    };
+}
+
+void from_json(const nlohmann::json& j, DocumentPreviewConfig& c) {
+    j.at("pdf").get_to(c.pdf);
+}
+
+void to_json(nlohmann::json& j, const PreviewConfig& c) {
+    j = {
+        {"documents", c.documents}
+    };
+}
+
+void from_json(const nlohmann::json& j, PreviewConfig& c) {
+    j.at("documents").get_to(c.documents);
+}
+
+void to_json(nlohmann::json& j, const ThumbnailsConfig& c) {
+    j = {
+        {"formats", c.formats},
+        {"sizes", c.sizes},
+        {"expiry_days", c.expiry_days}
+    };
+}
+
+void from_json(const nlohmann::json& j, ThumbnailsConfig& c) {
+    c.formats = j.value("formats", std::vector<std::string>{"jpg", "jpeg", "png", "webp", "pdf"});
+    c.sizes = j.value("sizes", std::vector<unsigned int>{128, 256, 512});
+    c.expiry_days = j.value("expiry_days", 30);
+}
+
+void to_json(nlohmann::json& j, const FullSizeCacheConfig& c) {
+    j = {
+        {"mirror", c.mirror},
+        {"expiry_days", c.expiry_days}
+    };
+}
+
+void from_json(const nlohmann::json& j, FullSizeCacheConfig& c) {
+    c.mirror = j.value("mirror", true);
+    c.expiry_days = j.value("expiry_days", 7);
+}
+
+void to_json(nlohmann::json& j, const SourceCacheFlags& c) {
+    j = {
+        {"thumbnails", c.thumbnails},
+        {"documents", {{"pdf", c.documents.pdf}}}
+    };
+}
+
+void from_json(const nlohmann::json& j, SourceCacheFlags& c) {
+    c.thumbnails = j.value("thumbnails", true);
+    if (const auto docs = j.find("documents"); docs != j.end()) {
+        c.documents.pdf = docs->value("pdf", true);
+    } else {
+        c.documents.pdf = true;
+    }
+}
+
+
+void to_json(nlohmann::json& j, const CachingConfig& c) {
+    j = {
+        {"path", c.path.string()},
+        {"thumbnails", c.thumbnails},
+        {"cloud", c.cloud_preview},
+        {"local", c.local},
+        {"cloud_preview", c.cloud_preview},
+        {"previews", c.previews},
+        {"max_size_mb", c.max_size_mb}
+    };
+}
+
+void from_json(const nlohmann::json& j, CachingConfig& c) {
+    j.at("thumbnails").get_to(c.thumbnails);
+    j.at("cloud").get_to(c.cloud);
+    j.at("local").get_to(c.local);
+    j.at("cloud_preview").get_to(c.cloud_preview);
+    j.at("previews").get_to(c.previews);
+    c.path = j.value("path", ".cache");
+    c.max_size_mb = j.value("max_size_mb", 10240);
+}
+
+void to_json(nlohmann::json& j, const DatabaseConfig& c) {
+    j = {
+        {"host", c.host},
+        {"port", c.port},
+        {"name", c.name},
+        {"user", c.user},
+        // Do not serialize password
+        {"pool_size", c.pool_size}
+    };
+}
+
+void from_json(const nlohmann::json& j, DatabaseConfig& c) {
+    c.host = j.value("host", "localhost");
+    c.port = j.value("port", 5432);
+    c.name = j.value("name", "vaulthalla");
+    c.user = j.value("user", "vaulthalla");
+    c.password = j.value("password", "changeme");
+    c.pool_size = j.value("pool_size", 10);
+}
+
+void to_json(nlohmann::json& j, const AuthConfig& c) {
+    j = {
+        {"token_expiry_minutes", c.token_expiry_minutes},
+        {"refresh_token_expiry_days", c.refresh_token_expiry_days}
+        // Do not serialize jwt_secret
+    };
+}
+
+void from_json(const nlohmann::json& j, AuthConfig& c) {
+    c.token_expiry_minutes = j.value("token_expiry_minutes", 60);
+    c.refresh_token_expiry_days = j.value("refresh_token_expiry_days", 7);
+    c.jwt_secret = j.value("jwt_secret", "changeme");
+}
+
+void to_json(nlohmann::json& j, const SharingConfig& c) {
+    j = {
+        {"enabled", c.enabled},
+        {"enable_public_links", c.enable_public_links}
+    };
+}
+
+void from_json(const nlohmann::json& j, SharingConfig& c) {
+    c.enabled = j.value("enabled", true);
+    c.enable_public_links = j.value("enable_public_links", true);
+}
+
+void to_json(nlohmann::json& j, const DevConfig& c) {
+    j = {
+        {"enabled", c.enabled},
+        {"init_r2_test_vault", c.init_r2_test_vault}
+    };
+}
+
+void from_json(const nlohmann::json& j, DevConfig& c) {
+    c.enabled = j.value("enabled", false);
+    c.init_r2_test_vault = j.value("init_r2_test_vault", false);
 }
 
 } // namespace vh::config

@@ -1,0 +1,21 @@
+#pragma once
+
+#define VH_CONFIG_PATH @VH_CONFIG_PATH@
+#define VH_LOG_PATH @VH_LOG_PATH@
+#define VH_MOUNT_PATH @VH_MOUNT_PATH@
+#define VH_BACKING_PATH @VH_BACKING_PATH@
+#define VH_RUNTIME_PATH @VH_RUNTIME_PATH@
+#define VH_CACHE_PATH @VH_CACHE_PATH@
+
+#include <filesystem>
+
+namespace vh::paths {
+
+inline std::filesystem::path getConfigPath() { return VH_CONFIG_PATH; }
+inline std::filesystem::path getLogPath() { return VH_LOG_PATH; }
+inline std::filesystem::path getMountPath() { return VH_MOUNT_PATH; }
+inline std::filesystem::path getBackingPath() { return VH_BACKING_PATH; }
+inline std::filesystem::path getRuntimePath() { return VH_RUNTIME_PATH; }
+inline std::filesystem::path getCachePath() { return VH_CACHE_PATH; }
+
+}

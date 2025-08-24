@@ -3,13 +3,15 @@
 #include <memory>
 #include <string>
 #include <spdlog/spdlog.h>
+#include <paths.h>
+#include <filesystem>
 
 namespace vh::logging {
 
 class LogRegistry {
 public:
     // Initialize all loggers with sinks/levels.
-    static void init(const std::string& logDir);
+    static void init(const std::filesystem::path& logDir = paths::getLogPath());
 
     // Generic access by name
     static std::shared_ptr<spdlog::logger> get(const std::string& name);

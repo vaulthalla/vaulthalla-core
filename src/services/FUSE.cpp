@@ -1,16 +1,15 @@
 #include "services/FUSE.hpp"
 #include "services/ServiceManager.hpp"
 #include "storage/FUSEBridge.hpp"
-#include "config/ConfigRegistry.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FUSERequestTask.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "services/LogRegistry.hpp"
 
 #include <cstring>
 #include <thread>
 #include <atomic>
+#include <paths.h>
 
 using namespace vh::services;
 using namespace vh::concurrency;
@@ -64,7 +63,7 @@ void FUSE::runLoop() {
         "vaulthalla-fuse",
         "-f",
         "-o", "allow_other",
-        config::ConfigRegistry::get().fuse.root_mount_path.string()
+        paths::getMountPath()
     };
 
     std::vector<std::unique_ptr<char[]>> ownedCStrs;

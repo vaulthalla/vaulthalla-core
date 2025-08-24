@@ -3,20 +3,22 @@
 #include "config/ConfigRegistry.hpp"
 #include "services/LogRegistry.hpp"
 
+#include <paths.h>
+
 using namespace vh::types;
 using namespace vh::config;
 using namespace vh::logging;
 
 Path::Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount)
-    : fuseRoot(ConfigRegistry::get().fuse.root_mount_path),
+    : fuseRoot(paths::getMountPath()),
       vaultRoot(fuseRoot / stripLeadingSlash(vaultFuseMount)),
-      cacheRoot(ConfigRegistry::get().fuse.backing_path /
+      cacheRoot(paths::getBackingPath() /
                 stripLeadingSlash(ConfigRegistry::get().caching.path) /
                 stripLeadingSlash(vaultBackingMount)),
       thumbnailRoot(cacheRoot / "thumbnails"),
       fileCacheRoot(cacheRoot / "files"),
-      backingRoot(ConfigRegistry::get().fuse.backing_path),
-      backingVaultRoot(ConfigRegistry::get().fuse.backing_path /
+      backingRoot(paths::getBackingPath()),
+      backingVaultRoot(paths::getBackingPath() /
                        stripLeadingSlash(vaultBackingMount)) {
 
     LogRegistry::storage()->debug("[Path] Initialized paths:\nfuseRoot: {}\nvaultRoot: {}\n"

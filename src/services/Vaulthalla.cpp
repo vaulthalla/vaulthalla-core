@@ -45,20 +45,29 @@ void Vaulthalla::runLoop() {
 }
 
 void Vaulthalla::initProtocols() {
-    const auto& serverConfig = ConfigRegistry::get().server;
-    const auto addr = boost::asio::ip::make_address(serverConfig.host);
-    auto port = serverConfig.port;
+    if (const auto& cfg = ConfigRegistry::get(); !cfg.websocket.enabled && !cfg.http_preview.enabled) {
+        LogRegistry::vaulthalla()->warn(
+            "[Vaulthalla] Both WebSocket and HTTP preview servers are disabled in configuration. Nothing to start.");
+        return;
+    }
 
     ioContext_ = std::make_shared<boost::asio::io_context>();
 
-    initWebsocketServer(boost::asio::ip::tcp::endpoint(addr, port++));
-    initHttpServer(boost::asio::ip::tcp::endpoint(addr, port));
+    initWebsocketServer();
+    initHttpServer();
 
     ioThread_ = std::thread([ctx = ioContext_] { ctx->run(); });
 }
 
 
-void Vaulthalla::initWebsocketServer(const boost::asio::ip::tcp::endpoint& endpoint) {
+void Vaulthalla::initWebsocketServer() {
+    const auto& cfg = ConfigRegistry::get().websocket;
+    if (!cfg.enabled) {
+        LogRegistry::vaulthalla()->info("[Vaulthalla] WebSocket server is disabled in configuration.");
+        return;
+    }
+
+    const auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(cfg.host), cfg.port);
     wsRouter_ = std::make_shared<websocket::WebSocketRouter>();
     wsHandler_ = std::make_shared<websocket::WebSocketHandler>(wsRouter_);
     wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint, wsRouter_);
@@ -66,7 +75,14 @@ void Vaulthalla::initWebsocketServer(const boost::asio::ip::tcp::endpoint& endpo
     wsServer_->run();
 }
 
-void Vaulthalla::initHttpServer(const boost::asio::ip::tcp::endpoint& endpoint) {
+void Vaulthalla::initHttpServer() {
+    const auto& cfg = ConfigRegistry::get().http_preview;
+    if (!cfg.enabled) {
+        LogRegistry::vaulthalla()->info("[Vaulthalla] HTTP preview server is disabled in configuration.");
+        return;
+    }
+
+    const auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(cfg.host), cfg.port);
     httpServer_ = std::make_shared<http::HttpServer>(*ioContext_, endpoint);
     httpServer_->run();
 }

@@ -39,11 +39,8 @@ private:
     std::shared_ptr<http::HttpServer> httpServer_;
 
     void initProtocols();
-
-    void initWebsocketServer(const boost::asio::ip::tcp::endpoint& endpoint);
-
-    void initHttpServer(const boost::asio::ip::tcp::endpoint& endpoint);
-
+    void initWebsocketServer();
+    void initHttpServer();
     void initThreatIntelligence();
 };
 

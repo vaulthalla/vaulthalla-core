@@ -46,7 +46,7 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Added API key for user ID: {}", userID);
+        LogRegistry::storage()->debug("[StorageHandler] Added API key for user ID: {}", userID);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleAddAPIKey error: {}", e.what());
 
@@ -71,7 +71,7 @@ void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& sessi
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Removed API key with ID: {} for user ID: {}", keyId, user->id);
+        LogRegistry::storage()->debug("[StorageHandler] Removed API key with ID: {} for user ID: {}", keyId, user->id);
 
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleRemoveAPIKey error: {}", e.what());
@@ -200,7 +200,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Added vault with ID: {} and type: {}", vault->id, type);
+        LogRegistry::storage()->debug("[StorageHandler] Added vault with ID: {} and type: {}", vault->id, type);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleAddVault error: {}", e.what());
 
@@ -229,7 +229,7 @@ void StorageHandler::handleUpdateVault(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Updated vault with ID: {}", vault->id);
+        LogRegistry::storage()->debug("[StorageHandler] Updated vault with ID: {}", vault->id);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleUpdateVault error: {}", e.what());
 
@@ -260,7 +260,7 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Removed vault with ID: {}", vaultId);
+        LogRegistry::storage()->debug("[StorageHandler] Removed vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleRemoveVault error: {}", e.what());
 
@@ -297,7 +297,7 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Fetched vault with ID: {}", vaultId);
+        LogRegistry::storage()->debug("[StorageHandler] Fetched vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleGetVault error: {}", e.what());
 
@@ -358,7 +358,7 @@ void StorageHandler::handleSyncVault(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        LogRegistry::storage()->info("[StorageHandler] Triggered sync for vault ID: {}", vaultId);
+        LogRegistry::storage()->debug("[StorageHandler] Triggered sync for vault ID: {}", vaultId);
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[StorageHandler] handleSyncVault error: {}", e.what());
 

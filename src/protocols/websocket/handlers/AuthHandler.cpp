@@ -42,9 +42,9 @@ void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) const 
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] User '{}' logged in successfully.", username);
+        LogRegistry::ws()->debug("[AuthHandler] User '{}' logged in successfully.", username);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleLogin error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleLogin error: {}", e.what());
 
         const json response = {{"command", "auth.login.response"}, {"status", "error"}, {"error", e.what()}};
 
@@ -80,9 +80,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] User '{}' registered successfully.", name);
+        LogRegistry::ws()->debug("[AuthHandler] User '{}' registered successfully.", name);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleRegister error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleRegister error: {}", e.what());
 
         const json response = {{"command", "auth.register.response"},
                          {"status", "error"},
@@ -111,9 +111,9 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Updated user '{}' data.", user->name);
+        LogRegistry::ws()->debug("[AuthHandler] Updated user '{}' data.", user->name);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleUpdateUser error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleUpdateUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.update.response"},
                          {"status", "error"},
@@ -141,9 +141,9 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] User '{}' changed password successfully.", user->name);
+        LogRegistry::ws()->debug("[AuthHandler] User '{}' changed password successfully.", user->name);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleChangePassword error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleChangePassword error: {}", e.what());
 
         const json response = {{"command", "auth.user.change_password.response"},
                          {"status", "error"},
@@ -175,9 +175,9 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Fetched user '{}' data.", requestedUser->name);
+        LogRegistry::ws()->debug("[AuthHandler] Fetched user '{}' data.", requestedUser->name);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleGetUser error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleGetUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.get.response"},
                          {"status", "error"},
@@ -206,9 +206,9 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
 
         session.send(response);
 
-        LogRegistry::auth()->debug("[AuthHandler] Session '{}' refreshed successfully.", session.getRefreshToken());
+        LogRegistry::ws()->debug("[AuthHandler] Session '{}' refreshed successfully.", session.getRefreshToken());
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleRefresh error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleRefresh error: {}", e.what());
 
         const json response = {{"command", "auth.refresh.response"},
                          {"status", "error"},
@@ -236,9 +236,9 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Session '{}' logged out successfully.", refreshToken);
+        LogRegistry::ws()->debug("[AuthHandler] Session '{}' logged out successfully.", refreshToken);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleLogout error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleLogout error: {}", e.what());
 
         const json response = {{"command", "auth.logout.response"},
                          {"status", "error"},
@@ -266,9 +266,9 @@ void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Fetched list of users successfully.");
+        LogRegistry::ws()->debug("[AuthHandler] Fetched list of users successfully.");
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleListUsers error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleListUsers error: {}", e.what());
 
         json response = {{"command", "auth.users.list.response"},
                          {"status", "error"},
@@ -301,9 +301,9 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Checked authentication status for token '{}'.", token);
+        LogRegistry::ws()->debug("[AuthHandler] Checked authentication status for token '{}'.", token);
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] isUserAuthenticated error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] isUserAuthenticated error: {}", e.what());
 
         const json response = {{"command", "auth.isAuthenticated.response"},
                          {"status", "error"},
@@ -334,9 +334,9 @@ void AuthHandler::handleGetUserByName(const json& msg, WebSocketSession& session
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Fetched user by name successfully.");
+        LogRegistry::ws()->debug("[AuthHandler] Fetched user by name successfully.");
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] handleGetUserByName error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] handleGetUserByName error: {}", e.what());
 
         const json response = {{"command", "auth.user.get.byName.response"},
                          {"status", "error"},
@@ -360,9 +360,9 @@ void AuthHandler::doesAdminHaveDefaultPassword(const json& msg, WebSocketSession
 
         session.send(response);
 
-        LogRegistry::auth()->info("[AuthHandler] Checked if admin has default password.");
+        LogRegistry::ws()->debug("[AuthHandler] Checked if admin has default password.");
     } catch (const std::exception& e) {
-        LogRegistry::auth()->error("[AuthHandler] doesAdminHaveDefaultPassword error: {}", e.what());
+        LogRegistry::ws()->error("[AuthHandler] doesAdminHaveDefaultPassword error: {}", e.what());
 
         const json response = {{"command", "auth.admin.default_password.response"},
                          {"status", "error"},

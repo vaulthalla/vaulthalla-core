@@ -16,7 +16,7 @@ using namespace vh::logging;
 UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}
 
 void UploadHandler::startUpload(const UploadArgs& args) {
-    LogRegistry::ws()->info("[UploadHandler] Starting upload (uploadId: {}, tmpPath: {}, finalPath: {}, "
+    LogRegistry::ws()->debug("[UploadHandler] Starting upload (uploadId: {}, tmpPath: {}, finalPath: {}, "
                             "fuseFrom: {}, fuseTo: {}, expectedSize: {})",
                              args.uploadId, args.tmpPath.string(), args.finalPath.string(),
                              args.fuseFrom.string(), args.fuseTo.string(), args.expectedSize);

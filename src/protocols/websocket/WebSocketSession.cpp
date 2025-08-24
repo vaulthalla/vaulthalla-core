@@ -75,7 +75,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
     // ── Lambda: what happens once the WebSocket handshake is accepted ──
     auto onHandshakeAccepted = [self](beast::error_code ec) {
         if (ec) {
-            LogRegistry::ws()->error("[Session] Handshake error: {}", ec.message());
+            LogRegistry::ws()->debug("[Session] Handshake error: {}", ec.message());
             return;
         }
 
@@ -89,7 +89,7 @@ void WebSocketSession::accept(tcp::socket&& socket) {
     auto onHeadersRead = [self, req, setHandshakeResponseHeaders, onHandshakeAccepted](beast::error_code ec,
         std::size_t) {
         if (ec) {
-            LogRegistry::ws()->error("[Session] Error reading HTTP headers: {}", ec.message());
+            LogRegistry::ws()->debug("[Session] Error reading HTTP headers: {}", ec.message());
             return;
         }
 
@@ -119,7 +119,7 @@ void WebSocketSession::close() {
         // close websocket
         beast::error_code ec;
         ws_->close(websocket::close_code::normal, ec);
-        if (ec) LogRegistry::ws()->error("[WebSocketSession] Error closing WebSocket: {}", ec.message());
+        if (ec) LogRegistry::ws()->debug("[WebSocketSession] Error closing WebSocket: {}", ec.message());
     }
 
     ws_.reset(); // release FD
@@ -155,7 +155,7 @@ void WebSocketSession::doWrite() {
 void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
     boost::ignore_unused(bytesWritten);
     if (ec) {
-        LogRegistry::ws()->error("[WebSocketSession] Write error: {}", ec.message());
+        LogRegistry::ws()->debug("[WebSocketSession] Write error: {}", ec.message());
         return;
     }
 
@@ -191,7 +191,7 @@ void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
     }
 
     if (ec) {
-        LogRegistry::ws()->error("[Session] Read error: {}", ec.message());
+        LogRegistry::ws()->debug("[Session] Read error: {}", ec.message());
         close(); // defensive cleanup
         return;
     }
@@ -201,14 +201,14 @@ void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
         try {
             router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
         } catch (const std::exception& ex) {
-            LogRegistry::ws()->error("[Session] Error parsing message: {}", ex.what());
+            LogRegistry::ws()->debug("[Session] Error parsing message: {}", ex.what());
             const json errorResponse = {{"command", "error"},
                                     {"status", "parse_error"},
                                     {"message", "Failed to parse message: " + std::string(ex.what())}};
             send(errorResponse);
             return;
         } catch (...) {
-            LogRegistry::ws()->error("[Session] Unknown error while processing message");
+            LogRegistry::ws()->debug("[Session] Unknown error while processing message");
             const json errorResponse = {{"command", "error"},
                                     {"status", "internal_error"},
                                     {"message", "An internal error occurred while processing your request."}};

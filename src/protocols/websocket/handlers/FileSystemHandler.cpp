@@ -26,7 +26,7 @@ FileSystemHandler::FileSystemHandler()
 
 void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& session) {
     try {
-        LogRegistry::ws()->info("[FileSystemHandler] handleUploadStart called.");
+        LogRegistry::ws()->debug("[FileSystemHandler] handleUploadStart called.");
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         const auto path = payload.at("path").get<std::string>();
@@ -61,7 +61,7 @@ void FileSystemHandler::handleUploadStart(const json& msg, WebSocketSession& ses
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] UploadStart on vault '{}' path '{}' with upload ID '{}'",
+        LogRegistry::fs()->debug("[FileSystemHandler] UploadStart on vault '{}' path '{}' with upload ID '{}'",
                                vaultId, path, uploadId);
 
     } catch (const std::exception& e) {
@@ -91,7 +91,7 @@ void FileSystemHandler::handleUploadFinish(const json& msg, WebSocketSession& se
         };
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] UploadFinish on vault '{}' path '{}'", vaultId, path);
+        LogRegistry::fs()->debug("[FileSystemHandler] UploadFinish on vault '{}' path '{}'", vaultId, path);
 
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleUploadFinish error: {}", e.what());
@@ -127,7 +127,7 @@ void FileSystemHandler::handleMkdir(const json& msg, WebSocketSession& session) 
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] Mkdir on vault '{}' path '{}'", vaultId, path);
+        LogRegistry::fs()->debug("[FileSystemHandler] Mkdir on vault '{}' path '{}'", vaultId, path);
 
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleMkdir error: {}", e.what());
@@ -162,7 +162,7 @@ void FileSystemHandler::handleMove(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] Move on vault '{}' from '{}' to '{}'", vaultId, from, to);
+        LogRegistry::fs()->debug("[FileSystemHandler] Move on vault '{}' from '{}' to '{}'", vaultId, from, to);
 
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleMove error: {}", e.what());
@@ -197,7 +197,7 @@ void FileSystemHandler::handleRename(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] Rename on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
+        LogRegistry::fs()->debug("[FileSystemHandler] Rename on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
 
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleRename error: {}", e.what());
@@ -232,7 +232,7 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] Copy on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
+        LogRegistry::fs()->debug("[FileSystemHandler] Copy on vault '{}' from '{}' to '{}'", vaultId, from.string(), to.string());
 
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleCopy error: {}", e.what());
@@ -245,7 +245,7 @@ void FileSystemHandler::handleCopy(const json& msg, WebSocketSession& session) {
 
 void FileSystemHandler::handleListDir(const json& msg, WebSocketSession& session) {
     try {
-        LogRegistry::ws()->info("[FileSystemHandler] handleListDir called");
+        LogRegistry::ws()->debug("[FileSystemHandler] handleListDir called");
         const auto& payload = msg.at("payload");
         const auto vaultId = payload.at("vault_id").get<unsigned int>();
         auto path = fs::path(payload.value("path", "/"));
@@ -317,7 +317,7 @@ void FileSystemHandler::handleDelete(const json& msg, WebSocketSession& session)
 
         session.send(response);
 
-        LogRegistry::fs()->info("[FileSystemHandler] Delete on vault '{}' path '{}'", vaultId, path.string());
+        LogRegistry::fs()->debug("[FileSystemHandler] Delete on vault '{}' path '{}'", vaultId, path.string());
     } catch (const std::exception& e) {
         LogRegistry::fs()->error("[FileSystemHandler] handleDelete error: {}", e.what());
 

@@ -14,7 +14,7 @@ using namespace vh::logging;
 using namespace std::chrono;
 
 void LocalFSTask::operator()() {
-    LogRegistry::sync()->info("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
+    LogRegistry::sync()->debug("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
     const auto start = steady_clock::now();
 
     try {
@@ -48,7 +48,7 @@ void LocalFSTask::operator()() {
     isRunning_ = false;
     const auto end = steady_clock::now();
     const auto duration = duration_cast<milliseconds>(end - start);
-    LogRegistry::sync()->info("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
+    LogRegistry::sync()->debug("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
     requeue();
 }
 

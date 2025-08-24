@@ -101,7 +101,8 @@ lib_core = static_library(
 
 lib_seed = static_library('vhseed', files(join_paths(source_root, 'seed/src/seed_db.cpp')),
                           include_directories: include_directories('seed/include', 'include', 'vendor'),
-                          link_with: lib_core)
+                          link_with: lib_core
+)
 
 lib_usage = static_library('vhusage',
                            usage_sources,
@@ -125,7 +126,8 @@ lib_usage_native = static_library('vhusage-native',
 dep = declare_dependency(
     include_directories: inc,
     link_with: [lib_core, lib_seed, lib_version, lib_usage],
-    dependencies: deps)
+    dependencies: deps
+)
 
 
 # ╭─────────────────────────────────── EXECUTABLES ────────────────────────────────────╮
@@ -133,12 +135,14 @@ dep = declare_dependency(
 executable('vaulthalla-server', main,
            include_directories: inc,
            dependencies: dep,
-           install: true)
+           install: true
+)
 
 executable('vaulthalla-cli', files(join_paths(source_root, 'main/cli.cpp')),
            include_directories: include_directories('vendor'),
            dependencies: fmt_dep,
-           install: true)
+           install: true
+)
 
 vh_usage = executable('vh_usage', main_usage,
                       include_directories: usage_inc,

@@ -1,9 +1,5 @@
 #pragma once
 
-#include "services/SyncController.hpp"
-#include "services/FUSE.hpp"
-#include "services/Vaulthalla.hpp"
-#include "services/CtlServerService.hpp"
 #include "LogRegistry.hpp"
 
 #include <csignal>
@@ -16,6 +12,13 @@
 #include <atomic>
 
 namespace vh::services {
+
+class AsyncService;
+class SyncController;
+class FUSE;
+class Vaulthalla;
+class CtlServerService;
+class ConnectionLifecycleManager;
 
 class ServiceManager : public std::enable_shared_from_this<ServiceManager> {
 public:
@@ -47,6 +50,7 @@ private:
     std::shared_ptr<FUSE> fuseService;
     std::shared_ptr<Vaulthalla> vaulthallaService;
     std::shared_ptr<CtlServerService> ctlServerService;
+    std::shared_ptr<ConnectionLifecycleManager> connectionLifecycleManager;
 
 
     mutable std::mutex mutex_;

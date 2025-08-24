@@ -22,7 +22,8 @@ class ConnectionLifecycleManager : public AsyncService {
 
     std::shared_ptr<auth::SessionManager> sessionManager_;
 
-    constexpr static std::chrono::milliseconds SweepInterval{1000}; // 1 second sweep interval
+    constexpr static std::chrono::seconds SWEEP_INTERVAL{15};
+    constexpr static std::chrono::seconds UNAUTHENTICATED_SESSION_TIMEOUT{60};
 };
 
 } // namespace vh::services

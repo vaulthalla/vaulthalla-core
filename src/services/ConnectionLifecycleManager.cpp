@@ -17,31 +17,42 @@ ConnectionLifecycleManager::~ConnectionLifecycleManager() {
 }
 
 void ConnectionLifecycleManager::runLoop() {
+    LogRegistry::ws()->info("[LifecycleManager] Started connection lifecycle manager.");
     while (running_ && !interruptFlag_.load()) {
         sweepActiveSessions();
-        std::this_thread::sleep_for(SweepInterval);
+        std::this_thread::sleep_for(SWEEP_INTERVAL);
     }
 }
 
 void ConnectionLifecycleManager::sweepActiveSessions() const {
-    const auto sessions = sessionManager_->getActiveSessions(); // Expose activeSessions_ snapshot in SessionManager
-
-    for (const auto& [tokenStr, client] : sessions) {
+    for (const auto& [tokenStr, client] : sessionManager_->getActiveSessions()) {
         if (!client) continue;
 
         const auto token = client->getToken();
-        const auto secondsLeft = client->getToken()->getTimeLeft();
 
-        if (token->revoked) {
-            LogRegistry::ws()->info("[LifecycleManager] Token revoked. Closing session for user {}", client->getUser()->id);
+        if (client->connOpenedAt() + UNAUTHENTICATED_SESSION_TIMEOUT < std::chrono::system_clock::now() && !token) {
+            LogRegistry::ws()->info("[LifecycleManager] Closing unauthenticated session (no token) opened at {}",
+                                    std::chrono::system_clock::to_time_t(client->connOpenedAt()));
+            client->sendControlMessage("unauthenticated_session_timeout", {});
+            client->closeConnection();
+            sessionManager_->invalidateSession(tokenStr);
+            continue;
+        }
+
+        if (!token || token->revoked) {
+            if (const auto user = client->getUser())
+                LogRegistry::ws()->info("[LifecycleManager] Token revoked. Closing session for user {}", user->id);
             client->sendControlMessage("token_revoked", {});
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
             continue;
         }
 
+        const auto secondsLeft = token->getTimeLeft();
+
         if (secondsLeft <= 0) {
-            LogRegistry::ws()->info("[LifecycleManager] Token expired. Closing session for user {}", client->getUser()->id);
+            if (const auto user = client->getUser())
+                LogRegistry::ws()->info("[LifecycleManager] Token expired. Closing session for user {}", user->id);
             client->sendControlMessage("token_expired", {});
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);

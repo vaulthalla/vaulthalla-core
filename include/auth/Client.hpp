@@ -45,12 +45,15 @@ class Client {
 
     void sendControlMessage(const std::string& type, const nlohmann::json& payload) const;
 
+    [[nodiscard]] std::chrono::system_clock::time_point connOpenedAt() const { return openedAt_; }
+
   private:
     std::shared_ptr<types::User> user_;
     std::shared_ptr<Token> token_{nullptr};
     std::shared_ptr<websocket::WebSocketSession> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
     const std::string jwt_secret_ = config::ConfigRegistry::get().auth.jwt_secret;
+    std::chrono::system_clock::time_point openedAt_ = std::chrono::system_clock::now();
 
     [[nodiscard]] std::string generateToken(const std::string& name) const;
 };

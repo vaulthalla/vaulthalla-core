@@ -1,7 +1,6 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "storage/CloudStorageEngine.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
@@ -26,7 +25,10 @@ void StorageManager::initStorageEngines() {
     LogRegistry::storage()->debug("[StorageManager] Initializing storage engines...");
     std::scoped_lock lock(mutex_);
 
-    if (ConfigRegistry::get().advanced.dev_mode && !UserQueries::adminUserExists()) seed::initDevCloudVault();
+
+    if (const auto& config = ConfigRegistry::get().advanced; config.dev_mode && config.init_dev_r2_test_vault)
+        if (const auto admin = UserQueries::getUserByName("admin");
+            !VaultQueries::vaultExists("R2 Test Vault", admin->id)) seed::initDevCloudVault();
 
     engines_.clear();
 

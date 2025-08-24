@@ -178,7 +178,8 @@ void to_json(nlohmann::json& j, const Config& c) {
              {"enable_sharing", c.advanced.enable_sharing},
              {"enable_public_links", c.advanced.enable_public_links},
              {"rate_limit_per_ip_per_minute", c.advanced.rate_limit_per_ip_per_minute},
-             {"dev_mode", c.advanced.dev_mode}
+             {"dev_mode", c.advanced.dev_mode},
+            {"init_dev_r2_test_vault", c.advanced.init_dev_r2_test_vault}
          }}
     };
 }
@@ -257,6 +258,7 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.advanced.enable_public_links = j.at("advanced").at("enable_public_links").get<bool>();
     c.advanced.rate_limit_per_ip_per_minute = j.at("advanced").at("rate_limit_per_ip_per_minute").get<int>();
     c.advanced.dev_mode = j.at("advanced").at("dev_mode").get<bool>();
+    c.advanced.init_dev_r2_test_vault = j.at("advanced").at("init_dev_r2_test_vault").get<bool>();
 }
 
 } // namespace vh::config

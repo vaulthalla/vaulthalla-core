@@ -340,6 +340,7 @@ struct convert<AdvancedConfig> {
         node["enable_public_links"] = rhs.enable_public_links;
         node["rate_limit_per_ip_per_minute"] = rhs.rate_limit_per_ip_per_minute;
         node["dev_mode"] = rhs.dev_mode;
+        node["init_dev_r2_test_vault"] = rhs.init_dev_r2_test_vault;
         return node;
     }
 
@@ -351,6 +352,7 @@ struct convert<AdvancedConfig> {
         rhs.enable_public_links = node["enable_public_links"].as<bool>(true);
         rhs.rate_limit_per_ip_per_minute = node["rate_limit_per_ip_per_minute"].as<int>(60);
         rhs.dev_mode = node["dev_mode"].as<bool>(false);
+        rhs.init_dev_r2_test_vault = node["init_dev_r2_test_vault"].as<bool>(false);
         return true;
     }
 };

@@ -13,7 +13,7 @@
 
 using namespace vh::shell;
 using namespace vh::logging;
-
+using namespace vh::types;
 
 void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) {
     std::string key = normalize(usage.command.empty() ? usage.ns : usage.ns + " " + usage.command);

@@ -69,8 +69,7 @@ static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
 
     if (outputOpt) {
         LogRegistry::audit()->warn(
-            "[shell::handle_secret_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *
-            outputOpt);
+            "[shell::handle_secret_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *outputOpt);
         try {
             std::ofstream outFile(*outputOpt);
             if (!outFile) return invalid("secrets export: failed to open output file " + *outputOpt);
@@ -146,5 +145,5 @@ static CommandResult handle_secrets(const CommandCall& call) {
 }
 
 void vh::shell::registerSecretsCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(SecretsUsage::secrets_set(), handle_secrets);
+    r->registerCommand(SecretsUsage::secrets(), handle_secrets);
 }

@@ -145,8 +145,8 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
         }
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-                .allow_algorithm(jwt::algorithm::hs256{config::ConfigRegistry::get().auth.jwt_secret})
-                .with_issuer("Vaulthalla") // Optional if you're not setting `iss`
+                .allow_algorithm(jwt::algorithm::hs256{jwt_secret_})
+                .with_issuer("Vaulthalla")
         ;
 
         verifier.verify(decoded);
@@ -233,7 +233,7 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<User>& user, const s
         throw std::runtime_error(oss.str());
     }
 
-    return true; // All checks passed
+    return true;
 }
 
 bool AuthManager::isValidName(const std::string& displayName) {
@@ -273,8 +273,8 @@ std::string generateUUID() {
     return {uuidStr};
 }
 
-std::pair<std::string, std::shared_ptr<RefreshToken> >
-AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) {
+std::pair<std::string, std::shared_ptr<RefreshToken>>
+AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) const {
     const auto now = std::chrono::system_clock::now();
     const auto exp = now + std::chrono::days(config::ConfigRegistry::get().auth.refresh_token_expiry_days);
     std::string jti = generateUUID();
@@ -286,13 +286,12 @@ AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSessio
         .set_issued_at(now)
         .set_expires_at(exp)
         .set_id(jti)
-        .sign(jwt::algorithm::hs256{config::ConfigRegistry::get().auth.jwt_secret});
+        .sign(jwt::algorithm::hs256{jwt_secret_});
 
     return {token,
             std::make_shared<RefreshToken>(jti,
-                                           hashPassword(
-                                               token), // Store hashed token
-                                           0,          // User ID will be set later
+                                           hashPassword(token),     // Store hashed token
+                                           0,                       // User ID will be set later
                                            session->getUserAgent(),
                                            session->getClientIp())};
 }

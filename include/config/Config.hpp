@@ -105,15 +105,12 @@ struct DatabaseConfig {
     uint16_t port = 5432;
     std::string name = "vaulthalla";
     std::string user = "vaulthalla";
-    // TODO: use a more secure method for handling passwords, possibly auto-gen and TPM sealed
-    std::string password = "changeme";
     int pool_size = 10;
 };
 
 struct AuthConfig {
     unsigned int token_expiry_minutes = 60;
     unsigned int refresh_token_expiry_days = 7;
-    std::string jwt_secret = "changeme";
 };
 
 struct SharingConfig {

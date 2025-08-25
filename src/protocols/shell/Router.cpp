@@ -3,7 +3,7 @@
 #include "protocols/shell/Parser.hpp"
 #include "services/LogRegistry.hpp"
 #include "types/User.hpp"
-#include "usage/include/CommandUsage.hpp"
+#include "CommandUsage.hpp"
 #include "ShellUsage.hpp"
 
 #include <fmt/core.h>

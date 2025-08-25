@@ -4,8 +4,6 @@
 #include "protocols/shell/commands.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "services/LogRegistry.hpp"
-#include "CommandUsage.hpp"
-#include "ShellUsage.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -157,7 +155,7 @@ void CtlServerService::runLoop() {
                 ::close(cfd);
                 continue;
             }
-            uint32_t len = ntohl(be);
+            const uint32_t len = ntohl(be);
             if (len > (1u << 20)) {
                 // 1 MiB cap
                 send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "request too large"}});
@@ -207,6 +205,9 @@ void CtlServerService::runLoop() {
                 ::close(cfd);
                 continue;
             }
+
+            LogRegistry::shell()->error("[CtlServerService] No 'line' field in request from UID {} (PID {})", p.uid, p.pid);
+            send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "invalid request"}});
         } catch (...) {
             // best-effort error response
             send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "internal error"}});

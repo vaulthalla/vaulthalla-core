@@ -2,17 +2,14 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "services/LogRegistry.hpp"
-#include "util/cmdLineHelpers.hpp"
 #include "types/User.hpp"
-#include "CommandUsage.hpp"
+#include "usage/include/CommandUsage.hpp"
 #include "ShellUsage.hpp"
 
 #include <fmt/core.h>
 #include <cctype>
-#include <stdexcept>
 #include <string>
 #include <algorithm>
-#include <sys/ioctl.h>
 
 using namespace vh::shell;
 using namespace vh::logging;
@@ -47,24 +44,23 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     return n; // unknown; let caller error
 }
 
-CommandResult Router::execute(const CommandCall& call) const {
-    const auto canonical = canonicalFor(call.name);
-    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
-    if (!commands_.contains(canonical))
-        return {2,
-            ShellUsage::all().filterTopLevelOnly().basicStr(),
-            fmt::format("Unknown command or alias: {}",
-                call.name)};
-    return commands_.at(canonical).handler(call);
-}
-
 CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user) const {
     LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;
 
     if (call.name.empty()) return CommandResult{1, "", "no command provided"};
-    return execute(call);
+    const auto canonical = canonicalFor(call.name);
+
+    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
+
+    if (!commands_.contains(canonical))
+        return {2,
+            ShellUsage::all().filterTopLevelOnly().basicStr(),
+            fmt::format("Unknown command or alias: {}",
+                call.name)};
+
+    return commands_.at(canonical).handler(call);
 }
 
 std::string Router::normalize(const std::string& s) {

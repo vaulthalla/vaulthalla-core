@@ -1,5 +1,12 @@
 #pragma once
+
+#include <memory>
+#include <string>
 #include <pqxx/connection>
+
+namespace vh::crypto {
+    class TPMKeyProvider;
+}
 
 namespace vh::database {
 
@@ -13,6 +20,7 @@ class DBConnection {
     void initPrepared() const;
 
   private:
+    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
     std::string DB_CONNECTION_STR;
     std::unique_ptr<pqxx::connection> conn_;
 
@@ -32,6 +40,7 @@ class DBConnection {
     void initPreparedSync() const;
     void initPreparedCache() const;
     void initPreparedGroups() const;
+    void initPreparedSecrets() const;
 };
 
 struct PathPatterns {

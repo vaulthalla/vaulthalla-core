@@ -18,7 +18,7 @@ APIKeyManager::APIKeyManager() {
 }
 
 void APIKeyManager::initAPIKeys() {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
     auto keys = database::APIKeyQueries::listAPIKeys();
     for (const auto& key : keys) {
         apiKeys_[key->id] = key;
@@ -26,10 +26,10 @@ void APIKeyManager::initAPIKeys() {
 }
 
 unsigned int APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
 
     // --- Encrypt secret_access_key before storage ---
-    std::vector<uint8_t> masterKey = tpmKeyProvider_->getMasterKey();
+    const auto masterKey = tpmKeyProvider_->getMasterKey();
     std::vector<uint8_t> iv;
     const auto plaintext = std::vector<uint8_t>(key->secret_access_key.begin(),
                                           key->secret_access_key.end());
@@ -54,16 +54,16 @@ unsigned int APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
 }
 
 void APIKeyManager::removeAPIKey(const unsigned int keyId, const unsigned int userId) {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
 
-    auto it = apiKeys_.find(keyId);
+    const auto it = apiKeys_.find(keyId);
     if (it != apiKeys_.end()) {
         if (it->second->user_id != userId) {
             throw std::runtime_error("API key does not belong to the user");
         }
         apiKeys_.erase(it);
     } else {
-        auto key = database::APIKeyQueries::getAPIKey(keyId);
+        const auto key = database::APIKeyQueries::getAPIKey(keyId);
         if (!key) throw std::runtime_error("API key not found");
         if (key->user_id != userId) throw std::runtime_error("API key does not belong to the user");
     }
@@ -72,25 +72,25 @@ void APIKeyManager::removeAPIKey(const unsigned int keyId, const unsigned int us
 }
 
 std::vector<std::shared_ptr<APIKey>> APIKeyManager::listAPIKeys() const {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
     return database::APIKeyQueries::listAPIKeys();
 }
 
 std::vector<std::shared_ptr<APIKey>> APIKeyManager::listUserAPIKeys(unsigned int userId) const {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
     return database::APIKeyQueries::listAPIKeys(userId);
 }
 
 std::shared_ptr<APIKey> APIKeyManager::getAPIKey(unsigned int keyId, unsigned int userId) const {
-    std::lock_guard lock(apiKeysMutex_);
+    std::scoped_lock lock(apiKeysMutex_);
 
     auto key = database::APIKeyQueries::getAPIKey(keyId);
     if (!key) throw std::runtime_error("API key not found");
     if (key->user_id != userId) throw std::runtime_error("API key does not belong to the user");
 
     // --- Decrypt secret_access_key before returning ---
-    std::vector<uint8_t> masterKey = tpmKeyProvider_->getMasterKey();
-    auto decrypted = crypto::decrypt_aes256_gcm(
+    const auto masterKey = tpmKeyProvider_->getMasterKey();
+    auto decrypted = decrypt_aes256_gcm(
         key->encrypted_secret_access_key, masterKey, key->iv);
 
     key->secret_access_key.assign(decrypted.begin(), decrypted.end());

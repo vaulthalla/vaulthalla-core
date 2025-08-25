@@ -156,4 +156,17 @@ std::string PasswordUtils::downloadURL(const std::string& url) {
     return response;
 }
 
+std::string PasswordUtils::escape_uri_component(const std::string& input) {
+    std::ostringstream escaped;
+    escaped.fill('0');
+    escaped << std::hex;
+
+    for (const unsigned char c : input) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') escaped << c;
+        else escaped << '%' << std::uppercase << std::setw(2) << static_cast<int>(c);
+    }
+
+    return escaped.str();
+}
+
 } // namespace vh::auth

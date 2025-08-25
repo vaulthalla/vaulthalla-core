@@ -7,11 +7,16 @@
 #include <random>
 #include <stdexcept>
 #include <cstring>
+#include <paths.h>
 
 using namespace std::string_literals;
 using namespace vh::logging;
 
 namespace vh::crypto {
+
+static std::filesystem::path resolveSealedDir(const std::string& key) {
+    return paths::getBackingPath() / (".sealed_" + key + ".blob");
+}
 
 static ESYS_CONTEXT* init_esys() {
     ESYS_CONTEXT* ctx{};
@@ -22,17 +27,20 @@ static ESYS_CONTEXT* init_esys() {
 static std::vector<uint8_t> random_key(std::size_t n = 32) {
     std::vector<uint8_t> k(n);
     std::random_device rd;
-    std::generate(k.begin(), k.end(), [&] { return static_cast<uint8_t>(rd()); });
+    std::ranges::generate(k.begin(), k.end(), [&] { return static_cast<uint8_t>(rd()); });
     return k;
 }
 
-TPMKeyProvider::TPMKeyProvider(std::string path)
-    : sealedDir_(std::move(path)) {
-}
+TPMKeyProvider::TPMKeyProvider(const std::string& name)
+    : name_(name), sealedDir_(resolveSealedDir(name)) {}
 
-void TPMKeyProvider::init() {
-    if (std::filesystem::exists(sealedDir_ / "master.priv")) unseal();
-    else generate_and_seal();
+void TPMKeyProvider::init(const std::optional<std::string>& initSecret) {
+    if (std::filesystem::exists(sealedDir_ / (name_ + ".priv"))) {
+        unseal();
+        return;
+    }
+    if (initSecret) masterKey_ = std::vector<uint8_t>(initSecret->begin(), initSecret->end());
+    generate_and_seal();
 }
 
 const std::vector<uint8_t>& TPMKeyProvider::getMasterKey() const { return masterKey_; }
@@ -89,7 +97,7 @@ static ESYS_TR create_primary(ESYS_CONTEXT* ctx) {
 }
 
 void TPMKeyProvider::generate_and_seal() {
-    masterKey_ = random_key();
+    if (masterKey_.empty()) masterKey_ = random_key();
 
     ESYS_CONTEXT* ctx = init_esys();
     ESYS_TR parent = create_primary(ctx);
@@ -132,8 +140,8 @@ void TPMKeyProvider::generate_and_seal() {
         throw std::runtime_error("Esys_Create failed rc=" + std::to_string(rc));
     }
 
-    dump(sealedDir_ / "master.priv", {outPriv->buffer, outPriv->buffer + outPriv->size});
-    dump(sealedDir_ / "master.pub",
+    dump(sealedDir_ / (name_ + ".priv"), {outPriv->buffer, outPriv->buffer + outPriv->size});
+    dump(sealedDir_ / (name_ + ".pub"),
          {reinterpret_cast<uint8_t*>(&outPub->publicArea),
           reinterpret_cast<uint8_t*>(&outPub->publicArea) + sizeof(outPub->publicArea)});
 
@@ -145,7 +153,7 @@ void TPMKeyProvider::generate_and_seal() {
 
     Esys_Finalize(&ctx);
 
-    LogRegistry::crypto()->debug("[TPMKeyProvider] Sealed master key to {}", sealedDir_.string());
+    LogRegistry::crypto()->debug("[TPMKeyProvider] Sealed {} key to {}", name_, sealedDir_.string());
 }
 
 void TPMKeyProvider::unseal() {
@@ -153,12 +161,12 @@ void TPMKeyProvider::unseal() {
     ESYS_TR parent = create_primary(ctx); // recreate parent each boot
 
     TPM2B_PRIVATE inPriv{};
-    auto privBuf = slurp(sealedDir_ / "master.priv");
+    auto privBuf = slurp(sealedDir_ / (name_ + ".priv"));
     inPriv.size = privBuf.size();
     memcpy(inPriv.buffer, privBuf.data(), privBuf.size());
 
     TPM2B_PUBLIC inPub{};
-    auto pubBuf = slurp(sealedDir_ / "master.pub");
+    auto pubBuf = slurp(sealedDir_ / (name_ + ".pub"));
     memcpy(&inPub.publicArea, pubBuf.data(), sizeof(inPub.publicArea));
 
     ESYS_TR obj;
@@ -181,6 +189,12 @@ void TPMKeyProvider::unseal() {
     Esys_Finalize(&ctx);
 
     LogRegistry::crypto()->debug("[TPMKeyProvider] Unsealed master key from {}", sealedDir_.string());
+}
+
+bool TPMKeyProvider::sealedExists() const {
+    const auto priv = sealedDir_ / (name_ + ".priv");
+    const auto pub  = sealedDir_ / (name_ + ".pub");
+    return std::filesystem::exists(priv) && std::filesystem::exists(pub);
 }
 
 } // namespace vh::crypto

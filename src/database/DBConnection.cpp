@@ -1,14 +1,66 @@
 #include "database/DBConnection.hpp"
 #include "config/Config.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "crypto/TPMKeyProvider.hpp"
+#include "crypto/PasswordUtils.hpp"
+
+#include <fstream>
+
+using namespace vh::crypto;
 
 namespace vh::database {
 
-DBConnection::DBConnection() {
+static std::optional<std::string> getFirstInitDBPass() {
+    const std::filesystem::path f{"/run/vaulthalla/db_password"};
+
+    if (!std::filesystem::exists(f)) {
+        LogRegistry::vaulthalla()->debug("[seed] No pending db_password file at {}", f.string());
+        return std::nullopt;
+    }
+
+    std::ifstream in(f);
+    if (!in.is_open()) {
+        LogRegistry::vaulthalla()->warn("[seed] Failed to open db_password file: {}", f.string());
+        return std::nullopt;
+    }
+
+    std::string pass{};
+    if (!(in >> pass)) {
+        LogRegistry::vaulthalla()->warn("[seed] Invalid contents in {}", f.string());
+        return std::nullopt;
+    }
+
+    try {
+        std::filesystem::remove(f);
+        LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending db_password file {}", f.string());
+    } catch (const std::exception& e) {
+        LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", f.string(), e.what());
+    }
+
+    return pass;
+}
+
+DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>("postgres")) {
+    if (tpmKeyProvider_->sealedExists()) tpmKeyProvider_->init();
+    else {
+        const auto initPass = getFirstInitDBPass();
+        if (!initPass) {
+            if (std::filesystem::exists("/run/vaulthalla/db_password")) {
+                std::filesystem::remove_all("/run/vaulthalla/db_password");
+                if (std::filesystem::exists("/run/vaulthalla/db_password"))
+                    throw std::runtime_error("Failed to remove stale /run/vaulthalla/db_password file");
+            }
+            throw std::runtime_error("Database password failed to initialize. See logs for details.");
+        }
+        tpmKeyProvider_->init(*initPass);
+    }
+
+    const auto& key = tpmKeyProvider_->getMasterKey();
+    const auto password = auth::PasswordUtils::escape_uri_component({key.begin(), key.end()});
+
     const auto& config = config::ConfigRegistry::get();
     const auto db = config.database;
-    DB_CONNECTION_STR = "postgresql://" + db.user + ":" + db.password + "@" + db.host + ":" + std::to_string(db.port) +
-                        "/" + db.name;
+    DB_CONNECTION_STR = "postgresql://" + db.user + ":" + password + "@" + db.host + ":" + std::to_string(db.port) + "/" + db.name;
     conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
 }
 
@@ -35,6 +87,7 @@ void DBConnection::initPrepared() const {
     initPreparedSync();
     initPreparedCache();
     initPreparedGroups();
+    initPreparedSecrets();
 }
 
 void DBConnection::initPreparedUsers() const {
@@ -978,5 +1031,17 @@ void DBConnection::initPreparedCache() const {
 
     conn_->prepare("count_cache_indices_by_type", "SELECT COUNT(*) FROM cache_index WHERE vault_id = $1 AND type = $2");
 }
+
+void DBConnection::initPreparedSecrets() const {
+    conn_->prepare("upsert_internal_secret",
+        "INSERT INTO internal_secrets (key, value, iv, created_at, updated_at) "
+        "VALUES ($1, $2, $3, NOW(), NOW()) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, iv = EXCLUDED.iv, updated_at = NOW()");
+
+    conn_->prepare("get_internal_secret", "SELECT * FROM internal_secrets WHERE key = $1");
+
+    conn_->prepare("internal_secret_exists", "SELECT EXISTS(SELECT 1 FROM internal_secrets WHERE key = $1) AS exists");
+}
+
 
 } // namespace vh::database

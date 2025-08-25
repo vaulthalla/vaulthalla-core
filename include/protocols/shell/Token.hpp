@@ -127,12 +127,17 @@ inline std::vector<Token> tokenize(const std::string& line) {
 
             // Long flag forms: --key or --key=value
             if (pre.rfind("--", 0) == 0) {
-                auto eq = pre.find('=');
-                if (eq == std::string::npos) {
-                    pushFlag(out, pre.substr(2));
+                if (out.empty()) {
+                    // First token: allow it to be a command
+                    pushWord(out, std::move(pre));
                 } else {
-                    pushFlag(out, pre.substr(2, eq - 2));
-                    pushWord(out, pre.substr(eq + 1)); // value (already dequoted if we folded)
+                    auto eq = pre.find('=');
+                    if (eq == std::string::npos) {
+                        pushFlag(out, pre.substr(2));
+                    } else {
+                        pushFlag(out, pre.substr(2, eq - 2));
+                        pushWord(out, pre.substr(eq + 1));
+                    }
                 }
                 skip_ws(p, e);
                 continue;
@@ -142,8 +147,8 @@ inline std::vector<Token> tokenize(const std::string& line) {
             // pre starts with '-' and not '--'
             if (pre.size() >= 2 && pre[0] == '-' && pre[1] != '-') {
                 if (pre.size() == 2) {
-                    // Simple "-k"
-                    pushFlag(out, pre.substr(1));
+                    if (out.empty()) pushWord(out, pre); // First token: treat as command alias
+                    else pushFlag(out, pre.substr(1));
                 } else {
                     // Could be bundle "-abc" or glued "-kVALUE"
                     std::string_view tail = std::string_view(pre).substr(2);

@@ -15,6 +15,8 @@ public:
     void init(const std::optional<std::string>& initSecret = std::nullopt);  // check or generate
     [[nodiscard]] const std::vector<uint8_t>& getMasterKey() const;
 
+    void updateMasterKey(const std::vector<uint8_t>& newMasterKey);
+
     [[nodiscard]] bool sealedExists() const;
 
 private:

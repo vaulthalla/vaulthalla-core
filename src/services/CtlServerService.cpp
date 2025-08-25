@@ -200,75 +200,9 @@ void CtlServerService::runLoop() {
                 }
             };
 
-            // 1) Preferred: raw command line string (max fidelity)
             if (req.contains("line") && req["line"].is_string()) {
-                std::string line = req["line"].get<std::string>();
+                auto line = req["line"].get<std::string>();
                 if (line.empty()) line = "help";
-                try_exec_line(line);
-                ::close(cfd);
-                continue;
-            }
-
-            // 2) Structured: name + options + positionals (maps cleanly to CommandCall)
-            if (req.contains("name") || req.contains("options") || req.contains("positionals")) {
-                try {
-                    shell::CommandCall call;
-                    call.name = req.value("name", "");
-                    if (req.contains("options") && req["options"].is_object()) {
-                        for (auto& [k, v] : req["options"].items()) {
-                            // normalize key as you do elsewhere (lowercase, strip dashes) if needed
-                            std::string norm = k;
-                            std::ranges::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
-                            // if you strip leading dashes: erase(0, norm.find_first_not_of('-'));
-
-                            const auto key_sv = std::move(norm);
-
-                            const auto& val_sv = [&v]() -> std::optional<std::string> {
-                                if (v.is_string()) return v.get<std::string>();
-                                if (v.is_boolean()) return v.get<bool>() ? std::string("true") : std::string("false");
-                                if (!v.is_null()) return v.dump();
-                                return std::nullopt;
-                            };
-
-                            setOpt(call, key_sv, val_sv());
-                        }
-                    }
-                    if (req.contains("positionals") && req["positionals"].is_array()) {
-                        for (auto& it : req["positionals"]) call.positionals.push_back(it.get<std::string>());
-                    }
-                    const auto res = router_->execute(call); // calls handler(const CommandCall&)
-
-                    json resp{
-                        {"ok", res.exit_code == 0},
-                        {"exit_code", res.exit_code},
-                    };
-                    if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
-                    if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
-                    if (res.has_data) resp["data"] = res.data;
-
-                    send_json(cfd, resp);
-                } catch (const std::invalid_argument& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
-                } catch (const std::exception& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
-                }
-                ::close(cfd);
-                continue;
-            }
-
-            // 3) Back-compat: cmd + args → reconstruct a line so tokenizer parses flags too
-            {
-                std::string cmd = req.value("cmd", "");
-                std::vector<std::string> args = req.value("args", std::vector<std::string>{});
-                if (cmd.empty()) cmd = "help";
-
-                // naive join (good enough if client already split on spaces)
-                std::string line = cmd;
-                for (auto& a : args) {
-                    line.push_back(' ');
-                    line += a;
-                }
-
                 try_exec_line(line);
                 ::close(cfd);
                 continue;

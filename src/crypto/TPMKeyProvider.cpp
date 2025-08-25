@@ -191,6 +191,11 @@ void TPMKeyProvider::unseal() {
     LogRegistry::crypto()->debug("[TPMKeyProvider] Unsealed master key from {}", sealedDir_.string());
 }
 
+void TPMKeyProvider::updateMasterKey(const std::vector<uint8_t>& newMasterKey) {
+    masterKey_ = newMasterKey;
+    generate_and_seal();
+}
+
 bool TPMKeyProvider::sealedExists() const {
     const auto priv = sealedDir_ / (name_ + ".priv");
     const auto pub  = sealedDir_ / (name_ + ".pub");

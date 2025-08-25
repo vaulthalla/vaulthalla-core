@@ -6,6 +6,7 @@
 #include "VaultUsage.hpp"
 #include "APIKeyUsage.hpp"
 #include "PermissionUsage.hpp"
+#include "SecretsUsage.hpp"
 
 using namespace vh::shell;
 
@@ -19,5 +20,6 @@ CommandBook ShellUsage::all() {
     book << VaultUsage::all();
     book << APIKeyUsage::all();
     book << PermissionUsage::all();
+    book << SecretsUsage::all();
     return book;
 }

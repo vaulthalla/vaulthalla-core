@@ -71,7 +71,7 @@ static std::vector<std::string> normalize_args(const int argc, char** argv, cons
         if (a == "--") { out.emplace_back("--"); continue; }
 
         if (a.rfind("--", 0) == 0) {
-            auto eq = a.find('=');
+            const auto eq = a.find('=');
             if (eq != std::string::npos) {
                 out.emplace_back(a.substr(0, eq));          // --key
                 out.emplace_back(a.substr(eq + 1));         // value

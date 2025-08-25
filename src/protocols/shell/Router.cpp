@@ -23,8 +23,11 @@ void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) 
 
     CommandInfo info{usage.description.empty() ? "No description provided." : usage.description, std::move(handler), {}};
 
-    for (const std::string& alias : usage.ns_aliases) {
-        std::string a = normalize_alias(alias);
+    auto aliases = usage.ns_aliases;
+    aliases.push_back(usage.ns);
+
+    for (const std::string& alias : aliases) {
+        std::string a = alias;
         if (auto it = aliasMap_.find(a); it != aliasMap_.end() && it->second != key) {
             LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
                                        a, it->second, key);
@@ -40,10 +43,7 @@ void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) 
 std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     std::string n = normalize(nameOrAlias);
     if (commands_.contains(n)) return n;
-
-    std::string a = normalize_alias(nameOrAlias);
-    if (aliasMap_.contains(a)) return aliasMap_.at(a);
-
+    if (aliasMap_.contains(n)) return aliasMap_.at(n);
     return n; // unknown; let caller error
 }
 
@@ -58,7 +58,7 @@ CommandResult Router::execute(const CommandCall& call) const {
     return commands_.at(canonical).handler(call);
 }
 
-CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const {
+CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user) const {
     LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;

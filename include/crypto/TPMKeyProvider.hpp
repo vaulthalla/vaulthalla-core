@@ -4,19 +4,24 @@
 #include <string>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 
 namespace vh::crypto {
 
 class TPMKeyProvider {
 public:
-    explicit TPMKeyProvider(std::string sealedBlobPath = "/var/lib/vaulthalla/sealed_master.blob");
+    explicit TPMKeyProvider(const std::string& name = "master");
 
-    void init();  // check or generate
+    void init(const std::optional<std::string>& initSecret = std::nullopt);  // check or generate
     [[nodiscard]] const std::vector<uint8_t>& getMasterKey() const;
+
+    void updateMasterKey(const std::vector<uint8_t>& newMasterKey);
+
+    [[nodiscard]] bool sealedExists() const;
 
 private:
     std::vector<uint8_t> masterKey_;
-    std::string sealedBlobPath_;
+    std::string sealedBlobPath_, name_;
     std::filesystem::path sealedDir_;
 
     void generate_and_seal();

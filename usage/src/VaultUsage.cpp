@@ -179,7 +179,12 @@ CommandUsage VaultUsage::vault_keys() {
     cmd.command = "keys";
     cmd.command_aliases = {"k"};
     cmd.description = "Manage API keys for accessing S3-backed vaults.";
-    cmd.positionals = {{"<subcommand>", "Subcommand to execute (list, create, delete)"}};
+    cmd.positionals = {{"<subcommand>", "Subcommand to execute (list, create, delete, export)"}};
+    cmd.optional = {
+        {"--recipient <gpg-fingerprint>", "GPG fingerprint to encrypt the exported key (for export subcommand)"},
+        {"--output <file>", "Output file for the exported key (for export subcommand)"},
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
+    };
     cmd.examples = {
         {"vh vault keys list 42", "List all API keys associated with the vault with ID 42."},
         {"vh vault keys create 42 --name mykey", "Create a new API key named 'mykey' for the vault with ID 42."},

@@ -21,13 +21,14 @@ http_preview_server:
 
 
 # === 🐘 DATABASE SETTINGS ===
+# 🔐 Password is TPM encrypted.
+# It is optionally auto-generated and set on first run.
+# Alternatively, it can be manually set, export, or regenerated using the `vaulthalla` CLI tool as the super-admin user.
 database:
   host: localhost              # PostgreSQL host
   port: 5432                   # PostgreSQL port
   name: vaulthalla             # Database name
   user: vaulthalla             # Database user
-  # 🔐 Override the password field with VAULTHALLA_DB_PASSWORD env var
-  password: changeme
   pool_size: 10                # Max DB connection pool size
 
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "auth/SessionManager.hpp"
+#include "crypto/InternalSecretManager.hpp"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -49,8 +51,8 @@ public:
     std::shared_ptr<Client> validateRefreshToken(const std::string& refreshToken,
                                                  const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
-    static std::pair<std::string, std::shared_ptr<RefreshToken> >
-    createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session);
+    std::pair<std::string, std::shared_ptr<RefreshToken>>
+    createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
     static bool isValidRegistration(const std::shared_ptr<types::User>& user,
                                     const std::string& password);
@@ -67,6 +69,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
     std::shared_ptr<SessionManager> sessionManager_;
     std::shared_ptr<storage::StorageManager> storageManager_;
+    const std::string jwt_secret_ = crypto::InternalSecretManager().jwtSecret();
 };
 
 } // namespace vh::auth

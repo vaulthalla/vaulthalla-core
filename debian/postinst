@@ -1,12 +1,22 @@
 #!/bin/sh
 set -e
 
+# postinst for vaulthalla
+# - Creates system user/group + runtime dirs
+# - (Optional) initializes PostgreSQL role/db
+# - Seeds super-admin UID to /run for runtime consumption
+# - Seeds DB password to /run for runtime TPM sealing
+# - Does NOT write secrets to /etc/vaulthalla/config.yaml
+#
+# Depends (in debian/control): postgresql, openssl
+
 . /usr/share/debconf/confmodule
 
 PKG="vaulthalla"
 DB_USER="vaulthalla"
 DB_NAME="vaulthalla"
-CONFIG_FILE="/etc/vaulthalla/config.yaml"
+
+# ---------- helpers ----------
 
 create_dir() {
     # create_dir path mode owner group
@@ -14,115 +24,145 @@ create_dir() {
 }
 
 detect_auto_uid() {
-    # Try SUDO_USER first (most installs), then logname, then first human uid>=1000
+    # Echo a non-root human UID if we can infer one, else nothing
     if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-        id -u "$SUDO_USER" 2>/dev/null && return 0
+        id -u "$SUDO_USER" 2>/dev/null && { id -u "$SUDO_USER"; return 0; }
     fi
     lnuser="$(logname 2>/dev/null || true)"
     if [ -n "$lnuser" ] && [ "$lnuser" != "root" ]; then
-        id -u "$lnuser" 2>/dev/null && return 0
+        id -u "$lnuser" 2>/dev/null && { id -u "$lnuser"; return 0; }
     fi
-    # Fallback: first uid >= 1000 < 60000 (Debian range for "regular" users)
-    getent passwd | awk -F: '1000 <= $3 && $3 < 60000 { print $3; exit 0 }'
+    getent passwd | awk -F: '1000 <= $3 && $3 < 60000 { print $3; exit 0 }' || true
+    return 0
+}
+
+detect_auto_user() {
+    # Echo a likely installing human username, else nothing
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+        echo "$SUDO_USER"; return 0
+    fi
+    lnuser="$(logname 2>/dev/null || true)"
+    if [ -n "$lnuser" ] && [ "$lnuser" != "root" ]; then
+        echo "$lnuser"; return 0
+    fi
+    getent passwd | awk -F: '1000 <= $3 && $3 < 60000 { print $1; exit 0 }' || true
+    return 0
 }
 
 psql_q() {
-    # Run a single SQL, quiet text output, fail on error
-    sudo -u postgres psql -v ON_ERROR_STOP=1 -tAc "$1" "$2"
+    # psql_q "SQL" [database]
+    sudo -u postgres psql -X -v ON_ERROR_STOP=1 -tAc "$1" "${2:-postgres}"
 }
+
+add_user_to_group_if_needed() {
+    u="$1"
+    g="$2"
+    if [ -n "$u" ] && getent group "$g" >/dev/null 2>&1; then
+        if id -nG "$u" 2>/dev/null | grep -qw "$g"; then
+            echo "[${PKG}] User '$u' already in group '$g'."
+        else
+            echo "[${PKG}] Adding '$u' to group '$g'…"
+            usermod -a -G "$g" "$u" 2>/dev/null || true
+        fi
+    fi
+}
+
+# ---------- main ----------
 
 case "$1" in
   configure)
-    # Ensure system user/group
+    # System user/group
     if ! id "$DB_USER" >/dev/null 2>&1; then
         adduser --quiet --system --group --home /nonexistent --no-create-home --shell /usr/sbin/nologin "$DB_USER"
     fi
 
-    # Runtime dirs
-    create_dir /var/lib/vaulthalla     0755 "$DB_USER" "$DB_USER"
-    create_dir /var/log/vaulthalla     0750 "$DB_USER" "$DB_USER"
-    create_dir /run/vaulthalla         0700 "$DB_USER" "$DB_USER"
-    # Optional mount point for admins
+    # Runtime/state dirs
+    create_dir /var/lib/vaulthalla 0755 "$DB_USER" "$DB_USER"
+    create_dir /var/log/vaulthalla 0750 "$DB_USER" "$DB_USER"
+    create_dir /run/vaulthalla     0700 "$DB_USER" "$DB_USER"
+    install -d -m 0755 /etc/vaulthalla
     [ -d /mnt/vaulthalla ] || create_dir /mnt/vaulthalla 0755 "$DB_USER" "$DB_USER"
 
-    # Ensure /etc
-    install -d -m 0755 /etc/vaulthalla
-
-    # Debconf: init-db
+    # --- Debconf: initialize database? ---
     db_get vaulthalla/init-db || true
-    INIT_DB="$RET"
-    [ -z "$INIT_DB" ] && INIT_DB="true"
+    INIT_DB="${RET:-true}"
 
     if [ "$INIT_DB" = "true" ]; then
-        echo "[${PKG}] Setting up PostgreSQL database..."
+        echo "[${PKG}] Setting up PostgreSQL role/database…"
 
-        # Safe password (32 alnum)
-        VAUL_PG_PASS="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 || true)"
-        ESCAPED_PASS="$(printf '%s\n' "$VAUL_PG_PASS" | sed 's/[&/]/\\&/g')"
+        ROLE_EXISTS="$(psql_q "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")"
+        DB_EXISTS="$(psql_q "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")"
 
-        # Create role if needed
-        if psql_q "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" postgres | grep -q 1; then
-            echo "[${PKG}] Role '${DB_USER}' exists."
+        # Generate password only if we will use it (create role or set password)
+        VAUL_PG_PASS="$(openssl rand -base64 32 | tr -d '\n')"
+
+        if [ "$ROLE_EXISTS" != "1" ]; then
+            # Safe quoting via psql var
+            sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+              --set=PASS="$VAUL_PG_PASS" \
+              -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD :'PASS';" postgres
+            echo "[${PKG}] Created role '${DB_USER}'."
         else
-            sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE USER ${DB_USER} WITH PASSWORD '${VAUL_PG_PASS}';" postgres
+            echo "[${PKG}] Role '${DB_USER}' already exists."
+            # Optionally set a fresh password here on first install only.
+            # sudo -u postgres psql -X -v ON_ERROR_STOP=1 --set=PASS="$VAUL_PG_PASS" \
+            #   -c "ALTER ROLE ${DB_USER} PASSWORD :'PASS';" postgres
         fi
 
-        # Create database if needed
-        if psql_q "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" postgres | grep -q 1; then
-            echo "[${PKG}] Database '${DB_NAME}' exists."
+        if [ "$DB_EXISTS" != "1" ]; then
+            sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+              -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" postgres
+            echo "[${PKG}] Created database '${DB_NAME}'."
         else
-            sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" postgres
+            echo "[${PKG}] Database '${DB_NAME}' already exists."
         fi
 
-        sudo -u postgres psql -v ON_ERROR_STOP=1 -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" postgres
+        # Harmless if owner already
+        sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+          -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" postgres
 
-        # Inject password into config.yaml if present
-        if [ -f "$CONFIG_FILE" ]; then
-            # replace the first 'password:' occurrence under 'database:' (best-effort)
-            sed -i "s/^\(\s*password:\s*\).*/\1${ESCAPED_PASS}/" "$CONFIG_FILE" || true
-            chmod 600 "$CONFIG_FILE" || true
-        else
-            echo "[${PKG}] WARNING: Config file not found, password not injected."
-        fi
-
-        echo "[${PKG}] Database setup complete."
+        # Seed DB password (for runtime TPM sealing)
+        PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
+        umask 077
+        printf '%s\n' "$VAUL_PG_PASS" > "$PENDING_DB_PASS_FILE"
+        chown "$DB_USER:$DB_USER" "$PENDING_DB_PASS_FILE"
+        echo "[${PKG}] Seeded DB password to ${PENDING_DB_PASS_FILE} (mode 600)."
     else
-        echo "[${PKG}] Skipping database setup per user choice."
+        echo "[${PKG}] Skipping PostgreSQL initialization per user choice."
     fi
 
-    # ── Super-admin UID seed (for runtime to consume) ──────────────────────────
-    # Get debconf value (may be empty or 'auto')
+    # --- Debconf: super-admin UID seed ---
     db_get vaulthalla/superadmin-uid || true
     SUPER_UID="$RET"
+    [ -z "$SUPER_UID" ] || [ "$SUPER_UID" = "auto" ] && SUPER_UID="$(detect_auto_uid || true)"
 
-    if [ -z "$SUPER_UID" ] || [ "$SUPER_UID" = "auto" ]; then
-        SUPER_UID="$(detect_auto_uid || true)"
-    fi
-
-    # Validate numeric, not root
     case "$SUPER_UID" in
-        ''|*[!0-9]*)
-            echo "[${PKG}] NOTE: Could not determine a non-root UID; leaving pending super-admin UID unset."
-            SUPER_UID=""
-            ;;
-        0)
-            echo "[${PKG}] NOTE: Refusing to set super-admin linux_uid=0 (root). Leaving unset."
-            SUPER_UID=""
-            ;;
-    esac
-
-    # Write one-shot seed file for runtime init (daemon must delete after use)
-    PENDING_UID_FILE="/run/vaulthalla/superadmin_uid"
-    if [ -n "$SUPER_UID" ]; then
+      ''|*[!0-9]*|0)
+        echo "[${PKG}] NOTE: No valid non-root super-admin UID detected; not seeding."
+        ;;
+      *)
+        PENDING_UID_FILE="/run/vaulthalla/superadmin_uid"
+        umask 077
         printf '%s\n' "$SUPER_UID" > "$PENDING_UID_FILE"
         chown "$DB_USER:$DB_USER" "$PENDING_UID_FILE"
-        chmod 600 "$PENDING_UID_FILE"
         echo "[${PKG}] Wrote pending super-admin UID to ${PENDING_UID_FILE} (mode 600)."
-    else
-        rm -f "$PENDING_UID_FILE" 2>/dev/null || true
-        echo "[${PKG}] NOTE: No pending super-admin UID written; runtime may auto-detect on first CLI."
-    fi
+        ;;
+    esac
 
+    # --- Add installing user to vaulthalla group (best-effort) ---
+    INSTALL_USER="$(detect_auto_user || true)"
+    add_user_to_group_if_needed "$INSTALL_USER" "$DB_USER"
+
+    #DEBHELPER#
+    ;;
+
+  abort-upgrade|abort-remove|abort-deconfigure)
+    #DEBHELPER#
+    ;;
+
+  *)
+    echo "postinst called with unknown argument \`$1'" >&2
+    exit 1
     ;;
 esac
 

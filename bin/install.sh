@@ -171,7 +171,7 @@ else
 fi
 
 # === 7) Setup Database ===
-VAUL_PG_PASS=$(uuidgen)
+VAUL_PG_PASS=$(openssl rand -base64 32 | tr -d '\n')
 echo "🔐 Creating PostgreSQL user and database..."
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='vaulthalla'" | grep -q 1 ||
@@ -198,7 +198,7 @@ else
   echo "✅ Wrote super-admin UID seed to $PENDING_UID_FILE"
 fi
 
-# === 7.6) Optional: Add current user to 'vaulthalla' group ===
+# === 7.6) Add current user to 'vaulthalla' group ===
 if getent group vaulthalla >/dev/null; then
   if id -nG "$SUPER_USER" | grep -qw vaulthalla; then
     echo "👥 User '$SUPER_USER' already in group 'vaulthalla'"
@@ -210,9 +210,13 @@ else
   echo "⚠️ Group 'vaulthalla' not found — skipping usermod"
 fi
 
-# === 8) Inject DB Password into Config ===
-echo "✍️  Updating config with DB password..."
-sudo sed -i "s/^\(\s*password:\s*\).*/\1${VAUL_PG_PASS}/" /etc/vaulthalla/config.yaml
+# === 8) Seed DB Password (for runtime TPM sealing) ===
+PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
+echo "🔐 Seeding PostgreSQL password for Vaulthalla user (pending runtime init)..."
+echo "$VAUL_PG_PASS" | sudo tee "$PENDING_DB_PASS_FILE" >/dev/null
+sudo chown vaulthalla:vaulthalla "$PENDING_DB_PASS_FILE"
+sudo chmod 600 "$PENDING_DB_PASS_FILE"
+echo "✅ Wrote DB password seed to $PENDING_DB_PASS_FILE"
 
 # === 9) Install systemd service ===
 echo "🛠️  Installing systemd service..."

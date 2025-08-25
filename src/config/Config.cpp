@@ -27,9 +27,6 @@ Config loadConfig(const std::string& path) {
     if (auto node = root["sharing"]) YAML::convert<SharingConfig>::decode(node, cfg.sharing);
     if (auto node = root["dev"]) YAML::convert<DevConfig>::decode(node, cfg.dev);
 
-    // 👇 Handle ENV overrides separately
-    if (const char* pw = std::getenv("VAULTHALLA_DB_PASSWORD")) cfg.database.password = pw;
-
     return cfg;
 }
 
@@ -309,7 +306,6 @@ void to_json(nlohmann::json& j, const DatabaseConfig& c) {
         {"port", c.port},
         {"name", c.name},
         {"user", c.user},
-        // Do not serialize password
         {"pool_size", c.pool_size}
     };
 }
@@ -319,7 +315,6 @@ void from_json(const nlohmann::json& j, DatabaseConfig& c) {
     c.port = j.value("port", 5432);
     c.name = j.value("name", "vaulthalla");
     c.user = j.value("user", "vaulthalla");
-    c.password = j.value("password", "changeme");
     c.pool_size = j.value("pool_size", 10);
 }
 
@@ -334,7 +329,6 @@ void to_json(nlohmann::json& j, const AuthConfig& c) {
 void from_json(const nlohmann::json& j, AuthConfig& c) {
     c.token_expiry_minutes = j.value("token_expiry_minutes", 60);
     c.refresh_token_expiry_days = j.value("refresh_token_expiry_days", 7);
-    c.jwt_secret = j.value("jwt_secret", "changeme");
 }
 
 void to_json(nlohmann::json& j, const SharingConfig& c) {

@@ -2,29 +2,29 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "services/LogRegistry.hpp"
-#include "util/cmdLineHelpers.hpp"
 #include "types/User.hpp"
 #include "CommandUsage.hpp"
 #include "ShellUsage.hpp"
 
 #include <fmt/core.h>
 #include <cctype>
-#include <stdexcept>
 #include <string>
 #include <algorithm>
-#include <sys/ioctl.h>
 
 using namespace vh::shell;
 using namespace vh::logging;
-
+using namespace vh::types;
 
 void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) {
     std::string key = normalize(usage.command.empty() ? usage.ns : usage.ns + " " + usage.command);
 
     CommandInfo info{usage.description.empty() ? "No description provided." : usage.description, std::move(handler), {}};
 
-    for (const std::string& alias : usage.ns_aliases) {
-        std::string a = normalize_alias(alias);
+    auto aliases = usage.ns_aliases;
+    aliases.push_back(usage.ns);
+
+    for (const std::string& alias : aliases) {
+        std::string a = alias;
         if (auto it = aliasMap_.find(a); it != aliasMap_.end() && it->second != key) {
             LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
                                        a, it->second, key);
@@ -40,31 +40,27 @@ void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) 
 std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     std::string n = normalize(nameOrAlias);
     if (commands_.contains(n)) return n;
-
-    std::string a = normalize_alias(nameOrAlias);
-    if (aliasMap_.contains(a)) return aliasMap_.at(a);
-
+    if (aliasMap_.contains(n)) return aliasMap_.at(n);
     return n; // unknown; let caller error
 }
 
-CommandResult Router::execute(const CommandCall& call) const {
-    const auto canonical = canonicalFor(call.name);
-    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
-    if (!commands_.contains(canonical))
-        return {2,
-            ShellUsage::all().filterTopLevelOnly().basicStr(),
-            fmt::format("Unknown command or alias: {}",
-                call.name)};
-    return commands_.at(canonical).handler(call);
-}
-
-CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const {
+CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user) const {
     LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;
 
     if (call.name.empty()) return CommandResult{1, "", "no command provided"};
-    return execute(call);
+    const auto canonical = canonicalFor(call.name);
+
+    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
+
+    if (!commands_.contains(canonical))
+        return {2,
+            ShellUsage::all().filterTopLevelOnly().basicStr(),
+            fmt::format("Unknown command or alias: {}",
+                call.name)};
+
+    return commands_.at(canonical).handler(call);
 }
 
 std::string Router::normalize(const std::string& s) {

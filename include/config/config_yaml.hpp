@@ -281,7 +281,6 @@ struct convert<DatabaseConfig> {
         node["port"] = rhs.port;
         node["name"] = rhs.name;
         node["user"] = rhs.user;
-        node["password"] = rhs.password;
         node["pool_size"] = rhs.pool_size;
         return node;
     }
@@ -292,7 +291,6 @@ struct convert<DatabaseConfig> {
         rhs.port = node["port"].as<uint16_t>(5432);
         rhs.name = node["name"].as<std::string>("vaulthalla");
         rhs.user = node["user"].as<std::string>("vaulthalla");
-        rhs.password = node["password"].as<std::string>("changeme");
         rhs.pool_size = node["pool_size"].as<int>(10);
         return true;
     }

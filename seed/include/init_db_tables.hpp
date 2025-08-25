@@ -58,6 +58,17 @@ CREATE TABLE IF NOT EXISTS group_members
     PRIMARY KEY (group_id, user_id)
 );
         )");
+
+        txn.exec(R"(
+CREATE TABLE IF NOT EXISTS internal_secrets
+(
+    key    VARCHAR(50) PRIMARY KEY,
+    value  BYTEA        NOT NULL,
+    iv     BYTEA        NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+        )");
     });
 }
 

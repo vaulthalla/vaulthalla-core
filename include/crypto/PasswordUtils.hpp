@@ -16,6 +16,8 @@ class PasswordUtils {
     static void loadCommonWeakPasswordsFromURLs(const std::vector<std::string>& urls);
     static std::string SHA1Hex(const std::string& input);
 
+    static std::string escape_uri_component(const std::string& input);
+
   private:
     static std::unordered_set<std::string> dictionaryWords_;
     static std::unordered_set<std::string> commonWeakPasswords_;

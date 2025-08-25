@@ -2,12 +2,9 @@
 
 #include <protocols/shell/types.hpp>
 
-#include <functional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
-#include <initializer_list>
 #include <nlohmann/json.hpp>
 
 namespace vh::types {
@@ -21,9 +18,7 @@ class CommandUsage;
 class Router {
 public:
     void registerCommand(const CommandUsage& usage, CommandHandler handler);
-    CommandResult execute(const CommandCall& call) const;
 
-    // Accept a view; we'll copy only once if needed
     CommandResult executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const;
 
 private:

@@ -23,48 +23,19 @@ create_dir() {
     install -d -m "$2" -o "$3" -g "$4" "$1"
 }
 
-detect_auto_uid() {
-    # Echo a non-root human UID if we can infer one, else nothing
-    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-        id -u "$SUDO_USER" 2>/dev/null && { id -u "$SUDO_USER"; return 0; }
-    fi
-    lnuser="$(logname 2>/dev/null || true)"
-    if [ -n "$lnuser" ] && [ "$lnuser" != "root" ]; then
-        id -u "$lnuser" 2>/dev/null && { id -u "$lnuser"; return 0; }
-    fi
-    getent passwd | awk -F: '1000 <= $3 && $3 < 60000 { print $3; exit 0 }' || true
-    return 0
-}
-
-detect_auto_user() {
-    # Echo a likely installing human username, else nothing
-    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-        echo "$SUDO_USER"; return 0
-    fi
-    lnuser="$(logname 2>/dev/null || true)"
-    if [ -n "$lnuser" ] && [ "$lnuser" != "root" ]; then
-        echo "$lnuser"; return 0
-    fi
-    getent passwd | awk -F: '1000 <= $3 && $3 < 60000 { print $1; exit 0 }' || true
-    return 0
-}
-
 psql_q() {
     # psql_q "SQL" [database]
     sudo -u postgres psql -X -v ON_ERROR_STOP=1 -tAc "$1" "${2:-postgres}"
 }
 
-add_user_to_group_if_needed() {
-    u="$1"
-    g="$2"
-    if [ -n "$u" ] && getent group "$g" >/dev/null 2>&1; then
-        if id -nG "$u" 2>/dev/null | grep -qw "$g"; then
-            echo "[${PKG}] User '$u' already in group '$g'."
-        else
-            echo "[${PKG}] Adding '$u' to group '$g'…"
-            usermod -a -G "$g" "$u" 2>/dev/null || true
-        fi
+ensure_tss_group_and_user_added() {
+    if getent group tss > /dev/null; then
+        echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
+    else
+        echo "⚠️ No 'tss' group found, creating one..."
+        addgroup --system tss
     fi
+    adduser vaulthalla tss
 }
 
 # ---------- main ----------
@@ -75,6 +46,8 @@ case "$1" in
     if ! id "$DB_USER" >/dev/null 2>&1; then
         adduser --quiet --system --group --home /nonexistent --no-create-home --shell /usr/sbin/nologin "$DB_USER"
     fi
+
+    ensure_tss_group_and_user_added
 
     # Runtime/state dirs
     create_dir /var/lib/vaulthalla 0755 "$DB_USER" "$DB_USER"
@@ -97,16 +70,12 @@ case "$1" in
         VAUL_PG_PASS="$(openssl rand -base64 32 | tr -d '\n')"
 
         if [ "$ROLE_EXISTS" != "1" ]; then
-            # Safe quoting via psql var
-            sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
-              --set=PASS="$VAUL_PG_PASS" \
-              -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD :'PASS';" postgres
+            sudo -u postgres psql -X -v ON_ERROR_STOP=1 postgres <<EOF
+CREATE ROLE ${DB_USER} LOGIN PASSWORD '${VAUL_PG_PASS}';
+EOF
             echo "[${PKG}] Created role '${DB_USER}'."
         else
             echo "[${PKG}] Role '${DB_USER}' already exists."
-            # Optionally set a fresh password here on first install only.
-            # sudo -u postgres psql -X -v ON_ERROR_STOP=1 --set=PASS="$VAUL_PG_PASS" \
-            #   -c "ALTER ROLE ${DB_USER} PASSWORD :'PASS';" postgres
         fi
 
         if [ "$DB_EXISTS" != "1" ]; then
@@ -131,27 +100,11 @@ case "$1" in
         echo "[${PKG}] Skipping PostgreSQL initialization per user choice."
     fi
 
-    # --- Debconf: super-admin UID seed ---
-    db_get vaulthalla/superadmin-uid || true
-    SUPER_UID="$RET"
-    [ -z "$SUPER_UID" ] || [ "$SUPER_UID" = "auto" ] && SUPER_UID="$(detect_auto_uid || true)"
-
-    case "$SUPER_UID" in
-      ''|*[!0-9]*|0)
-        echo "[${PKG}] NOTE: No valid non-root super-admin UID detected; not seeding."
-        ;;
-      *)
-        PENDING_UID_FILE="/run/vaulthalla/superadmin_uid"
-        umask 077
-        printf '%s\n' "$SUPER_UID" > "$PENDING_UID_FILE"
-        chown "$DB_USER:$DB_USER" "$PENDING_UID_FILE"
-        echo "[${PKG}] Wrote pending super-admin UID to ${PENDING_UID_FILE} (mode 600)."
-        ;;
-    esac
-
-    # --- Add installing user to vaulthalla group (best-effort) ---
-    INSTALL_USER="$(detect_auto_user || true)"
-    add_user_to_group_if_needed "$INSTALL_USER" "$DB_USER"
+    systemctl --system daemon-reexec
+    systemctl --system daemon-reload
+    systemctl --system preset vaulthalla.service >/dev/null || true
+    systemctl --system preset vaulthalla-cli.socket >/dev/null || true
+    systemctl --system preset vaulthalla-cli.service >/dev/null || true
 
     #DEBHELPER#
     ;;

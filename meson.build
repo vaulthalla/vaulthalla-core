@@ -202,6 +202,7 @@ install_dir = join_paths(get_option('prefix'), get_option('bindir'))
 install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
+install_data('debian/vaulthalla.udev' , install_dir: join_paths(get_option('prefix'), get_option('libdir'), 'udev', 'rules.d'), rename: '60-vaulthalla-tpm.rules')
 install_data('deploy/config/config.yaml', install_dir: config_dir)
 install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
 install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))

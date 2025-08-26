@@ -89,7 +89,7 @@ else
     echo "👥 'vaulthalla' group already exists."
 fi
 
-# === 10) Add current user to vaulthalla group ===
+# === 3) Add current user to 'vaulthalla' group ===
 SUDO_USER=$(who -m | awk '{print $1}')
 if [[ -n "$SUDO_USER" ]]; then
     echo "👤 Adding current user '$SUDO_USER' to 'vaulthalla' group..."
@@ -99,7 +99,8 @@ else
     echo "⚠️  No SUDO_USER found, skipping user group addition."
 fi
 
-# Check if 'tss' group exists and add 'vaulthalla' to it
+
+# === 4) Add 'vaulthalla' user to 'tss' group (for TPM access) ===
 if getent group tss > /dev/null; then
     echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
     sudo usermod -aG tss vaulthalla
@@ -109,7 +110,7 @@ else
     sudo usermod -aG tss vaulthalla
 fi
 
-# === 3) Ensure TPM device permissions ===
+# === 5) Ensure TPM device permissions ===
 udev_rule_file="/etc/udev/rules.d/60-tpm.rules"
 
 check_perms() {
@@ -135,7 +136,7 @@ else
     echo "✅ TPM device permissions already correct."
 fi
 
-# === 3) Build Project ===
+# === 6) Build Project ===
 echo "🏗️  Starting Vaulthalla build..."
 
 meson setup build "${MESON_ARGS[@]}" --reconfigure
@@ -150,7 +151,7 @@ for dir in /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla /run/vaulthal
 done
 sudo chmod 750 /var/log/vaulthalla
 
-# === 6) Deploy Config ===
+# === 7) Deploy Config ===
 echo "⚙️  Deploying default config..."
 sudo install -d -m 755 /etc/vaulthalla
 sudo cp deploy/config/config_template.yaml.in /etc/vaulthalla/
@@ -170,7 +171,7 @@ else
     echo "🔒 Production mode enabled."
 fi
 
-# === 7) Setup Database ===
+# === 8) Setup Database ===
 VAUL_PG_PASS=$(openssl rand -base64 32 | tr -d '\n')
 echo "🔐 Creating PostgreSQL user and database..."
 
@@ -182,35 +183,7 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'"
 
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaulthalla;"
 
-# === 7.5) Seed pending super-admin UID (for runtime assignment) ===
-echo "🧑‍💻 Seeding current user as Vaulthalla super-admin (pending runtime init)..."
-
-SUPER_UID=$(id -u)
-SUPER_USER=$(id -un)
-PENDING_UID_FILE="/run/vaulthalla/superadmin_uid"
-
-if [ "$SUPER_UID" -eq 0 ]; then
-  echo "⚠️ Refusing to set linux_uid=0 (root) — skipping seed"
-else
-  echo "$SUPER_UID" | sudo tee "$PENDING_UID_FILE" >/dev/null
-  sudo chown vaulthalla:vaulthalla "$PENDING_UID_FILE"
-  sudo chmod 600 "$PENDING_UID_FILE"
-  echo "✅ Wrote super-admin UID seed to $PENDING_UID_FILE"
-fi
-
-# === 7.6) Add current user to 'vaulthalla' group ===
-if getent group vaulthalla >/dev/null; then
-  if id -nG "$SUPER_USER" | grep -qw vaulthalla; then
-    echo "👥 User '$SUPER_USER' already in group 'vaulthalla'"
-  else
-    echo "➕ Adding '$SUPER_USER' to group 'vaulthalla'..."
-    sudo usermod -a -G vaulthalla "$SUPER_USER"
-  fi
-else
-  echo "⚠️ Group 'vaulthalla' not found — skipping usermod"
-fi
-
-# === 8) Seed DB Password (for runtime TPM sealing) ===
+# === 9) Seed DB Password (for runtime TPM sealing) ===
 PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
 echo "🔐 Seeding PostgreSQL password for Vaulthalla user (pending runtime init)..."
 echo "$VAUL_PG_PASS" | sudo tee "$PENDING_DB_PASS_FILE" >/dev/null
@@ -218,7 +191,7 @@ sudo chown vaulthalla:vaulthalla "$PENDING_DB_PASS_FILE"
 sudo chmod 600 "$PENDING_DB_PASS_FILE"
 echo "✅ Wrote DB password seed to $PENDING_DB_PASS_FILE"
 
-# === 9) Install systemd service ===
+# === 10) Install systemd service ===
 echo "🛠️  Installing systemd service..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now vaulthalla.service

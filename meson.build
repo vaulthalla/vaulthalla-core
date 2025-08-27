@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.11.0',
+        version: '0.11.1',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
@@ -202,10 +202,14 @@ install_dir = join_paths(get_option('prefix'), get_option('bindir'))
 install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
-install_data('debian/vaulthalla.udev' , install_dir: join_paths(get_option('prefix'), get_option('libdir'), 'udev', 'rules.d'), rename: '60-vaulthalla-tpm.rules')
 install_data('deploy/config/config.yaml', install_dir: config_dir)
 install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
 install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
+install_data('deploy/vaulthalla.env', install_dir: join_paths(get_option('sysconfdir'), meson.project_name()))
+
+install_data('debian/vaulthalla.udev',
+             install_dir: join_paths(get_option('libdir'), 'udev', 'rules.d'),
+             rename: '60-vaulthalla-tpm.rules')
 
 configure_file(
     input: 'deploy/systemd/vaulthalla.service.in',

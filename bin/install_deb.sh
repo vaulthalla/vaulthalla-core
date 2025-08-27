@@ -57,8 +57,11 @@ require awk
 require pandoc
 [[ $PUSH -eq 1 ]] && require curl
 
-# Ensure meson build exists
-[[ -d build ]] || meson setup build
+# cleanup old build dir if it exists
+rm -rf "$ARTIFACT_ROOT"
+
+rm -rf build
+meson setup build
 MESON_VERSION="$(meson introspect --projectinfo build 2>/dev/null \
                         | sed -En 's/.*\"version\": *\"([^\"]+)\".*/\1/p')"
 
@@ -89,7 +92,7 @@ trap cleanup EXIT
 
 log "Creating isolated build tree…"
 # Preserve .git so dpkg-parsechangelog etc still behave if needed
-rsync -a --exclude $ARTIFACT_ROOT "$REPO_ROOT/" "$TMP_BUILD_ROOT/src/"
+rsync -a --exclude "$ARTIFACT_ROOT" "$REPO_ROOT/" "$TMP_BUILD_ROOT/src/"
 
 # Ensure /etc/vaulthalla/config.yaml exists
 if [[ ! -f /etc/vaulthalla/config.yaml ]]; then
@@ -108,7 +111,6 @@ else
 fi
 
 log "Collecting artifacts → $ARTIFACT_ROOT"
-rm -rf "$ARTIFACT_ROOT"
 mkdir -p "$ARTIFACT_ROOT"
 cd "$TMP_BUILD_ROOT"
 shopt -s nullglob

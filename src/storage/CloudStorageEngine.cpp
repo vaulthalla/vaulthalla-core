@@ -12,17 +12,19 @@
 #include "services/ThumbnailWorker.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "crypto/APIKeyManager.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::crypto;
 using namespace vh::concurrency;
 using namespace vh::services;
+using namespace vh::cloud;
 
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
       key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
-      s3Provider_(std::make_shared<cloud::S3Controller>(key_, vault->bucket)) {}
+      s3Provider_(std::make_shared<S3Controller>(key_, vault->bucket)) {}
 
 void CloudStorageEngine::purge(const std::filesystem::path& rel_path) const {
     removeLocally(rel_path);

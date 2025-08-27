@@ -9,6 +9,7 @@
 #include "services/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 
+#include <unordered_set>
 #include <mutex>
 
 using namespace vh::storage;

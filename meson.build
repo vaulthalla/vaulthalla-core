@@ -34,14 +34,14 @@ vh_version_header = configure_file(
 
 # ╭──────────────────────────────── PATH HEADER ─────────────────────────────────╮
 
-config_dir = join_paths('/', get_option('sysconfdir'), meson.project_name())
+config_dir = join_paths(get_option('sysconfdir'), meson.project_name())
 log_dir = join_paths(get_option('localstatedir'), 'log', meson.project_name())
 state_dir = join_paths(get_option('localstatedir'), 'lib', meson.project_name())
 runtime_dir = join_paths(get_option('localstatedir'), 'run', meson.project_name())
 
 conf = configuration_data()
 conf.set_quoted('VH_MOUNT_PATH', join_paths('/mnt', meson.project_name()))
-conf.set_quoted('VH_CONFIG_PATH', join_paths(config_dir, 'config.yaml'))
+conf.set_quoted('VH_CONFIG_PATH', join_paths('/', config_dir, 'config.yaml'))
 conf.set_quoted('VH_LOG_PATH', log_dir)
 conf.set_quoted('VH_BACKING_PATH', state_dir)
 conf.set_quoted('VH_RUNTIME_PATH', runtime_dir)
@@ -204,8 +204,11 @@ install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
 install_data('deploy/config/config.yaml', install_dir: config_dir)
 install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
+
 install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
-install_data('deploy/vaulthalla.env', install_dir: join_paths(get_option('sysconfdir'), meson.project_name()))
+
+install_data('debian/tmpfiles.d/vaulthalla.conf',
+             install_dir: join_paths(get_option('prefix'), get_option('libdir'), 'tmpfiles.d'))
 
 install_data('debian/vaulthalla.udev',
              install_dir: join_paths(get_option('libdir'), 'udev', 'rules.d'),

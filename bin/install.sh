@@ -193,6 +193,12 @@ echo "✅ Wrote DB password seed to $PENDING_DB_PASS_FILE"
 
 # === 10) Install systemd service ===
 echo "🛠️  Installing systemd service..."
+
+# uncomment the EnvironmentFile line in the service file
+sudo install -d -m 0755 /etc/systemd/system/vaulthalla.service.d
+printf '[Service]\nEnvironmentFile=/etc/vaulthalla/vaulthalla.env\n' \
+| sudo tee /etc/systemd/system/vaulthalla.service.d/override.conf >/dev/null
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now vaulthalla.service
 sudo systemctl enable --now vaulthalla-cli.socket

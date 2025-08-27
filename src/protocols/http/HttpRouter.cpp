@@ -12,6 +12,7 @@
 #include "services/LogRegistry.hpp"
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
+#include "storage/FSCache.hpp"
 
 #include <ranges>
 

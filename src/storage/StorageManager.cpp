@@ -7,6 +7,7 @@
 #include "types/User.hpp"
 #include "types/Path.hpp"
 #include "database/Queries/VaultQueries.hpp"
+#include "database/Queries/UserQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/LogRegistry.hpp"
 #include "seed/include/seed_db.hpp"

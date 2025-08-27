@@ -6,6 +6,7 @@
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "storage/FSCache.hpp"
 
 #include <optional>
 
@@ -265,7 +266,7 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
         const auto parentRes = txn.exec_prepared("get_fs_entry_parent_id", *parentId);
         if (*parentId == stopAt) deleteDirs = false;
         if (deleteDirs && fsCount == 0) {
-            const auto inode = txn.exec_prepared("get_fs_entry_inode", *parentId).one_field().as<fuse_ino_t>();
+            const auto inode = txn.exec_prepared("get_fs_entry_inode", *parentId).one_field().as<ino_t>();
             txn.exec_prepared("delete_fs_entry", *parentId);
             ServiceDepsRegistry::instance().fsCache->evictIno(inode);
             --subDirsDeleted;

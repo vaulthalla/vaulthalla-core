@@ -11,9 +11,10 @@
 
 # Production
 /dist/
+.release_notes
 
 # Debian
 /debian/**/*debhelper*
 /debian/vaulthalla-server
-/debian/vaulthalla-server.substvars
+/debian/vaulthalla.substvars
 /debian/files

@@ -10,6 +10,8 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "services/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
+#include "services/SyncController.hpp"
+#include "storage/FSCache.hpp"
 
 using namespace vh::types;
 using namespace vh::services;

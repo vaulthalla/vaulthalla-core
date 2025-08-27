@@ -1,14 +1,23 @@
 #pragma once
 
-#include "auth/AuthManager.hpp"
-#include "storage/StorageManager.hpp"
-#include "services/SyncController.hpp"
-#include "storage/FSCache.hpp"
-#include "../crypto/APIKeyManager.hpp"
-
 #include <memory>
 
+namespace vh::storage {
+    class StorageManager;
+    class FSCache;
+}
+
+namespace vh::crypto {
+    class APIKeyManager;
+}
+
+namespace vh::auth {
+    class AuthManager;
+}
+
 namespace vh::services {
+
+class SyncController;
 
 struct ServiceDepsRegistry {
     std::shared_ptr<storage::StorageManager> storageManager;
@@ -20,22 +29,11 @@ struct ServiceDepsRegistry {
     ServiceDepsRegistry(const ServiceDepsRegistry&) = delete;
     ServiceDepsRegistry& operator=(const ServiceDepsRegistry&) = delete;
 
-    static ServiceDepsRegistry& instance() {
-        static ServiceDepsRegistry instance_;
-        return instance_;
-    }
+    static ServiceDepsRegistry& instance();
 
-    static void init() {
-        auto& ctx = instance();
-        ctx.storageManager = std::make_shared<storage::StorageManager>();
-        ctx.apiKeyManager = std::make_shared<crypto::APIKeyManager>();
-        ctx.authManager = std::make_shared<auth::AuthManager>();
-        ctx.fsCache = std::make_shared<storage::FSCache>();
-    }
+    static void init();
 
-    static void setSyncController(const std::shared_ptr<SyncController>& syncController) {
-        instance().syncController = syncController;
-    }
+    static void setSyncController(const std::shared_ptr<SyncController>& syncController);
 
 private:
     ServiceDepsRegistry() = default;  // private ctor

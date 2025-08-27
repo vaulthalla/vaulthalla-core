@@ -15,6 +15,8 @@ void LogRegistry::init(const std::filesystem::path& logDir) {
         return;
     }
 
+    spdlog::info("[LogRegistry] Initializing... LogDir: {}", logDir.string());
+
     const auto log_file = logDir / "vaulthalla.log";
     const auto audit_log_file = logDir / "audit.log";
 
@@ -40,20 +42,22 @@ void LogRegistry::init(const std::filesystem::path& logDir) {
         spdlog::register_logger(logger);
     };
 
-    makeLogger("vaulthalla", cnf.levels.subsystem_levels.vaulthalla);
-    makeLogger("fuse", cnf.levels.subsystem_levels.fuse);
-    makeLogger("filesystem", cnf.levels.subsystem_levels.filesystem);
-    makeLogger("cloud", cnf.levels.subsystem_levels.cloud);
-    makeLogger("crypto", cnf.levels.subsystem_levels.crypto);
-    makeLogger("auth", cnf.levels.subsystem_levels.auth);
-    makeLogger("ws", cnf.levels.subsystem_levels.websocket);
-    makeLogger("http", cnf.levels.subsystem_levels.http);
-    makeLogger("shell", cnf.levels.subsystem_levels.shell);
-    makeLogger("db", cnf.levels.subsystem_levels.db);
-    makeLogger("sync", cnf.levels.subsystem_levels.sync);
-    makeLogger("thumb", cnf.levels.subsystem_levels.thumb);
-    makeLogger("storage", cnf.levels.subsystem_levels.storage);
-    makeLogger("types", cnf.levels.subsystem_levels.types);
+    const auto& sub_levels = cnf.levels.subsystem_levels;
+
+    makeLogger("vaulthalla", sub_levels.vaulthalla);
+    makeLogger("fuse", sub_levels.fuse);
+    makeLogger("filesystem", sub_levels.filesystem);
+    makeLogger("cloud", sub_levels.cloud);
+    makeLogger("crypto", sub_levels.crypto);
+    makeLogger("auth", sub_levels.auth);
+    makeLogger("ws", sub_levels.websocket);
+    makeLogger("http", sub_levels.http);
+    makeLogger("shell", sub_levels.shell);
+    makeLogger("db", sub_levels.db);
+    makeLogger("sync", sub_levels.sync);
+    makeLogger("thumb", sub_levels.thumb);
+    makeLogger("storage", sub_levels.storage);
+    makeLogger("types", sub_levels.types);
 
     // Audit logger (special: append-only file sink, no rotation)
     {

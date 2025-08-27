@@ -3,10 +3,12 @@
 #include "config/ConfigRegistry.hpp"
 #include "crypto/TPMKeyProvider.hpp"
 #include "crypto/PasswordUtils.hpp"
+#include "services/LogRegistry.hpp"
 
 #include <fstream>
 
 using namespace vh::crypto;
+using namespace vh::logging;
 
 namespace vh::database {
 
@@ -32,7 +34,7 @@ static std::optional<std::string> getFirstInitDBPass() {
 
     try {
         std::filesystem::remove(f);
-        LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending db_password file {}", f.string());
+        LogRegistry::vaulthalla()->debug("[seed] Consumed and removed pending db_password file {}", f.string());
     } catch (const std::exception& e) {
         LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", f.string(), e.what());
     }

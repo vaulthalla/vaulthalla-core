@@ -89,8 +89,13 @@ CtlServerService::CtlServerService()
     : AsyncService("vaulthalla-cli"),
       router_(std::make_shared<shell::Router>()),
       socketPath_("/run/vaulthalla/cli.sock"),
-      adminGid_(getgrnam("vaulthalla")->gr_gid) {
+      adminGid_(getgrnam("vaulthalla")->gr_gid),
+      adminUIDSet_(false) {
     shell::registerAllCommands(router_);
+
+    const auto admin = UserQueries::getUserByName("admin");
+    if (!admin) LogRegistry::shell()->warn("[CtlServerService] No 'admin' user found in database");
+    if (admin->linux_uid.has_value()) adminUIDSet_.store(true);
 }
 
 CtlServerService::~CtlServerService() { closeListener(); }
@@ -108,6 +113,75 @@ void CtlServerService::onStop() {
     closeListener();
 }
 
+void CtlServerService::initAdminUid(const int cfd, const uid_t uid) {
+    const auto msg = fmt::format(
+        "[CtlServerService] 'admin' user has no Linux UID set; Assigning first user UID {} to 'admin'", uid);
+    LogRegistry::shell()->info(msg);
+    LogRegistry::audit()->info(msg);
+
+    const struct passwd* pw = getpwuid(uid);
+    if (!pw) throw std::runtime_error("Unable to resolve UID to username");
+    const std::string uname = pw->pw_name;
+
+    LogRegistry::shell()->info("[CtlServerService] Adding UID {} to vaulthalla group", uid);
+
+    // Assign UID to admin
+    const auto admin = UserQueries::getUserByName("admin");
+    if (!admin) throw std::runtime_error("admin user disappeared");
+    admin->linux_uid = uid;
+    UserQueries::updateUser(admin);
+    adminUIDSet_.store(true);
+
+    LogRegistry::shell()->info("[CtlServerService] Assigned UID {} to 'admin' user", uid);
+
+    // Check if user is already in the vaulthalla group
+    struct group* grp = getgrnam("vaulthalla");
+    if (!grp) throw std::runtime_error("Group 'vaulthalla' not found");
+
+    bool in_group = false;
+    for (char** mem = grp->gr_mem; *mem != nullptr; ++mem) {
+        if (uname == *mem) {
+            in_group = true;
+            break;
+        }
+    }
+
+    if (!in_group) {
+        // Fall back to system() since group modification isn't possible without `usermod`
+        std::string cmd = fmt::format(kAddAdminCmd, uname);
+        LogRegistry::shell()->info("[CtlServerService] Running fallback group add command: {}", cmd);
+
+        if (const int result = std::system(cmd.c_str()); result != 0) {
+            LogRegistry::shell()->warn("[CtlServerService] usermod failed, checking group manually...");
+
+            // Retry group check (maybe the change propagated anyway)
+            endgrent(); // flush group cache
+            grp = getgrnam("vaulthalla");
+            if (!grp) throw std::runtime_error("Group 'vaulthalla' not found after fallback");
+
+            in_group = false;
+            for (char** mem = grp->gr_mem; *mem != nullptr; ++mem) {
+                if (uname == *mem) {
+                    in_group = true;
+                    break;
+                }
+            }
+
+            if (!in_group) {
+                LogRegistry::shell()->error("[CtlServerService] Failed to add '{}' to vaulthalla group", uname);
+                send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "failed to add to vaulthalla group"}});
+                ::close(cfd);
+                throw std::runtime_error("Group add failed and could not verify fallback");
+            }
+        }
+    }
+
+    LogRegistry::shell()->info("[CtlServerService] Verified '{}' in vaulthalla group", uname);
+    LogRegistry::audit()->info("Promoted user '{}' (UID {}) to admin group", uname, uid);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
 void CtlServerService::runLoop() {
     // Bind
     ::unlink(socketPath_.c_str());
@@ -120,7 +194,7 @@ void CtlServerService::runLoop() {
                sizeof(sa_family_t) + std::strlen(addr.sun_path) + 1) != 0)
         throw std::runtime_error("bind()");
     ::chmod(socketPath_.c_str(), 0660);
-    // chown to vaulthalla:vaulthalla-admin in your service startup if needed
+    // chown to vaulthalla:vaulthalla in your service startup if needed
 
     if (::listen(listenFd_, 16) != 0) throw std::runtime_error("listen()");
 
@@ -132,11 +206,16 @@ void CtlServerService::runLoop() {
             continue;
         }
 
-        // Handle one request/response per connection (simple MVP)
         try {
             const auto p = peercred(cfd);
+
+            LogRegistry::shell()->warn("[CtlServerService] Connection from UID {} (PID {})", p.uid, p.pid);
+
+            if (!adminUIDSet_.load() && p.uid != 0 && p.uid >= 1000) initAdminUid(cfd, p.uid);
+
             if (!in_group(p.uid, adminGid_)) {
-                LogRegistry::shell()->warn("[CtlServerService] Connection from UID {} (PID {}) not in vaulthalla-admin group", p.uid, p.pid);
+                LogRegistry::shell()->warn("[CtlServerService] Connection from UID {} (PID {}) not in vaulthalla group",
+                                           p.uid, p.pid);
                 send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "permission denied"}});
                 ::close(cfd);
                 continue;
@@ -181,9 +260,9 @@ void CtlServerService::runLoop() {
                     const auto res = router_->executeLine(line, user); // uses tokenize() + parseTokens() under the hood
 
                     json resp{
-                            {"ok", res.exit_code == 0},
-                            {"exit_code", res.exit_code},
-                        };
+                        {"ok", res.exit_code == 0},
+                        {"exit_code", res.exit_code},
+                    };
                     if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
                     if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
                     if (res.has_data) resp["data"] = res.data;
@@ -206,7 +285,8 @@ void CtlServerService::runLoop() {
                 continue;
             }
 
-            LogRegistry::shell()->error("[CtlServerService] No 'line' field in request from UID {} (PID {})", p.uid, p.pid);
+            LogRegistry::shell()->error("[CtlServerService] No 'line' field in request from UID {} (PID {})", p.uid,
+                                        p.pid);
             send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "invalid request"}});
         } catch (...) {
             // best-effort error response

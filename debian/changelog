@@ -1,5 +1,6 @@
-vaulthalla-server (0.8.8) UNRELEASED; urgency=medium
+vaulthalla (0.11.1-1) unstable; urgency=medium
 
-  v0.8.8-alpha1 d
+  * Initial Debian upload
+  * A FUSE filesystem back with postgres and robust encryption
 
- -- Cooper Larson <cooper@valkyrianlabs.com>  Mon, 21 Jul 2025 19:18:51 +0000
+ -- Cooper Larson <cooper@valkyrianlabs.com>  Wed, 27 Aug 2025 16:15:45 +0000

@@ -31,7 +31,18 @@ sudo systemctl stop vaulthalla-cli.socket || true
 sudo systemctl disable vaulthalla-cli.service || true
 sudo systemctl disable vaulthalla-cli.socket || true
 sudo systemctl disable vaulthalla.service || true
+
+# Ensure the socket actually stopped
+if systemctl is-active --quiet vaulthalla-cli.socket; then
+    echo "⚠️  vaulthalla-cli.socket is still active, attempting to stop again..."
+    sudo systemctl kill vaulthalla-cli.socket || true
+fi
+
+if [ -d /etc/systemd/system/vaulthalla.service.d ]; then
+    sudo rm -rf /etc/systemd/system/vaulthalla.service.d
+fi
 sudo rm -f /etc/systemd/system/vaulthalla*
+
 sudo systemctl daemon-reload
 echo "✅ Systemd services uninstalled."
 

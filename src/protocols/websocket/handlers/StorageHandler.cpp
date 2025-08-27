@@ -10,6 +10,7 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/LogRegistry.hpp"
+#include "services/SyncController.hpp"
 
 #include <nlohmann/json.hpp>
 #include <boost/algorithm/string.hpp>
@@ -48,7 +49,7 @@ void StorageHandler::handleAddAPIKey(const json& msg, WebSocketSession& session)
 
         LogRegistry::storage()->debug("[StorageHandler] Added API key for user ID: {}", userID);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleAddAPIKey error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleAddAPIKey error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.add.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -74,7 +75,7 @@ void StorageHandler::handleRemoveAPIKey(const json& msg, WebSocketSession& sessi
         LogRegistry::storage()->debug("[StorageHandler] Removed API key with ID: {} for user ID: {}", keyId, user->id);
 
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleRemoveAPIKey error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleRemoveAPIKey error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.remove.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -100,7 +101,7 @@ void StorageHandler::handleListAPIKeys(const json& msg, WebSocketSession& sessio
 
         LogRegistry::storage()->debug("[StorageHandler] Listed all API keys successfully.");
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListAPIKeys error: " << e.what() << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] handleListAPIKeys error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.list.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -128,7 +129,7 @@ void StorageHandler::handleListUserAPIKeys(const json& msg, WebSocketSession& se
 
         LogRegistry::storage()->debug("[StorageHandler] Listed API keys for user ID: {}", user->id);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleListUserAPIKeys error: " << e.what() << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] handleListUserAPIKeys error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.list.user.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -156,7 +157,7 @@ void StorageHandler::handleGetAPIKey(const json& msg, WebSocketSession& session)
 
         LogRegistry::storage()->debug("[StorageHandler] Fetched API key with ID: {} for user ID: {}", keyId, user->id);
     } catch (const std::exception& e) {
-        std::cerr << "[StorageHandler] handleGetAPIKey error: " << e.what() << std::endl;
+        LogRegistry::storage()->debug("[StorageHandler] handleGetAPIKey error: {}", e.what());
 
         const json response = {{"command", "storage.apiKey.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -202,7 +203,7 @@ void StorageHandler::handleAddVault(const json& msg, WebSocketSession& session) 
 
         LogRegistry::storage()->debug("[StorageHandler] Added vault with ID: {} and type: {}", vault->id, type);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleAddVault error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleAddVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.add.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -231,7 +232,7 @@ void StorageHandler::handleUpdateVault(const json& msg, WebSocketSession& sessio
 
         LogRegistry::storage()->debug("[StorageHandler] Updated vault with ID: {}", vault->id);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleUpdateVault error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleUpdateVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.update.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -262,7 +263,7 @@ void StorageHandler::handleRemoveVault(const json& msg, WebSocketSession& sessio
 
         LogRegistry::storage()->debug("[StorageHandler] Removed vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleRemoveVault error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleRemoveVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.remove.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -299,7 +300,7 @@ void StorageHandler::handleGetVault(const json& msg, WebSocketSession& session) 
 
         LogRegistry::storage()->debug("[StorageHandler] Fetched vault with ID: {}", vaultId);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleGetVault error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleGetVault error: {}", e.what());
 
         const json response = {{"command", "storage.vault.get.response"},
                                {"requestId", msg.at("requestId").get<std::string>()},
@@ -330,7 +331,7 @@ void StorageHandler::handleListVaults(const json& msg, WebSocketSession& session
 
         LogRegistry::storage()->debug("[StorageHandler] Listed {} vaults for user ID: {}", vaults.size(), user->id);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageHandler] handleListVaults error: {}", e.what());
+        LogRegistry::storage()->debug("[StorageHandler] handleListVaults error: {}", e.what());
 
         const json response = {
             {"command", "storage.vault.list.response"},

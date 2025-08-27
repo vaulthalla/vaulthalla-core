@@ -2,6 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "types/APIKey.hpp"
+#include "types/User.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"

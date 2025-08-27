@@ -1,12 +1,13 @@
 #pragma once
 
-#include "types/User.hpp"
-
 #include <functional>
 #include <string>
-#include <string_view>
 #include <nlohmann/json.hpp>
 #include <unordered_set>
+
+namespace vh::types {
+    struct User;
+}
 
 namespace vh::shell {
 

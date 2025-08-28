@@ -5,8 +5,6 @@
 #include <memory>
 #include <shared_mutex>
 
-namespace fs = std::filesystem;
-
 namespace vh::types {
 struct Vault;
 struct File;
@@ -20,9 +18,11 @@ class VaultEncryptionManager;
 
 namespace vh::storage {
 
+namespace fs = std::filesystem;
+
 enum class StorageType { Local, Cloud };
 
-struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
+struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     std::shared_ptr<types::Vault> vault;
     std::shared_ptr<types::Sync> sync;
     std::shared_ptr<types::Path> paths;
@@ -41,6 +41,8 @@ struct StorageEngine : public std::enable_shared_from_this<StorageEngine> {
 
     [[nodiscard]] bool isFile(const fs::path& rel_path) const;
 
+    [[nodiscard]] std::vector<uint8_t> decrypt(const std::shared_ptr<types::File>& f) const;
+    [[nodiscard]] std::vector<uint8_t> decrypt(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& payload) const;
     [[nodiscard]] std::vector<uint8_t> decrypt(unsigned int vaultId, const std::filesystem::path& relPath,
                                                const std::vector<uint8_t>& payload) const;
 

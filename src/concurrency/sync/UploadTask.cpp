@@ -13,7 +13,7 @@ UploadTask::UploadTask(std::shared_ptr<CloudStorageEngine> eng, std::shared_ptr<
 
 void UploadTask::operator()() {
     try {
-        engine->uploadFile(file);
+        engine->upload(file);
         promise.set_value(true);
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[UploadTask] Failed to upload file: {} - {}", file->path.string(), e.what());

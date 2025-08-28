@@ -13,7 +13,8 @@ struct S3Vault;
 
 namespace api {
 struct APIKey;
-}}
+}
+}
 
 namespace vh::cloud {
 class S3Controller;
@@ -21,7 +22,7 @@ class S3Controller;
 
 namespace vh::storage {
 
-class CloudStorageEngine : public StorageEngine {
+class CloudStorageEngine final : public StorageEngine {
 public:
     CloudStorageEngine() = default;
     ~CloudStorageEngine() override = default;
@@ -36,11 +37,13 @@ public:
 
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
 
-    void uploadFile(const std::shared_ptr<types::File>& f) const;
+    void upload(const std::shared_ptr<types::File>& f) const;
 
-    void uploadFileBuffer(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& buffer) const;
+    void upload(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& buffer, bool isCiphertext = true) const;
 
     std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
+
+    std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 
     void indexAndDeleteFile(const std::filesystem::path& rel_path);
 
@@ -49,8 +52,6 @@ public:
     [[nodiscard]] std::unordered_map<std::u8string, std::shared_ptr<types::File>> getGroupedFilesFromS3(const std::filesystem::path& prefix = {}) const;
 
     std::vector<std::shared_ptr<types::Directory>> extractDirectories(const std::vector<std::shared_ptr<types::File>>& files) const;
-
-    std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 
     [[nodiscard]] bool remoteFileIsEncrypted(const std::filesystem::path& rel_path) const;
 
@@ -61,6 +62,8 @@ private:
     std::shared_ptr<cloud::S3Controller> s3Provider_;
 
     std::shared_ptr<types::S3Vault> s3Vault() const;
+
+    std::unordered_map<std::string, std::string> getMetaMapFromFile(const std::shared_ptr<types::File>& f) const;
 };
 
 } // namespace vh::storage

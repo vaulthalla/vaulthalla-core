@@ -1,6 +1,6 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"

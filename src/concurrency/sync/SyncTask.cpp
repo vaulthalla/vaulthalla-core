@@ -1,5 +1,5 @@
 #include "concurrency/sync/SyncTask.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/sync/UploadTask.hpp"
 #include "concurrency/sync/CloudDeleteTask.hpp"

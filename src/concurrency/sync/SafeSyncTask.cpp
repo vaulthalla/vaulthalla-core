@@ -1,6 +1,6 @@
 #include "concurrency/sync/SafeSyncTask.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"

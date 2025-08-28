@@ -27,4 +27,24 @@ std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& 
                                      const std::string& payloadHash);
 void trimInPlace(std::string& s);
 
+void ensureCurlGlobalInit();
+
+inline std::string slurp(const std::istream& in) {
+    std::ostringstream oss;
+    oss << in.rdbuf();          // copy entire buffer
+    return oss.str();
+}
+
+/** Build a curl_slist from stable heap‑stored strings */
+struct HeaderList {
+    std::vector<std::string> store; // owns the memory
+    curl_slist* list = nullptr;     // raw list pointer
+    ~HeaderList() { if (list) curl_slist_free_all(list); }
+
+    void add(const std::string& h) {
+        store.push_back(h);
+        list = curl_slist_append(list, store.back().c_str());
+    }
+};
+
 }

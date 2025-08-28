@@ -1,5 +1,5 @@
 #include "concurrency/sync/DownloadTask.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "services/LogRegistry.hpp"
 

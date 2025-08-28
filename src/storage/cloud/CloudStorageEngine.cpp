@@ -1,6 +1,6 @@
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
-#include "storage/cloud/S3Controller.hpp"
+#include "storage/cloud/s3/S3Controller.hpp"
 #include "types/FSEntry.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
@@ -222,3 +222,5 @@ std::optional<std::pair<std::string, unsigned int>> CloudStorageEngine::getRemot
 
     return std::make_pair(iv_b64, key_version);
 }
+
+std::shared_ptr<S3Vault> CloudStorageEngine::s3Vault() const { return std::static_pointer_cast<S3Vault>(vault); }

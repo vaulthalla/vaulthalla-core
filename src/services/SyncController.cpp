@@ -7,7 +7,7 @@
 #include "concurrency/sync/SafeSyncTask.hpp"
 #include "concurrency/sync/MirrorSyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "types/Sync.hpp"
 #include "types/RSync.hpp"

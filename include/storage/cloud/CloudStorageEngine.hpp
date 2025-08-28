@@ -59,6 +59,8 @@ public:
 private:
     std::shared_ptr<types::api::APIKey> key_;
     std::shared_ptr<cloud::S3Controller> s3Provider_;
+
+    std::shared_ptr<types::S3Vault> s3Vault() const;
 };
 
 } // namespace vh::storage

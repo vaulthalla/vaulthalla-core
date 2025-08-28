@@ -11,6 +11,11 @@
 
 namespace vh::util {
 
+void ensureCurlGlobalInit() {
+    static std::once_flag once;
+    std::call_once(once, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
+}
+
 std::string sha256Hex(const std::string& data) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char*>(data.data()), data.size(), hash);

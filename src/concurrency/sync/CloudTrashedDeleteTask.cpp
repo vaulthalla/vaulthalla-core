@@ -1,5 +1,5 @@
 #include "concurrency/sync/CloudTrashedDeleteTask.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/TrashedFile.hpp"
 #include "types/CacheIndex.hpp"
 #include "types/Path.hpp"

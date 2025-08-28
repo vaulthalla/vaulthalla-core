@@ -19,7 +19,9 @@ class Router {
 public:
     void registerCommand(const CommandUsage& usage, CommandHandler handler);
 
-    CommandResult executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const;
+    CommandResult executeLine(const std::string& line,
+        const std::shared_ptr<types::User>& user,
+        IO* io = nullptr) const;
 
 private:
     std::unordered_map<std::string, CommandInfo> commands_;

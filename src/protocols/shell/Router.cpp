@@ -44,10 +44,11 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     return n; // unknown; let caller error
 }
 
-CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user) const {
+CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user, IO* io) const {
     LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;
+    call.io = io;
 
     if (call.name.empty()) return CommandResult{1, "", "no command provided"};
     const auto canonical = canonicalFor(call.name);

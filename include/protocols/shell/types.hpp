@@ -16,12 +16,21 @@ struct FlagKV {
     std::optional<std::string> value;
 };
 
+struct IO {
+    virtual ~IO() = default;
+    virtual void print(std::string_view s) = 0;
+    virtual bool confirm(std::string_view prompt, bool def_no) = 0;
+    virtual std::string prompt(std::string_view prompt,
+                               std::string_view def) = 0;
+};
+
 struct CommandCall {
     std::string name;
     std::vector<FlagKV> options;
     std::vector<std::string> positionals;
     bool rewrote = false;
     std::shared_ptr<types::User> user;
+    IO* io = nullptr; // if set, command was run interactively
 
     // owns any strings you create at runtime (JSON, rewrites, etc.)
     std::vector<std::string> arena;

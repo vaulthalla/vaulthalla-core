@@ -4,6 +4,8 @@
 #include "protocols/shell/commands.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "services/LogRegistry.hpp"
+#include "protocols/shell/SocketIO.hpp"
+#include "types/User.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -55,7 +57,7 @@ bool in_group(uid_t uid, gid_t admin_gid) {
 bool readn(const int fd, void* buf, size_t n) {
     auto* p = static_cast<unsigned char*>(buf);
     while (n) {
-        ssize_t r = ::read(fd, p, n);
+        const ssize_t r = ::read(fd, p, n);
         if (r <= 0) return false;
         p += r;
         n -= r;
@@ -66,7 +68,7 @@ bool readn(const int fd, void* buf, size_t n) {
 bool writen(const int fd, const void* buf, size_t n) {
     auto* p = static_cast<const unsigned char*>(buf);
     while (n) {
-        ssize_t w = ::write(fd, p, n);
+        const ssize_t w = ::write(fd, p, n);
         if (w <= 0) return false;
         p += w;
         n -= w;
@@ -82,6 +84,8 @@ void send_json(const int fd, const json& j) {
 }
 
 } // namespace
+
+using namespace vh::shell;
 
 namespace vh::services {
 
@@ -149,7 +153,7 @@ void CtlServerService::initAdminUid(const int cfd, const uid_t uid) {
     if (!in_group) {
         // Fall back to system() since group modification isn't possible without `usermod`
         std::string cmd = fmt::format(kAddAdminCmd, uname);
-        LogRegistry::shell()->info("[CtlServerService] Running fallback group add command: {}", cmd);
+        LogRegistry::shell()->debug("[CtlServerService] Running fallback group add command: {}", cmd);
 
         if (const int result = std::system(cmd.c_str()); result != 0) {
             LogRegistry::shell()->warn("[CtlServerService] usermod failed, checking group manually...");
@@ -280,7 +284,34 @@ void CtlServerService::runLoop() {
             if (req.contains("line") && req["line"].is_string()) {
                 auto line = req["line"].get<std::string>();
                 if (line.empty()) line = "help";
-                try_exec_line(line);
+
+                std::unique_ptr<IO> io;
+
+                if (req.value("interactive", false))
+                    io = std::make_unique<SocketIO>(cfd);
+
+                try {
+                    const auto res = router_->executeLine(line, user, io.get());
+
+                    json reply{
+                {"type", "result"},
+                {"ok", res.exit_code == 0},
+                {"exit_code", res.exit_code}
+                    };
+                    if (!res.stdout_text.empty()) reply["stdout"] = res.stdout_text;
+                    if (!res.stderr_text.empty()) reply["stderr"] = res.stderr_text;
+                    if (res.has_data) reply["data"] = res.data;
+
+                    SocketIO::send_json(cfd, reply);
+                } catch (const std::exception& e) {
+                    SocketIO::send_json(cfd, {
+                        {"type", "result"},
+                        {"ok", false},
+                        {"exit_code", 1},
+                        {"stderr", e.what()}
+                    });
+                }
+
                 ::close(cfd);
                 continue;
             }
@@ -296,4 +327,4 @@ void CtlServerService::runLoop() {
     }
 }
 
-} // namespace vh::services
+}

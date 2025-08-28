@@ -117,9 +117,33 @@ ValidateResult S3Controller::validateAPICredentials() const {
     return {false, "Auth probe failed: " + resp.body};
 }
 
-bool S3Controller::uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const {
+bool S3Controller::isBucketEmpty(const std::string& bucket) const {
+    const std::string url = apiKey_->endpoint + "/" + bucket + "?list-type=2&max-keys=1";
+
+    static const std::string kCanonical = "/" + bucket + "/?list-type=2&max-keys=1";
+    static const std::string kUnsigned = "UNSIGNED-PAYLOAD";
+
+    CurlEasy tmpHandle;
+    SList hdrs = makeSigHeaders("GET", kCanonical, kUnsigned);
+    hdrs.add("Content-Type: application/xml");
+
+    const auto resp = performCurl([&](CURL* h) {
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
+        curl_easy_setopt(h, CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(h, CURLOPT_UPLOAD, 0L);
+        curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(0));
+    });
+
+    if (!resp.ok()) throw std::runtime_error("S3Provider: failed to query bucket: " + resp.body);
+
+    // Look for <Contents> tag. If absent, bucket is empty
+    return resp.body.find("<Contents>") == std::string::npos;
+}
+
+void S3Controller::uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const {
     std::ifstream fin(filePath, std::ios::binary);
-    if (!fin) return false;
+    if (!fin) throw std::runtime_error("Failed to open file for upload: " + filePath.string());
 
     fin.seekg(0, std::ios::end);
     const curl_off_t sz = fin.tellg();
@@ -144,17 +168,18 @@ bool S3Controller::uploadObject(const std::filesystem::path& key, const std::fil
         curl_easy_setopt(h, CURLOPT_READDATA, &fin);
         curl_easy_setopt(h, CURLOPT_INFILESIZE_LARGE, sz);
         curl_easy_setopt(h, CURLOPT_READFUNCTION,
-            +[](char* buf, size_t sz, size_t nm, void* ud) -> size_t {
+            +[](char* buf, const size_t sz, const size_t nm, void* ud) -> size_t {
                 auto* fp = static_cast<std::ifstream*>(ud);
                 fp->read(buf, static_cast<std::streamsize>(sz * nm));
                 return static_cast<size_t>(fp->gcount());
             });
     });
 
-    return resp.ok();
+    if (!resp.ok()) throw std::runtime_error(
+        fmt::format("Failed to upload file to S3 (HTTP {}): {}", resp.http, resp.body));
 }
 
-bool S3Controller::uploadBufferWithMetadata(
+void S3Controller::uploadBufferWithMetadata(
     const std::filesystem::path& key,
     const std::vector<uint8_t>& buffer,
     const std::unordered_map<std::string, std::string>& metadata) const
@@ -218,18 +243,19 @@ bool S3Controller::uploadBufferWithMetadata(
             });
     });
 
-    return resp.ok();
+    if (!resp.ok()) throw std::runtime_error(
+        fmt::format("Failed to upload buffer to S3 (HTTP {}): {}", resp.http, resp.body));
 }
 
-bool S3Controller::downloadObject(const std::filesystem::path& key,
+void S3Controller::downloadObject(const std::filesystem::path& key,
                                 const std::filesystem::path& outputPath) const {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to init curl for S3 download");
 
     std::ofstream file(outputPath, std::ios::binary);
     if (!file) {
         curl_easy_cleanup(curl);
-        return false;
+        throw std::runtime_error("Failed to open output file for S3 download: " + outputPath.string());
     }
 
     const auto [canonicalPath, url] = constructPaths(curl, key);
@@ -257,10 +283,12 @@ bool S3Controller::downloadObject(const std::filesystem::path& key,
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     file.close();
-    return res == CURLE_OK;
+
+    if (res != CURLE_OK) throw std::runtime_error(
+        fmt::format("Failed to download file from S3: CURL error {}", res));
 }
 
-bool S3Controller::deleteObject(const std::filesystem::path& key) const {
+void S3Controller::deleteObject(const std::filesystem::path& key) const {
     const CurlEasy tmpHandle;
     const auto [canonical, url] = constructPaths(static_cast<CURL*>(tmpHandle), key);
 
@@ -278,7 +306,8 @@ bool S3Controller::deleteObject(const std::filesystem::path& key) const {
         resp.curl, resp.http, resp.body
     );
 
-    return resp.ok();
+    if (!resp.ok()) throw std::runtime_error(
+        fmt::format("Failed to delete object from S3 (HTTP {}): {}", resp.http, resp.body));
 }
 
 std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& key) const {
@@ -325,10 +354,10 @@ std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& k
     return "";
 }
 
-bool S3Controller::uploadPart(const std::filesystem::path& key, const std::string& uploadId,
+void S3Controller::uploadPart(const std::filesystem::path& key, const std::string& uploadId,
                              const int partNumber, const std::string& partData, std::string& etagOut) const {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to init curl for S3 multipart upload");
 
     const auto keyStr = key.u8string();
     const std::string query = "?partNumber=" + std::to_string(partNumber) + "&uploadId=" + uploadId;
@@ -353,16 +382,23 @@ bool S3Controller::uploadPart(const std::filesystem::path& key, const std::strin
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &respHdr);
 
     const CURLcode res = curl_easy_perform(curl);
+    long httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
-    return res == CURLE_OK && extractETag(respHdr, etagOut);
+
+    if (res != CURLE_OK || httpCode != 200)
+        throw std::runtime_error(fmt::format("Failed to upload part {}: CURL={} HTTP={}", partNumber, res, httpCode));
+
+    if (!extractETag(respHdr, etagOut))
+        throw std::runtime_error(fmt::format("Failed to extract ETag for uploaded part {}", partNumber));
 }
 
-bool S3Controller::completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
+void S3Controller::completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
                                          const std::vector<std::string>& etags) const {
-    if (etags.empty()) return false;
+    if (etags.empty()) throw std::runtime_error("No ETags provided to completeMultipartUpload");
 
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to init curl for S3 complete multipart upload");
 
     std::u8string keyStr = key.u8string();
     const std::string query = "?uploadId=" + uploadId;
@@ -395,17 +431,16 @@ bool S3Controller::completeMultipartUpload(const std::filesystem::path& key, con
     if (res != CURLE_OK || httpCode != 200) {
         LogRegistry::cloud()->error("[S3Provider] completeMultipartUpload failed: CURL={} HTTP={} Response:\n{}",
                                     res, httpCode, response);
-        return false;
+        throw std::runtime_error(
+            fmt::format("Failed to complete multipart upload to S3 (HTTP {}): {}", httpCode, response));
     }
-
-    return true;
 }
 
-bool S3Controller::abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const {
+void S3Controller::abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to init curl for S3 abort multipart upload");
 
-    std::u8string keyStr = key.u8string();
+    const auto keyStr = key.u8string();
     const std::string query = "?uploadId=" + uploadId;
     const auto [canonicalPath, url] = constructPaths(curl, keyStr, query);
 
@@ -423,23 +458,25 @@ bool S3Controller::abortMultipartUpload(const std::filesystem::path& key, const 
 
     const CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
-    return res == CURLE_OK;
+
+    if (res != CURLE_OK)
+        throw std::runtime_error("Failed to abort multipart upload to S3: CURL error " + std::to_string(res));
 }
 
-bool S3Controller::uploadLargeObject(const std::filesystem::path& key,
+void S3Controller::uploadLargeObject(const std::filesystem::path& key,
                                    const std::filesystem::path& filePath,
                                    size_t partSize) const {
     std::ifstream file(filePath, std::ios::binary);
-    if (!file) return false;
+    if (!file) throw std::runtime_error("Failed to open file for large upload: " + filePath.string());
 
     const std::string uploadId = initiateMultipartUpload(key);
-    if (uploadId.empty()) return false;
+    if (uploadId.empty()) throw std::runtime_error("Failed to initiate multipart upload for: " + key.string());
 
     std::vector<std::string> etags;
     int partNo = 1;
     bool success = true;
 
-    while (file && success) {
+    while (file) {
         std::string part(partSize, '\0');
         file.read(&part[0], static_cast<std::streamsize>(partSize));
         std::streamsize bytesRead = file.gcount();
@@ -448,16 +485,27 @@ bool S3Controller::uploadLargeObject(const std::filesystem::path& key,
         part.resize(static_cast<size_t>(bytesRead));
 
         std::string etag;
-        success = uploadPart(key, uploadId, partNo++, part, etag);
-        if (success) etags.push_back(std::move(etag));
+        try { uploadPart(key, uploadId, partNo++, part, etag); }
+        catch (const std::exception& e) {
+            LogRegistry::cloud()->error("[S3Provider] uploadLargeObject failed to upload part {}: {}", partNo - 1, e.what());
+            success = false;
+            break;
+        }
+        etags.push_back(std::move(etag));
     }
 
     if (!success || etags.empty()) {
-        if (!abortMultipartUpload(key, uploadId))
+        try {
+            abortMultipartUpload(key, uploadId);
+            return;
+        }
+        catch (const std::exception& e) {
             LogRegistry::cloud()->error(
                 "[S3Provider] uploadLargeObject failed to abort multipart upload for {}: uploadId={}",
                 key.string(), uploadId);
-        return false;
+            LogRegistry::cloud()->error(e.what());
+            throw std::runtime_error("Failed to abort multipart upload after part upload failure");
+        }
     }
 
     return completeMultipartUpload(key, uploadId, etags);
@@ -564,7 +612,7 @@ S3Controller::getHeadObject(const std::filesystem::path& key) const {
     return metadata;
 }
 
-bool S3Controller::setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const {
+void S3Controller::setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const {
     CurlEasy curl;
     const auto [canonicalPath, url] = constructPaths(static_cast<CURL*>(curl), key);
 
@@ -594,10 +642,11 @@ bool S3Controller::setObjectContentHash(const std::filesystem::path& key, const 
         LogRegistry::cloud()->error("[S3Provider] setObjectContentHash failed for {}: CURL={} HTTP={}",
                                         key.string(), resp.curl, resp.http);
 
-    return resp.ok();
+    if (!resp.ok()) throw std::runtime_error(
+        fmt::format("Failed to set content hash metadata on S3 object (HTTP {}): {}", resp.http, resp.body));
 }
 
-bool S3Controller::setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const {
+void S3Controller::setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const {
     CurlEasy curl;
     const auto [canonicalPath, url] = constructPaths(static_cast<CURL*>(curl), key);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
@@ -630,12 +679,13 @@ bool S3Controller::setObjectEncryptionMetadata(const std::string& key, const std
         LogRegistry::cloud()->error("[S3Provider] setObjectEncryptionMetadata failed for {}: CURL={} HTTP={}",
                                         key, resp.curl, resp.http);
 
-    return resp.ok();
+    if (!resp.ok()) throw std::runtime_error(
+        fmt::format("Failed to set encryption metadata on S3 object (HTTP {}): {}", resp.http, resp.body));
 }
 
-bool S3Controller::downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const {
+void S3Controller::downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) throw std::runtime_error("Failed to init curl for S3 download to buffer");
 
     const auto [canonicalPath, url] = constructPaths(curl, key);
     const std::string payloadHash = "UNSIGNED-PAYLOAD";
@@ -663,7 +713,8 @@ bool S3Controller::downloadToBuffer(const std::filesystem::path& key, std::vecto
         LogRegistry::cloud()->error("[S3Provider] downloadToBuffer failed for {}: CURL={} Response:\n{}",
                                         key.string(), res, curl_easy_strerror(res));
 
-    return res == CURLE_OK;
+    if (res != CURLE_OK) throw std::runtime_error(
+        fmt::format("Failed to download object from S3 to buffer: CURL error {}", res));
 }
 
 std::map<std::string, std::string> S3Controller::buildHeaderMap(const std::string& payloadHash) const {

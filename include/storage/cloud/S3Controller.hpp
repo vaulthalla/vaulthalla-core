@@ -24,55 +24,57 @@ public:
 
     ~S3Controller();
 
-    bool uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const;
+    void uploadObject(const std::filesystem::path& key, const std::filesystem::path& filePath) const;
 
-    bool uploadBufferWithMetadata(
+    void uploadBufferWithMetadata(
         const std::filesystem::path& key,
         const std::vector<uint8_t>& buffer,
         const std::unordered_map<std::string, std::string>& metadata) const;
 
-    bool downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath) const;
+    void downloadObject(const std::filesystem::path& key, const std::filesystem::path& outputPath) const;
 
-    bool deleteObject(const std::filesystem::path& path) const;
+    void deleteObject(const std::filesystem::path& path) const;
 
-    bool uploadLargeObject(const std::filesystem::path& key,
+    void uploadLargeObject(const std::filesystem::path& key,
                            const std::filesystem::path& filePath,
                            size_t partSize = 5 * 1024 * 1024) const;
 
-    std::string initiateMultipartUpload(const std::filesystem::path& key) const;
+    [[nodiscard]] std::string initiateMultipartUpload(const std::filesystem::path& key) const;
 
-    bool uploadPart(const std::filesystem::path& key, const std::string& uploadId,
+    void uploadPart(const std::filesystem::path& key, const std::string& uploadId,
                     int partNumber, const std::string& partData, std::string& etagOut) const;
 
-    bool completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
+    void completeMultipartUpload(const std::filesystem::path& key, const std::string& uploadId,
                                  const std::vector<std::string>& etags) const;
 
-    bool abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const;
+    void abortMultipartUpload(const std::filesystem::path& key, const std::string& uploadId) const;
 
-    std::u8string listObjects(const std::filesystem::path& prefix = {}) const;
+    [[nodiscard]] std::u8string listObjects(const std::filesystem::path& prefix = {}) const;
 
-    std::optional<std::unordered_map<std::string, std::string>> getHeadObject(const std::filesystem::path& key) const;
+    [[nodiscard]] std::optional<std::unordered_map<std::string, std::string>> getHeadObject(const std::filesystem::path& key) const;
 
-    bool setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const;
+    void setObjectContentHash(const std::filesystem::path& key, const std::string& hash) const;
 
-    bool setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const;
+    void setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const;
 
-    bool downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
+    void downloadToBuffer(const std::filesystem::path& key, std::vector<uint8_t>& outBuffer) const;
 
     [[nodiscard]] ValidateResult validateAPICredentials() const;
+
+    [[nodiscard]] bool isBucketEmpty(const std::string& bucket) const;
 
 private:
     std::shared_ptr<types::api::APIKey> apiKey_;
     std::string bucket_;
 
-    std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
+    [[nodiscard]] std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
 
     std::pair<std::string, std::string> constructPaths(CURL* curl, const std::filesystem::path& p,
                                                        const std::string& query = "") const;
 
-    SList makeSigHeaders(const std::string& method,
-                         const std::string& canonical,
-                         const std::string& payloadHash) const;
+    [[nodiscard]] SList makeSigHeaders(const std::string& method,
+                                       const std::string& canonical,
+                                       const std::string& payloadHash) const;
 
 };
 

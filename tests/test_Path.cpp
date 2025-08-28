@@ -4,9 +4,6 @@
 #include "util/fsPath.hpp"
 
 #include <filesystem>
-#include <paths.h>
-
-#include "services/LogRegistry.hpp"
 
 namespace fs = std::filesystem;
 using namespace vh::types;
@@ -15,10 +12,7 @@ using namespace vh::config;
 class PathTest : public ::testing::Test {
 protected:
     fs::path vaultFuseMount = "/admin", vaultBackingMount = "/QQQAF9_HWXSAFJXY6NH6EESSHVFN05RPC";
-    void SetUp() override {
-        ConfigRegistry::init();
-        vh::logging::LogRegistry::init(fs::temp_directory_path() / "vaulthalla");
-    }
+    void SetUp() override { /* no-op for now */ }
 };
 
 TEST_F(PathTest, AbsPath_VaultRoot) {

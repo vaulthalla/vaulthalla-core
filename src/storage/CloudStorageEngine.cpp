@@ -21,6 +21,28 @@ using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::cloud;
 
+static constexpr std::string_view META_VH_ENCRYPTED_FLAG = "vh-encrypted";
+static constexpr std::string_view META_VH_IV_FLAG = "vh-iv";
+static constexpr std::string_view META_VH_KEY_VERSION_FLAG = "vh-key-version";
+static constexpr std::string_view META_CONTENT_HASH_FLAG = "content-hash";
+static constexpr std::string_view META_VH_ENCRYPTED = "x-amz-meta-vh-encrypted";
+static constexpr std::string_view META_VH_IV = "x-amz-meta-vh-iv";
+static constexpr std::string_view META_VH_KEY_VERSION = "x-amz-meta-vh-key-version";
+static constexpr std::string_view META_CONTENT_HASH = "x-amz-meta-content-hash";
+
+static std::unordered_map<std::string, std::string> getMetaMapFromFile(const std::shared_ptr<File>& f) {
+    std::unordered_map<std::string, std::string> meta;
+
+    meta[std::string(META_VH_ENCRYPTED_FLAG)] = f->encryption_iv.empty() ? "false" : "true";
+    if (f->content_hash) meta[std::string(META_CONTENT_HASH_FLAG)] = *f->content_hash;
+    if (!f->encryption_iv.empty()) {
+        meta[std::string(META_VH_KEY_VERSION_FLAG)] = std::to_string(f->encrypted_with_key_version);
+        meta[std::string(META_VH_IV_FLAG)] = f->encryption_iv;
+    }
+
+    return meta;
+}
+
 CloudStorageEngine::CloudStorageEngine(const std::shared_ptr<S3Vault>& vault)
     : StorageEngine(vault),
       key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
@@ -41,8 +63,7 @@ void CloudStorageEngine::removeLocally(const std::filesystem::path& rel_path) co
 }
 
 void CloudStorageEngine::removeRemotely(const std::filesystem::path& rel_path, const bool rmThumbnails) const {
-    if (!s3Provider_->deleteObject(stripLeadingSlash(rel_path))) throw std::runtime_error(
-        "[CloudStorageEngine] Failed to delete object from S3: " + rel_path.string());
+    s3Provider_->deleteObject(stripLeadingSlash(rel_path));
     if (rmThumbnails) purgeThumbnails(rel_path);
 }
 
@@ -57,13 +78,11 @@ void CloudStorageEngine::uploadFile(const std::shared_ptr<File>& f) const {
     else s3Provider_->uploadLargeObject(s3Key, f->backing_path);
 
     std::vector<uint8_t> buffer;
-    if (!s3Provider_->downloadToBuffer(s3Key, buffer))
-        throw std::runtime_error("[CloudStorageEngine] Failed to download uploaded file: " + s3Key.string());
+    s3Provider_->downloadToBuffer(s3Key, buffer);
 
     s3Provider_->setObjectContentHash(s3Key, f->content_hash ? *f->content_hash : FileQueries::getContentHash(vault->id, f->path));
 
-    if (!s3Provider_->setObjectEncryptionMetadata(s3Key, f->encryption_iv, f->encrypted_with_key_version))
-        throw std::runtime_error("[CloudStorageEngine] Failed to set encryption metadata for file: " + f->path.string());
+    s3Provider_->setObjectEncryptionMetadata(s3Key, f->encryption_iv, f->encrypted_with_key_version);
 }
 
 void CloudStorageEngine::uploadFileBuffer(const std::shared_ptr<File>& f, const std::vector<uint8_t>& buffer) const {
@@ -74,24 +93,14 @@ void CloudStorageEngine::uploadFileBuffer(const std::shared_ptr<File>& f, const 
         throw std::invalid_argument("[CloudStorageEngine] Invalid file or buffer for upload");
 
     const auto s3Key = stripLeadingSlash(f->path);
-    std::unordered_map<std::string, std::string> meta;
+    const auto meta = getMetaMapFromFile(f);
 
-    meta["vh-encrypted"] = f->encryption_iv.empty() ? "false" : "true";
-    if (f->content_hash) meta["content-hash"] = *f->content_hash;
-    if (!f->encryption_iv.empty()) {
-        meta["vh-key-version"] = std::to_string(f->encrypted_with_key_version);
-        meta["vh-iv"] = f->encryption_iv;
-    }
-
-    if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
-        throw std::runtime_error("[CloudStorageEngine] Failed to upload file buffer: " + f->path.string());
+    s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta);
 }
 
 std::vector<uint8_t> CloudStorageEngine::downloadToBuffer(const std::filesystem::path& rel_path) const {
     std::vector<uint8_t> buffer;
-    if (!s3Provider_->downloadToBuffer(stripLeadingSlash(rel_path), buffer))
-        throw std::runtime_error("[CloudStorageEngine] Failed to download file: " + rel_path.string());
-
+    s3Provider_->downloadToBuffer(stripLeadingSlash(rel_path), buffer);
     return buffer;
 }
 
@@ -116,16 +125,9 @@ std::shared_ptr<File> CloudStorageEngine::downloadFile(const std::filesystem::pa
             .overwrite = true
         });
 
-    std::unordered_map<std::string, std::string> meta;
-    meta["vh-encrypted"] = f->encryption_iv.empty() ? "false" : "true";
-    if (f->content_hash) meta["content-hash"] = *f->content_hash;
-    if (!f->encryption_iv.empty()) {
-        meta["vh-key-version"] = std::to_string(f->encrypted_with_key_version);
-        meta["vh-iv"] = f->encryption_iv;
-    }
+    const auto meta = getMetaMapFromFile(f);
 
-    if (!s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta))
-        throw std::runtime_error("[CloudStorageEngine] Failed to reupload new file with enhanced metadata: " + rel_path.string());
+    s3Provider_->uploadBufferWithMetadata(s3Key, buffer, meta);
 
     ThumbnailWorker::enqueue(shared_from_this(), buffer, f);
 
@@ -144,7 +146,7 @@ CloudStorageEngine::getGroupedFilesFromS3(const std::filesystem::path& prefix) c
 
 std::string CloudStorageEngine::getRemoteContentHash(const std::filesystem::path& rel_path) const {
     if (const auto head = s3Provider_->getHeadObject(stripLeadingSlash(rel_path)))
-        if (head->contains("x-amz-meta-content-hash")) return head->at("x-amz-meta-content-hash");
+        if (head->contains(std::string(META_CONTENT_HASH))) return head->at(std::string(META_CONTENT_HASH));
     return "";
 }
 
@@ -152,7 +154,7 @@ bool CloudStorageEngine::remoteFileIsEncrypted(const std::filesystem::path& rel_
     const auto s3Key = stripLeadingSlash(rel_path);
 
     if (const auto head = s3Provider_->getHeadObject(s3Key)) {
-        const auto it = head->find("x-amz-meta-vh-encrypted");
+        const auto it = head->find(std::string(META_VH_ENCRYPTED));
         if (it != head->end()) {
             const std::string& val = it->second;
             return val == "true" || val == "1";
@@ -207,9 +209,9 @@ std::optional<std::pair<std::string, unsigned int>> CloudStorageEngine::getRemot
     unsigned int key_version = 0;
 
     if (const auto head = s3Provider_->getHeadObject(s3Key)) {
-        const auto it = head->find("x-amz-meta-vh-iv");
+        const auto it = head->find(std::string(META_VH_IV));
         if (it != head->end()) iv_b64 = it->second;
-        const auto versionIt = head->find("x-amz-meta-vh-key-version");
+        const auto versionIt = head->find(std::string(META_VH_KEY_VERSION));
         if (versionIt != head->end()) key_version = std::stoul(versionIt->second);
     }
 

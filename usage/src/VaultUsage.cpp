@@ -59,8 +59,9 @@ CommandUsage VaultUsage::vault_create() {
             {"--api-key <name | id>", "Name or ID of the API key to access the S3 bucket"},
             {"--bucket <name>", "Name of the S3 bucket"},
             {"--sync-strategy <cache | sync | mirror>", "Sync strategy for S3 vaults. Default is 'cache'."},
-            {"--on-sync-conflict <keep_local | keep_remote | ask>",
-             "Conflict resolution strategy during sync. Default is 'ask'."}
+            {"--on-sync-conflict <keep_local | keep_remote | ask>", "Conflict resolution strategy during sync. Default is 'ask'."},
+            {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
+            {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
         }}
     };
     cmd.examples = {
@@ -135,8 +136,10 @@ CommandUsage VaultUsage::vault_update() {
         {"--api-key <name|id>", "New API key name or ID for S3 vaults"},
         {"--bucket <name>", "New S3 bucket name for S3 vaults"},
         {"--sync-strategy <cache|sync|mirror>", "New sync strategy for S3 vaults"},
-        {"--on-sync-conflict <overwrite|keep_both|ask|keep_local|keep_remote>",
-         "New conflict resolution strategy"},
+        {"--on-sync-conflict <overwrite|keep_both|ask|keep_local|keep_remote>", "New conflict resolution strategy"},
+        {"--encrypt <true|false>", "Enable or disable upstream encryption for S3 vaults. Default is true."},
+        {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
+        {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
     };
     cmd.examples = {
         {"vh vault update 42 --desc \"Updated Description\" --quota 20G", "Update the description and quota of the vault with ID 42."},

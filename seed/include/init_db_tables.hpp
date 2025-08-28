@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS s3
     vault_id     INTEGER PRIMARY KEY REFERENCES vault (id) ON DELETE CASCADE,
     api_key_id   INTEGER REFERENCES api_keys (id) ON DELETE CASCADE,
     bucket       TEXT NOT NULL,
+    encrypt_upstream    BOOLEAN DEFAULT TRUE,
 
     UNIQUE (api_key_id, bucket) -- Ensure unique bucket per API key
 );

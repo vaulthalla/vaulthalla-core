@@ -13,6 +13,7 @@ namespace vh::types {
 struct S3Vault : Vault {
     unsigned int api_key_id{};
     std::string bucket;
+    bool encrypt_upstream{true};
 
     S3Vault() = default;
     S3Vault(const std::string& name, unsigned int apiKeyID, std::string bucketName);

@@ -70,7 +70,8 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
 
         if (vault->type == VaultType::S3) {
             const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-            txn.exec_prepared("upsert_s3_vault", pqxx::params{vaultId, s3Vault->api_key_id, s3Vault->bucket});
+            pqxx::params s3p{vaultId, s3Vault->api_key_id, s3Vault->bucket, s3Vault->encrypt_upstream};
+            txn.exec_prepared("upsert_s3_vault", s3p);
         }
 
         txn.commit();

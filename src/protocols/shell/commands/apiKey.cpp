@@ -6,7 +6,7 @@
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
-#include "storage/cloud/S3Controller.hpp"
+#include "storage/cloud/s3/S3Controller.hpp"
 #include "APIKeyUsage.hpp"
 
 using namespace vh::shell;

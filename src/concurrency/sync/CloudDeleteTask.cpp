@@ -1,5 +1,5 @@
 #include "concurrency/sync/CloudDeleteTask.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "services/LogRegistry.hpp"

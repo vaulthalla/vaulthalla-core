@@ -24,7 +24,7 @@ enum class AdminPermission : uint16_t {
 };
 
 enum class VaultPermission : uint16_t {
-    MigrateData             = 1ULL << 0,   // migrate vault data to another storage backend
+    ManageVault             = 1ULL << 0,   // manage vault settings, including sync & upstream encryption settings
     ManageAccess            = 1ULL << 1,   // manage vault roles, assign users/groups to vault roles
     ManageTags              = 1ULL << 2,   // manage tags for files and directories in the vault
     ManageMetadata          = 1ULL << 3,

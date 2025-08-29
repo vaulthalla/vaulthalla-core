@@ -47,8 +47,8 @@ static uint16_t parseUserRolePermissions(const CommandCall& call, uint16_t permi
 }
 
 static uint16_t parseVaultRolePermissions(const CommandCall& call, uint16_t permissions = 0) {
-    if (hasFlag(call, "migrate-data") || hasFlag(call, "set-migrate-data")) permissions |= (1 << 0);
-    else if (hasFlag(call, "unset-migrate-data")) permissions &= ~(1 << 0);
+    if (hasFlag(call, "manage-vault") || hasFlag(call, "set-manage-vault")) permissions |= (1 << 0);
+    else if (hasFlag(call, "unset-manage-vault")) permissions &= ~(1 << 0);
 
     if (hasFlag(call, "manage-access") || hasFlag(call, "set-manage-access")) permissions |= (1 << 1);
     else if (hasFlag(call, "unset-manage-access")) permissions &= ~(1 << 1);

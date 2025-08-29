@@ -24,7 +24,27 @@ void parsePagination(const std::string& response, std::string& continuationToken
 std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& api_key,
                                      const std::string& method, const std::string& fullPath,
                                      const std::map<std::string, std::string>& headers,
-                                     const std::string& payloadHash);
+                                     const std::string& payloadHash, const std::string& canonicalQuery = "");
 void trimInPlace(std::string& s);
+
+void ensureCurlGlobalInit();
+
+inline std::string slurp(const std::istream& in) {
+    std::ostringstream oss;
+    oss << in.rdbuf();          // copy entire buffer
+    return oss.str();
+}
+
+/** Build a curl_slist from stable heap‑stored strings */
+struct HeaderList {
+    std::vector<std::string> store; // owns the memory
+    curl_slist* list = nullptr;     // raw list pointer
+    ~HeaderList() { if (list) curl_slist_free_all(list); }
+
+    void add(const std::string& h) {
+        store.push_back(h);
+        list = curl_slist_append(list, store.back().c_str());
+    }
+};
 
 }

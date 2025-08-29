@@ -1,7 +1,7 @@
 #include "concurrency/sync/CacheSyncTask.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/CacheQueries.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "types/Vault.hpp"

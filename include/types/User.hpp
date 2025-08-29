@@ -61,7 +61,7 @@ struct User {
     [[nodiscard]] bool canCreateVaults() const;
 
     // Vault permissions
-    [[nodiscard]] bool canMigrateVaultData(unsigned int vaultId, const std::filesystem::path& path = {}) const;
+    [[nodiscard]] bool canManageVault(unsigned int vaultId, const std::filesystem::path& path = {}) const;
     [[nodiscard]] bool canManageVaultAccess(unsigned int vaultId, const std::filesystem::path& path = {}) const;
     [[nodiscard]] bool canManageVaultTags(unsigned int vaultId, const std::filesystem::path& path = {}) const;
     [[nodiscard]] bool canManageVaultMetadata(unsigned int vaultId, const std::filesystem::path& path = {}) const;

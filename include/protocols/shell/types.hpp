@@ -1,5 +1,7 @@
 #pragma once
 
+#include "protocols/shell/SocketIO.hpp"
+
 #include <functional>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -22,6 +24,7 @@ struct CommandCall {
     std::vector<std::string> positionals;
     bool rewrote = false;
     std::shared_ptr<types::User> user;
+    SocketIO* io = nullptr; // if set, command was run interactively
 
     // owns any strings you create at runtime (JSON, rewrites, etc.)
     std::vector<std::string> arena;

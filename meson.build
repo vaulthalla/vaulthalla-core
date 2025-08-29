@@ -82,7 +82,7 @@ deps = [
     fmt_dep
 ]
 
-test_deps = deps + dependency('gtest', required: true, main: true)
+test_deps = deps + dependency('gtest', required: true, main: false)
 
 
 # ╭────────────────────────────────   FILES   ──────────────────────────────────╮

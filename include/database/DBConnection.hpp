@@ -41,6 +41,7 @@ class DBConnection {
     void initPreparedCache() const;
     void initPreparedGroups() const;
     void initPreparedSecrets() const;
+    void initPreparedWaivers() const;
 };
 
 struct PathPatterns {

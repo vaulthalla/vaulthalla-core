@@ -1,6 +1,6 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
@@ -25,7 +25,6 @@ StorageManager::StorageManager() = default;
 void StorageManager::initStorageEngines() {
     LogRegistry::storage()->debug("[StorageManager] Initializing storage engines...");
     std::scoped_lock lock(mutex_);
-
 
     if (const auto& config = ConfigRegistry::get().dev; config.enabled && config.init_r2_test_vault)
         if (const auto admin = UserQueries::getUserByName("admin");
@@ -146,7 +145,7 @@ void StorageManager::removeVault(const unsigned int vaultId) {
 
 std::shared_ptr<Vault> StorageManager::getVault(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
-    if (vaultToEngine_.find(vaultId) != vaultToEngine_.end()) return vaultToEngine_.at(vaultId)->vault;
+    if (vaultToEngine_.contains(vaultId)) return vaultToEngine_.at(vaultId)->vault;
     return VaultQueries::getVault(vaultId);
 }
 

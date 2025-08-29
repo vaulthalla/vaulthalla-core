@@ -66,7 +66,7 @@ struct VaultRole final : Role {
         return isEnabled;
     }
 
-    [[nodiscard]] bool canMigrateData(const std::filesystem::path& path) const;
+    [[nodiscard]] bool canManageVault(const std::filesystem::path& path) const;
     [[nodiscard]] bool canManageAccess(const std::filesystem::path& path) const;
     [[nodiscard]] bool canManageTags(const std::filesystem::path& path) const;
     [[nodiscard]] bool canManageMetadata(const std::filesystem::path& path) const;

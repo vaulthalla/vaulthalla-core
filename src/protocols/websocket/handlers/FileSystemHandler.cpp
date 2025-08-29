@@ -4,6 +4,7 @@
 #include "types/VaultRole.hpp"
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
+#include "types/User.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"

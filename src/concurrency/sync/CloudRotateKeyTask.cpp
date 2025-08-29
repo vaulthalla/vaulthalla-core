@@ -1,5 +1,5 @@
 #include "concurrency/sync/CloudRotateKeyTask.hpp"
-#include "storage/CloudStorageEngine.hpp"
+#include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "types/RSync.hpp"
 #include "database/Queries/FileQueries.hpp"
@@ -48,7 +48,7 @@ void CloudRotateKeyTask::operator()() {
                 if (ciphertext.empty())
                     throw std::runtime_error("Failed to encrypt file: " + file->backing_path.string());
 
-                engine->uploadFileBuffer(file, ciphertext);
+                engine->upload(file, ciphertext);
                 FileQueries::setEncryptionIVAndVersion(file);
 
                 if (rsync->strategy == RSync::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;
@@ -66,7 +66,7 @@ void CloudRotateKeyTask::operator()() {
             if (ciphertext.empty())
                 throw std::runtime_error("Failed to rotate key for file: " + file->backing_path.string());
 
-            engine->uploadFileBuffer(file, ciphertext);
+            engine->upload(file, ciphertext);
             FileQueries::setEncryptionIVAndVersion(file);
 
             if (rsync->strategy == RSync::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;

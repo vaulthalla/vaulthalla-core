@@ -1,6 +1,7 @@
 #pragma once
 
 #include <protocols/shell/types.hpp>
+#include "protocols/shell/SocketIO.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -19,7 +20,9 @@ class Router {
 public:
     void registerCommand(const CommandUsage& usage, CommandHandler handler);
 
-    CommandResult executeLine(const std::string& line, const std::shared_ptr<types::User>& user) const;
+    CommandResult executeLine(const std::string& line,
+        const std::shared_ptr<types::User>& user,
+        SocketIO* io = nullptr) const;
 
 private:
     std::unordered_map<std::string, CommandInfo> commands_;

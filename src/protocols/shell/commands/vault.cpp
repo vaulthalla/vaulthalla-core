@@ -312,6 +312,36 @@ On-Sync-Conflict Policy Options:
             s3Vault->encrypt_upstream = io->confirm("Enable upstream encryption? (yes/no) [yes]", false);
         }
 
+        auto interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m] --help for details:", "15m");
+        while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(interval)) != helpOptions.end()) {
+            io->print(R"(
+Sync Interval:
+
+  S3 Vaults: Defines how often the system will synchronize changes between the local cache and the S3 bucket.
+  Local Vaults: Sync is primarily event-driven, but this interval sets how often the system checks for filesystem changes.
+
+  ⚠️  S3 Vaults only: Setting a very short interval (e.g., every few seconds) may lead to increased API usage and potential costs.
+      Choose an interval that balances timeliness with cost-effectiveness.
+
+  ⚠️  Setting a very short interval may lead to high CPU usage due to frequent filesystem checks.
+      Choose an interval that balances timeliness with system performance.
+
+  Format: A number followed by a time unit:
+      s - seconds
+      m - minutes
+      h - hours
+      d - days
+
+  Examples:
+    30s  - Every 30 seconds
+    10m  - Every 10 minutes
+    1h   - Every 1 hour
+  Default is 15 minutes (15m).
+)");
+            interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m]:", "15m");
+        }
+        sync->interval = parseSyncInterval(interval);
+
         return finish_vault_create(call, v, sync);
 
     } catch (const std::exception& e) {

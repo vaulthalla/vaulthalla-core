@@ -25,7 +25,7 @@ std::string PermissionUsage::usage_user_permissions() {
 std::string PermissionUsage::usage_vault_permissions() {
     std::ostringstream os;
     os << "Vault Permissions Flags:\n"
-       << "  --migrate-data        | --set-migrate-data        | --unset-migrate-data\n"
+       << "  --manage-vault        | --set-manage-vault        | --unset-manage-vault\n"
        << "  --manage-access       | --set-manage-access       | --unset-manage-access\n"
        << "  --manage-tags         | --set-manage-tags         | --unset-manage-tags\n"
        << "  --manage-metadata     | --set-manage-metadata     | --unset-manage-metadata\n"

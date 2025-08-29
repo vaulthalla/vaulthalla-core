@@ -63,10 +63,10 @@ ValidateResult S3Controller::validateAPICredentials() const {
     return {false, "Auth probe failed: " + resp.body};
 }
 
-bool S3Controller::isBucketEmpty(const std::string& bucket) const {
-    const std::string url = apiKey_->endpoint + "/" + bucket + "?list-type=2&max-keys=1";
+bool S3Controller::isBucketEmpty() const {
+    const std::string url = apiKey_->endpoint + "/" + bucket_ + "?list-type=2&max-keys=1";
 
-    static const std::string kCanonical = "/" + bucket + "/?list-type=2&max-keys=1";
+    static const std::string kCanonical = "/" + bucket_ + "/?list-type=2&max-keys=1";
     static const std::string kUnsigned = "UNSIGNED-PAYLOAD";
 
     CurlEasy tmpHandle;

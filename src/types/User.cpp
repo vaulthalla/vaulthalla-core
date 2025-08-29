@@ -120,9 +120,9 @@ bool User::canCreateVaults() const { return hasPermission(role->permissions, Adm
 
 // --- Vault role->permissions ---
 
-bool User::canMigrateVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
+bool User::canManageVault(const unsigned int vaultId, const std::filesystem::path& path) const {
     const auto role = getRole(vaultId);
-    return role && role->canMigrateData(path);
+    return role && role->canManageVault(path);
 }
 
 bool User::canManageVaultAccess(const unsigned int vaultId, const std::filesystem::path& path) const {

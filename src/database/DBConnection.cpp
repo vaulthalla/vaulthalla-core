@@ -49,8 +49,8 @@ DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(
         if (!initPass) {
             if (std::filesystem::exists("/run/vaulthalla/db_password")) {
                 std::filesystem::remove_all("/run/vaulthalla/db_password");
-                if (std::filesystem::exists("/run/vaulthalla/db_password"))
-                    throw std::runtime_error("Failed to remove stale /run/vaulthalla/db_password file");
+                if (std::filesystem::exists("/run/vaulthalla/db_password")) throw std::runtime_error(
+                    "Failed to remove stale /run/vaulthalla/db_password file");
             }
             throw std::runtime_error("Database password failed to initialize. See logs for details.");
         }
@@ -62,7 +62,8 @@ DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(
 
     const auto& config = config::ConfigRegistry::get();
     const auto db = config.database;
-    DB_CONNECTION_STR = "postgresql://" + db.user + ":" + password + "@" + db.host + ":" + std::to_string(db.port) + "/" + db.name;
+    DB_CONNECTION_STR = "postgresql://" + db.user + ":" + password + "@" + db.host + ":" + std::to_string(db.port) + "/"
+                        + db.name;
     conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
 }
 
@@ -90,6 +91,7 @@ void DBConnection::initPrepared() const {
     initPreparedCache();
     initPreparedGroups();
     initPreparedSecrets();
+    initPreparedWaivers();
 }
 
 void DBConnection::initPreparedUsers() const {
@@ -180,6 +182,42 @@ void DBConnection::initPreparedGroups() const {
                    "FROM users u "
                    "JOIN group_members gm ON u.id = gm.user_id "
                    "WHERE gm.group_id = $1");
+}
+
+void DBConnection::initPreparedWaivers() const {
+    conn_->prepare("insert_cloud_encryption_waiver",
+                   "INSERT INTO cloud_encryption_waivers ("
+                   " vault_id, user_id, api_key_id, "
+                   " vault_name, user_name, user_email, linux_uid, "
+                   " bucket, api_key_name, api_provider, api_access_key, api_key_region, api_key_endpoint, "
+                   " encrypt_upstream, waiver_text"
+                   ") "
+                   "SELECT "
+                   " v.id, u.id, a.id, "
+                   " v.name, u.name, u.email, u.linux_uid, "
+                   " s.bucket, a.name, a.provider, a.access_key, a.region, a.endpoint, "
+                   " s.encrypt_upstream, $4 "
+                   "FROM vault v "
+                   "JOIN s3 s ON s.vault_id = v.id "
+                   "JOIN api_keys a ON s.api_key_id = a.id "
+                   "JOIN users u ON v.owner_id = u.id "
+                   "WHERE v.id = $1 AND u.id = $2 AND a.id = $3 RETURNING id");
+
+    conn_->prepare("insert_waiver_owner_override",
+                   "INSERT INTO waiver_owner_overrides "
+                   "(waiver_id, owner_id, owner_name, owner_email, overriding_role_id, overriding_role_name, "
+                   "overriding_role_scope, overriding_role_permissions) "
+                   "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING waiver_id");
+
+    conn_->prepare("insert_permission_snapshots_for_waiver",
+                   "INSERT INTO waiver_permission_snapshots ("
+                   " waiver_id, permission_id, permission_name, permission_category, permission_bit_position"
+                   ") "
+                   "SELECT "
+                   " $1, p.id, p.name, p.category, p.bit_position "
+                   "FROM permission p "
+                   "WHERE p.category = $2"
+        );
 }
 
 void DBConnection::initPreparedAPIKeys() const {
@@ -1036,9 +1074,9 @@ void DBConnection::initPreparedCache() const {
 
 void DBConnection::initPreparedSecrets() const {
     conn_->prepare("upsert_internal_secret",
-        "INSERT INTO internal_secrets (key, value, iv, created_at, updated_at) "
-        "VALUES ($1, $2, $3, NOW(), NOW()) "
-        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, iv = EXCLUDED.iv, updated_at = NOW()");
+                   "INSERT INTO internal_secrets (key, value, iv, created_at, updated_at) "
+                   "VALUES ($1, $2, $3, NOW(), NOW()) "
+                   "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, iv = EXCLUDED.iv, updated_at = NOW()");
 
     conn_->prepare("get_internal_secret", "SELECT * FROM internal_secrets WHERE key = $1");
 

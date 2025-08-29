@@ -9,15 +9,18 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
+#include "database/Queries/WaiverQueries.hpp"
 
 #include "services/LogRegistry.hpp"
 #include "services/SyncController.hpp"
 
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
+#include "storage/cloud/s3/S3Controller.hpp"
 
 #include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/GPGEncryptor.hpp"
+#include "crypto/APIKeyManager.hpp"
 
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
@@ -27,16 +30,24 @@
 #include "types/FSync.hpp"
 #include "types/RSync.hpp"
 #include "types/VaultRole.hpp"
+#include "types/User.hpp"
+#include "types/Waiver.hpp"
+#include "types/Role.hpp"
+#include "types/UserRole.hpp"
+#include "types/VaultRole.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
 #include "VaultUsage.hpp"
+#include "util/waiver.hpp"
 
 #include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <memory>
+#include <utility>
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -47,12 +58,106 @@ using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::cloud;
 
 
 // ################################################################################
 // #################### 🧱 Vault Lifecycle (create/delete) ########################
 // ################################################################################
 
+static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault) {
+    auto waiver = std::make_shared<Waiver>();
+    waiver->vault = s3Vault;
+    waiver->user = call.user;
+    waiver->apiKey = APIKeyQueries::getAPIKey(s3Vault->api_key_id);
+    waiver->encrypt_upstream = s3Vault->encrypt_upstream;
+    waiver->waiver_text = s3Vault->encrypt_upstream ?
+        ENABLE_UPSTREAM_ENCRYPTION_WAIVER : DISABLE_UPSTREAM_ENCRYPTION_WAIVER;
+
+    if (s3Vault->owner_id != call.user->id) {
+        waiver->owner = UserQueries::getUserById(s3Vault->owner_id);
+        if (!waiver->owner) throw std::runtime_error("Failed to load owner ID " + std::to_string(s3Vault->owner_id));
+
+        if (waiver->owner->canManageVaults()) waiver->overridingRole = std::make_shared<Role>(*call.user->role);
+        else {
+            const auto role = call.user->getRole(s3Vault->id);
+            if (!role || role->type != "vault") throw std::runtime_error(
+                "User ID " + std::to_string(call.user->id) + " does not have a role for vault ID " + std::to_string(s3Vault->id));
+
+            // validate role has vault management perms
+            if (!role->canManageVault({})) throw std::runtime_error(
+                "User ID " + std::to_string(call.user->id) + " does not have permission to manage vault ID " + std::to_string(s3Vault->id));
+
+            waiver->overridingRole = std::make_shared<Role>(*role);
+        }
+    }
+
+    return waiver;
+}
+
+static bool upstream_bucket_is_empty(const std::shared_ptr<S3Vault>& s3Vault) {
+    const auto apiKey = ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(s3Vault->api_key_id, s3Vault->owner_id);
+    if (!apiKey) throw std::runtime_error("Failed to load API key ID " + std::to_string(s3Vault->api_key_id));
+    const S3Controller ctrl(apiKey, s3Vault->bucket);
+
+    if (const auto [ok, msg] = ctrl.validateAPICredentials(); !ok)
+        throw std::runtime_error("Failed to validate S3 credentials: " + msg);
+
+    return ctrl.isBucketEmpty();
+}
+
+static bool requires_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault, const bool isUpdate = false) {
+    const bool hasEncryptFlag = hasFlag(call, "encrypt");
+    const bool hasNoEncryptFlag = hasFlag(call, "no-encrypt");
+
+    if (hasEncryptFlag && hasNoEncryptFlag)
+        throw std::runtime_error("Cannot use --encrypt and --no-encrypt together");
+
+    if (!hasEncryptFlag && !hasNoEncryptFlag) {
+        if (isUpdate) return false;
+        s3Vault->encrypt_upstream = true;
+        return !upstream_bucket_is_empty(s3Vault);
+    }
+
+    if (hasEncryptFlag) {
+        s3Vault->encrypt_upstream = true;
+        if (isUpdate && s3Vault->encrypt_upstream) return false;
+        if (hasFlag(call, "accept-overwrite-waiver")) return false;
+        return !upstream_bucket_is_empty(s3Vault);
+    }
+
+    // hasNoEncryptFlag
+    s3Vault->encrypt_upstream = false;
+    if (isUpdate && !s3Vault->encrypt_upstream) return false;
+    if (hasFlag(call, "accept_decryption_waiver")) return false;
+    return !upstream_bucket_is_empty(s3Vault);
+}
+
+struct WaiverResult {
+    bool okToProceed;
+    std::shared_ptr<Waiver> waiver;
+};
+
+static WaiverResult handle_encryption_waiver(const CommandCall& call, const std::shared_ptr<Vault>& vault, const bool isUpdate = false) {
+    if (!vault) throw std::invalid_argument("Invalid vault");
+    if (vault->type != VaultType::S3) return {true, nullptr};
+
+    const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+    if (!s3Vault) throw std::runtime_error("Failed to cast vault to S3Vault");
+
+    if (!requires_waiver(call, s3Vault, isUpdate)) return {true, nullptr};
+
+    const auto waiverText = s3Vault->encrypt_upstream ?
+        ENABLE_UPSTREAM_ENCRYPTION_WAIVER : DISABLE_UPSTREAM_ENCRYPTION_WAIVER;
+
+    if (const auto res = call.io->prompt(waiverText, "I DO NOT ACCEPT"); res == "I ACCEPT") {
+        const auto waiver = create_encrypt_waiver(call, s3Vault);
+        if (!waiver) throw std::runtime_error("Failed to create encryption waiver");
+        return {true, waiver};
+    }
+
+    return {false, nullptr};
+}
 
 static CommandResult handle_vault_create(const CommandCall& call) {
     try {
@@ -155,7 +260,11 @@ static CommandResult handle_vault_create(const CommandCall& call) {
         if (quotaOpt) vault->quota = parseSize(*quotaOpt);
         else vault->quota = 0; // 0 means unlimited
 
+        const auto [okToProceed, waiver] = handle_encryption_waiver(call, vault, false);
+        if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
+
         vault = ServiceDepsRegistry::instance().storageManager->addVault(vault, sync);
+        if (waiver) WaiverQueries::addWaiver(waiver);
 
         return ok("Successfully created new vault!\n" + to_string(vault));
     } catch (const std::exception& e) {
@@ -250,6 +359,10 @@ static CommandResult handle_vault_update(const CommandCall& call) {
 
         if (bucketOpt) s3Vault->bucket = *bucketOpt;
     }
+
+    const auto [okToProceed, waiver] = handle_encryption_waiver(call, vault, true);
+    if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
+    if (waiver) WaiverQueries::addWaiver(waiver);
 
     VaultQueries::upsertVault(vault, sync);
 
@@ -812,12 +925,10 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
         engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
     } else {
         const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) throw std::invalid_argument(
-            "vault sync update: missing required --owner <id | name> for vault name lookup");
+        if (!ownerOpt) throw std::invalid_argument("vault sync update: missing required --owner <id | name> for vault name lookup");
         unsigned int ownerId = call.user->id;
         if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) throw std::invalid_argument(
-                "vault sync update: --owner <id> must be a positive integer");
+            if (*ownerIdOpt <= 0) throw std::invalid_argument("vault sync update: --owner <id> must be a positive integer");
             ownerId = *ownerIdOpt;
         } else {
             const auto owner = UserQueries::getUserByName(*ownerOpt);

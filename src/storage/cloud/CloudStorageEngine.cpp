@@ -20,6 +20,8 @@ using namespace vh::crypto;
 using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::cloud;
+using namespace vh::database;
+using namespace vh::util;
 
 static constexpr std::string_view META_VH_ENCRYPTED_FLAG = "vh-encrypted";
 static constexpr std::string_view META_VH_IV_FLAG = "vh-iv";

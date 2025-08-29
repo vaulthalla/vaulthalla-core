@@ -76,7 +76,7 @@ public:
     // #########################################################################
 
     [[nodiscard]] ValidateResult validateAPICredentials() const;
-    [[nodiscard]] bool isBucketEmpty(const std::string& bucket) const;
+    [[nodiscard]] bool isBucketEmpty() const;
 
     // #########################################################################
     // ############################### GENERAL #################################

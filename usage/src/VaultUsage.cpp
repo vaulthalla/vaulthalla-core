@@ -60,6 +60,8 @@ CommandUsage VaultUsage::vault_create() {
             {"--bucket <name>", "Name of the S3 bucket"},
             {"--sync-strategy <cache | sync | mirror>", "Sync strategy for S3 vaults. Default is 'cache'."},
             {"--on-sync-conflict <keep_local | keep_remote | ask>", "Conflict resolution strategy during sync. Default is 'ask'."},
+            {"--encrypt", "Enable upstream encryption for S3 vaults. This is the default."},
+            {"--no-encrypt", "Disable upstream encryption for S3 vaults."},
             {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
             {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
         }}
@@ -137,7 +139,8 @@ CommandUsage VaultUsage::vault_update() {
         {"--bucket <name>", "New S3 bucket name for S3 vaults"},
         {"--sync-strategy <cache|sync|mirror>", "New sync strategy for S3 vaults"},
         {"--on-sync-conflict <overwrite|keep_both|ask|keep_local|keep_remote>", "New conflict resolution strategy"},
-        {"--encrypt <true|false>", "Enable or disable upstream encryption for S3 vaults. Default is true."},
+        {"--encrypt", "Enable upstream encryption for S3 vaults. This is the default."},
+        {"--no-encrypt", "Disable upstream encryption for S3 vaults."},
         {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
         {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
     };

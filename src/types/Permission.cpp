@@ -46,7 +46,7 @@ std::string to_string(const AdminPermission p) {
 
 std::string to_string(const VaultPermission p) {
     switch (p) {
-    case VaultPermission::MigrateData: return "Migrate Data";
+    case VaultPermission::ManageVault: return "Manage Vault";
     case VaultPermission::ManageAccess: return "Manage Access";
     case VaultPermission::ManageTags: return "Manage Tags";
     case VaultPermission::ManageMetadata: return "Manage Metadata";
@@ -105,7 +105,7 @@ nlohmann::json jsonFromAdminMask(const uint16_t mask) {
 
 nlohmann::json jsonFromVaultMask(const uint16_t mask) {
     return {
-        {"migrate_data", (mask & (1 << 0)) != 0},
+        {"manage_vault", (mask & (1 << 0)) != 0},
         {"manage_access", (mask & (1 << 1)) != 0},
         {"manage_tags", (mask & (1 << 2)) != 0},
         {"manage_metadata", (mask & (1 << 3)) != 0},
@@ -139,7 +139,7 @@ uint16_t adminMaskFromJson(const nlohmann::json& j) {
 
 uint16_t vaultMaskFromJson(const nlohmann::json& j) {
     uint16_t mask = 0;
-    if (j.at("migrate_data").get<bool>()) mask |= (1 << 0);
+    if (j.at("manage_vault").get<bool>()) mask |= (1 << 0);
     if (j.at("manage_access").get<bool>()) mask |= (1 << 1);
     if (j.at("manage_tags").get<bool>()) mask |= (1 << 2);
     if (j.at("manage_metadata").get<bool>()) mask |= (1 << 3);

@@ -24,8 +24,7 @@ By proceeding, you acknowledge that:
 - You have made proper backups if needed
 - You are fully responsible for downstream consequences
 
-▶️ To proceed, run:
-`vh vault set my-vault --encrypt=true --accept-overwrite-waiver`
+Please type "I ACCEPT" to confirm:
 )";
 
 static constexpr std::string_view DISABLE_UPSTREAM_ENCRYPTION_WAIVER = R"(
@@ -43,8 +42,11 @@ This may:
 
 Vaulthalla will continue to encrypt data locally. You are solely responsible for securing your upstream bucket.
 
-▶️ To proceed, run:
-`vh vault set my-vault --encrypt=false --accept-decryption-waiver`
+By proceeding, you acknowledge that:
+- You understand and accept the risks
+- You are fully responsible for data security in the upstream bucket
+
+Please type "I ACCEPT" to confirm:
 )";
 
 }

@@ -107,8 +107,8 @@ std::vector<std::shared_ptr<PermissionOverride> > VaultRole::getPermissionOverri
 }
 
 
-bool VaultRole::canMigrateData(const std::filesystem::path& path) const {
-    return validatePermission(permissions, VaultPermission::MigrateData, path);
+bool VaultRole::canManageVault(const std::filesystem::path& path) const {
+    return validatePermission(permissions, VaultPermission::ManageVault, path);
 }
 
 bool VaultRole::canManageAccess(const std::filesystem::path& path) const {

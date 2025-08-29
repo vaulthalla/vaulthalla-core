@@ -1,6 +1,7 @@
 #pragma once
 
 #include <protocols/shell/types.hpp>
+#include "protocols/shell/SocketIO.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -21,7 +22,7 @@ public:
 
     CommandResult executeLine(const std::string& line,
         const std::shared_ptr<types::User>& user,
-        IO* io = nullptr) const;
+        SocketIO* io = nullptr) const;
 
 private:
     std::unordered_map<std::string, CommandInfo> commands_;

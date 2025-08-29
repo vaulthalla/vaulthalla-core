@@ -64,13 +64,18 @@ ValidateResult S3Controller::validateAPICredentials() const {
 }
 
 bool S3Controller::isBucketEmpty() const {
-    const std::string url = apiKey_->endpoint + "/" + bucket_ + "?list-type=2&max-keys=1";
+    const auto rstrip = [](std::string s){ while(!s.empty() && s.back()=='/') s.pop_back(); return s; };
+    const std::string base = rstrip(apiKey_->endpoint);
+    const std::string path = "/" + bucket_;          // canonical URI
+    const std::string query = "list-type=2&max-keys=1"; // canonical query string (already sorted)
 
-    static const std::string kCanonical = "/" + bucket_ + "/?list-type=2&max-keys=1";
+    const std::string url = base + path + "?" + query;
+
     static const std::string kUnsigned = "UNSIGNED-PAYLOAD";
 
     CurlEasy tmpHandle;
-    SList hdrs = makeSigHeaders("GET", kCanonical, kUnsigned);
+    // NEW: pass query to the signer so it’s included in the canonical request
+    SList hdrs = makeSigHeaders("GET", path, kUnsigned, query);
     hdrs.add("Content-Type: application/xml");
 
     const auto resp = performCurl([&](CURL* h) {
@@ -82,7 +87,5 @@ bool S3Controller::isBucketEmpty() const {
     });
 
     if (!resp.ok()) throw std::runtime_error("S3Provider: failed to query bucket: " + resp.body);
-
-    // Look for <Contents> tag. If absent, bucket is empty
     return resp.body.find("<Contents>") == std::string::npos;
 }

@@ -19,9 +19,10 @@ std::map<std::string, std::string> S3Controller::buildHeaderMap(const std::strin
 
 SList S3Controller::makeSigHeaders(const std::string& method,
                                  const std::string& canonical,
-                                 const std::string& payloadHash) const {
+                                 const std::string& payloadHash,
+                                 const std::string& query) const {
     auto base = buildHeaderMap(payloadHash);      // host + dates
-    const auto auth =  buildAuthorizationHeader(apiKey_, method, canonical, base, payloadHash);
+    const auto auth =  buildAuthorizationHeader(apiKey_, method, canonical, base, payloadHash, query);
 
     SList out;
     out.add("Authorization: " + auth);

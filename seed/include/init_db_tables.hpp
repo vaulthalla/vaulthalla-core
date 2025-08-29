@@ -244,15 +244,49 @@ CREATE TABLE IF NOT EXISTS waiver_permission_snapshots
 );
         )");
 
-        txn.exec("REVOKE DELETE ON cloud_encryption_waivers FROM PUBLIC;");
-        txn.exec("ALTER TABLE cloud_encryption_waivers ENABLE ROW LEVEL SECURITY;");
-        txn.exec("ALTER TABLE cloud_encryption_waivers FORCE ROW LEVEL SECURITY;");
-
         txn.exec(R"(
+-- Revoke public DELETE access and force RLS
+REVOKE DELETE ON cloud_encryption_waivers FROM PUBLIC;
+ALTER TABLE cloud_encryption_waivers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cloud_encryption_waivers FORCE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (needed because CREATE POLICY doesn't support OR REPLACE)
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE policyname = 'allow_insert' AND tablename = 'cloud_encryption_waivers'
+    ) THEN
+        DROP POLICY allow_insert ON cloud_encryption_waivers;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE policyname = 'allow_select_returning' AND tablename = 'cloud_encryption_waivers'
+    ) THEN
+        DROP POLICY allow_select_returning ON cloud_encryption_waivers;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE policyname = 'no_delete' AND tablename = 'cloud_encryption_waivers'
+    ) THEN
+        DROP POLICY no_delete ON cloud_encryption_waivers;
+    END IF;
+END $$;
+
+-- Allow inserts from app role (or use PUBLIC if unsure)
+CREATE POLICY allow_insert ON cloud_encryption_waivers
+    FOR INSERT TO vaulthalla
+    WITH CHECK (true);
+
+-- Allow selects from app role (needed for INSERT ... RETURNING)
+CREATE POLICY allow_select_returning ON cloud_encryption_waivers
+    FOR SELECT TO vaulthalla
+    USING (true);
+
+-- Block deletes via RLS
 CREATE POLICY no_delete ON cloud_encryption_waivers
-FOR DELETE
-USING (false);
-        )");
+    FOR DELETE
+    USING (false);
+)");
 
         txn.exec(R"(
 CREATE OR REPLACE FUNCTION prevent_delete()
@@ -265,9 +299,13 @@ $$;
         )");
 
         txn.exec(R"(
-CREATE TRIGGER prevent_delete_trigger
-BEFORE DELETE ON cloud_encryption_waivers
-FOR EACH ROW EXECUTE FUNCTION prevent_delete();
+DO $$ BEGIN
+    CREATE TRIGGER prevent_delete_trigger
+    BEFORE DELETE ON cloud_encryption_waivers
+    FOR EACH ROW EXECUTE FUNCTION prevent_delete();
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
         )");
 
         txn.exec(R"(
@@ -296,9 +334,13 @@ $$;
         )");
 
         txn.exec(R"(
-CREATE TRIGGER block_immutable_waiver_updates_trigger
-BEFORE UPDATE ON cloud_encryption_waivers
-FOR EACH ROW EXECUTE FUNCTION block_immutable_waiver_updates();
+DO $$ BEGIN
+    CREATE TRIGGER block_immutable_waiver_updates_trigger
+    BEFORE UPDATE ON cloud_encryption_waivers
+    FOR EACH ROW EXECUTE FUNCTION block_immutable_waiver_updates();
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
         )");
     });
 }

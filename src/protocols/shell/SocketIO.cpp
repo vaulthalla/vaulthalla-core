@@ -36,13 +36,13 @@ void SocketIO::print(const std::string_view msg) {
     send_json(fd_, {{"type", "output"}, {"text", std::string{msg}}});
 }
 
-bool SocketIO::confirm(const std::string_view prompt, const bool def_no) {
+bool SocketIO::confirm(const std::string_view promptIn, const bool def_no) {
     auto id = next_id();
     send_json(fd_, {
         {"type", "prompt"},
         {"style", "confirm"},
         {"id", id},
-        {"text", std::string{prompt}},
+        {"text", std::string{promptIn}},
         {"default", def_no ? "no" : "yes"}
     });
 
@@ -58,13 +58,13 @@ bool SocketIO::confirm(const std::string_view prompt, const bool def_no) {
     }
 }
 
-std::string SocketIO::prompt(const std::string_view prompt, const std::string_view def) {
+std::string SocketIO::prompt(const std::string_view promptIn, const std::string_view def) {
     auto id = next_id();
     send_json(fd_, {
         {"type", "prompt"},
         {"style", "input"},
         {"id", id},
-        {"text", std::string{prompt}},
+        {"text", std::string{promptIn}},
         {"default", std::string{def}}
     });
 
@@ -75,3 +75,6 @@ std::string SocketIO::prompt(const std::string_view prompt, const std::string_vi
         }
     }
 }
+
+bool SocketIO::confirm(const std::string_view promptIn) { return confirm(promptIn, true); }
+std::string SocketIO::prompt(const std::string_view promptIn) { return prompt(promptIn, ""); }

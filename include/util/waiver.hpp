@@ -5,14 +5,15 @@
 namespace vh::util {
 
 static constexpr std::string_view ENABLE_UPSTREAM_ENCRYPTION_WAIVER = R"(
-⚠️ You are enabling encryption on a vault that already contains files in the upstream S3 bucket.
+
+⚠️  You are enabling encryption on a vault that already contains files in the upstream S3 bucket.
 
 This operation will:
 - Encrypt and overwrite all existing files in the bucket
 - Permanently change the format and accessibility of those files
 - Require your encryption key for any future access
 
-⚠️ If any other service currently reads from this bucket, it will immediately break.
+⚠️  If any other service currently reads from this bucket, it will immediately break.
 
 ❗ You are solely responsible for:
 - Backing up the unencrypted originals
@@ -25,9 +26,11 @@ By proceeding, you acknowledge that:
 - You are fully responsible for downstream consequences
 
 Please type "I ACCEPT" to confirm:
+
 )";
 
 static constexpr std::string_view DISABLE_UPSTREAM_ENCRYPTION_WAIVER = R"(
+
 ⚠️ You are disabling upstream encryption for this vault.
 
 Going forward, files uploaded to the upstream S3 bucket will:
@@ -47,6 +50,7 @@ By proceeding, you acknowledge that:
 - You are fully responsible for data security in the upstream bucket
 
 Please type "I ACCEPT" to confirm:
+
 )";
 
 }

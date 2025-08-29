@@ -96,7 +96,8 @@ private:
 
     [[nodiscard]] SList makeSigHeaders(const std::string& method,
                                        const std::string& canonical,
-                                       const std::string& payloadHash) const;
+                                       const std::string& payloadHash,
+                                       const std::string& query = "") const;
 };
 
 }

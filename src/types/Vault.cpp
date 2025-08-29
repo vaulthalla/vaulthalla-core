@@ -102,8 +102,6 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaul
         { "NAME",  Align::Left,  4, 64,  false, false },
         { "TYPE",  Align::Left,  4, 24,  false, false },
         { "QUOTA", Align::Right, 5, 32,  false, false },
-        // keep mount reasonable; ellipsize middle for deep paths
-        { "MOUNT", Align::Left,  5, 48,  false, true  },
         // description wraps, effectively acts as flex column
         { "DESCRIPTION", Align::Left, 11, 2000, true, false },
     }, /*term_width*/ term_width());
@@ -125,7 +123,6 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Vault>>& vaul
             v.name,
             to_string(v.type),
             quota,
-            v.mount_point.string(),
             v.description
         });
     }

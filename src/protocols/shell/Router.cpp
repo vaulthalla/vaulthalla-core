@@ -44,7 +44,7 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     return n; // unknown; let caller error
 }
 
-CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user, IO* io) const {
+CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user, SocketIO* io) const {
     LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;

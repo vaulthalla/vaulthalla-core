@@ -12,7 +12,6 @@ void WaiverQueries::addWaiver(const std::shared_ptr<types::Waiver>& waiver) {
     if (!waiver) throw std::invalid_argument("Invalid waiver");
     if (!waiver->vault) throw std::invalid_argument("Invalid vault in waiver");
     if (!waiver->user) throw std::invalid_argument("Invalid user in waiver");
-    if (!waiver->owner) throw std::invalid_argument("Invalid owner in waiver");
     if (!waiver->apiKey) throw std::invalid_argument("Invalid API key in waiver");
     if (waiver->waiver_text.empty()) throw std::invalid_argument("Waiver text cannot be empty");
 

@@ -285,7 +285,7 @@ void CtlServerService::runLoop() {
                 auto line = req["line"].get<std::string>();
                 if (line.empty()) line = "help";
 
-                std::unique_ptr<IO> io;
+                std::unique_ptr<SocketIO> io;
 
                 if (req.value("interactive", false))
                     io = std::make_unique<SocketIO>(cfd);

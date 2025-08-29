@@ -343,9 +343,10 @@ void DBConnection::initPreparedVaults() const {
        RETURNING id)");
 
     conn_->prepare("upsert_s3_vault",
-                   "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "
+                   "INSERT INTO s3 (vault_id, api_key_id, bucket, encrypt_upstream) VALUES ($1, $2, $3, $4) "
                    "ON CONFLICT (api_key_id, bucket) DO UPDATE "
-                   "SET bucket = EXCLUDED.bucket, api_key_id = EXCLUDED.api_key_id "
+                   "SET bucket = EXCLUDED.bucket, api_key_id = EXCLUDED.api_key_id, "
+                   "encrypt_upstream = EXCLUDED.encrypt_upstream, vault_id = EXCLUDED.vault_id "
                    "RETURNING vault_id");
 
     conn_->prepare("insert_s3_vault", "INSERT INTO s3 (vault_id, api_key_id, bucket) VALUES ($1, $2, $3) "

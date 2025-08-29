@@ -44,6 +44,7 @@ CommandUsage VaultUsage::vault_create() {
     cmd.positionals = {{"<name>", "Name of the new vault"}};
     cmd.required = {{"--local | --s3", "Type of vault to create (local or S3)"}};
     cmd.optional = {
+        {"--interactive", "Run in interactive mode, prompting for missing information"},
         {"--desc <description>", "Optional description for the vault"},
         {"--quota <size|unlimited>", "Optional storage quota (e.g. 10G, 500M). Default is unlimited."},
         {"--owner <id|name>", "User ID or username of the vault owner. Default is the current user."},

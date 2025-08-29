@@ -277,3 +277,15 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     EXPECT_GT(jpeg.size(), 100);
     EXPECT_NO_THROW(s3Provider_->deleteObject(key));
 }
+
+TEST_F(S3ProviderIntegrationTest, test_ValidateS3Credentials) {
+    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+
+    EXPECT_NO_THROW(const auto ok = s3Provider_->validateAPICredentials());
+}
+
+TEST_F(S3ProviderIntegrationTest, test_isBucketEmpty) {
+    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+
+    EXPECT_NO_THROW(const auto empty = s3Provider_->isBucketEmpty());
+}

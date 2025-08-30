@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "PermissionUsage.hpp"
@@ -14,6 +14,6 @@ static CommandResult handle_permission(const CommandCall& call) {
     return invalid("permissions: unrecognized argument '" + std::string(sub) + "'\n\n" + PermissionUsage::permissions().str());
 }
 
-void vh::shell::registerPermissionCommands(const std::shared_ptr<Router>& r) {
+void commands::registerPermissionCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(PermissionUsage::permissions(), handle_permission);
 }

@@ -1,7 +1,7 @@
 #include "services/CtlServerService.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Parser.hpp"
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "services/LogRegistry.hpp"
 #include "protocols/shell/SocketIO.hpp"
@@ -95,7 +95,8 @@ CtlServerService::CtlServerService()
       socketPath_("/run/vaulthalla/cli.sock"),
       adminGid_(getgrnam("vaulthalla")->gr_gid),
       adminUIDSet_(false) {
-    shell::registerAllCommands(router_);
+
+    commands::registerAllCommands(router_);
 
     const auto admin = UserQueries::getUserByName("admin");
     if (!admin) LogRegistry::shell()->warn("[CtlServerService] No 'admin' user found in database");

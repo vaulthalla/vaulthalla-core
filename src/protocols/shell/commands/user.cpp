@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
@@ -16,7 +16,6 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
-
 
 static CommandResult createUser(const CommandCall& subcall) {
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
@@ -261,7 +260,7 @@ static CommandResult handle_user(const CommandCall& call) {
     return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
 }
 
-void vh::shell::registerUserCommands(const std::shared_ptr<Router>& r) {
+void commands::registerUserCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(UserUsage::users_list(), handle_list_users);
     r->registerCommand(UserUsage::user(), handle_user);
 }

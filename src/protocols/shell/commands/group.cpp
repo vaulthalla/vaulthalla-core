@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/types.hpp"
 #include "util/shellArgsHelpers.hpp"
@@ -253,7 +253,7 @@ static CommandResult handle_groups(const CommandCall& call) {
     return handle_group_list(call);
 }
 
-void vh::shell::registerGroupCommands(const std::shared_ptr<Router>& r) {
+void commands::registerGroupCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(GroupUsage::group(), handle_group);
     r->registerCommand(GroupUsage::groups_list(), handle_groups);
 }

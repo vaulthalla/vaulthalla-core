@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "usage/include/SecretsUsage.hpp"
 #include "util/shellArgsHelpers.hpp"
@@ -144,6 +144,6 @@ static CommandResult handle_secrets(const CommandCall& call) {
     return ok(SecretsUsage::all().str());
 }
 
-void vh::shell::registerSecretsCommands(const std::shared_ptr<Router>& r) {
+void commands::registerSecretsCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(SecretsUsage::secrets(), handle_secrets);
 }

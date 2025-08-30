@@ -8,6 +8,9 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
+#include <filesystem>
+#include <mutex>
+#include <curl/curl.h>
 
 namespace vh::util {
 
@@ -36,18 +39,18 @@ std::string hmacSha256Hex(const std::string& key, const std::string& data) {
 
 std::string hmacSha256Raw(const std::string& key, const std::string& data) {
     unsigned char digest[SHA256_DIGEST_LENGTH];
-    HMAC(EVP_sha256(), key.data(), key.size(),
+    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
          reinterpret_cast<const unsigned char*>(data.data()), data.size(), digest, nullptr);
     return {reinterpret_cast<char*>(digest), SHA256_DIGEST_LENGTH};
 }
 
 std::string hmacSha256HexFromRaw(const std::string& rawKey, const std::string& data) {
     unsigned char sig[SHA256_DIGEST_LENGTH];
-    HMAC(EVP_sha256(), rawKey.data(), rawKey.size(),
+    HMAC(EVP_sha256(), rawKey.data(), static_cast<int>(rawKey.size()),
          reinterpret_cast<const unsigned char*>(data.data()), data.size(), sig, nullptr);
 
     std::ostringstream oss;
-    for (unsigned char i : sig) oss << std::hex << std::setw(2) << std::setfill('0') << (int)i;
+    for (unsigned char i : sig) oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(i);
     return oss.str();
 }
 

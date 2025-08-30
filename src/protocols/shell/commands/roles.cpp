@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/PermsQueries.hpp"
@@ -307,7 +307,7 @@ static CommandResult handle_roles(const CommandCall& call) {
     return handleRolesList(call);
 }
 
-void vh::shell::registerRoleCommands(const std::shared_ptr<Router>& r) {
+void commands::registerRoleCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(RoleUsage::role(), handle_role);
     r->registerCommand(RoleUsage::roles_list(), handle_roles);
 }

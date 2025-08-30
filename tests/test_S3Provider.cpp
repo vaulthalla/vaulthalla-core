@@ -217,7 +217,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
 
     const auto entries = fromS3XML(xml);
     EXPECT_FALSE(entries.empty()) << "fromS3XML should return at least one entry";
-    auto match = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+    auto match = std::ranges::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
         return !entry->isDirectory() && entry->path.filename() == key;
     });
     EXPECT_TRUE(match != entries.end()) << "Uploaded key not found in fromS3XML()";
@@ -229,7 +229,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
     const auto it = std::search(buffer.begin(), buffer.end(),
                                 expected.begin(), expected.end());
 
-    EXPECT_TRUE(it != buffer.end());
+    EXPECT_TRUE(it != buffer.end()) << "Downloaded buffer does not contain expected content";
 
     EXPECT_NO_THROW(s3Provider_->deleteObject(key));
 }
@@ -287,5 +287,5 @@ TEST_F(S3ProviderIntegrationTest, test_ValidateS3Credentials) {
 TEST_F(S3ProviderIntegrationTest, test_isBucketEmpty) {
     if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
-    EXPECT_NO_THROW(const auto empty = s3Provider_->isBucketEmpty());
+    EXPECT_NO_THROW(const auto _ = s3Provider_->isBucketEmpty());
 }

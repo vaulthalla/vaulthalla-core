@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "types/APIKey.hpp"
@@ -155,7 +155,7 @@ static CommandResult handle_keys(const CommandCall& call) {
     return handleListAPIKeys(call);
 }
 
-void vh::shell::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
+void commands::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(APIKeyUsage::apikeys_list(), handle_keys);
     r->registerCommand(APIKeyUsage::apikey(), handle_key);
 }

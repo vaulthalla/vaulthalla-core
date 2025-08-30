@@ -1,4 +1,4 @@
-#include "protocols/shell/commands.hpp"
+#include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
 #include "SystemUsage.hpp"
 #include "ShellUsage.hpp"
@@ -16,7 +16,7 @@ static CommandResult handle_version(const CommandCall& call) {
     return {0, "Vaulthalla v" + std::string(VH_VERSION), ""};
 }
 
-void registerSystemCommands(const std::shared_ptr<Router>& r) {
+void commands::registerSystemCommands(const std::shared_ptr<Router>& r) {
     r->registerCommand(SystemUsage::help(), handle_help);
     r->registerCommand(SystemUsage::version(), handle_version);
 }

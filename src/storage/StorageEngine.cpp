@@ -151,9 +151,4 @@ void StorageEngine::remove(const fs::path& rel_path, const unsigned int userId) 
     Filesystem::remove(paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId, shared_from_this());
 }
 
-void StorageEngine::rotateEncryptionKey() {
-
-}
-
-
 }

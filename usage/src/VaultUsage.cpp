@@ -13,6 +13,10 @@ CommandBook VaultUsage::all() {
         vault_delete(),
         vault_info(),
         vault_update(),
+        vault_role_assign(),
+        vault_role_override(),
+        vault_role_remove(),
+        vault_role_list(),
         vault_role(),
         vault_keys(),
         vault_sync()
@@ -153,30 +157,102 @@ CommandUsage VaultUsage::vault_update() {
     return cmd;
 }
 
+CommandUsage VaultUsage::vault_role_assign() {
+    auto cmd = buildBaseUsage_();
+    cmd.command = "role assign";
+    cmd.command_aliases = {"r a", "role add", "r add"};
+    cmd.description = "Assign a role to a user or group for a specific vault.";
+    cmd.positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to assign"}};
+    cmd.required = {{"--uid | --gid | --user | --group", "Specify the user or group to assign the role to"}};
+    cmd.optional = {
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
+    };
+    cmd.examples = {
+        {"vh vault role assign 42 read-only bob", "Add user 'bob' to the 'read-only' role for the vault with ID 42."},
+        {"vh vault role assign myvault read-write developers --owner alice", "Add group 'developers' to the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
+    };
+    return cmd;
+}
+
+CommandUsage VaultUsage::vault_role_remove_assignment() {
+    auto cmd = buildBaseUsage_();
+    cmd.command = "role unassign";
+    cmd.command_aliases = {"r ua", "role ua", "r unassign", "role remove", "r rm", "role rm"};
+    cmd.description = "Remove a role assignment from a user or group for a specific vault.";
+    cmd.positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to unassign"}};
+    cmd.required = {{"--uid | --gid | --user | --group", "Specify the user or group to remove the role from"}};
+    cmd.optional = {
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
+    };
+    cmd.examples = {
+        {"vh vault role unassign 42 read-only bob", "Remove user 'bob' from the 'read-only' role for the vault with ID 42."},
+        {"vh vault role unassign myvault read-write developers --owner alice", "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
+    };
+    return cmd;
+}
+
+CommandUsage VaultUsage::vault_role_add_override() {
+    auto cmd = buildBaseUsage_();
+    cmd.command = "role override add";
+    cmd.command_aliases = {"r oa", "role oa", "r override add", "role add-override", "role override new", "r override new"};
+    cmd.description = "Add a permission override for a user or group in a specific vault role.";
+    cmd.positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}};
+    cmd.required = {
+        {"--uid | --gid | --user | --group", "Specify the user or group to override the permission for"},
+        {"<--permission_flag>", "Permission flag to override (e.g. --download, --upload, --delete, etc.)"},
+        {"--allow | --deny", "Specify whether to allow or deny the permission"}
+    };
+    cmd.optional = {
+        {"--pattern <regex>", "Optional regex pattern to scope the override to specific paths"},
+        {"--effect", "If set, the pattern is treated as a positive match; otherwise, it's a negative match"},
+        {"--enabled <bool=true>", "Enable or disable the override (default is true)"},
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
+    };
+    cmd.examples = {
+        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
+        {R"(vh vault role override myvault read-write developers --gid 1001 --delete deny --pattern "^/sensitive/")",
+         "Deny group with GID 1001 from deleting files in the '/sensitive/' directory in the vault named 'myvault'."}
+    };
+    return cmd;
+}
+
+CommandUsage VaultUsage::vault_role_update_override() {
+
+}
+
+
+CommandUsage VaultUsage::vault_role_override() {
+
+}
+
+
+CommandUsage VaultUsage::vault_role_list() {
+    auto cmd = buildBaseUsage_();
+    cmd.command = "role list";
+    cmd.command_aliases = {"roles", "r l", "role l", "r list"};
+    cmd.description = "List all role assignments for a specific vault.";
+    cmd.positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}};
+    cmd.optional = {
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
+    };
+    cmd.examples = {
+        {"vh vault role list 42", "List all role assignments for the vault with ID 42."},
+        {"vh vault role list myvault --owner alice", "List all role assignments for the vault named 'myvault' owned by 'alice'."}
+    };
+    return cmd;
+}
+
 CommandUsage VaultUsage::vault_role() {
     auto cmd = buildBaseUsage_();
     cmd.command = "role";
     cmd.command_aliases = {"r"};
-    cmd.description = "Manage vault roles and permissions.";
-    cmd.positionals = {{"<subcommand>", "Subcommand to execute (assign, override)"}};
-    cmd.required = {{"<vault-id|vault-name>", "ID or name of the vault"}};
-    cmd.optional = {
-        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
-    };
-    cmd.groups = {
-        {"Role Assignment", {
-            {"assign <role_id> --[uid|gid|user|group] <id|name>",
-             "Assign a role to a user or group by UID, GID, username, or group name"}
-        }},
-        {"Permission Overrides", {
-            {"override <role_id> --[uid|gid|user|group] <id|name> <--permission_flag> --[allow|deny] [--pattern <regex>] [--enabled <bool=true>]",
-             "Override a specific permission for a user or group"}
-        }}
-    };
+    cmd.description = "Manage vault role assignments and permission overrides.";
+    cmd.positionals = {{"<subcommand>", "Subcommand to execute (assign, remove, override, list)"}};
     cmd.examples = {
         {"vh vault role assign 42 read-only bob", "Add user 'bob' to the 'read-only' role for the vault with ID 42."},
-        {"vh vault role assign myvault read-write developers --owner alice", "Add group 'developers' to the 'read-write' role for the vault named 'myvault' owned by 'alice'."},
-        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."}
+        {"vh vault role remove myvault read-write developers --owner alice", "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."},
+        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
+        {"vh vault role list myvault --owner alice", "List all role assignments for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }

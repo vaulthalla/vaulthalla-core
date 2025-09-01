@@ -23,9 +23,9 @@ namespace vh::types {
 struct PermissionOverride;
 
 struct VaultRole final : Role {
-    unsigned int assignment_id, subject_id, role_id, vault_id;
+    unsigned int assignment_id{}, subject_id{}, role_id{}, vault_id{};
     std::string subject_type; // 'user' or 'group'
-    std::time_t assigned_at;
+    std::time_t assigned_at{};
     std::vector<std::shared_ptr<PermissionOverride> > permission_overrides;
 
     VaultRole() = default;

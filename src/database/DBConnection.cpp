@@ -49,8 +49,9 @@ DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(
         if (!initPass) {
             if (std::filesystem::exists("/run/vaulthalla/db_password")) {
                 std::filesystem::remove_all("/run/vaulthalla/db_password");
-                if (std::filesystem::exists("/run/vaulthalla/db_password")) throw std::runtime_error(
-                    "Failed to remove stale /run/vaulthalla/db_password file");
+                if (std::filesystem::exists("/run/vaulthalla/db_password"))
+                    throw std::runtime_error(
+                        "Failed to remove stale /run/vaulthalla/db_password file");
             }
             throw std::runtime_error("Database password failed to initialize. See logs for details.");
         }
@@ -92,6 +93,7 @@ void DBConnection::initPrepared() const {
     initPreparedGroups();
     initPreparedSecrets();
     initPreparedWaivers();
+    initPreparedVaultPermOverrides();
 }
 
 void DBConnection::initPreparedUsers() const {
@@ -939,26 +941,36 @@ void DBConnection::initPreparedVaultRoles() const {
 }
 
 void DBConnection::initPreparedPermOverrides() const {
-    conn_->prepare("get_permission_override",
-                   "SELECT p.*, vpo.enabled, vpo.regex, vpo.assignment_id, vra.role_id "
+    conn_->prepare("get_permission_override_by_vault_subject_and_bitpos",
+                   "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
                    "FROM permission p "
                    "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
                    "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
-                   "WHERE vra.id = $1");
+                   "WHERE vra.vault_id = $1 AND vra.subject_type = $2 AND vra.subject_id = $3 AND p.bit_position = $4");
 
-    conn_->prepare("get_vault_permission_overrides",
-                   "SELECT p.*, vpo.enabled, vpo.regex, vpo.assignment_id, vra.role_id "
+    conn_->prepare("list_vault_permission_overrides",
+                   "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
                    "FROM permission p "
                    "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
                    "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
                    "WHERE vra.vault_id = $1");
 
-    conn_->prepare("get_subject_permission_overrides",
-                   "SELECT p.*, vpo.enabled, vpo.regex, vpo.assignment_id, vra.role_id "
+    conn_->prepare("list_subject_permission_overrides",
+                   "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
                    "FROM permission p "
                    "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
                    "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
                    "WHERE vra.subject_type = $1 AND vra.subject_id = $2");
+
+    conn_->prepare("insert_vault_permission_override",
+                   "INSERT INTO vault_permission_overrides (assignment_id, permission_id, pattern, enabled, effect) "
+                   "VALUES ($1, $2, $3, $4, $5) RETURNING id");
+
+    conn_->prepare("update_vault_permission_override",
+                   "UPDATE vault_permission_overrides SET pattern = $3, enabled = $4, effect = $5 "
+                   "WHERE id = $1");
+
+    conn_->prepare("delete_vault_permission_override", "DELETE FROM vault_permission_overrides WHERE id = $1");
 }
 
 void DBConnection::initPreparedSync() const {

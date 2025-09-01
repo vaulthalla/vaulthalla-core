@@ -74,6 +74,9 @@ public:
     [[nodiscard]] std::string basicStr(bool splitHeader = false) const;
     [[nodiscard]] std::string markdown() const;
 
+    [[nodiscard]] std::vector<std::string> nsAliases() const;
+    [[nodiscard]] std::vector<std::string> commandAliases() const;
+
 private:
     // internal helpers (exposed for testing if you want)
     [[nodiscard]] std::string buildSynopsis_() const;

@@ -366,6 +366,23 @@ std::string CommandUsage::markdown() const {
     return md.str();
 }
 
+std::vector<std::string> CommandUsage::nsAliases() const {
+    std::vector<std::string> all;
+    all.reserve(1 + ns_aliases.size());
+    if (!ns.empty()) all.push_back(ns);
+    for (const auto& a : ns_aliases) all.push_back(a);
+    return all;
+}
+
+std::vector<std::string> CommandUsage::commandAliases() const {
+    std::vector<std::string> all;
+    all.reserve(1 + command_aliases.size());
+    if (!command.empty()) all.push_back(command);
+    for (const auto& a : command_aliases) all.push_back(a);
+    return all;
+}
+
+
 // ---------- CommandBook impl ----------
 
 std::string CommandBook::str() const {

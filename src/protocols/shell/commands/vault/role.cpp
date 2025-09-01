@@ -120,6 +120,98 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     return ok("Successfully assigned role '" + role->name + "' to vault '" + vault->name + "'");
 }
 
+static CommandResult handle_vault_role_remove(const CommandCall& call) {
+    if (call.positionals.size() < 2) return invalid("vault remove: missing <vault_id> and <role_id>");
+    if (call.positionals.size() > 2) return invalid("vault remove: too many arguments");
+
+    const auto vaultArg = call.positionals.at(0);
+    const auto vaultIdOpt = parseInt(vaultArg);
+
+    const auto roleArg = call.positionals.at(1);
+
+    std::shared_ptr<Vault> vault;
+
+    if (vaultIdOpt) {
+        if (*vaultIdOpt <= 0) return invalid("vault remove: vault ID must be a positive integer");
+        vault = VaultQueries::getVault(*vaultIdOpt);
+    } else {
+        unsigned int ownerId;
+        const auto ownerOpt = optVal(call, "owner");
+        if (!ownerOpt) return invalid("vault remove: vault does not have a owner");
+        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+            if (*ownerIdOpt <= 0) return invalid("vault remove: --owner must be a positive integer");
+            ownerId = *ownerIdOpt;
+        } else if (ownerOpt) {
+            if (ownerOpt->empty()) return invalid("vault remove: --owner requires a value");
+            const auto owner = UserQueries::getUserByName(*ownerOpt);
+            if (!owner) return invalid("vault remove: owner not found: " + *ownerOpt);
+            ownerId = owner->id;
+        } else ownerId = call.user->id;
+        vault = VaultQueries::getVault(vaultArg, ownerId);
+    }
+
+    if (!vault) return invalid("vault remove: vault with arg " + vaultArg + " not found");
+
+    if (vault->owner_id != call.user->id) {
+        if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id)) return invalid(
+            "vault remove: you do not have permission to remove roles from this vault");
+
+        if (!call.user->canManageRoles()) return invalid("vault remove: you do not have permission to manage roles");
+    }
+
+    std::shared_ptr<Role> role;
+
+
+    std::string subjectType;
+    unsigned int subjectId;
+}
+
+static CommandResult handle_vault_role_list(const CommandCall& call) {
+    if (call.positionals.size() > 1) return invalid("vault list: too many arguments");
+
+    std::shared_ptr<Vault> vault;
+    if (!call.positionals.empty()) {
+        const auto vaultArg = call.positionals.at(0);
+        const auto vaultIdOpt = parseInt(vaultArg);
+
+        if (vaultIdOpt) {
+            if (*vaultIdOpt <= 0) return invalid("vault list: vault ID must be a positive integer");
+            vault = VaultQueries::getVault(*vaultIdOpt);
+        } else {
+            unsigned int ownerId;
+            const auto ownerOpt = optVal(call, "owner");
+            if (!ownerOpt) return invalid("vault list: vault does not have a owner");
+            if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+                if (*ownerIdOpt <= 0) return invalid("vault list: --owner must be a positive integer");
+                ownerId = *ownerIdOpt;
+            } else if (ownerOpt) {
+                if (ownerOpt->empty()) return invalid("vault list: --owner requires a value");
+                const auto owner = UserQueries::getUserByName(*ownerOpt);
+                if (!owner) return invalid("vault list: owner not found: " + *ownerOpt);
+                ownerId = owner->id;
+            } else ownerId = call.user->id;
+            vault = VaultQueries::getVault(vaultArg, ownerId);
+        }
+
+        if (!vault) return invalid("vault list: vault with arg " + vaultArg + " not found");
+
+        if (vault->owner_id != call.user->id) {
+            if (!call.user->canManageVaults() && !call.user->canManageVaultAccess(vault->id)) return invalid(
+                "vault list: you do not have permission to view roles for this vault");
+        }
+    }
+
+    std::vector<std::shared_ptr<VaultRole>> roles;
+    if (vault) roles = PermsQueries::listVaultAssignedRoles(vault->id);
+    else {
+        if (!call.user->canManageRoles()) return invalid("vault list: you do not have permission to manage roles");
+        roles = PermsQueries::listVaultAssignedRoles(0); // List all roles
+    }
+
+    nlohmann::json j;
+    j["roles"] = roles;
+    return ok(j.dump(4));
+}
 
 static CommandResult handle_vault_role_override(const CommandCall& call) {
     if (call.positionals.size() < 2) return invalid("vault override: missing <vault_id> and <role_id>");
@@ -129,7 +221,6 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
     const auto vaultIdOpt = parseInt(vaultArg);
 
     const auto roleArg = call.positionals.at(1);
-    const auto roleIdOpt = parseInt(roleArg);
 
     std::shared_ptr<Vault> vault;
 
@@ -163,20 +254,30 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
 
     std::shared_ptr<Role> role;
 
-    // TODO: implement role override
-    return invalid("vault override: not implemented yet");
+    if (const auto roleIdOpt = parseInt(roleArg)) role = PermsQueries::getRole(*roleIdOpt);
+    else role = PermsQueries::getRoleByName(roleArg);
 }
 
 
 CommandResult vault::handle_vault_role(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault role: missing subcommand");
+    if (call.positionals.empty()) return ok(VaultUsage::vault_role().str());
     if (call.positionals.size() > 1) return invalid("vault role: too many arguments");
 
     const auto subcommand = call.positionals[0];
     auto subcall = call;
     subcall.positionals.erase(subcall.positionals.begin());
 
-    if (subcommand == "assign") return handle_vault_role_assign(subcall);
-    if (subcommand == "override") return handle_vault_role_override(subcall);
+    if (std::ranges::any_of(VaultUsage::vault_role_assign().commandAliases(),
+        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_assign(subcall);
+
+    if (std::ranges::any_of(VaultUsage::vault_role_remove().commandAliases(),
+        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_remove(subcall);
+
+    if (std::ranges::any_of(VaultUsage::vault_role_list().commandAliases(),
+        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_list(subcall);
+
+    if (std::ranges::any_of(VaultUsage::vault_role_override().commandAliases(),
+        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_override(subcall);
+
     return invalid("vault role: unknown subcommand: " + subcommand);
 }

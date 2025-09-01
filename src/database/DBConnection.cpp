@@ -93,7 +93,6 @@ void DBConnection::initPrepared() const {
     initPreparedGroups();
     initPreparedSecrets();
     initPreparedWaivers();
-    initPreparedVaultPermOverrides();
 }
 
 void DBConnection::initPreparedUsers() const {

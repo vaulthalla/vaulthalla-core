@@ -1,6 +1,5 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
-#include "usage/include/SecretsUsage.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "types/User.hpp"
 #include "crypto/TPMKeyProvider.hpp"
@@ -9,6 +8,8 @@
 #include <nlohmann/json.hpp>
 #include "crypto/GPGEncryptor.hpp"
 #include "services/LogRegistry.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -25,7 +26,11 @@ static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
 }
 
 static CommandResult handle_secrets_set(const CommandCall& call) {
-    if (call.positionals.size() != 1) return invalid("secrets set: missing <secret>\n\n" + SecretsUsage::secrets_set().str());
+    if (call.positionals.size() != 1) return {
+        2,
+        ServiceDepsRegistry::instance().shellUsageManager->renderHelp(call.constructFullArgs()),
+
+    };
 
     const auto secretArg = call.positionals[0];
 
@@ -116,7 +121,11 @@ static nlohmann::json getJWTSecret() {
 }
 
 static CommandResult handle_secrets_export(const CommandCall& call) {
-    if (call.positionals.size() != 1) return invalid("secrets export: missing <secret>\n\n" + SecretsUsage::secrets_export().str());
+    if (call.positionals.size() != 1) return {
+        2,
+        ServiceDepsRegistry::instance().shellUsageManager->renderHelp(call.constructFullArgs()),
+
+    };
 
     const auto secretArg = call.positionals[0];
 
@@ -132,7 +141,8 @@ static CommandResult handle_secrets(const CommandCall& call) {
     if (!call.user->isSuperAdmin() && !call.user->canManageEncryptionKeys())
         return invalid("secrets: only super admins or users with ManageEncryptionKeys permission can manage secrets");
 
-    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(SecretsUsage::all().str());
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+        return usage(call.constructFullArgs());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -141,9 +151,10 @@ static CommandResult handle_secrets(const CommandCall& call) {
     if (sub == "set" || sub == "update") return handle_secrets_set(subcall);
     if (sub == "export" || sub == "get" || sub == "show") return handle_secrets_export(subcall);
 
-    return ok(SecretsUsage::all().str());
+    return invalid(call.constructFullArgs(), "Unknown secrets subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerSecretsCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(SecretsUsage::secrets(), handle_secrets);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "secrets"}), handle_secrets);
 }

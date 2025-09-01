@@ -7,7 +7,8 @@
 #include "types/Group.hpp"
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
-#include "GroupUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -208,7 +209,7 @@ static CommandResult handle_group_user(const CommandCall& call) {
 
     if (action == "add") return handle_group_add_user(subcall);
     if (action == "remove") return handle_group_remove_user(subcall);
-    return invalid("group user: unknown action '" + std::string(action) + "'.\n" + GroupUsage::group_user().str());
+    return invalid(call.constructFullArgs(), "Unknown group user action: '" + std::string(action) + "'");
 }
 
 static CommandResult handle_group_list_users(const CommandCall& call) {
@@ -232,7 +233,8 @@ static CommandResult handle_group_list_users(const CommandCall& call) {
 }
 
 static CommandResult handle_group(const CommandCall& call) {
-    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::all().str());
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+        return usage(call.constructFullArgs());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -245,15 +247,10 @@ static CommandResult handle_group(const CommandCall& call) {
     if (sub == "user" || sub == "u") return handle_group_user(subcall);
     if (sub == "list-users" || sub == "members") return handle_group_list_users(subcall);
 
-    return invalid("group: unknown subcommand '" + std::string(sub) + "'");
-}
-
-static CommandResult handle_groups(const CommandCall& call) {
-    if (hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::groups_list().str());
-    return handle_group_list(call);
+    return invalid(call.constructFullArgs(), "Unknown group subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerGroupCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(GroupUsage::group(), handle_group);
-    r->registerCommand(GroupUsage::groups_list(), handle_groups);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "group"}), handle_group);
 }

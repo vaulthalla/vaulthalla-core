@@ -4,10 +4,11 @@
 #include "types/APIKey.hpp"
 #include "types/User.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "storage/cloud/s3/S3Controller.hpp"
-#include "APIKeyUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
+#include "usage/include/usages.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -16,7 +17,6 @@ using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::types::api;
 using namespace vh::cloud;
-
 
 static S3Provider s3_provider_from_shell_input(const std::string& str) {
     if (str == "aws") return S3Provider::AWS;
@@ -71,7 +71,6 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         if (!endpointOpt || endpointOpt->empty()) errors.emplace_back("Missing required option: --endpoint");
         if (!providerOpt || providerOpt->empty()) {
             errors.emplace_back("Missing required option: --provider");
-            errors.push_back(APIKeyUsage::usage_provider());
         }
 
         if (!errors.empty()) {
@@ -138,7 +137,7 @@ static CommandResult handleAPIKeyInfo(const CommandCall& call) {
 }
 
 static CommandResult handle_key(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(APIKeyUsage::all().str());
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -148,7 +147,7 @@ static CommandResult handle_key(const CommandCall& call) {
     if (sub == "delete" || sub == "rm") return handleDeleteAPIKey(subcall);
     if (sub == "info" || sub == "get") return handleAPIKeyInfo(subcall);
     if (sub == "list") return handleListAPIKeys(subcall);
-    return ok(APIKeyUsage::all().str());
+    return invalid(call.constructFullArgs(), "Unknown api-key subcommand: '" + std::string(sub) + "'");
 }
 
 static CommandResult handle_keys(const CommandCall& call) {
@@ -156,6 +155,6 @@ static CommandResult handle_keys(const CommandCall& call) {
 }
 
 void commands::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(APIKeyUsage::apikeys_list(), handle_keys);
-    r->registerCommand(APIKeyUsage::apikey(), handle_key);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "api-key"}), handle_key);
 }

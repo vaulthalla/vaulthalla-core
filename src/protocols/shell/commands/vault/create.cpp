@@ -230,7 +230,7 @@ Sync Interval:
     }
 }
 
-CommandResult vault::handle_vault_create(const CommandCall& call) {
+CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
     std::shared_ptr<Vault> vault;
 
     try {

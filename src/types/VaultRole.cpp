@@ -8,6 +8,8 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::types;
+using namespace vh::util;
+using namespace vh::shell;
 
 VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
     : Role(row),
@@ -16,7 +18,7 @@ VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
       role_id(row["role_id"].as<unsigned int>()),
       vault_id(row["vault_id"].as<unsigned int>()),
       subject_type(row["subject_type"].as<std::string>()),
-      assigned_at(util::parsePostgresTimestamp(row["assigned_at"].as<std::string>())),
+      assigned_at(parsePostgresTimestamp(row["assigned_at"].as<std::string>())),
       permission_overrides(permissionOverridesFromPqRes(overrides)) {
 }
 
@@ -27,7 +29,7 @@ VaultRole::VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrid
       role_id(row["role_id"].as<unsigned int>()),
       vault_id(row["vault_id"].as<unsigned int>()),
       subject_type(row["subject_type"].as<std::string>()),
-      assigned_at(util::parsePostgresTimestamp(row["assigned_at"].as<std::string>())) {
+      assigned_at(parsePostgresTimestamp(row["assigned_at"].as<std::string>())) {
     for (const auto& override : overrides) permission_overrides.push_back(
         std::make_shared<PermissionOverride>(override));
 }
@@ -39,7 +41,7 @@ VaultRole::VaultRole(const nlohmann::json& j)
       role_id(j.at("role_id").get<unsigned int>()),
       vault_id(j.at("vault_id").get<unsigned int>()),
       subject_type(j.at("subject_type").get<std::string>()),
-      assigned_at(util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>())),
+      assigned_at(parsePostgresTimestamp(j.at("assigned_at").get<std::string>())),
       permission_overrides(j.at("permission_overrides")) {
 }
 
@@ -165,14 +167,14 @@ bool VaultRole::canList(const std::filesystem::path& path) const {
 }
 
 std::string vh::types::to_string(const std::shared_ptr<VaultRole>& role) {
-    std::string out = shell::snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
+    std::string out = snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
     out += " - Description: " + role->description + "\n";
     out += " - Type: " + role->type + "\n";
     out += " - Subject Type: " + role->subject_type + "\n";
     out += " - Subject ID: " + std::to_string(role->subject_id) + "\n";
     out += " - Vault ID: " + std::to_string(role->vault_id) + "\n";
-    out += " - Created at: " + util::timestampToString(role->created_at) + "\n";
-    out += " - Assigned at: " + util::timestampToString(role->assigned_at) + "\n";
+    out += " - Created at: " + timestampToString(role->created_at) + "\n";
+    out += " - Assigned at: " + timestampToString(role->assigned_at) + "\n";
     out += " - Permissions:\n" + admin_perms_to_string(role->permissions, 12) + "\n";
     out += " - Permission Overrides: " + to_string(role->permission_overrides) + "\n";
     return out;

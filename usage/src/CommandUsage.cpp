@@ -2,13 +2,12 @@
 
 #include <algorithm>
 #include <cctype>
-#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <ranges>
 
 #include <fmt/format.h>
-#include <unordered_set>
 
 namespace vh::shell {
 
@@ -168,30 +167,55 @@ std::string shortOr(const std::string& s, const std::string& fallback) {
     return fallback;
 }
 
-} // namespace
+}
 
 // ---------- CommandUsage internals ----------
 
-std::string CommandUsage::joinAliasesInline_(const std::string& primary,
-                                             const std::vector<std::string>& aliases,
-                                             const std::string& sep) {
-    if (aliases.empty()) return primary;
+bool CommandUsage::matches(const std::string& alias) const {
+    return std::ranges::any_of(aliases, [&](const std::string& a){ return a == alias; });
+}
+
+std::string CommandUsage::primary() const {
+    if (aliases.empty()) throw std::runtime_error("CommandUsage::primary() called with no aliases");
+    return aliases[0];
+}
+
+std::string CommandUsage::joinSubcommandsInline(const std::string& sep) const {
+    if (subcommands.empty()) throw std::runtime_error("joinSubcommandsInline called with no subcommands");
     std::ostringstream ss;
-    ss << primary;
-    for (const auto& a : aliases) ss << sep << a;
+    for (const auto& sc : subcommands) {
+        if (ss.tellp() > 0) ss << sep;
+        ss << sc->primary();
+        if (pluralAliasImpliesList) ss << sep << sc->primary() << "s";
+    }
     return ss.str();
 }
 
-std::string CommandUsage::joinAliasesCode_(const std::string& primary,
-                                           const std::vector<std::string>& aliases) {
-    if (aliases.empty()) return fmt::format("`{}`", primary);
+std::string CommandUsage::joinAliasesInline_(const std::string& sep) const {
+    if (aliases.empty()) throw std::runtime_error("joinAliasesInline_ called with empty aliases");
     std::ostringstream ss;
-    ss << "`" << primary << "` (";
+    for (const auto& a : aliases) ss << sep << a;
+    if (pluralAliasImpliesList) ss << sep << primary() << "s";
+    return ss.str();
+}
+
+std::string CommandUsage::joinAliasesCode_() {
+    if (aliases.empty()) return fmt::format("`{}`", primary());
+    std::ostringstream ss;
+    ss << "`" << primary() << "` (";
     for (std::size_t i = 0; i < aliases.size(); ++i) {
         if (i) ss << ", ";
         ss << "`" << aliases[i] << "`";
     }
+    if (pluralAliasImpliesList) ss << ", `" << primary() << "s`";
     ss << ")";
+    return ss.str();
+}
+
+std::string CommandUsage::constructCmdString() const {
+    std::ostringstream ss;
+    if (parent) ss << parent->constructCmdString() << " ";
+    ss << primary();
     return ss.str();
 }
 
@@ -213,14 +237,10 @@ std::string CommandUsage::buildSynopsis_() const {
     std::ostringstream syn;
 
     // ns + command (with aliases inline if enabled)
-    const auto nsWithAliases = show_aliases
-        ? joinAliasesInline_(ns, ns_aliases, " | ")
-        : ns;
+    const auto nsWithAliases = show_aliases ? joinAliasesInline_() : primary();
 
-    const bool hasCmd = !command.empty();
-    const auto cmdWithAliases = hasCmd
-        ? (show_aliases ? joinAliasesInline_(command, command_aliases, " | ")
-                        : command)
+    const bool hasCmd = !aliases.empty();
+    const auto cmdWithAliases = hasCmd ? (show_aliases ? joinAliasesInline_() : primary())
         : std::string{};
 
     // Prefix with binary name for clarity in synopsis
@@ -264,6 +284,8 @@ std::string CommandUsage::str() const {
 }
 
 std::string CommandUsage::basicStr(const bool splitHeader) const {
+    if (aliases.empty()) throw std::runtime_error("CommandUsage::basicStr() called with no command");
+
     const int tw = term_width > 40 ? term_width : 100;
 
     std::ostringstream out;
@@ -271,13 +293,13 @@ std::string CommandUsage::basicStr(const bool splitHeader) const {
     {
         std::ostringstream head;
 
-        if (!show_aliases || ns_aliases.empty()) head << ns;
-        else head << "[" << joinAliasesInline_(ns, ns_aliases, " | ") << "]";
+        if (!show_aliases) head << constructCmdString();
+        else head << "[" << joinAliasesInline_() << "]";
 
-        if (!command.empty()) {
+        if (!subcommands.empty()) {
             head << " ";
-            if (!show_aliases || command_aliases.empty()) head << command;
-            else head << "[" << joinAliasesInline_(command, command_aliases, " | ") << "]";
+            if (subcommands.size() == 1) head << subcommands[0]->primary();
+            else head << "(" << joinSubcommandsInline() << ")";
         }
 
         out << theme.C() << head.str() << theme.R();
@@ -301,11 +323,12 @@ std::string CommandUsage::basicStr(const bool splitHeader) const {
 std::string CommandUsage::markdown() const {
     std::ostringstream md;
 
+    if (aliases.empty()) throw std::runtime_error("CommandUsage::markdown() called with no command");
+
     // Title
     {
         std::ostringstream head;
-        head << ns;
-        if (!command.empty()) head << " " << command;
+        head << constructCmdString();
         md << fmt::format("# `{}`\n\n", head.str());
     }
 
@@ -313,20 +336,12 @@ std::string CommandUsage::markdown() const {
         md << description << "\n\n";
     }
 
-    if (show_aliases && (!ns_aliases.empty() || !command_aliases.empty())) {
-        if (!ns_aliases.empty()) {
-            md << "**Namespace aliases:** ";
-            for (std::size_t i = 0; i < ns_aliases.size(); ++i) {
-                if (i) md << ", ";
-                md << "`" << ns_aliases[i] << "`";
-            }
-            md << "\n\n";
-        }
-        if (!command_aliases.empty()) {
+    if (show_aliases) {
+        if (!aliases.empty()) {
             md << "**Command aliases:** ";
-            for (std::size_t i = 0; i < command_aliases.size(); ++i) {
+            for (std::size_t i = 0; i < aliases.size(); ++i) {
                 if (i) md << ", ";
-                md << "`" << command_aliases[i] << "`";
+                md << "`" << aliases[i] << "`";
             }
             md << "\n\n";
         }
@@ -364,102 +379,6 @@ std::string CommandUsage::markdown() const {
     }
 
     return md.str();
-}
-
-std::vector<std::string> CommandUsage::nsAliases() const {
-    std::vector<std::string> all;
-    all.reserve(1 + ns_aliases.size());
-    if (!ns.empty()) all.push_back(ns);
-    for (const auto& a : ns_aliases) all.push_back(a);
-    return all;
-}
-
-std::vector<std::string> CommandUsage::commandAliases() const {
-    std::vector<std::string> all;
-    all.reserve(1 + command_aliases.size());
-    if (!command.empty()) all.push_back(command);
-    for (const auto& a : command_aliases) all.push_back(a);
-    return all;
-}
-
-
-// ---------- CommandBook impl ----------
-
-std::string CommandBook::str() const {
-    std::ostringstream out;
-    if (!title.empty()) out << title << "\n\n";
-    for (std::size_t i = 0; i < commands.size(); ++i) {
-        CommandUsage c = commands[i];
-        if (book_theme) c.theme = *book_theme;
-        out << c.str();
-        if (i + 1 < commands.size()) out << "\n";
-    }
-    return out.str();
-}
-
-std::string CommandBook::basicStr() const {
-    std::ostringstream out;
-    if (!title.empty()) out << title << "\n\n";
-    for (const auto & c : commands) out << c.basicStr();
-    return out.str();
-}
-
-std::string CommandBook::markdown() const {
-    std::ostringstream md;
-    if (!title.empty()) md << "# " << title << "\n\n";
-    for (auto c : commands) {
-        if (book_theme) c.theme = *book_theme;
-        md << c.markdown() << "\n";
-    }
-    return md.str();
-}
-
-void CommandBook::operator<<(const CommandBook& other) {
-    std::unordered_set<std::string> existing;
-    for (const auto& cmd : commands) {
-        const auto key = cmd.command.empty() ? cmd.ns + "_" + "__default" : cmd.ns + "_" + cmd.command;
-        existing.insert(key);
-    }
-
-    for (const auto& cmd : other.commands) {
-        const auto key = cmd.command.empty() ? cmd.ns + "_" + "__default" : cmd.ns + "_" + cmd.command;
-        if (!existing.contains(key)) {
-            commands.push_back(cmd);
-            existing.insert(key);
-        }
-    }
-}
-
-std::unordered_map<std::string, CommandBook> CommandBook::splitByNamespace() const {
-    std::unordered_map<std::string, CommandBook> books;
-    for (const auto& cmd : commands) {
-        if (!books.contains(cmd.ns)) {
-            CommandBook book;
-            book.title = cmd.ns + " Commands";
-            if (book_theme) book.book_theme = *book_theme;
-            books[cmd.ns] = book;
-        }
-        books[cmd.ns].commands.push_back(cmd);
-    }
-    return books;
-}
-
-CommandBook CommandBook::filterByNamespace(const std::string& ns) const {
-    CommandBook book;
-    book.title = ns + " Commands";
-    if (book_theme) book.book_theme = *book_theme;
-    for (const auto& cmd : commands) {
-        if (cmd.ns == ns) book.commands.push_back(cmd);
-    }
-    return book;
-}
-
-CommandBook CommandBook::filterTopLevelOnly() const {
-    CommandBook book;
-    book.title = "Top-Level Commands";
-    if (book_theme) book.book_theme = *book_theme;
-    for (const auto& cmd : commands) if (cmd.command.empty()) book.commands.push_back(cmd);
-    return book;
 }
 
 }

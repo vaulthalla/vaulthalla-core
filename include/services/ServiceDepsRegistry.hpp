@@ -15,6 +15,10 @@ namespace vh::auth {
     class AuthManager;
 }
 
+namespace vh::shell {
+    class UsageManager;
+}
+
 namespace vh::services {
 
 class SyncController;
@@ -25,6 +29,7 @@ struct ServiceDepsRegistry {
     std::shared_ptr<auth::AuthManager> authManager;
     std::shared_ptr<SyncController> syncController;
     std::shared_ptr<storage::FSCache> fsCache;
+    std::shared_ptr<shell::UsageManager> shellUsageManager;
 
     ServiceDepsRegistry(const ServiceDepsRegistry&) = delete;
     ServiceDepsRegistry& operator=(const ServiceDepsRegistry&) = delete;

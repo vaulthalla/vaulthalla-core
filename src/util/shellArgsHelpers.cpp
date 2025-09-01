@@ -1,4 +1,7 @@
 #include "util/shellArgsHelpers.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/CommandUsage.hpp"
+#include "usage/include/UsageManager.hpp"
 
 #include <optional>
 #include <string>
@@ -6,9 +9,20 @@
 #include <algorithm>
 
 using namespace vh::shell;
+using namespace vh::services;
 
 CommandResult vh::shell::invalid(std::string msg) { return {2, "", std::move(msg)}; }
 CommandResult vh::shell::ok(std::string out) { return {0, std::move(out), ""}; }
+
+CommandResult vh::shell::invalid(const std::vector<std::string>& args, std::string msg) {
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    return {2, usageManager->renderHelp(args), std::move(msg)};
+}
+
+CommandResult vh::shell::usage(const std::vector<std::string>& args) {
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    return {0, usageManager->renderHelp(args), ""};
+}
 
 std::optional<std::string> vh::shell::optVal(const CommandCall& c, const std::string& key) {
     for (const auto& [k, v] : c.options) if (k == key) return v.value_or(std::string{});
@@ -43,3 +57,12 @@ uintmax_t vh::shell::parseSize(const std::string& s) {
     default: return std::stoull(s);                                                      // Assume bytes if no suffix
     }
 }
+
+bool vh::shell::isCommandMatch(const std::vector<std::string>& path, std::string_view subcmd) {
+    const auto& usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usage = usageManager->resolve(path);
+    return std::ranges::any_of(usage->aliases, [&](const auto& alias) {
+        return alias == subcmd;
+    });
+}
+

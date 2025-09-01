@@ -6,7 +6,8 @@
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/UserRole.hpp"
-#include "RoleUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -289,7 +290,8 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
 }
 
 static CommandResult handle_role(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, RoleUsage::role().str(), ""};
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
     subcall.positionals.erase(subcall.positionals.begin());
@@ -299,15 +301,10 @@ static CommandResult handle_role(const CommandCall& call) {
     if (sub == "info") return handleRoleInfo(subcall);
     if (sub == "update") return handleRoleUpdate(subcall);
 
-    return invalid("role: unknown subcommand '" + std::string(sub) + "'");
-}
-
-static CommandResult handle_roles(const CommandCall& call) {
-    if (hasKey(call, "help") || hasKey(call, "h")) return {0, RoleUsage::roles_list().str(), ""};
-    return handleRolesList(call);
+    return invalid(call.constructFullArgs(), "Unknown roles subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerRoleCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(RoleUsage::role(), handle_role);
-    r->registerCommand(RoleUsage::roles_list(), handle_roles);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "roles"}), handle_role);
 }

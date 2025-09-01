@@ -1,15 +1,15 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
-#include "SystemUsage.hpp"
-#include "ShellUsage.hpp"
 #include "util/shellArgsHelpers.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 #include <version.h>
 
 namespace vh::shell {
 
 static CommandResult handle_help(const CommandCall& call) {
-    return ok(ShellUsage::all().filterTopLevelOnly().basicStr());
+    return usage({"vh"});
 }
 
 static CommandResult handle_version(const CommandCall& call) {
@@ -17,8 +17,9 @@ static CommandResult handle_version(const CommandCall& call) {
 }
 
 void commands::registerSystemCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(SystemUsage::help(), handle_help);
-    r->registerCommand(SystemUsage::version(), handle_version);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "help"}), handle_help);
+    r->registerCommand(usageManager->resolve({"vh", "version"}), handle_version);
 }
 
 }

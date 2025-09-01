@@ -36,7 +36,7 @@ using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 
-CommandResult vault::handle_vault_info(const CommandCall& call) {
+CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
     if (call.positionals.empty()) return invalid("vault info: missing <name>");
     if (call.positionals.size() > 1) return invalid("vault info: too many arguments");
 
@@ -63,7 +63,7 @@ CommandResult vault::handle_vault_info(const CommandCall& call) {
     return ok(to_string(vault));
 }
 
-CommandResult vault::handle_vaults_list(const CommandCall& call) {
+CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
     const bool f_local = hasFlag(call, "local");
     const bool f_s3 = hasFlag(call, "s3");
     if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");

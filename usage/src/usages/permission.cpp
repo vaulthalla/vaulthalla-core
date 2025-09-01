@@ -1,10 +1,12 @@
-#include "PermissionUsage.hpp"
+#include "usages.hpp"
 
 #include <sstream>
 
 using namespace vh::shell;
 
-std::string PermissionUsage::usage_user_permissions() {
+namespace vh::shell::permissions {
+
+std::string usage_user_permissions() {
     std::ostringstream os;
     os << "Permission Flags:\n"
        << "  --manage-encryption-keys   | --set-manage-encryption-keys  | --unset-manage-encryption-keys\n"
@@ -22,7 +24,7 @@ std::string PermissionUsage::usage_user_permissions() {
     return os.str();
 }
 
-std::string PermissionUsage::usage_vault_permissions() {
+std::string usage_vault_permissions() {
     std::ostringstream os;
     os << "Vault Permissions Flags:\n"
        << "  --manage-vault        | --set-manage-vault        | --unset-manage-vault\n"
@@ -45,20 +47,22 @@ std::string PermissionUsage::usage_vault_permissions() {
     return os.str();
 }
 
-CommandBook PermissionUsage::all() {
-    CommandBook book;
-    book.title = "Vaulthalla Permission Commands";
-    book.commands = {permissions()};
+static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& parent) {
+    const auto cmd = std::make_shared<CommandUsage>();
+    cmd->parent = parent;
+    cmd->aliases = {"permission", "permissions", "perm", "perms"};
+    cmd->optional = {{"<type>", "Type of permissions to display: 'user'/'u' or 'vault'/'v' (default: both)"}};
+    cmd->description = "Display available permission flags for user and vault roles.";
+    cmd->examples.push_back({"vh permissions", "Show all available permission flags."});
+    return cmd;
+}
+
+std::shared_ptr<CommandBook> get(const std::shared_ptr<CommandUsage>& parent) {
+    const auto cmd = base(parent);
+    const auto book = std::make_shared<CommandBook>();
+    book->title = "Permission Commands";
+    book->root = cmd;
     return book;
 }
 
-
-CommandUsage PermissionUsage::permissions() {
-    CommandUsage cmd;
-    cmd.ns = "permissions";
-    cmd.ns_aliases = {"permission", "p"};
-    cmd.optional = {{"<type>", "Type of permissions to display: 'user'/'u' or 'vault'/'v' (default: both)"}};
-    cmd.description = "Display available permission flags for user and vault roles.";
-    cmd.examples.push_back({"vh permissions", "Show all available permission flags."});
-    return cmd;
 }

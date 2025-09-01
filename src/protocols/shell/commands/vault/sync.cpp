@@ -13,7 +13,8 @@
 #include "types/RSync.hpp"
 #include "types/Sync.hpp"
 #include "util/interval.hpp"
-#include "VaultUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 #include <optional>
 #include <string>
@@ -31,7 +32,8 @@ using namespace vh::util;
 using namespace vh::logging;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
-    if (call.positionals.size() > 1) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
+    if (call.positionals.size() > 1)
+        return invalid(call.constructFullArgs(), "vault sync: too many arguments");
 
     const auto vaultArg = call.positionals[0];
     std::shared_ptr<Vault> vault;
@@ -96,8 +98,9 @@ static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& c
 }
 
 static CommandResult handle_vault_sync_update(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
-    if (call.positionals.size() > 1) return invalid("vault sync update: too many arguments\n\n" + VaultUsage::vault_sync().str());
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.size() > 1)
+        return invalid(call.constructFullArgs(), "vault sync update: too many arguments");
 
     const auto engine = extractEngineFromArgs(call, call.positionals[0]);
 
@@ -163,8 +166,9 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_sync_info(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
-    if (call.positionals.size() > 1) return invalid("vault sync info: too many arguments\n\n" + VaultUsage::vault_sync().str());
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.size() > 1)
+        return invalid(call.constructFullArgs(), "vault sync info: too many arguments");
 
     try {
         const auto engine = extractEngineFromArgs(call, call.positionals[0]);
@@ -182,9 +186,10 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
     }
 }
 
-CommandResult vault::handle_sync(const CommandCall& call) {
-    if (call.positionals.empty()) return {0, VaultUsage::vault_sync().str(), ""};
-    if (call.positionals.size() > 2) return invalid("vault sync: too many arguments\n\n" + VaultUsage::vault_sync().str());
+CommandResult commands::vault::handle_sync(const CommandCall& call) {
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.size() > 2)
+        return invalid(call.constructFullArgs(), "vault sync: too many arguments");
 
     const auto arg = call.positionals[0];
 
@@ -197,5 +202,5 @@ CommandResult vault::handle_sync(const CommandCall& call) {
 
     if (call.positionals.size() == 1) return handle_vault_sync(call);
 
-    return ok("Unrecognized command: " + arg + "\n" + VaultUsage::vault_sync().str());
+    return invalid(call.constructFullArgs(), "vault sync: unknown subcommand: '" + std::string(arg) + "'");
 }

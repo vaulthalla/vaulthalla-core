@@ -108,7 +108,7 @@ static bool requires_waiver(const CommandCall& call, const std::shared_ptr<S3Vau
     return !upstream_bucket_is_empty(s3Vault);
 }
 
-WaiverResult vault::handle_encryption_waiver(const WaiverContext& ctx) {
+WaiverResult commands::vault::handle_encryption_waiver(const WaiverContext& ctx) {
     if (!ctx.vault) throw std::invalid_argument("Invalid vault");
     if (ctx.vault->type != VaultType::S3) return {true, nullptr};
 

@@ -28,6 +28,15 @@ struct CommandCall {
 
     // owns any strings you create at runtime (JSON, rewrites, etc.)
     std::vector<std::string> arena;
+
+    [[nodiscard]] inline std::vector<std::string> constructFullArgs() const {
+        std::vector<std::string> args;
+        args.reserve(2 + positionals.size());
+        args.emplace_back("vh");
+        args.push_back(name);
+        for (const auto& pos : positionals) args.push_back(pos);
+        return args;
+    }
 };
 
 struct CommandResult {

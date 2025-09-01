@@ -2,7 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "VaultUsage.hpp"
+#include "usage/include/UsageManager.hpp"
 
 #include <string>
 #include <string_view>
@@ -17,7 +17,7 @@ using namespace vh::services;
 
 static CommandResult handle_vault(const CommandCall& call) {
     if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
-        return ok(VaultUsage::all().str());
+        return usage(call.constructFullArgs());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -31,15 +31,10 @@ static CommandResult handle_vault(const CommandCall& call) {
     if (sub == "role" || sub == "r") return handle_vault_role(subcall);
     if (sub == "keys") return handle_vault_keys(subcall);
 
-    return ok(VaultUsage::all().str());
+    return invalid(call.constructFullArgs(), "Unknown vault subcommand: '" + std::string(sub) + "'");
 }
 
-static CommandResult handle_vaults(const CommandCall& call) {
-    if (hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::vaults_list().str());
-    return handle_vaults_list(call);
-}
-
-void vault::registerCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(VaultUsage::vault(), handle_vault);
-    r->registerCommand(VaultUsage::vaults_list(), handle_vaults);
+void commands::vault::registerCommands(const std::shared_ptr<Router>& r) {
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "vault"}), handle_vault);
 }

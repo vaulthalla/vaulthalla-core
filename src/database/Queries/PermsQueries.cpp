@@ -122,7 +122,7 @@ std::vector<std::shared_ptr<VaultRole>> PermsQueries::listVaultAssignedRoles(con
 // #####################################################################################################
 
 unsigned int PermsQueries::addVPermOverride(const std::shared_ptr<PermissionOverride>& override) {
-    return Transactions::exec("PermsQueries::addVPermOverride", [&](pqxx::work& txn) {)
+    return Transactions::exec("PermsQueries::addVPermOverride", [&](pqxx::work& txn) {
         pqxx::params p;
         p.append(override->assignment_id);
         p.append(override->permission.id);

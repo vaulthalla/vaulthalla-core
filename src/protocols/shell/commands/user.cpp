@@ -3,12 +3,12 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "services/LogRegistry.hpp"
 #include "types/UserRole.hpp"
-#include "UserUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -246,7 +246,7 @@ static CommandResult handle_list_users(const CommandCall& call) {
 }
 
 static CommandResult handle_user(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(UserUsage::all().str());
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
 
     const std::string_view sub = call.positionals[0];
     CommandCall subcall = call;
@@ -257,10 +257,10 @@ static CommandResult handle_user(const CommandCall& call) {
     if (sub == "info" || sub == "get") return handleUserInfo(subcall);
     if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
 
-    return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
+    return invalid(call.constructFullArgs(), "Unknown user subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerUserCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(UserUsage::users_list(), handle_list_users);
-    r->registerCommand(UserUsage::user(), handle_user);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve({"vh", "user"}), handle_user);
 }

@@ -135,7 +135,7 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
 }
 
 
-CommandResult vault::handle_vault_delete(const CommandCall& call) {
+CommandResult commands::vault::handle_vault_delete(const CommandCall& call) {
     if (call.positionals.empty()) return invalid("vault delete: missing <name>");
     if (call.positionals.size() > 1) return invalid("vault delete: too many arguments");
 

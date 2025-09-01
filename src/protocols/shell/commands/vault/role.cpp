@@ -259,25 +259,20 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
 }
 
 
-CommandResult vault::handle_vault_role(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(VaultUsage::vault_role().str());
-    if (call.positionals.size() > 1) return invalid("vault role: too many arguments");
+CommandResult commands::vault::handle_vault_role(const CommandCall& call) {
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.size() > 1) return invalid(call.constructFullArgs(), "vault role: too many arguments");
 
     const auto subcommand = call.positionals[0];
     auto subcall = call;
     subcall.positionals.erase(subcall.positionals.begin());
 
-    if (std::ranges::any_of(VaultUsage::vault_role_assign().commandAliases(),
-        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_assign(subcall);
+    if (isCommandMatch({"vh", "vault", "role", "assign"}, subcommand)) return handle_vault_role_assign(subcall);
+    if (isCommandMatch({"vh", "vault", "role", "remove"}, subcommand)) return handle_vault_role_remove(subcall);
+    if (isCommandMatch({"vh", "vault", "role", "list"}, subcommand)) return handle_vault_role_list(subcall);
+    if (isCommandMatch({"vh", "vault", "role", "override"}, subcommand)) return handle_vault_role_override(subcall);
 
-    if (std::ranges::any_of(VaultUsage::vault_role_remove().commandAliases(),
-        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_remove(subcall);
-
-    if (std::ranges::any_of(VaultUsage::vault_role_list().commandAliases(),
-        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_list(subcall);
-
-    if (std::ranges::any_of(VaultUsage::vault_role_override().commandAliases(),
-        [&](const auto& alias) { return alias == subcommand; })) return handle_vault_role_override(subcall);
-
-    return invalid("vault role: unknown subcommand: " + subcommand);
+    return invalid(call.constructFullArgs(), "Unknown vault role subcommand: '" + std::string(subcommand) + "'");
 }

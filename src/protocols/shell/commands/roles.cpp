@@ -12,6 +12,7 @@
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
+using namespace vh::services;
 
 static uint16_t parseUserRolePermissions(const CommandCall& call, uint16_t permissions = 0) {
     if (hasFlag(call, "manage-encryption-keys") || hasFlag(call, "allow-manage-encryption-keys")) permissions |= (1 << 0);

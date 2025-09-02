@@ -86,7 +86,7 @@ static CommandResult handleRoleInfo(const CommandCall& call) {
 }
 
 static std::shared_ptr<Role> resolveFromRoleSameType(const std::string& from,
-                                                     std::string_view expected_type) {
+                                                     const std::string_view expected_type) {
     std::shared_ptr<Role> r;
     if (const auto idOpt = parseInt(from)) r = PermsQueries::getRole(*idOpt);
     else r = PermsQueries::getRoleByName(from);

@@ -164,7 +164,6 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<Comma
     };
     cmd->optional = {
         {"--pattern <regex>", "Optional regex pattern to scope the override to specific paths"},
-        {"--effect", "If set, the pattern is treated as a positive match; otherwise, it's a negative match"},
         {"--enable | --disable", "Enable or disable the override (default: enabled)"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };

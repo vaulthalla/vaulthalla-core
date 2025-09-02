@@ -25,24 +25,28 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     };
     cmd->groups = {
         {"Local Vault Options", {
-            {"--local", "Create a local vault (mutually exclusive with --s3)"},
-            {"--on-sync-conflict <overwrite | keep_both | ask>",
-             "Conflict resolution strategy for local vaults. Default is 'overwrite'."}
-        }},
+             {"--local", "Create a local vault (mutually exclusive with --s3)"},
+             {"--on-sync-conflict <overwrite | keep_both | ask>",
+              "Conflict resolution strategy for local vaults. Default is 'overwrite'."}
+         }},
         {"S3 Vault Options", {
-            {"--s3", "Create an S3-backed vault (mutually exclusive with --local)"},
-            {"--api-key <name | id>", "Name or ID of the API key to access the S3 bucket"},
-            {"--bucket <name>", "Name of the S3 bucket"},
-            {"--sync-strategy <cache | sync | mirror>", "Sync strategy for S3 vaults. Default is 'cache'."},
-            {"--on-sync-conflict <keep_local | keep_remote | ask>", "Conflict resolution strategy during sync. Default is 'ask'."},
-            {"--encrypt", "Enable upstream encryption for S3 vaults. This is the default."},
-            {"--no-encrypt", "Disable upstream encryption for S3 vaults."},
-            {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
-            {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
-        }}
+             {"--s3", "Create an S3-backed vault (mutually exclusive with --local)"},
+             {"--api-key <name | id>", "Name or ID of the API key to access the S3 bucket"},
+             {"--bucket <name>", "Name of the S3 bucket"},
+             {"--sync-strategy <cache | sync | mirror>", "Sync strategy for S3 vaults. Default is 'cache'."},
+             {"--on-sync-conflict <keep_local | keep_remote | ask>",
+              "Conflict resolution strategy during sync. Default is 'ask'."},
+             {"--encrypt", "Enable upstream encryption for S3 vaults. This is the default."},
+             {"--no-encrypt", "Disable upstream encryption for S3 vaults."},
+             {"--accept-overwrite-waiver",
+              "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
+             {"--accept-decryption-waiver",
+              "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
+         }}
     };
     cmd->examples = {
-        {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G", "Create a local vault with a 10GB quota."},
+        {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G",
+         "Create a local vault with a 10GB quota."},
         {"vh vault create s3vault --s3 --api-key myapikey --bucket mybucket", "Create an S3-backed vault."}
     };
     return cmd;
@@ -63,12 +67,16 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
         {"--on-sync-conflict <overwrite|keep_both|ask|keep_local|keep_remote>", "New conflict resolution strategy"},
         {"--encrypt", "Enable upstream encryption for S3 vaults. This is the default."},
         {"--no-encrypt", "Disable upstream encryption for S3 vaults."},
-        {"--accept-overwrite-waiver", "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
-        {"--accept-decryption-waiver", "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
+        {"--accept-overwrite-waiver",
+         "Acknowledge the risks of enabling encryption on an upstream s3 bucket with existing files."},
+        {"--accept-decryption-waiver",
+         "Acknowledge the risks of disabling encryption on an upstream s3 bucket with existing encrypted files."}
     };
     cmd->examples = {
-        {"vh vault update 42 --desc \"Updated Description\" --quota 20G", "Update the description and quota of the vault with ID 42."},
-        {"vh vault update myvault --owner bob --api-key newkey --bucket newbucket --sync-strategy mirror --on-sync-conflict keep_remote --owner alice",
+        {"vh vault update 42 --desc \"Updated Description\" --quota 20G",
+         "Update the description and quota of the vault with ID 42."},
+        {"vh vault update myvault --owner bob --api-key newkey --bucket newbucket --sync-strategy mirror "
+         "--on-sync-conflict keep_remote --owner alice",
          "Update multiple properties of the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
@@ -125,14 +133,16 @@ static std::shared_ptr<CommandUsage> role_assign(const std::weak_ptr<CommandUsag
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"assign", "add", "new", "create", "mk"};
     cmd->description = "Assign a role to a user or group for a specific vault.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to assign"}};
+    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"},
+                        {"<role_id>", "ID of the role to assign"}};
     cmd->required = {{"--uid | --gid | --user | --group", "Specify the user or group to assign the role to"}};
     cmd->optional = {
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
     };
     cmd->examples = {
         {"vh vault role assign 42 read-only bob", "Add user 'bob' to the 'read-only' role for the vault with ID 42."},
-        {"vh vault role assign myvault read-write developers --owner alice", "Add group 'developers' to the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault role assign myvault read-write developers --owner alice",
+         "Add group 'developers' to the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -141,14 +151,17 @@ static std::shared_ptr<CommandUsage> role_unassign(const std::weak_ptr<CommandUs
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"unassign", "remove", "del", "rm"};
     cmd->description = "Remove a role assignment from a user or group for a specific vault.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to unassign"}};
+    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"},
+                        {"<role_id>", "ID of the role to unassign"}};
     cmd->required = {{"--uid | --gid | --user | --group", "Specify the user or group to remove the role from"}};
     cmd->optional = {
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"},
     };
     cmd->examples = {
-        {"vh vault role unassign 42 read-only bob", "Remove user 'bob' from the 'read-only' role for the vault with ID 42."},
-        {"vh vault role unassign myvault read-write developers --owner alice", "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault role unassign 42 read-only bob",
+         "Remove user 'bob' from the 'read-only' role for the vault with ID 42."},
+        {"vh vault role unassign myvault read-write developers --owner alice",
+         "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -157,7 +170,8 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<Comma
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"add", "new", "create", "mk"};
     cmd->description = "Add a permission override for a user or group in a specific vault role.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}};
+    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"},
+                        {"<role_id>", "ID of the role to override"}};
     cmd->required = {
         {"[--user || -u || --group || -g] <id|name>", "Specify the user or group to override the permission for"},
         {"<--permission_flag>", "Permission flag to override (e.g. --download, --upload, --delete, etc.)"}
@@ -168,7 +182,8 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<Comma
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
-        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
+        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")",
+         "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
         {R"(vh vault role override myvault read-write developers --gid 1001 --delete deny --pattern "^/sensitive/")",
          "Deny group with GID 1001 from deleting files in the '/sensitive/' directory in the vault named 'myvault'."}
     };
@@ -179,14 +194,19 @@ static std::shared_ptr<CommandUsage> role_override_update(const std::weak_ptr<Co
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update a permission override for a user or group in a specific vault role.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}, {"<override_id>", "ID of the override to update"}};
+    cmd->positionals = {
+        {"<vault-id|vault-name>", "ID or name of the vault"},
+        {"<role_id>", "ID of the role to override"},
+        {"<override_id>", "ID of the override to update"}
+    };
     cmd->optional = {
         {"--pattern <regex>", "New regex pattern to scope the override to specific paths"},
         {"--enable | --disable", "Enable or disable the override (default: enabled)"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
-        {R"(vh vault role override update 42 read-only 7 --deny --pattern ".*\.exe$")", "Update override ID 7 for user 'bob' in the vault with ID 42 to deny downloading .exe files."},
+        {R"(vh vault role override update 42 read-only 7 --deny --pattern ".*\.exe$")",
+         "Update override ID 7 for user 'bob' in the vault with ID 42 to deny downloading .exe files."},
         {R"(vh vault role override update myvault read-write 3 --enabled false --owner alice)",
          "Disable override ID 3 for group 'developers' in the vault named 'myvault' owned by 'alice'."}
     };
@@ -196,14 +216,46 @@ static std::shared_ptr<CommandUsage> role_override_update(const std::weak_ptr<Co
 static std::shared_ptr<CommandUsage> role_override_remove(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"remove", "del", "rm"};
-    cmd->description = "Remove a permission override from a user or group in a specific vault role.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}, {"<override_id>", "ID of the override to remove"}};
+    cmd->description = "Remove a permission override (by bit position) from a user or group in a specific vault role.";
+    cmd->positionals = {
+        {"<vault-id|vault-name>", "ID or name of the vault"},
+        {"<role_id|role_hint>", "ID of the role or a hint (resolved within subject+vault)"},
+        {"<bit_position>", "Bit position of the permission override to remove"}
+    };
+    cmd->required = {
+        {"[--user | -u | --group | -g] <id|name>", "Specify the user or group whose role assignment owns the override"}
+    };
     cmd->optional = {
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
-        {"vh vault role override remove 42 read-only 7", "Remove override ID 7 for user 'bob' in the vault with ID 42."},
-        {"vh vault role override rm myvault read-write 3 --owner alice", "Remove override ID 3 for group 'developers' in the vault named 'myvault' owned by 'alice'."}
+        {"vh vault role override remove 42 read-only 5 -u bob",
+         "Remove the bit-5 override for user 'bob' in vault 42 on role 'read-only'."},
+        {"vh vault role override rm myvault read-write 3 --group developers --owner alice",
+         "Remove the bit-3 override for group 'developers' in 'myvault' owned by 'alice'."}
+    };
+    return cmd;
+}
+
+static std::shared_ptr<CommandUsage> role_override_list(const std::weak_ptr<CommandUsage>& parent) {
+    auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"list", "ls"};
+    cmd->description = "List permission overrides for a user or group in a specific vault role.";
+    cmd->positionals = {
+        {"<vault-id|vault-name>", "ID or name of the vault"},
+        {"<role_id|role_hint>", "ID of the role or a hint (resolved within subject+vault)"}
+    };
+    cmd->required = {
+        {"[--user || -u || --group || -g] <id|name>", "Specify the user or group whose role assignment to list"}
+    };
+    cmd->optional = {
+        {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
+    };
+    cmd->examples = {
+        {"vh vault role override list 42 read-only -u bob",
+         "List all overrides for user 'bob' in role 'read-only' on vault 42."},
+        {"vh vault role override ls myvault read-write --group developers --owner alice",
+         "List all overrides for group 'developers' in 'myvault' (owner 'alice') on role 'read-write'."}
     };
     return cmd;
 }
@@ -213,18 +265,19 @@ static std::shared_ptr<CommandUsage> role_override(const std::weak_ptr<CommandUs
     cmd->aliases = {"override", "o"};
     cmd->description = "Manage permission overrides for users or groups in a specific vault role.";
     cmd->examples = {
-        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
-        {R"(vh vault role override myvault read-write developers --gid 1001 --delete deny --pattern "^/sensitive/")",
-         "Deny group with GID 1001 from deleting files in the '/sensitive/' directory in the vault named 'myvault'."}
+        {R"(vh vault role override 42 read-only -u bob --download allow --pattern ".*\.pdf$")",
+         "Allow user 'bob' to download PDF files in vault 42, overriding 'read-only'."},
+        {R"(vh vault role override myvault read-write --group developers --delete deny --pattern "^/sensitive/" --owner alice)",
+         "Deny 'developers' from deleting files under '/sensitive/' in 'myvault' (owner 'alice')."}
     };
     cmd->subcommands = {
         role_override_add(cmd->weak_from_this()),
         role_override_update(cmd->weak_from_this()),
-        role_override_remove(cmd->weak_from_this())
+        role_override_remove(cmd->weak_from_this()),
+        role_override_list(cmd->weak_from_this())
     };
     return cmd;
 }
-
 
 static std::shared_ptr<CommandUsage> role_list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
@@ -236,7 +289,8 @@ static std::shared_ptr<CommandUsage> role_list(const std::weak_ptr<CommandUsage>
     };
     cmd->examples = {
         {"vh vault role list 42", "List all role assignments for the vault with ID 42."},
-        {"vh vault role list myvault --owner alice", "List all role assignments for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault role list myvault --owner alice",
+         "List all role assignments for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -248,9 +302,12 @@ static std::shared_ptr<CommandUsage> vrole(const std::weak_ptr<CommandUsage>& pa
     cmd->description = "Manage vault role assignments and permission overrides.";
     cmd->examples = {
         {"vh vault role assign 42 read-only bob", "Add user 'bob' to the 'read-only' role for the vault with ID 42."},
-        {"vh vault role remove myvault read-write developers --owner alice", "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."},
-        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")", "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
-        {"vh vault role list myvault --owner alice", "List all role assignments for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault role remove myvault read-write developers --owner alice",
+         "Remove group 'developers' from the 'read-write' role for the vault named 'myvault' owned by 'alice'."},
+        {R"(vh vault role override 42 read-only bob --download allow --pattern ".*\.pdf$")",
+         "Allow user 'bob' to download PDF files in the vault with ID 42, overriding the 'read-only' role."},
+        {"vh vault role list myvault --owner alice",
+         "List all role assignments for the vault named 'myvault' owned by 'alice'."}
     };
     cmd->subcommands = {
         role_list(cmd->weak_from_this()),
@@ -279,7 +336,8 @@ static std::shared_ptr<CommandUsage> key_create(const std::weak_ptr<CommandUsage
     };
     cmd->examples = {
         {"vh vault keys create 42 --name mykey", "Create a new encryption key named 'mykey' for the vault with ID 42."},
-        {"vh vault keys create myvault --name backupkey --owner alice", "Create a new encryption key named 'backupkey' for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault keys create myvault --name backupkey --owner alice",
+         "Create a new encryption key named 'backupkey' for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -288,13 +346,15 @@ static std::shared_ptr<CommandUsage> key_delete(const std::weak_ptr<CommandUsage
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an encryption key from a specific vault.";
-    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<key-name>", "Name of the encryption key to delete"}};
+    cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"},
+                        {"<key-name>", "Name of the encryption key to delete"}};
     cmd->optional = {
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
         {"vh vault keys delete 42 mykey", "Delete the encryption key named 'mykey' from the vault with ID 42."},
-        {"vh vault keys delete myvault backupkey --owner alice", "Delete the encryption key named 'backupkey' from the vault named 'myvault' owned by 'alice'."}
+        {"vh vault keys delete myvault backupkey --owner alice",
+         "Delete the encryption key named 'backupkey' from the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -332,7 +392,8 @@ static std::shared_ptr<CommandUsage> sync_info(const std::weak_ptr<CommandUsage>
     };
     cmd->examples = {
         {"vh vault sync info 42", "Show sync configuration for the vault with ID 42."},
-        {"vh vault sync info myvault --owner alice", "Show sync configuration for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault sync info myvault --owner alice",
+         "Show sync configuration for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -344,12 +405,15 @@ static std::shared_ptr<CommandUsage> sync_set(const std::weak_ptr<CommandUsage>&
     cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}};
     cmd->optional = {
         {"--sync-strategy <cache | sync | mirror>", "Sync strategy for S3 vaults"},
-        {"--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>", "Conflict resolution strategy during sync"},
+        {"--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>",
+         "Conflict resolution strategy during sync"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
-        {"vh vault sync set 42 --sync-strategy mirror --on-sync-conflict keep_remote", "Set sync configuration for the vault with ID 42."},
-        {"vh vault sync set myvault --sync-strategy cache --owner alice", "Set sync configuration for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault sync set 42 --sync-strategy mirror --on-sync-conflict keep_remote",
+         "Set sync configuration for the vault with ID 42."},
+        {"vh vault sync set myvault --sync-strategy cache --owner alice",
+         "Set sync configuration for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -361,12 +425,14 @@ static std::shared_ptr<CommandUsage> sync_update(const std::weak_ptr<CommandUsag
     cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}};
     cmd->optional = {
         {"--sync-strategy <cache | sync | mirror>", "New sync strategy for S3 vaults"},
-        {"--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>", "New conflict resolution strategy during sync"},
+        {"--on-sync-conflict <overwrite | keep_both | ask | keep_local | keep_remote>",
+         "New conflict resolution strategy during sync"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
         {"vh vault sync update 42 --sync-strategy cache", "Update the sync strategy for the vault with ID 42."},
-        {"vh vault sync update myvault --on-sync-conflict keep_local --owner alice", "Update the conflict resolution strategy for the vault named 'myvault' owned by 'alice'."}
+        {"vh vault sync update myvault --on-sync-conflict keep_local --owner alice",
+         "Update the conflict resolution strategy for the vault named 'myvault' owned by 'alice'."}
     };
     return cmd;
 }
@@ -379,7 +445,8 @@ static std::shared_ptr<CommandUsage> sync(const std::weak_ptr<CommandUsage>& par
     cmd->examples = {
         {"vh vault sync 42", "Manually trigger a sync for the vault with ID 42."},
         {"vh vault sync info 42", "Show sync configuration for the vault with ID 42."},
-        {"vh vault sync set 42 --sync-strategy mirror --on-sync-conflict keep_remote", "Set sync configuration for the vault with ID 42."},
+        {"vh vault sync set 42 --sync-strategy mirror --on-sync-conflict keep_remote",
+         "Set sync configuration for the vault with ID 42."},
         {"vh vault sync update 42 --sync-strategy cache", "Update the sync strategy for the vault with ID 42."}
     };
     cmd->subcommands = {
@@ -395,11 +462,15 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"vault", "v"};
     cmd->description = "Manage a single vault.";
     cmd->examples = {
-        {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G", "Create a local vault with a 10GB quota."},
+        {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G",
+         "Create a local vault with a 10GB quota."},
         {"vh vault delete myvault --owner alice", "Delete the vault named 'myvault' owned by user 'alice'."},
-        {"vh vault info myvault --owner alice", "Show information for the vault named 'myvault' owned by user 'alice'."},
-        {"vh vault update myvault --desc \"Updated Description\" --quota 20G", "Update the description and quota of 'myvault'."},
-        {"vh vault role myvault --add bob --perm download,upload", "Add user 'bob' with download and upload permissions to 'myvault'."},
+        {"vh vault info myvault --owner alice",
+         "Show information for the vault named 'myvault' owned by user 'alice'."},
+        {"vh vault update myvault --desc \"Updated Description\" --quota 20G",
+         "Update the description and quota of 'myvault'."},
+        {"vh vault role myvault --add bob --perm download,upload",
+         "Add user 'bob' with download and upload permissions to 'myvault'."},
         {"vh vault keys myvault --list", "List all encryption keys associated with 'myvault'."},
         {"vh vault sync myvault", "Manually trigger a sync for 'myvault'."}
     };

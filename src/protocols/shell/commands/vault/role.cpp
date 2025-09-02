@@ -632,9 +632,136 @@ static CommandResult handle_vault_role_list(const CommandCall& call) {
     return ok(j.dump(4));
 }
 
-static CommandResult handle_vault_role_override_remove(const CommandCall& call) {}
+static CommandResult handle_vault_role_override_remove(const CommandCall& call) {
+    constexpr const char* ERR = "vault override remove";
 
-static CommandResult handle_vault_role_override_list(const CommandCall& call) {}
+    if (call.positionals.size() < 3)
+        return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint> <bit_position>");
+    if (call.positionals.size() > 3)
+        return invalid(std::string(ERR) + ": too many arguments");
+
+    const auto vaultArg = call.positionals.at(0);
+    const auto roleArg  = call.positionals.at(1);
+    const auto bitArg   = call.positionals.at(2);
+
+    // Vault
+    auto vLkp = resolveVault(call, vaultArg, ERR);
+    if (!vLkp) return invalid(vLkp.error);
+    auto vault = vLkp.ptr;
+
+    // AuthZ
+    if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
+
+    // SUBJECT IS REQUIRED (type + id|name)
+    auto subjLkp = parseSubject(call, ERR);
+    if (!subjLkp) return invalid(subjLkp.error);
+    const Subject subj = *subjLkp.ptr;
+
+    // Role in context of (vault, subject)
+    auto roleLkp = resolveRole(roleArg, vault, &subj, ERR);
+    if (!roleLkp) return invalid(roleLkp.error);
+    auto role = roleLkp.ptr;
+
+    // bit_position
+    std::string bitErr;
+    auto bitPosOpt = parsePositiveUint(bitArg, "bit position", bitErr);
+    if (!bitPosOpt) return invalid(std::string(ERR) + ": " + bitErr);
+    const unsigned int bitPosition = *bitPosOpt;
+
+    // Locate override by (vault, subject, bit)
+    VPermOverrideQuery q{
+        .vault_id     = vault->id,
+        .subject_type = subj.type,   // "user" | "group"
+        .subject_id   = subj.id,
+        .bit_position = bitPosition
+    };
+
+    auto ov = PermsQueries::getVPermOverride(q);
+    if (!ov) {
+        return invalid(std::string(ERR) + ": no override found for (vault="
+                       + std::to_string(vault->id) + ", " + subj.type + "="
+                       + std::to_string(subj.id) + ", bit=" + std::to_string(bitPosition) + ")");
+    }
+    if (ov->assignment_id != role->id) {
+        return invalid(std::string(ERR) + ": override does not belong to role '"
+                       + role->name + "' (assignment mismatch)");
+    }
+
+    PermsQueries::removeVPermOverride(ov->id);
+
+    return ok("Removed override (vault=" + std::to_string(vault->id) +
+              ", " + subj.type + "=" + std::to_string(subj.id) +
+              ", bit=" + std::to_string(bitPosition) + ") from role '" + role->name + "'");
+}
+
+static CommandResult handle_vault_role_override_list(const CommandCall& call) {
+    constexpr const char* ERR = "vault override list";
+
+    if (call.positionals.size() < 2)
+        return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint>");
+    if (call.positionals.size() > 2)
+        return invalid(std::string(ERR) + ": too many arguments");
+
+    const auto vaultArg = call.positionals.at(0);
+    const auto roleArg  = call.positionals.at(1);
+
+    // Vault
+    auto vLkp = resolveVault(call, vaultArg, ERR);
+    if (!vLkp) return invalid(vLkp.error);
+    auto vault = vLkp.ptr;
+
+    // AuthZ
+    if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
+
+    // Subject required to bind role assignment (one per (vault, subject))
+    auto subjLkp = parseSubject(call, ERR);
+    if (!subjLkp) return invalid(subjLkp.error);
+    const Subject subj = *subjLkp.ptr;
+
+    // Role in context of (vault, subject)
+    auto roleLkp = resolveRole(roleArg, vault, &subj, ERR);
+    if (!roleLkp) return invalid(roleLkp.error);
+    auto role = roleLkp.ptr;
+
+    const auto& ovs = role->permission_overrides;
+
+    if (ovs.empty()) {
+        return ok("No overrides found for role '" + role->name + "' in vault '" + vault->name +
+                  "' for " + subj.type + " id " + std::to_string(subj.id));
+    }
+
+    std::vector<std::shared_ptr<PermissionOverride>> overrides = ovs;
+    std::ranges::sort(overrides.begin(), overrides.end(),
+              [](const auto& a, const auto& b) {
+                  return a->permission.bit_position < b->permission.bit_position;
+              });
+
+    // TODO: // implement a proper to_string using shell::Table
+    std::string out;
+    out += "Overrides for role '" + role->name + "' in vault '" + vault->name +
+           "' for " + subj.type + " id " + std::to_string(subj.id) + ":\n";
+    out += "  bit  | permission       | effect | enabled | pattern\n";
+    out += "  -----+-------------------+--------+---------+----------------------------\n";
+
+    for (const auto& ov : overrides) {
+        const auto bit = ov->permission.bit_position;
+        const auto& permName = ov->permission.name;
+        const char* eff = (ov->effect == OverrideOpt::ALLOW ? "ALLOW" : "DENY");
+        const char* en  = (ov->enabled ? "true" : "false");
+
+        out += "  " + std::to_string(bit);
+        out += (bit < 10 ? "   | " : (bit < 100 ? "  | " : " | ")); // basic align
+        out += permName;
+        if (permName.size() < 17) out.append(17 - permName.size(), ' ');
+        out += " | ";
+        out += eff; out += "   | ";
+        out += en;  out += "    | ";
+        out += ov->patternStr;
+        out += "\n";
+    }
+
+    return ok(out);
+}
 
 static bool isVaultRoleMatch(const std::string& cmd, const std::string_view input) {
     return isCommandMatch({"vault", "role", cmd}, input);

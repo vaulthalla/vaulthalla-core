@@ -24,8 +24,8 @@ public:
     [[nodiscard]] std::string basicStr() const;
     [[nodiscard]] std::string markdown() const;
 
-    std::shared_ptr<CommandUsage> resolve(const std::vector<std::string>& args) const;
-    std::string renderHelp(const std::vector<std::string>& args) const;
+    [[nodiscard]] std::shared_ptr<CommandUsage> resolve(const std::vector<std::string>& args) const;
+    [[nodiscard]] std::string renderHelp(const std::vector<std::string>& args) const;
 };
 
 }

@@ -66,17 +66,26 @@ public:
     [[nodiscard]] bool matches(const std::string& alias) const;
 
 private:
-    // internal helpers (exposed for testing if you want)
+    static constexpr std::string_view binName_ = "vh";
+
     [[nodiscard]] std::string buildSynopsis_() const;
     [[nodiscard]] static std::string normalizePositional_(const std::string& s);
-    [[nodiscard]] static std::string bracketizeIfNeeded_(const std::string& s, bool square);
     [[nodiscard]] std::string constructCmdString() const;
-    [[nodiscard]] std::string joinSubcommandsInline(const std::string& sep = " | ") const;
     [[nodiscard]] std::string joinAliasesInline_(const std::string& sep = " | ") const;
     [[nodiscard]] std::string joinAliasesCode_();
     void emitCommand(std::ostringstream& out,
         const std::shared_ptr<CommandUsage>& command = nullptr,
         bool spaceLines = false) const;
+
+    [[nodiscard]] std::vector<const CommandUsage*> lineage_() const;
+    [[nodiscard]] std::string tokenFor_(const CommandUsage* node) const;
+    static bool sameAliases_(const CommandUsage* a, const CommandUsage* b);
+    [[nodiscard]] static std::string join_(const std::vector<std::string>& v, std::string_view sep);
+    [[nodiscard]] static std::string renderEntryPrimary_(const Entry& e, bool squareIfOptional);
+    static void appendWrapped_(std::ostringstream& out,
+                               const std::string& text,
+                               size_t width,
+                               size_t indentAfterFirst = 0);
 };
 
-} // namespace vh::shell
+}

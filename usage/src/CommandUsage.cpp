@@ -180,17 +180,6 @@ std::string CommandUsage::primary() const {
     return aliases[0];
 }
 
-std::string CommandUsage::joinSubcommandsInline(const std::string& sep) const {
-    if (subcommands.empty()) throw std::runtime_error("joinSubcommandsInline called with no subcommands");
-    std::ostringstream ss;
-    for (const auto& sc : subcommands) {
-        if (ss.tellp() > 0) ss << sep;
-        ss << sc->primary();
-        if (pluralAliasImpliesList) ss << sep << sc->primary() << "s";
-    }
-    return ss.str();
-}
-
 std::string CommandUsage::joinAliasesInline_(const std::string& sep) const {
     if (aliases.empty()) throw std::runtime_error("joinAliasesInline_ called with empty aliases");
     std::ostringstream ss;
@@ -231,35 +220,107 @@ std::string CommandUsage::normalizePositional_(const std::string& s) {
     return fmt::format("<{}>", s);
 }
 
-std::string CommandUsage::bracketizeIfNeeded_(const std::string& s, bool square) {
-    // If caller already bracketed, don't double-wrap
-    if (s.find('<') != std::string::npos || s.find('[') != std::string::npos) return s;
-    return square ? fmt::format("[{}]", s) : fmt::format("<{}>", s);
+std::vector<const CommandUsage*> CommandUsage::lineage_() const {
+    std::vector<const CommandUsage*> chain;
+    const CommandUsage* cur = this;
+    while (cur) {
+        chain.push_back(cur);
+        auto p = cur->parent.lock();
+        cur = p.get();
+    }
+    std::ranges::reverse(chain.begin(), chain.end());
+    return chain;
+}
+
+std::string CommandUsage::tokenFor_(const CommandUsage* node) const {
+    // Use node’s own alias policy
+    return show_aliases ? node->joinAliasesInline_(" | ") : node->primary();
+}
+
+bool CommandUsage::sameAliases_(const CommandUsage* a, const CommandUsage* b) {
+    if (!a || !b) return false;
+    return a->aliases == b->aliases && a->pluralAliasImpliesList == b->pluralAliasImpliesList;
+}
+
+std::string CommandUsage::join_(const std::vector<std::string>& v, std::string_view sep) {
+    std::ostringstream ss;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (i) ss << sep;
+        ss << v[i];
+    }
+    return ss.str();
+}
+
+void CommandUsage::appendWrapped_(std::ostringstream& out,
+                               const std::string& text,
+                               const size_t width,
+                               const size_t indentAfterFirst) {
+    if (width == 0) { out << text; return; }
+    size_t col = 0;
+    bool firstLine = true;
+    for (size_t i = 0; i < text.size(); ) {
+        if (col == 0 && !firstLine && indentAfterFirst) {
+            out << std::string(indentAfterFirst, ' ');
+            col += indentAfterFirst;
+        }
+        const size_t nextSpace = text.find(' ', i);
+        std::string_view word = (nextSpace == std::string::npos)
+            ? std::string_view(text).substr(i)
+            : std::string_view(text).substr(i, nextSpace - i);
+        const size_t need = word.size() + (col ? 1 : 0);
+        if (col + need > width && col > 0) {
+            out << "\n";
+            col = 0;
+            firstLine = false;
+            continue;
+        }
+        if (col) { out << ' '; ++col; }
+        out << word;
+        col += word.size();
+        if (nextSpace == std::string::npos) break;
+        i = nextSpace + 1;
+    }
+}
+
+// If Entry has aliases, treat them as a <choice|list|...>
+std::string CommandUsage::renderEntryPrimary_(const Entry& e, bool squareIfOptional) {
+    // e.label can be "--flag <arg>" or just "--flag" or "name"
+    // If e.aliases non-empty, treat them as the value choices.
+    std::string rhs;
+    if (!e.aliases.empty()) rhs = "<" + join_(e.aliases, "|") + ">";
+
+    // If the label already contains <...> or [...] keep it verbatim
+    const bool preWrapped = (e.label.find('<') != std::string::npos) || (e.label.find('[') != std::string::npos);
+    std::string base = e.label;
+    if (!preWrapped && !rhs.empty()) base += " " + rhs;
+
+    // Wrap only if caller didn’t already
+    if (!preWrapped) {
+        if (squareIfOptional) return "[" + base + "]";
+        return "<" + base + ">";
+    }
+    return base; // already bracketed upstream
 }
 
 std::string CommandUsage::buildSynopsis_() const {
     if (synopsis) return *synopsis;
 
     std::ostringstream syn;
+    syn << binName_;
 
-    // ns + command (with aliases inline if enabled)
-    const auto nsWithAliases = show_aliases ? joinAliasesInline_() : primary();
+    const auto chain = lineage_();
+    constexpr size_t startIdx = 1;  // Skip root (vh) at index 0
 
-    const bool hasCmd = !aliases.empty();
-    const auto cmdWithAliases = hasCmd ? (show_aliases ? joinAliasesInline_() : primary())
-        : std::string{};
+    for (size_t i = startIdx; i < chain.size(); ++i) {
+        // Collapse adjacent nodes if they render to the same token set
+        if (i > startIdx && sameAliases_(chain[i], chain[i - 1])) continue;
+        syn << ' ' << tokenFor_(chain[i]);
+    }
 
-    // Prefix with binary name for clarity in synopsis
-    syn << "vh ";
-    syn << nsWithAliases;
-    if (hasCmd) syn << " " << cmdWithAliases;
+    for (const auto& p : positionals) syn << ' ' << normalizePositional_(p.label);
+    for (const auto& r : required) syn << ' ' << renderEntryPrimary_(r, false);
+    for (const auto& o : optional) syn << ' ' << renderEntryPrimary_(o, true);
 
-    // positionals (labels only)
-    for (const auto& p : positionals) syn << " " << normalizePositional_(p.label);
-    // required flags (primary only keeps synopsis readable)
-    for (const auto& r : required)    syn << " " << bracketizeIfNeeded_(r.label, /*square=*/false);
-    // optional flags (primary only)
-    for (const auto& o : optional)    syn << " " << bracketizeIfNeeded_(o.label, /*square=*/true);
     return syn.str();
 }
 
@@ -344,7 +405,6 @@ std::string CommandUsage::basicStr() const {
     out << "\n";
 
     emitCommand(out);
-    out << "\n";
     for (const auto& c : subcommands) emitCommand(out, c);
 
     return out.str();

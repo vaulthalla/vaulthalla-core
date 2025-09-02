@@ -26,6 +26,7 @@ struct PermissionOverride {
     std::string patternStr;
     std::regex pattern;
 
+    PermissionOverride() = default;
     explicit PermissionOverride(const pqxx::row& row);
     explicit PermissionOverride(const nlohmann::json& j);
 };

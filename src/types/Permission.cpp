@@ -64,6 +64,26 @@ std::string to_string(const VaultPermission p) {
     }
 }
 
+std::string get_vault_perm_name(const VaultPermission& p) {
+    switch (p) {
+    case VaultPermission::ManageVault: return "manage_vault";
+    case VaultPermission::ManageAccess: return "manage_access";
+    case VaultPermission::ManageTags: return "manage_tags";
+    case VaultPermission::ManageMetadata: return "manage_metadata";
+    case VaultPermission::ManageVersions: return "manage_versions";
+    case VaultPermission::ManageFileLocks: return "manage_file_locks";
+    case VaultPermission::Share: return "share";
+    case VaultPermission::Sync: return "sync";
+    case VaultPermission::Create: return "create";
+    case VaultPermission::Download: return "download";
+    case VaultPermission::Delete: return "delete";
+    case VaultPermission::Rename: return "rename";
+    case VaultPermission::Move: return "move";
+    case VaultPermission::List: return "list";
+    default: return "unknown-vault-permission";
+    }
+}
+
 void to_json(nlohmann::json& j, const Permission& p) {
     j = {
         {"id", p.id},
@@ -71,8 +91,8 @@ void to_json(nlohmann::json& j, const Permission& p) {
 
         {"description", p.description},
         {"bit_position", p.bit_position},
-        {"created_at", util::timestampToString(p.created_at)},
-        {"updated_at", util::timestampToString(p.updated_at)}
+        {"created_at", vh::util::timestampToString(p.created_at)},
+        {"updated_at", vh::util::timestampToString(p.updated_at)}
     };
 }
 

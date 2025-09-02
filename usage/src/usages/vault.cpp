@@ -159,14 +159,13 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<Comma
     cmd->description = "Add a permission override for a user or group in a specific vault role.";
     cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}};
     cmd->required = {
-        {"--uid | --gid | --user | --group", "Specify the user or group to override the permission for"},
-        {"<--permission_flag>", "Permission flag to override (e.g. --download, --upload, --delete, etc.)"},
-        {"--allow | --deny", "Specify whether to allow or deny the permission"}
+        {"[--user || -u || --group || -g] <id|name>", "Specify the user or group to override the permission for"},
+        {"<--permission_flag>", "Permission flag to override (e.g. --download, --upload, --delete, etc.)"}
     };
     cmd->optional = {
         {"--pattern <regex>", "Optional regex pattern to scope the override to specific paths"},
         {"--effect", "If set, the pattern is treated as a positive match; otherwise, it's a negative match"},
-        {"--enabled <bool=true>", "Enable or disable the override (default is true)"},
+        {"--enable | --disable", "Enable or disable the override (default: enabled)"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {
@@ -184,8 +183,7 @@ static std::shared_ptr<CommandUsage> role_override_update(const std::weak_ptr<Co
     cmd->positionals = {{"<vault-id|vault-name>", "ID or name of the vault"}, {"<role_id>", "ID of the role to override"}, {"<override_id>", "ID of the override to update"}};
     cmd->optional = {
         {"--pattern <regex>", "New regex pattern to scope the override to specific paths"},
-        {"--allow | --deny", "Set whether to allow or deny the permission"},
-        {"--enabled <bool>", "Enable or disable the override"},
+        {"--enable | --disable", "Enable or disable the override (default: enabled)"},
         {"--owner <id|name>", "User ID or username of the vault owner (required if using name)"}
     };
     cmd->examples = {

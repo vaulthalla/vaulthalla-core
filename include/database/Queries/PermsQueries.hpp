@@ -10,6 +10,7 @@ struct UserRole;
 struct VaultRole;
 struct Permission;
 struct PermissionOverride;
+enum class VaultPermission : uint16_t;
 }
 
 namespace vh::database {
@@ -35,7 +36,8 @@ struct PermsQueries {
     // Vault Role CRUD
     static void assignVaultRole(const std::shared_ptr<types::VaultRole>& roleAssignment);
     static void removeVaultRoleAssignment(unsigned int id);
-    static std::shared_ptr<types::VaultRole> getVaultRoleBySubject(unsigned int subjectId, const std::string& subjectType, unsigned int roleId);
+    static std::shared_ptr<types::VaultRole> getVaultRoleBySubjectAndRoleId(unsigned int subjectId, const std::string& subjectType, unsigned int roleId);
+    static std::shared_ptr<types::VaultRole> getVaultRoleBySubjectAndVaultId(unsigned int subjectId, const std::string& subjectType, unsigned int vaultId);
     static std::shared_ptr<types::VaultRole> getVaultRole(unsigned int id);
     static std::vector<std::shared_ptr<types::VaultRole>> listVaultAssignedRoles(unsigned int vaultId);
 
@@ -50,6 +52,7 @@ struct PermsQueries {
     // Permission queries
     static std::shared_ptr<types::Permission> getPermission(unsigned int id);
     static std::shared_ptr<types::Permission> getPermissionByName(const std::string& name);
+    static std::shared_ptr<types::VaultPermission> getVaultPermission(const types::VaultPermission& vp);
     static std::vector<std::shared_ptr<types::Permission>> listPermissions();
     static unsigned short countPermissions();
 };

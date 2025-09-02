@@ -3,6 +3,7 @@
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
+#include "types/PermissionOverride.hpp"
 
 using namespace vh::database;
 using namespace vh::types;

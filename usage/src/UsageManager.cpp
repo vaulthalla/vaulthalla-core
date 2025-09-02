@@ -20,15 +20,15 @@ UsageManager::UsageManager() {
         {"vh version", "Show the current version of Vaulthalla."}
     };
 
-    registerBook(vault::get(root_));
-    registerBook(user::get(root_));
-    registerBook(group::get(root_));
-    registerBook(secrets::get(root_));
-    registerBook(aku::get(root_));
-    registerBook(role::get(root_));
-    registerBook(permissions::get(root_));
-    registerBook(help::get(root_));
-    registerBook(version::get(root_));
+    registerBook(vault::get(root_->weak_from_this()));
+    registerBook(user::get(root_->weak_from_this()));
+    registerBook(group::get(root_->weak_from_this()));
+    registerBook(secrets::get(root_->weak_from_this()));
+    registerBook(aku::get(root_->weak_from_this()));
+    registerBook(role::get(root_->weak_from_this()));
+    registerBook(permissions::get(root_->weak_from_this()));
+    registerBook(help::get(root_->weak_from_this()));
+    registerBook(version::get(root_->weak_from_this()));
 }
 
 void UsageManager::registerBook(const std::shared_ptr<CommandBook>& book) {
@@ -47,26 +47,30 @@ std::shared_ptr<CommandBook> UsageManager::bookFor(const std::string& topLevelAl
 
 std::shared_ptr<CommandUsage> UsageManager::resolve(const std::vector<std::string>& args) const {
     if (args.empty()) return nullptr;
-    if (args[0] != "vh") throw std::runtime_error("UsageManager: resolve called with non-vh root");
-    if (args.size() == 1) return root_;
-    const auto book = bookFor(args[1]);
-    if (!book) return nullptr;
-    if (args.size() == 2) return book->root;
+    const auto book = bookFor(args[0]);
+    if (!book) throw std::runtime_error("UsageManager: resolve called with unknown top-level alias: " + args[1]);
+    if (args.size() == 1) return book->root;
     return book->resolve(args);
 }
 
+std::shared_ptr<CommandUsage> UsageManager::resolve(const std::string& topLevelArg) const {
+    if (topLevelArg.empty()) return nullptr;
+    const auto book = bookFor(topLevelArg);
+    if (!book) throw std::runtime_error("UsageManager: resolve called with unknown top-level alias: " + topLevelArg);
+    return book->root;
+}
+
 std::string UsageManager::renderHelp(const std::vector<std::string>& args) const {
-    if (args.size() < 2) return root_->basicStr();
+    if (args.empty()) return root_->basicStr();
     const auto book = bookFor(args[0]);
     if (!book) {
         std::ostringstream out;
-        out << "Unknown command or alias: ";
+        out << "[UsageManager] Unknown command or alias: ";
         for (const auto& a : args) out << a << ' ';
         out << "\n\n";
-        out << index_.begin()->second->root->basicStr(true);
+        out << index_.begin()->second->root->basicStr();
         return out.str();
     }
-    if (args.size() == 1) return book->renderHelp({"vh"});
     return book->renderHelp(args);
 }
 

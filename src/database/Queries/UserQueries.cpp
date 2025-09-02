@@ -22,7 +22,7 @@ std::shared_ptr<User> UserQueries::getUserByName(const std::string& name) {
 
         pqxx::params p{"user", userId};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
-        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+        const auto overridesRes = txn.exec_prepared("list_subject_permission_overrides", p);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -35,7 +35,7 @@ std::shared_ptr<User> UserQueries::getUserById(const unsigned int id) {
 
         pqxx::params p{"user", id};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
-        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+        const auto overridesRes = txn.exec_prepared("list_subject_permission_overrides", p);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -55,7 +55,7 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
 
         pqxx::params p{"user", userId};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
-        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+        const auto overridesRes = txn.exec_prepared("list_subject_permission_overrides", p);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -145,7 +145,7 @@ std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
 
         pqxx::params p{"user", userId};
         const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
-        const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+        const auto overridesRes = txn.exec_prepared("list_subject_permission_overrides", p);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -161,7 +161,7 @@ std::vector<std::shared_ptr<User> > UserQueries::listUsers() {
             const auto userRoleRow = txn.exec_prepared("get_user_assigned_role", pqxx::params{row["id"].as<unsigned int>()}).one_row();
             pqxx::params p{"user", row["id"].as<unsigned int>()};
             const auto rolesRes = txn.exec_prepared("get_subject_assigned_vault_roles", p);
-            const auto overridesRes = txn.exec_prepared("get_subject_permission_overrides", p);
+            const auto overridesRes = txn.exec_prepared("list_subject_permission_overrides", p);
 
             usersWithRoles.push_back(std::make_shared<User>(row, userRoleRow, rolesRes, overridesRes));
         }

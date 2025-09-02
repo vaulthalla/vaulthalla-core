@@ -5,13 +5,13 @@ using namespace vh::shell;
 
 namespace vh::shell::vault {
 
-static std::shared_ptr<CommandUsage> buildBaseUsage(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> create(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new vault. Supports local and S3-backed vaults.";
@@ -48,7 +48,7 @@ static std::shared_ptr<CommandUsage> create(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> update(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing vault.";
@@ -74,7 +74,7 @@ static std::shared_ptr<CommandUsage> update(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> remove(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing vault by ID or name.";
@@ -89,7 +89,7 @@ static std::shared_ptr<CommandUsage> remove(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> info(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about a vault.";
@@ -104,7 +104,7 @@ static std::shared_ptr<CommandUsage> info(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> list(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all vaults accessible to the current user.";
@@ -121,7 +121,7 @@ static std::shared_ptr<CommandUsage> list(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_assign(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_assign(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"assign", "add", "new", "create", "mk"};
     cmd->description = "Assign a role to a user or group for a specific vault.";
@@ -137,7 +137,7 @@ static std::shared_ptr<CommandUsage> role_assign(const std::shared_ptr<CommandUs
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_unassign(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_unassign(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"unassign", "remove", "del", "rm"};
     cmd->description = "Remove a role assignment from a user or group for a specific vault.";
@@ -153,7 +153,7 @@ static std::shared_ptr<CommandUsage> role_unassign(const std::shared_ptr<Command
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_override_add(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"add", "new", "create", "mk"};
     cmd->description = "Add a permission override for a user or group in a specific vault role.";
@@ -177,7 +177,7 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::shared_ptr<Com
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_override_update(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_override_update(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update a permission override for a user or group in a specific vault role.";
@@ -196,7 +196,7 @@ static std::shared_ptr<CommandUsage> role_override_update(const std::shared_ptr<
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_override_remove(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_override_remove(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"remove", "del", "rm"};
     cmd->description = "Remove a permission override from a user or group in a specific vault role.";
@@ -211,7 +211,7 @@ static std::shared_ptr<CommandUsage> role_override_remove(const std::shared_ptr<
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> role_override(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_override(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"override", "o"};
     cmd->description = "Manage permission overrides for users or groups in a specific vault role.";
@@ -221,15 +221,15 @@ static std::shared_ptr<CommandUsage> role_override(const std::shared_ptr<Command
          "Deny group with GID 1001 from deleting files in the '/sensitive/' directory in the vault named 'myvault'."}
     };
     cmd->subcommands = {
-        role_override_add(cmd->shared_from_this()),
-        role_override_update(cmd->shared_from_this()),
-        role_override_remove(cmd->shared_from_this())
+        role_override_add(cmd->weak_from_this()),
+        role_override_update(cmd->weak_from_this()),
+        role_override_remove(cmd->weak_from_this())
     };
     return cmd;
 }
 
 
-static std::shared_ptr<CommandUsage> role_list(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> role_list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all role assignments for a specific vault.";
@@ -244,7 +244,7 @@ static std::shared_ptr<CommandUsage> role_list(const std::shared_ptr<CommandUsag
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> vrole(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> vrole(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"role", "r"};
     cmd->pluralAliasImpliesList = true;
@@ -256,22 +256,22 @@ static std::shared_ptr<CommandUsage> vrole(const std::shared_ptr<CommandUsage>& 
         {"vh vault role list myvault --owner alice", "List all role assignments for the vault named 'myvault' owned by 'alice'."}
     };
     cmd->subcommands = {
-        role_list(cmd->shared_from_this()),
-        role_override(cmd->shared_from_this()),
-        role_assign(cmd->shared_from_this()),
-        role_unassign(cmd->shared_from_this())
+        role_list(cmd->weak_from_this()),
+        role_override(cmd->weak_from_this()),
+        role_assign(cmd->weak_from_this()),
+        role_unassign(cmd->weak_from_this())
     };
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> key_list(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> key_list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all encryption keys for all vaults (secret keys are not shown).";
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> key_create(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> key_create(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new encryption key for a specific vault.";
@@ -287,7 +287,7 @@ static std::shared_ptr<CommandUsage> key_create(const std::shared_ptr<CommandUsa
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> key_delete(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> key_delete(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an encryption key from a specific vault.";
@@ -302,7 +302,7 @@ static std::shared_ptr<CommandUsage> key_delete(const std::shared_ptr<CommandUsa
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> key(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> key(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"key", "k"};
     cmd->pluralAliasImpliesList = true;
@@ -318,14 +318,14 @@ static std::shared_ptr<CommandUsage> key(const std::shared_ptr<CommandUsage>& pa
         {"vh vault keys delete 42 mykey", "Delete the API key named 'mykey' from the vault with ID 42."}
     };
     cmd->subcommands = {
-        key_list(cmd->shared_from_this()),
-        key_create(cmd->shared_from_this()),
-        key_delete(cmd->shared_from_this())
+        key_list(cmd->weak_from_this()),
+        key_create(cmd->weak_from_this()),
+        key_delete(cmd->weak_from_this())
     };
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> sync_info(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> sync_info(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display the current synchronization settings for a specific vault.";
@@ -340,7 +340,7 @@ static std::shared_ptr<CommandUsage> sync_info(const std::shared_ptr<CommandUsag
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> sync_set(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> sync_set(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"set", "update", "modify", "edit"};
     cmd->description = "Set or update synchronization settings for a specific vault.";
@@ -357,7 +357,7 @@ static std::shared_ptr<CommandUsage> sync_set(const std::shared_ptr<CommandUsage
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> sync_update(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> sync_update(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update synchronization settings for a specific vault.";
@@ -374,7 +374,7 @@ static std::shared_ptr<CommandUsage> sync_update(const std::shared_ptr<CommandUs
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> sync(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> sync(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"sync", "s"};
     cmd->description = "Manage vault synchronization settings and operations.";
@@ -386,14 +386,14 @@ static std::shared_ptr<CommandUsage> sync(const std::shared_ptr<CommandUsage>& p
         {"vh vault sync update 42 --sync-strategy cache", "Update the sync strategy for the vault with ID 42."}
     };
     cmd->subcommands = {
-        sync_info(cmd->shared_from_this()),
-        sync_set(cmd->shared_from_this()),
-        sync_update(cmd->shared_from_this())
+        sync_info(cmd->weak_from_this()),
+        sync_set(cmd->weak_from_this()),
+        sync_update(cmd->weak_from_this())
     };
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"vault", "v"};
     cmd->description = "Manage a single vault.";
@@ -407,19 +407,19 @@ static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& p
         {"vh vault sync myvault", "Manually trigger a sync for 'myvault'."}
     };
     cmd->subcommands = {
-        list(cmd->shared_from_this()),
-        create(cmd->shared_from_this()),
-        remove(cmd->shared_from_this()),
-        info(cmd->shared_from_this()),
-        update(cmd->shared_from_this()),
-        vrole(cmd->shared_from_this()),
-        key(cmd->shared_from_this()),
-        sync(cmd->shared_from_this())
+        list(cmd->weak_from_this()),
+        create(cmd->weak_from_this()),
+        remove(cmd->weak_from_this()),
+        info(cmd->weak_from_this()),
+        update(cmd->weak_from_this()),
+        vrole(cmd->weak_from_this()),
+        key(cmd->weak_from_this()),
+        sync(cmd->weak_from_this())
     };
     return cmd;
 }
 
-std::shared_ptr<CommandBook> get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandBook>();
     cmd->title = "Vault Commands";
     cmd->root = base(parent);

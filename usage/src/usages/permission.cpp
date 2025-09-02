@@ -47,7 +47,7 @@ std::string usage_vault_permissions() {
     return os.str();
 }
 
-static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     cmd->aliases = {"permission", "permissions", "perm", "perms"};
@@ -57,7 +57,7 @@ static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-std::shared_ptr<CommandBook> get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = base(parent);
     const auto book = std::make_shared<CommandBook>();
     book->title = "Permission Commands";

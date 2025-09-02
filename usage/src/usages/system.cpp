@@ -4,7 +4,7 @@ using namespace vh::shell;
 
 namespace vh::shell {
 
-static std::shared_ptr<CommandUsage> help_base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> help_base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     cmd->aliases = {"help", "-h", "--h", "--help"};
@@ -20,7 +20,7 @@ static std::shared_ptr<CommandUsage> help_base(const std::shared_ptr<CommandUsag
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> version_base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> version_base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     cmd->aliases = {"version", "-v", "--v", "--version"};
@@ -29,14 +29,14 @@ static std::shared_ptr<CommandUsage> version_base(const std::shared_ptr<CommandU
     return cmd;
 }
 
-std::shared_ptr<CommandBook> help::get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> help::get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();
     book->title = "Help Command";
     book->root = help_base(parent);
     return book;
 }
 
-std::shared_ptr<CommandBook> version::get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> version::get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();
     book->title = "Version Command";
     book->root = version_base(parent);

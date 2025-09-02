@@ -4,13 +4,13 @@ using namespace vh::shell;
 
 namespace vh::shell::user {
 
-static std::shared_ptr<CommandUsage> buildBaseUsage(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> list(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all users in the system.";
@@ -22,7 +22,7 @@ static std::shared_ptr<CommandUsage> list(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> create(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new user.";
@@ -44,7 +44,7 @@ static std::shared_ptr<CommandUsage> create(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> remove(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "rm"};
     cmd->description = "Delete an existing user by username.";
@@ -57,7 +57,7 @@ static std::shared_ptr<CommandUsage> remove(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> info(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Get information about a specific user by username.";
@@ -70,7 +70,7 @@ static std::shared_ptr<CommandUsage> info(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> update(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing user.";
@@ -92,17 +92,17 @@ static std::shared_ptr<CommandUsage> update(const std::shared_ptr<CommandUsage>&
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"user", "u"};
     cmd->description = "Manage a single user.";
     cmd->pluralAliasImpliesList = true;
     cmd->subcommands = {
-        list(cmd->shared_from_this()),
-        create(cmd->shared_from_this()),
-        remove(cmd->shared_from_this()),
-        info(cmd->shared_from_this()),
-        update(cmd->shared_from_this())
+        list(cmd->weak_from_this()),
+        create(cmd->weak_from_this()),
+        remove(cmd->weak_from_this()),
+        info(cmd->weak_from_this()),
+        update(cmd->weak_from_this())
     };
     cmd->examples = {
         {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
@@ -115,7 +115,7 @@ static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-std::shared_ptr<CommandBook> get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();
     book->title = "User Commands";
     book->root = base(parent);

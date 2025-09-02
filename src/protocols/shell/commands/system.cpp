@@ -9,7 +9,7 @@
 namespace vh::shell {
 
 static CommandResult handle_help(const CommandCall& call) {
-    return usage({"vh"});
+    return usage();
 }
 
 static CommandResult handle_version(const CommandCall& call) {
@@ -18,8 +18,8 @@ static CommandResult handle_version(const CommandCall& call) {
 
 void commands::registerSystemCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "help"}), handle_help);
-    r->registerCommand(usageManager->resolve({"vh", "version"}), handle_version);
+    r->registerCommand(usageManager->resolve("help"), handle_help);
+    r->registerCommand(usageManager->resolve("version"), handle_version);
 }
 
 }

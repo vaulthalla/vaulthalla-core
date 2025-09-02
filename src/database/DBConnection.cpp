@@ -966,7 +966,7 @@ void DBConnection::initPreparedPermOverrides() const {
                    "VALUES ($1, $2, $3, $4, $5) RETURNING id");
 
     conn_->prepare("update_vault_permission_override",
-                   "UPDATE vault_permission_overrides SET pattern = $3, enabled = $4, effect = $5 "
+                   "UPDATE vault_permission_overrides SET pattern = $2, enabled = $3, effect = $4 "
                    "WHERE id = $1");
 
     conn_->prepare("delete_vault_permission_override", "DELETE FROM vault_permission_overrides WHERE id = $1");

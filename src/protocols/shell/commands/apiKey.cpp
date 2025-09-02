@@ -156,5 +156,5 @@ static CommandResult handle_keys(const CommandCall& call) {
 
 void commands::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "api-key"}), handle_key);
+    r->registerCommand(usageManager->resolve("api-key"), handle_key);
 }

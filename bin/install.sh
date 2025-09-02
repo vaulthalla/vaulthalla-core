@@ -139,7 +139,7 @@ fi
 # === 6) Build Project ===
 echo "🏗️  Starting Vaulthalla build..."
 
-meson setup build "${MESON_ARGS[@]}" --reconfigure
+meson setup build "${MESON_ARGS[@]}" -Db_sanitize=address,undefined
 meson compile -C build
 sudo meson install -C build
 sudo ldconfig

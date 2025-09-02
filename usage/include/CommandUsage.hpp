@@ -45,7 +45,7 @@ public:
     std::vector<std::string> aliases;
     std::string description;
     std::optional<std::string> synopsis;  // if empty, synthesized
-    std::shared_ptr<CommandUsage> parent;
+    std::weak_ptr<CommandUsage> parent;
     std::vector<std::shared_ptr<CommandUsage>> subcommands;
     std::vector<Entry> positionals, required, optional;
     std::vector<GroupedOptions> groups;
@@ -60,7 +60,7 @@ public:
     [[nodiscard]] std::string primary() const;
 
     [[nodiscard]] std::string str() const;
-    [[nodiscard]] std::string basicStr(bool splitHeader = false) const;
+    [[nodiscard]] std::string basicStr() const;
     [[nodiscard]] std::string markdown() const;
 
     [[nodiscard]] bool matches(const std::string& alias) const;
@@ -74,6 +74,9 @@ private:
     [[nodiscard]] std::string joinSubcommandsInline(const std::string& sep = " | ") const;
     [[nodiscard]] std::string joinAliasesInline_(const std::string& sep = " | ") const;
     [[nodiscard]] std::string joinAliasesCode_();
+    void emitCommand(std::ostringstream& out,
+        const std::shared_ptr<CommandUsage>& command = nullptr,
+        bool spaceLines = false) const;
 };
 
 } // namespace vh::shell

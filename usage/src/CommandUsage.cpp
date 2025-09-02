@@ -194,8 +194,13 @@ std::string CommandUsage::joinSubcommandsInline(const std::string& sep) const {
 std::string CommandUsage::joinAliasesInline_(const std::string& sep) const {
     if (aliases.empty()) throw std::runtime_error("joinAliasesInline_ called with empty aliases");
     std::ostringstream ss;
-    for (const auto& a : aliases) ss << sep << a;
+    if (aliases.size() > 1 || pluralAliasImpliesList) ss << "[";
+    for (unsigned int i = 0; i < aliases.size(); ++i) {
+        ss << aliases[i];
+        if (i + 1 < aliases.size()) ss << sep;
+    }
     if (pluralAliasImpliesList) ss << sep << primary() << "s";
+    if (aliases.size() > 1 || pluralAliasImpliesList) ss << "]";
     return ss.str();
 }
 
@@ -214,8 +219,9 @@ std::string CommandUsage::joinAliasesCode_() {
 
 std::string CommandUsage::constructCmdString() const {
     std::ostringstream ss;
-    if (parent) ss << parent->constructCmdString() << " ";
-    ss << primary();
+    if (const auto p = parent.lock(); p.get()) ss << p->constructCmdString() << " ";
+    const auto cmdWithAliases = show_aliases ? joinAliasesInline_() : primary();
+    ss << cmdWithAliases;
     return ss.str();
 }
 
@@ -259,6 +265,42 @@ std::string CommandUsage::buildSynopsis_() const {
 
 // ---------- CommandUsage impl ----------
 
+static std::string lineBreak(const int tw = 100, const int padding = 3) {
+    if (tw - 2 * padding < 10) return std::string(tw, '-');
+    return std::string(padding, ' ') + std::string(tw - 2 * padding, '-') + std::string(padding, ' ');
+}
+
+void CommandUsage::emitCommand(std::ostringstream& out, const std::shared_ptr<CommandUsage>& command, const bool spaceLines) const {
+    const auto cmd = command ? command : shared_from_this();
+    const int tw = term_width > 40 ? term_width : 100;
+
+    {
+        std::ostringstream head;
+
+        if (!show_aliases || aliases.size() < 2) head << cmd->constructCmdString();
+        else head << cmd->constructCmdString();
+
+        out << theme.C() << head.str() << theme.R() << "\n";
+        if (spaceLines) out << "\n";
+        out << theme.A2() << "Description:" << theme.R();
+        const auto needsSpace = cmd->description.contains("\n");
+        if (needsSpace) out << "\n";
+        if (cmd->description.empty()) out << "  No description provided.\n";
+        else emitWrapped(out, cmd->description, needsSpace ? 2 : 1, tw);
+    }
+
+    if (spaceLines) out << "\n";
+    out << theme.H() << "Usage:" << theme.R();
+    {
+        const auto syn = cmd->buildSynopsis_();
+        const bool needsSpace = syn.contains("\n");
+        if (needsSpace) out << "\n";
+        emitWrapped(out, syn, needsSpace ? 2 : 1, tw);
+    }
+    out << "\n";
+}
+
+
 std::string CommandUsage::str() const {
     const int tw = term_width > 40 ? term_width : 100;
     constexpr std::size_t indent = 2;
@@ -266,56 +308,44 @@ std::string CommandUsage::str() const {
 
     std::ostringstream out;
 
-    emitTwoColSection(out, "Required:", required, indent, gap, tw, max_key_col, theme, show_aliases);
-    emitTwoColSection(out, "Optional:", optional, indent, gap, tw, max_key_col, theme, show_aliases);
-    for (const auto& g : groups)
-        emitTwoColSection(out, g.title + ":", g.items, indent, gap, tw, max_key_col, theme, show_aliases);
+    const auto emit = [&](const std::shared_ptr<CommandUsage>& command = nullptr) {
+        const auto cmd = command ? command : shared_from_this();
 
-    if (!examples.empty()) {
-        out << theme.H() << "Examples:" << theme.R() << "\n";
-        for (const auto& ex : examples) {
-            emitWrapped(out, fmt::format("$ {}", ex.cmd), indent, tw);
-            if (!ex.note.empty()) emitWrapped(out, ex.note, indent + 2, tw);
-            out << "\n";
+        emitCommand(out, command, true);
+
+        emitTwoColSection(out, "Required:", cmd->required, indent, gap, tw, max_key_col, theme, show_aliases);
+        emitTwoColSection(out, "Optional:", cmd->optional, indent, gap, tw, max_key_col, theme, show_aliases);
+        for (const auto& g : cmd->groups)
+            emitTwoColSection(out, g.title + ":", g.items, indent, gap, tw, max_key_col, theme, show_aliases);
+
+        if (!examples.empty()) {
+            out << theme.A3() << "Examples:" << theme.R() << "\n";
+            for (const auto& ex : cmd->examples) {
+                emitWrapped(out, fmt::format("$ {}", ex.cmd), indent, tw);
+                if (!ex.note.empty()) emitWrapped(out, ex.note, indent + 2, tw);
+                out << "\n";
+            }
         }
+    };
+
+    emit();
+    for (unsigned int i = 0; i < subcommands.size(); ++i) {
+        emit(subcommands[i]);
+        if (i + 1 < subcommands.size()) out << "\n" << lineBreak() << "\n\n";
     }
 
-    return basicStr(true) + out.str();
+    return out.str();
 }
 
-std::string CommandUsage::basicStr(const bool splitHeader) const {
+std::string CommandUsage::basicStr() const {
     if (aliases.empty()) throw std::runtime_error("CommandUsage::basicStr() called with no command");
 
-    const int tw = term_width > 40 ? term_width : 100;
-
     std::ostringstream out;
+    out << "\n";
 
-    {
-        std::ostringstream head;
-
-        if (!show_aliases) head << constructCmdString();
-        else head << "[" << joinAliasesInline_() << "]";
-
-        if (!subcommands.empty()) {
-            head << " ";
-            if (subcommands.size() == 1) head << subcommands[0]->primary();
-            else head << "(" << joinSubcommandsInline() << ")";
-        }
-
-        out << theme.C() << head.str() << theme.R();
-        if (!description.empty()) out << " - " << shortOr(description, "");
-        out << "\n";
-    }
-
-    if (splitHeader) out << "\n";
-    out << theme.H() << "Usage:" << theme.R();
-    {
-        const auto syn = buildSynopsis_();
-        const bool needsSpace = syn.contains("\n");
-        if (needsSpace) out << "\n";
-        emitWrapped(out, syn, needsSpace ? 2 : 1, tw);
-        out << "\n";
-    }
+    emitCommand(out);
+    out << "\n";
+    for (const auto& c : subcommands) emitCommand(out, c);
 
     return out.str();
 }
@@ -332,9 +362,7 @@ std::string CommandUsage::markdown() const {
         md << fmt::format("# `{}`\n\n", head.str());
     }
 
-    if (!description.empty()) {
-        md << description << "\n\n";
-    }
+    if (!description.empty()) md << description << "\n\n";
 
     if (show_aliases) {
         if (!aliases.empty()) {

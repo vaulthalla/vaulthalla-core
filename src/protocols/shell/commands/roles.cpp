@@ -306,5 +306,5 @@ static CommandResult handle_role(const CommandCall& call) {
 
 void commands::registerRoleCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "roles"}), handle_role);
+    r->registerCommand(usageManager->resolve("role"), handle_role);
 }

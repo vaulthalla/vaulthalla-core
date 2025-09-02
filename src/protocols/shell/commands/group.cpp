@@ -252,5 +252,5 @@ static CommandResult handle_group(const CommandCall& call) {
 
 void commands::registerGroupCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "group"}), handle_group);
+    r->registerCommand(usageManager->resolve("group"), handle_group);
 }

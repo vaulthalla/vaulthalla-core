@@ -320,6 +320,10 @@ void CtlServerService::runLoop() {
             LogRegistry::shell()->error("[CtlServerService] No 'line' field in request from UID {} (PID {})", p.uid,
                                         p.pid);
             send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "invalid request"}});
+        } catch (const std::exception& e) {
+            LogRegistry::shell()->error("[CtlServerService] Internal error: {}", e.what());
+            // best-effort error response
+            send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
         } catch (...) {
             // best-effort error response
             send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "internal error"}});

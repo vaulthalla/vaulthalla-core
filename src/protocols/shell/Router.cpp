@@ -6,6 +6,7 @@
 #include "CommandUsage.hpp"
 #include "UsageManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "util/shellArgsHelpers.hpp"
 
 #include <fmt/core.h>
 #include <cctype>
@@ -31,6 +32,7 @@ void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, Command
         }
         info.aliases.insert(a);
         aliasMap_[a] = key;
+        LogRegistry::shell()->info("Alias '{}' mapped to '{}'", a, key);
     }
 
     commands_[key] = std::move(info);
@@ -49,16 +51,15 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     call.user = user;
     call.io = io;
 
-    if (call.name.empty()) return CommandResult{1, "", "no command provided"};
+    if (call.name.empty()) return invalid("No command provided.");
     const auto canonical = canonicalFor(call.name);
 
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
 
-    if (!commands_.contains(canonical))
-        return {2,
-            ServiceDepsRegistry::instance().shellUsageManager->resolve(call.constructFullArgs())->basicStr(),
-            fmt::format("Unknown command or alias: {}",
-                call.name)};
+    if (!commands_.contains(canonical)) {
+        LogRegistry::shell()->info("Commands:\n{}", fmt::join(commands_ | std::views::keys, "\n"));
+        return invalid(call.constructFullArgs(), fmt::format("[Router] Unknown command or alias: {}", call.name));
+    }
 
     return commands_.at(canonical).handler(call);
 }

@@ -11,7 +11,7 @@ namespace vh::shell {
 CommandResult invalid(std::string msg);
 CommandResult invalid(const std::vector<std::string>& args, std::string msg);
 CommandResult ok(std::string out);
-CommandResult usage(const std::vector<std::string>& args);
+CommandResult usage(const std::vector<std::string>& args = {});
 
 std::optional<std::string> optVal(const CommandCall& c, const std::string& key);
 

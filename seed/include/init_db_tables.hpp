@@ -793,8 +793,8 @@ CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_perm
         )");
 
         txn.exec(R"(
-CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_assignment_scope
-    ON vault_permission_overrides (assignment_id, scope);
+CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_assignment_perm
+    ON vault_permission_overrides (assignment_id, permission_id);
         )");
     });
 }

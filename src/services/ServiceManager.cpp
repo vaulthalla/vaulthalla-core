@@ -40,7 +40,7 @@ void ServiceManager::startAll() {
     startWatchdog();
 }
 
-void ServiceManager::stopAll(int signal) {
+void ServiceManager::stopAll(const int signal) {
     LogRegistry::vaulthalla()->debug("[ServiceManager] Stopping all services...");
     {
         std::lock_guard lock(mutex_);

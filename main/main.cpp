@@ -65,6 +65,7 @@ int main() {
         LogRegistry::vaulthalla()->info("[*] Initializing service dependencies...");
         ServiceDepsRegistry::init();
         ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
+        LogRegistry::vaulthalla()->info("[✓] SyncController set in ServiceDepsRegistry.");
         Filesystem::init(ServiceDepsRegistry::instance().storageManager);
         ServiceDepsRegistry::instance().storageManager->initStorageEngines();
 

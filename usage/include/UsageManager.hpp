@@ -18,6 +18,7 @@ public:
     void registerBook(const std::shared_ptr<CommandBook>& book);
 
     std::shared_ptr<CommandUsage> resolve(const std::vector<std::string>& args) const;
+    std::shared_ptr<CommandUsage> resolve(const std::string& topLevelArg) const;
     std::string renderHelp(const std::vector<std::string>& args) const;
 
     std::shared_ptr<CommandBook> bookFor(const std::string& topLevelAlias) const;

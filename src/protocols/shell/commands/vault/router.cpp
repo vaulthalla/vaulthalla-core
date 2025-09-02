@@ -36,5 +36,5 @@ static CommandResult handle_vault(const CommandCall& call) {
 
 void commands::vault::registerCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "vault"}), handle_vault);
+    r->registerCommand(usageManager->resolve("vault"), handle_vault);
 }

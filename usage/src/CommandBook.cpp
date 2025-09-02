@@ -29,14 +29,14 @@ std::string CommandBook::markdown() const {
 }
 
 std::shared_ptr<CommandUsage> CommandBook::resolve(const std::vector<std::string>& args) const {
+    if (!root) throw std::runtime_error("CommandBook::resolve() called with no root");
     auto current = root;
     for (const auto& arg : args) {
-        if (!current) return nullptr;
         auto it = std::ranges::find_if(current->subcommands.begin(), current->subcommands.end(),
                                [&](const std::shared_ptr<CommandUsage>& cu) {
                                    return cu->matches(arg);
                                });
-        if (it == current->subcommands.end()) return nullptr;
+        if (it == current->subcommands.end()) return current;
         current = *it;
     }
     return current;
@@ -44,13 +44,15 @@ std::shared_ptr<CommandUsage> CommandBook::resolve(const std::vector<std::string
 
 std::string CommandBook::renderHelp(const std::vector<std::string>& args) const {
     const auto cmd = resolve(args);
+    std::ostringstream out;
     if (!cmd) {
-        std::ostringstream out;
-        out << "Unknown command or alias: ";
-        for (const auto& a : args) out << a << ' ';
+        out << root->basicStr();
         out << "\n\n";
-        out << root->basicStr(true);
+        out << "[CommandBook] Unknown command or alias: ";
+        for (const auto& a : args) out << a << ' ';
+        out << "root is at: " << root->primary() << "\n";
         return out.str();
     }
-    return cmd->str();
+    out << "\n" << book_theme->H() << title << book_theme->R() << "\n\n";
+    return out.str() + cmd->str();
 }

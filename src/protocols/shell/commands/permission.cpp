@@ -18,5 +18,5 @@ static CommandResult handle_permission(const CommandCall& call) {
 
 void commands::registerPermissionCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "permission"}), handle_permission);
+    r->registerCommand(usageManager->resolve("permission"), handle_permission);
 }

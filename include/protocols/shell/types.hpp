@@ -30,9 +30,9 @@ struct CommandCall {
     std::vector<std::string> arena;
 
     [[nodiscard]] inline std::vector<std::string> constructFullArgs() const {
+        if (name == "vh" && positionals.empty()) return {};
         std::vector<std::string> args;
-        args.reserve(2 + positionals.size());
-        args.emplace_back("vh");
+        args.reserve(1 + positionals.size());
         args.push_back(name);
         for (const auto& pos : positionals) args.push_back(pos);
         return args;

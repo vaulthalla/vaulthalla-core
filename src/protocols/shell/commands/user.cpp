@@ -262,5 +262,5 @@ static CommandResult handle_user(const CommandCall& call) {
 
 void commands::registerUserCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "user"}), handle_user);
+    r->registerCommand(usageManager->resolve("user"), handle_user);
 }

@@ -4,13 +4,13 @@ using namespace vh::shell;
 
 namespace vh::shell::secrets {
 
-static std::shared_ptr<CommandUsage> buildBaseUsage(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> set(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> set(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Set or update an internal secret";
@@ -28,7 +28,7 @@ static std::shared_ptr<CommandUsage> set(const std::shared_ptr<CommandUsage>& pa
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> secret_export(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> secret_export(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"export", "get", "download"};
     cmd->description = "Export an internal secret to a file";
@@ -46,12 +46,13 @@ static std::shared_ptr<CommandUsage> secret_export(const std::shared_ptr<Command
     return cmd;
 }
 
-static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& parent) {
+static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"secret", "secrets", "sec"};
     cmd->description = "Manage internal secrets used by Vaulthalla.";
     cmd->subcommands = {
-        set(cmd->shared_from_this()),
-        secret_export(cmd->shared_from_this())
+        set(cmd->weak_from_this()),
+        secret_export(cmd->weak_from_this())
     };
     cmd->examples = {
         {"vh secret set db-password --file /path/to/password.txt", "Set the database password from the specified file."},
@@ -60,7 +61,7 @@ static std::shared_ptr<CommandUsage> base(const std::shared_ptr<CommandUsage>& p
     return cmd;
 }
 
-std::shared_ptr<CommandBook> get(const std::shared_ptr<CommandUsage>& parent) {
+std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();
     book->title = "Secrets Commands";
     book->root = base(parent);

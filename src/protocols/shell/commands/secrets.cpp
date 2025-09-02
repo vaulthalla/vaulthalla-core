@@ -26,11 +26,7 @@ static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
 }
 
 static CommandResult handle_secrets_set(const CommandCall& call) {
-    if (call.positionals.size() != 1) return {
-        2,
-        ServiceDepsRegistry::instance().shellUsageManager->renderHelp(call.constructFullArgs()),
-
-    };
+    if (call.positionals.size() != 1) return usage(call.constructFullArgs());
 
     const auto secretArg = call.positionals[0];
 
@@ -121,11 +117,7 @@ static nlohmann::json getJWTSecret() {
 }
 
 static CommandResult handle_secrets_export(const CommandCall& call) {
-    if (call.positionals.size() != 1) return {
-        2,
-        ServiceDepsRegistry::instance().shellUsageManager->renderHelp(call.constructFullArgs()),
-
-    };
+    if (call.positionals.size() != 1) return usage(call.constructFullArgs());
 
     const auto secretArg = call.positionals[0];
 
@@ -156,5 +148,5 @@ static CommandResult handle_secrets(const CommandCall& call) {
 
 void commands::registerSecretsCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    r->registerCommand(usageManager->resolve({"vh", "secrets"}), handle_secrets);
+    r->registerCommand(usageManager->resolve("secrets"), handle_secrets);
 }

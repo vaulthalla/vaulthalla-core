@@ -14,82 +14,41 @@ using namespace vh::types;
 using namespace vh::database;
 using namespace vh::services;
 
+static void parseFlag(const CommandCall& call, const std::string& flag, uint16_t& permissions, const unsigned int bitPosition) {
+    if (hasFlag(call, flag) || hasFlag(call, "allow-" + flag)) permissions |= (1 << bitPosition);
+    else if (hasFlag(call, "deny-" + flag)) permissions &= ~(1 << bitPosition);
+}
+
 static uint16_t parseUserRolePermissions(const CommandCall& call, uint16_t permissions = 0) {
-    if (hasFlag(call, "manage-encryption-keys") || hasFlag(call, "allow-manage-encryption-keys")) permissions |= (1 << 0);
-    else if (hasFlag(call, "deny-manage-encryption-keys")) permissions &= ~(1 << 0);
-
-    if (hasFlag(call, "manage-admins") || hasFlag(call, "allow-manage-admins")) permissions |= (1 << 1);
-    else if (hasFlag(call, "deny-manage-admins")) permissions &= ~(1 << 1);
-
-    if (hasFlag(call, "manage-users") || hasFlag(call, "allow-manage-users")) permissions |= (1 << 2);
-    else if (hasFlag(call, "deny-manage-users")) permissions &= ~(1 << 2);
-
-    if (hasFlag(call, "manage-groups") || hasFlag(call, "allow-manage-groups")) permissions |= (1 << 3);
-    else if (hasFlag(call, "deny-manage-groups")) permissions &= ~(1 << 3);
-
-    if (hasFlag(call, "manage-vaults") || hasFlag(call, "allow-manage-vaults")) permissions |= (1 << 4);
-    else if (hasFlag(call, "deny-manage-vaults")) permissions &= ~(1 << 4);
-
-    if (hasFlag(call, "manage-groups") || hasFlag(call, "allow-manage-groups")) permissions |= (1 << 5);
-    else if (hasFlag(call, "deny-manage-groups")) permissions &= ~(1 << 5);
-
-    if (hasFlag(call, "manage-roles") || hasFlag(call, "allow-manage-roles")) permissions |= (1 << 6);
-    else if (hasFlag(call, "deny-manage-roles")) permissions &= ~(1 << 6);
-
-    if (hasFlag(call, "manage-api-keys") || hasFlag(call, "allow-manage-api-keys")) permissions |= (1 << 7);
-    else if (hasFlag(call, "deny-manage-api-keys")) permissions &= ~(1 << 7);
-
-    if (hasFlag(call, "audit-log-access") || hasFlag(call, "allow-audit-log-access")) permissions |= (1 << 8);
-    else if (hasFlag(call, "deny-audit-log-access")) permissions &= ~(1 << 8);
-
-    if (hasFlag(call, "create-vaults") || hasFlag(call, "allow-create-vaults")) permissions |= (1 << 9);
-    else if (hasFlag(call, "deny-create-vaults")) permissions &= ~(1 << 9);
+    parseFlag(call, "manage-encryption-keys", permissions, 0);
+    parseFlag(call, "manage-admins", permissions, 1);
+    parseFlag(call, "manage-users", permissions, 2);
+    parseFlag(call, "manage-groups", permissions, 3);
+    parseFlag(call, "manage-roles", permissions, 4);
+    parseFlag(call, "manage-settings", permissions, 5);
+    parseFlag(call, "manage-vaults", permissions, 6);
+    parseFlag(call, "manage-api-keys", permissions, 7);
+    parseFlag(call, "audit-log-access", permissions, 8);
+    parseFlag(call, "create-vaults", permissions, 9);
 
     return permissions;
 }
 
 static uint16_t parseVaultRolePermissions(const CommandCall& call, uint16_t permissions = 0) {
-    if (hasFlag(call, "manage-vault") || hasFlag(call, "allow-manage-vault")) permissions |= (1 << 0);
-    else if (hasFlag(call, "deny-manage-vault")) permissions &= ~(1 << 0);
-
-    if (hasFlag(call, "manage-access") || hasFlag(call, "allow-manage-access")) permissions |= (1 << 1);
-    else if (hasFlag(call, "deny-manage-access")) permissions &= ~(1 << 1);
-
-    if (hasFlag(call, "manage-tags") || hasFlag(call, "allow-manage-tags")) permissions |= (1 << 2);
-    else if (hasFlag(call, "deny-manage-tags")) permissions &= ~(1 << 2);
-
-    if (hasFlag(call, "manage-metadata") || hasFlag(call, "allow-manage-metadata")) permissions |= (1 << 3);
-    else if (hasFlag(call, "deny-manage-metadata")) permissions &= ~(1 << 3);
-
-    if (hasFlag(call, "manage-versions") || hasFlag(call, "allow-manage-versions")) permissions |= (1 << 4);
-    else if (hasFlag(call, "deny-manage-versions")) permissions &= ~(1 << 4);
-
-    if (hasFlag(call, "manage-file-locks") || hasFlag(call, "allow-manage-file-locks")) permissions |= (1 << 5);
-    else if (hasFlag(call, "deny-manage-file-locks")) permissions &= ~(1 << 5);
-
-    if (hasFlag(call, "share") || hasFlag(call, "allow-share")) permissions |= (1 << 6);
-    else if (hasFlag(call, "deny-share")) permissions &= ~(1 << 6);
-
-    if (hasFlag(call, "sync") || hasFlag(call, "allow-sync")) permissions |= (1 << 7);
-    else if (hasFlag(call, "deny-sync")) permissions &= ~(1 << 7);
-
-    if (hasFlag(call, "create") || hasFlag(call, "allow-create")) permissions |= (1 << 8);
-    else if (hasFlag(call, "deny-create")) permissions &= ~(1 << 8);
-
-    if (hasFlag(call, "download") || hasFlag(call, "allow-download")) permissions |= (1 << 9);
-    else if (hasFlag(call, "deny-download")) permissions &= ~(1 << 9);
-
-    if (hasFlag(call, "delete") || hasFlag(call, "allow-delete")) permissions |= (1 << 10);
-    else if (hasFlag(call, "deny-delete")) permissions &= ~(1 << 10);
-
-    if (hasFlag(call, "rename") || hasFlag(call, "allow-rename")) permissions |= (1 << 11);
-    else if (hasFlag(call, "deny-rename")) permissions &= ~(1 << 11);
-
-    if (hasFlag(call, "move") || hasFlag(call, "allow-move")) permissions |= (1 << 12);
-    else if (hasFlag(call, "deny-move")) permissions &= ~(1 << 12);
-
-    if (hasFlag(call, "list") || hasFlag(call, "allow-list")) permissions |= (1 << 13);
-    else if (hasFlag(call, "deny-list")) permissions &= ~(1 << 13);
+    parseFlag(call, "manage-vault", permissions, 0);
+    parseFlag(call, "manage-access", permissions, 1);
+    parseFlag(call, "manage-tags", permissions, 2);
+    parseFlag(call, "manage-metadata", permissions, 3);
+    parseFlag(call, "manage-versions", permissions, 4);
+    parseFlag(call, "manage-file-locks", permissions, 5);
+    parseFlag(call, "share", permissions, 6);
+    parseFlag(call, "sync", permissions, 7);
+    parseFlag(call, "create", permissions, 8);
+    parseFlag(call, "download", permissions, 9);
+    parseFlag(call, "delete", permissions, 10);
+    parseFlag(call, "rename", permissions, 11);
+    parseFlag(call, "move", permissions, 12);
+    parseFlag(call, "list", permissions, 13);
 
     return permissions;
 }

@@ -232,20 +232,23 @@ static CommandResult handle_group_list_users(const CommandCall& call) {
     return ok(to_string(group->members));
 }
 
+static bool isGroupMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"group", cmd}, input);
+}
+
 static CommandResult handle_group(const CommandCall& call) {
     if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
         return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "create" || sub == "new") return handle_group_create(subcall);
-    if (sub == "delete" || sub == "rm") return handle_group_delete(subcall);
-    if (sub == "info" || sub == "get") return handle_group_info(subcall);
-    if (sub == "update" || sub == "set") return handle_group_update(subcall);
-    if (sub == "user" || sub == "u") return handle_group_user(subcall);
-    if (sub == "list-users" || sub == "members") return handle_group_list_users(subcall);
+    if (isGroupMatch("create", sub)) return handle_group_create(subcall);
+    if (isGroupMatch("update", sub)) return handle_group_update(subcall);
+    if (isGroupMatch("delete", sub)) return handle_group_delete(subcall);
+    if (isGroupMatch("info", sub)) return handle_group_info(subcall);
+    if (isGroupMatch("list", sub)) return handle_group_list(subcall);
+    if (isGroupMatch("user", sub)) return handle_group_user(subcall);
+    if (isGroupMatch("list-users", sub)) return handle_group_list_users(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown group subcommand: '" + std::string(sub) + "'");
 }

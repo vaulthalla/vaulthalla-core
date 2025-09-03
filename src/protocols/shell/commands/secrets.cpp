@@ -125,8 +125,13 @@ static CommandResult handle_secrets_export(const CommandCall& call) {
 
     if (secretArg == "db-password" || secretArg == "all") out.push_back(getDBPassword());
     if (secretArg == "jwt-secret" || secretArg == "all") out.push_back(getJWTSecret());
+
     if (out.empty()) return invalid("secrets export: unknown secret '" + std::string(secretArg) + "'. Valid secrets are: db-password, jwt-secret, all");
     return handle_secret_encrypt_and_response(call, out);
+}
+
+static bool isSecretsMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"secrets", cmd}, input);
 }
 
 static CommandResult handle_secrets(const CommandCall& call) {
@@ -136,12 +141,10 @@ static CommandResult handle_secrets(const CommandCall& call) {
     if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
         return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "set" || sub == "update") return handle_secrets_set(subcall);
-    if (sub == "export" || sub == "get" || sub == "show") return handle_secrets_export(subcall);
+    if (isSecretsMatch("set", sub)) return handle_secrets_set(subcall);
+    if (isSecretsMatch("export", sub)) return handle_secrets_export(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown secrets subcommand: '" + std::string(sub) + "'");
 }

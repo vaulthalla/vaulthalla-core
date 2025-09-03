@@ -136,17 +136,20 @@ static CommandResult handleAPIKeyInfo(const CommandCall& call) {
     }
 }
 
+static bool isAPIKeyMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"api-key", cmd}, input);
+}
+
 static CommandResult handle_key(const CommandCall& call) {
     if (call.positionals.empty()) return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "create" || sub == "new") return handleCreateAPIKey(subcall);
-    if (sub == "delete" || sub == "rm") return handleDeleteAPIKey(subcall);
-    if (sub == "info" || sub == "get") return handleAPIKeyInfo(subcall);
-    if (sub == "list") return handleListAPIKeys(subcall);
+    if (isAPIKeyMatch("list", sub)) return handleListAPIKeys(subcall);
+    if (isAPIKeyMatch("create", sub)) return handleCreateAPIKey(subcall);
+    if (isAPIKeyMatch("delete", sub)) return handleDeleteAPIKey(subcall);
+    if (isAPIKeyMatch("info", sub)) return handleAPIKeyInfo(subcall);
+
     return invalid(call.constructFullArgs(), "Unknown api-key subcommand: '" + std::string(sub) + "'");
 }
 

@@ -2,6 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/PermsQueries.hpp"
+#include "protocols/shell/commands/vault.hpp"
 #include "types/User.hpp"
 #include "types/Role.hpp"
 #include "types/VaultRole.hpp"
@@ -9,6 +10,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 
+using namespace vh::shell::commands;
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
@@ -141,20 +143,6 @@ static CommandResult handleRoleCreateVault(const CommandCall& call, const std::s
         role->type = "vault";
         role->permissions = perms;
 
-        if (hasFlag(call, "uid")) {
-            if (hasFlag(call, "gid")) return invalid("roles create vault: cannot specify both --uid and --gid");
-            role->subject_type = "user";
-            const auto uidOpt = optIntFlag(call, "uid");
-            if (!uidOpt) return invalid("roles create vault: missing required --uid <uid>");
-            role->subject_id = *uidOpt;
-        } else if (hasFlag(call, "gid")) {
-            if (hasFlag(call, "uid")) return invalid("roles create vault: cannot specify both --uid and --gid");
-            role->subject_type = "group";
-            const auto gidOpt = optIntFlag(call, "gid");
-            if (!gidOpt) return invalid("roles create vault: missing required --gid <gid>");
-            role->subject_id = *gidOpt;
-        } else return invalid("roles create vault: must specify either --uid or --gid");
-
         if (const auto vid = optIntFlag(call, "vault-id")) role->vault_id = *vid;
         else return invalid("roles create vault: missing required --vault-id <vid>");
 
@@ -179,17 +167,18 @@ static CommandResult handleRoleCreate(const CommandCall& call) {
 }
 
 static CommandResult handleRoleUpdate(const CommandCall& call) {
+    constexpr const auto* ERR = "roles update";
+
     if (!call.user->canManageRoles()) return invalid("roles update: can't manage");
 
     if (call.positionals.empty()) return invalid("roles update: missing <id> or <name>");
     if (call.positionals.size() > 1) return invalid("roles update: too many arguments");
 
-    const auto roleId = call.positionals[0];
-    auto roleIdOpt = parseInt(roleId);
-    if (!roleIdOpt) return invalid("roles update: invalid role ID '" + roleId + "'");
+    const auto roleArg = call.positionals[0];
 
-    const auto role = PermsQueries::getRole(*roleIdOpt);
-    if (!role) return invalid("roles update: role with ID " + std::to_string(*roleIdOpt) + " not found");
+    const auto rLkp = resolveRole(roleArg, ERR);
+    if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
+    const auto role = rLkp.ptr;
 
     if (role->type == "user" && !call.user->canManageUsers())
         return invalid("roles update: you do not have permission to update user roles");
@@ -203,19 +192,13 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
 
     if (role->type == "vault") {
         const auto vaultRole = std::static_pointer_cast<VaultRole>(role);
-        if (hasFlag(call, "uid")) {
-            if (hasFlag(call, "gid")) return invalid("roles update: cannot specify both --uid and --gid");
-            vaultRole->subject_type = "user";
-            const auto uidOpt = optIntFlag(call, "uid");
-            if (!uidOpt) return invalid("roles update: missing required --uid <uid>");
-            vaultRole->subject_id = *uidOpt;
-        } else if (hasFlag(call, "gid")) {
-            if (hasFlag(call, "uid")) return invalid("roles update: cannot specify both --uid and --gid");
-            vaultRole->subject_type = "group";
-            const auto gidOpt = optIntFlag(call, "gid");
-            if (!gidOpt) return invalid("roles update: missing required --gid <gid>");
-            vaultRole->subject_id = *gidOpt;
-        }
+
+        const auto sLkp = parseSubject(call, ERR);
+        if (!sLkp) return invalid(sLkp.error);
+        const auto [subjectType, subjectId] = *sLkp.ptr;
+
+        vaultRole->subject_type = subjectType;
+        vaultRole->subject_id = subjectId;
 
         if (const auto vid = optIntFlag(call, "vault-id")) vaultRole->vault_id = *vid;
     }
@@ -226,20 +209,16 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
 }
 
 static CommandResult handleRoleDelete(const CommandCall& call) {
+    constexpr const auto* ERR = "roles delete";
+
     if (call.positionals.empty()) return invalid("roles delete: missing <id> or <name>");
     if (call.positionals.size() > 1) return invalid("roles delete: too many arguments");
 
-    const auto arg = call.positionals[0];
-    const auto roleIdOpt = parseInt(arg);
-    std::shared_ptr<Role> role;
+    const auto roleArg = call.positionals[0];
 
-    if (roleIdOpt) {
-        role = PermsQueries::getRole(*roleIdOpt);
-        if (!role) return invalid("roles delete: role with ID " + std::to_string(*roleIdOpt) + " not found");
-    } else {
-        role = PermsQueries::getRoleByName(std::string(arg));
-        if (!role) return invalid("roles delete: role with name '" + std::string(arg) + "' not found");
-    }
+    const auto rLkp = resolveRole(roleArg, ERR);
+    if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
+    const auto role = rLkp.ptr;
 
     try {
         PermsQueries::deleteRole(role->id);
@@ -249,17 +228,21 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
     }
 }
 
+static bool isRoleMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"role", cmd}, input);
+}
+
 static CommandResult handle_role(const CommandCall& call) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
     if (call.positionals.empty()) return usage(call.constructFullArgs());
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
 
-    if (sub == "create") return handleRoleCreate(subcall);
-    if (sub == "delete") return handleRoleDelete(subcall);
-    if (sub == "info") return handleRoleInfo(subcall);
-    if (sub == "update") return handleRoleUpdate(subcall);
+    const auto [sub, subcall] = descend(call);
+
+    if (isRoleMatch("create", sub)) return handleRoleCreate(subcall);
+    if (isRoleMatch("update", sub)) return handleRoleUpdate(subcall);
+    if (isRoleMatch("delete", sub)) return handleRoleDelete(subcall);
+    if (isRoleMatch("info", sub)) return handleRoleInfo(subcall);
+    if (isRoleMatch("list", sub)) return handleRolesList(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown roles subcommand: '" + std::string(sub) + "'");
 }

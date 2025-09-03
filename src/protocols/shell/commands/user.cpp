@@ -245,17 +245,20 @@ static CommandResult handle_list_users(const CommandCall& call) {
     return ok(to_string(UserQueries::listUsers()));
 }
 
+static bool isUserMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"user", cmd}, input);
+}
+
 static CommandResult handle_user(const CommandCall& call) {
     if (call.positionals.empty()) return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "create" || sub == "new") return createUser(subcall);
-    if (sub == "delete" || sub == "rm") return deleteUser(subcall);
-    if (sub == "info" || sub == "get") return handleUserInfo(subcall);
-    if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
+    if (isUserMatch("create", sub)) return createUser(subcall);
+    if (isUserMatch("delete", sub)) return deleteUser(subcall);
+    if (isUserMatch("info", sub)) return handleUserInfo(subcall);
+    if (isUserMatch("update", sub)) return handleUpdateUser(subcall);
+    if (isUserMatch("list", sub) || isUserMatch("ls", sub)) return handle_list_users(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown user subcommand: '" + std::string(sub) + "'");
 }

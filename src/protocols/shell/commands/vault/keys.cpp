@@ -82,31 +82,14 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
 
 
 static CommandResult export_one_key(const CommandCall& call) {
+    constexpr const auto* ERR = "vault keys export";
+
     const auto vaultArg = call.positionals[0];
-    std::shared_ptr<StorageEngine> engine;
 
-    if (const auto vaultIdOpt = parseInt(vaultArg)) {
-        if (*vaultIdOpt <= 0) return invalid("vault keys export: vault ID must be a positive integer");
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
-    } else {
-        const auto ownerOpt = optVal(call, "owner");
-        unsigned int ownerId;
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault assign: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        } else if (ownerOpt) {
-            if (ownerOpt->empty()) return invalid("vault assign: --owner requires a value");
-            const auto owner = UserQueries::getUserByName(*ownerOpt);
-            if (!owner) return invalid("vault assign: owner not found: " + *ownerOpt);
-            ownerId = owner->id;
-        } else ownerId = call.user->id;
-        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid(
-            "vault keys export: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
-    }
+    const auto engLkp = resolveEngine(call, vaultArg, ERR);
+    if (!engLkp || !engLkp.ptr) return invalid(engLkp.error);
+    const auto engine = engLkp.ptr;
 
-    if (!engine) return invalid("vault keys export: no storage engine found for vault '" + vaultArg + "'");
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     const auto& key = engine->encryptionManager->get_key(context);
     const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
@@ -151,6 +134,8 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
 
 
 static CommandResult handle_inspect_vault_key(const CommandCall& call) {
+    constexpr const auto* ERR = "vault keys inspect";
+
     if (!call.user->isSuperAdmin()) {
         if (!call.user->canManageEncryptionKeys()) return invalid(
             "vault keys inspect: only super admins can inspect vault keys");
@@ -167,30 +152,9 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
     const auto vaultArg = call.positionals[0];
     if (vaultArg.empty()) return invalid("vault keys inspect: missing <vault_id | name>");
 
-    std::shared_ptr<StorageEngine> engine;
-
-    if (const auto vaultIdOpt = parseInt(vaultArg)) {
-        if (*vaultIdOpt <= 0) return invalid("vault keys inspect: vault ID must be a positive integer");
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
-    } else {
-        const auto ownerOpt = optVal(call, "owner");
-        unsigned int ownerId;
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault keys inspect: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        } else if (ownerOpt) {
-            if (ownerOpt->empty()) return invalid("vault keys inspect: --owner requires a value");
-            const auto owner = UserQueries::getUserByName(*ownerOpt);
-            if (!owner) return invalid("vault keys inspect: owner not found: " + *ownerOpt);
-            ownerId = owner->id;
-        } else ownerId = call.user->id;
-        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid(
-            "vault keys inspect: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
-    }
-
-    if (!engine) return invalid("vault keys inspect: no storage engine found for vault '" + vaultArg + "'");
+    const auto engLkp = resolveEngine(call, vaultArg, ERR);
+    if (!engLkp || !engLkp.ptr) return invalid(engLkp.error);
+    const auto engine = engLkp.ptr;
 
     const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
 
@@ -199,6 +163,8 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
 
 
 static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
+    constexpr const auto* ERR = "vault keys rotate";
+
     if (!call.user->isSuperAdmin()) {
         if (!call.user->canManageEncryptionKeys()) return invalid(
             "vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
@@ -212,48 +178,27 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     if (call.positionals.size() != 1) return invalid(
         "vault keys rotate: expected exactly one argument <vault_id | name>");
 
-    const auto vaultArg = call.positionals[0];
-    if (vaultArg.empty()) return invalid("vault keys rotate: missing <vault_id | name>");
+    const auto syncNow = hasFlag(call, "now");
+    const auto rotateKey = [&syncNow](const std::shared_ptr<StorageEngine>& engine) {
+        engine->encryptionManager->prepare_key_rotation();
+        if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
+    };
 
-    const bool syncNow = hasFlag(call, "now");
+    const auto vaultArg = call.positionals[0];
 
     if (vaultArg == "all") {
-        for (const auto& engine : ServiceDepsRegistry::instance().storageManager->getEngines()) {
-            engine->encryptionManager->prepare_key_rotation();
-            if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
-        }
+        for (const auto& engine : ServiceDepsRegistry::instance().storageManager->getEngines())
+            rotateKey(engine);
 
         return ok("Vault keys for all vaults have been rotated successfully.\n"
             "If you have --now flag set, the sync will be triggered immediately.");
     }
 
-    std::shared_ptr<StorageEngine> engine;
+    const auto engLkp = resolveEngine(call, vaultArg, ERR);
+    if (!engLkp || !engLkp.ptr) return invalid(engLkp.error);
+    const auto engine = engLkp.ptr;
 
-    if (const auto vaultIdOpt = parseInt(vaultArg)) {
-        if (*vaultIdOpt <= 0) return invalid("vault keys rotate: vault ID must be a positive integer");
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
-    } else {
-        const auto ownerOpt = optVal(call, "owner");
-        unsigned int ownerId;
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault keys rotate: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        } else if (ownerOpt) {
-            if (ownerOpt->empty()) return invalid("vault keys rotate: --owner requires a value");
-            const auto owner = UserQueries::getUserByName(*ownerOpt);
-            if (!owner) return invalid("vault keys rotate: owner not found: " + *ownerOpt);
-            ownerId = owner->id;
-        } else ownerId = call.user->id;
-        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) return invalid(
-            "vault keys rotate: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
-    }
-
-    if (!engine) return invalid("vault keys rotate: no storage engine found for vault '" + vaultArg + "'");
-
-    engine->encryptionManager->prepare_key_rotation();
-    if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
+    rotateKey(engine);
 
     return ok("Vault key for '" + engine->vault->name + "' (ID: " + std::to_string(engine->vault->id) +
               ") has been rotated successfully.\n"

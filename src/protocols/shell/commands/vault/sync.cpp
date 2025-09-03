@@ -32,33 +32,16 @@ using namespace vh::util;
 using namespace vh::logging;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
+    constexpr const auto* ERR = "vault sync";
+
     if (call.positionals.size() > 1)
         return invalid(call.constructFullArgs(), "vault sync: too many arguments");
 
     const auto vaultArg = call.positionals[0];
-    std::shared_ptr<Vault> vault;
 
-    if (const auto vaultIdOpt = parseInt(vaultArg)) {
-        if (*vaultIdOpt <= 0) return invalid("vault sync: vault ID must be a positive integer");
-        vault = VaultQueries::getVault(*vaultIdOpt);
-    } else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) return invalid("vault sync: missing required --owner <id | name> for vault name lookup");
-
-        unsigned int ownerId;
-
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault sync: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        } else {
-            const auto owner = UserQueries::getUserByName(*ownerOpt);
-            if (!owner) return invalid("vault sync: owner not found: " + *ownerOpt);
-            ownerId = owner->id;
-        }
-        vault = VaultQueries::getVault(vaultArg, ownerId);
-    }
-
-    if (!vault) return invalid("vault sync: vault with arg '" + vaultArg + "' not found");
+    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
+    const auto vault = vLkp.ptr;
 
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->
         canSyncVaultData(vault->id)) return invalid("vault sync: you do not have permission to manage this vault");
@@ -68,43 +51,16 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
     return ok("Vault sync initiated for '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")");
 }
 
-static std::shared_ptr<StorageEngine> extractEngineFromArgs(const CommandCall& call, const std::string& vaultArg) {
-    std::shared_ptr<StorageEngine> engine;
-
-    if (const auto vaultIdOpt = parseInt(vaultArg)) {
-        if (*vaultIdOpt <= 0) throw std::invalid_argument("vault sync update: vault ID must be a positive integer");
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
-    } else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) throw std::invalid_argument("vault sync update: missing required --owner <id | name> for vault name lookup");
-        unsigned int ownerId;
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) throw std::invalid_argument("vault sync update: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        } else {
-            const auto owner = UserQueries::getUserByName(*ownerOpt);
-            if (!owner) throw std::invalid_argument("vault sync update: owner not found: " + *ownerOpt);
-            ownerId = owner->id;
-        }
-        const auto vault = VaultQueries::getVault(vaultArg, ownerId);
-        if (!vault) throw std::invalid_argument(
-            "vault sync update: vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId));
-        engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
-    }
-
-    if (!engine) throw std::invalid_argument("vault sync update: no storage engine found for vault '" + vaultArg + "'");
-
-    return engine;
-}
-
 static CommandResult handle_vault_sync_update(const CommandCall& call) {
+    constexpr const auto* ERR = "vault sync update";
+
     if (call.positionals.empty()) return usage(call.constructFullArgs());
     if (call.positionals.size() > 1)
         return invalid(call.constructFullArgs(), "vault sync update: too many arguments");
 
-    const auto engine = extractEngineFromArgs(call, call.positionals[0]);
-
-    if (!engine) return invalid("vault sync update: no storage engine found for vault '" + call.positionals[0] + "'");
+    const auto eLkp = resolveEngine(call, call.positionals[0], ERR);
+    if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
+    const auto engine = eLkp.ptr;
 
     if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
         !call.user->canSyncVaultData(engine->vault->id))
@@ -166,12 +122,15 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_sync_info(const CommandCall& call) {
+    constexpr const auto* ERR = "vault sync info";
     if (call.positionals.empty()) return usage(call.constructFullArgs());
     if (call.positionals.size() > 1)
         return invalid(call.constructFullArgs(), "vault sync info: too many arguments");
 
     try {
-        const auto engine = extractEngineFromArgs(call, call.positionals[0]);
+        const auto eLkp = resolveEngine(call, call.positionals[0], ERR);
+        if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
+        const auto engine = eLkp.ptr;
 
         if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
             !call.user->canSyncVaultData(engine->vault->id))
@@ -186,21 +145,21 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
     }
 }
 
+static bool isVaultSyncMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"vault", "sync", cmd}, input);
+}
+
 CommandResult commands::vault::handle_sync(const CommandCall& call) {
     if (call.positionals.empty()) return usage(call.constructFullArgs());
     if (call.positionals.size() > 2)
         return invalid(call.constructFullArgs(), "vault sync: too many arguments");
 
-    const auto arg = call.positionals[0];
-
-    if (call.positionals.size() > 1) {
-        CommandCall subcall = call;
-        subcall.positionals.erase(subcall.positionals.begin());
-        if (arg == "set" || arg == "update") return handle_vault_sync_update(subcall);
-        if (arg == "info" || arg == "get") return handle_vault_sync_info(subcall);
-    }
+    const auto [arg, subcall] = descend(call);
 
     if (call.positionals.size() == 1) return handle_vault_sync(call);
+
+    if (isVaultSyncMatch("update", arg)) return handle_vault_sync_update(subcall);
+    if (isVaultSyncMatch("info", arg)) return handle_vault_sync_info(subcall);
 
     return invalid(call.constructFullArgs(), "vault sync: unknown subcommand: '" + std::string(arg) + "'");
 }

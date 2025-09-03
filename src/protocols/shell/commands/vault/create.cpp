@@ -41,6 +41,57 @@ using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 
+static constexpr const auto* SYNC_STRATEGY_HELP = R"(
+Sync Strategy Options:
+  cache  - Local cache of S3 bucket. Changes are uploaded to S3 on demand.
+           Downloads are served from cache if available, otherwise fetched from S3.
+  sync   - Two-way sync between local and S3. Changes in either location are propagated
+           to the other during sync operations.
+  mirror - One-way mirror of local to S3. Local changes are uploaded to S3,
+           but changes in S3 are not downloaded locally.
+
+)";
+
+static constexpr const auto* LOCAL_CONFLICT_POLICY_HELP = R"(
+On-Sync-Conflict Policy Options:
+  overwrite  - In case of conflict, overwrite the remote with the local version.
+  keep_both  - In case of conflict, keep both versions by renaming the remote.
+  ask        - Prompt the user to resolve conflicts during sync operations.
+)";
+
+static constexpr const auto* REMOTE_CONFLICT_POLICY_HELP = R"(
+On-Sync-Conflict Policy Options:
+  keep_local  - In case of conflict, keep the local version and overwrite the remote.
+  keep_remote - In case of conflict, keep the remote version and overwrite the local.
+  ask         - Prompt the user to resolve conflicts during sync operations.
+
+)";
+
+static constexpr const auto& SYNC_INTERVAL_HELP = R"(
+Sync Interval:
+
+  S3 Vaults: Defines how often the system will synchronize changes between the local cache and the S3 bucket.
+  Local Vaults: Sync is primarily event-driven, but this interval sets how often the system checks for filesystem changes.
+
+  ⚠️  S3 Vaults only: Setting a very short interval (e.g., every few seconds) may lead to increased API usage and potential costs.
+      Choose an interval that balances timeliness with cost-effectiveness.
+
+  ⚠️  Setting a very short interval may lead to high CPU usage due to frequent filesystem checks.
+      Choose an interval that balances timeliness with system performance.
+
+  Format: A number followed by a time unit:
+      s - seconds
+      m - minutes
+      h - hours
+      d - days
+
+  Examples:
+    30s  - Every 30 seconds
+    10m  - Every 10 minutes
+    1h   - Every 1 hour
+  Default is 15 minutes (15m).
+)";
+
 static CommandResult finish_vault_create(const CommandCall& call, std::shared_ptr<Vault>& v, const std::shared_ptr<Sync>& s) {
     const auto [okToProceed, waiver] = handle_encryption_waiver({call, v, false});
     if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
@@ -116,12 +167,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
 
             auto conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite] --help for details:", "overwrite");
             while (conflictStr == "help") {
-                io->print(R"(
-On-Sync-Conflict Policy Options:
-  overwrite  - In case of conflict, overwrite the remote with the local version.
-  keep_both  - In case of conflict, keep both versions by renaming the remote.
-  ask        - Prompt the user to resolve conflicts during sync operations.
-)");
+                io->print(LOCAL_CONFLICT_POLICY_HELP);
                 conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite]:", "overwrite");
             }
             fSync->conflict_policy = fsConflictPolicyFromString(conflictStr);
@@ -160,16 +206,7 @@ On-Sync-Conflict Policy Options:
 
             auto strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache] --help for details:", "cache");
             while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(strategyStr)) != helpOptions.end()) {
-                io->print(R"(
-Sync Strategy Options:
-  cache  - Local cache of S3 bucket. Changes are uploaded to S3 on demand.
-           Downloads are served from cache if available, otherwise fetched from S3.
-  sync   - Two-way sync between local and S3. Changes in either location are propagated
-           to the other during sync operations.
-  mirror - One-way mirror of local to S3. Local changes are uploaded to S3,
-           but changes in S3 are not downloaded locally.
-
-)");
+                io->print(SYNC_STRATEGY_HELP);
                 strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache]:", "cache");
             }
             const auto rsync = std::make_shared<RSync>();
@@ -177,13 +214,7 @@ Sync Strategy Options:
 
             auto conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask] --help for details:", "ask");
             while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(conflictStr)) != helpOptions.end()) {
-                io->print(R"(
-On-Sync-Conflict Policy Options:
-  keep_local  - In case of conflict, keep the local version and overwrite the remote.
-  keep_remote - In case of conflict, keep the remote version and overwrite the local.
-  ask         - Prompt the user to resolve conflicts during sync operations.
-
-)");
+                io->print(REMOTE_CONFLICT_POLICY_HELP);
                 conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask]:", "ask");
             }
             rsync->conflict_policy = rsConflictPolicyFromString(conflictStr);
@@ -195,30 +226,7 @@ On-Sync-Conflict Policy Options:
 
         auto interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m] --help for details:", "15m");
         while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(interval)) != helpOptions.end()) {
-            io->print(R"(
-Sync Interval:
-
-  S3 Vaults: Defines how often the system will synchronize changes between the local cache and the S3 bucket.
-  Local Vaults: Sync is primarily event-driven, but this interval sets how often the system checks for filesystem changes.
-
-  ⚠️  S3 Vaults only: Setting a very short interval (e.g., every few seconds) may lead to increased API usage and potential costs.
-      Choose an interval that balances timeliness with cost-effectiveness.
-
-  ⚠️  Setting a very short interval may lead to high CPU usage due to frequent filesystem checks.
-      Choose an interval that balances timeliness with system performance.
-
-  Format: A number followed by a time unit:
-      s - seconds
-      m - minutes
-      h - hours
-      d - days
-
-  Examples:
-    30s  - Every 30 seconds
-    10m  - Every 10 minutes
-    1h   - Every 1 hour
-  Default is 15 minutes (15m).
-)");
+            io->print(SYNC_INTERVAL_HELP);
             interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m]:", "15m");
         }
         sync->interval = parseSyncInterval(interval);

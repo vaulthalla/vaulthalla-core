@@ -17,9 +17,7 @@ using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::services;
 
-namespace vh::shell::commands::vault {
-
-std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut) {
+std::optional<unsigned int> commands::vaulparsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut) {
     if (const auto v = parseInt(s)) {
         if (*v <= 0) { errOut = std::string(errLabel) + " must be a positive integer"; return std::nullopt; }
         return static_cast<unsigned int>(*v);
@@ -28,7 +26,9 @@ std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* 
     return std::nullopt;
 }
 
-Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& errPrefix) {
+// Resolve owner id from --owner <id|name>. When resolving a vault by name,
+// we *require* --owner to disambiguate (matches your usage text).
+Lookup<User> commands::vaulresolveOwnerRequired(const CommandCall& call, const std::string& errPrefix) {
     Lookup<User> out;
     const auto ownerOpt = optVal(call, "owner");
     if (!ownerOpt || ownerOpt->empty()) {
@@ -46,7 +46,7 @@ Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& er
     return out;
 }
 
-Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
+Lookup<Vault> commands::vaulresolveVault(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
     Lookup<Vault> out;
     if (const auto idOpt = parseInt(vaultArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": vault ID must be a positive integer"; return out; }
@@ -54,7 +54,7 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
         if (!out.ptr) out.error = errPrefix + ": vault with id " + std::to_string(*idOpt) + " not found";
         return out;
     }
-
+    // Named vault -> require owner
     auto ownerLkp = resolveOwnerRequired(call, errPrefix);
     if (!ownerLkp) { out.error = std::move(ownerLkp.error); return out; }
     out.ptr = VaultQueries::getVault(vaultArg, ownerLkp.ptr->id);
@@ -62,19 +62,50 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
     return out;
 }
 
-Lookup<StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
+Lookup<StorageEngine> commands::vaulresolveEngine(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
     Lookup<StorageEngine> out;
+    if (const auto vaultIdOpt = parseInt(vaultArg)) {
+        if (*vaultIdOpt <= 0) {
+            out.error = errPrefix + ": vault ID must be a positive integer";
+            return out;
+        }
+        out.ptr = ServiceDepsRegistry::instance().storageManager->getEngine(*vaultIdOpt);
+        if (!out.ptr) out.error = errPrefix + ": no storage engine found for vault ID " + std::to_string(*vaultIdOpt);
+        return out;
+    }
 
-    const auto vLkp = resolveVault(call, vaultArg, errPrefix);
-    if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }
-    const auto vault = vLkp.ptr;
+    unsigned int ownerId;
+    if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+        if (*ownerIdOpt <= 0) {
+            out.error = errPrefix + ": --owner must be a positive integer";
+            return out;
+        }
+        ownerId = *ownerIdOpt;
+    } else if (const auto ownerOpt = optVal(call, "owner")) {
+        if (ownerOpt->empty()) {
+            out.error = errPrefix + ": --owner requires a value";
+            return out;
+        }
+        const auto owner = UserQueries::getUserByName(*ownerOpt);
+        if (!owner) {
+            out.error = errPrefix + ": owner not found";
+            return out;
+        }
+        ownerId = owner->id;
+    } else ownerId = call.user->id;
+
+    const auto vault = VaultQueries::getVault(vaultArg, ownerId);
+    if (!vault) {
+        out.error = errPrefix + ": vault with name '" + vaultArg + "' not found for user ID " + std::to_string(ownerId);
+        return out;
+    }
 
     out.ptr = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
     if (!out.ptr) out.error = errPrefix + ": no storage engine found for vault '" + vaultArg + "'";
     return out;
 }
 
-std::optional<std::string> checkOverridePermissions(const CommandCall& call, const std::shared_ptr<Vault>& vault, const std::string& errPrefix) {
+std::optional<std::string> commands::vaulcheckOverridePermissions(const CommandCall& call, const std::shared_ptr<Vault>& vault, const std::string& errPrefix) {
     if (vault->owner_id == call.user->id) return std::nullopt;
     const bool canManageThisVault =
         call.user->canManageVaults() || call.user->canManageVaultAccess(vault->id);
@@ -85,7 +116,22 @@ std::optional<std::string> checkOverridePermissions(const CommandCall& call, con
     return std::nullopt;
 }
 
-Lookup<VaultRole> resolveVRole(const std::string& roleArg,
+Lookup<Role> commands::vaulresolveRole(const std::string& roleArg, const std::string& errPrefix) {
+    Lookup<Role> out;
+
+    if (const auto roleIdOpt = parseInt(roleArg)) {
+        if (*roleIdOpt <= 0) {
+            out.error = errPrefix + ": role ID must be a positive integer";
+            return out;
+        }
+        out.ptr = PermsQueries::getRole(*roleIdOpt);
+    } else out.ptr = PermsQueries::getRoleByName(roleArg);
+
+    if (!out.ptr) out.error = errPrefix + ": role not found";
+    return out;
+}
+
+Lookup<VaultRole> commands::vaulresolveVRole(const std::string& roleArg,
                               const std::shared_ptr<Vault>& vault,
                               const Subject* subjectOrNull,
                               const std::string& errPrefix) {
@@ -105,7 +151,7 @@ Lookup<VaultRole> resolveVRole(const std::string& roleArg,
     return out;
 }
 
-PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
+PatternParse commands::vaulparsePatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
     PatternParse out;
     auto p = optVal(call, "path");
     if (!p) p = optVal(call, "pattern");
@@ -125,7 +171,7 @@ PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::
     return out;
 }
 
-EnableParse parseEnableDisableOpt(const CommandCall& call, const std::string& errPrefix) {
+EnableParse commands::vaulparseEnableDisableOpt(const CommandCall& call, const std::string& errPrefix) {
     EnableParse out;
     const bool hasEnable  = hasFlag(call, "enable");
     const bool hasDisable = hasFlag(call, "disable");
@@ -139,7 +185,7 @@ EnableParse parseEnableDisableOpt(const CommandCall& call, const std::string& er
     return out;
 }
 
-EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& errPrefix) {
+EffectParse commands::vaulparseEffectChangeOpt(const CommandCall& call, const std::string& errPrefix) {
     EffectParse out;
     const bool allowFlag = hasFlag(call, "allow") || hasFlag(call, "allow-effect");
     const bool denyFlag  = hasFlag(call, "deny")  || hasFlag(call, "deny-effect");
@@ -151,6 +197,4 @@ EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& err
     if (denyFlag)  out.value = OverrideOpt::DENY;
     out.ok = true;
     return out;
-}
-
 }

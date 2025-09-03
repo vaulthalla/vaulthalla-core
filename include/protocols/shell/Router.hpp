@@ -18,7 +18,7 @@ class CommandUsage;
 
 class Router {
 public:
-    void registerCommand(const CommandUsage& usage, CommandHandler handler);
+    void registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler);
 
     CommandResult executeLine(const std::string& line,
         const std::shared_ptr<types::User>& user,

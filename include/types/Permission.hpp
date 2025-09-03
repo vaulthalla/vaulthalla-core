@@ -43,9 +43,10 @@ enum class VaultPermission : uint16_t {
 struct Permission {
     unsigned int id{};
     std::string name, description;
-    uint16_t bit_position;
+    uint16_t bit_position{};
     std::time_t created_at{}, updated_at{};
 
+    Permission() = default;
     explicit Permission(const pqxx::row& row);
     explicit Permission(const nlohmann::json& j);
     Permission(unsigned int bitPos, std::string name, std::string description);
@@ -57,6 +58,7 @@ inline unsigned short vaultPermToBit(const VaultPermission& perm) { return stati
 // String conversions
 std::string to_string(AdminPermission p);
 std::string to_string(VaultPermission p);
+std::string get_vault_perm_name(const VaultPermission& p);
 
 // JSON serialization
 void to_json(nlohmann::json& j, const Permission& p);

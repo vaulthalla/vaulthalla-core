@@ -764,15 +764,15 @@ CREATE TABLE IF NOT EXISTS vault_role_assignments (
         // Overrides
         txn.exec(R"(
 CREATE TABLE IF NOT EXISTS vault_permission_overrides (
-    id            SERIAL PRIMARY KEY,
-    assignment_id INTEGER NOT NULL REFERENCES vault_role_assignments (id) ON DELETE CASCADE,
-    permission_id INTEGER NOT NULL REFERENCES permission (id) ON DELETE CASCADE,
-    scope         VARCHAR(10) NOT NULL CHECK (scope IN ('vault', 'file', 'directory')),
-    enabled       BOOLEAN DEFAULT FALSE,
-    regex         TEXT NOT NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (assignment_id, permission_id, regex)
+    id              SERIAL PRIMARY KEY,
+    assignment_id   INTEGER NOT NULL REFERENCES vault_role_assignments (id) ON DELETE CASCADE,
+    permission_id   INTEGER NOT NULL REFERENCES permission (id) ON DELETE CASCADE,
+    pattern         TEXT        NOT NULL,
+    enabled         BOOLEAN DEFAULT TRUE,
+    effect          VARCHAR(10) NOT NULL CHECK (effect IN ('allow', 'deny')),
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (assignment_id, permission_id, pattern)
 );
         )");
 
@@ -793,8 +793,8 @@ CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_perm
         )");
 
         txn.exec(R"(
-CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_assignment_scope
-    ON vault_permission_overrides (assignment_id, scope);
+CREATE INDEX IF NOT EXISTS idx_vault_permission_overrides_assignment_perm
+    ON vault_permission_overrides (assignment_id, permission_id);
         )");
     });
 }

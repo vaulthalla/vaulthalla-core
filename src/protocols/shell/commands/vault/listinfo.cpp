@@ -36,23 +36,17 @@ using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 
-CommandResult vault::handle_vault_info(const CommandCall& call) {
+CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
+    constexpr const auto* ERR = "vault info";
+
     if (call.positionals.empty()) return invalid("vault info: missing <name>");
     if (call.positionals.size() > 1) return invalid("vault info: too many arguments");
 
-    const std::string name = call.positionals[0];
-    const auto idOpt = parseInt(name);
+    const std::string vaultArg = call.positionals[0];
 
-    std::shared_ptr<Vault> vault;
-    if (idOpt) vault = VaultQueries::getVault(*idOpt);
-    else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) return invalid("vault info: missing required --owner <id | name> for vault name lookup");
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
-        else vault = VaultQueries::getVault(name, call.user->id);
-    }
-
-    if (!vault) return invalid("vault info: vault with arg '" + name + "' not found");
+    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
+    const auto vault = vLkp.ptr;
 
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
         "vault info: you do not have permission to view this vault");
@@ -63,7 +57,7 @@ CommandResult vault::handle_vault_info(const CommandCall& call) {
     return ok(to_string(vault));
 }
 
-CommandResult vault::handle_vaults_list(const CommandCall& call) {
+CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
     const bool f_local = hasFlag(call, "local");
     const bool f_s3 = hasFlag(call, "s3");
     if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");

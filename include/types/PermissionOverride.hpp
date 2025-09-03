@@ -18,12 +18,15 @@ std::string to_string(const OverrideOpt& opt);
 OverrideOpt overrideOptFromString(const std::string& str);
 
 struct PermissionOverride {
+    unsigned int id{0};
     Permission permission;
     OverrideOpt effect{OverrideOpt::ALLOW};
+    unsigned int assignment_id{0}; // ID of the vault_role_assignment this override is assigned to
     bool is_file{false}, enabled{false};
     std::string patternStr;
     std::regex pattern;
 
+    PermissionOverride() = default;
     explicit PermissionOverride(const pqxx::row& row);
     explicit PermissionOverride(const nlohmann::json& j);
 };

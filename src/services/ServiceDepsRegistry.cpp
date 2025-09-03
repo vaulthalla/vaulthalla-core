@@ -5,6 +5,7 @@
 #include "storage/FSCache.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "services/LogRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::services;
 using namespace vh::storage;
@@ -17,10 +18,10 @@ ServiceDepsRegistry& ServiceDepsRegistry::instance() {
     return instance_;
 }
 
-
 void ServiceDepsRegistry::init() {
     if (const auto& registry = instance();
-        registry.storageManager || registry.apiKeyManager || registry.authManager || registry.fsCache) {
+        registry.storageManager || registry.apiKeyManager || registry.authManager || registry.fsCache
+        || registry.syncController || registry.shellUsageManager) {
         LogRegistry::vaulthalla()->warn("[ServiceDepsRegistry] Already initialized, ignoring second init()");
         return;
     }
@@ -32,6 +33,7 @@ void ServiceDepsRegistry::init() {
     ctx.apiKeyManager = std::make_shared<APIKeyManager>();
     ctx.authManager = std::make_shared<AuthManager>();
     ctx.fsCache = std::make_shared<FSCache>();
+    ctx.shellUsageManager = std::make_shared<shell::UsageManager>();
 
     LogRegistry::vaulthalla()->info("[ServiceDepsRegistry] Initialized.");
 }

@@ -1,10 +1,12 @@
 #pragma once
 
+#include "ColorTheme.hpp"
+
 #include <string>
 #include <vector>
 #include <optional>
 #include <cstddef>
-#include <unordered_map>
+#include <memory>
 
 namespace vh::shell {
 
@@ -38,69 +40,52 @@ struct Example {
     std::string note;
 };
 
-struct ColorTheme {
-    bool enabled = true;
-
-    std::string header = "\033[1;36m"; // section titles (bold cyan)
-    std::string command = "\033[1;32m"; // command name (bold green)
-    std::string key = "\033[33m";      // left column keys (yellow)
-    std::string dim = "\033[2m";       // dim/secondary text
-    std::string reset = "\033[0m";
-
-    [[nodiscard]] std::string maybe(const std::string& code) const { return enabled ? code : ""; }
-    [[nodiscard]] std::string H() const { return maybe(header); }
-    [[nodiscard]] std::string C() const { return maybe(command); }
-    [[nodiscard]] std::string K() const { return maybe(key); }
-    [[nodiscard]] std::string D() const { return maybe(dim); }
-    [[nodiscard]] std::string R() const { return maybe(reset); }
-};
-
-class CommandUsage {
+class CommandUsage : public std::enable_shared_from_this<CommandUsage> {
 public:
-    std::string ns, command;
-    std::vector<std::string> ns_aliases, command_aliases;
+    std::vector<std::string> aliases;
     std::string description;
     std::optional<std::string> synopsis;  // if empty, synthesized
+    std::weak_ptr<CommandUsage> parent;
+    std::vector<std::shared_ptr<CommandUsage>> subcommands;
     std::vector<Entry> positionals, required, optional;
     std::vector<GroupedOptions> groups;
     std::vector<Example> examples;
+    bool pluralAliasImpliesList = false;
 
     int term_width = 100;  // target width for str()
     std::size_t max_key_col = 30; // cap left column width
     bool show_aliases = true;
     ColorTheme theme{};
 
-    [[nodiscard]] std::string str() const;
-    [[nodiscard]] std::string basicStr(bool splitHeader = false) const;
-    [[nodiscard]] std::string markdown() const;
-
-private:
-    // internal helpers (exposed for testing if you want)
-    [[nodiscard]] std::string buildSynopsis_() const;
-    [[nodiscard]] static std::string normalizePositional_(const std::string& s);
-    [[nodiscard]] static std::string bracketizeIfNeeded_(const std::string& s, bool square);
-    [[nodiscard]] static std::string joinAliasesInline_(const std::string& primary,
-                                                        const std::vector<std::string>& aliases,
-                                                        const std::string& sep);
-    [[nodiscard]] static std::string joinAliasesCode_(const std::string& primary,
-                                                      const std::vector<std::string>& aliases);
-};
-
-class CommandBook {
-public:
-    std::string title;
-    std::vector<CommandUsage> commands;
-    std::optional<ColorTheme> book_theme;
+    [[nodiscard]] std::string primary() const;
 
     [[nodiscard]] std::string str() const;
     [[nodiscard]] std::string basicStr() const;
     [[nodiscard]] std::string markdown() const;
 
-    void operator<<(const CommandBook& other);
+    [[nodiscard]] bool matches(const std::string& alias) const;
 
-    [[nodiscard]] std::unordered_map<std::string, CommandBook> splitByNamespace() const;
-    [[nodiscard]] CommandBook filterByNamespace(const std::string& ns) const;
-    [[nodiscard]] CommandBook filterTopLevelOnly() const;
+private:
+    static constexpr std::string_view binName_ = "vh";
+
+    [[nodiscard]] std::string buildSynopsis_() const;
+    [[nodiscard]] static std::string normalizePositional_(const std::string& s);
+    [[nodiscard]] std::string constructCmdString() const;
+    [[nodiscard]] std::string joinAliasesInline_(const std::string& sep = " | ") const;
+    [[nodiscard]] std::string joinAliasesCode_();
+    void emitCommand(std::ostringstream& out,
+        const std::shared_ptr<CommandUsage>& command = nullptr,
+        bool spaceLines = false) const;
+
+    [[nodiscard]] std::vector<const CommandUsage*> lineage_() const;
+    [[nodiscard]] std::string tokenFor_(const CommandUsage* node) const;
+    static bool sameAliases_(const CommandUsage* a, const CommandUsage* b);
+    [[nodiscard]] static std::string join_(const std::vector<std::string>& v, std::string_view sep);
+    [[nodiscard]] static std::string renderEntryPrimary_(const Entry& e, bool squareIfOptional);
+    static void appendWrapped_(std::ostringstream& out,
+                               const std::string& text,
+                               size_t width,
+                               size_t indentAfterFirst = 0);
 };
 
-} // namespace vh::shell
+}

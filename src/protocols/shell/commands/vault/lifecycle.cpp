@@ -4,7 +4,6 @@
 
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
 #include "database/Queries/WaiverQueries.hpp"
 
 #include "storage/StorageManager.hpp"
@@ -136,26 +135,16 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
 
 
 CommandResult vault::handle_vault_delete(const CommandCall& call) {
+    constexpr const auto* ERR = "vault delete";
+
     if (call.positionals.empty()) return invalid("vault delete: missing <name>");
     if (call.positionals.size() > 1) return invalid("vault delete: too many arguments");
 
-    const std::string name = call.positionals[0];
-    const auto idOpt = parseInt(name);
+    const std::string vaultArg = call.positionals[0];
 
-    std::shared_ptr<Vault> vault;
-
-    if (idOpt) vault = VaultQueries::getVault(*idOpt);
-    else {
-        const auto ownerOpt = optVal(call, "owner");
-        if (!ownerOpt) return invalid("vault delete: missing required --owner <id | name> for vault name lookup");
-
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) vault = VaultQueries::getVault(name, *ownerIdOpt);
-        else if (const auto owner =
-            UserQueries::getUserByName(*ownerOpt)) vault = VaultQueries::getVault(name, call.user->id);
-        else return invalid("vault delete: owner '" + *ownerOpt + "' not found");
-    }
-
-    if (!vault) return invalid("vault delete: vault with ID " + std::to_string(*idOpt) + " not found");
+    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
+    const auto vault = vLkp.ptr;
 
     if (!call.user->canManageVaults()) {
         if (call.user->id != vault->owner_id) return invalid(
@@ -165,7 +154,7 @@ CommandResult vault::handle_vault_delete(const CommandCall& call) {
             "vault delete: you do not have permission to delete this vault's data");
     }
 
-    ServiceDepsRegistry::instance().storageManager->removeVault(*idOpt);
+    ServiceDepsRegistry::instance().storageManager->removeVault(vault->id);
 
     return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
 }

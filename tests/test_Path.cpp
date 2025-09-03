@@ -6,7 +6,6 @@
 
 namespace fs = std::filesystem;
 using namespace vh::types;
-using namespace vh::config;
 
 class PathTest : public ::testing::Test {
 protected:

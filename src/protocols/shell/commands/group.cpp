@@ -7,7 +7,8 @@
 #include "types/Group.hpp"
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
-#include "GroupUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -15,6 +16,7 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::util;
 using namespace vh::types;
+using namespace vh::services;
 
 static CommandResult handle_group_create(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group create: you do not have permission to create groups");
@@ -208,7 +210,7 @@ static CommandResult handle_group_user(const CommandCall& call) {
 
     if (action == "add") return handle_group_add_user(subcall);
     if (action == "remove") return handle_group_remove_user(subcall);
-    return invalid("group user: unknown action '" + std::string(action) + "'.\n" + GroupUsage::group_user().str());
+    return invalid(call.constructFullArgs(), "Unknown group user action: '" + std::string(action) + "'");
 }
 
 static CommandResult handle_group_list_users(const CommandCall& call) {
@@ -231,29 +233,28 @@ static CommandResult handle_group_list_users(const CommandCall& call) {
     return ok(to_string(group->members));
 }
 
-static CommandResult handle_group(const CommandCall& call) {
-    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::all().str());
-
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
-
-    if (sub == "create" || sub == "new") return handle_group_create(subcall);
-    if (sub == "delete" || sub == "rm") return handle_group_delete(subcall);
-    if (sub == "info" || sub == "get") return handle_group_info(subcall);
-    if (sub == "update" || sub == "set") return handle_group_update(subcall);
-    if (sub == "user" || sub == "u") return handle_group_user(subcall);
-    if (sub == "list-users" || sub == "members") return handle_group_list_users(subcall);
-
-    return invalid("group: unknown subcommand '" + std::string(sub) + "'");
+static bool isGroupMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"group", cmd}, input);
 }
 
-static CommandResult handle_groups(const CommandCall& call) {
-    if (hasKey(call, "help") || hasKey(call, "h")) return ok(GroupUsage::groups_list().str());
-    return handle_group_list(call);
+static CommandResult handle_group(const CommandCall& call) {
+    if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+        return usage(call.constructFullArgs());
+
+    const auto [sub, subcall] = descend(call);
+
+    if (isGroupMatch("create", sub)) return handle_group_create(subcall);
+    if (isGroupMatch("update", sub)) return handle_group_update(subcall);
+    if (isGroupMatch("delete", sub)) return handle_group_delete(subcall);
+    if (isGroupMatch("info", sub)) return handle_group_info(subcall);
+    if (isGroupMatch("list", sub)) return handle_group_list(subcall);
+    if (isGroupMatch("user", sub)) return handle_group_user(subcall);
+    if (isGroupMatch("list-users", sub)) return handle_group_list_users(subcall);
+
+    return invalid(call.constructFullArgs(), "Unknown group subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerGroupCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(GroupUsage::group(), handle_group);
-    r->registerCommand(GroupUsage::groups_list(), handle_groups);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve("group"), handle_group);
 }

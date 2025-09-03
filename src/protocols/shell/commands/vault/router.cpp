@@ -2,7 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "VaultUsage.hpp"
+#include "usage/include/UsageManager.hpp"
 
 #include <string>
 #include <string_view>
@@ -15,31 +15,29 @@ using namespace vh::shell::commands::vault;
 using namespace vh::types;
 using namespace vh::services;
 
+static bool isVaultMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"vault", cmd}, input);
+}
+
 static CommandResult handle_vault(const CommandCall& call) {
     if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
-        return ok(VaultUsage::all().str());
+        return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "sync") return handle_sync(subcall);
-    if (sub == "create" || sub == "new") return handle_vault_create(subcall);
-    if (sub == "delete" || sub == "rm") return handle_vault_delete(subcall);
-    if (sub == "info" || sub == "get") return handle_vault_info(subcall);
-    if (sub == "update" || sub == "set") return handle_vault_update(subcall);
-    if (sub == "role" || sub == "r") return handle_vault_role(subcall);
-    if (sub == "keys") return handle_vault_keys(subcall);
+    if (isVaultMatch("sync", sub)) return handle_sync(subcall);
+    if (isVaultMatch("list", sub)) return handle_vaults_list(subcall);
+    if (isVaultMatch("info", sub)) return handle_vault_info(subcall);
+    if (isVaultMatch("create", sub)) return handle_vault_create(subcall);
+    if (isVaultMatch("update", sub)) return handle_vault_update(subcall);
+    if (isVaultMatch("delete", sub)) return handle_vault_delete(subcall);
+    if (isVaultMatch("keys", sub)) return handle_vault_keys(subcall);
+    if (isVaultMatch("role", sub)) return handle_vault_role(subcall);
 
-    return ok(VaultUsage::all().str());
+    return invalid(call.constructFullArgs(), "Unknown vault subcommand: '" + std::string(sub) + "'");
 }
 
-static CommandResult handle_vaults(const CommandCall& call) {
-    if (hasKey(call, "help") || hasKey(call, "h")) return ok(VaultUsage::vaults_list().str());
-    return handle_vaults_list(call);
-}
-
-void vault::registerCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(VaultUsage::vault(), handle_vault);
-    r->registerCommand(VaultUsage::vaults_list(), handle_vaults);
+void commands::vault::registerCommands(const std::shared_ptr<Router>& r) {
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve("vault"), handle_vault);
 }

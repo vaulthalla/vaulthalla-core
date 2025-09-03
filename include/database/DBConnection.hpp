@@ -42,6 +42,7 @@ class DBConnection {
     void initPreparedGroups() const;
     void initPreparedSecrets() const;
     void initPreparedWaivers() const;
+    void initPreparedVaultPermOverrides() const;
 };
 
 struct PathPatterns {

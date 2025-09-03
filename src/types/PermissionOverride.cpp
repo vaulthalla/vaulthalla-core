@@ -11,33 +11,45 @@ using namespace vh::shell;
 
 PermissionOverride::PermissionOverride(const pqxx::row& row)
     : permission(row),
+      id(row["id"].as<unsigned int>()),
+      effect(overrideOptFromString(row["effect"].as<std::string>())),
+      assignment_id(row["assignment_id"].as<unsigned int>()),
       is_file(row["is_file"].as<bool>()),
       enabled(row["enabled"].as<bool>()),
-      patternStr(row["regex"].as<std::string>()),
+      patternStr(row["pattern"].as<std::string>()),
       pattern(patternStr) {}
 
 PermissionOverride::PermissionOverride(const nlohmann::json& j)
     : permission(j.at("permission")),
+      id(j.value("id", 0)),
+      effect(overrideOptFromString(j.value("effect", std::string("allow")))),
+      assignment_id(j.value("assignment_id", 0)),
       is_file(j.value("is_file", false)),
       enabled(j.value("enabled", false)),
-      patternStr(j.value("regex", std::string())),
+      patternStr(j.value("pattern", std::string())),
       pattern(patternStr) {
     if (!j.contains("permission")) throw std::runtime_error("PermissionOverride JSON must contain 'permission'");
 }
 
 void vh::types::to_json(nlohmann::json& j, const PermissionOverride& po) {
     j = {
+        {"id", po.id},
+        {"effect", to_string(po.effect)},
+        {"assignment_id", po.assignment_id},
         {"is_file", po.is_file},
         {"enabled", po.enabled},
-        {"regex", po.patternStr},
+        {"pattern", po.patternStr},
         {"permission", po.permission}
     };
 }
 
 void vh::types::from_json(const nlohmann::json& j, PermissionOverride& po) {
+    po.id = j.at("id").get<unsigned int>();
+    po.effect = overrideOptFromString(j.at("effect"));
+    po.assignment_id = j.at("assignment_id").get<unsigned int>();
     po.is_file = j.at("is_file").get<bool>();
     po.enabled = j.at("enabled").get<bool>();
-    po.patternStr = j.at("regex").get<std::string>();
+    po.patternStr = j.at("pattern").get<std::string>();
     po.pattern = std::regex(po.patternStr);
     from_json(j.at("permission"), po.permission);
 }
@@ -67,18 +79,22 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<PermissionOve
     if (overrides.empty()) return "No overrides";
 
     Table tbl({
-        {"Name", Align::Left, 4, 32, false, false},
-        {"Description", Align::Left, 4, 64, false, false},
-        {"Value", Align::Left, 4, 8, false, false},
-        {"Regex", Align::Left, 4, 64, false, false}
+        {"ID", Align::Left, 4, 8, false, false},
+        {"NAME", Align::Left, 4, 32, false, false},
+        {"DESCRIPTION", Align::Left, 4, 64, false, false},
+        {"PATTERN", Align::Left, 4, 64, false, false},
+        {"EFFECT", Align::Left, 4, 8, false, false},
+        {"ENABLED", Align::Left, 4, 8, false, false}
     }, term_width());
 
     for (const auto& ovr : overrides) {
         tbl.add_row({
+            std::to_string(ovr->id),
             ovr->permission.name,
             ovr->permission.description,
-            ovr->enabled ? "On" : "Off",
-            ovr->patternStr
+            ovr->patternStr,
+            to_string(ovr->effect),
+            ovr->enabled ? "On" : "Off"
         });
     }
 

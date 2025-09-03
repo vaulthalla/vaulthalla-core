@@ -3,12 +3,12 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "services/LogRegistry.hpp"
 #include "types/UserRole.hpp"
-#include "UserUsage.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "usage/include/UsageManager.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -16,6 +16,8 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::util;
+using namespace vh::crypto;
 
 static CommandResult createUser(const CommandCall& subcall) {
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
@@ -245,22 +247,25 @@ static CommandResult handle_list_users(const CommandCall& call) {
     return ok(to_string(UserQueries::listUsers()));
 }
 
+static bool isUserMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"user", cmd}, input);
+}
+
 static CommandResult handle_user(const CommandCall& call) {
-    if (call.positionals.empty()) return ok(UserUsage::all().str());
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
 
-    const std::string_view sub = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
+    const auto [sub, subcall] = descend(call);
 
-    if (sub == "create" || sub == "new") return createUser(subcall);
-    if (sub == "delete" || sub == "rm") return deleteUser(subcall);
-    if (sub == "info" || sub == "get") return handleUserInfo(subcall);
-    if (sub == "update" || sub == "set") return handleUpdateUser(subcall);
+    if (isUserMatch("create", sub)) return createUser(subcall);
+    if (isUserMatch("delete", sub)) return deleteUser(subcall);
+    if (isUserMatch("info", sub)) return handleUserInfo(subcall);
+    if (isUserMatch("update", sub)) return handleUpdateUser(subcall);
+    if (isUserMatch("list", sub) || isUserMatch("ls", sub)) return handle_list_users(subcall);
 
-    return invalid("Unknown user subcommand: '" + std::string(sub) + "'");
+    return invalid(call.constructFullArgs(), "Unknown user subcommand: '" + std::string(sub) + "'");
 }
 
 void commands::registerUserCommands(const std::shared_ptr<Router>& r) {
-    r->registerCommand(UserUsage::users_list(), handle_list_users);
-    r->registerCommand(UserUsage::user(), handle_user);
+    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    r->registerCommand(usageManager->resolve("user"), handle_user);
 }

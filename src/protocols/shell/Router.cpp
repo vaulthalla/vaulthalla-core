@@ -4,7 +4,9 @@
 #include "services/LogRegistry.hpp"
 #include "types/User.hpp"
 #include "CommandUsage.hpp"
-#include "ShellUsage.hpp"
+#include "UsageManager.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "util/shellArgsHelpers.hpp"
 
 #include <fmt/core.h>
 #include <cctype>
@@ -14,16 +16,14 @@
 using namespace vh::shell;
 using namespace vh::logging;
 using namespace vh::types;
+using namespace vh::services;
 
-void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) {
-    std::string key = normalize(usage.command.empty() ? usage.ns : usage.ns + " " + usage.command);
+void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler) {
+    std::string key = normalize(usage->primary());
 
-    CommandInfo info{usage.description.empty() ? "No description provided." : usage.description, std::move(handler), {}};
+    CommandInfo info{usage->description.empty() ? "No description provided." : usage->description, std::move(handler), {}};
 
-    auto aliases = usage.ns_aliases;
-    aliases.push_back(usage.ns);
-
-    for (const std::string& alias : aliases) {
+    for (const std::string& alias : usage->aliases) {
         std::string a = alias;
         if (auto it = aliasMap_.find(a); it != aliasMap_.end() && it->second != key) {
             LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
@@ -32,6 +32,7 @@ void Router::registerCommand(const CommandUsage& usage, CommandHandler handler) 
         }
         info.aliases.insert(a);
         aliasMap_[a] = key;
+        LogRegistry::shell()->info("Alias '{}' mapped to '{}'", a, key);
     }
 
     commands_[key] = std::move(info);
@@ -50,16 +51,15 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     call.user = user;
     call.io = io;
 
-    if (call.name.empty()) return CommandResult{1, "", "no command provided"};
+    if (call.name.empty()) return invalid("No command provided.");
     const auto canonical = canonicalFor(call.name);
 
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
 
-    if (!commands_.contains(canonical))
-        return {2,
-            ShellUsage::all().filterTopLevelOnly().basicStr(),
-            fmt::format("Unknown command or alias: {}",
-                call.name)};
+    if (!commands_.contains(canonical)) {
+        LogRegistry::shell()->info("Commands:\n{}", fmt::join(commands_ | std::views::keys, "\n"));
+        return invalid(call.constructFullArgs(), fmt::format("[Router] Unknown command or alias: {}", call.name));
+    }
 
     return commands_.at(canonical).handler(call);
 }

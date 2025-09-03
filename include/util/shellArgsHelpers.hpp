@@ -2,6 +2,7 @@
 
 #include "protocols/shell/types.hpp"
 #include "types/PermissionOverride.hpp"
+#include "types/ListQueryParams.hpp"
 
 #include <optional>
 #include <string>
@@ -65,7 +66,10 @@ bool isCommandMatch(const std::vector<std::string>& path, std::string_view subcm
 
 Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPrefix);
 Lookup<types::Role> resolveRole(const std::string& roleArg, const std::string& errPrefix);
+Lookup<types::User> resolveUser(const std::string& userArg, const std::string& errPrefix);
 
 std::pair<std::string_view, CommandCall> descend(const CommandCall& call);
+
+types::ListQueryParams parseListQuery(const CommandCall& call);
 
 }

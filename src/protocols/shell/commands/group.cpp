@@ -124,15 +124,12 @@ static CommandResult handle_group_info(const CommandCall& call) {
 }
 
 static CommandResult handle_group_list(const CommandCall& call) {
-    int limit = 100; // Default limit
-    if (auto lim = optVal(call, "limit")) {
-        if (lim->empty()) return invalid("group list: --limit requires a value");
-        auto parsed = parseInt(*lim);
-        if (!parsed || *parsed <= 0) return invalid("group list: --limit must be a positive integer");
-        limit = *parsed;
-    }
+    auto params = parseListQuery(call);
 
-    const auto groups = GroupQueries::listGroups();
+    std::vector<std::shared_ptr<Group>> groups;
+    if (!call.user->canManageGroups()) groups = GroupQueries::listGroups(call.user->id, std::move(params));
+    else groups = GroupQueries::listGroups(std::nullopt, std::move(params));
+
     return ok(to_string(groups));
 }
 

@@ -117,12 +117,18 @@ std::shared_ptr<Vault> VaultQueries::getVault(const std::string& name, unsigned 
     });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(DBQueryParams&& params) {
+std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(const std::optional<VaultType>& type, ListQueryParams&& params) {
     return Transactions::exec("VaultQueries::listVaults", [&](pqxx::work& txn) {
-        pqxx::params p{params.sortBy, to_string(params.order), params.limit, params.offset};
-        const auto res = txn.exec_prepared("list_vaults", p);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT v.*, s.* "
+            "FROM vault v "
+            "LEFT JOIN s3 s ON v.id = s.vault_id",
+            params, "v.id", "v.name"
+        );
 
-        std::vector<std::shared_ptr<Vault> > vaults;
+        const auto res = txn.exec(sql);
+
+        std::vector<std::shared_ptr<Vault>> vaults;
 
         for (const auto& row : res) {
             switch (from_string(row["type"].as<std::string>())) {
@@ -142,19 +148,46 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(DBQueryParams&& pa
     });
 }
 
-std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId, DBQueryParams&& params) {
+std::vector<std::shared_ptr<Vault> > VaultQueries::listUserVaults(const unsigned int userId, const std::optional<VaultType>& type, ListQueryParams&& params) {
     return Transactions::exec("VaultQueries::listUserVaults", [&](pqxx::work& txn) {
-        pqxx::params p{userId, params.sortBy, to_string(params.order), params.limit, params.offset};
+        std::string sql;
+        if (!type) {
+            sql = appendPaginationAndFilter(
+            "SELECT v.*, s.* "
+                "FROM vault v "
+                "LEFT JOIN s3 s ON v.id = s.vault_id "
+                "WHERE v.owner_id = " + txn.quote(userId),
+                params, "v.id", "v.name"
+            );
+        } else if (*type == VaultType::S3) {
+            sql = appendPaginationAndFilter(
+            "SELECT v.*, s.* "
+                "FROM vault v "
+                "JOIN s3 s ON v.id = s.vault_id "
+                "WHERE v.owner_id = " + txn.quote(userId) + " AND v.type = " + to_string(VaultType::S3),
+                params, "v.id", "v.name"
+            );
+        } else if (*type == VaultType::Local) {
+            sql = appendPaginationAndFilter(
+            "SELECT v.*, s.* "
+                "FROM vault v "
+                "LEFT JOIN s3 s ON v.id = s.vault_id "
+                "WHERE v.owner_id = " + txn.quote(userId) + " AND v.type = " + to_string(VaultType::Local),
+                params, "v.id", "v.name"
+            );
+        } else throw std::runtime_error("Unsupported VaultType in listUserVaults(): " + to_string(*type));
 
-        const auto res = txn.exec_prepared("list_user_vaults", p);
+        const auto res = txn.exec(sql);
 
         std::vector<std::shared_ptr<Vault> > vaults;
         for (const auto& row : res) {
             const auto typeStr = row["type"].as<std::string>();
             switch (from_string(typeStr)) {
-            case VaultType::Local: vaults.push_back(std::make_shared<Vault>(row));
+            case VaultType::Local:
+                vaults.push_back(std::make_shared<Vault>(row));
                 break;
-            case VaultType::S3: vaults.push_back(std::make_shared<S3Vault>(row));
+            case VaultType::S3:
+                vaults.push_back(std::make_shared<S3Vault>(row));
                 break;
             default: throw std::runtime_error("Unsupported VaultType in listUserVaults(): " + typeStr);
             }

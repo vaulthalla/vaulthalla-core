@@ -108,8 +108,6 @@ void DBConnection::initPreparedUsers() const {
                    "SELECT u.* FROM users u "
                    "JOIN refresh_tokens rt ON u.id = rt.user_id WHERE rt.jti = $1");
 
-    conn_->prepare("get_users", "SELECT * FROM users");
-
     conn_->prepare("update_user",
                    "UPDATE users SET name = $2, email = $3, password_hash = $4, is_active = $5, linux_uid = $6, "
                    "last_modified_by = $7, updated_at = NOW() "
@@ -164,13 +162,6 @@ void DBConnection::initPreparedGroups() const {
 
     conn_->prepare("get_group_by_name", "SELECT * FROM groups WHERE name = $1");
 
-    conn_->prepare("list_all_groups", "SELECT * FROM groups");
-
-    conn_->prepare("list_groups_by_user",
-                   "SELECT g.* FROM groups g "
-                   "JOIN group_members gm ON g.id = gm.group_id "
-                   "WHERE gm.user_id = $1");
-
     conn_->prepare("add_member_to_group",
                    "INSERT INTO group_members (group_id, user_id, joined_at) "
                    "VALUES ($1, $2, NOW()) "
@@ -222,11 +213,6 @@ void DBConnection::initPreparedWaivers() const {
 }
 
 void DBConnection::initPreparedAPIKeys() const {
-    conn_->prepare("list_api_keys", "SELECT * FROM api_keys");
-
-    conn_->prepare("list_user_api_keys",
-                   "SELECT * FROM api_keys WHERE user_id = $1");
-
     conn_->prepare("get_api_key", "SELECT * FROM api_keys WHERE id = $1");
 
     conn_->prepare("get_api_key_by_name", "SELECT * FROM api_keys WHERE name = $1");
@@ -367,52 +353,6 @@ void DBConnection::initPreparedVaults() const {
                    "FROM vault v "
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "WHERE v.name = $1 AND v.owner_id = $2");
-
-    conn_->prepare("list_vaults",
-        "SELECT v.*, s.* "
-        "FROM vault v "
-        "LEFT JOIN s3 s ON v.id = s.vault_id");
-
-    // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
-    conn_->prepare(
-        "list_vaults",
-        "SELECT v.*, s.* "
-        "FROM vault v "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "ORDER BY "
-        "CASE WHEN $1::text IS NULL THEN v.id END ASC, "
-        "CASE WHEN $1::text = 'id'         AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.id        END ASC, "
-        "CASE WHEN $1::text = 'id'         AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.id        END DESC, "
-        "CASE WHEN $1::text = 'name'       AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.name      END ASC, "
-        "CASE WHEN $1::text = 'name'       AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
-        "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
-        "CASE WHEN $1::text = 'created_at' AND COALESCE($2::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
-        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'asc'  THEN s.bucket    END ASC, "
-        "CASE WHEN $1::text = 'bucket'     AND COALESCE($2::text,'asc') ILIKE 'desc' THEN s.bucket    END DESC "
-        "LIMIT  COALESCE($3::bigint, 9223372036854775807) "
-        "OFFSET COALESCE($4::bigint, 0)"
-        );
-
-    // list_user_vaults(owner_id, SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
-    conn_->prepare(
-        "list_user_vaults",
-        "SELECT v.*, s.* "
-        "FROM vault v "
-        "LEFT JOIN s3 s ON v.id = s.vault_id "
-        "WHERE v.owner_id = $1 "
-        "ORDER BY "
-        "CASE WHEN $2::text IS NULL THEN v.id END ASC, "
-        "CASE WHEN $2::text = 'id'         AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.id        END ASC, "
-        "CASE WHEN $2::text = 'id'         AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.id        END DESC, "
-        "CASE WHEN $2::text = 'name'       AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.name      END ASC, "
-        "CASE WHEN $2::text = 'name'       AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.name      END DESC, "
-        "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN v.created_at END ASC, "
-        "CASE WHEN $2::text = 'created_at' AND COALESCE($3::text,'asc') ILIKE 'desc' THEN v.created_at END DESC, "
-        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'asc'  THEN s.bucket    END ASC, "
-        "CASE WHEN $2::text = 'bucket'     AND COALESCE($3::text,'asc') ILIKE 'desc' THEN s.bucket    END DESC "
-        "LIMIT  COALESCE($4::bigint, 9223372036854775807) "
-        "OFFSET COALESCE($5::bigint, 0)"
-        );
 
     conn_->prepare("get_vault_owners_name",
                    "SELECT u.name FROM users u "
@@ -868,19 +808,6 @@ void DBConnection::initPreparedRoles() const {
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE r.name = $1");
 
-    conn_->prepare("list_roles",
-                   "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
-                   "p.permissions::int AS permissions "
-                   "FROM role r "
-                   "JOIN permissions p ON r.id = p.role_id");
-
-    conn_->prepare("list_roles_by_type",
-                   "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
-                   "p.permissions::int AS permissions "
-                   "FROM role r "
-                   "JOIN permissions p ON r.id = p.role_id "
-                   "WHERE r.type = $1");
-
     conn_->prepare("assign_permission_to_role",
                    "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
 }
@@ -919,14 +846,6 @@ void DBConnection::initPreparedVaultRoles() const {
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
                    "WHERE vra.vault_id = $1");
 
-    conn_->prepare("get_subject_assigned_vault_role",
-                   "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
-                   "r.name, r.description, r.type, p.permissions::int AS permissions "
-                   "FROM role r "
-                   "JOIN vault_role_assignments vra ON r.id = vra.role_id "
-                   "JOIN permissions p ON r.id = p.role_id "
-                   "WHERE vra.subject_type = $1 AND vra.subject_id = $2 AND vra.role_id = $3");
-
     conn_->prepare("get_subject_assigned_vault_roles",
                    "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
                    "r.name, r.description, r.type, p.permissions::int AS permissions "
@@ -934,6 +853,14 @@ void DBConnection::initPreparedVaultRoles() const {
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE vra.subject_type = $1 AND vra.subject_id = $2");
+
+    conn_->prepare("get_subject_assigned_vault_role",
+                   "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
+                   "r.name, r.description, r.type, p.permissions::int AS permissions "
+                   "FROM role r "
+                   "JOIN vault_role_assignments vra ON r.id = vra.role_id "
+                   "JOIN permissions p ON r.id = p.role_id "
+                   "WHERE vra.subject_type = $1 AND vra.subject_id = $2 AND vra.role_id = $3");
 
     conn_->prepare("assign_vault_role",
                    "INSERT INTO vault_role_assignments (subject_type, subject_id, vault_id, role_id, assigned_at) "

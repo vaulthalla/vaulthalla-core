@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types/ListQueryParams.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,7 +27,7 @@ class UserQueries {
     static bool authenticateUser(const std::string& name, const std::string& password);
     static void updateUserPassword(unsigned int userId, const std::string& newPassword);
     static void deleteUser(unsigned int userId);
-    static std::vector<std::shared_ptr<types::User>> listUsers();
+    static std::vector<std::shared_ptr<types::User>> listUsers(types::ListQueryParams&& params = {});
     static void updateLastLoggedInUser(unsigned int userId);
     [[nodiscard]] static unsigned int getUserIdByLinuxUID(unsigned int linuxUid);
     [[nodiscard]] static std::shared_ptr<types::User> getUserByLinuxUID(unsigned int linuxUid);

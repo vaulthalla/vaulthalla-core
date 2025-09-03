@@ -3,8 +3,9 @@
 #include "types/Group.hpp"
 
 using namespace vh::database;
+using namespace vh::types;
 
-unsigned int GroupQueries::createGroup(const std::shared_ptr<types::Group>& group) {
+unsigned int GroupQueries::createGroup(const std::shared_ptr<Group>& group) {
     return Transactions::exec("GroupQueries::createGroup", [&](pqxx::work& txn) {
         pqxx::params p{group->name, group->description, group->linux_gid};
         const auto res = txn.exec_prepared("insert_group", p);
@@ -13,7 +14,7 @@ unsigned int GroupQueries::createGroup(const std::shared_ptr<types::Group>& grou
     });
 }
 
-void GroupQueries::updateGroup(const std::shared_ptr<types::Group>& group) {
+void GroupQueries::updateGroup(const std::shared_ptr<Group>& group) {
     Transactions::exec("GroupQueries::updateGroup", [&](pqxx::work& txn) {
         pqxx::params p{group->id, group->name, group->description, group->linux_gid};
         txn.exec_prepared("update_group", p);
@@ -52,39 +53,53 @@ void GroupQueries::removeMembersFromGroup(const unsigned int group, const std::v
     });
 }
 
-std::vector<std::shared_ptr<vh::types::Group>> GroupQueries::listGroups(unsigned int userId) {
-    return Transactions::exec("GroupQueries::listGroups", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<types::Group>> {
-        pqxx::result res;
-        if (userId == 0) res = txn.exec_prepared("list_all_groups");
-        else res = txn.exec_prepared("list_groups_by_user", userId);
+std::vector<std::shared_ptr<Group>> GroupQueries::listGroups(const std::optional<unsigned int>& userId, ListQueryParams&& params) {
+    return Transactions::exec("GroupQueries::listGroups", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<Group>> {
+        std::string sql;
 
-        std::vector<std::shared_ptr<types::Group>> groups;
+        if (!userId) {
+            sql = appendPaginationAndFilter(
+                "SELECT * FROM groups",
+                params, "id", "name"
+            );
+        } else {
+            sql = appendPaginationAndFilter(
+                "SELECT g.* FROM groups g "
+                "JOIN group_members gm ON g.id = gm.group_id "
+                "WHERE gm.user_id = " + txn.quote(*userId),
+                params, "g.id", "g.name"
+            );
+        }
+
+        const auto res = txn.exec(sql);
+
+        std::vector<std::shared_ptr<Group>> groups;
         for (const auto& group : res) {
             const auto groupId = group["id"].as<unsigned int>();
             const auto members = txn.exec_prepared("list_group_members", groupId);
-            groups.push_back(std::make_shared<types::Group>(group, members));
+            groups.push_back(std::make_shared<Group>(group, members));
         }
         return groups;
     });
 }
 
-std::shared_ptr<vh::types::Group> GroupQueries::getGroup(const unsigned int groupId) {
-    return Transactions::exec("GroupQueries::getGroup", [&](pqxx::work& txn) -> std::shared_ptr<types::Group> {
+std::shared_ptr<Group> GroupQueries::getGroup(const unsigned int groupId) {
+    return Transactions::exec("GroupQueries::getGroup", [&](pqxx::work& txn) -> std::shared_ptr<Group> {
         const auto res = txn.exec_prepared("get_group", groupId);
         if (res.empty()) return nullptr;
         const auto members = txn.exec_prepared("list_group_members", groupId);
-        return std::make_shared<types::Group>(res.one_row(), members);
+        return std::make_shared<Group>(res.one_row(), members);
     });
 }
 
-std::shared_ptr<vh::types::Group> GroupQueries::getGroupByName(const std::string& name) {
+std::shared_ptr<Group> GroupQueries::getGroupByName(const std::string& name) {
     return Transactions::exec("GroupQueries::getGroupByName",
-        [&](pqxx::work& txn) -> std::shared_ptr<types::Group> {
+        [&](pqxx::work& txn) -> std::shared_ptr<Group> {
             const auto res = txn.exec_prepared("get_group_by_name", name);
             if (res.empty()) return nullptr;
             const auto groupRow = res.one_row();
             const auto groupId = groupRow["id"].as<unsigned int>();
             const auto members = txn.exec_prepared("list_group_members", groupId);
-            return std::make_shared<types::Group>(groupRow, members);
+            return std::make_shared<Group>(groupRow, members);
         });
 }

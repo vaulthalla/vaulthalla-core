@@ -310,31 +310,7 @@ static CommandResult handle_vault_role_override_list(const CommandCall& call) {
                   return a->permission.bit_position < b->permission.bit_position;
               });
 
-    // TODO: // implement a proper to_string using shell::Table
-    std::string out;
-    out += "Overrides for role '" + role->name + "' in vault '" + vault->name +
-           "' for " + subj.type + " id " + std::to_string(subj.id) + ":\n";
-    out += "  bit  | permission       | effect | enabled | pattern\n";
-    out += "  -----+-------------------+--------+---------+----------------------------\n";
-
-    for (const auto& ov : overrides) {
-        const auto bit = ov->permission.bit_position;
-        const auto& permName = ov->permission.name;
-        const char* eff = (ov->effect == OverrideOpt::ALLOW ? "ALLOW" : "DENY");
-        const char* en  = (ov->enabled ? "true" : "false");
-
-        out += "  " + std::to_string(bit);
-        out += (bit < 10 ? "   | " : (bit < 100 ? "  | " : " | ")); // basic align
-        out += permName;
-        if (permName.size() < 17) out.append(17 - permName.size(), ' ');
-        out += " | ";
-        out += eff; out += "   | ";
-        out += en;  out += "    | ";
-        out += ov->patternStr;
-        out += "\n";
-    }
-
-    return ok(out);
+    return ok(to_string(overrides));
 }
 
 static CommandResult handle_vault_role_assign(const CommandCall& call) {

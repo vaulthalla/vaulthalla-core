@@ -151,10 +151,14 @@ std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
     });
 }
 
-std::vector<std::shared_ptr<User> > UserQueries::listUsers() {
+std::vector<std::shared_ptr<User> > UserQueries::listUsers(ListQueryParams&& params) {
     return Transactions::exec("UserQueries::listUsersWithRoles", [&](pqxx::work& txn) {
-        const pqxx::result res = txn.exec_prepared("get_users");
+        const auto sql = appendPaginationAndFilter(
+            "SELECT * FROM users",
+            params, "id", "name"
+        );
 
+        const auto res = txn.exec(sql);
         std::vector<std::shared_ptr<User>> usersWithRoles;
 
         for (const auto& row : res) {

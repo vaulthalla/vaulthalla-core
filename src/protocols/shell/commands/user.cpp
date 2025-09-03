@@ -20,6 +20,8 @@ using namespace vh::util;
 using namespace vh::crypto;
 
 static CommandResult createUser(const CommandCall& subcall) {
+    constexpr const auto* ERR = "user create";
+
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
 
     const auto nameOpt = optVal(subcall, "name");
@@ -48,36 +50,18 @@ static CommandResult createUser(const CommandCall& subcall) {
 
     if (!AuthManager::isValidName(user->name)) return invalid("Invalid user name: " + user->name);
 
-    if (const auto rInt = parseInt(*roleOpt)) {
-        if (*rInt == PermsQueries::getRoleByName("super_admin")->id)
-            return invalid("Cannot create user with super admin role.");
+    const auto rLkp = resolveRole(*roleOpt, ERR);
+    if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
+    const auto role = rLkp.ptr;
 
-        if (*rInt == PermsQueries::getRoleByName("admin")->id && !subcall.user->canManageAdmins())
-            return invalid("You do not have permission to create admin users.");
-
-        const auto role = PermsQueries::getRole(*rInt);
-        if (!role) return invalid("Invalid role ID: " + std::to_string(*rInt));
-        user->role->id = role->id;
-        user->role->name = role->name;
-        user->role->permissions = role->permissions;
-    } else {
-        if (*roleOpt == "super_admin")
-            return invalid("Cannot create user with super admin role.");
-
-        if (*roleOpt == "admin" && !subcall.user->canManageAdmins())
-            return invalid("You do not have permission to create admin users.");
-
-        const auto role = PermsQueries::getRoleByName(std::string(*roleOpt));
-        if (!role) return invalid("Invalid role name: " + std::string(*roleOpt));
-        user->role->id = role->id;
-        user->role->name = role->name;
-        user->role->permissions = role->permissions;
-    }
+    user->role->id = role->id;
+    user->role->name = role->name;
+    user->role->permissions = role->permissions;
 
     constexpr unsigned short maxRetries = 1024;
     std::string password;
     for (unsigned short i = 1; i < maxRetries; ++i) {
-        password = vh::crypto::generate_secure_password(84);
+        password = generate_secure_password(84);
         if (AuthManager::isValidPassword(password)) {
             try {
                 AuthManager::isValidRegistration(user, password);
@@ -87,13 +71,11 @@ static CommandResult createUser(const CommandCall& subcall) {
             }
         }
         if (i == maxRetries)
-            return invalid(
-                "Failed to generate a valid password after " + std::to_string(maxRetries) +
-                " attempts.");
+            return invalid("Failed to generate a valid password after " + std::to_string(maxRetries) + " attempts.");
     }
 
     try {
-        user->setPasswordHash(vh::crypto::hashPassword(password));
+        user->setPasswordHash(hashPassword(password));
         user->id = UserQueries::createUser(user);
 
         std::string out = "User created successfully: " + user->name + "\n";
@@ -144,25 +126,13 @@ static CommandResult deleteUser(const CommandCall& subcall) {
 }
 
 static CommandResult handleUserInfo(const CommandCall& subcall) {
-    auto name = subcall.positionals.empty() ? "" : subcall.positionals[0];
-    const auto nameOpt = optVal(subcall, "name");
-    const auto idOpt = optVal(subcall, "id");
+    constexpr const auto* ERR = "user info";
 
-    std::shared_ptr<User> user;
+    const auto userArg = subcall.positionals[0];
 
-    if (!name.empty()) {
-        user = UserQueries::getUserByName(name);
-        if (!user) return invalid("User not found: " + name);
-    } else if (nameOpt) {
-        name = *nameOpt;
-        user = UserQueries::getUserByName(name);
-        if (!user) return invalid("User not found: " + name);
-    } else if (idOpt) {
-        const auto id = parseInt(*idOpt);
-        if (!id) return invalid("Invalid user ID: " + *idOpt);
-        user = UserQueries::getUserById(*id);
-        if (!user) return invalid("User not found with ID: " + std::to_string(*id));
-    } else return invalid("Usage: user info <name> | --id <user_id>");
+    const auto uLkp = resolveUser(userArg, ERR);
+    if (!uLkp || !uLkp.ptr) return invalid(uLkp.error);
+    const auto user = uLkp.ptr;
 
     if (subcall.user->id != user->id) {
         if (user->isSuperAdmin())
@@ -177,6 +147,8 @@ static CommandResult handleUserInfo(const CommandCall& subcall) {
 }
 
 static CommandResult handleUpdateUser(const CommandCall& subcall) {
+    constexpr const auto* ERR = "user update";
+
     if (subcall.positionals.empty()) return invalid("Usage: user update <name> [--name <new_name>] [--email <email>] [--role <role>] [--linux-uid <uid>]");
 
     const auto name = subcall.positionals[0];
@@ -194,42 +166,28 @@ static CommandResult handleUpdateUser(const CommandCall& subcall) {
             return invalid("You do not have permission to update admin users.");
     }
 
-    const auto newNameOpt = optVal(subcall, "name");
-    const auto newEmailOpt = optVal(subcall, "email");
-    const auto newRoleOpt = optVal(subcall, "role");
-    const auto newLinuxUidOpt = optVal(subcall, "linux-uid");
-
-    if (newNameOpt) {
+    if (const auto newNameOpt = optVal(subcall, "name")) {
         if (user->isSuperAdmin()) return invalid("Cannot change name of super_admin user: " + user->name);
         if (!AuthManager::isValidName(*newNameOpt)) return invalid("Invalid new user name: " + *newNameOpt);
         user->name = *newNameOpt;
     }
 
-    if (newEmailOpt) {
+    if (const auto newEmailOpt = optVal(subcall, "email")) {
         if (!AuthManager::isValidEmail(*newEmailOpt)) return invalid("Invalid email address: " + *newEmailOpt);
         user->email = *newEmailOpt;
     }
 
-    if (newRoleOpt) {
-        if (user->isSuperAdmin())
-            return invalid("Cannot change role of super_admin user: " + user->name);
+    if (const auto newRoleOpt = optVal(subcall, "role")) {
+        if (user->isSuperAdmin()) return invalid("Cannot change role of super_admin user: " + user->name);
+        if (*newRoleOpt == "super_admin") return invalid("Cannot change role to super_admin.");
 
-        if (const auto rInt = parseInt(*newRoleOpt)) {
-            if (*rInt == PermsQueries::getRoleByName("super_admin")->id)
-                return invalid("Cannot change role to super_admin.");
-
-            const auto role = PermsQueries::getRole(*rInt);
-            if (!role) return invalid("Invalid role ID: " + std::to_string(*rInt));
-            user->role->id = role->id;
-        } else {
-            if (*newRoleOpt == "super_admin") return invalid("Cannot change role to super_admin.");
-            const auto role = PermsQueries::getRoleByName(std::string(*newRoleOpt));
-            if (!role) return invalid("Invalid role name: " + std::string(*newRoleOpt));
-            user->role->id = role->id;
-        }
+        const auto rLkp = resolveRole(*newRoleOpt, ERR);
+        if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
+        const auto role = rLkp.ptr;
+        user->role->id = role->id;
     }
 
-    if (newLinuxUidOpt) {
+    if (const auto newLinuxUidOpt = optVal(subcall, "linux-uid")) {
         const auto linuxUid = parseInt(*newLinuxUidOpt);
         if (!linuxUid) return invalid("Invalid Linux UID: " + *newLinuxUidOpt);
         user->linux_uid = linuxUid;
@@ -244,7 +202,7 @@ static CommandResult handleUpdateUser(const CommandCall& subcall) {
 
 static CommandResult handle_list_users(const CommandCall& call) {
     if (!call.user->canManageUsers()) return invalid("You do not have permission to list users.");
-    return ok(to_string(UserQueries::listUsers()));
+    return ok(to_string(UserQueries::listUsers(parseListQuery(call))));
 }
 
 static bool isUserMatch(const std::string& cmd, const std::string_view input) {

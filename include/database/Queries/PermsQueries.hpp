@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types/ListQueryParams.hpp"
+
 #include <memory>
 #include <vector>
 #include <string>
@@ -29,9 +31,9 @@ struct PermsQueries {
     static void updateRole(const std::shared_ptr<types::Role>& role);
     static std::shared_ptr<types::Role> getRole(unsigned int id);
     static std::shared_ptr<types::Role> getRoleByName(const std::string& name);
-    static std::vector<std::shared_ptr<types::Role>> listRoles();
-    static std::vector<std::shared_ptr<types::Role>> listUserRoles();
-    static std::vector<std::shared_ptr<types::Role>> listVaultRoles();
+    static std::vector<std::shared_ptr<types::Role>> listRoles(types::ListQueryParams&& params = {});
+    static std::vector<std::shared_ptr<types::Role>> listUserRoles(types::ListQueryParams&& params = {});
+    static std::vector<std::shared_ptr<types::Role>> listVaultRoles(types::ListQueryParams&& params = {});
 
     // Vault Role CRUD
     static void assignVaultRole(const std::shared_ptr<types::VaultRole>& roleAssignment);
@@ -45,8 +47,8 @@ struct PermsQueries {
     static unsigned int addVPermOverride(const std::shared_ptr<types::PermissionOverride>& override);
     static void updateVPermOverride(const std::shared_ptr<types::PermissionOverride>& override);
     static void removeVPermOverride(unsigned int permOverrideId);
-    static std::vector<std::shared_ptr<types::PermissionOverride>> listVPermOverrides(unsigned int vaultId);
-    static std::vector<std::shared_ptr<types::PermissionOverride>> listAssignedVRoleOverrides(const VPermOverrideQuery& query);
+    static std::vector<std::shared_ptr<types::PermissionOverride>> listVPermOverrides(unsigned int vaultId, types::ListQueryParams&& params = {});
+    static std::vector<std::shared_ptr<types::PermissionOverride>> listAssignedVRoleOverrides(const VPermOverrideQuery& query, types::ListQueryParams&& params = {});
     static std::shared_ptr<types::PermissionOverride> getVPermOverride(const VPermOverrideQuery& query);
 
     // Permission queries

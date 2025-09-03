@@ -25,8 +25,10 @@ public:
         SocketIO* io = nullptr) const;
 
 private:
+
     std::unordered_map<std::string, CommandInfo> commands_;
     std::unordered_map<std::string, std::string> aliasMap_; // alias -> canonical
+    std::unordered_map<std::string, std::string> pluralMap_; // plural -> singular
 
     std::string canonicalFor(const std::string& nameOrAlias) const;
 

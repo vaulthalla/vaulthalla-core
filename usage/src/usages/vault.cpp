@@ -461,6 +461,7 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"vault", "v"};
     cmd->description = "Manage a single vault.";
+    cmd->pluralAliasImpliesList = true;
     cmd->examples = {
         {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G",
          "Create a local vault with a 10GB quota."},

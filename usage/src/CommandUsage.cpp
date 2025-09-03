@@ -267,8 +267,7 @@ void CommandUsage::appendWrapped_(std::ostringstream& out,
         std::string_view word = (nextSpace == std::string::npos)
             ? std::string_view(text).substr(i)
             : std::string_view(text).substr(i, nextSpace - i);
-        const size_t need = word.size() + (col ? 1 : 0);
-        if (col + need > width && col > 0) {
+        if (const size_t need = word.size() + (col ? 1 : 0); col + need > width && col > 0) {
             out << "\n";
             col = 0;
             firstLine = false;

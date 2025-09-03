@@ -22,7 +22,7 @@ struct PermissionOverride {
     Permission permission;
     OverrideOpt effect{OverrideOpt::ALLOW};
     unsigned int assignment_id{0}; // ID of the vault_role_assignment this override is assigned to
-    bool is_file{false}, enabled{false};
+    bool enabled{false};
     std::string patternStr;
     std::regex pattern;
 
@@ -38,6 +38,7 @@ std::vector<std::shared_ptr<PermissionOverride>> permissionOverridesFromPqRes(co
 std::vector<std::shared_ptr<PermissionOverride>> permissionOverridesFromJson(const nlohmann::json& j);
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<PermissionOverride>>& overrides);
 
+std::string to_string(const std::shared_ptr<PermissionOverride>& override);
 std::string to_string(const std::vector<std::shared_ptr<PermissionOverride>>& overrides);
 
 }

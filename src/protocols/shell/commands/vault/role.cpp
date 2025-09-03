@@ -2,14 +2,9 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "database/Queries/GroupQueries.hpp"
 
 #include "types/Vault.hpp"
-#include "types/Group.hpp"
 #include "types/VaultRole.hpp"
 #include "types/User.hpp"
 #include "types/Role.hpp"
@@ -278,7 +273,7 @@ static CommandResult handle_vault_role_override_remove(const CommandCall& call) 
 }
 
 static CommandResult handle_vault_role_override_list(const CommandCall& call) {
-    constexpr const char* ERR = "vault override list";
+    constexpr const auto* ERR = "vault override list";
 
     if (call.positionals.size() < 2)
         return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint>");
@@ -288,20 +283,16 @@ static CommandResult handle_vault_role_override_list(const CommandCall& call) {
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
 
-    // Vault
     auto vLkp = resolveVault(call, vaultArg, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
-    // AuthZ
     if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
 
-    // Subject required to bind role assignment (one per (vault, subject))
     auto subjLkp = parseSubject(call, ERR);
     if (!subjLkp) return invalid(subjLkp.error);
     const Subject subj = *subjLkp.ptr;
 
-    // Role in context of (vault, subject)
     auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
     if (!roleLkp) return invalid(roleLkp.error);
     auto role = roleLkp.ptr;
@@ -419,7 +410,7 @@ static CommandResult handle_vault_role_remove(const CommandCall& call) {
 }
 
 static CommandResult handle_vault_role_list(const CommandCall& call) {
-    constexpr const char* ERR = "vault role list";
+    constexpr const auto* ERR = "vault role list";
 
     if (call.positionals.size() > 1) return invalid("vault list: too many arguments");
 

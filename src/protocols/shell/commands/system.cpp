@@ -6,6 +6,8 @@
 
 #include <version.h>
 
+using namespace vh::services;
+
 namespace vh::shell {
 
 static CommandResult handle_help(const CommandCall& call) {

@@ -28,8 +28,6 @@ std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* 
     return std::nullopt;
 }
 
-// Resolve owner id from --owner <id|name>. When resolving a vault by name,
-// we *require* --owner to disambiguate (matches your usage text).
 Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& errPrefix) {
     Lookup<User> out;
     const auto ownerOpt = optVal(call, "owner");
@@ -56,7 +54,7 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
         if (!out.ptr) out.error = errPrefix + ": vault with id " + std::to_string(*idOpt) + " not found";
         return out;
     }
-    // Named vault -> require owner
+
     auto ownerLkp = resolveOwnerRequired(call, errPrefix);
     if (!ownerLkp) { out.error = std::move(ownerLkp.error); return out; }
     out.ptr = VaultQueries::getVault(vaultArg, ownerLkp.ptr->id);
@@ -85,21 +83,6 @@ std::optional<std::string> checkOverridePermissions(const CommandCall& call, con
     if (!call.user->canManageRoles())
         return errPrefix + ": you do not have permission to manage roles";
     return std::nullopt;
-}
-
-Lookup<Role> resolveRole(const std::string& roleArg, const std::string& errPrefix) {
-    Lookup<Role> out;
-
-    if (const auto roleIdOpt = parseInt(roleArg)) {
-        if (*roleIdOpt <= 0) {
-            out.error = errPrefix + ": role ID must be a positive integer";
-            return out;
-        }
-        out.ptr = PermsQueries::getRole(*roleIdOpt);
-    } else out.ptr = PermsQueries::getRoleByName(roleArg);
-
-    if (!out.ptr) out.error = errPrefix + ": role not found";
-    return out;
 }
 
 Lookup<VaultRole> resolveVRole(const std::string& roleArg,

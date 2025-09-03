@@ -82,7 +82,7 @@ std::pair<std::string_view, CommandCall> vh::shell::descend(const CommandCall& c
     return {sub, subcall};
 }
 
-Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPrefix) {
+Lookup<Subject> vh::shell::parseSubject(const CommandCall& call, const std::string& errPrefix) {
     Lookup<Subject> out;
 
     const std::vector<std::string> userFlags = {"user", "u"};
@@ -119,7 +119,7 @@ Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPref
     return out;
 }
 
-Lookup<Role> resolveRole(const std::string& roleArg, const std::string& errPrefix) {
+Lookup<Role> vh::shell::resolveRole(const std::string& roleArg, const std::string& errPrefix) {
     Lookup<Role> out;
 
     if (const auto roleIdOpt = parseInt(roleArg)) {

@@ -35,6 +35,8 @@ using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::logging;
 
+namespace vh::shell::commands::vault {
+
 static VaultPermission permFromString(const std::string& perm) {
     if (perm.empty()) throw std::invalid_argument("Vault permission string cannot be empty");
 
@@ -92,39 +94,31 @@ static CommandResult handle_vault_role_override_add(const CommandCall& call) {
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
 
-    // Vault
     auto vLkp = resolveVault(call, vaultArg, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
-    // AuthZ
     if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
 
-    // Subject (required for ADD)
     const auto subjLkp = parseSubject(call, ERR);
     if (!subjLkp) return invalid(subjLkp.error);
     const Subject subj = *subjLkp.ptr;
 
-    // Role (by id if numeric, otherwise fallback to subject+vault)
     const auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
     if (!roleLkp) return invalid(roleLkp.error);
     const auto role = roleLkp.ptr;
 
-    // Permissions to override
     const auto parsedPerms = parseExplicitVaultPermissionFlags(call);
     if (parsedPerms.allow.empty() && parsedPerms.deny.empty())
         return invalid(std::string(ERR) + ": must specify at least one permission using --<perm> (allow) or --unset-<perm> (deny)");
 
-    // Pattern is REQUIRED for ADD (keeps your existing behavior; supports --path OR --pattern)
     const auto patt = parsePatternOpt(call, /*required=*/true, ERR);
     if (!patt.ok) return invalid(patt.error);
 
-    // Enabled?
     const auto en = parseEnableDisableOpt(call, ERR);
     if (!en.ok) return invalid(en.error);
     const bool enabled = en.value.value_or(true);
 
-    // Prepare and insert overrides
     const auto applyOne = [&](const VaultPermission& perm, OverrideOpt effect) {
         const auto ov = std::make_shared<PermissionOverride>();
         ov->assignment_id = role->id;
@@ -142,13 +136,9 @@ static CommandResult handle_vault_role_override_add(const CommandCall& call) {
     return ok("Successfully added permission override(s) to role '" + role->name + "' on vault '" + vault->name + "'");
 }
 
-
-// ---------------- UPDATE ----------------
-
 static CommandResult handle_vault_role_override_update(const CommandCall& call) {
     constexpr const char* ERR = "vault role override update";
 
-    // Now treated as: <vault-id|vault-name> <role_id|role_hint> <bit_position>
     if (call.positionals.size() < 3)
         return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint> <bit_position>");
     if (call.positionals.size() > 3)
@@ -158,34 +148,28 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
     const auto roleArg  = call.positionals.at(1);
     const auto bitArg   = call.positionals.at(2);
 
-    // Vault
     auto vLkp = resolveVault(call, vaultArg, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
-    // AuthZ
     if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
 
-    // SUBJECT IS REQUIRED
     auto subjLkp = parseSubject(call, ERR);
     if (!subjLkp) return invalid(subjLkp.error);
     const Subject subj = *subjLkp.ptr;
 
-    // Role must resolve within (vault, subject)
     auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
     if (!roleLkp) return invalid(roleLkp.error);
     auto role = roleLkp.ptr;
 
-    // bit_position
     std::string bitErr;
     auto bitPosOpt = parsePositiveUint(bitArg, "bit position", bitErr);
     if (!bitPosOpt) return invalid(std::string(ERR) + ": " + bitErr);
     const unsigned int bitPosition = *bitPosOpt;
 
-    // Locate override by (vault, subject, bit)
     VPermOverrideQuery q{
         .vault_id     = vault->id,
-        .subject_type = subj.type,   // "user" | "group"
+        .subject_type = subj.type,
         .subject_id   = subj.id,
         .bit_position = bitPosition
     };
@@ -197,7 +181,7 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
                        + std::to_string(subj.id) + ", bit=" + std::to_string(bitPosition) + ")");
     }
 
-    // Defensive: ensure the override we fetched indeed belongs to the resolved role assignment
+    // Defensive: ensure the override fetched indeed belongs to the resolved role assignment
     if (ov->assignment_id != role->id) {
         return invalid(std::string(ERR) + ": override does not belong to role '"
                        + role->name + "' (assignment mismatch)");
@@ -205,7 +189,6 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
 
     bool changed = false;
 
-    // Effect change? (--allow/--deny or --allow-effect/--deny-effect)
     const auto eff = parseEffectChangeOpt(call, ERR);
     if (!eff.ok) return invalid(eff.error);
     if (eff.value) {
@@ -213,7 +196,6 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
         changed = true;
     }
 
-    // Pattern change? (--path/--pattern) optional
     const auto patt = parsePatternOpt(call, /*required=*/false, ERR);
     if (!patt.ok) return invalid(patt.error);
     if (patt.compiled) {
@@ -222,7 +204,6 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
         changed = true;
     }
 
-    // Enabled/disabled?
     const auto en = parseEnableDisableOpt(call, ERR);
     if (!en.ok) return invalid(en.error);
     if (en.value) {
@@ -252,34 +233,28 @@ static CommandResult handle_vault_role_override_remove(const CommandCall& call) 
     const auto roleArg  = call.positionals.at(1);
     const auto bitArg   = call.positionals.at(2);
 
-    // Vault
     auto vLkp = resolveVault(call, vaultArg, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
-    // AuthZ
     if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
 
-    // SUBJECT IS REQUIRED (type + id|name)
     auto subjLkp = parseSubject(call, ERR);
     if (!subjLkp) return invalid(subjLkp.error);
     const Subject subj = *subjLkp.ptr;
 
-    // Role in context of (vault, subject)
     auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
     if (!roleLkp) return invalid(roleLkp.error);
     auto role = roleLkp.ptr;
 
-    // bit_position
     std::string bitErr;
     auto bitPosOpt = parsePositiveUint(bitArg, "bit position", bitErr);
     if (!bitPosOpt) return invalid(std::string(ERR) + ": " + bitErr);
     const unsigned int bitPosition = *bitPosOpt;
 
-    // Locate override by (vault, subject, bit)
     VPermOverrideQuery q{
         .vault_id     = vault->id,
-        .subject_type = subj.type,   // "user" | "group"
+        .subject_type = subj.type,
         .subject_id   = subj.id,
         .bit_position = bitPosition
     };
@@ -497,7 +472,7 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
     return invalid(call.constructFullArgs(), "Unknown vault override action: '" + std::string(sub) + "'");
 }
 
-CommandResult commands::vault::handle_vault_role(const CommandCall& call) {
+CommandResult handle_vault_role(const CommandCall& call) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
 
     if (call.positionals.empty()) return usage(call.constructFullArgs());
@@ -511,4 +486,6 @@ CommandResult commands::vault::handle_vault_role(const CommandCall& call) {
     if (isVaultRoleMatch({"override"}, sub)) return handle_vault_role_override(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown vault role subcommand: '" + std::string(sub) + "'");
+}
+
 }

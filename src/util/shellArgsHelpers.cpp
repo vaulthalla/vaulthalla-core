@@ -19,6 +19,11 @@ using namespace vh::services;
 using namespace vh::types;
 using namespace vh::database;
 
+static constexpr uintmax_t KILOBYTE = 1024;
+static constexpr uintmax_t MEGABYTE = KILOBYTE * KILOBYTE;
+static constexpr uintmax_t GIGABYTE = KILOBYTE * MEGABYTE;
+static constexpr uintmax_t TERABYTE = KILOBYTE * GIGABYTE;
+
 CommandResult vh::shell::invalid(std::string msg) { return {2, "", std::move(msg)}; }
 CommandResult vh::shell::ok(std::string out) { return {0, std::move(out), ""}; }
 
@@ -59,10 +64,10 @@ std::optional<int> vh::shell::parseInt(const std::string& sv) {
 
 uintmax_t vh::shell::parseSize(const std::string& s) {
     switch (std::toupper(s.back())) {
-    case 'T': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024 * 1024 * 1024; // TiB
-    case 'G': return std::stoull(s.substr(0, s.size() - 1)) * 1024;                      // GiB
-    case 'M': return std::stoull(s.substr(0, s.size() - 1)) * 1024 * 1024;               // MiB
-    default: return std::stoull(s);                                                      // Assume bytes if no suffix
+    case 'T': return std::stoull(s.substr(0, s.size() - 1)) * TERABYTE;
+    case 'G': return std::stoull(s.substr(0, s.size() - 1)) * GIGABYTE;
+    case 'M': return std::stoull(s.substr(0, s.size() - 1)) * MEGABYTE;
+    default: return std::stoull(s); // Assume bytes if no suffix
     }
 }
 

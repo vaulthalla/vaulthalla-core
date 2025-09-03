@@ -368,6 +368,11 @@ void DBConnection::initPreparedVaults() const {
                    "LEFT JOIN s3 s ON v.id = s.vault_id "
                    "WHERE v.name = $1 AND v.owner_id = $2");
 
+    conn_->prepare("list_vaults",
+        "SELECT v.*, s.* "
+        "FROM vault v "
+        "LEFT JOIN s3 s ON v.id = s.vault_id");
+
     // list_vaults(SORT text?, ORDER text?, LIMIT bigint?, OFFSET bigint?)
     conn_->prepare(
         "list_vaults",

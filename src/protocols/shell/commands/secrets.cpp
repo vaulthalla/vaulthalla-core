@@ -16,6 +16,7 @@ using namespace vh::types;
 using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::services;
 
 static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
     auto start = secret.begin();

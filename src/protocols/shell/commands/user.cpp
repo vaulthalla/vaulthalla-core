@@ -16,6 +16,8 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::util;
+using namespace vh::crypto;
 
 static CommandResult createUser(const CommandCall& subcall) {
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");

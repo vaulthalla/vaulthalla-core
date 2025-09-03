@@ -16,6 +16,7 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::util;
 using namespace vh::types;
+using namespace vh::services;
 
 static CommandResult handle_group_create(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group create: you do not have permission to create groups");

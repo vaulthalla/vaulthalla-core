@@ -35,17 +35,7 @@ void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, Command
         LogRegistry::shell()->debug("Alias '{}' mapped to '{}'", a, key);
     }
 
-    if (usage->pluralAliasImpliesList) {
-        const auto plural = key + "s";
-        if (aliasMap_.contains(plural) && aliasMap_.at(plural) != key) {
-            LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
-                                       plural, aliasMap_.at(plural), key);
-        } else {
-            info.aliases.insert(plural);
-            aliasMap_[plural] = key;
-            LogRegistry::shell()->debug("Alias '{}' mapped to '{}'", plural, key);
-        }
-    }
+    if (usage->pluralAliasImpliesList) pluralMap_[key + "s"] = key;
 
     commands_[key] = std::move(info);
 }
@@ -54,6 +44,7 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
     std::string n = normalize(nameOrAlias);
     if (commands_.contains(n)) return n;
     if (aliasMap_.contains(n)) return aliasMap_.at(n);
+    if (pluralMap_.contains(n)) return pluralMap_.at(n);
     return n; // unknown; let caller error
 }
 
@@ -66,12 +57,15 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     if (call.name.empty()) return invalid("No command provided.");
     const auto canonical = canonicalFor(call.name);
 
+    if (pluralMap_.contains(call.name) && call.positionals.empty()) {
+        call.name = canonical;
+        call.positionals.emplace_back("list");
+    }
+
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
 
-    if (!commands_.contains(canonical)) {
-        LogRegistry::shell()->info("Commands:\n{}", fmt::join(commands_ | std::views::keys, "\n"));
+    if (!commands_.contains(canonical))
         return invalid(call.constructFullArgs(), fmt::format("[Router] Unknown command or alias: {}", call.name));
-    }
 
     return commands_.at(canonical).handler(call);
 }

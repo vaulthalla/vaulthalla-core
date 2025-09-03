@@ -67,11 +67,8 @@ uintmax_t vh::shell::parseSize(const std::string& s) {
 }
 
 bool vh::shell::isCommandMatch(const std::vector<std::string>& path, std::string_view subcmd) {
-    const auto& usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-    const auto usage = usageManager->resolve(path);
-    return std::ranges::any_of(usage->aliases, [&](const auto& alias) {
-        return alias == subcmd;
-    });
+    const auto usage = ServiceDepsRegistry::instance().shellUsageManager->resolve(path);
+    return std::ranges::any_of(usage->aliases, [&](const auto& alias) { return alias == subcmd; });
 }
 
 std::pair<std::string_view, CommandCall> vh::shell::descend(const CommandCall& call) {

@@ -50,7 +50,9 @@ std::shared_ptr<CommandUsage> UsageManager::resolve(const std::vector<std::strin
     const auto book = bookFor(args[0]);
     if (!book) throw std::runtime_error("UsageManager: resolve called with unknown top-level alias: " + args[1]);
     if (args.size() == 1) return book->root;
-    return book->resolve(args);
+    auto subArgs = args;
+    subArgs.erase(subArgs.begin());
+    return book->resolve(subArgs);
 }
 
 std::shared_ptr<CommandUsage> UsageManager::resolve(const std::string& topLevelArg) const {

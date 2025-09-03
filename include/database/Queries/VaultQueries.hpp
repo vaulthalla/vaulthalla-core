@@ -1,9 +1,11 @@
 #pragma once
 
-#include "types/DBQueryParams.hpp"
+#include "types/ListQueryParams.hpp"
 
 #include <memory>
 #include <vector>
+#include <string>
+#include <optional>
 
 namespace vh::types {
     struct Vault;
@@ -21,8 +23,8 @@ struct VaultQueries {
     static void removeVault(unsigned int vaultId);
     static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
     static std::shared_ptr<types::Vault> getVault(const std::string& name, unsigned int ownerId);
-    static std::vector<std::shared_ptr<types::Vault>> listVaults(types::DBQueryParams&& params = {});
-    static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, types::DBQueryParams&& params = {});
+    static std::vector<std::shared_ptr<types::Vault>> listVaults(const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
+    static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
     static std::string getVaultOwnersName(unsigned int vaultId);
 
     static void updateVaultSync(const std::shared_ptr<types::Sync>& sync, const types::VaultType& type);

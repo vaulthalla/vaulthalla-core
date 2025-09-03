@@ -10,7 +10,7 @@
 #include "storage/StorageEngine.hpp"
 
 #include "types/Vault.hpp"
-#include "types/DBQueryParams.hpp"
+#include "types/ListQueryParams.hpp"
 #include "types/VaultRole.hpp"
 #include "types/User.hpp"
 
@@ -58,34 +58,25 @@ CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
 }
 
 CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
+    if (!call.positionals.empty()) return invalid("vaults: unexpected positional arguments");
+
+    const auto user = call.user;
+
     const bool f_local = hasFlag(call, "local");
     const bool f_s3 = hasFlag(call, "s3");
     if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");
-    if (!call.positionals.empty()) return invalid("vaults: unexpected positional arguments");
 
-    int limit = 100;
-    if (const auto lim = optVal(call, "limit")) {
-        if (lim->empty()) return invalid("vaults: --limit requires a value");
-        const auto parsed = parseInt(*lim);
-        if (!parsed || *parsed <= 0) return invalid("vaults: --limit must be a positive integer");
-        limit = *parsed;
-    }
+    std::optional<VaultType> typeFilter = std::nullopt;
+    if (f_local) typeFilter = VaultType::Local;
+    else if (f_s3) typeFilter = VaultType::S3;
 
-    const auto user = call.user;
-    const bool listAll = user->isAdmin() || user->canManageVaults();
+    const auto canListAll = user->isAdmin() || user->canManageVaults();
 
-    DBQueryParams p{
-        .sortBy = "created_at",
-        .order = SortOrder::DESC,
-        .limit = limit,
-        .offset = 0, // TODO: handle pagination if needed
-    };
+    auto vaults = canListAll
+                      ? VaultQueries::listVaults(typeFilter, parseListQuery(call))
+                      : VaultQueries::listUserVaults(user->id, typeFilter, parseListQuery(call));
 
-    auto vaults = listAll
-                      ? VaultQueries::listVaults(std::move(p))
-                      : VaultQueries::listUserVaults(user->id, std::move(p));
-
-    if (!listAll) {
+    if (!canListAll) {
         for (const auto& r : call.user->roles) {
             if (r->canList({})) {
                 const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;

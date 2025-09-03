@@ -29,17 +29,23 @@ void APIKeyQueries::removeAPIKey(const unsigned int keyId) {
     });
 }
 
-std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned int userId) {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned int userId, const types::ListQueryParams& params) {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_user_api_keys", userId);
-        return api_keys_from_pq_res(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT * FROM api_keys WHERE user_id = " + txn.quote(userId),
+            params, "id", "name"
+        );
+        return api_keys_from_pq_res(txn.exec(sql));
     });
 }
 
-std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys() {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const types::ListQueryParams& params) {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_api_keys");
-        return api_keys_from_pq_res(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT * FROM api_keys",
+            params, "id", "name"
+        );
+        return api_keys_from_pq_res(txn.exec(sql));
     });
 }
 

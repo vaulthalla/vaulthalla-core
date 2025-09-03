@@ -49,17 +49,30 @@ std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
     });
 }
 
-std::vector<std::shared_ptr<Role>> PermsQueries::listRoles() {
+std::vector<std::shared_ptr<Role>> PermsQueries::listRoles(ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_roles");
-        return roles_from_pq_res(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
+            "p.permissions::int AS permissions "
+            "FROM role r "
+            "JOIN permissions p ON r.id = p.role_id",
+            params, "r.id", "r.name"
+        );
+        return roles_from_pq_res(txn.exec(sql));
     });
 }
 
-std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles() {
+std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles(ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listUserRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_roles_by_type", pqxx::params{"user"});
-        return roles_from_pq_res(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
+            "p.permissions::int AS permissions "
+            "FROM role r "
+            "JOIN permissions p ON r.id = p.role_id "
+            "WHERE r.type = 'user'",
+            params, "r.id", "r.name"
+        );
+        return roles_from_pq_res(txn.exec(sql));
     });
 }
 
@@ -67,10 +80,17 @@ std::vector<std::shared_ptr<Role>> PermsQueries::listUserRoles() {
 // ############################################# Vault Role  ###########################################
 // #####################################################################################################
 
-std::vector<std::shared_ptr<Role>> PermsQueries::listVaultRoles() {
+std::vector<std::shared_ptr<Role>> PermsQueries::listVaultRoles(ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listFSRoles", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_roles_by_type", pqxx::params{"vault"});
-        return roles_from_pq_res(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
+            "p.permissions::int AS permissions "
+            "FROM role r "
+            "JOIN permissions p ON r.id = p.role_id "
+            "WHERE r.type = 'vault'",
+            params, "r.id", "r.name"
+        );
+        return roles_from_pq_res(txn.exec(sql));
     });
 }
 
@@ -164,22 +184,33 @@ void PermsQueries::removeVPermOverride(const unsigned int permOverrideId) {
     });
 }
 
-std::vector<std::shared_ptr<PermissionOverride>> PermsQueries::listVPermOverrides(const unsigned int vaultId) {
+std::vector<std::shared_ptr<PermissionOverride>> PermsQueries::listVPermOverrides(const unsigned int vaultId, ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listVPermOverrides", [&](pqxx::work& txn) {
-        const auto res = txn.exec_prepared("list_vault_permission_overrides", pqxx::params{vaultId});
-        return permissionOverridesFromPqRes(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
+            "FROM permission p "
+            "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
+            "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
+            "WHERE vra.vault_id = " + txn.quote(vaultId),
+            params, "p.id"
+        );
+        return permissionOverridesFromPqRes(txn.exec(sql));
     });
 }
 
-std::vector<std::shared_ptr<PermissionOverride>> PermsQueries::listAssignedVRoleOverrides(const VPermOverrideQuery& query) {
+std::vector<std::shared_ptr<PermissionOverride>> PermsQueries::listAssignedVRoleOverrides(const VPermOverrideQuery& query, ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listAssignedVRoleOverrides", [&](pqxx::work& txn) {
-        pqxx::params p;
-        p.append(query.vault_id);
-        p.append(query.subject_type);
-        p.append(query.subject_id);
-
-        const auto res = txn.exec_prepared("list_subject_permission_overrides", p);
-        return permissionOverridesFromPqRes(res);
+        const auto sql = appendPaginationAndFilter(
+            "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
+            "FROM permission p "
+            "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
+            "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
+            "WHERE vra.vault_id = " + txn.quote(query.vault_id)
+            + " AND vra.subject_type = " + txn.quote(query.subject_type)
+            + " AND vra.subject_id = " + txn.quote(query.subject_id),
+            params, "p.id"
+        );
+        return permissionOverridesFromPqRes(txn.exec(sql));
     });
 }
 

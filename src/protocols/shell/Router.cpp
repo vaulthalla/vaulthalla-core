@@ -25,14 +25,26 @@ void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, Command
 
     for (const std::string& alias : usage->aliases) {
         std::string a = alias;
-        if (auto it = aliasMap_.find(a); it != aliasMap_.end() && it->second != key) {
+        if (aliasMap_.contains(a) && aliasMap_.at(a) != key) {
             LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
-                                       a, it->second, key);
+                                       a, aliasMap_.at(a), key);
             continue;
         }
         info.aliases.insert(a);
         aliasMap_[a] = key;
-        LogRegistry::shell()->info("Alias '{}' mapped to '{}'", a, key);
+        LogRegistry::shell()->debug("Alias '{}' mapped to '{}'", a, key);
+    }
+
+    if (usage->pluralAliasImpliesList) {
+        const auto plural = key + "s";
+        if (aliasMap_.contains(plural) && aliasMap_.at(plural) != key) {
+            LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
+                                       plural, aliasMap_.at(plural), key);
+        } else {
+            info.aliases.insert(plural);
+            aliasMap_[plural] = key;
+            LogRegistry::shell()->debug("Alias '{}' mapped to '{}'", plural, key);
+        }
     }
 
     commands_[key] = std::move(info);

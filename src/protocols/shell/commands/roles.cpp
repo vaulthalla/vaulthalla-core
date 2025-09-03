@@ -56,15 +56,15 @@ static uint16_t parseVaultRolePermissions(const CommandCall& call, uint16_t perm
 }
 
 static CommandResult handleRolesList(const CommandCall& call) {
-    int limit = 100; // Default limit
-    if (auto lim = optVal(call, "limit")) {
-        if (lim->empty()) return invalid("roles list: --limit requires a value");
-        auto parsed = parseInt(*lim);
-        if (!parsed || *parsed <= 0) return invalid("roles list: --limit must be a positive integer");
-        limit = *parsed;
-    }
+    if (!call.user->canManageRoles()) return invalid("roles list: can't manage");
 
-    const auto roles = PermsQueries::listRoles();
+    auto params = parseListQuery(call);
+    std::vector<std::shared_ptr<Role>> roles;
+
+    if (hasFlag(call, "user")) roles = PermsQueries::listUserRoles(std::move(params));
+    else if (hasFlag(call, "vault")) roles = PermsQueries::listVaultRoles(std::move(params));
+    else roles = PermsQueries::listRoles(std::move(params));
+
     return ok(to_string(roles));
 }
 

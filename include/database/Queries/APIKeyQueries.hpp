@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types/APIKey.hpp"
+#include "types/ListQueryParams.hpp"
+
 #include <memory>
 
 namespace vh::database {
@@ -12,9 +14,9 @@ struct APIKeyQueries {
 
     static void removeAPIKey(unsigned int keyId);
 
-    static std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys(unsigned int userId);
+    static std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys(unsigned int userId, const types::ListQueryParams& params = {});
 
-    static std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys();
+    static std::vector<std::shared_ptr<types::api::APIKey>> listAPIKeys(const types::ListQueryParams& params = {});
 
     static std::shared_ptr<types::api::APIKey> getAPIKey(unsigned int keyId);
 

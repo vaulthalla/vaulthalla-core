@@ -133,3 +133,59 @@ Lookup<Role> vh::shell::resolveRole(const std::string& roleArg, const std::strin
     if (!out.ptr) out.error = errPrefix + ": role not found";
     return out;
 }
+
+ListQueryParams vh::shell::parseListQuery(const CommandCall& call) {
+    ListQueryParams p;
+
+    if (const auto sortOpt = optVal(call, "sort")) {
+        if (sortOpt->empty()) throw std::invalid_argument("Invalid --sort value: cannot be empty");
+        p.sort = *sortOpt;
+    }
+
+    if (const auto dirOpt = optVal(call, "direction")) {
+        if (dirOpt->empty()) throw std::invalid_argument("Invalid --direction value: cannot be empty");
+        const auto dirLower = [&]() {
+            std::string s = *dirOpt;
+            std::ranges::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+            return s;
+        }();
+        if (dirLower == "asc") p.direction = SortDirection::ASC;
+        else if (dirLower == "desc") p.direction = SortDirection::DESC;
+        else throw std::invalid_argument("Invalid --direction value: must be 'asc' or 'desc'");
+    }
+
+    if (const auto filterOpt = optVal(call, "filter")) {
+        if (filterOpt->empty()) throw std::invalid_argument("Invalid --filter value: cannot be empty");
+        p.filter = *filterOpt;
+    }
+
+    if (const auto limitOpt = optVal(call, "limit")) {
+        if (limitOpt->empty()) throw std::invalid_argument("Invalid --limit value: cannot be empty");
+        const auto limitParsed = parseInt(*limitOpt);
+        if (!limitParsed || *limitParsed <= 0)
+            throw std::invalid_argument("Invalid --limit value: must be a positive integer");
+        p.limit = *limitParsed;
+    }
+
+    if (const auto pageOpt = optVal(call, "page")) {
+        if (pageOpt->empty()) throw std::invalid_argument("Invalid --page value: cannot be empty");
+        const auto pageParsed = parseInt(*pageOpt);
+        if (!pageParsed || *pageParsed <= 0)
+            throw std::invalid_argument("Invalid --page value: must be a positive integer");
+        p.page = *pageParsed;
+    }
+
+    return p;
+}
+
+Lookup<User> vh::shell::resolveUser(const std::string& userArg, const std::string& errPrefix) {
+    Lookup<User> out;
+
+    if (const auto idOpt = parseInt(userArg)) {
+        if (*idOpt <= 0) {
+            out.error = errPrefix + ": user ID must be a positive integer";
+            return out;
+        }
+        out.ptr = UserQueries::getUserById(*idOpt);
+    } else out.ptr = UserQueries::getUserByName(userArg);
+}

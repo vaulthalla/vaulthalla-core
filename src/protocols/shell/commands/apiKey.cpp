@@ -33,16 +33,13 @@ static S3Provider s3_provider_from_shell_input(const std::string& str) {
 
 static CommandResult handleListAPIKeys(const CommandCall& call) {
     try {
-        const bool json = hasFlag(call, "json");
-
-        const auto user = call.user;
-        if (!user) return invalid("You must be logged in to list API keys.");
+        const auto params = parseListQuery(call);
 
         std::vector<std::shared_ptr<APIKey>> keys;
-        if (user->canManageAPIKeys()) keys = APIKeyQueries::listAPIKeys();
-        else keys = APIKeyQueries::listAPIKeys(user->id);
+        if (call.user->canManageAPIKeys()) keys = APIKeyQueries::listAPIKeys(params);
+        else keys = APIKeyQueries::listAPIKeys(call.user->id, params);
 
-        if (json) {
+        if (hasFlag(call, "json")) {
             auto out = nlohmann::json(keys).dump(4);
             out.push_back('\n');
             return ok(out);

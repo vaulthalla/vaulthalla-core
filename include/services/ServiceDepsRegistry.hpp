@@ -31,6 +31,7 @@ struct ServiceDepsRegistry {
     std::shared_ptr<storage::FSCache> fsCache;
     std::shared_ptr<shell::UsageManager> shellUsageManager;
 
+
     ServiceDepsRegistry(const ServiceDepsRegistry&) = delete;
     ServiceDepsRegistry& operator=(const ServiceDepsRegistry&) = delete;
 

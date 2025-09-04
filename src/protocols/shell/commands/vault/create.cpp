@@ -17,7 +17,7 @@
 #include "types/RSync.hpp"
 #include "types/User.hpp"
 
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
 

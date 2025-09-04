@@ -25,7 +25,7 @@
 // Misc
 #include "config/ConfigRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"

@@ -6,7 +6,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "services/SyncController.hpp"
 
 #include "storage/StorageManager.hpp"

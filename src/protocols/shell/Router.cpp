@@ -1,7 +1,7 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "types/User.hpp"
 #include "CommandUsage.hpp"
 #include "UsageManager.hpp"

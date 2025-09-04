@@ -3,7 +3,7 @@
 #include "util/shellArgsHelpers.hpp"
 
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 
 #include "storage/StorageManager.hpp"

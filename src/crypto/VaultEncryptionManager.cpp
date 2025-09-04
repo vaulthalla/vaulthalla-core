@@ -1,6 +1,6 @@
 #include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "types/VaultKey.hpp"
 #include "types/File.hpp"

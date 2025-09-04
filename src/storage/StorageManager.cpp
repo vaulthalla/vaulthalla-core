@@ -9,7 +9,7 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "seed/include/seed_db.hpp"
 #include "crypto/IdGenerator.hpp"
 

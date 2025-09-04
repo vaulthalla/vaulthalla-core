@@ -2,7 +2,7 @@
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"

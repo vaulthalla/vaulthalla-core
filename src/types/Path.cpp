@@ -1,7 +1,7 @@
 #include "types/Path.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <paths.h>
 

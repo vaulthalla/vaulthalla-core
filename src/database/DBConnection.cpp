@@ -3,7 +3,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "crypto/TPMKeyProvider.hpp"
 #include "crypto/PasswordUtils.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <fstream>
 

@@ -5,7 +5,7 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "util/parse.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <boost/beast/http.hpp>
 #include <regex>

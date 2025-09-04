@@ -9,7 +9,7 @@
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "services/SyncController.hpp"
 
 #include <nlohmann/json.hpp>

@@ -4,7 +4,7 @@
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "types/Path.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::types;

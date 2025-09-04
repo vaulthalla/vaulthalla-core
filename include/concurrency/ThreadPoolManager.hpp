@@ -1,7 +1,7 @@
 #pragma once
 
 #include "concurrency/ThreadPool.hpp"
-#include "../services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <atomic>
 #include <memory>

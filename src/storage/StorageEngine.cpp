@@ -12,7 +12,7 @@
 #include "storage/Filesystem.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "util/fsPath.hpp"
 
 using namespace vh::crypto;

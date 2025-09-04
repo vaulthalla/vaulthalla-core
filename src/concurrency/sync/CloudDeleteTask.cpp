@@ -2,7 +2,7 @@
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/File.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::types;

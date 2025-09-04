@@ -1,6 +1,8 @@
 #pragma once
 
 #include "config/Config.hpp"
+#include "config/util.hpp"
+
 #include <yaml-cpp/yaml.h>
 
 namespace YAML {
@@ -120,16 +122,12 @@ template<>
 struct convert<LoggingConfig> {
     static Node encode(const LoggingConfig& rhs) {
         Node node;
-        node["log_rotation_days"] = rhs.log_rotation_days.count();
-        node["audit_log_rotation_days"] = rhs.audit_log_rotation_days.count();
         node["log_levels"] = rhs.levels;
         return node;
     }
 
     static bool decode(const Node& node, LoggingConfig& rhs) {
         if (!node.IsMap()) return false;
-        rhs.log_rotation_days = std::chrono::days(node["log_rotation_days"].as<unsigned int>(7));
-        rhs.audit_log_rotation_days = std::chrono::days(node["audit_log_rotation_days"].as<unsigned int>(30));
         rhs.levels = node["log_levels"].as<LogLevelsConfig>();
         return true;
     }
@@ -226,6 +224,80 @@ struct convert<SharingConfig> {
         if (!node.IsMap()) return false;
         rhs.enabled = node["enabled"].as<bool>(true);
         rhs.enable_public_links = node["enable_public_links"].as<bool>(true);
+        return true;
+    }
+};
+
+template<>
+struct convert<AuditLogConfig> {
+    static Node encode(const AuditLogConfig& rhs) {
+        Node node;
+        node["retention_days"] = rhs.retention_days.count();
+        node["rotate_max_size"] = bytesToMbOrGbStr(rhs.rotate_max_size);
+        node["rotate_interval"] = hoursToDayOrHourStr(rhs.rotate_interval);
+        node["compression"] = compressionToString(rhs.compression);
+        node["max_retained_logs_size"] = bytesToMbOrGbStr(rhs.max_retained_logs_size);
+        node["strict_retention"] = rhs.strict_retention;
+        return node;
+    }
+
+    static bool decode(const Node& node, AuditLogConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.retention_days = std::chrono::days(node["retention_days"].as<unsigned int>(30));
+        rhs.rotate_max_size = parseMbOrGbToByte(node["rotate_max_size"].as<std::string>("50MB"));
+        rhs.rotate_interval = parseHoursFromDayOrHour(node["rotate_interval"].as<std::string>("24h"));
+        rhs.compression = parseCompression(node["compression"].as<std::string>("zstd"));
+        rhs.max_retained_logs_size = parseMbOrGbToByte(node["max_retained_logs_size"].as<std::string>("1GB"));
+        rhs.strict_retention = node["strict_retention"].as<bool>(false);
+        return true;
+    }
+};
+
+template<>
+struct convert<EncryptionWaiverConfig> {
+    static Node encode(const EncryptionWaiverConfig& rhs) {
+        Node node;
+        node["retention_days"] = rhs.retention_days.count();
+        return node;
+    }
+
+    static bool decode(const Node& node, EncryptionWaiverConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.retention_days = std::chrono::days(node["retention_days"].as<unsigned int>(180));
+        return true;
+    }
+};
+
+template<>
+struct convert<FilesTrashedConfig> {
+    static Node encode(const FilesTrashedConfig& rhs) {
+        Node node;
+        node["retention_days"] = rhs.retention_days.count();
+        return node;
+    }
+
+    static bool decode(const Node& node, FilesTrashedConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.retention_days = std::chrono::days(node["retention_days"].as<unsigned int>(60));
+        return true;
+    }
+};
+
+template<>
+struct convert<AuditConfig> {
+    static Node encode(const AuditConfig& rhs) {
+        Node node;
+        node["audit_log"] = rhs.audit_log;
+        node["encryption_waivers"] = rhs.encryption_waivers;
+        node["files_trashed"] = rhs.files_trashed;
+        return node;
+    }
+
+    static bool decode(const Node& node, AuditConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.audit_log = node["audit_log"].as<AuditLogConfig>();
+        rhs.encryption_waivers = node["encryption_waivers"].as<EncryptionWaiverConfig>();
+        rhs.files_trashed = node["files_trashed"].as<FilesTrashedConfig>();
         return true;
     }
 };

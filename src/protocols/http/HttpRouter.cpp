@@ -9,7 +9,7 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/files.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "storage/FSCache.hpp"

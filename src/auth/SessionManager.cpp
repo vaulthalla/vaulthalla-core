@@ -1,7 +1,7 @@
 #include "auth/SessionManager.hpp"
 #include "types/RefreshToken.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::auth;
 using namespace vh::database;

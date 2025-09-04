@@ -1,7 +1,7 @@
 #include "storage/cloud/s3/S3Controller.hpp"
 #include "types/APIKey.hpp"
 #include "util/u8.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <fstream>
 #include <regex>

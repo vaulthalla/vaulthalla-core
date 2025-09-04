@@ -13,7 +13,7 @@
 #include "types/RSync.hpp"
 #include "types/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <thread>

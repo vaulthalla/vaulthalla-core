@@ -3,7 +3,7 @@
 #include "auth/Client.hpp"
 #include "auth/AuthManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::auth;

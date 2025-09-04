@@ -4,24 +4,31 @@
 #     A self-hosted empire demands no less than glory
 # ═══════════════════════════════════════════════════════
 
-# === 🧠 CORE SERVER SETTINGS ===
+# === 💻 Websocket Server ===
+# The websocket server handles real-time communication between the frontend and backend,
+# using low-latency sockets and a command protocol to support interactive features,
+# including file uploads, notifications, and other interactive features.
 websocket_server:
-  enabled: true                     # Enable WebSocket server for frontend communication
+  enabled: false  # disabled for now, vaulthalla-web will be shipping shortly after the initial release, not needed for CLI
   host: 0.0.0.0
   port: 36969
   max_connections: 1024
   max_upload_size_mb: 2048
 
+
+# === 🖼️ HTTP Previews ===
+# The HTTP preview server serves file previews and thumbnails,
+# allowing users to view files directly in their browsers without downloading them.
 http_preview_server:
-  enabled: true                     # Enable HTTP server for file previews
+  enabled: false  # disabled for now, vaulthalla-web will be shipping shortly after the initial release, not needed for CLI
   host: 0.0.0.0
   port: 36970
   max_connections: 512
   max_preview_size_mb: 512
 
 
-# === 🐘 DATABASE SETTINGS ===
-# 🔐 Password is TPM encrypted.
+# === 🗄️ DATABASE SETTINGS ===
+# 🔑 Password is TPM encrypted.
 # It is optionally auto-generated and set on first run.
 # Alternatively, it can be manually set, export, or regenerated using the `vaulthalla` CLI tool as the super-admin user.
 database:
@@ -33,51 +40,59 @@ database:
 
 
 # === 🔐 AUTHENTICATION SETTINGS ===
+# Authentication is handled via JWT tokens.
+# Access tokens have a short TTL, while refresh tokens last longer.
+# Users can refresh their access tokens using valid refresh tokens.
+# This setup balances security and usability.
 auth:
   token_expiry_minutes: 60          # JWT access token TTL
   refresh_token_expiry_days: 7      # Refresh token TTL
 
 
 # === 🤝 SHARING SETTINGS ===
+# Sharing features allow users to share files and folders internally
+# and via public links.
+# Public links can be enabled or disabled based on security requirements.
+# This will be released alongside vaulthalla-web.
 sharing:
   enabled: true                # Enable internal sharing features
   enable_public_links: true    # Enable public share links
 
 
-# === Caching & Previews ===
+# === ⚡ Caching & Previews ===
+# Caching improves performance by storing frequently accessed files and thumbnails.
+# The cache size and thumbnail settings can be adjusted based on server capacity and user needs.
 caching:
-  max_size_mb: 10240           # Max size for full-size cache (10 GB)
+  max_size_mb: 10240                          # Max size for full-size cache (10 GB)
   thumbnails:
     formats: [jpg, jpeg, png, webp, pdf]
-    sizes: [128, 256, 512]
+    sizes: [128, 256, 512]                    # Thumbnail sizes in pixels
     expiry_days: 30
 
 
-# === 📜 LOGGING SETTINGS ===
-logging:
-  log_rotation_days: 7
-  audit_log_rotation_days: 30
-  log_levels:
-    console_log_level: info
-    file_log_level: debug
-    subsystem_levels:
-      vaulthalla: info
-      fuse: info
-      filesystem: info
-      cloud: info
-      crypto: info
-      auth: info
-      websocket: info
-      http: info
-      shell: warn
-      db: info
-      sync: info
-      thumb: info
-      storage: info
-      types: info
+# === ⚖️ Auditing ===
+# Auditing settings manage log rotation, encryption waivers, and trashed files.
+# Logs are rotated to prevent excessive disk usage.
+# Encryption waivers and trashed files have retention policies to ensure compliance and data management.
+auditing:
+  audit_log:
+    retention_days: 30              # Retain logs for 30 days minimum, minimum 7 days
+    rotate_max_size: 50M            # Rotate when log exceeds this size, minimum 10MB  (M for MB, G for GB)
+    rotate_interval: 1d             # Rotate at least once per day, minimum 1 hour  (h for hour, d for day)
+    compression: zstd               # Compress rotated files to save disk, options: none, gzip, zstd
+    max_retained_logs_size: 1G      # Max total size for retained logs, minimum 100MB  (M for MB, G for GB)
+    strict_retention: false         # Enforce strict retention_period, disables max_retained_logs_size
+
+  encryption_waivers:
+    retention_days: 180          # Permanently delete encryption waivers after this many days, minimum 30 days
+
+  files_trashed:                 # Trashed files are files that users have deleted, and may or may not be recoverable.
+    retention_days: 60           # Permanently delete trashed file metadata after this many days, minimum 7 days
 
 
 # === 🛠️ DEVELOPMENT SETTINGS ===
+# Development settings enable features useful during development and testing.
+# These features should be disabled in production for security and performance reasons.
 dev:
   enabled: false                    # Enable dev mode features
   init_r2_test_vault: false         # Initialize a test R2 vault in dev mode

@@ -201,40 +201,6 @@ void from_json(const nlohmann::json& j, SubsystemLogLevelsConfig& c) {
     c.types = j.value("types", spdlog::level::info);
 }
 
-void to_json(nlohmann::json& j, const PDFDocumentConfig& c) {
-    j = {
-        {"enabled", c.enabled},
-        {"max_pages", c.max_pages},
-        {"expiry_days", c.expiry_days}
-    };
-}
-
-void from_json(const nlohmann::json& j, PDFDocumentConfig& c) {
-    c.enabled = j.value("enabled", true);
-    c.max_pages = j.value("max_pages", 0);
-    c.expiry_days = j.value("expiry_days", 15);
-}
-
-void to_json(nlohmann::json& j, const DocumentPreviewConfig& c) {
-    j = {
-        {"pdf", c.pdf}
-    };
-}
-
-void from_json(const nlohmann::json& j, DocumentPreviewConfig& c) {
-    j.at("pdf").get_to(c.pdf);
-}
-
-void to_json(nlohmann::json& j, const PreviewConfig& c) {
-    j = {
-        {"documents", c.documents}
-    };
-}
-
-void from_json(const nlohmann::json& j, PreviewConfig& c) {
-    j.at("documents").get_to(c.documents);
-}
-
 void to_json(nlohmann::json& j, const ThumbnailsConfig& c) {
     j = {
         {"formats", c.formats},
@@ -249,54 +215,15 @@ void from_json(const nlohmann::json& j, ThumbnailsConfig& c) {
     c.expiry_days = j.value("expiry_days", 30);
 }
 
-void to_json(nlohmann::json& j, const FullSizeCacheConfig& c) {
-    j = {
-        {"mirror", c.mirror},
-        {"expiry_days", c.expiry_days}
-    };
-}
-
-void from_json(const nlohmann::json& j, FullSizeCacheConfig& c) {
-    c.mirror = j.value("mirror", true);
-    c.expiry_days = j.value("expiry_days", 7);
-}
-
-void to_json(nlohmann::json& j, const SourceCacheFlags& c) {
-    j = {
-        {"thumbnails", c.thumbnails},
-        {"documents", {{"pdf", c.documents.pdf}}}
-    };
-}
-
-void from_json(const nlohmann::json& j, SourceCacheFlags& c) {
-    c.thumbnails = j.value("thumbnails", true);
-    if (const auto docs = j.find("documents"); docs != j.end()) {
-        c.documents.pdf = docs->value("pdf", true);
-    } else {
-        c.documents.pdf = true;
-    }
-}
-
-
 void to_json(nlohmann::json& j, const CachingConfig& c) {
     j = {
-        {"path", c.path.string()},
         {"thumbnails", c.thumbnails},
-        {"cloud", c.cloud_preview},
-        {"local", c.local},
-        {"cloud_preview", c.cloud_preview},
-        {"previews", c.previews},
         {"max_size_mb", c.max_size_mb}
     };
 }
 
 void from_json(const nlohmann::json& j, CachingConfig& c) {
     j.at("thumbnails").get_to(c.thumbnails);
-    j.at("cloud").get_to(c.cloud);
-    j.at("local").get_to(c.local);
-    j.at("cloud_preview").get_to(c.cloud_preview);
-    j.at("previews").get_to(c.previews);
-    c.path = j.value("path", ".cache");
     c.max_size_mb = j.value("max_size_mb", 10240);
 }
 

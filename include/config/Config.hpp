@@ -56,48 +56,15 @@ struct LoggingConfig {
     LogLevelsConfig levels;
 };
 
-struct PDFDocumentConfig {
-    bool enabled = true;
-    unsigned int max_pages = 0;
-    unsigned int expiry_days = 15;
-};
-
-struct DocumentPreviewConfig {
-    PDFDocumentConfig pdf;
-};
-
-struct PreviewConfig {
-    DocumentPreviewConfig documents;
-};
-
 struct ThumbnailsConfig {
     std::vector<std::string> formats = {"jpg", "jpeg", "png", "webp", "pdf"};
     std::vector<unsigned int> sizes = {128, 256, 512};
     unsigned int expiry_days = 30;
 };
 
-struct FullSizeCacheConfig {
-    bool mirror = true;
-    unsigned int expiry_days = 7;
-};
-
-struct SourceCacheFlags {
-    bool thumbnails = true;
-    struct {
-        bool pdf = true;
-    } documents;
-};
-
 struct CachingConfig {
-    std::filesystem::path path = ".cache";
     unsigned int max_size_mb = 10240;
-
-    SourceCacheFlags cloud;
-    SourceCacheFlags local;
-
-    FullSizeCacheConfig cloud_preview;
     ThumbnailsConfig thumbnails;
-    PreviewConfig previews;
 };
 
 struct DatabaseConfig {
@@ -149,18 +116,8 @@ void to_json(nlohmann::json& j, const SubsystemLogLevelsConfig& c);
 void from_json(const nlohmann::json& j, SubsystemLogLevelsConfig& c);
 void to_json(nlohmann::json& j, const LoggingConfig& c);
 void from_json(const nlohmann::json& j, LoggingConfig& c);
-void to_json(nlohmann::json& j, const PDFDocumentConfig& c);
-void from_json(const nlohmann::json& j, PDFDocumentConfig& c);
-void to_json(nlohmann::json& j, const DocumentPreviewConfig& c);
-void from_json(const nlohmann::json& j, DocumentPreviewConfig& c);
-void to_json(nlohmann::json& j, const PreviewConfig& c);
-void from_json(const nlohmann::json& j, PreviewConfig& c);
 void to_json(nlohmann::json& j, const ThumbnailsConfig& c);
 void from_json(const nlohmann::json& j, ThumbnailsConfig& c);
-void to_json(nlohmann::json& j, const FullSizeCacheConfig& c);
-void from_json(const nlohmann::json& j, FullSizeCacheConfig& c);
-void to_json(nlohmann::json& j, const SourceCacheFlags& c);
-void from_json(const nlohmann::json& j, SourceCacheFlags& c);
 void to_json(nlohmann::json& j, const CachingConfig& c);
 void from_json(const nlohmann::json& j, CachingConfig& c);
 void to_json(nlohmann::json& j, const DatabaseConfig& c);

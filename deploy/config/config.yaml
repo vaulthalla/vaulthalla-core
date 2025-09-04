@@ -47,33 +47,10 @@ sharing:
 # === Caching & Previews ===
 caching:
   max_size_mb: 10240           # Max size for full-size cache (10 GB)
-
-  cloud:
-    thumbnails: true
-    full_size: true
-    documents:
-      pdf: true
-
-  local:
-    thumbnails: true
-    documents:
-      pdf: true
-
-  # Cloud preview settings
-  cloud_preview:
-    expiry_days: 7
-    mirror: true               # Mirror full-size files to local storage, false = on demand caching of cloud files
-
   thumbnails:
     formats: [jpg, jpeg, png, webp, pdf]
     sizes: [128, 256, 512]
     expiry_days: 30
-
-  previews:
-    documents:
-      pdf:
-        max_pages: 0
-        expiry_days: 15
 
 
 # === 📜 LOGGING SETTINGS ===

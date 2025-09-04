@@ -135,59 +135,6 @@ struct convert<LoggingConfig> {
     }
 };
 
-// === PDFDocumentConfig ===
-template<>
-struct convert<PDFDocumentConfig> {
-    static Node encode(const PDFDocumentConfig& rhs) {
-        Node node;
-        node["enabled"] = rhs.enabled;
-        node["max_pages"] = rhs.max_pages;
-        node["expiry_days"] = rhs.expiry_days;
-        return node;
-    }
-
-    static bool decode(const Node& node, PDFDocumentConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.enabled = node["enabled"].as<bool>(true);
-        rhs.max_pages = node["max_pages"].as<unsigned int>(0);
-        rhs.expiry_days = node["expiry_days"].as<unsigned int>(15);
-        return true;
-    }
-};
-
-// === DocumentPreviewConfig ===
-template<>
-struct convert<DocumentPreviewConfig> {
-    static Node encode(const DocumentPreviewConfig& rhs) {
-        Node node;
-        node["pdf"] = rhs.pdf;
-        return node;
-    }
-
-    static bool decode(const Node& node, DocumentPreviewConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.pdf = node["pdf"].as<PDFDocumentConfig>();
-        return true;
-    }
-};
-
-// === PreviewConfig ===
-template<>
-struct convert<PreviewConfig> {
-    static Node encode(const PreviewConfig& rhs) {
-        Node node;
-        node["documents"] = rhs.documents;
-        return node;
-    }
-
-    static bool decode(const Node& node, PreviewConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.documents = node["documents"].as<DocumentPreviewConfig>();
-        return true;
-    }
-};
-
-// === ThumbnailsConfig ===
 template<>
 struct convert<ThumbnailsConfig> {
     static Node encode(const ThumbnailsConfig& rhs) {
@@ -207,68 +154,19 @@ struct convert<ThumbnailsConfig> {
     }
 };
 
-// === FullSizeCacheConfig ===
-template<>
-struct convert<FullSizeCacheConfig> {
-    static Node encode(const FullSizeCacheConfig& rhs) {
-        Node node;
-        node["mirror"] = rhs.mirror;
-        node["expiry_days"] = rhs.expiry_days;
-        return node;
-    }
-
-    static bool decode(const Node& node, FullSizeCacheConfig& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.mirror = node["mirror"].as<bool>(true);
-        rhs.expiry_days = node["expiry_days"].as<unsigned int>(7);
-        return true;
-    }
-};
-
-// === SourceCacheFlags (cloud/local) ===
-template<>
-struct convert<SourceCacheFlags> {
-    static Node encode(const SourceCacheFlags& rhs) {
-        Node node;
-        node["thumbnails"] = rhs.thumbnails;
-        Node docs;
-        docs["pdf"] = rhs.documents.pdf;
-        node["documents"] = docs;
-        return node;
-    }
-
-    static bool decode(const Node& node, SourceCacheFlags& rhs) {
-        if (!node.IsMap()) return false;
-        rhs.thumbnails = node["thumbnails"].as<bool>(true);
-        if (const auto docs = node["documents"]) rhs.documents.pdf = docs["pdf"].as<bool>(true);
-        return true;
-    }
-};
-
-// === CachingConfig ===
 template<>
 struct convert<CachingConfig> {
     static Node encode(const CachingConfig& rhs) {
         Node node;
-        node["path"] = rhs.path.string();
         node["max_size_mb"] = rhs.max_size_mb;
-        node["cloud"] = rhs.cloud;
-        node["local"] = rhs.local;
-        node["cloud_preview"] = rhs.cloud_preview;
         node["thumbnails"] = rhs.thumbnails;
-        node["previews"] = rhs.previews;
         return node;
     }
 
     static bool decode(const Node& node, CachingConfig& rhs) {
         if (!node.IsMap()) return false;
-        rhs.path = node["path"].as<std::string>(".cache");
         rhs.max_size_mb = node["max_size_mb"].as<unsigned int>(10240);
-        rhs.cloud = node["cloud"].as<SourceCacheFlags>();
-        rhs.local = node["local"].as<SourceCacheFlags>();
-        rhs.cloud_preview = node["cloud_preview"].as<FullSizeCacheConfig>();
         rhs.thumbnails = node["thumbnails"].as<ThumbnailsConfig>();
-        rhs.previews = node["previews"].as<PreviewConfig>();
         return true;
     }
 };

@@ -13,7 +13,7 @@ Path::Path(const fs::path& vaultFuseMount, const fs::path& vaultBackingMount)
     : fuseRoot(paths::getMountPath()),
       vaultRoot(fuseRoot / stripLeadingSlash(vaultFuseMount)),
       cacheRoot(paths::getBackingPath() /
-                stripLeadingSlash(ConfigRegistry::get().caching.path) /
+                stripLeadingSlash(paths::getCachePath()) /
                 stripLeadingSlash(vaultBackingMount)),
       thumbnailRoot(cacheRoot / "thumbnails"),
       fileCacheRoot(cacheRoot / "files"),

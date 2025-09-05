@@ -72,7 +72,9 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
     }
 }
 
-void HttpSession::on_write(const bool close, beast::error_code ec, std::size_t bytes) {
+void HttpSession::on_write(const bool close, beast::error_code ec, const std::size_t bytes) {
+    (void)bytes; // unused
+
     if (ec) {
         LogRegistry::http()->error("[HttpSession] Write error: {}", ec.message());
         return;

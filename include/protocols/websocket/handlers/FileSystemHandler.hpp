@@ -1,15 +1,15 @@
 #pragma once
 
-#include "services/ServiceManager.hpp"
+#include "protocols/websocket/WebSocketSession.hpp"
 #include "storage/StorageManager.hpp"
+#include "types/User.hpp"
+
 #include <memory>
 #include <nlohmann/json.hpp>
 
 namespace vh::websocket {
 
 using json = nlohmann::json;
-
-class WebSocketSession;
 
 class FileSystemHandler {
 public:
@@ -28,8 +28,6 @@ public:
     void handleCopy(const json& msg, WebSocketSession& session);
 
     void handleListDir(const json& msg, WebSocketSession& session);
-
-    void handleReadFile(const json& msg, WebSocketSession& session);
 
     void handleDelete(const json& msg, WebSocketSession& session);
 

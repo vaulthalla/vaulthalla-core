@@ -120,10 +120,10 @@ void emitTwoCol(std::ostringstream& out,
 void emitTwoColSection(std::ostringstream& out,
                        const std::string& title,
                        const std::vector<Entry>& items,
-                       std::size_t indent, std::size_t gap, int width,
-                       std::size_t max_key_col,
+                       const std::size_t indent, const std::size_t gap, const int width,
+                       const std::size_t max_key_col,
                        const ColorTheme& theme,
-                       bool show_aliases) {
+                       const bool show_aliases) {
     if (items.empty()) return;
     out << theme.H() << title << theme.R() << "\n";
     const auto keyw = computeKeyWidth(items, max_key_col, show_aliases);
@@ -160,11 +160,6 @@ void emitMarkdownTable(std::ostringstream& md, const std::vector<Entry>& items, 
             : fmt::format("`{}`", escapePipes(it.label));
         md << "| " << keyCell << " | " << escapePipes(it.desc) << " |\n";
     }
-}
-
-std::string shortOr(const std::string& s, const std::string& fallback) {
-    for (const char c : s) if (!std::isspace(static_cast<unsigned char>(c))) return s;
-    return fallback;
 }
 
 }

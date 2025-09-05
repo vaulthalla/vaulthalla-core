@@ -155,6 +155,8 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
         const std::string tokenSub = decoded.get_subject();
         const auto tokenExp = decoded.get_expires_at();
 
+        if (tokenExp < std::chrono::system_clock::now()) throw std::runtime_error("Refresh token has expired");
+
         if (tokenJti.empty()) throw std::runtime_error("Missing JTI in refresh token");
 
         // 3. Lookup refresh token by jti

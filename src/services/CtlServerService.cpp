@@ -257,43 +257,16 @@ void CtlServerService::runLoop() {
             std::vector<std::string> args = req.value("args", std::vector<std::string>{});
             if (cmd.empty()) cmd = "help";
 
+            std::unique_ptr<SocketIO> io;
+
             auto try_exec_line = [&](const std::string& line) {
-                try {
-                    const auto res = router_->executeLine(line, user); // uses tokenize() + parseTokens() under the hood
-
-                    json resp{
-                        {"ok", res.exit_code == 0},
-                        {"exit_code", res.exit_code},
-                    };
-                    if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
-                    if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
-
-                    send_json(cfd, resp);
-
-                    send_json(cfd, {{"ok", true}, {"exit_code", 0}, {"stderr", "ok"}});
-                } catch (const std::invalid_argument& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
-                } catch (const std::exception& e) {
-                    send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", e.what()}});
-                }
-            };
-
-            if (req.contains("line") && req["line"].is_string()) {
-                auto line = req["line"].get<std::string>();
-                if (line.empty()) line = "help";
-
-                std::unique_ptr<SocketIO> io;
-
-                if (req.value("interactive", false))
-                    io = std::make_unique<SocketIO>(cfd);
-
                 try {
                     const auto res = router_->executeLine(line, user, io.get());
 
                     json reply{
-                {"type", "result"},
-                {"ok", res.exit_code == 0},
-                {"exit_code", res.exit_code}
+                    {"type", "result"},
+                    {"ok", res.exit_code == 0},
+                    {"exit_code", res.exit_code}
                     };
                     if (!res.stdout_text.empty()) reply["stdout"] = res.stdout_text;
                     if (!res.stderr_text.empty()) reply["stderr"] = res.stderr_text;
@@ -307,7 +280,13 @@ void CtlServerService::runLoop() {
                         {"stderr", e.what()}
                     });
                 }
+            };
 
+            if (req.contains("line") && req["line"].is_string()) {
+                auto line = req["line"].get<std::string>();
+                if (line.empty()) line = "help";
+                if (req.value("interactive", false)) io = std::make_unique<SocketIO>(cfd);
+                try_exec_line(line);
                 ::close(cfd);
                 continue;
             }

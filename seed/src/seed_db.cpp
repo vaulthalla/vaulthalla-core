@@ -94,11 +94,11 @@ void vh::seed::initPermissions() {
 
     Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
         for (const auto& p : userPerms)
-            txn.exec_prepared("insert_raw_permission",
+            txn.exec(pqxx::prepped{"insert_raw_permission"},
                 pqxx::params{p.bit_position, p.name, p.description, "user"});
 
         for (const auto& p : vaultPerms)
-            txn.exec_prepared("insert_raw_permission",
+            txn.exec(pqxx::prepped{"insert_raw_permission"},
                 pqxx::params{p.bit_position, p.name, p.description, "vault"});
     });
 }
@@ -116,10 +116,10 @@ void vh::seed::initRoles() {
 
     Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
         for (auto& r : roles) {
-            r.id = txn.exec_prepared("insert_role",
+            r.id = txn.exec(pqxx::prepped{"insert_role"},
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
 
-            txn.exec_prepared("assign_permission_to_role",
+            txn.exec(pqxx::prepped{"assign_permission_to_role"},
                 pqxx::params{r.id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
         }
     });

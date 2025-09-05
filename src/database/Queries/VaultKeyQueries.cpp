@@ -1,15 +1,15 @@
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/VaultKey.hpp"
+#include "util/bytea.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::util;
 
 unsigned int VaultKeyQueries::addVaultKey(const std::shared_ptr<VaultKey>& key) {
     return Transactions::exec("VaultKeyQueries::addVaultKey", [&](pqxx::work& txn) {
-        pqxx::binarystring enc_key(key->encrypted_key.data(), key->encrypted_key.size());
-        pqxx::binarystring iv(key->iv.data(), key->iv.size());
-        pqxx::params p{key->vaultId, enc_key, iv};
+        pqxx::params p{key->vaultId, to_hex_bytea(key->encrypted_key), to_hex_bytea(key->iv)};
         const auto res = txn.exec(pqxx::prepped{"insert_vault_key"}, p);
         if (res.empty()) throw std::runtime_error("Failed to add vault key: no result returned");
         return res.one_field().as<unsigned int>();
@@ -24,9 +24,7 @@ void VaultKeyQueries::deleteVaultKey(unsigned int vaultId) {
 
 void VaultKeyQueries::updateVaultKey(const std::shared_ptr<VaultKey>& key) {
     Transactions::exec("VaultKeyQueries::updateVaultKey", [&](pqxx::work& txn) {
-        pqxx::binarystring enc_key(key->encrypted_key.data(), key->encrypted_key.size());
-        pqxx::binarystring iv(key->iv.data(), key->iv.size());
-        pqxx::params p{key->vaultId, enc_key, iv};
+        pqxx::params p{key->vaultId, to_hex_bytea(key->encrypted_key), to_hex_bytea(key->iv)};
         txn.exec(pqxx::prepped{"update_vault_key"}, p);
     });
 }
@@ -41,9 +39,7 @@ std::shared_ptr<VaultKey> VaultKeyQueries::getVaultKey(unsigned int vaultId) {
 
 unsigned int VaultKeyQueries::rotateVaultKey(const std::shared_ptr<VaultKey>& newKey) {
     return Transactions::exec("VaultKeyQueries::rotateVaultKey", [&](pqxx::work& txn) {
-        pqxx::binarystring enc_key(newKey->encrypted_key.data(), newKey->encrypted_key.size());
-        pqxx::binarystring iv(newKey->iv.data(), newKey->iv.size());
-        pqxx::params p{newKey->vaultId, enc_key, iv};
+        pqxx::params p{newKey->vaultId, to_hex_bytea(newKey->encrypted_key), to_hex_bytea(newKey->iv)};
         const auto res = txn.exec(pqxx::prepped{"rotate_vault_key"}, p);
         if (res.empty()) throw std::runtime_error("Failed to rotate vault key: no result returned");
         return res.one_field().as<unsigned int>();

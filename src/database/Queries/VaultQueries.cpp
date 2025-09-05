@@ -133,10 +133,12 @@ std::vector<std::shared_ptr<Vault> > VaultQueries::listVaults(const std::optiona
         for (const auto& row : res) {
             switch (from_string(row["type"].as<std::string>())) {
             case VaultType::Local: {
+                if (type && *type != VaultType::Local) continue;
                 vaults.push_back(std::make_shared<Vault>(row));
                 break;
             }
             case VaultType::S3: {
+                if (type && *type != VaultType::S3) continue;
                 vaults.push_back(std::make_shared<S3Vault>(row));
                 break;
             }

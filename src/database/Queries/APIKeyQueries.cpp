@@ -1,21 +1,21 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/APIKey.hpp"
+#include "util/bytea.hpp"
 
 using namespace vh::database;
 using namespace vh::types::api;
+using namespace vh::util;
 
 unsigned int APIKeyQueries::upsertAPIKey(const std::shared_ptr<APIKey>& key) {
     return Transactions::exec("APIKeyQueries::addAPIKey", [&](pqxx::work& txn) {
-        pqxx::binarystring enc_secret(key->encrypted_secret_access_key.data(), key->encrypted_secret_access_key.size());
-        pqxx::binarystring iv(key->iv.data(), key->iv.size());
         pqxx::params p{
             key->user_id,
             key->name,
             to_string(key->provider),
             key->access_key,
-            enc_secret,
-            iv,
+            to_hex_bytea(key->encrypted_secret_access_key),
+            to_hex_bytea(key->iv),
             key->region,
             key->endpoint
         };

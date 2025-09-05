@@ -4,9 +4,9 @@ project('vaulthalla', 'cpp',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
-            'werror=false',
+            'werror=true',
             'cpp_std=c++23',
-            'unity=on',
+            'unity=off',
             'unity_size=10',
             'prefix=/usr'
         ]

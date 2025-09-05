@@ -1,15 +1,15 @@
 #include "database/Queries/InternalSecretQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/InternalSecret.hpp"
+#include "util/bytea.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::util;
 
 void InternalSecretQueries::upsertSecret(const std::shared_ptr<types::InternalSecret>& secret) {
     Transactions::exec("InternalSecretQueries::upsertSecret", [&](pqxx::work& txn) {
-        pqxx::binarystring value_blob(secret->value.data(), secret->value.size());
-        pqxx::binarystring iv_blob(secret->iv.data(), secret->iv.size());
-        pqxx::params p{secret->key, value_blob, iv_blob};
+        pqxx::params p{secret->key, to_hex_bytea(secret->value), to_hex_bytea(secret->iv)};
         txn.exec(pqxx::prepped{"upsert_internal_secret"}, p);
     });
 }

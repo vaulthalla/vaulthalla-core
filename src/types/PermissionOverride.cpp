@@ -12,8 +12,8 @@ using namespace vh::types;
 using namespace vh::shell;
 
 PermissionOverride::PermissionOverride(const pqxx::row& row)
-    : permission(row),
-      id(row["id"].as<unsigned int>()),
+    : id(row["id"].as<unsigned int>()),
+      permission(row),
       effect(overrideOptFromString(row["effect"].as<std::string>())),
       assignment_id(row["assignment_id"].as<unsigned int>()),
       enabled(row["enabled"].as<bool>()),
@@ -21,8 +21,8 @@ PermissionOverride::PermissionOverride(const pqxx::row& row)
       pattern(patternStr) {}
 
 PermissionOverride::PermissionOverride(const nlohmann::json& j)
-    : permission(j.at("permission")),
-      id(j.value("id", 0)),
+    : id(j.value("id", 0)),
+      permission(j.at("permission")),
       effect(overrideOptFromString(j.value("effect", std::string("allow")))),
       assignment_id(j.value("assignment_id", 0)),
       enabled(j.value("enabled", false)),

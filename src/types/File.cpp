@@ -21,6 +21,7 @@ File::File(const pqxx::row& row, const pqxx::result& parentRows)
 
 File::File(const std::string& s3_key, const uint64_t size, const std::optional<std::time_t>& updated)
     : FSEntry(s3_key) {
+    size_bytes = size;
     if (updated) updated_at = *updated;
 }
 

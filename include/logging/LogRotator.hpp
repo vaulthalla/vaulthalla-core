@@ -52,9 +52,9 @@ public:
     explicit LogRotator(Options opts);
 
     // Rotation / pruning API
-    void maybeRotate();
-    void forceRotate();
-    void pruneOnly();
+    void maybeRotate() const;
+    void forceRotate() const;
+    void pruneOnly() const;
 
 private:
     enum class RotateReason { None, Size, Interval, Forced };
@@ -69,7 +69,7 @@ private:
     // Helpers
     static std::string escapeRx(const std::string& s);
     static std::chrono::system_clock::time_point to_sys(std::filesystem::file_time_type tp);
-    RotateReason rotationReason();
+    RotateReason rotationReason() const;
     static std::string nowStamp();
     std::filesystem::path rotatedName() const;
 
@@ -86,10 +86,10 @@ private:
 #endif
     };
 
-    void rotateImpl(RotateReason why);
+    void rotateImpl(RotateReason why) const;
     bool compressFile(const std::filesystem::path& src, Compression c) const;
     static std::string shellQuote(const std::string& s);
-    void pruneImpl();
+    void pruneImpl() const;
 
     static const char* reasonStr(RotateReason r);
 };

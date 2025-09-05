@@ -19,7 +19,7 @@ class FUSE;
 class Vaulthalla;
 class CtlServerService;
 class ConnectionLifecycleManager;
-struct LogRotationService;
+class LogRotationService;
 
 class ServiceManager : public std::enable_shared_from_this<ServiceManager> {
 public:

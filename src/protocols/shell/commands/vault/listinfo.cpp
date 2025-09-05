@@ -10,18 +10,15 @@
 #include "storage/StorageEngine.hpp"
 
 #include "types/Vault.hpp"
-#include "types/ListQueryParams.hpp"
 #include "types/VaultRole.hpp"
 #include "types/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
 
-#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
 #include <memory>
-#include <utility>
 
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
@@ -32,9 +29,7 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::util;
 using namespace vh::logging;
-using namespace vh::cloud;
 
 CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
     constexpr const auto* ERR = "vault info";

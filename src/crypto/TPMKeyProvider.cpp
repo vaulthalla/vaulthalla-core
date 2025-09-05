@@ -27,7 +27,7 @@ static ESYS_CONTEXT* init_esys() {
 static std::vector<uint8_t> random_key(std::size_t n = 32) {
     std::vector<uint8_t> k(n);
     std::random_device rd;
-    std::ranges::generate(k.begin(), k.end(), [&] { return static_cast<uint8_t>(rd()); });
+    std::generate(k.begin(), k.end(), [&] { return static_cast<uint8_t>(rd()); });
     return k;
 }
 

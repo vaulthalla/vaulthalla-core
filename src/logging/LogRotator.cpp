@@ -28,7 +28,7 @@ LogRotator::LogRotator(Options opts)
         rotated_regex_ = std::regex(
             std::string("^")
             + escapeRx(base_) + R"(\.\d{8}-\d{6})" + escapeRx(ext_)
-            + R"((?:\.gz|\.zst)?)$)"
+            + R"((?:\.gz|\.zst)?)" + "$"
         );
         opts_.rotated_filter = [this](const std::filesystem::path& p) {
             return std::regex_match(p.filename().string(), rotated_regex_);
@@ -37,21 +37,19 @@ LogRotator::LogRotator(Options opts)
     if (!opts_.lock_dir) opts_.lock_dir = dir_;
 }
 
-void LogRotator::maybeRotate() {
+void LogRotator::maybeRotate() const {
     std::scoped_lock lk(m_);
-    if (const auto reason = rotationReason(); reason != RotateReason::None) {
-        rotateImpl(reason);
-    }
+    if (const auto reason = rotationReason(); reason != RotateReason::None) rotateImpl(reason);
     pruneImpl();
 }
 
-void LogRotator::forceRotate() {
+void LogRotator::forceRotate() const {
     std::scoped_lock lk(m_);
     rotateImpl(RotateReason::Forced);
     pruneImpl();
 }
 
-void LogRotator::pruneOnly() {
+void LogRotator::pruneOnly() const {
     std::scoped_lock lk(m_);
     pruneImpl();
 }
@@ -59,8 +57,8 @@ void LogRotator::pruneOnly() {
 // ===== helpers =====
 
 std::string LogRotator::escapeRx(const std::string& s) {
-    static const std::regex re{ R"([.^$|()\\[*+?{\]])" };
-    return std::regex_replace(s, re, R"(\$&)");
+    static const std::regex special_chars(R"([.^$|()\[\]{}*+?\\])");
+    return std::regex_replace(s, special_chars, R"(\$&)");
 }
 
 std::chrono::system_clock::time_point LogRotator::to_sys(std::filesystem::file_time_type tp) {
@@ -69,24 +67,22 @@ std::chrono::system_clock::time_point LogRotator::to_sys(std::filesystem::file_t
     return sctp;
 }
 
-LogRotator::RotateReason LogRotator::rotationReason() {
+LogRotator::RotateReason LogRotator::rotationReason() const {
     std::error_code ec;
 
     if (!std::filesystem::exists(opts_.active_path, ec)) {
         return RotateReason::None; // nothing to rotate
     }
 
-    if (opts_.max_bytes) {
-        auto sz = std::filesystem::file_size(opts_.active_path, ec);
-        if (!ec && sz >= *opts_.max_bytes) return RotateReason::Size;
-    }
+    if (opts_.max_bytes && !ec && std::filesystem::file_size(opts_.active_path, ec) >= *opts_.max_bytes)
+        return RotateReason::Size;
 
     if (opts_.max_interval) {
-        auto mtime = std::filesystem::last_write_time(opts_.active_path, ec);
+        const auto mtime = std::filesystem::last_write_time(opts_.active_path, ec);
         if (!ec) {
             using namespace std::chrono;
-            auto now  = system_clock::now();
-            auto then = to_sys(mtime);
+            const auto now  = system_clock::now();
+            const auto then = to_sys(mtime);
             if (now - then >= *opts_.max_interval) return RotateReason::Interval;
         }
     }
@@ -139,7 +135,7 @@ LogRotator::FileLock::~FileLock() {
 
 // ===== rotation/compression/pruning =====
 
-void LogRotator::rotateImpl(RotateReason why) {
+void LogRotator::rotateImpl(const RotateReason why) const {
     // Prevent concurrent rotation across processes
     const auto lockfile = *opts_.lock_dir / (base_ + ext_ + ".rotate.lock");
     std::optional<FileLock> lk;
@@ -221,7 +217,7 @@ std::string LogRotator::shellQuote(const std::string& s) {
     return out;
 }
 
-void LogRotator::pruneImpl() {
+void LogRotator::pruneImpl() const {
     using namespace std::chrono;
 
     // 1) Gather rotated files
@@ -238,7 +234,7 @@ void LogRotator::pruneImpl() {
     if (rotated.empty()) return;
 
     // 2) Sort oldest -> newest by mtime
-    std::sort(rotated.begin(), rotated.end(),
+    std::ranges::sort(rotated.begin(), rotated.end(),
               [](const auto& a, const auto& b){
                   std::error_code ea, eb;
                   return std::filesystem::last_write_time(a, ea) < std::filesystem::last_write_time(b, eb);

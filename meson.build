@@ -1,12 +1,12 @@
 project('vaulthalla', 'cpp',
-        version: '0.12.1',
+        version: '0.12.2',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
             'cpp_std=c++23',
             'unity=on',
-            'unity_size=9',
+            'unity_size=10',
             'prefix=/usr'
         ]
 )

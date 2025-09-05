@@ -7,6 +7,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 #include <nlohmann/json_fwd.hpp>
+#include <chrono>
 
 namespace vh::config {
 

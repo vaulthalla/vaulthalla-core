@@ -2,11 +2,11 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "usage/include/CommandUsage.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "usage/include/usages.hpp"
 
 using namespace vh::shell;
+using namespace vh::services;
 
 static CommandResult handle_permission(const CommandCall& call) {
     if (call.positionals.empty() || call.positionals.size() > 1) return usage(call.constructFullArgs());

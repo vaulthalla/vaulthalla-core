@@ -4,6 +4,7 @@
 #include "services/Vaulthalla.hpp"
 #include "services/CtlServerService.hpp"
 #include "services/ConnectionLifecycleManager.hpp"
+#include "services/LogRotationService.hpp"
 
 using namespace vh::logging;
 using namespace vh::services;

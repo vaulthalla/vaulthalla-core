@@ -3,7 +3,7 @@
 #include "types/Path.hpp"
 #include "types/FSEntry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "storage/FSCache.hpp"
 
 #include <fstream>

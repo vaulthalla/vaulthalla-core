@@ -10,7 +10,7 @@
 #include "types/Role.hpp"
 #include "types/Permission.hpp"
 
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 
 #include <optional>

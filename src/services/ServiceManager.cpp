@@ -4,6 +4,7 @@
 #include "services/Vaulthalla.hpp"
 #include "services/CtlServerService.hpp"
 #include "services/ConnectionLifecycleManager.hpp"
+#include "services/LogRotationService.hpp"
 
 using namespace vh::logging;
 using namespace vh::services;
@@ -18,13 +19,15 @@ ServiceManager::ServiceManager()
       fuseService(std::make_shared<FUSE>()),
       vaulthallaService(std::make_shared<Vaulthalla>()),
       ctlServerService(std::make_shared<CtlServerService>()),
-      connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>())
+      connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>()),
+      logRotationService(std::make_shared<LogRotationService>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;
     services_["Vaulthalla"] = vaulthallaService;
     services_["CtlServer"] = ctlServerService;
     services_["ConnectionLifecycleManager"] = connectionLifecycleManager;
+    services_["LogRotationService"] = logRotationService;
 }
 
 void ServiceManager::startAll() {
@@ -35,6 +38,7 @@ void ServiceManager::startAll() {
     tryStart("SyncController", syncController);
     tryStart("CtlServer", ctlServerService);
     tryStart("ConnectionLifecycleManager", connectionLifecycleManager);
+    tryStart("LogRotationService", logRotationService);
     LogRegistry::vaulthalla()->debug("[ServiceManager] All services started.");
 
     startWatchdog();
@@ -49,6 +53,7 @@ void ServiceManager::stopAll(const int signal) {
         stopService("Vaulthalla", vaulthallaService, signal);
         stopService("CtlServer", ctlServerService, signal);
         stopService("ConnectionLifecycleManager", connectionLifecycleManager, signal);
+        stopService("LogRotationService", logRotationService, signal);
     }
 
     stopWatchdog();

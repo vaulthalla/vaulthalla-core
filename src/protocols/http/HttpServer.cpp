@@ -6,7 +6,7 @@
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::services;

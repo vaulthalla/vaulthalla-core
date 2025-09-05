@@ -18,9 +18,10 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Transactions.hpp"
 #include "util/fsDBHelpers.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/IdGenerator.hpp"
+#include "storage/FSCache.hpp"
 
 #include <ranges>
 #include <vector>

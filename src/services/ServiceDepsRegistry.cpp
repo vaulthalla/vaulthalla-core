@@ -4,7 +4,7 @@
 #include "services/SyncController.hpp"
 #include "storage/FSCache.hpp"
 #include "crypto/APIKeyManager.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 
 using namespace vh::services;

@@ -10,7 +10,6 @@
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::types;
-using namespace vh::database;
 
 MirrorSyncTask::MirrorSyncTask(const std::shared_ptr<StorageEngine>& engine)
     : SyncTask(engine) {}

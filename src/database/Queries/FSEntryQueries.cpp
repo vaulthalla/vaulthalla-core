@@ -4,7 +4,7 @@
 #include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "util/u8.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
 using namespace vh::types;

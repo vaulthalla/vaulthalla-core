@@ -3,7 +3,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/Vault.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "concurrency/fs/LocalRotateKeyTask.hpp"
 
 using namespace vh::concurrency;

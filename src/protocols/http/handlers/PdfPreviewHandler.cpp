@@ -4,7 +4,7 @@
 #include "storage/StorageEngine.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <pdfium/fpdfview.h>
 

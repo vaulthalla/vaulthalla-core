@@ -14,7 +14,7 @@
 #include "crypto/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "util/task.hpp"
 
 using namespace vh::concurrency;

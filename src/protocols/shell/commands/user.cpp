@@ -5,7 +5,7 @@
 #include "util/shellArgsHelpers.hpp"
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "types/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"

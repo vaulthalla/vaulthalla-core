@@ -3,7 +3,7 @@
 #include "protocols/shell/Parser.hpp"
 #include "protocols/shell/commands/all.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "protocols/shell/SocketIO.hpp"
 #include "types/User.hpp"
 

@@ -2,7 +2,7 @@
 #include "util/timestamp.hpp"
 #include "types/Directory.hpp"
 #include "types/File.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "util/fsPath.hpp"

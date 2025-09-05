@@ -2,7 +2,7 @@
 #include <filesystem>
 
 #include "config/ConfigRegistry.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 namespace fs = std::filesystem;
 

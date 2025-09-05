@@ -2,7 +2,7 @@
 #include "types/APIKey.hpp"
 #include "util/timestamp.hpp"
 #include "util/s3Helpers.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::cloud;
 using namespace vh::types;

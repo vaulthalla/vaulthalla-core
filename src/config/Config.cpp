@@ -1,5 +1,6 @@
 #include "config/Config.hpp"
 #include "config/config_yaml.hpp"
+#include "config/util.hpp"
 
 #include <cstdlib>
 #include <yaml-cpp/yaml.h>
@@ -20,11 +21,11 @@ Config loadConfig(const std::string& path) {
 
     if (auto node = root["websocket_server"]) YAML::convert<WebsocketConfig>::decode(node, cfg.websocket);
     if (auto node = root["http_preview_server"]) YAML::convert<HttpPreviewConfig>::decode(node, cfg.http_preview);
-    if (auto node = root["logging"]) YAML::convert<LoggingConfig>::decode(node, cfg.logging);
     if (auto node = root["caching"]) YAML::convert<CachingConfig>::decode(node, cfg.caching);
     if (auto node = root["database"]) YAML::convert<DatabaseConfig>::decode(node, cfg.database);
     if (auto node = root["auth"]) YAML::convert<AuthConfig>::decode(node, cfg.auth);
     if (auto node = root["sharing"]) YAML::convert<SharingConfig>::decode(node, cfg.sharing);
+    if (auto node = root["auditing"]) YAML::convert<AuditConfig>::decode(node, cfg.auditing);
     if (auto node = root["dev"]) YAML::convert<DevConfig>::decode(node, cfg.dev);
 
     return cfg;
@@ -55,11 +56,11 @@ void Config::save() const {
     unordered_map<string, string> sectionMap = {
         {"websocket_server", encode(websocket)},
         {"http_preview_server", encode(http_preview)},
-        {"logging", encode(logging)},
         {"caching", encode(caching)},
         {"database", encode(database)},
         {"auth", encode(auth)},
         {"sharing", encode(sharing)},
+        {"auditing", encode(auditing)},
         {"dev", encode(dev)}
     };
 
@@ -85,11 +86,11 @@ void to_json(nlohmann::json& j, const Config& c) {
     j = {
         {"websocket_server", c.websocket},
         {"http_preview_server", c.http_preview},
-        {"logging", c.logging},
         {"caching", c.caching},
         {"database", c.database},
         {"auth", c.auth},
         {"sharing", c.sharing},
+        {"auditing", c.auditing},
         {"dev", c.dev}
     };
 }
@@ -97,11 +98,11 @@ void to_json(nlohmann::json& j, const Config& c) {
 void from_json(const nlohmann::json& j, Config& c) {
     j.at("websocket_server").get_to(c.websocket);
     j.at("http_preview_server").get_to(c.http_preview);
-    j.at("logging").get_to(c.logging);
     j.at("caching").get_to(c.caching);
     j.at("database").get_to(c.database);
     j.at("auth").get_to(c.auth);
     j.at("sharing").get_to(c.sharing);
+    j.at("auditing").get_to(c.auditing);
     j.at("dev").get_to(c.dev);
 }
 
@@ -141,15 +142,11 @@ void from_json(const nlohmann::json& j, HttpPreviewConfig& c) {
 
 void to_json(nlohmann::json& j, const LoggingConfig& c) {
     j = {
-        {"log_rotation_days", c.log_rotation_days.count()},
-        {"audit_log_rotation_days", c.audit_log_rotation_days.count()},
         {"levels", c.levels}
     };
 }
 
 void from_json(const nlohmann::json& j, LoggingConfig& c) {
-    c.log_rotation_days = std::chrono::days(j.value("log_rotation_days", 7));
-    c.audit_log_rotation_days = std::chrono::days(j.value("audit_log_rotation_days", 30));
     j.at("levels").get_to(c.levels);
 }
 
@@ -268,6 +265,60 @@ void to_json(nlohmann::json& j, const SharingConfig& c) {
 void from_json(const nlohmann::json& j, SharingConfig& c) {
     c.enabled = j.value("enabled", true);
     c.enable_public_links = j.value("enable_public_links", true);
+}
+
+void to_json(nlohmann::json& j, const AuditLogConfig& c) {
+    j = {
+        {"retention_days", c.retention_days.count()},
+        {"rotate_max_size", bytesToMbOrGbStr(c.rotate_max_size)},
+        {"rotate_interval", hoursToDayOrHourStr(c.rotate_interval)},
+        {"compression", compressionToString(c.compression)},
+        {"max_retained_logs_size", bytesToMbOrGbStr(c.max_retained_logs_size)},
+        {"strict_retention", c.strict_retention}
+    };
+}
+
+void from_json(const nlohmann::json& j, AuditLogConfig& c) {
+    c.retention_days = std::chrono::days(j.value("retention_days", 30));
+    c.rotate_max_size = parseMbOrGbToByte(j.value("rotate_max_size", "50MB"));
+    c.rotate_interval = parseHoursFromDayOrHour(j.value("rotate_interval", "24h"));
+    c.compression = parseCompression(j.value("compression", "zstd"));
+    c.max_retained_logs_size = parseMbOrGbToByte(j.value("max_retained_logs_size", "1GB"));
+    c.strict_retention = j.value("strict_retention", false);
+}
+
+void to_json(nlohmann::json& j, const EncryptionWaiverConfig& c) {
+    j = {
+        {"retention_days", c.retention_days.count()}
+    };
+}
+
+void from_json(const nlohmann::json& j, EncryptionWaiverConfig& c) {
+    c.retention_days = std::chrono::days(j.value("retention_days", 180));
+}
+
+void to_json(nlohmann::json& j, const FilesTrashedConfig& c) {
+    j = {
+        {"retention_days", c.retention_days.count()}
+    };
+}
+
+void from_json(const nlohmann::json& j, FilesTrashedConfig& c) {
+    c.retention_days = std::chrono::days(j.value("retention_days", 60));
+}
+
+void to_json(nlohmann::json& j, const AuditConfig& c) {
+    j = {
+        {"audit_log", c.audit_log},
+        {"encryption_waivers", c.encryption_waivers},
+        {"files_trashed", c.files_trashed}
+    };
+}
+
+void from_json(const nlohmann::json& j, AuditConfig& c) {
+    j.at("audit_log").get_to(c.audit_log);
+    j.at("encryption_waivers").get_to(c.encryption_waivers);
+    j.at("files_trashed").get_to(c.files_trashed);
 }
 
 void to_json(nlohmann::json& j, const DevConfig& c) {

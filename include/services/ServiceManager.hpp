@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <csignal>
 #include <cstdlib>
@@ -19,6 +19,7 @@ class FUSE;
 class Vaulthalla;
 class CtlServerService;
 class ConnectionLifecycleManager;
+class LogRotationService;
 
 class ServiceManager : public std::enable_shared_from_this<ServiceManager> {
 public:
@@ -51,7 +52,7 @@ private:
     std::shared_ptr<Vaulthalla> vaulthallaService;
     std::shared_ptr<CtlServerService> ctlServerService;
     std::shared_ptr<ConnectionLifecycleManager> connectionLifecycleManager;
-
+    std::shared_ptr<LogRotationService> logRotationService;
 
     mutable std::mutex mutex_;
     std::map<std::string, std::shared_ptr<AsyncService>> services_;

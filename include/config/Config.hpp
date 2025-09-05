@@ -1,10 +1,13 @@
 #pragma once
 
+#include "logging/LogRotator.hpp"
+
 #include <filesystem>
 #include <string>
 #include <vector>
 #include <spdlog/spdlog.h>
 #include <nlohmann/json_fwd.hpp>
+#include <chrono>
 
 namespace vh::config {
 
@@ -25,35 +28,6 @@ struct HttpPreviewConfig {
     uint16_t port = 33370;
     unsigned int max_connections = 512;
     uintmax_t max_preview_size_bytes = MAX_PREVIEW_SIZE_BYTES;
-};
-
-struct SubsystemLogLevelsConfig {
-    spdlog::level::level_enum vaulthalla = spdlog::level::debug;
-    spdlog::level::level_enum fuse = spdlog::level::debug;
-    spdlog::level::level_enum filesystem = spdlog::level::info;
-    spdlog::level::level_enum crypto = spdlog::level::info;
-    spdlog::level::level_enum cloud = spdlog::level::info;
-    spdlog::level::level_enum auth = spdlog::level::info;
-    spdlog::level::level_enum websocket = spdlog::level::info;
-    spdlog::level::level_enum http = spdlog::level::info;
-    spdlog::level::level_enum shell = spdlog::level::info;
-    spdlog::level::level_enum db = spdlog::level::warn;
-    spdlog::level::level_enum sync = spdlog::level::info;
-    spdlog::level::level_enum thumb = spdlog::level::info;
-    spdlog::level::level_enum storage = spdlog::level::info;
-    spdlog::level::level_enum types = spdlog::level::info;
-};
-
-struct LogLevelsConfig {
-    spdlog::level::level_enum console_log_level = spdlog::level::info;
-    spdlog::level::level_enum file_log_level = spdlog::level::debug;
-    SubsystemLogLevelsConfig subsystem_levels;
-};
-
-struct LoggingConfig {
-    std::chrono::days log_rotation_days = std::chrono::days(7);
-    std::chrono::days audit_log_rotation_days = std::chrono::days(30);
-    LogLevelsConfig levels;
 };
 
 struct ThumbnailsConfig {
@@ -85,20 +59,72 @@ struct SharingConfig {
     bool enable_public_links = true;
 };
 
+struct AuditLogConfig {
+    std::chrono::days retention_days = std::chrono::days(30);
+    uintmax_t rotate_max_size = 50 * 1024 * 1024; // 50MB
+    std::chrono::hours rotate_interval = std::chrono::hours(24);
+    logging::LogRotator::Compression compression = logging::LogRotator::Compression::Zstd;
+    uintmax_t max_retained_logs_size = 1024 * 1024 * 1024; // 1GB
+    bool strict_retention = false; // If true, retain logs for full retention days minimum, even if over the size limit
+};
+
+struct EncryptionWaiverConfig {
+    std::chrono::days retention_days = std::chrono::days(180);
+};
+
+struct FilesTrashedConfig {
+    std::chrono::days retention_days = std::chrono::days(60);
+};
+
+struct AuditConfig {
+    AuditLogConfig audit_log;
+    EncryptionWaiverConfig encryption_waivers;
+    FilesTrashedConfig files_trashed;
+};
+
 struct DevConfig {
     bool enabled = false;
     bool init_r2_test_vault = false;
 };
 
+struct SubsystemLogLevelsConfig {
+    spdlog::level::level_enum vaulthalla   = spdlog::level::info;   // Top-level events like startup/shutdown
+    spdlog::level::level_enum fuse         = spdlog::level::warn;   // Don’t log every op; only surface permission or IO failures
+    spdlog::level::level_enum filesystem   = spdlog::level::warn;   // Only structural errors or corruption
+    spdlog::level::level_enum crypto       = spdlog::level::warn;   // Rare; surface failure to encrypt/decrypt
+    spdlog::level::level_enum cloud        = spdlog::level::warn;   // AWS/S3 errors, not routine syncs
+    spdlog::level::level_enum auth         = spdlog::level::warn;   // Failed logins, token errors
+    spdlog::level::level_enum websocket    = spdlog::level::warn;   // Auth failures, closed sockets, hijack attempts
+    spdlog::level::level_enum http         = spdlog::level::warn;   // 5xx, invalid auth, etc.
+    spdlog::level::level_enum shell        = spdlog::level::warn;   // CLI parsing edge cases or override violations
+    spdlog::level::level_enum db           = spdlog::level::err;    // Only if DB is unreachable, failed tx, corruption
+    spdlog::level::level_enum sync         = spdlog::level::warn;   // Conflict resolution issues, failed upload/download
+    spdlog::level::level_enum thumb        = spdlog::level::warn;   // Failed renders only
+    spdlog::level::level_enum storage      = spdlog::level::warn;   // Underlying I/O issues
+    spdlog::level::level_enum types        = spdlog::level::err;    // Violations of invariants or schema errors
+};
+
+struct LogLevelsConfig {
+    spdlog::level::level_enum console_log_level = spdlog::level::info;
+    spdlog::level::level_enum file_log_level = spdlog::level::warn;
+    SubsystemLogLevelsConfig subsystem_levels;
+};
+
+struct LoggingConfig {
+    LogLevelsConfig levels;
+};
+
 struct Config {
     WebsocketConfig websocket;
     HttpPreviewConfig http_preview;
-    LoggingConfig logging;
     CachingConfig caching;
     DatabaseConfig database;
     AuthConfig auth;
     SharingConfig sharing;
+    AuditConfig auditing;
     DevConfig dev;
+
+    LoggingConfig logging; // internal only
 
     void save() const;
 };
@@ -126,6 +152,14 @@ void to_json(nlohmann::json& j, const AuthConfig& c);
 void from_json(const nlohmann::json& j, AuthConfig& c);
 void to_json(nlohmann::json& j, const SharingConfig& c);
 void from_json(const nlohmann::json& j, SharingConfig& c);
+void to_json(nlohmann::json& j, const AuditLogConfig& c);
+void from_json(const nlohmann::json& j, AuditLogConfig& c);
+void to_json(nlohmann::json& j, const EncryptionWaiverConfig& c);
+void from_json(const nlohmann::json& j, EncryptionWaiverConfig& c);
+void to_json(nlohmann::json& j, const FilesTrashedConfig& c);
+void from_json(const nlohmann::json& j, FilesTrashedConfig& c);
+void to_json(nlohmann::json& j, const AuditConfig& c);
+void from_json(const nlohmann::json& j, AuditConfig& c);
 void to_json(nlohmann::json& j, const DevConfig& c);
 void from_json(const nlohmann::json& j, DevConfig& c);
 

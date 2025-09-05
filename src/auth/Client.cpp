@@ -1,5 +1,5 @@
 #include "auth/Client.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 
 #include <chrono>

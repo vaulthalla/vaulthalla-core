@@ -7,7 +7,7 @@
 #include "crypto/InternalSecretManager.hpp"
 #include <nlohmann/json.hpp>
 #include "crypto/GPGEncryptor.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 

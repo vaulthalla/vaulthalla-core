@@ -5,7 +5,7 @@
 #include "concurrency/thumbnail/ThumbnailTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <memory>
 #include <string>

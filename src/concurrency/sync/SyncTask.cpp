@@ -10,7 +10,7 @@
 #include "database/Queries/SyncQueries.hpp"
 #include "types/File.hpp"
 #include "types/Sync.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <utility>
 

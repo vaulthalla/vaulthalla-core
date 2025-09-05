@@ -1,6 +1,6 @@
 #include "services/AsyncService.hpp"
 #include "services/ServiceManager.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::logging;

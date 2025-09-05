@@ -9,7 +9,7 @@
 #include "storage/StorageEngine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/SyncController.hpp"
 #include "storage/FSCache.hpp"

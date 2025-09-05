@@ -1,5 +1,5 @@
 #include "crypto/encrypt.hpp"
-#include "services/LogRegistry.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <sodium.h>
 #include <stdexcept>

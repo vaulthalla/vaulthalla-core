@@ -102,7 +102,7 @@ static CommandResult finish_vault_create(const CommandCall& call, std::shared_pt
     return ok("\nSuccessfully created new vault!\n" + to_string(v));
 }
 
-static CommandResult handle_vault_create_failure(const CommandCall& call, const std::shared_ptr<Vault>& v, const std::string& err) {
+static CommandResult handle_vault_create_failure(const std::shared_ptr<Vault>& v, const std::string& err) {
     if (VaultQueries::vaultExists(v->name, v->owner_id))
         ServiceDepsRegistry::instance().storageManager->removeVault(v->id);
 
@@ -234,7 +234,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
         return finish_vault_create(call, v, sync);
 
     } catch (const std::exception& e) {
-        return handle_vault_create_failure(call, v, e.what());
+        return handle_vault_create_failure(v, e.what());
     }
 }
 
@@ -343,6 +343,6 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
         return finish_vault_create(call, vault, sync);
 
     } catch (const std::exception& e) {
-        return handle_vault_create_failure(call, vault, e.what());
+        return handle_vault_create_failure(vault, e.what());
     }
 }

@@ -20,6 +20,7 @@ FUSE::FUSE()
     : AsyncService("FUSE") {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
+    (void)userdata;
     LogRegistry::fuse()->debug("[FUSE] Initializing FUSE connection...");
 
     constexpr uintmax_t MB = 1024 * 1024;

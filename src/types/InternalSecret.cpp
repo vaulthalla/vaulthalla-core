@@ -1,17 +1,14 @@
 #include "types/InternalSecret.hpp"
+#include "util/bytea.hpp"
 
 #include <pqxx/row>
-#include <pqxx/binarystring>
 
 using namespace vh::types;
+using namespace vh::util;
 
 InternalSecret::InternalSecret(const pqxx::row& row)
     : key(row["key"].c_str()),
+      value(from_hex_bytea(row["value"].as<std::string>())),
+      iv(from_hex_bytea(row["iv"].as<std::string>())),
       created_at(row["created_at"].as<std::time_t>()),
-      updated_at(row["updated_at"].as<std::time_t>()) {
-    const pqxx::binarystring blob(row["value"]);
-    value.assign(blob.begin(), blob.end());
-
-    const pqxx::binarystring iv_blob(row["iv"]);
-    iv.assign(iv_blob.begin(), iv_blob.end());
-}
+      updated_at(row["updated_at"].as<std::time_t>()) {}

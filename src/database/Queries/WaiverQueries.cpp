@@ -16,14 +16,14 @@ void WaiverQueries::addWaiver(const std::shared_ptr<types::Waiver>& waiver) {
     if (waiver->waiver_text.empty()) throw std::invalid_argument("Waiver text cannot be empty");
 
     Transactions::exec("WaiverQueries::addWaiver", [&](pqxx::work& txn) {
-        pqxx::params p{
+        const pqxx::params p{
             waiver->vault->id,
             waiver->user->id,
             waiver->apiKey->id,
             waiver->waiver_text
         };
 
-        const auto res = txn.exec_prepared("insert_cloud_encryption_waiver", p);
+        const auto res = txn.exec(pqxx::prepped{"insert_cloud_encryption_waiver"}, p);
         if (res.empty() || res.affected_rows() == 0)
             throw std::runtime_error("Failed to insert waiver for user " + std::to_string(waiver->user->id));
         waiver->id = res.one_field().as<unsigned int>();
@@ -40,12 +40,12 @@ void WaiverQueries::addWaiver(const std::shared_ptr<types::Waiver>& waiver) {
                 waiver->overridingRole->permissions
             };
 
-            const auto res2 = txn.exec_prepared("insert_waiver_owner_override", p2);
+            const auto res2 = txn.exec(pqxx::prepped{"insert_waiver_owner_override"}, p2);
             if (res2.empty() || res2.affected_rows() == 0)
                 throw std::runtime_error("Failed to insert waiver for owner " + std::to_string(waiver->owner->id));
 
-            pqxx::params p3{waiver->id, waiver->overridingRole->type};
-            txn.exec_prepared("insert_permission_snapshots_for_waiver", p3);
+            const pqxx::params p3{waiver->id, waiver->overridingRole->type};
+            txn.exec(pqxx::prepped{"insert_permission_snapshots_for_waiver"}, p3);
         }
     });
 }

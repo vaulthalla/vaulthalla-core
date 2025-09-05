@@ -6,6 +6,7 @@
 #include "protocols/shell/Table.hpp"
 #include "util/cmdLineHelpers.hpp"
 #include "util/timestamp.hpp"
+#include "util/bytea.hpp"
 #include "crypto/encrypt.hpp"
 
 #include <unordered_map>
@@ -59,36 +60,27 @@ APIKey::APIKey(const unsigned int userId, std::string name,
       name(std::move(name)),
       provider(provider),
       access_key(std::move(accessKey)),
-      secret_access_key(std::move(secretAccessKey)), // runtime only, will be encrypted before insert
       region(std::move(region)),
-      endpoint(std::move(endpoint)) {}
+      endpoint(std::move(endpoint)),
+      secret_access_key(std::move(secretAccessKey)) {}
 
 APIKey::APIKey(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
       user_id(row["user_id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
       provider(s3_provider_from_string(row["provider"].as<std::string>())),
       access_key(row["access_key"].as<std::string>()),
       region(row["region"].as<std::string>()),
-      endpoint(row["endpoint"].as<std::string>())
-{
-    if (!row["encrypted_secret_access_key"].is_null()) {
-        const pqxx::binarystring key(row["encrypted_secret_access_key"]);
-        encrypted_secret_access_key.assign(key.begin(), key.end());
-    }
-
-    if (!row["iv"].is_null()) {
-        const pqxx::binarystring blob(row["iv"]);
-        iv.assign(blob.begin(), blob.end());
-    }
-}
+      endpoint(row["endpoint"].as<std::string>()),
+      encrypted_secret_access_key(from_hex_bytea(row["encrypted_secret_access_key"].as<std::string>())),
+      iv(from_hex_bytea(row["iv"].as<std::string>())) {}
 
 void vh::types::api::from_json(const nlohmann::json& j, APIKey& key) {
     key.id = j.at("api_key_id").get<unsigned int>();
     key.user_id = j.at("user_id").get<unsigned int>();
     key.name = j.at("name").get<std::string>();
-    key.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
+    key.created_at = parsePostgresTimestamp(j.at("created_at").get<std::string>());
     key.provider = s3_provider_from_string(j.at("provider").get<std::string>());
     key.access_key = j.at("access_key").get<std::string>();
     key.region = j.at("region").get<std::string>();
@@ -108,7 +100,7 @@ void vh::types::api::to_json(nlohmann::json& j, const APIKey& k) {
             {"api_key_id", k.id},
             {"user_id", k.user_id},
             {"name", k.name},
-            {"created_at", util::timestampToString(k.created_at)},
+            {"created_at", timestampToString(k.created_at)},
             {"provider", to_string(k.provider)},
             {"access_key", k.access_key},
             {"region", k.region},
@@ -129,7 +121,7 @@ void vh::types::api::to_json(nlohmann::json& j, const std::vector<std::shared_pt
 std::string vh::types::api::to_string(const std::shared_ptr<APIKey>& key) {
     std::string out = key->name + " (ID: " + std::to_string(key->id) + ")\n";
     out += "  User: " + UserQueries::getUserById(key->user_id)->name + "\n";
-    out += "  Created: " + util::timestampToString(key->created_at) + "\n";
+    out += "  Created: " + timestampToString(key->created_at) + "\n";
     out += "  Provider: " + to_string(key->provider) + "\n";
     out += "  Access Key: " + key->access_key + "\n";
     out += "  Region: " + key->region + "\n";
@@ -155,7 +147,7 @@ std::string vh::types::api::to_string(const std::vector<std::shared_ptr<APIKey>>
             key->name,
             UserQueries::getUserById(key->user_id)->name,
             to_string(key->provider),
-            util::timestampToString(key->created_at)
+            timestampToString(key->created_at)
         });
     }
 

@@ -29,9 +29,9 @@ VaultType vh::types::from_string(const std::string& type) {
 
 Vault::Vault(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
+      owner_id(row["owner_id"].as<unsigned int>()),
       name(row["name"].as<std::string>()),
       description(row["description"].as<std::string>()),
-      owner_id(row["owner_id"].as<unsigned int>()),
       quota(row["quota"].as<unsigned long long>()),
       type(from_string(row["type"].as<std::string>())),
       mount_point(std::filesystem::path(row["mount_point"].as<std::string>())),

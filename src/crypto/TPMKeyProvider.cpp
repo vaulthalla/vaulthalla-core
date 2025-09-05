@@ -80,8 +80,8 @@ static ESYS_TR create_primary(ESYS_CONTEXT* ctx) {
     pub.publicArea.parameters.rsaDetail.keyBits = 2048;
     pub.publicArea.parameters.rsaDetail.exponent = 0;
 
-    TPM2B_DATA outside = {.size = 0};
-    TPML_PCR_SELECTION pcr = {.count = 0};
+    TPM2B_DATA outside = {.size = 0, .buffer = {}};
+    TPML_PCR_SELECTION pcr = {.count = 0, .pcrSelections = {}};
 
     ESYS_TR primHandle = ESYS_TR_NONE;
     TSS2_RC rc = Esys_CreatePrimary(
@@ -125,7 +125,7 @@ void TPMKeyProvider::generate_and_seal() {
 
     TPM2B_PRIVATE* outPriv = nullptr;
     TPM2B_PUBLIC* outPub = nullptr;
-    ESYS_TR sealedObj = ESYS_TR_NONE;
+    // ESYS_TR sealedObj = ESYS_TR_NONE;
 
     TSS2_RC rc = Esys_Create(ctx, parent,
                              ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,

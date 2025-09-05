@@ -150,10 +150,6 @@ static CommandResult handle_key(const CommandCall& call) {
     return invalid(call.constructFullArgs(), "Unknown api-key subcommand: '" + std::string(sub) + "'");
 }
 
-static CommandResult handle_keys(const CommandCall& call) {
-    return handleListAPIKeys(call);
-}
-
 void commands::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
     r->registerCommand(usageManager->resolve("api-key"), handle_key);

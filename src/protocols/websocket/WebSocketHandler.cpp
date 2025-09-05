@@ -15,7 +15,6 @@ WebSocketHandler::WebSocketHandler(const std::shared_ptr<WebSocketRouter>& route
     authHandler_ = std::make_shared<AuthHandler>(ServiceDepsRegistry::instance().authManager);
     storageHandler_ = std::make_shared<StorageHandler>(ServiceDepsRegistry::instance().storageManager);
     fsHandler_ = std::make_shared<FileSystemHandler>();
-    shareHandler_ = std::make_shared<ShareHandler>();
     registerAllHandlers();
 }
 

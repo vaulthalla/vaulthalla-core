@@ -190,4 +190,7 @@ Lookup<User> vh::shell::resolveUser(const std::string& userArg, const std::strin
         }
         out.ptr = UserQueries::getUserById(*idOpt);
     } else out.ptr = UserQueries::getUserByName(userArg);
+
+    if (!out.ptr) out.error = errPrefix + ": user not found";
+    return out;
 }

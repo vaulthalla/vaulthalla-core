@@ -18,6 +18,7 @@ LogRotationService::LogRotationService()
         .max_bytes = 25_MiB,
         .max_interval = std::chrono::hours(24),
         .retention_days = std::chrono::days(7),
+        .max_retained_size = 100_MiB,
         .compression = LogRotator::Compression::Zstd,
         .ignore_compress_errors = true,
         .on_reopen = []() { LogRegistry::reopenMainLog(); },

@@ -1,13 +1,15 @@
 project('vaulthalla', 'cpp',
-        version: '0.12.2',
+        version: '0.13.0',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
+            'werror=true',
             'cpp_std=c++23',
             'unity=on',
             'unity_size=10',
-            'prefix=/usr'
+            'prefix=/usr',
+            'cpp_args=-D_GLIBCXX_USE_CXX11_ABI=1'
         ]
 )
 

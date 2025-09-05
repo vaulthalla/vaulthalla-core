@@ -11,11 +11,11 @@ std::shared_ptr<types::Sync> SyncQueries::getSync(const unsigned int vaultId) {
 
         if (type == "local")
             return std::make_shared<types::FSync>(
-                txn.exec_prepared("get_fsync_config", vaultId).one_row());
+                txn.exec(pqxx::prepped{"get_fsync_config"}, vaultId).one_row());
 
         if (type == "s3")
             return std::make_shared<types::RSync>(
-                txn.exec_prepared("get_rsync_config", vaultId).one_row());
+                txn.exec(pqxx::prepped{"get_rsync_config"}, vaultId).one_row());
 
         throw std::runtime_error("Unknown sync type: " + type);
     });
@@ -23,13 +23,13 @@ std::shared_ptr<types::Sync> SyncQueries::getSync(const unsigned int vaultId) {
 
 void SyncQueries::reportSyncStarted(const unsigned int syncId) {
     Transactions::exec("SyncQueries::reportSyncStarted", [&](pqxx::work& txn) {
-        txn.exec_prepared("report_sync_started", syncId);
+        txn.exec(pqxx::prepped{"report_sync_started"}, syncId);
     });
 }
 
 void SyncQueries::reportSyncSuccess(const unsigned int syncId) {
     Transactions::exec("SyncQueries::reportSyncSuccess", [&](pqxx::work& txn) {
-        txn.exec_prepared("report_sync_success", syncId);
+        txn.exec(pqxx::prepped{"report_sync_success"}, syncId);
     });
 }
 

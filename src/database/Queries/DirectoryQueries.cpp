@@ -1,7 +1,6 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Transactions.hpp"
 #include "types/FSEntry.hpp"
-#include "types/File.hpp"
 #include "types/Directory.hpp"
 #include "util/u8.hpp"
 #include "util/fsPath.hpp"
@@ -17,8 +16,8 @@ using namespace vh::logging;
 unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
     return Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
-        const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", directory->inode).one_field().as<bool>();
-        if (directory->inode) txn.exec_prepared("delete_fs_entry_by_inode", directory->inode);
+        const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, directory->inode).one_field().as<bool>();
+        if (directory->inode) txn.exec(pqxx::prepped{"delete_fs_entry_by_inode"}, directory->inode);
 
         pqxx::params p;
         p.append(directory->vault_id);
@@ -38,14 +37,14 @@ unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>&
         p.append(directory->file_count);
         p.append(directory->subdirectory_count);
 
-        const auto id = txn.exec_prepared("upsert_directory", p).one_field().as<unsigned int>();
+        const auto id = txn.exec(pqxx::prepped{"upsert_directory"}, p).one_field().as<unsigned int>();
 
         if (directory->parent_id) {
             std::optional<unsigned int> parentId = directory->parent_id;
             while (parentId) {
                 pqxx::params stats_params{parentId, 0, 0, exists ? 0 : 1}; // Increment subdir count
-                txn.exec_prepared("update_dir_stats", stats_params);
-                const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
+                txn.exec(pqxx::prepped{"update_dir_stats"}, stats_params);
+                const auto res = txn.exec(pqxx::prepped{"get_fs_entry_parent_id"}, parentId);
                 if (res.empty()) break;
                 parentId = res.one_field().as<std::optional<unsigned int>>();
             }
@@ -67,8 +66,8 @@ void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory
         std::filesystem::path path = directory->path;
         while (parentId && path != commonPath) {
             pqxx::params stats_params{parentId, -static_cast<int>(directory->size_bytes), -static_cast<int>(directory->file_count), 0};
-            txn.exec_prepared("update_dir_stats", stats_params).one_field().as<unsigned int>();
-            const auto row = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            txn.exec(pqxx::prepped{"update_dir_stats"}, stats_params);
+            const auto row = txn.exec(pqxx::prepped{"get_fs_entry_parent_id_and_path"}, parentId).one_row();
             parentId = row["parent_id"].as<std::optional<unsigned int>>();
             path = row["path"].as<std::string>();
         }
@@ -76,7 +75,7 @@ void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory
         // Update the directory's path and parent_id
         directory->path = newPath;
         pqxx::params search_params{userId, to_utf8_string(newPath.parent_path().u8string())};
-        directory->parent_id = txn.exec_prepared("get_fs_entry_id_by_path", search_params).one_field().as<unsigned int>();
+        directory->parent_id = txn.exec(pqxx::prepped{"get_fs_entry_id_by_path"}, search_params).one_field().as<unsigned int>();
         directory->last_modified_by = userId;
 
         pqxx::params p;
@@ -90,15 +89,15 @@ void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory
         p.append(directory->file_count);
         p.append(directory->subdirectory_count);
 
-        txn.exec_prepared("upsert_directory", p);
+        txn.exec(pqxx::prepped{"upsert_directory"}, p);
 
         // Update parent directories stats
         parentId = directory->parent_id;
         path = directory->path;
         while (parentId && path != commonPath) {
             pqxx::params stats_params{parentId, directory->size_bytes, directory->file_count, 0}; // Increment size_bytes and file_count
-            txn.exec_prepared("update_dir_stats", stats_params);
-            const auto nextRow = txn.exec_prepared("get_fs_entry_parent_id_and_path", parentId).one_row();
+            txn.exec(pqxx::prepped{"update_dir_stats"}, stats_params);
+            const auto nextRow = txn.exec(pqxx::prepped{"get_fs_entry_parent_id_and_path"}, parentId).one_row();
             parentId = nextRow["parent_id"].as<std::optional<unsigned int>>();
             path = nextRow["path"].as<std::string>();
         }
@@ -107,8 +106,8 @@ void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory
 
 std::shared_ptr<Directory> DirectoryQueries::getDirectoryByPath(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("DirectoryQueries::getDirectoryByPath", [&](pqxx::work& txn) {
-        const auto row = txn.exec_prepared("get_dir_by_path", pqxx::params{vaultId, relPath.string()}).one_row();
-        const auto parentRows = txn.exec_prepared("collect_parent_chain", row["parent_id"].as<std::optional<unsigned int>>());
+        const auto row = txn.exec(pqxx::prepped{"get_dir_by_path"}, pqxx::params{vaultId, relPath.string()}).one_row();
+        const auto parentRows = txn.exec(pqxx::prepped{"collect_parent_chain"}, row["parent_id"].as<std::optional<unsigned int>>());
         return std::make_shared<Directory>(row, parentRows);
     });
 }
@@ -116,7 +115,7 @@ std::shared_ptr<Directory> DirectoryQueries::getDirectoryByPath(const unsigned i
 std::optional<unsigned int> DirectoryQueries::getDirectoryIdByPath(const unsigned int vaultId, const std::filesystem::path& path) {
     return Transactions::exec("DirectoryQueries::getDirectoryIdByPath", [&](pqxx::work& txn) -> std::optional<unsigned int> {
         pqxx::params p{vaultId, path.string()};
-        const auto res = txn.exec_prepared("get_fs_entry_id_by_path", p);
+        const auto res = txn.exec(pqxx::prepped{"get_fs_entry_id_by_path"}, p);
         if (res.empty()) return std::nullopt;
         return res.one_row()["id"].as<unsigned int>();
     });
@@ -125,14 +124,14 @@ std::optional<unsigned int> DirectoryQueries::getDirectoryIdByPath(const unsigne
 unsigned int DirectoryQueries::getRootDirectoryId(const unsigned int vaultId) {
     return Transactions::exec("DirectoryQueries::getRootDirectoryId", [&](pqxx::work& txn) -> unsigned int {
         pqxx::params p{vaultId, "/"};
-        return txn.exec_prepared("get_fs_entry_id_by_path", p).one_row()["id"].as<unsigned int>();
+        return txn.exec(pqxx::prepped{"get_fs_entry_id_by_path"}, p).one_row()["id"].as<unsigned int>();
     });
 }
 
 bool DirectoryQueries::isDirectory(const unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("DirectoryQueries::isDirectory", [&](pqxx::work& txn) -> bool {
         pqxx::params p{vaultId, relPath.string()};
-        return txn.exec_prepared("is_directory", p).one_row()["exists"].as<bool>();
+        return txn.exec(pqxx::prepped{"is_directory"}, p).one_row()["exists"].as<bool>();
     });
 }
 
@@ -143,8 +142,8 @@ bool DirectoryQueries::directoryExists(const unsigned int vaultId, const std::fi
 std::vector<std::shared_ptr<Directory>> DirectoryQueries::listDirectoriesInDir(const unsigned int parentId, const bool recursive) {
     return Transactions::exec("DirectoryQueries::listDirectoriesInDir", [&](pqxx::work& txn) {
         const auto res = recursive
-            ? txn.exec_prepared("list_dirs_in_dir_by_parent_id_recursive", parentId)
-            : txn.exec_prepared("list_dirs_in_dir_by_parent_id", parentId);
+            ? txn.exec(pqxx::prepped{"list_dirs_in_dir_by_parent_id_recursive"}, parentId)
+            : txn.exec(pqxx::prepped{"list_dirs_in_dir_by_parent_id"}, parentId);
 
         return directories_from_pq_res(res);
     });
@@ -152,6 +151,6 @@ std::vector<std::shared_ptr<Directory>> DirectoryQueries::listDirectoriesInDir(c
 
 pqxx::result DirectoryQueries::collectParentStats(unsigned int parentId) {
     return Transactions::exec("DirectoryQueries::collectParentStats", [&](pqxx::work& txn) {
-        return txn.exec_prepared("collect_parent_dir_stats", parentId);
+        return txn.exec(pqxx::prepped{"collect_parent_dir_stats"}, parentId);
     });
 }

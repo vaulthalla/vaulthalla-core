@@ -10,10 +10,8 @@ namespace vh::database {
 
 class DBPool {
   public:
-    DBPool(size_t size = 4) {
-        for (size_t i = 0; i < size; ++i) {
-            pool_.push(std::make_unique<DBConnection>());
-        }
+    explicit DBPool(const size_t size = 4) {
+        for (size_t i = 0; i < size; ++i) pool_.push(std::make_unique<DBConnection>());
     }
 
     std::unique_ptr<DBConnection> acquire() {
@@ -31,7 +29,7 @@ class DBPool {
     }
 
     void initPreparedStatements() {
-        for (auto i = 0; i < pool_.size(); ++i) {
+        for (size_t i = 0; i < pool_.size(); ++i) {
             auto conn = std::move(pool_.front());
             pool_.pop();
             conn->initPrepared();

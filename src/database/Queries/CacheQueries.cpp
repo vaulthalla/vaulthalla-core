@@ -16,32 +16,32 @@ void CacheQueries::upsertCacheIndex(const std::shared_ptr<CacheIndex>& index) {
         p.append(to_string(index->type));
         p.append(index->size);
 
-        txn.exec_prepared("upsert_cache_index", p);
+        txn.exec(pqxx::prepped{"upsert_cache_index"}, p);
     });
 }
 
 void CacheQueries::deleteCacheIndex(unsigned int indexId) {
     Transactions::exec("CacheQueries::deleteCacheIndex", [&](pqxx::work& txn) {
-        txn.exec_prepared("delete_cache_index", pqxx::params{indexId});
+        txn.exec(pqxx::prepped{"delete_cache_index"}, pqxx::params{indexId});
     });
 }
 
 void CacheQueries::deleteCacheIndex(unsigned int vaultId, const std::filesystem::path& relPath) {
     Transactions::exec("CacheQueries::deleteCacheIndexByPath", [&](pqxx::work& txn) {
-        txn.exec_prepared("delete_cache_index_by_path", pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
+        txn.exec(pqxx::prepped{"delete_cache_index_by_path"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
     });
 }
 
 std::shared_ptr<CacheIndex> CacheQueries::getCacheIndex(unsigned int indexId) {
     return Transactions::exec("CacheQueries::getCacheIndex", [&](pqxx::work& txn) -> std::shared_ptr<CacheIndex> {
-        const auto row = txn.exec_prepared("get_cache_index", pqxx::params{indexId}).one_row();
+        const auto row = txn.exec(pqxx::prepped{"get_cache_index"}, pqxx::params{indexId}).one_row();
         return std::make_shared<CacheIndex>(row);
     });
 }
 
 std::shared_ptr<CacheIndex> CacheQueries::getCacheIndexByPath(unsigned int vaultId, const std::filesystem::path& path) {
     return Transactions::exec("CacheQueries::getCacheIndexByPath", [&](pqxx::work& txn) -> std::shared_ptr<CacheIndex> {
-        const auto row = txn.exec_prepared("get_cache_index_by_path", pqxx::params{vaultId, to_utf8_string(path.u8string())}).one_row();
+        const auto row = txn.exec(pqxx::prepped{"get_cache_index_by_path"}, pqxx::params{vaultId, to_utf8_string(path.u8string())}).one_row();
         return std::make_shared<CacheIndex>(row);
     });
 }
@@ -50,11 +50,11 @@ std::vector<std::shared_ptr<CacheIndex>> CacheQueries::listCacheIndices(unsigned
     return Transactions::exec("CacheQueries::listCacheindices", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<CacheIndex>> {
         pqxx::result res;
 
-        if (relPath.empty()) res = txn.exec_prepared("list_cache_indices", pqxx::params{vaultId});
+        if (relPath.empty()) res = txn.exec(pqxx::prepped{"list_cache_indices"}, pqxx::params{vaultId});
         else {
             const auto patterns = computePatterns(relPath.string(), recursive);
-            if (recursive) res = txn.exec_prepared("list_cache_indices_by_path_recursive", pqxx::params{vaultId, patterns.like});
-            else res = txn.exec_prepared("list_cache_indices_by_path", pqxx::params{vaultId, patterns.like, patterns.not_like});
+            if (recursive) res = txn.exec(pqxx::prepped{"list_cache_indices_by_path_recursive"}, pqxx::params{vaultId, patterns.like});
+            else res = txn.exec(pqxx::prepped{"list_cache_indices_by_path"}, pqxx::params{vaultId, patterns.like, patterns.not_like});
         }
 
         return cache_indices_from_pq_res(res);
@@ -63,21 +63,21 @@ std::vector<std::shared_ptr<CacheIndex>> CacheQueries::listCacheIndices(unsigned
 
 std::vector<std::shared_ptr<CacheIndex>> CacheQueries::listCacheIndicesByFile(unsigned int fileId) {
     return Transactions::exec("CacheQueries::listCacheIndicesByFile", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<CacheIndex>> {
-        const auto res = txn.exec_prepared("list_cache_indices_by_file", pqxx::params{fileId});
+        const auto res = txn.exec(pqxx::prepped{"list_cache_indices_by_file"}, pqxx::params{fileId});
         return cache_indices_from_pq_res(res);
     });
 }
 
 std::vector<std::shared_ptr<CacheIndex>> CacheQueries::listCacheIndicesByType(const unsigned int vaultId, const CacheIndex::Type& type) {
     return Transactions::exec("CacheQueries::listCacheIndicesByType", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<CacheIndex>> {
-        const auto res = txn.exec_prepared("list_cache_indices_by_type", pqxx::params{vaultId, to_string(type)});
+        const auto res = txn.exec(pqxx::prepped{"list_cache_indices_by_type"}, pqxx::params{vaultId, to_string(type)});
         return cache_indices_from_pq_res(res);
     });
 }
 
 std::vector<std::shared_ptr<CacheIndex>> CacheQueries::nLargestCacheIndicesByType(const unsigned int n, const unsigned int vaultId, const CacheIndex::Type& type) {
     return Transactions::exec("CacheQueries::nLargestCacheIndicesByType", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<CacheIndex>> {
-        const auto res = txn.exec_prepared("n_largest_cache_indices_by_type", pqxx::params{vaultId, to_string(type), n});
+        const auto res = txn.exec(pqxx::prepped{"n_largest_cache_indices_by_type"}, pqxx::params{vaultId, to_string(type), n});
         return cache_indices_from_pq_res(res);
     });
 }
@@ -86,11 +86,11 @@ std::vector<std::shared_ptr<CacheIndex>> CacheQueries::nLargestCacheIndices(cons
     return Transactions::exec("CacheQueries::nLargestCacheIndicesByPath", [&](pqxx::work& txn) -> std::vector<std::shared_ptr<CacheIndex>> {
         pqxx::result res;
 
-        if (relPath.empty()) res = txn.exec_prepared("n_largest_cache_indices", pqxx::params{vaultId, n});
+        if (relPath.empty()) res = txn.exec(pqxx::prepped{"n_largest_cache_indices"}, pqxx::params{vaultId, n});
         else {
             const auto patterns = computePatterns(relPath.string(), recursive);
-            if (recursive) res = txn.exec_prepared("n_largest_cache_indices_by_path_recursive", pqxx::params{vaultId, patterns.like, n});
-            else res = txn.exec_prepared("n_largest_cache_indices_by_path", pqxx::params{vaultId, patterns.like, patterns.not_like, n});
+            if (recursive) res = txn.exec(pqxx::prepped{"n_largest_cache_indices_by_path_recursive"}, pqxx::params{vaultId, patterns.like, n});
+            else res = txn.exec(pqxx::prepped{"n_largest_cache_indices_by_path"}, pqxx::params{vaultId, patterns.like, patterns.not_like, n});
         }
 
         return cache_indices_from_pq_res(res);
@@ -99,14 +99,14 @@ std::vector<std::shared_ptr<CacheIndex>> CacheQueries::nLargestCacheIndices(cons
 
 bool CacheQueries::cacheIndexExists(unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("CacheQueries::cacheIndexExists", [&](pqxx::work& txn) -> bool {
-        return txn.exec_prepared("cache_index_exists", pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_row()["exists"].as<bool>();
+        return txn.exec(pqxx::prepped{"cache_index_exists"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_row()["exists"].as<bool>();
     });
 }
 
 unsigned int CacheQueries::countCacheIndices(unsigned int vaultId, const std::optional<types::CacheIndex::Type>& type) {
     return Transactions::exec("CacheQueries::countCacheIndices", [&](pqxx::work& txn) -> unsigned int {
-        if (type) return txn.exec_prepared("count_cache_indices_by_type", pqxx::params{vaultId, to_string(*type)}).one_row()["count"].as<unsigned int>();
-        return txn.exec_prepared("count_cache_indices", pqxx::params{vaultId}).one_row()["count"].as<unsigned int>();
+        if (type) return txn.exec(pqxx::prepped{"count_cache_indices_by_type"}, pqxx::params{vaultId, to_string(*type)}).one_row()["count"].as<unsigned int>();
+        return txn.exec(pqxx::prepped{"count_cache_indices"}, pqxx::params{vaultId}).one_row()["count"].as<unsigned int>();
     });
 }
 

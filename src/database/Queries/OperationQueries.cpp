@@ -16,20 +16,20 @@ void OperationQueries::addOperation(const std::shared_ptr<Operation>& op) {
         p.append(op->source_path);
         p.append(op->destination_path);
 
-        txn.exec_prepared("insert_operation", p);
+        txn.exec(pqxx::prepped{"insert_operation"}, p);
     });
 }
 
 void OperationQueries::deleteOperation(unsigned int id) {
     Transactions::exec("OperationQueries::deleteOperation", [&](pqxx::work& txn) {
-        txn.exec_prepared("delete_operation", id);
+        txn.exec(pqxx::prepped{"delete_operation"}, id);
     });
 }
 
 std::vector<std::shared_ptr<Operation>> OperationQueries::listOperationsByVault(unsigned int vaultId) {
     return Transactions::exec("OperationQueries::listOperationsByVault", [&](pqxx::work& txn) {
         pqxx::params p{vaultId};
-        const auto res = txn.exec_prepared("list_pending_operations_by_vault", p);
+        const auto res = txn.exec(pqxx::prepped{"list_pending_operations_by_vault"}, p);
         return operations_from_pq_res(res);
     });
 }
@@ -41,6 +41,6 @@ void OperationQueries::markOperationCompleted(const std::shared_ptr<Operation>& 
         p.append(to_string(op->status));
         p.append(op->error.value_or(""));
 
-        txn.exec_prepared("mark_operation_completed_and_update", p);
+        txn.exec(pqxx::prepped{"mark_operation_completed_and_update"}, p);
     });
 }

@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 #include <string_view>
-#include <cctype>
 
 namespace vh::shell {
 
@@ -25,20 +24,20 @@ inline bool looks_negative_number(std::string_view s) {
     return digit;
 }
 
-static inline void pushFlag(std::vector<Token>& out, std::string k) {
+inline void pushFlag(std::vector<Token>& out, std::string k) {
     // Strip leading '-' if present (callers usually pass already-stripped)
     if (!k.empty() && k[0] == '-') k.erase(k.begin());
     out.push_back({TokenType::Flag, std::move(k)});
 }
-static inline void pushWord(std::vector<Token>& out, std::string v) {
+inline void pushWord(std::vector<Token>& out, std::string v) {
     out.push_back({TokenType::Word, std::move(v)});
 }
 
-static inline void skip_ws(const char*& p, const char* e) {
+inline void skip_ws(const char*& p, const char* e) {
     while (p < e && (*p == ' ' || *p == '\t')) ++p;
 }
 
-static inline std::string read_quoted(const char*& p, const char* e, char quote) {
+inline std::string read_quoted(const char*& p, const char* e, char quote) {
     // p is at the opening quote; consume it
     ++p;
     std::string buf;
@@ -56,7 +55,7 @@ static inline std::string read_quoted(const char*& p, const char* e, char quote)
     return buf; // no outer quotes, escapes resolved for double quotes
 }
 
-static inline std::string read_unquoted_atom(const char*& p, const char* e) {
+inline std::string read_unquoted_atom(const char*& p, const char* e) {
     // Read until whitespace or quote (we stop before quote to let caller handle it)
     const char* b = p;
     while (p < e && *p != ' ' && *p != '\t' && *p != '"' && *p != '\'') ++p;
@@ -65,12 +64,12 @@ static inline std::string read_unquoted_atom(const char*& p, const char* e) {
 
 // Heuristic: decide if "-XYZ" is a bundle or "-X<value>".
 // If tail contains obvious value chars (/, ., :, =), treat as glued value.
-static inline bool looks_glued_value(std::string_view tail) {
+inline bool looks_glued_value(std::string_view tail) {
     return std::ranges::any_of(tail, [](char c) { return c == '/' || c == '.' || c == ':' || c == '='; });
 }
 
 // Expand short bundle "-abc" -> flags a,b,c
-static inline void expand_bundle(std::string_view bundle, std::vector<Token>& out) {
+inline void expand_bundle(std::string_view bundle, std::vector<Token>& out) {
     for (const char c : bundle) pushFlag(out, std::string(1, c));
 }
 
@@ -102,7 +101,6 @@ inline std::vector<Token> tokenize(const std::string& line) {
         }
 
         if (*p == '-') {
-            const char* start = p;
             // Long or short flag
             // Peek ahead to distinguish "--" vs "-"* and guard negative numbers.
             // If it's a negative number, treat as Word.

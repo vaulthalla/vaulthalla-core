@@ -27,7 +27,7 @@ namespace vh::websocket {
 
 WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router)
     : authManager_{ServiceDepsRegistry::instance().authManager},
-      ws_{nullptr}, router_{router}, uploadHandler_(std::make_shared<UploadHandler>(*this)) {
+      ws_{nullptr}, uploadHandler_(std::make_shared<UploadHandler>(*this)), router_{router} {
     buffer_.max_size(65536);
 }
 

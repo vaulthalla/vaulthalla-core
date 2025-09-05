@@ -10,11 +10,11 @@ using namespace vh::services;
 
 namespace vh::shell {
 
-static CommandResult handle_help(const CommandCall& call) {
+static CommandResult handle_help(const CommandCall&) {
     return usage();
 }
 
-static CommandResult handle_version(const CommandCall& call) {
+static CommandResult handle_version(const CommandCall&) {
     return {0, "Vaulthalla v" + std::string(VH_VERSION), ""};
 }
 

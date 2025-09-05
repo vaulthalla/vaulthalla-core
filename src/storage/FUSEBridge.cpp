@@ -30,6 +30,7 @@ namespace vh::fuse {
 
 void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[getattr] Called for inode: {}", ino);
+    (void)fi;
 
     try {
         const auto& cache = ServiceDepsRegistry::instance().fsCache;
@@ -57,13 +58,7 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
             return;
         }
 
-        struct stat st = {};
-        st.st_ino = ino;
-        st.st_mode = entry->isDirectory() ? S_IFDIR | 0755 : S_IFREG | 0644;
-        st.st_nlink = 1;
-        st.st_size = static_cast<off_t>(entry->size_bytes);
-        st.st_mtim.tv_sec = entry->updated_at;
-        st.st_atim = st.st_ctim = st.st_mtim;
+        const auto st = statFromEntry(entry, ino);
 
         fuse_reply_attr(req, &st, 0.1); // match attr_timeout from lookup()
     } catch (const std::exception& ex) {
@@ -73,6 +68,7 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
 void setattr(const fuse_req_t req, const fuse_ino_t ino,
                          struct stat* attr, int to_set, fuse_file_info* fi) {
+    (void)fi;
     const fuse_ctx* ctx = fuse_req_ctx(req);
 
     LogRegistry::fuse()->debug("[setattr] Called for inode: {}, to_set: {}, uid: {}, gid: {}",
@@ -132,8 +128,8 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     std::vector<char> buf(size);
     size_t buf_used = 0;
 
-    auto add_entry = [&](const std::string& name, const struct stat& st, off_t next_off) {
-        size_t entry_size = fuse_add_direntry(req, nullptr, 0, name.c_str(), &st, next_off);
+    auto add_entry = [&](const std::string& name, const struct stat& st, const off_t next_off) {
+        const size_t entry_size = fuse_add_direntry(req, nullptr, 0, name.c_str(), &st, next_off);
         if (buf_used + entry_size > size) return false;
 
         fuse_add_direntry(req, buf.data() + buf_used, entry_size, name.c_str(), &st, next_off);
@@ -144,12 +140,14 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     off_t current_off = 0;
 
     if (off <= current_off++) {
-        struct stat dot = { .st_mode = S_IFDIR };
+        struct stat dot;
+        dot.st_mode = S_IFDIR;
         if (!add_entry(".", dot, current_off)) goto reply;
     }
 
     if (off <= current_off++) {
-        struct stat dotdot = { .st_mode = S_IFDIR };
+        struct stat dotdot;
+        dotdot.st_mode = S_IFDIR;
         if (!add_entry("..", dotdot, current_off)) goto reply;
     }
 
@@ -277,6 +275,7 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
                        const size_t size, const off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    (void)ino; // unused
 
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
     if (res < 0) fuse_reply_err(req, errno);
@@ -285,6 +284,7 @@ void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
 
 void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
+    (void)ino; // unused
 
     std::vector<char> buffer(size);
     const ssize_t res = ::pread(fh->fd, buffer.data(), size, off);
@@ -391,7 +391,7 @@ void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
 void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const fuse_ctx *ctx = fuse_req_ctx(req);
     const uid_t uid = ctx->uid;
-    const gid_t gid = ctx->gid;
+    // const gid_t gid = ctx->gid;
 
     LogRegistry::fuse()->debug("[unlink] Called for parent: {}, name: {}", parent, name);
 
@@ -430,7 +430,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const fuse_ctx *ctx = fuse_req_ctx(req);
     const uid_t uid = ctx->uid;
-    const gid_t gid = ctx->gid;
+    // const gid_t gid = ctx->gid;
 
     LogRegistry::fuse()->debug("[rmdir] Called for parent: {}, name: {}", parent, name);
 
@@ -469,8 +469,8 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 void flush(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     LogRegistry::fuse()->debug("[flush] Called for inode: {}, file handle: {}", ino, fi->fh);
 
-    // This can be a no-op unless you want to sync(2) or call fsync(fd)
-    // You usually don’t finalize here since flush may be called multiple times per FD
+    // This can be a no-op unless something like sync(2) or call fsync(fd) is desired
+    // Likely no need finalize here since flush may be called multiple times per FD
 
     fuse_reply_err(req, 0);
 }
@@ -501,8 +501,7 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
     (void) datasync; // if we want to treat differently
 
     try {
-        int fd = fi->fh;
-        if (::fsync(fd) < 0) {
+        if (const int fd = fi->fh; ::fsync(fd) < 0) {
             LogRegistry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
             fuse_reply_err(req, errno);
             return;
@@ -519,7 +518,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
     LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
     try {
         struct statvfs st{};
-        auto backingPath = paths::getBackingPath();
+        const auto backingPath = vh::paths::getBackingPath();
 
         if (::statvfs(backingPath.c_str(), &st) < 0) {
             LogRegistry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", backingPath.string(), strerror(errno));

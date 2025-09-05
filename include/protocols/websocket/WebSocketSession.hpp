@@ -1,7 +1,6 @@
 #pragma once
 
 #include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
@@ -9,12 +8,10 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <memory>
-#include <mutex>
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <unordered_set>
 #include <fstream>
-#include <optional>
 
 struct UploadContext {
     std::string path;
@@ -31,7 +28,7 @@ class AuthManager;
 } // namespace vh::auth
 
 namespace vh::types {
-class User;
+struct User;
 }
 
 namespace vh::websocket {

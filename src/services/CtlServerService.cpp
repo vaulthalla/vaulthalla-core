@@ -257,9 +257,6 @@ void CtlServerService::runLoop() {
             std::vector<std::string> args = req.value("args", std::vector<std::string>{});
             if (cmd.empty()) cmd = "help";
 
-            // ... after parsing `req` ...
-            int exit_code = 0;
-
             auto try_exec_line = [&](const std::string& line) {
                 try {
                     const auto res = router_->executeLine(line, user); // uses tokenize() + parseTokens() under the hood
@@ -270,7 +267,6 @@ void CtlServerService::runLoop() {
                     };
                     if (!res.stdout_text.empty()) resp["stdout"] = res.stdout_text;
                     if (!res.stderr_text.empty()) resp["stderr"] = res.stderr_text;
-                    if (res.has_data) resp["data"] = res.data;
 
                     send_json(cfd, resp);
 
@@ -301,7 +297,6 @@ void CtlServerService::runLoop() {
                     };
                     if (!res.stdout_text.empty()) reply["stdout"] = res.stdout_text;
                     if (!res.stderr_text.empty()) reply["stderr"] = res.stderr_text;
-                    if (res.has_data) reply["data"] = res.data;
 
                     SocketIO::send_json(cfd, reply);
                 } catch (const std::exception& e) {

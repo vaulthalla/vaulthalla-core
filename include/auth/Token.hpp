@@ -7,7 +7,7 @@
 namespace vh::auth {
 
 struct Token {
-    Token(std::string token, unsigned short userId)
+    Token(std::string token, const unsigned short userId)
         : rawToken(std::move(token)), userId(userId),
           expiryTs(std::chrono::system_clock::now() + std::chrono::hours(1)) {}
 

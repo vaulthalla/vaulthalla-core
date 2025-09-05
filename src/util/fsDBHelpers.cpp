@@ -6,8 +6,8 @@
 using namespace vh::database;
 
 void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<types::File>& file) {
-    const auto exists = txn.exec_prepared("fs_entry_exists_by_inode", file->inode).one_field().as<bool>();
-    const auto sizeRes = txn.exec_prepared("get_file_size_by_inode", file->inode);
+    const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, file->inode).one_field().as<bool>();
+    const auto sizeRes = txn.exec(pqxx::prepped{"get_file_size_by_inode"}, file->inode);
     const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
 
     pqxx::params p;
@@ -17,13 +17,13 @@ void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<types::File
     p.append(file->content_hash);
     p.append(file->encryption_iv);
 
-    txn.exec_prepared("update_file_only", p);
+    txn.exec(pqxx::prepped{"update_file_only"}, p);
 
     std::optional<unsigned int> parentId = file->parent_id;
     while (parentId) {
         pqxx::params stats_params{parentId, file->size_bytes - existingSize, exists ? 0 : 1, 0}; // Increment size_bytes and file_count
-        txn.exec_prepared("update_dir_stats", stats_params);
-        const auto res = txn.exec_prepared("get_fs_entry_parent_id", parentId);
+        txn.exec(pqxx::prepped{"update_dir_stats"}, stats_params);
+        const auto res = txn.exec(pqxx::prepped{"get_fs_entry_parent_id"}, parentId);
         if (res.empty()) break;
         parentId = res.one_field().as<std::optional<unsigned int>>();
     }
@@ -44,6 +44,6 @@ void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<types::F
     p.append(entry->is_hidden);
     p.append(entry->is_system);
 
-    txn.exec_prepared("update_fs_entry_by_inode", p);
+    txn.exec(pqxx::prepped{"update_fs_entry_by_inode"}, p);
 }
 

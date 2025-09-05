@@ -43,8 +43,6 @@ struct CommandResult {
     int exit_code = 0;                 // 0 = success
     std::string stdout_text;           // CLI stdout
     std::string stderr_text;           // CLI stderr
-    nlohmann::json data;               // optional machine-readable payload
-    bool has_data = false;
 };
 
 using CommandHandler = std::function<CommandResult(const CommandCall&)>;

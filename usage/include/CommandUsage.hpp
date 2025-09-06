@@ -7,29 +7,84 @@
 #include <optional>
 #include <cstddef>
 #include <memory>
+#include <unordered_map>
 
 namespace vh::shell {
 
 struct Entry {
     std::string label;
     std::string desc;
-    std::vector<std::string> aliases;
 
     // Constructors to support brace-initialization with or without aliases
     Entry(std::string l, std::string d)
-        : label(std::move(l)), desc(std::move(d)), aliases{} {}
-
-    Entry(std::string l, std::string d, std::vector<std::string> a)
-        : label(std::move(l)), desc(std::move(d)), aliases(std::move(a)) {}
+        : label(std::move(l)), desc(std::move(d)) {}
 
     Entry() = default;
 };
 
+struct Positional : Entry {
+    std::vector<std::string> aliases;
+
+    Positional(std::string l, std::string d) : Entry(std::move(l), std::move(d)) {}
+
+    Positional(std::string l, std::string d, std::vector<std::string> a)
+        : Entry(std::move(l), std::move(d)), aliases(std::move(a)) {}
+
+    Positional() = default;
+};
+
+struct Flag : Positional {
+    bool default_state = false;
+
+    Flag(std::string l, std::string d) : Positional(std::move(l), std::move(d)) {}
+
+    Flag(std::string l, std::string d, std::string a)
+        : Positional(std::move(l), std::move(d), std::vector{std::move(a)}) {}
+
+    Flag(std::string l, std::string d, bool s) : Positional(std::move(l), std::move(d)), default_state(s) {}
+
+    Flag(std::string l, std::string d, bool s, std::vector<std::string> a)
+        : Positional(std::move(l), std::move(d), std::move(a)), default_state(s) {}
+
+    Flag() = default;
+};
+
+struct Option : Entry {
+    // allows for better grouping of flag aliases and possible values
+    // e.g. { "--user", { { "<name>", "<id>" } } } for "--user <name|id>"
+    //   or { "--group", { { "<group>", "<id>" } } } for "-g | --group"
+    std::unordered_map<std::string, std::vector<std::string>> aliases{};
+
+    Option(std::string l, std::string d) : Entry(std::move(l), std::move(d)) {}
+
+    Option(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a)
+        : Entry(std::move(l), std::move(d)), aliases(std::move(a)) {}
+
+    Option() = default;
+};
+
+struct Optional : Option {
+    std::optional<std::string> default_value;
+
+    Optional(std::string l, std::string d) : Option(std::move(l), std::move(d)) {}
+
+    Optional(std::string l, std::string d, std::optional<std::string> a)
+        : Option(std::move(l), std::move(d)), default_value(std::move(a)) {}
+
+    Optional(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a)
+        : Option(std::move(l), std::move(d), std::move(a)) {}
+
+    Optional(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a, std::optional<std::string> b)
+        : Option(std::move(l), std::move(d), std::move(a)), default_value(std::move(b)) {}
+
+    Optional() = default;
+};
+
 struct GroupedOptions {
     std::string title;
-    std::vector<Entry> items;
+    std::vector<Optional> items;
 
-    GroupedOptions(std::string t, std::vector<Entry> i)
+    GroupedOptions(std::string t, std::vector<Optional> i)
         : title(std::move(t)), items(std::move(i)) {}
 
     GroupedOptions() = default;
@@ -47,7 +102,10 @@ public:
     std::optional<std::string> synopsis;  // if empty, synthesized
     std::weak_ptr<CommandUsage> parent;
     std::vector<std::shared_ptr<CommandUsage>> subcommands;
-    std::vector<Entry> positionals, required, optional;
+    std::vector<Positional> positionals;
+    std::vector<Flag> optional_flags, required_flags;
+    std::vector<Optional> optional;
+    std::vector<Option> required;
     std::vector<GroupedOptions> groups;
     std::vector<Example> examples;
     bool pluralAliasImpliesList = false;

@@ -252,6 +252,7 @@ void CLITestRunner::genHappyPathTest(const std::vector<std::string>& path_aliase
                                      const std::shared_ptr<CommandUsage>& u) {
     // Build "vh <path> <required/positionals>"
     std::ostringstream cmd;
+    cmd << "vh";
     for (auto& seg : path_aliases) cmd << ' ' << seg;
 
     Context ctx;

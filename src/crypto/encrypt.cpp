@@ -1,5 +1,6 @@
 #include "crypto/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
+#include "config/ConfigRegistry.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -7,8 +8,14 @@
 #include <cstring>
 
 using namespace vh::logging;
+using namespace vh::config;
 
 namespace vh::crypto {
+
+static bool is_aes_gcm_supported() {
+    if (ConfigRegistry::get().dev.enabled || std::getenv("VH_ALLOW_FAKE_AES")) return true;
+    return crypto_aead_aes256gcm_is_available() != 0;
+}
 
 std::vector<uint8_t> encrypt_aes256_gcm(
     const std::vector<uint8_t>& plaintext,
@@ -26,7 +33,7 @@ std::vector<uint8_t> encrypt_aes256_gcm(
     std::vector<uint8_t> ciphertext(plaintext.size() + AES_TAG_SIZE);
 
     unsigned long long ciphertext_len = 0;
-    if (crypto_aead_aes256gcm_is_available() == 0)
+    if (!is_aes_gcm_supported())
         throw std::runtime_error("AES256-GCM not supported on this CPU");
 
     crypto_aead_aes256gcm_encrypt(
@@ -54,7 +61,7 @@ std::vector<uint8_t> decrypt_aes256_gcm(
     std::vector<uint8_t> decrypted(ciphertext_with_tag.size() - AES_TAG_SIZE);
     unsigned long long decrypted_len = 0;
 
-    if (crypto_aead_aes256gcm_is_available() == 0)
+    if (!is_aes_gcm_supported())
         throw std::runtime_error("AES256-GCM not supported on this CPU");
 
     if (crypto_aead_aes256gcm_decrypt(

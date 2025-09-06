@@ -210,7 +210,8 @@ static bool isUserMatch(const std::string& cmd, const std::string_view input) {
 }
 
 static CommandResult handle_user(const CommandCall& call) {
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.empty() || hasFlag(call, "h") || hasFlag(call, "help"))
+        return usage(call.constructFullArgs());
 
     const auto [sub, subcall] = descend(call);
 

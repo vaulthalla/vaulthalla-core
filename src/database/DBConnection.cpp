@@ -104,6 +104,8 @@ void DBConnection::initPreparedUsers() const {
 
     conn_->prepare("get_user_by_name", "SELECT * FROM users WHERE name = $1");
 
+    conn_->prepare("user_exists", "SELECT EXISTS(SELECT 1 FROM users WHERE name = $1) AS exists");
+
     conn_->prepare("get_user_by_refresh_token",
                    "SELECT u.* FROM users u "
                    "JOIN refresh_tokens rt ON u.id = rt.user_id WHERE rt.jti = $1");
@@ -790,6 +792,8 @@ void DBConnection::initPreparedRoles() const {
                    "UPDATE role SET name = $2, description = $3, type = $4 "
                    "WHERE id = $1");
 
+    conn_->prepare("update_role_permissions", "UPDATE permissions SET permissions = $2 WHERE role_id = $1");
+
     conn_->prepare("delete_role", "DELETE FROM role WHERE id = $1");
 
     conn_->prepare("get_permissions_type", "SELECT type FROM role WHERE id = $1");
@@ -816,10 +820,6 @@ void DBConnection::initPreparedPermissions() const {
     conn_->prepare("insert_raw_permission",
                    "INSERT INTO permission (bit_position, name, description, category) "
                    "VALUES ($1, $2, $3, $4)");
-
-    conn_->prepare("upsert_permission",
-                   "INSERT INTO permissions (role_id, permissions) "
-                   "VALUES ($1, $2) ON CONFLICT (role_id) DO UPDATE SET permissions = $2");
 
     conn_->prepare("update_permission", "UPDATE permissions SET permissions = $2 WHERE role_id = $1");
 

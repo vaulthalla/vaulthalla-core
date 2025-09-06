@@ -34,6 +34,7 @@ CommandResult vh::shell::invalid(const std::vector<std::string>& args, std::stri
 
 CommandResult vh::shell::usage(const std::vector<std::string>& args) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usage = args.empty() ? usageManager->root()->basicStr() : usageManager->renderHelp(args);
     return {0, usageManager->renderHelp(args), ""};
 }
 

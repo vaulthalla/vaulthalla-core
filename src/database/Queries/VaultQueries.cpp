@@ -90,7 +90,9 @@ void VaultQueries::removeVault(const unsigned int vaultId) {
 std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
     return Transactions::exec("VaultQueries::getVault",
                               [vaultID](pqxx::work& txn) -> std::shared_ptr<Vault> {
-                                  const auto row = txn.exec(pqxx::prepped{"get_vault"}, pqxx::params{vaultID}).one_row();
+                                  const auto res = txn.exec(pqxx::prepped{"get_vault"}, pqxx::params{vaultID});
+                                  if (res.empty()) return nullptr;
+                                  const auto row = res.one_row();
                                   const auto typeStr = row["type"].as<std::string>();
 
                                   switch (from_string(typeStr)) {

@@ -13,6 +13,13 @@ public:
     CtlServerService();
     ~CtlServerService() override;
 
+    [[nodiscard]] std::shared_ptr<vh::shell::Router> get_router() const { return router_; }
+
+    void setSocketPath(const std::string& path) { socketPath_ = path; }
+    [[nodiscard]] const std::string& socketPath() const noexcept { return socketPath_; }
+
+    [[nodiscard]] bool adminUIDSet() const noexcept { return adminUIDSet_.load(); }
+
 protected:
     void runLoop() override;
     void onStop(); // close listener to break accept()

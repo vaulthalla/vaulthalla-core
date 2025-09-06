@@ -9,15 +9,15 @@
 #include <cstring>
 #include <thread>
 #include <atomic>
-#include <paths.h>
+#include <utility>
 
 using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::fuse;
 using namespace vh::logging;
 
-FUSE::FUSE()
-    : AsyncService("FUSE") {}
+FUSE::FUSE(std::filesystem::path mount)
+    : AsyncService("FUSE"), mountPoint_(std::move(mount)) {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     (void)userdata;
@@ -36,35 +36,36 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
 
 void FUSE::stop() {
     if (!isRunning()) return;
-
     LogRegistry::fuse()->info("[FUSE] Stopping FUSE connection...");
     interruptFlag_.store(true);
 
-    if (session_) {
-        fuse_session_exit(session_);
-        fuse_session_unmount(session_);
-        fuse_remove_signal_handlers(session_);
-        fuse_session_destroy(session_);
-        session_ = nullptr;
-    }
+    // Only wake the loop. Do NOT unmount/destroy here.
+    if (session_) fuse_session_exit(session_);
 
-    // Only join if we’re not calling stop() from the same thread
-    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) worker_.join();
+    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id())
+        worker_.join();
 
     running_.store(false);
     interruptFlag_.store(false);
-
     LogRegistry::fuse()->info("[FUSE] FUSE service stopped");
 }
 
 void FUSE::runLoop() {
     LogRegistry::fuse()->debug("[FUSE] Running FUSE service");
 
+    if (!fs::exists(mountPoint_)) {
+        std::error_code ec;
+        if (!fs::create_directories(mountPoint_, ec)) {
+            LogRegistry::fuse()->error("[FUSE] Failed to create mountpoint {}: {}", mountPoint_.string(), ec.message());
+            return;
+        }
+    }
+
     std::vector<std::string> argsStr = {
         "vaulthalla-fuse",
         "-f",
         "-o", "allow_other",
-        paths::getMountPath()
+        mountPoint_
     };
 
     std::vector<std::unique_ptr<char[]>> ownedCStrs;

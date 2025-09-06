@@ -11,6 +11,10 @@
 #include <chrono>
 #include <atomic>
 
+namespace vh::shell {
+class Router;
+}
+
 namespace vh::services {
 
 class AsyncService;
@@ -36,6 +40,14 @@ public:
     // prevent accidental copies
     ServiceManager(const ServiceManager&) = delete;
     ServiceManager& operator=(const ServiceManager&) = delete;
+
+    void setFuseMountPoint(const std::filesystem::path& mount) const;
+    [[nodiscard]] std::filesystem::path getFuseMountPoint() const;
+
+    std::shared_ptr<vh::shell::Router> getCLIRouter() const;
+
+    void setCtlSocketPath(const std::string& path) const;
+    [[nodiscard]] std::string getCtlSocketPath() const;
 
 private:
     ServiceManager();

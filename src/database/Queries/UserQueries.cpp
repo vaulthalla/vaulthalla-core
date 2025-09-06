@@ -15,8 +15,13 @@ using namespace vh::types;
 namespace vh::database {
 
 std::shared_ptr<User> UserQueries::getUserByName(const std::string& name) {
-    return Transactions::exec("UserQueries::getUserByName", [&](pqxx::work& txn) {
-        const auto userRow = txn.exec(pqxx::prepped{"get_user_by_name"}, pqxx::params{name}).one_row();
+    return Transactions::exec("UserQueries::getUserByName", [&](pqxx::work& txn) -> std::shared_ptr<User> {
+        const auto res = txn.exec(pqxx::prepped{"get_user_by_name"}, pqxx::params{name});
+        if (res.empty()) {
+            LogRegistry::db()->trace("[UserQueries] No user found with name: {}", name);
+            return nullptr;
+        }
+        const auto userRow = res.one_row();
         const auto userId = userRow["id"].as<unsigned int>();
         const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
 
@@ -225,6 +230,12 @@ void UserQueries::revokeAndPurgeRefreshTokens(const unsigned int userId) {
         txn.exec(pqxx::prepped{"revoke_most_recent_refresh_token"}, p);
         txn.exec(pqxx::prepped{"delete_refresh_tokens_older_than_7_days"}, p);
         txn.exec(pqxx::prepped{"delete_refresh_tokens_keep_five"}, p);
+    });
+}
+
+bool UserQueries::userExists(const std::string& name) {
+    return Transactions::exec("UserQueries::userExists", [&](pqxx::work& txn) {
+        return txn.exec(pqxx::prepped{"user_exists"}, pqxx::params{name}).one_field().as<bool>();
     });
 }
 

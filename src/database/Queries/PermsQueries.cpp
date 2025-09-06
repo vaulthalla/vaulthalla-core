@@ -4,9 +4,11 @@
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 #include "types/PermissionOverride.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::logging;
 
 // #################################################################################################
 // ############################################ Role  #############################################
@@ -29,15 +31,19 @@ void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
         pqxx::params p{role->id, role->name, role->description, role->type};
         txn.exec(pqxx::prepped{"update_role"}, p);
 
-        const pqxx::params perms_params{role->id, role->permissions};
-        txn.exec(pqxx::prepped{"upsert_permissions"}, perms_params);
+        LogRegistry::db()->trace("[PermsQueries] Updating permissions for role ID {} to mask {}",
+            role->id, bitStringFromMask(role->permissions));
+
+        const pqxx::params perms_params{role->id, bitStringFromMask(role->permissions)};
+        txn.exec(pqxx::prepped{"update_role_permissions"}, perms_params);
     });
 }
 
 std::shared_ptr<Role> PermsQueries::getRole(const unsigned int id) {
-    return Transactions::exec("PermsQueries::getRole", [&](pqxx::work& txn) {
-        const auto row = txn.exec("SELECT * FROM role WHERE id = " + txn.quote(id)).one_row();
-        return std::make_shared<Role>(row);
+    return Transactions::exec("PermsQueries::getRole", [&](pqxx::work& txn) -> std::shared_ptr<Role> {
+        const auto res = txn.exec(pqxx::prepped{"get_role"}, pqxx::params{id});
+        if (res.empty()) return nullptr;
+        return std::make_shared<Role>(res.one_row());
     });
 }
 

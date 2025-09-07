@@ -233,6 +233,8 @@ struct TestCommandUsage {
     std::shared_ptr<CommandUsage> command;
     unsigned int minIter = 1, max_iter = 1;
 
+    TestCommandUsage() = default;
+
     explicit TestCommandUsage(const std::shared_ptr<CommandUsage>& cmd,
                  const unsigned int min_iter = 1,
                  const unsigned int max_iter = 1)
@@ -285,6 +287,8 @@ public:
     std::size_t max_key_col = 30; // cap left column width
     bool show_aliases = true;
     ColorTheme theme{};
+
+    CommandUsage() = default;
 
     [[nodiscard]] std::string primary() const;
 

@@ -20,6 +20,8 @@ class CommandUsage;
 
 namespace vh::test {
 
+class TestUsageManager;
+
 using ExecFn = std::function<shell::CommandResult(const std::string& line)>;
 
 struct AssertionResult {
@@ -87,7 +89,7 @@ struct GenerateConfig {
 
 class CLITestRunner {
 public:
-    explicit CLITestRunner(vh::shell::UsageManager& usage,
+    explicit CLITestRunner(TestUsageManager& usage,
                            ExecFn exec,
                            std::shared_ptr<ArgValueProvider> provider = std::make_shared<DefaultArgValueProvider>());
 
@@ -116,7 +118,7 @@ public:
     const std::vector<TestCase>& tests() const { return tests_; }
 
 private:
-    vh::shell::UsageManager& usage_;
+    TestUsageManager& usage_;
     ExecFn exec_;
     std::shared_ptr<ArgValueProvider> provider_;
 

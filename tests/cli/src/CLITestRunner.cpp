@@ -1,6 +1,6 @@
 #include "CLITestRunner.hpp"
 #include "CommandUsage.hpp"
-#include "UsageManager.hpp"
+#include "TestUsageManager.hpp"
 
 #include <sstream>
 #include <iostream>
@@ -35,7 +35,7 @@ namespace vh::test {
 
 // ======= ctor / basic registration =======
 
-CLITestRunner::CLITestRunner(UsageManager& usage,
+CLITestRunner::CLITestRunner(TestUsageManager& usage,
                              ExecFn exec,
                              std::shared_ptr<ArgValueProvider> provider)
     : usage_(usage), exec_(std::move(exec)), provider_(std::move(provider)) {}

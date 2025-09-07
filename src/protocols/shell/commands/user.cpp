@@ -128,6 +128,8 @@ static CommandResult deleteUser(const CommandCall& subcall) {
 static CommandResult handleUserInfo(const CommandCall& subcall) {
     constexpr const auto* ERR = "user info";
 
+    if (subcall.positionals.empty()) return invalid("Usage: user info <name>");
+
     const auto userArg = subcall.positionals[0];
 
     const auto uLkp = resolveUser(userArg, ERR);

@@ -57,11 +57,9 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     if (call.name.empty()) return invalid("No command provided.");
     const auto canonical = canonicalFor(call.name);
 
-    if (call.positionals.empty()) {
-        if (pluralMap_.contains(call.name)) {
-            call.name = canonical;
-            call.positionals.emplace_back("list");
-        }
+    if (call.positionals.empty() && pluralMap_.contains(call.name)) {
+        call.name = canonical;
+        call.positionals.emplace_back("list");
     }
 
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);

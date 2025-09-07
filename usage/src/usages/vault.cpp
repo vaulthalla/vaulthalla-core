@@ -13,10 +13,10 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
 
 static Positional VAULT_POS = Positional::WithAliases("vault", "Name or ID of the vault", {"name", "id"});
 
-static Optional LOCAL_CONFLICT_OPTIONAL = Optional::Single("local_conflict", "Conflict resolution strategy for local vaults",
-                             "on-sync-conflict", "overwrite | keep_both | ask", "overwrite");
-static Optional SYNC_STRATEGY_OPTIONAL = Optional::Multi("sync_strategy", "Sync strategy for S3 vaults", {"sync-strategy", "strategy", "ss"}, {"cache", "sync", "mirror"});
-static Optional S3_CONFLICT_OPTIONAL = Optional::Multi("on_sync_conflict", "Conflict resolution strategy", {"on-sync-conflict", "conflict", "osc"}, {"overwrite", "keep_both", "ask", "keep_local", "keep_remote"});
+static Optional LOCAL_CONFLICT_OPTIONAL = Optional::Multi("local_conflict", "Conflict resolution strategy for local vaults",
+{"on-sync-conflict", "conflict"}, {"overwrite", "keep_both", "ask"}, "overwrite");
+static Optional SYNC_STRATEGY_OPTIONAL = Optional::Multi("sync_strategy", "Sync strategy for S3 vaults", {"sync-strategy", "strategy"}, {"cache", "sync", "mirror"});
+static Optional S3_CONFLICT_OPTIONAL = Optional::Multi("on_sync_conflict", "Conflict resolution strategy", {"on-sync-conflict", "conflict"}, {"keep_local", "keep_remote", "ask"});
 
 static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);

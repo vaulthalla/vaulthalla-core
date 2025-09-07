@@ -61,7 +61,7 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
         if (pluralMap_.contains(call.name)) {
             call.name = canonical;
             call.positionals.emplace_back("list");
-        } else return usage();
+        }
     }
 
     LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);

@@ -155,16 +155,103 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
         {"vh group user remove devs alice", "Remove user 'alice' from the 'devs' group."},
         {"vh group users devs", "List all users in the 'devs' group."}
     };
-    cmd->subcommands = {
-        list(cmd->weak_from_this()),
-        create(cmd->weak_from_this()),
-        remove(cmd->weak_from_this()),
-        info(cmd->weak_from_this()),
-        update(cmd->weak_from_this()),
-        group_user(cmd->weak_from_this())
+
+    // ---------- build subcommands (stack pointers) ----------
+    const auto listCmd        = list(cmd->weak_from_this());
+    const auto createCmd      = create(cmd->weak_from_this());
+    const auto removeCmd      = remove(cmd->weak_from_this());
+    const auto infoCmd        = info(cmd->weak_from_this());
+    const auto updateCmd      = update(cmd->weak_from_this());
+
+    // membership subtree
+    const auto groupUserCmd   = group_user(cmd->weak_from_this());
+    const auto usersCmd       = user_list(groupUserCmd->weak_from_this());
+    const auto userAddCmd     = user_add(groupUserCmd->weak_from_this());
+    const auto userRmCmd      = user_remove(groupUserCmd->weak_from_this());
+
+    // ---------- test lifecycles ----------
+    // list: should tolerate empty; best with a few groups present
+    listCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
     };
+
+    // create: verify info/update/users, then clean
+    createCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(infoCmd),
+            TestCommandUsage::Single(updateCmd),
+            TestCommandUsage::Single(usersCmd),
+            // add/remove a user to ensure membership paths don’t regress
+            TestCommandUsage::Single(userAddCmd),
+            TestCommandUsage::Single(userRmCmd)
+        },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // remove: ensure a group exists first
+    removeCmd->test_usage = {
+        .setup = { TestCommandUsage::Single(createCmd) }
+    };
+
+    // info: exercise on fresh groups; clean them up
+    infoCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    // update: same as info; validate round-trips don’t corrupt invariants
+    updateCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    // users (list members): make sure members exist, then remove them, then delete group
+    usersCmd->test_usage = {
+        .setup = {
+            TestCommandUsage::Single(createCmd),
+            TestCommandUsage::Multiple(userAddCmd) // add 1..3 members
+        },
+        .teardown = {
+            TestCommandUsage::Multiple(userRmCmd), // remove all we added
+            TestCommandUsage::Single(removeCmd)
+        }
+    };
+
+    // membership add: ensure group exists; list users afterward; clean up
+    userAddCmd->test_usage = {
+        .setup    = { TestCommandUsage::Single(createCmd) },
+        .lifecycle = { TestCommandUsage::Single(usersCmd) },
+        .teardown = {
+            TestCommandUsage::Single(userRmCmd),
+            TestCommandUsage::Single(removeCmd)
+        }
+    };
+
+    // membership remove: ensure group + at least one member
+    userRmCmd->test_usage = {
+        .setup = {
+            TestCommandUsage::Single(createCmd),
+            TestCommandUsage::Single(userAddCmd)
+        },
+        .lifecycle = { TestCommandUsage::Single(usersCmd) },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // ---------- finalize ----------
+    cmd->subcommands = {
+        listCmd,
+        createCmd,
+        removeCmd,
+        infoCmd,
+        updateCmd,
+        usersCmd,      // expose "vh group users" as sibling
+        groupUserCmd   // expose "vh group user [add|remove]"
+    };
+
     return cmd;
 }
+
 
 std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();

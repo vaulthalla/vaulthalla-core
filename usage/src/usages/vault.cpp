@@ -498,6 +498,225 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"vault", "v"};
     cmd->description = "Manage a single vault.";
     cmd->pluralAliasImpliesList = true;
+
+    // ---- build direct children first (we'll mine their subcommands next) ----
+    const auto listCmd   = list(cmd->weak_from_this());
+    const auto createCmd = create(cmd->weak_from_this());
+    const auto removeCmd = remove(cmd->weak_from_this());
+    const auto infoCmd   = info(cmd->weak_from_this());
+    const auto updateCmd = update(cmd->weak_from_this());
+
+    const auto vroleCmd  = vrole(cmd->weak_from_this());
+    const auto keyCmd    = key(cmd->weak_from_this());
+    const auto syncCmd   = sync(cmd->weak_from_this()); // executable (manual sync) + has subcommands
+
+    // ---- helpers to pluck children by alias from a parent we just built ----
+    auto findChild = [](const std::shared_ptr<CommandUsage>& parentCmd, std::string_view alias)
+        -> std::shared_ptr<CommandUsage>
+    {
+        for (const auto& sc : parentCmd->subcommands) {
+            if (sc && sc->matches(std::string(alias))) return sc;
+        }
+        return nullptr;
+    };
+
+    // ---- dig into vrole -> (list | override | assign | unassign) ----
+    const auto roleListCmd     = findChild(vroleCmd, "list");
+    const auto roleOverrideCmd = findChild(vroleCmd, "override");
+    const auto roleAssignCmd   = findChild(vroleCmd, "assign");
+    const auto roleUnassignCmd = findChild(vroleCmd, "unassign");
+
+    // and into override -> (add | update | remove | list)
+    std::shared_ptr<CommandUsage> ovAddCmd, ovUpdCmd, ovRmCmd, ovListCmd;
+    if (roleOverrideCmd) {
+        ovAddCmd  = findChild(roleOverrideCmd, "add");
+        ovUpdCmd  = findChild(roleOverrideCmd, "update");
+        ovRmCmd   = findChild(roleOverrideCmd, "remove");
+        ovListCmd = findChild(roleOverrideCmd, "list");
+    }
+
+    // ---- dig into key -> (export | rotate) ----
+    const auto keyExportCmd = findChild(keyCmd, "export");
+    const auto keyRotateCmd = findChild(keyCmd, "rotate");
+
+    // ---- dig into sync -> (info | set) ----
+    const auto syncInfoCmd = findChild(syncCmd, "info");
+    const auto syncSetCmd  = findChild(syncCmd, "set");
+
+    // ------------------------------------------------------------------------
+    //                           test lifecycles
+    // ------------------------------------------------------------------------
+
+    // vault list: seed a few vaults; tolerate already-empty state on teardown
+    listCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
+    };
+
+    // vault create: validate via info + update; optionally hit sync & key export; always clean up
+    createCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(infoCmd),
+            TestCommandUsage::Single(updateCmd),
+            // exercise sync and key pipeline lightly if available
+            syncSetCmd   ? TestCommandUsage::Single(syncSetCmd)   : TestCommandUsage{createCmd, 0, 0},
+            syncInfoCmd  ? TestCommandUsage::Single(syncInfoCmd)  : TestCommandUsage{createCmd, 0, 0},
+            keyExportCmd ? TestCommandUsage::Single(keyExportCmd) : TestCommandUsage{createCmd, 0, 0}
+        },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // vault remove: ensure a vault exists first
+    removeCmd->test_usage = {
+        .setup = { TestCommandUsage::Single(createCmd) }
+    };
+
+    // vault info/update: bootstrap a fresh vault then tear it down
+    infoCmd->test_usage = {
+        .setup    = { TestCommandUsage::Single(createCmd) },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+    updateCmd->test_usage = {
+        .setup    = { TestCommandUsage::Single(createCmd) },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // manual "vh vault sync <vault>" (the syncCmd itself is executable)
+    if (syncCmd) {
+        syncCmd->test_usage = {
+            .setup = { TestCommandUsage::Single(createCmd) },
+            .teardown = { TestCommandUsage::Single(removeCmd) }
+        };
+    }
+
+    // sync/info + sync/set rely on an existing vault
+    if (syncInfoCmd) {
+        syncInfoCmd->test_usage = {
+            .setup    = { TestCommandUsage::Single(createCmd) },
+            .teardown = { TestCommandUsage::Single(removeCmd) }
+        };
+    }
+    if (syncSetCmd) {
+        syncSetCmd->test_usage = {
+            .setup    = { TestCommandUsage::Single(createCmd) },
+            .teardown = { TestCommandUsage::Single(removeCmd) }
+        };
+    }
+
+    // keys/export + keys/rotate: ensure vault exists; rotate then export to validate round-trip
+    if (keyExportCmd) {
+        keyExportCmd->test_usage = {
+            .setup    = { TestCommandUsage::Single(createCmd) },
+            .teardown = { TestCommandUsage::Single(removeCmd) }
+        };
+    }
+    if (keyRotateCmd) {
+        keyRotateCmd->test_usage = {
+            .setup = { TestCommandUsage::Single(createCmd) },
+            .lifecycle = { keyExportCmd ? TestCommandUsage::Single(keyExportCmd)
+                                        : TestCommandUsage{createCmd, 0, 0} },
+            .teardown = { TestCommandUsage::Single(removeCmd) }
+        };
+    }
+
+    // role assign/unassign/list: must have a vault; keep subject cleanup symmetric
+    if (roleAssignCmd) {
+        roleAssignCmd->test_usage = {
+            .setup = { TestCommandUsage::Single(createCmd) },
+            .lifecycle = {
+                roleListCmd ? TestCommandUsage::Single(roleListCmd)
+                            : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = { roleUnassignCmd ? TestCommandUsage::Single(roleUnassignCmd)
+                                          : TestCommandUsage{createCmd, 0, 0} }
+        };
+    }
+    if (roleUnassignCmd) {
+        roleUnassignCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                roleAssignCmd ? TestCommandUsage::Single(roleAssignCmd)
+                              : TestCommandUsage{createCmd, 0, 0}
+            }
+        };
+    }
+    if (roleListCmd) {
+        roleListCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                // seed a couple of assignments if possible
+                roleAssignCmd ? TestCommandUsage::Multiple(roleAssignCmd) : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = {
+                roleUnassignCmd ? TestCommandUsage::Multiple(roleUnassignCmd) : TestCommandUsage{createCmd, 0, 0},
+                TestCommandUsage::Single(removeCmd)
+            }
+        };
+    }
+
+    // role overrides: rely on an assignment; add→list→update→remove flow
+    if (ovAddCmd) {
+        ovAddCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                roleAssignCmd ? TestCommandUsage::Single(roleAssignCmd) : TestCommandUsage{createCmd, 0, 0}
+            },
+            .lifecycle = {
+                ovListCmd ? TestCommandUsage::Single(ovListCmd) : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = {
+                ovRmCmd ? TestCommandUsage::Single(ovRmCmd) : TestCommandUsage{createCmd, 0, 0},
+                roleUnassignCmd ? TestCommandUsage::Single(roleUnassignCmd) : TestCommandUsage{createCmd, 0, 0},
+                TestCommandUsage::Single(removeCmd)
+            }
+        };
+    }
+    if (ovUpdCmd) {
+        ovUpdCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                roleAssignCmd ? TestCommandUsage::Single(roleAssignCmd) : TestCommandUsage{createCmd, 0, 0},
+                ovAddCmd     ? TestCommandUsage::Single(ovAddCmd)       : TestCommandUsage{createCmd, 0, 0}
+            },
+            .lifecycle = {
+                ovListCmd ? TestCommandUsage::Single(ovListCmd) : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = {
+                ovRmCmd ? TestCommandUsage::Single(ovRmCmd) : TestCommandUsage{createCmd, 0, 0},
+                roleUnassignCmd ? TestCommandUsage::Single(roleUnassignCmd) : TestCommandUsage{createCmd, 0, 0},
+                TestCommandUsage::Single(removeCmd)
+            }
+        };
+    }
+    if (ovRmCmd) {
+        ovRmCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                roleAssignCmd ? TestCommandUsage::Single(roleAssignCmd) : TestCommandUsage{createCmd, 0, 0},
+                ovAddCmd     ? TestCommandUsage::Single(ovAddCmd)       : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = {
+                roleUnassignCmd ? TestCommandUsage::Single(roleUnassignCmd) : TestCommandUsage{createCmd, 0, 0},
+                TestCommandUsage::Single(removeCmd)
+            }
+        };
+    }
+    if (ovListCmd) {
+        ovListCmd->test_usage = {
+            .setup = {
+                TestCommandUsage::Single(createCmd),
+                roleAssignCmd ? TestCommandUsage::Single(roleAssignCmd) : TestCommandUsage{createCmd, 0, 0},
+                ovAddCmd ? TestCommandUsage::Multiple(ovAddCmd) : TestCommandUsage{createCmd, 0, 0}
+            },
+            .teardown = {
+                ovRmCmd ? TestCommandUsage::Multiple(ovRmCmd) : TestCommandUsage{createCmd, 0, 0},
+                roleUnassignCmd ? TestCommandUsage::Single(roleUnassignCmd) : TestCommandUsage{createCmd, 0, 0},
+                TestCommandUsage::Single(removeCmd)
+            }
+        };
+    }
+
+    // ---- examples (unchanged) ----
     cmd->examples = {
         {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G",
          "Create a local vault with a 10GB quota."},
@@ -511,16 +730,19 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
          "Export the encryption key for the vault with ID 42 to 'keyfile.pem', encrypted for the GPG recipient with fingerprint 'ABCDEF1234567890'."},
         {"vh vault sync 42", "Manually trigger a sync for the vault with ID 42."}
     };
+
+    // ---- finalize tree ----
     cmd->subcommands = {
-        list(cmd->weak_from_this()),
-        create(cmd->weak_from_this()),
-        remove(cmd->weak_from_this()),
-        info(cmd->weak_from_this()),
-        update(cmd->weak_from_this()),
-        vrole(cmd->weak_from_this()),
-        key(cmd->weak_from_this()),
-        sync(cmd->weak_from_this())
+        listCmd,
+        createCmd,
+        removeCmd,
+        infoCmd,
+        updateCmd,
+        vroleCmd,
+        keyCmd,
+        syncCmd
     };
+
     return cmd;
 }
 

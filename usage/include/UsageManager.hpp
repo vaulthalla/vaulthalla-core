@@ -25,9 +25,7 @@ public:
 
     [[nodiscard]] const std::shared_ptr<CommandUsage>& root() const { return root_; }
 
-    [[nodiscard]] std::shared_ptr<CommandUsage> getFilteredTestUsage() const;
-
-private:
+protected:
     std::unordered_map<std::string, std::shared_ptr<CommandBook>> index_;
     std::shared_ptr<CommandUsage> root_;
 };

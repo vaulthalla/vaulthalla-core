@@ -117,13 +117,42 @@ std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     cmd->aliases = {"api-key", "aku", "ak"};
     cmd->pluralAliasImpliesList = true;
     cmd->description = "Manage a single API key.";
-    cmd->subcommands = {
-        list(cmd->weak_from_this()),
-        create(cmd->weak_from_this()),
-        remove(cmd->weak_from_this()),
-        info(cmd->weak_from_this()),
-        update(cmd->weak_from_this())
+
+    const auto listCmd = list(cmd->weak_from_this());
+    const auto createCmd = create(cmd->weak_from_this());
+    const auto removeCmd = remove(cmd->weak_from_this());
+    const auto infoCmd = info(cmd->weak_from_this());
+    const auto updateCmd = update(cmd->weak_from_this());
+
+    listCmd->test_usage = {
+        .setup = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
     };
+
+    createCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(removeCmd),
+            TestCommandUsage::Single(infoCmd),
+            TestCommandUsage::Single(updateCmd)
+        },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    removeCmd->test_usage = {
+        .setup = { TestCommandUsage::Single(createCmd) }
+    };
+
+    infoCmd->test_usage = {
+        .setup = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    updateCmd->test_usage = {
+        .setup = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    cmd->subcommands = { listCmd, createCmd, removeCmd, infoCmd, updateCmd };
     return cmd;
 }
 

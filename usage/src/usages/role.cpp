@@ -102,13 +102,49 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"role", "r"};
     cmd->pluralAliasImpliesList = true;
     cmd->description = "Manage a single role.";
-    cmd->subcommands = {
-        list(cmd->weak_from_this()),
-        create(cmd->weak_from_this()),
-        remove(cmd->weak_from_this()),
-        info(cmd->weak_from_this()),
-        update(cmd->weak_from_this())
+
+    // ---------- build subcommands ----------
+    const auto listCmd   = list(cmd->weak_from_this());
+    const auto createCmd = create(cmd->weak_from_this());
+    const auto removeCmd = remove(cmd->weak_from_this());
+    const auto infoCmd   = info(cmd->weak_from_this());
+    const auto updateCmd = update(cmd->weak_from_this());
+
+    // ---------- test lifecycles ----------
+    // list: should work even with no roles, but better to create some first
+    listCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
     };
+
+    // create: after creation, verify info/update paths, then delete
+    createCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(infoCmd),
+            TestCommandUsage::Single(updateCmd)
+        },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // remove: must ensure a role exists first
+    removeCmd->test_usage = {
+        .setup = { TestCommandUsage::Single(createCmd) }
+    };
+
+    // info: exercise against a fresh role; then clean up
+    infoCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    // update: same deal as info
+    updateCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd) }
+    };
+
+    // ---------- finalize ----------
+    cmd->subcommands = { listCmd, createCmd, removeCmd, infoCmd, updateCmd };
     return cmd;
 }
 

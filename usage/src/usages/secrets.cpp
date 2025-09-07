@@ -48,16 +48,42 @@ static std::shared_ptr<CommandUsage> secret_export(const std::weak_ptr<CommandUs
 
 static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
-    cmd->aliases = {"secret", "secrets", "sec"};
+    cmd->aliases = {"secrets", "secret"};
     cmd->description = "Manage internal secrets used by Vaulthalla.";
-    cmd->subcommands = {
-        set(cmd->weak_from_this()),
-        secret_export(cmd->weak_from_this())
-    };
+
+    // --- subcommands (define pointers) ---
+    const auto setCmd       = set(cmd->weak_from_this());
+    const auto exportCmd    = secret_export(cmd->weak_from_this());
+
+    // --- examples ---
     cmd->examples = {
         {"vh secret set db-password --file /path/to/password.txt", "Set the database password from the specified file."},
         {"vh secret export jwt-secret --output /path/to/output_jwt_secret.txt", "Export the JWT secret to the specified file."}
     };
+
+    // --- lifecycles ---
+    // Setting a secret should be followed by an export to validate round-trip
+    setCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(exportCmd)
+        }
+        // no teardown: set is idempotent/overwriting by nature
+    };
+
+    // Export requires the secret to exist; ensure via set
+    exportCmd->test_usage = {
+        .setup = {
+            TestCommandUsage::Single(setCmd)
+        }
+        // no teardown needed; export is read-only
+    };
+
+    // --- finalize subcommands ---
+    cmd->subcommands = {
+        setCmd,
+        exportCmd
+    };
+
     return cmd;
 }
 

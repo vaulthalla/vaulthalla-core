@@ -227,6 +227,44 @@ struct Example {
     std::string note;
 };
 
+class CommandUsage;
+
+struct TestCommandUsage {
+    std::shared_ptr<CommandUsage> command;
+    unsigned int minIter = 1, max_iter = 1;
+
+    explicit TestCommandUsage(const std::shared_ptr<CommandUsage>& cmd,
+                 const unsigned int min_iter = 1,
+                 const unsigned int max_iter = 1)
+        : command(cmd), minIter(min_iter), max_iter(max_iter) {}
+
+    static TestCommandUsage Single(const std::shared_ptr<CommandUsage>& cmd) {
+        return TestCommandUsage(cmd, 1, 1);
+    }
+
+    static TestCommandUsage Optional(const std::shared_ptr<CommandUsage>& cmd) {
+        return TestCommandUsage(cmd, 0, 1);
+    }
+
+    static TestCommandUsage Multiple(const std::shared_ptr<CommandUsage>& cmd,
+                                      const unsigned int min_iter = 1,
+                                      const unsigned int max_iter = 3) {
+        return TestCommandUsage(cmd, min_iter, max_iter);
+    }
+
+    static TestCommandUsage Robust(const std::shared_ptr<CommandUsage>& cmd) {
+        return TestCommandUsage(cmd, 1, 5);
+    }
+
+    static TestCommandUsage Stress(const std::shared_ptr<CommandUsage>& cmd) {
+        return TestCommandUsage(cmd, 3, 10);
+    }
+};
+
+struct TestUsage {
+    std::vector<TestCommandUsage> setup, lifecycle, teardown;
+};
+
 class CommandUsage : public std::enable_shared_from_this<CommandUsage> {
 public:
     std::vector<std::string> aliases;
@@ -240,6 +278,7 @@ public:
     std::vector<Option> required;
     std::vector<GroupedOptions> groups;
     std::vector<Example> examples;
+    TestUsage test_usage;
     bool pluralAliasImpliesList = false;
 
     int term_width = 100;  // target width for str()

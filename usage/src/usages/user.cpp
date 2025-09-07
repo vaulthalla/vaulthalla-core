@@ -101,13 +101,15 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"user", "u"};
     cmd->description = "Manage a single user.";
     cmd->pluralAliasImpliesList = true;
-    cmd->subcommands = {
-        list(cmd->weak_from_this()),
-        create(cmd->weak_from_this()),
-        remove(cmd->weak_from_this()),
-        info(cmd->weak_from_this()),
-        update(cmd->weak_from_this())
-    };
+
+    // ---------- subcommands ----------
+    const auto listCmd   = list(cmd->weak_from_this());
+    const auto createCmd = create(cmd->weak_from_this());
+    const auto removeCmd = remove(cmd->weak_from_this());
+    const auto infoCmd   = info(cmd->weak_from_this());
+    const auto updateCmd = update(cmd->weak_from_this());
+
+    // ---------- examples ----------
     cmd->examples = {
         {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
          "Create a new user named 'alice' with admin role, email, and Linux UID."},
@@ -116,6 +118,49 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
         {"vh user update alice --email alice123@icann.org --role user",
          "Update user 'alice' with a new email and role."}
     };
+
+    // ---------- lifecycles ----------
+    // list: better with some users present
+    listCmd->test_usage = {
+        .setup    = { TestCommandUsage::Multiple(createCmd) },
+        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
+    };
+
+    // create: verify info and update, then remove
+    createCmd->test_usage = {
+        .lifecycle = {
+            TestCommandUsage::Single(infoCmd),
+            TestCommandUsage::Single(updateCmd)
+        },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // remove: ensure a user exists first
+    removeCmd->test_usage = {
+        .setup = { TestCommandUsage::Single(createCmd) }
+    };
+
+    // info: make sure a user exists before querying
+    infoCmd->test_usage = {
+        .setup    = { TestCommandUsage::Single(createCmd) },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // update: same as info
+    updateCmd->test_usage = {
+        .setup    = { TestCommandUsage::Single(createCmd) },
+        .teardown = { TestCommandUsage::Single(removeCmd) }
+    };
+
+    // ---------- finalize ----------
+    cmd->subcommands = {
+        listCmd,
+        createCmd,
+        removeCmd,
+        infoCmd,
+        updateCmd
+    };
+
     return cmd;
 }
 

@@ -4,6 +4,9 @@
 #include "usages.hpp"
 
 #include <sstream>
+#include <stdexcept>
+#include <ranges>
+#include <algorithm>
 
 using namespace vh::shell;
 
@@ -11,9 +14,9 @@ UsageManager::UsageManager() {
     root_ = std::make_shared<CommandUsage>();
     root_->aliases = {"vh"};
     root_->description = "Vaulthalla Command Line Interface";
-    root_->optional = {
-        {"-h | --help", "Show help information"},
-        {"-v | --version", "Show version information"}
+    root_->optional_flags = {
+        Flag::WithAliases("help", "Show help information", {"h", "?"}),
+        Flag::Alias("version", "Show version information", "v")
     };
     root_->examples = {
         {"vh help", "Show general help information."},

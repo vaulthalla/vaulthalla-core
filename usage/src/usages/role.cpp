@@ -18,8 +18,8 @@ static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& par
         Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
     };
     cmd->optional_flags = {
-        {"user_filter", "List only user roles", {"user"}},
-        {"vault_filter", "List only vault roles", {"vault"}}
+        Flag::Alias("user_filer", "List only user roles", "user"),
+        Flag::Alias("vault_filter", "List only vault roles", "vault")
     };
     cmd->optional = {
         Optional::Single("json_filter", "Output the list in JSON format", "json", "j")
@@ -54,7 +54,7 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
         Option::OneToMany("role_type", "Type of the role", "type", {"user", "vault"})
     };
     cmd->optional_flags = {
-        Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions')", ALL_SHELL_PERMS)
+        Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions')", ALL_SHELL_PERMS_STR)
     };
     cmd->optional = {
         Optional::OneToMany("inherit_perms", "Inherit permissions from an existing role ID", "from", {"id", "name"}),
@@ -82,7 +82,7 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->description = "Update properties and permissions of an existing role.";
     cmd->positionals = {{"<id>", "ID of the role to update"}};
     cmd->optional_flags = {
-        Flag::WithAliases("permissions_flags", "Permission flags to set or unset for the role (see 'vh permissions')", ALL_SHELL_PERMS)
+        Flag::WithAliases("permissions_flags", "Permission flags to set or unset for the role (see 'vh permissions')", ALL_SHELL_PERMS_STR)
     };
     cmd->optional = {
         Optional::Single("role_name", "New name for the role", "name", "new_name"),

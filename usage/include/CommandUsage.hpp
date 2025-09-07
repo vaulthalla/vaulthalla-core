@@ -7,7 +7,6 @@
 #include <optional>
 #include <cstddef>
 #include <memory>
-#include <unordered_map>
 
 namespace vh::shell {
 
@@ -60,13 +59,10 @@ struct Flag : Positional {
     Flag(std::string label_, std::string desc_)
         : Positional(std::move(label_), std::move(desc_)) {}
 
-    Flag(std::string label_, std::string desc_, std::string alias_)
-        : Positional(std::move(label_), std::move(desc_), std::vector{std::move(alias_)}) {}
+    Flag(std::string label_, std::string desc_, std::string alias_, const bool default_state_ = false)
+        : Positional(std::move(label_), std::move(desc_), std::vector{std::move(alias_)}), default_state(default_state_) {}
 
-    Flag(std::string label_, std::string desc_, const bool default_state_)
-        : Positional(std::move(label_), std::move(desc_)), default_state(default_state_) {}
-
-    Flag(std::string label_, std::string desc_, std::vector<std::string> aliases_, bool default_state_)
+    Flag(std::string label_, std::string desc_, std::vector<std::string> aliases_, const bool default_state_)
         : Positional(std::move(label_), std::move(desc_), std::move(aliases_)), default_state(default_state_) {}
 
     Flag() = default;
@@ -90,12 +86,12 @@ struct Flag : Positional {
     }
 
     static Flag Toggle(std::string label, std::string desc, bool default_state) {
-        return {std::move(label), std::move(desc), {}, default_state};
+        return {std::move(label), std::move(desc), std::vector<std::string>{}, default_state};
     }
 };
 
 struct Option : Entry {
-    std::vector<std::string> option_tokens, value_tokens;
+    std::vector<std::string> option_tokens{}, value_tokens{};
 
     Option(std::string label_, std::string desc_,
            std::vector<std::string> option_tokens_,
@@ -147,7 +143,7 @@ struct Option : Entry {
 };
 
 struct Optional : Option {
-    std::optional<std::string> default_value;
+    std::optional<std::string> default_value{};
 
     Optional(std::string label_,
              std::string desc_,

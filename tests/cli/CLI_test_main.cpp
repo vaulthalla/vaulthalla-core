@@ -17,6 +17,8 @@
 #include <pdfium/fpdfview.h>
 #include <memory>
 #include <filesystem>
+#include <iostream>
+#include <string>
 
 namespace fs = std::filesystem;
 using namespace vh::shell;

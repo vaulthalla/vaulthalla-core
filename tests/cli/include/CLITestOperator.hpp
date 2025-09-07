@@ -24,7 +24,6 @@ struct Step {
     std::vector<CaptureRule> captures;
     std::vector<ValidatorFn> validators;
     // Optional: extra required placeholders for validation dependency ordering
-    std::vector<std::string> requires; // e.g. {"role_name"}
     // Optional: step-specific allow-failure (for edge case probes)
     bool allowFailure{false};
 };

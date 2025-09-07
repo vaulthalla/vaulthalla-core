@@ -61,9 +61,9 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
             )
     };
     cmd->optional_flags = {
-        {"user_filter", "Filter permissions for user roles", {"user", "u"}},
-        {"vault_filter", "Filter permissions for vault roles", {"vault", "v"}},
-        {"help", "Show help message", {"h"}}
+        Flag::WithAliases("user_filter", "Filter permissions for user roles", {"user", "u"}),
+        Flag::WithAliases("vault_filter", "Filter permissions for vault roles", {"vault", "v"}),
+        Flag::Alias("help", "Show help message", "h")
     };
     cmd->description = "Display available permission flags for user and vault roles.";
     cmd->examples.push_back({"vh permissions", "Show all available permission flags."});

@@ -211,7 +211,7 @@ static std::shared_ptr<CommandUsage> role_override_add(const std::weak_ptr<Comma
         Positional::Alias("role_id", "ID of the role to override", "id")
     };
     cmd->required_flags = {
-        Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions') min=1", ALL_SHELL_PERMS)
+        Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions') min=1", ALL_SHELL_PERMS_STR)
     };
     cmd->required = {
         Option::Multi("subject", "Specify the user or group to assign the override to", {"user", "u", "group", "g"}, {"id", "name"})

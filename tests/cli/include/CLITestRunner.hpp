@@ -75,6 +75,16 @@ public:
     }
 };
 
+struct GenerateConfig {
+    bool help_tests = true;
+    bool happy_path = true;
+    bool negative_required = true;
+    bool negative_invalid_values = true;
+    bool matrix_variants = true;          // exercise alt tokens / value tokens
+    std::size_t max_examples_per_cmd = 2; // cap example-based tests per cmd
+    std::size_t max_variants_per_cmd = 3; // cap matrix tests per cmd
+};
+
 class CLITestRunner {
 public:
     explicit CLITestRunner(vh::shell::UsageManager& usage,
@@ -86,6 +96,8 @@ public:
                            bool happy_path = true,
                            bool negative_required = true,
                            size_t max_examples_per_cmd = 2);
+
+    void generateFromUsage(const GenerateConfig& cfg);
 
     // Register extra validators for a path, e.g. "user/create"
     void registerValidator(const std::string& path, ValidatorFn v);
@@ -113,7 +125,28 @@ private:
     std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_not_contains_;
     std::vector<TestCase> tests_;
 
-private:
+    static std::string dashify(const std::string& t);
+    static std::string pickBestToken(const std::vector<std::string>& tokens); // prefers long
+    static std::optional<std::string> firstValueFromTokens(const std::vector<std::string>& value_tokens,
+                                                           ArgValueProvider& provider,
+                                                           const std::string& usage_path,
+                                                           Context& ctx,
+                                                           std::string* chosen_token_out = nullptr);
+
+    static std::string usagePathFor(const std::vector<std::string>& path_aliases);
+
+    // richer generators
+    void genMatrixVariants(const std::vector<std::string>& path_aliases,
+                           const std::shared_ptr<shell::CommandUsage>& u,
+                           const GenerateConfig& cfg);
+
+    void genMissingEachRequiredTest(const std::vector<std::string>& path_aliases,
+                                    const std::shared_ptr<shell::CommandUsage>& u);
+
+    void genInvalidValueTests(const std::vector<std::string>& path_aliases,
+                              const std::shared_ptr<shell::CommandUsage>& u,
+                              std::size_t max_variants);
+
     static std::string primaryAlias(const std::shared_ptr<vh::shell::CommandUsage>& u);
     static std::string joinPath(const std::vector<std::string>& segs);
     static bool isLeaf(const std::shared_ptr<vh::shell::CommandUsage>& u);

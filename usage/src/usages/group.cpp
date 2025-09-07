@@ -29,7 +29,9 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new group.";
-    cmd->positionals = {{"group_name", "Name of the new group", {"name", {"name", "group_name"}}}};
+    cmd->positionals = {
+        Positional::Alias("group", "Name for the new group", "name")
+    };
     cmd->optional = {
         Optional::Single("description", "The description of the new group.", "desc", "description"),
         Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id")
@@ -45,7 +47,9 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing group by name or ID.";
-    cmd->positionals = {{"group", "Name or ID of the group to delete", {"name", "id"}}};
+    cmd->positionals = {
+        Positional::WithAliases("group", "Name or ID of the group to delete", {"name", "id"})
+    };
     cmd->examples = {
         {"vh group delete devs", "Delete the group named 'devs'."},
         {"vh group rm 42", "Delete the group with ID 42 (using alias)."}
@@ -57,7 +61,9 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about a group.";
-    cmd->positionals = {{"group", "Name or ID of the group", {"name", "id"}}};
+    cmd->positionals = {
+        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"})
+    };
     cmd->examples = {
         {"vh group info devs", "Show information for the group named 'devs'."},
         {"vh group get 42", "Show information for the group with ID 42 (using alias)."}
@@ -69,7 +75,9 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "mod", "modify"};
     cmd->description = "Update properties of an existing group.";
-    cmd->positionals = {{"group", "Name or ID of the group to update", {"name", "id"}}};
+    cmd->positionals = {
+        Positional::WithAliases("group", "Name or ID of the group to update", {"name", "id"})
+    };
     cmd->optional = {
         Optional::Single("description", "The description of the new group.", "desc", "description"),
         Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id"),
@@ -82,7 +90,9 @@ static std::shared_ptr<CommandUsage> user_list(const std::weak_ptr<CommandUsage>
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all users in a specific group.";
-    cmd->positionals = {{"group", "Name or ID of the group", {"name", "id"}}};
+    cmd->positionals = {
+        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"})
+    };
     cmd->examples = {
         {"vh group users devs", "List all users in the 'devs' group."},
         {"vh group users 42", "List all users in the group with ID 42."}
@@ -95,8 +105,8 @@ static std::shared_ptr<CommandUsage> user_add(const std::weak_ptr<CommandUsage>&
     cmd->aliases = {"add", "new", "mk"};
     cmd->description = "Add a user to a specific group.";
     cmd->positionals = {
-        {"group", "Name or ID of the group", {"name", "id"}},
-        {"user", "Username or ID of the user to add", {"name", "id"}}
+        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"}),
+        Positional::WithAliases("user", "Username or ID of the user to add", {"name", "id"})
     };
     cmd->examples = {
         {"vh group user add devs alice", "Add user 'alice' to the 'devs' group."},
@@ -110,8 +120,8 @@ static std::shared_ptr<CommandUsage> user_remove(const std::weak_ptr<CommandUsag
     cmd->aliases = {"remove", "del", "rm"};
     cmd->description = "Remove a user from a specific group.";
     cmd->positionals = {
-        {"group", "Name or ID of the group", {"name", "id"}},
-        {"user", "Username or ID of the user to remove", {"name", "id"}}
+        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"}),
+        Positional::WithAliases("user", "Username or ID of the user to remove", {"name", "id"})
     };
     cmd->examples.push_back({"vh group user remove devs alice", "Remove user 'alice' from the 'devs' group."});
     cmd->examples.push_back({"vh group user remove 42 1001", "Remove user with ID 1001 from the group with ID 42."});

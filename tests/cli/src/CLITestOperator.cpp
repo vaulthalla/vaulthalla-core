@@ -32,7 +32,7 @@ void CLITestOperator::applyCaptures(const std::vector<CaptureRule>& caps,
     auto scan = [&](const std::string& text) {
         for (const auto& c : caps) {
             std::smatch m;
-            if (std::regex_search(text, m, c.pattern) && m.size() > c.group) {
+            if (std::regex_search(text, m, c.pattern) && m.size() > static_cast<size_t>(c.group)) {
                 ctx_[c.key] = m[c.group].str();
             }
         }

@@ -27,12 +27,12 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new user.";
     cmd->required = {
-        {"--name <name>", "Username for the new user"},
-        {"--role <role>", "Role name or ID for the new user"}
+        Option::Same("name", "Username for the new user"),
+        Option::Same("role", "Role name or ID for the new user")
     };
     cmd->optional = {
-        {"--email <email>", "Email address of the new user"},
-        {"--linux-uid <uid>", "Linux UID for system integration"}
+        Optional::Same("email", "Email address of the new user"),
+        Optional::Single("linux_uid", "Linux UID for system integration", "linux-uid", "uid")
     };
     cmd->examples = {
         {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
@@ -48,7 +48,9 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "rm"};
     cmd->description = "Delete an existing user by username.";
-    cmd->positionals = {{"<name>", "Username of the user to delete"}};
+    cmd->positionals = {
+        Positional::Alias("username", "Username of the user to delete", "name")
+    };
     cmd->examples = {
         {"vh user delete alice", "Delete the user named 'alice'."},
         {"vh user remove bob", "Delete the user named 'bob' (using alias)."},
@@ -61,7 +63,9 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Get information about a specific user by username.";
-    cmd->positionals = {{"<name>", "Username of the user to retrieve"}};
+    cmd->positionals = {
+        Positional::Alias("username", "Username of the user to get information about", "name")
+    };
     cmd->examples = {
         {"vh user info alice", "Get information about the user named 'alice'."},
         {"vh user get bob", "Get information about the user named 'bob' (using alias)."},
@@ -76,10 +80,10 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->description = "Update properties of an existing user.";
     cmd->positionals = {{"<name>", "Username of the user to update"}};
     cmd->optional = {
-        {"--name <new_name>", "New username"},
-        {"--email <email>", "New email address"},
-        {"--role <role>", "New role name or ID"},
-        {"--linux-uid <uid>", "New Linux UID"}
+        Optional::Single("username", "New username", "name", "new_name"),
+        Optional::Single("email", "New email address", "email", "new_email"),
+        Optional::Single("role", "New role name or ID", "role", "new_role"),
+        Optional::Single("linux_uid", "New Linux UID", "linux-uid", "new_linux_uid")
     };
     cmd->examples = {
         {"vh user update alice --email alice123@icann.org --role user",

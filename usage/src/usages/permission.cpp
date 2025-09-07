@@ -51,7 +51,20 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
     cmd->aliases = {"permission", "permissions", "perm", "perms"};
-    cmd->optional = {{"<type>", "Type of permissions to display: 'user'/'u' or 'vault'/'v' (default: both)"}};
+    cmd->optional = {
+        Optional::OneToMany(
+            "type_filter",
+            "Filter permissions by type",
+            "type",
+            {"user", "vault"},
+            "both"
+            )
+    };
+    cmd->optional_flags = {
+        {"user_filter", "Filter permissions for user roles", {"user", "u"}},
+        {"vault_filter", "Filter permissions for vault roles", {"vault", "v"}},
+        {"help", "Show help message", {"h"}}
+    };
     cmd->description = "Display available permission flags for user and vault roles.";
     cmd->examples.push_back({"vh permissions", "Show all available permission flags."});
     return cmd;

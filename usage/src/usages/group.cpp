@@ -14,8 +14,12 @@ static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& par
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all groups in the system.";
+    cmd->optional_flags = {
+        Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
+    };
     cmd->optional = {
-        {"--limit <number>", "Limit the number of groups returned (default 100)"}
+        Optional::Single("result_limit", "Limit the number of results returned (default 100)", "limit", "limit", "100"),
+        Optional::Single("page_number", "Specify the page number when using --limit for pagination (default 1)", "page", "page", "1")
     };
     cmd->examples.push_back({"vh groups", "List all groups."});
     return cmd;
@@ -27,8 +31,8 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->description = "Create a new group.";
     cmd->positionals = {{"group_name", "Name of the new group", {"name", {"name", "group_name"}}}};
     cmd->optional = {
-        {"description", "Optional description for the group", {"desc", {"description"}}},
-        {"linux_group", "Optional Linux GID for system integration", {"linux-gid", {"id"}}}
+        Optional::Single("description", "The description of the new group.", "desc", "description"),
+        Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id")
     };
     cmd->examples = {
         {"vh group create devs --desc \"Development Team\" --linux-gid 1001", "Create a new group named 'devs'."},
@@ -67,9 +71,9 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->description = "Update properties of an existing group.";
     cmd->positionals = {{"group", "Name or ID of the group to update", {"name", "id"}}};
     cmd->optional = {
-        {"group_name", "New name for the group", {"name", {"name", "group_name"}}},
-        {"description", "New description for the group", {"desc", {"description"}}},
-        {"linux_group", "New Linux GID for system integration", {"linux-gid", {"id"}}}
+        Optional::Single("description", "The description of the new group.", "desc", "description"),
+        Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id"),
+        Optional::Mirrored("group_name", "The new name for the group.", "name")
     };
     return cmd;
 }
@@ -91,8 +95,8 @@ static std::shared_ptr<CommandUsage> user_add(const std::weak_ptr<CommandUsage>&
     cmd->aliases = {"add", "new", "mk"};
     cmd->description = "Add a user to a specific group.";
     cmd->positionals = {
-        {"group", "Name or ID of the group", {"group", {"name", "id"}}},
-        {"user", "Username or ID of the user to add", {"user", {"name", "id"}}}
+        {"group", "Name or ID of the group", {"name", "id"}},
+        {"user", "Username or ID of the user to add", {"name", "id"}}
     };
     cmd->examples = {
         {"vh group user add devs alice", "Add user 'alice' to the 'devs' group."},
@@ -106,8 +110,8 @@ static std::shared_ptr<CommandUsage> user_remove(const std::weak_ptr<CommandUsag
     cmd->aliases = {"remove", "del", "rm"};
     cmd->description = "Remove a user from a specific group.";
     cmd->positionals = {
-        {"<group_name|gid>", "Name or ID of the group"},
-        {"<user_name|uid>", "Username or ID of the user"}
+        {"group", "Name or ID of the group", {"name", "id"}},
+        {"user", "Username or ID of the user to remove", {"name", "id"}}
     };
     cmd->examples.push_back({"vh group user remove devs alice", "Remove user 'alice' from the 'devs' group."});
     cmd->examples.push_back({"vh group user remove 42 1001", "Remove user with ID 1001 from the group with ID 42."});

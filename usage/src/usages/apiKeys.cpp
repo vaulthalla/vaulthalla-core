@@ -28,7 +28,7 @@ static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all API keys in the system.";
     cmd->optional_flags = {
-        {"json", "Output the list in JSON format", {"--json", "-j"}}
+        Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
     };
     cmd->examples = {
         {"vh api-keys", "List all API keys in the system."},
@@ -44,14 +44,14 @@ std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) 
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new API key for accessing S3 storage.";
     cmd->required = {
-        {"api_key_name", "Name for the new API key", {"name", {"<name>"}}},
-        {"access_key", "Access key for the S3 provider", {"access", {"<accessKey>"}}},
-        {"secret_key", "Secret key for the S3 provider", {"secret", {"<secret>"}}},
-        {"provider", "S3 provider (" + usage_provider() + ")", {"provider", {"<provider>"}}},
-        {"endpoint", "Custom endpoint URL for the S3 provider (currently required for all providers)", {"endpoint", {"<endpoint>"}}}
+        Option::Mirrored("api_key_name", "Name for the new API key", "name"),
+        Option::Single("access_key", "Access key for the S3 provider", "access", "accessKey"),
+        Option::Single("secret_key", "Secret key for the S3 provider", "secret", "secret"),
+        Option::Mirrored("s3_provider", "S3 provider (" + usage_provider() + ")", "provider"),
+        Option::Multi("endpoint", "Custom endpoint URL for the S3 provider (currently required for all providers)", {"endpoint", "url"}, {"endpoint"})
     };
     cmd->optional = {
-        {"region", "Region for the S3 provider", {"region", {"<region>"}}, "auto"}
+        Optional::Same("region", "Region for the S3 provider", "auto")
     };
     cmd->examples = {
         {"vh api-key create --name mykey --access AKIA... --secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY --provider aws --region us-east-1",
@@ -66,7 +66,9 @@ std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing API key by ID.";
-    cmd->positionals = {{"api_key", "ID of the API key to delete", {"<id>", "<api_key_id>"}}};
+    cmd->positionals = {
+        Positional::WithAliases("api_key", "ID of the API key to delete", {"id", "api_key_id"})
+    };
     cmd->examples = {
         {"vh api-key delete 42", "Delete the API key with ID 42."},
         {"vh api-key rm 42", "Delete the API key with ID 42 (using alias)."}
@@ -78,7 +80,9 @@ std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about an API key.";
-    cmd->positionals = {{"api_key", "ID of the API key", {"<id>", "<api_key_id>"}}};
+    cmd->positionals = {
+        Positional::WithAliases("api_key", "ID of the API key", {"name", "id"})
+    };
     cmd->examples = {
         {"vh api-key info 42", "Show information for the API key with ID 42."},
         {"vh api-key show 42", "Show information for the API key with ID 42 (using alias)."}
@@ -90,14 +94,16 @@ std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing API key.";
-    cmd->positionals = {{"api_key", "ID of the API key to update", {"<id>", "<api_key_id>"}}};
+    cmd->positionals = {
+        Positional::WithAliases("api_key", "ID of the API key to update", {"name", "id"})
+    };
     cmd->optional = {
-        {"name", "New name for the API key", {"name", {"<new_name>"}}},
-        {"access_key", "New access key for the S3 provider", {"access", {"<new_access_key>"}}},
-        {"secret_key", "New secret key for the S3 provider", {"secret", {"<new_secret_key>"}}},
-        {"region", "New region for the S3 provider", {"region", {"<new_region>"}}},
-        {"endpoint", "New custom endpoint URL for the S3 provider", {"endpoint", {"<new_endpoint>"}}},
-        {"provider", "New S3 provider (" + usage_provider() + ")", {"provider", {"<new_provider>"}}}
+        Optional::Single("name", "New name for the API key", "name", "new_name"),
+        Optional::Single("access_key", "New access key for the S3 provider", "access", "new_access_key"),
+        Optional::Single("secret_key", "New secret key for the S3 provider", "secret", "new_secret_key"),
+        Optional::Single("region", "New region for the S3 provider", "region", "new_region"),
+        Optional::Single("endpoint", "New custom endpoint URL for the S3 provider", "endpoint", "new_endpoint"),
+        Optional::Single("provider", "New S3 provider (" + usage_provider() + ")", "provider", "new_provider")
     };
     cmd->examples = {
         {"vh api-key update 42 --name newname --region us-east-1", "Update the name and region of the API key with ID 42."},

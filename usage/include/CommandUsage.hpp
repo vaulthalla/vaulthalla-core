@@ -15,9 +15,8 @@ struct Entry {
     std::string label;
     std::string desc;
 
-    // Constructors to support brace-initialization with or without aliases
-    Entry(std::string l, std::string d)
-        : label(std::move(l)), desc(std::move(d)) {}
+    Entry(std::string label_, std::string desc_)
+        : label(std::move(label_)), desc(std::move(desc_)) {}
 
     Entry() = default;
 };
@@ -25,66 +24,203 @@ struct Entry {
 struct Positional : Entry {
     std::vector<std::string> aliases;
 
-    Positional(std::string l, std::string d) : Entry(std::move(l), std::move(d)) {}
+    Positional(std::string label_, std::string desc_)
+        : Entry(std::move(label_), std::move(desc_)) {}
 
-    Positional(std::string l, std::string d, std::vector<std::string> a)
-        : Entry(std::move(l), std::move(d)), aliases(std::move(a)) {}
+    Positional(std::string label_, std::string desc_, std::vector<std::string> aliases_)
+        : Entry(std::move(label_), std::move(desc_)), aliases(std::move(aliases_)) {}
 
     Positional() = default;
+
+    // 🏗️ Factory Methods
+
+    static Positional Same(const std::string& label, std::string desc) {
+        return {label, std::move(desc), {label}};
+    }
+
+    // No aliases
+    static Positional Required(std::string label, std::string desc) {
+        return {std::move(label), std::move(desc)};
+    }
+
+    // With aliases
+    static Positional WithAliases(std::string label, std::string desc, std::vector<std::string> aliases) {
+        return {std::move(label), std::move(desc), std::move(aliases)};
+    }
+
+    // Shortcut for one alias
+    static Positional Alias(std::string label, std::string desc, std::string alias) {
+        return Positional(std::move(label), std::move(desc), {std::move(alias)});
+    }
 };
 
 struct Flag : Positional {
     bool default_state = false;
 
-    Flag(std::string l, std::string d) : Positional(std::move(l), std::move(d)) {}
+    Flag(std::string label_, std::string desc_)
+        : Positional(std::move(label_), std::move(desc_)) {}
 
-    Flag(std::string l, std::string d, std::string a)
-        : Positional(std::move(l), std::move(d), std::vector{std::move(a)}) {}
+    Flag(std::string label_, std::string desc_, std::string alias_)
+        : Positional(std::move(label_), std::move(desc_), std::vector{std::move(alias_)}) {}
 
-    Flag(std::string l, std::string d, bool s) : Positional(std::move(l), std::move(d)), default_state(s) {}
+    Flag(std::string label_, std::string desc_, const bool default_state_)
+        : Positional(std::move(label_), std::move(desc_)), default_state(default_state_) {}
 
-    Flag(std::string l, std::string d, bool s, std::vector<std::string> a)
-        : Positional(std::move(l), std::move(d), std::move(a)), default_state(s) {}
+    Flag(std::string label_, std::string desc_, std::vector<std::string> aliases_, bool default_state_)
+        : Positional(std::move(label_), std::move(desc_), std::move(aliases_)), default_state(default_state_) {}
 
     Flag() = default;
+
+    // 🏗️ Factory Methods
+
+    static Flag On(std::string label, std::string desc, std::vector<std::string> aliases = {}) {
+        return {std::move(label), std::move(desc), std::move(aliases), true};
+    }
+
+    static Flag Off(std::string label, std::string desc, std::vector<std::string> aliases = {}) {
+        return {std::move(label), std::move(desc), std::move(aliases), false};
+    }
+
+    static Flag Alias(std::string label, std::string desc, std::string alias, const bool default_state = false) {
+        return Flag(std::move(label), std::move(desc), std::vector{std::move(alias)}, default_state);
+    }
+
+    static Flag WithAliases(std::string label, std::string desc, std::vector<std::string> aliases, const bool default_state = false) {
+        return {std::move(label), std::move(desc), std::move(aliases), default_state};
+    }
+
+    static Flag Toggle(std::string label, std::string desc, bool default_state) {
+        return {std::move(label), std::move(desc), {}, default_state};
+    }
 };
 
 struct Option : Entry {
-    // allows for better grouping of flag aliases and possible values
-    // e.g. { "--user", { { "<name>", "<id>" } } } for "--user <name|id>"
-    //   or { "--group", { { "<group>", "<id>" } } } for "-g | --group"
-    std::unordered_map<std::string, std::vector<std::string>> aliases{};
+    std::vector<std::string> option_tokens, value_tokens;
 
-    Option(std::string l, std::string d) : Entry(std::move(l), std::move(d)) {}
+    Option(std::string label_, std::string desc_,
+           std::vector<std::string> option_tokens_,
+           std::vector<std::string> value_tokens_)
+        : Entry(std::move(label_), std::move(desc_)),
+          option_tokens(std::move(option_tokens_)),
+          value_tokens(std::move(value_tokens_)) {}
 
-    Option(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a)
-        : Entry(std::move(l), std::move(d)), aliases(std::move(a)) {}
+    Option(std::string label_, std::string desc_)
+        : Entry(std::move(label_), std::move(desc_)) {}
 
     Option() = default;
+
+    static Option Single(std::string label,
+                         std::string desc,
+                         std::string option,
+                         std::string value_token) {
+        return Option(std::move(label), std::move(desc),
+                      {std::move(option)}, {std::move(value_token)});
+    }
+
+    static Option Multi(std::string label,
+                        std::string desc,
+                        std::vector<std::string> options,
+                        std::vector<std::string> value_tokens) {
+        return Option(std::move(label), std::move(desc),
+                      std::move(options), std::move(value_tokens));
+    }
+
+    static Option Mirrored(std::string label,
+                           std::string desc,
+                        const std::string& token) {
+        return Option(std::move(label), std::move(desc),
+                      {token}, {token});
+    }
+
+    static Option OneToMany(std::string label,
+                             std::string desc,
+                             std::string option,
+                             std::vector<std::string> value_tokens) {
+        return Option(std::move(label), std::move(desc),
+                      {std::move(option)}, std::move(value_tokens));
+    }
+
+    static Option Same(std::string token,
+                           std::string desc) {
+        return Option(token, std::move(desc), {token}, {token});
+    }
 };
 
 struct Optional : Option {
     std::optional<std::string> default_value;
 
-    Optional(std::string l, std::string d) : Option(std::move(l), std::move(d)) {}
-
-    Optional(std::string l, std::string d, std::optional<std::string> a)
-        : Option(std::move(l), std::move(d)), default_value(std::move(a)) {}
-
-    Optional(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a)
-        : Option(std::move(l), std::move(d), std::move(a)) {}
-
-    Optional(std::string l, std::string d, std::unordered_map<std::string, std::vector<std::string>> a, std::optional<std::string> b)
-        : Option(std::move(l), std::move(d), std::move(a)), default_value(std::move(b)) {}
+    Optional(std::string label_,
+             std::string desc_,
+             std::vector<std::string> option_tokens_,
+             std::vector<std::string> value_tokens_,
+             std::optional<std::string> default_value_)
+        : Option(std::move(label_), std::move(desc_),
+                 std::move(option_tokens_), std::move(value_tokens_)),
+          default_value(std::move(default_value_)) {}
 
     Optional() = default;
+
+    static Optional Single(std::string label,
+                           std::string desc,
+                           std::string option,
+                           std::string value_token,
+                           std::optional<std::string> def = std::nullopt) {
+        return Optional(std::move(label), std::move(desc),
+                        {std::move(option)}, {std::move(value_token)},
+                        std::move(def));
+    }
+
+    static Optional Multi(std::string label,
+                          std::string desc,
+                          std::vector<std::string> options,
+                          std::vector<std::string> value_tokens,
+                          std::optional<std::string> def = std::nullopt) {
+        return {std::move(label), std::move(desc),
+                        std::move(options), std::move(value_tokens),
+                        std::move(def)};
+    }
+
+    static Optional OneToMany(std::string label,
+                                 std::string desc,
+                                 std::string option,
+                                 std::vector<std::string> value_tokens,
+                                 std::optional<std::string> def = std::nullopt) {
+        return Optional(std::move(label), std::move(desc),
+                        {std::move(option)}, std::move(value_tokens),
+                        std::move(def));
+    }
+
+    static Optional ManyToOne(std::string label,
+                             std::string desc,
+                             std::vector<std::string> options,
+                             std::string value_token,
+                             std::optional<std::string> def = std::nullopt) {
+        return Optional(std::move(label), std::move(desc),
+                        std::move(options), {std::move(value_token)},
+                        std::move(def));
+    }
+
+    static Optional Mirrored(std::string label,
+                             std::string desc,
+                             std::string token,
+                             std::optional<std::string> def = std::nullopt) {
+        return Optional(std::move(label), std::move(desc),
+                        {token}, {token}, std::move(def));
+    }
+
+    // 🆕 new factory
+    static Optional Same(std::string token,
+                         std::string desc,
+                         std::optional<std::string> def = std::nullopt) {
+        return Optional(token, std::move(desc), {token}, {token}, std::move(def));
+    }
 };
 
 struct GroupedOptions {
     std::string title;
-    std::vector<Optional> items;
+    std::vector<std::variant<Optional, Flag>> items;
 
-    GroupedOptions(std::string t, std::vector<Optional> i)
+    GroupedOptions(std::string t, std::vector<std::variant<Optional, Flag>> i)
         : title(std::move(t)), items(std::move(i)) {}
 
     GroupedOptions() = default;

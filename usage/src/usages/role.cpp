@@ -14,11 +14,15 @@ static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& par
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all roles in the system.";
+    cmd->optional_flags = {
+        Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
+    };
+    cmd->optional_flags = {
+        {"user_filter", "List only user roles", {"user"}},
+        {"vault_filter", "List only vault roles", {"vault"}}
+    };
     cmd->optional = {
-        {"--user", "List only user roles"},
-        {"--vault", "List only vault roles"},
-        {"--json", "Output the list in JSON format"},
-        {"--limit <n>", "Limit the number of results returned"}
+        Optional::Single("json_filter", "Output the list in JSON format", "json", "j")
     };
     cmd->examples.push_back({"vh roles", "List all roles."});
     cmd->examples.push_back({"vh roles --user --json", "List all user roles in JSON format."});
@@ -29,10 +33,12 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about a specific role.";
-    cmd->positionals = {{"<id|name>", "ID or name of the role"}};
-    cmd->optional = {
-        {"--user", "Specify if the role is a user role when using name"},
-        {"--vault", "Specify if the role is a vault role when using name"}
+    cmd->positionals = {
+        {"role", "ID or name of the role", {"id", "name"}}
+    };
+    cmd->optional_flags = {
+        Flag::WithAliases("user_filter", "Indicates the role is a user role", {"user", "u"}),
+        Flag::WithAliases("vault_filter", "Indicates the role is a vault role", {"vault", "v"})
     };
     cmd->examples.push_back({"vh role info 42", "Show information for the role with ID 42."});
     cmd->examples.push_back({"vh role info admin --user", "Show information for the user role named 'admin'."});
@@ -43,13 +49,15 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new role with specified permissions.";
-    cmd->positionals = {{"<name>", "Name for the new role"}};
+    cmd->positionals = {Positional::Alias("role_name", "Name of the new role", "name")};
     cmd->required = {
-        {"--type <user|vault>", "Type of role to create (user or vault)"}
+        Option::OneToMany("role_type", "Type of the role", "type", {"user", "vault"})
+    };
+    cmd->optional_flags = {
+        Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions')", ALL_SHELL_PERMS)
     };
     cmd->optional = {
-        {"--from <id|name>", "ID or name of an existing role to copy permissions from"},
-        {"<permission_flags>", "Permission flags to set for the new role (see 'vh help role create')"}
+        Optional::OneToMany("inherit_perms", "Inherit permissions from an existing role ID", "from", {"id", "name"}),
     };
     cmd->examples.push_back({"vh role create editor --type user --set-manage-users --set-manage-groups",
                            "Create a new user role named 'editor' with user and group management permissions."});
@@ -62,7 +70,7 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing role by ID.";
-    cmd->positionals = {{"<id>", "ID of the role to delete"}};
+    cmd->positionals = {{"role_id", "ID of the role to delete", {"id"}}};
     cmd->examples.push_back({"vh role delete 42", "Delete the role with ID 42."});
     cmd->examples.push_back({"vh role rm 42", "Delete the role with ID 42 (using alias)."});
     return cmd;
@@ -73,9 +81,11 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties and permissions of an existing role.";
     cmd->positionals = {{"<id>", "ID of the role to update"}};
+    cmd->optional_flags = {
+        Flag::WithAliases("permissions_flags", "Permission flags to set or unset for the role (see 'vh permissions')", ALL_SHELL_PERMS)
+    };
     cmd->optional = {
-        {"--name <new_name>", "New name for the role"},
-        {"<permission_flag>", "Permission flags to add or remove (see 'vh help role update')"}
+        Optional::Single("role_name", "New name for the role", "name", "new_name"),
     };
     cmd->examples.push_back({"vh role update 42 --name superadmin --set-manage-admins",
                            "Rename role ID 42 to 'superadmin' and add admin management permission."});

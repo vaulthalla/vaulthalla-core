@@ -73,10 +73,9 @@ static CommandResult handleRoleInfo(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("roles info: too many arguments");
 
     const auto& arg = call.positionals[0];
-    const auto roleIdOpt = parseInt(arg);
     std::shared_ptr<Role> role;
 
-    if (roleIdOpt) {
+    if (const auto roleIdOpt = parseInt(arg)) {
         role = PermsQueries::getRole(*roleIdOpt);
         if (!role) return invalid("roles info: role with ID " + std::to_string(*roleIdOpt) + " not found");
     } else {

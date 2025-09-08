@@ -16,6 +16,7 @@
 namespace vh::shell {
 class UsageManager;
 class CommandUsage;
+struct TestCommandUsage;
 }
 
 namespace vh::test {
@@ -72,6 +73,12 @@ public:
         if (token == "vault_id" || token == "id") return "1";
         if (token == "size" || token == "quota") return "10G";
         if (token == "permissions") return "15"; // 0b1111
+        if (token == "access") return "ehwguawlei-3183103j1-3fjl13j3ilj1";
+        if (token == "secret") return "asdasd-123123-123123-123123";
+        if (token == "region") return "us-west-1";
+        if (token == "endpoint") return "https://s3.example.org";
+        if (token == "pattern") return "^/path/to/something/.*$";
+        if (token == "provider") return "aws";
         // Unknown token → give nothing; caller decides whether to skip positive test
         return std::nullopt;
     }
@@ -82,9 +89,13 @@ struct GenerateConfig {
     bool happy_path = true;
     bool negative_required = true;
     bool negative_invalid_values = true;
-    bool matrix_variants = true;          // exercise alt tokens / value tokens
-    std::size_t max_examples_per_cmd = 2; // cap example-based tests per cmd
-    std::size_t max_variants_per_cmd = 3; // cap matrix tests per cmd
+    bool matrix_variants = true;
+    std::size_t max_examples_per_cmd = 2;
+    std::size_t max_variants_per_cmd = 3;
+
+    // NEW knobs for test_usage-driven lifecycles
+    bool test_usage_scenarios = true;
+    bool lifecycle_use_max_iters = false; // default: deterministic minimal path
 };
 
 class CLITestRunner {
@@ -121,6 +132,7 @@ private:
     TestUsageManager& usage_;
     ExecFn exec_;
     std::shared_ptr<ArgValueProvider> provider_;
+    std::unordered_map<std::string, std::vector<Context>> open_objects_;
 
     std::unordered_map<std::string, std::vector<ValidatorFn>> per_path_validators_;
     std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_contains_;
@@ -178,6 +190,20 @@ private:
     std::optional<std::string> buildArgs(const std::shared_ptr<vh::shell::CommandUsage>& u,
                                          Context& out_ctx);
     static std::vector<std::string> extractAngleTokens(const std::string& spec);
+
+    // NEW: test_usage scenario pipeline
+    void genTestUsageScenarios(const std::shared_ptr<vh::shell::CommandUsage>& root,
+                               const GenerateConfig& cfg);
+
+    void emitPhaseRun_(const std::vector<std::string>& base_path,
+                       const std::vector<shell::TestCommandUsage>& phase,
+                       const GenerateConfig& cfg,
+                       bool is_teardown);
+
+    static std::vector<std::string> pathAliasesOf(const std::shared_ptr<vh::shell::CommandUsage>& u);
+
+    // Convenience: merges the “latest” ctx from all open paths for seeding
+    Context mergedOpenContext_() const;
 };
 
 }

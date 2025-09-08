@@ -10,6 +10,14 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
     return cmd;
 }
 
+static const auto userPos = Positional::WithAliases("username", "Username or ID of the user", {"name", "id"});
+static const auto namePos = Positional::Alias("username", "Username of the user", "name");
+static const auto nameOpt = Optional::Single("username", "New username for the user", "name", "new_name");
+static const auto emailOpt = Optional::ManyToOne("email", "Email address of the user", {"email", "e"}, "email");
+static const auto role = Option::Multi("role", "Role name or ID to assign to the user", {"role", "r"}, {"name", "id"});
+static const auto linuxUidOpt = Optional::ManyToOne("linux_uid", "Linux UID for system integration",
+                                                    {"linux-uid", "uid"}, "id");
+
 static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
@@ -26,14 +34,9 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new user.";
-    cmd->required = {
-        Option::Same("name", "Username for the new user"),
-        Option::Same("role", "Role name or ID for the new user")
-    };
-    cmd->optional = {
-        Optional::Same("email", "Email address of the new user"),
-        Optional::Single("linux_uid", "Linux UID for system integration", "linux-uid", "uid")
-    };
+    cmd->positionals = {namePos};
+    cmd->required = {role};
+    cmd->optional = {emailOpt, linuxUidOpt};
     cmd->examples = {
         {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
          "Create a new user named 'alice' with admin role, email, and Linux UID."},
@@ -48,9 +51,7 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "rm"};
     cmd->description = "Delete an existing user by username.";
-    cmd->positionals = {
-        Positional::Alias("username", "Username of the user to delete", "name")
-    };
+    cmd->positionals = {userPos};
     cmd->examples = {
         {"vh user delete alice", "Delete the user named 'alice'."},
         {"vh user remove bob", "Delete the user named 'bob' (using alias)."},
@@ -63,9 +64,7 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Get information about a specific user by username.";
-    cmd->positionals = {
-        Positional::Alias("username", "Username of the user to get information about", "name")
-    };
+    cmd->positionals = {userPos};
     cmd->examples = {
         {"vh user info alice", "Get information about the user named 'alice'."},
         {"vh user get bob", "Get information about the user named 'bob' (using alias)."},
@@ -78,13 +77,8 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing user.";
-    cmd->positionals = {{"<name>", "Username of the user to update"}};
-    cmd->optional = {
-        Optional::Single("username", "New username", "name", "new_name"),
-        Optional::Single("email", "New email address", "email", "new_email"),
-        Optional::Single("role", "New role name or ID", "role", "new_role"),
-        Optional::Single("linux_uid", "New Linux UID", "linux-uid", "new_linux_uid")
-    };
+    cmd->positionals = {userPos};
+    cmd->optional = {nameOpt, emailOpt, Optional(role), linuxUidOpt};
     cmd->examples = {
         {"vh user update alice --email alice123@icann.org --role user",
          "Update user 'alice' with a new email and role."},
@@ -103,10 +97,10 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->pluralAliasImpliesList = true;
 
     // ---------- subcommands ----------
-    const auto listCmd   = list(cmd->weak_from_this());
+    const auto listCmd = list(cmd->weak_from_this());
     const auto createCmd = create(cmd->weak_from_this());
     const auto removeCmd = remove(cmd->weak_from_this());
-    const auto infoCmd   = info(cmd->weak_from_this());
+    const auto infoCmd = info(cmd->weak_from_this());
     const auto updateCmd = update(cmd->weak_from_this());
 
     // ---------- examples ----------
@@ -119,38 +113,32 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
          "Update user 'alice' with a new email and role."}
     };
 
+    const auto createSingle = TestCommandUsage::Single(createCmd);
+    const auto createMultiple = TestCommandUsage::Multiple(createCmd);
+    const auto removeSingle = TestCommandUsage::Single(removeCmd);
+    const auto removeMultiple = TestCommandUsage::Multiple(removeCmd);
+    const auto infoSingle = TestCommandUsage::Single(infoCmd);
+    const auto updateSingle = TestCommandUsage::Single(updateCmd);
+
     // ---------- lifecycles ----------
     // list: better with some users present
-    listCmd->test_usage = {
-        .setup    = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
-    };
+    listCmd->test_usage.setup = {createMultiple};
+    listCmd->test_usage.teardown = {removeMultiple};
 
     // create: verify info and update, then remove
-    createCmd->test_usage = {
-        .lifecycle = {
-            TestCommandUsage::Single(infoCmd),
-            TestCommandUsage::Single(updateCmd)
-        },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    createCmd->test_usage.lifecycle = {infoSingle, updateSingle};
+    createCmd->test_usage.teardown = {removeSingle};
 
     // remove: ensure a user exists first
-    removeCmd->test_usage = {
-        .setup = { TestCommandUsage::Single(createCmd) }
-    };
+    removeCmd->test_usage.setup = {createSingle};
 
     // info: make sure a user exists before querying
-    infoCmd->test_usage = {
-        .setup    = { TestCommandUsage::Single(createCmd) },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    infoCmd->test_usage.setup = {createSingle};
+    infoCmd->test_usage.teardown = {removeSingle};
 
     // update: same as info
-    updateCmd->test_usage = {
-        .setup    = { TestCommandUsage::Single(createCmd) },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    updateCmd->test_usage.setup = {createSingle};
+    updateCmd->test_usage.teardown = {removeSingle};
 
     // ---------- finalize ----------
     cmd->subcommands = {

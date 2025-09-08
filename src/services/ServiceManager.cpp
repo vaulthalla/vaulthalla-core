@@ -44,6 +44,13 @@ void ServiceManager::startAll() {
     startWatchdog();
 }
 
+void ServiceManager::startTestServices() {
+    std::scoped_lock lock(mutex_);
+    tryStart("FUSE", fuseService);
+    tryStart("CtlServer", ctlServerService);
+}
+
+
 void ServiceManager::stopAll(const int signal) {
     LogRegistry::vaulthalla()->debug("[ServiceManager] Stopping all services...");
     {

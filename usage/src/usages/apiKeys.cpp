@@ -23,13 +23,19 @@ std::string usage_provider() {
     return options;
 }
 
+static const auto keyName = Option::Mirrored("api_key_name", "Name for the new API key", "name");
+static const auto accessKey = Option::Single("access_key", "Access key for the S3 provider", "access", "accessKey");
+static const auto secretKey = Option::Single("secret_key", "Secret key for the S3 provider", "secret", "secret");
+static const auto provider = Option::Mirrored("s3_provider", "S3 provider (" + usage_provider() + ")", "provider");
+static const auto endpoint = Option::Multi("endpoint", "Custom endpoint URL for the S3 provider (currently required for all providers)", {"endpoint", "url"}, {"endpoint"});
+static const auto region = Optional::Same("region", "Region for the S3 provider", "auto");
+static const auto apiKeyPos = Positional::WithAliases("api_key", "ID of the API key to delete", {"id", "api_key_id"});
+
 static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all API keys in the system.";
-    cmd->optional_flags = {
-        Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
-    };
+    cmd->optional_flags = { jsonFlag };
     cmd->examples = {
         {"vh api-keys", "List all API keys in the system."},
         {"vh api-key", "List all API keys in the system (using alias)."},
@@ -43,16 +49,8 @@ std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new API key for accessing S3 storage.";
-    cmd->required = {
-        Option::Mirrored("api_key_name", "Name for the new API key", "name"),
-        Option::Single("access_key", "Access key for the S3 provider", "access", "accessKey"),
-        Option::Single("secret_key", "Secret key for the S3 provider", "secret", "secret"),
-        Option::Mirrored("s3_provider", "S3 provider (" + usage_provider() + ")", "provider"),
-        Option::Multi("endpoint", "Custom endpoint URL for the S3 provider (currently required for all providers)", {"endpoint", "url"}, {"endpoint"})
-    };
-    cmd->optional = {
-        Optional::Same("region", "Region for the S3 provider", "auto")
-    };
+    cmd->required = { keyName, accessKey, secretKey, provider, endpoint };
+    cmd->optional = { region };
     cmd->examples = {
         {"vh api-key create --name mykey --access AKIA... --secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY --provider aws --region us-east-1",
          "Create a new API key named 'mykey' for AWS S3 in the us-east-1 region."},
@@ -66,9 +64,7 @@ std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing API key by ID.";
-    cmd->positionals = {
-        Positional::WithAliases("api_key", "ID of the API key to delete", {"id", "api_key_id"})
-    };
+    cmd->positionals = { apiKeyPos };
     cmd->examples = {
         {"vh api-key delete 42", "Delete the API key with ID 42."},
         {"vh api-key rm 42", "Delete the API key with ID 42 (using alias)."}
@@ -80,9 +76,7 @@ std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about an API key.";
-    cmd->positionals = {
-        Positional::WithAliases("api_key", "ID of the API key", {"name", "id"})
-    };
+    cmd->positionals = { apiKeyPos };
     cmd->examples = {
         {"vh api-key info 42", "Show information for the API key with ID 42."},
         {"vh api-key show 42", "Show information for the API key with ID 42 (using alias)."}
@@ -94,17 +88,8 @@ std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing API key.";
-    cmd->positionals = {
-        Positional::WithAliases("api_key", "ID of the API key to update", {"name", "id"})
-    };
-    cmd->optional = {
-        Optional::Single("name", "New name for the API key", "name", "new_name"),
-        Optional::Single("access_key", "New access key for the S3 provider", "access", "new_access_key"),
-        Optional::Single("secret_key", "New secret key for the S3 provider", "secret", "new_secret_key"),
-        Optional::Single("region", "New region for the S3 provider", "region", "new_region"),
-        Optional::Single("endpoint", "New custom endpoint URL for the S3 provider", "endpoint", "new_endpoint"),
-        Optional::Single("provider", "New S3 provider (" + usage_provider() + ")", "provider", "new_provider")
-    };
+    cmd->positionals = { apiKeyPos };
+    cmd->optional = { Optional(keyName), Optional(accessKey), Optional(secretKey), Optional(provider), Optional(endpoint), region };
     cmd->examples = {
         {"vh api-key update 42 --name newname --region us-east-1", "Update the name and region of the API key with ID 42."},
         {"vh api-key set 42 --secret newsecretkey", "Update the secret key of the API key with ID 42 (using alias)."}
@@ -124,33 +109,26 @@ std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto infoCmd = info(cmd->weak_from_this());
     const auto updateCmd = update(cmd->weak_from_this());
 
-    listCmd->test_usage = {
-        .setup = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
-    };
+    const auto createMultiple = TestCommandUsage::Multiple(createCmd);
+    const auto createSingle = TestCommandUsage::Single(createCmd);
+    const auto removeSingle = TestCommandUsage::Single(removeCmd);
+    const auto removeMultiple = TestCommandUsage::Multiple(removeCmd);
+    const auto infoSingle = TestCommandUsage::Single(infoCmd);
+    const auto updateSingle = TestCommandUsage::Single(updateCmd);
 
-    createCmd->test_usage = {
-        .lifecycle = {
-            TestCommandUsage::Single(removeCmd),
-            TestCommandUsage::Single(infoCmd),
-            TestCommandUsage::Single(updateCmd)
-        },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    listCmd->test_usage.setup = { createMultiple };
+    listCmd->test_usage.teardown = { removeMultiple };
 
-    removeCmd->test_usage = {
-        .setup = { TestCommandUsage::Single(createCmd) }
-    };
+    createCmd->test_usage.lifecycle = { infoSingle, updateSingle };
+    createCmd->test_usage.teardown = { removeSingle };
 
-    infoCmd->test_usage = {
-        .setup = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd) }
-    };
+    removeCmd->test_usage.setup = { createSingle };
 
-    updateCmd->test_usage = {
-        .setup = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd) }
-    };
+    infoCmd->test_usage.setup = { createMultiple };
+    infoCmd->test_usage.teardown = { removeMultiple };
+
+    updateCmd->test_usage.setup = { createMultiple };
+    updateCmd->test_usage.teardown = { removeMultiple };
 
     cmd->subcommands = { listCmd, createCmd, removeCmd, infoCmd, updateCmd };
     return cmd;

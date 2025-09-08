@@ -1,7 +1,6 @@
 #include "CLITestRunner.hpp"
-#include "UsageManager.hpp"
+#include "TestUsageManager.hpp"
 #include "protocols/shell/Router.hpp"
-#include "protocols/shell/commands/all.hpp"
 #include "database/Transactions.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "seed/include/init_db_tables.hpp"
@@ -44,7 +43,7 @@ static vh::test::AssertionResult assert_user_exists(const vh::test::Context& ctx
 }
 
 int main() {
-    ConfigRegistry::init();
+    ConfigRegistry::init("config.yaml");
     LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
 
     FPDF_LIBRARY_CONFIG config;
@@ -70,11 +69,11 @@ int main() {
 
     Filesystem::init(ServiceDepsRegistry::instance().storageManager);
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
-    ServiceManager::instance().startAll();
+    ServiceManager::instance().startTestServices();
 
     const auto router = ServiceManager::instance().getCLIRouter();
 
-    UsageManager usage;
+    TestUsageManager usage;
 
     const auto admin = UserQueries::getUserByName("admin");
     if (!admin) {
@@ -82,11 +81,12 @@ int main() {
         return 1;
     }
 
-    std::unique_ptr<SocketIO> io;
-
     vh::test::CLITestRunner runner(
         usage,
-        /*exec*/ [&](const std::string& cmd) { return router->executeLine(cmd, admin, io.get()); }
+        /*exec*/ [&](const std::string& cmd) {
+            constexpr std::unique_ptr<SocketIO> io;
+            return router->executeLine(cmd, admin, io.get());
+        }
     );
 
     // Example: For "user/create" positive path, assert DB contains the user we created

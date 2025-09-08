@@ -10,17 +10,18 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
     return cmd;
 }
 
+static const auto namePos = Positional::Alias("group", "Name of the group", "name");
+static const auto nameOptional = Optional::Single("group", "New name for the group", "name", "new_name");
+static const auto groupPos = Positional::WithAliases("group", "Name or ID of the group", {"name", "id"});
+static const auto descriptionOpt = Optional::ManyToOne("description", "Description of the group", {"desc", "d"}, "description");
+static const auto linuxGidOpt = Optional::ManyToOne("linux_group", "Linux GID for system integration", {"linux-gid", "gid"}, "id");
+
 static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all groups in the system.";
-    cmd->optional_flags = {
-        Flag::WithAliases("json_filter", "Output the list in JSON format", {"json", "j"})
-    };
-    cmd->optional = {
-        Optional::Single("result_limit", "Limit the number of results returned (default 100)", "limit", "limit", "100"),
-        Optional::Single("page_number", "Specify the page number when using --limit for pagination (default 1)", "page", "page", "1")
-    };
+    cmd->optional_flags = { jsonFlag };
+    cmd->optional = { limitOpt, pageOpt };
     cmd->examples.push_back({"vh groups", "List all groups."});
     return cmd;
 }
@@ -29,13 +30,8 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new group.";
-    cmd->positionals = {
-        Positional::Alias("group", "Name for the new group", "name")
-    };
-    cmd->optional = {
-        Optional::Single("description", "The description of the new group.", "desc", "description"),
-        Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id")
-    };
+    cmd->positionals = { namePos };
+    cmd->optional = { descriptionOpt, linuxGidOpt };
     cmd->examples = {
         {"vh group create devs --desc \"Development Team\" --linux-gid 1001", "Create a new group named 'devs'."},
         {"vh group mk admins --linux-gid 2001", "Create a new group named 'admins' with Linux GID 2001 (using alias)."}
@@ -47,9 +43,7 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing group by name or ID.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group to delete", {"name", "id"})
-    };
+    cmd->positionals = { groupPos };
     cmd->examples = {
         {"vh group delete devs", "Delete the group named 'devs'."},
         {"vh group rm 42", "Delete the group with ID 42 (using alias)."}
@@ -61,9 +55,7 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about a group.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"})
-    };
+    cmd->positionals = { groupPos };
     cmd->examples = {
         {"vh group info devs", "Show information for the group named 'devs'."},
         {"vh group get 42", "Show information for the group with ID 42 (using alias)."}
@@ -75,14 +67,8 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "mod", "modify"};
     cmd->description = "Update properties of an existing group.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group to update", {"name", "id"})
-    };
-    cmd->optional = {
-        Optional::Single("description", "The description of the new group.", "desc", "description"),
-        Optional::Single("linux_group", "The Linux GID for system integration.", "linux-gid", "id"),
-        Optional::Mirrored("group_name", "The new name for the group.", "name")
-    };
+    cmd->positionals = { groupPos };
+    cmd->optional = { descriptionOpt, linuxGidOpt, nameOptional };
     return cmd;
 }
 
@@ -90,9 +76,7 @@ static std::shared_ptr<CommandUsage> user_list(const std::weak_ptr<CommandUsage>
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all users in a specific group.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"})
-    };
+    cmd->positionals = { groupPos };
     cmd->examples = {
         {"vh group users devs", "List all users in the 'devs' group."},
         {"vh group users 42", "List all users in the group with ID 42."}
@@ -104,10 +88,7 @@ static std::shared_ptr<CommandUsage> user_add(const std::weak_ptr<CommandUsage>&
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"add", "new", "mk"};
     cmd->description = "Add a user to a specific group.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"}),
-        Positional::WithAliases("user", "Username or ID of the user to add", {"name", "id"})
-    };
+    cmd->positionals = { groupPos, userPos };
     cmd->examples = {
         {"vh group user add devs alice", "Add user 'alice' to the 'devs' group."},
         {"vh group user add 42 1001", "Add user with ID 1001 to the group with ID 42."}
@@ -119,10 +100,7 @@ static std::shared_ptr<CommandUsage> user_remove(const std::weak_ptr<CommandUsag
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"remove", "del", "rm"};
     cmd->description = "Remove a user from a specific group.";
-    cmd->positionals = {
-        Positional::WithAliases("group", "Name or ID of the group", {"name", "id"}),
-        Positional::WithAliases("user", "Username or ID of the user to remove", {"name", "id"})
-    };
+    cmd->positionals = { groupPos, userPos };
     cmd->examples.push_back({"vh group user remove devs alice", "Remove user 'alice' from the 'devs' group."});
     cmd->examples.push_back({"vh group user remove 42 1001", "Remove user with ID 1001 from the group with ID 42."});
     return cmd;
@@ -169,74 +147,51 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     const auto userAddCmd     = user_add(groupUserCmd->weak_from_this());
     const auto userRmCmd      = user_remove(groupUserCmd->weak_from_this());
 
-    // ---------- test lifecycles ----------
+    // ---------- test commands ----------
+    const auto createMultiple = TestCommandUsage::Multiple(createCmd);
+    const auto createSingle = TestCommandUsage::Single(createCmd);
+    const auto removeMultiple = TestCommandUsage::Multiple(removeCmd, 0, 0);
+    const auto removeSingle = TestCommandUsage::Single(removeCmd);
+    const auto infoSingle = TestCommandUsage::Single(infoCmd);
+    const auto updateSingle = TestCommandUsage::Single(updateCmd);
+    const auto usersSingle = TestCommandUsage::Single(usersCmd);
+    const auto userAddSingle = TestCommandUsage::Single(userAddCmd);
+    const auto userAddMultiple = TestCommandUsage::Multiple(userAddCmd);
+    const auto userRmSingle = TestCommandUsage::Single(userRmCmd);
+    const auto userRmMultiple = TestCommandUsage::Multiple(userRmCmd);
+
     // list: should tolerate empty; best with a few groups present
-    listCmd->test_usage = {
-        .setup    = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd, 0, 0) }
-    };
+    listCmd->test_usage.setup = { createMultiple };
+    listCmd->test_usage.teardown = { removeMultiple };
 
     // create: verify info/update/users, then clean
-    createCmd->test_usage = {
-        .lifecycle = {
-            TestCommandUsage::Single(infoCmd),
-            TestCommandUsage::Single(updateCmd),
-            TestCommandUsage::Single(usersCmd),
-            // add/remove a user to ensure membership paths don’t regress
-            TestCommandUsage::Single(userAddCmd),
-            TestCommandUsage::Single(userRmCmd)
-        },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    createCmd->test_usage.lifecycle = { infoSingle, updateSingle, usersSingle };
+    createCmd->test_usage.teardown = { removeSingle };
 
     // remove: ensure a group exists first
-    removeCmd->test_usage = {
-        .setup = { TestCommandUsage::Single(createCmd) }
-    };
+    removeCmd->test_usage.setup = { createSingle };
 
     // info: exercise on fresh groups; clean them up
-    infoCmd->test_usage = {
-        .setup    = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd) }
-    };
+    infoCmd->test_usage.setup = { createMultiple };
+    infoCmd->test_usage.teardown = { removeMultiple };
 
     // update: same as info; validate round-trips don’t corrupt invariants
-    updateCmd->test_usage = {
-        .setup    = { TestCommandUsage::Multiple(createCmd) },
-        .teardown = { TestCommandUsage::Multiple(removeCmd) }
-    };
+    updateCmd->test_usage.setup = { createMultiple };
+    updateCmd->test_usage.teardown = { removeMultiple };
 
     // users (list members): make sure members exist, then remove them, then delete group
-    usersCmd->test_usage = {
-        .setup = {
-            TestCommandUsage::Single(createCmd),
-            TestCommandUsage::Multiple(userAddCmd) // add 1..3 members
-        },
-        .teardown = {
-            TestCommandUsage::Multiple(userRmCmd), // remove all we added
-            TestCommandUsage::Single(removeCmd)
-        }
-    };
+    usersCmd->test_usage.setup = { createSingle, userAddMultiple };
+    usersCmd->test_usage.teardown = { userRmMultiple, removeSingle };
 
     // membership add: ensure group exists; list users afterward; clean up
-    userAddCmd->test_usage = {
-        .setup    = { TestCommandUsage::Single(createCmd) },
-        .lifecycle = { TestCommandUsage::Single(usersCmd) },
-        .teardown = {
-            TestCommandUsage::Single(userRmCmd),
-            TestCommandUsage::Single(removeCmd)
-        }
-    };
+    userAddCmd->test_usage.setup = { createSingle };
+    userAddCmd->test_usage.lifecycle = { usersSingle };
+    userAddCmd->test_usage.teardown = { userRmSingle, removeSingle };
 
     // membership remove: ensure group + at least one member
-    userRmCmd->test_usage = {
-        .setup = {
-            TestCommandUsage::Single(createCmd),
-            TestCommandUsage::Single(userAddCmd)
-        },
-        .lifecycle = { TestCommandUsage::Single(usersCmd) },
-        .teardown = { TestCommandUsage::Single(removeCmd) }
-    };
+    userRmCmd->test_usage.setup = { createSingle, userAddSingle };
+    userRmCmd->test_usage.lifecycle = { usersSingle };
+    userRmCmd->test_usage.teardown = { removeSingle };
 
     // ---------- finalize ----------
     cmd->subcommands = {

@@ -6,6 +6,8 @@
 #include <iostream>
 #include <algorithm>
 
+#include "logging/LogRegistry.hpp"
+
 using namespace vh::shell;
 
 namespace {
@@ -109,10 +111,11 @@ void CLITestRunner::generateFromUsage(bool help_tests,
 void CLITestRunner::generateFromUsage(const GenerateConfig& cfg) {
     auto root = usage_.getFilteredTestUsage();
     std::vector<std::string> segs;
+
+    // Pass 1: help/happy/negatives
     traverse(root, segs, cfg.help_tests, cfg.happy_path, cfg.negative_required, cfg.max_examples_per_cmd);
 
-    // Second pass for richer tests (variants / invalids)
-    // Walk again to keep original traversal unchanged
+    // Pass 2: variants + invalids
     segs.clear();
     std::function<void(std::shared_ptr<CommandUsage>&, std::vector<std::string>&)> walk =
         [&](std::shared_ptr<CommandUsage>& node, std::vector<std::string>& path) {
@@ -126,8 +129,13 @@ void CLITestRunner::generateFromUsage(const GenerateConfig& cfg) {
                 for (auto& sub : node->subcommands) walk(sub, path);
             }
             if (!path.empty() && primaryAlias(node) != "vh") path.pop_back();
-        };
+    };
     walk(root, segs);
+
+    // Pass 3: test_usage lifecycle scenarios
+    if (cfg.test_usage_scenarios) {
+        genTestUsageScenarios(root, cfg);
+    }
 }
 
 // ======= traversal =======
@@ -215,20 +223,30 @@ std::optional<std::string> CLITestRunner::buildArgs(const std::shared_ptr<Comman
                                                     Context& ctx) {
     if (!u) return std::string{};
     std::ostringstream args;
-    const std::string usage_path = "<" + primaryAlias(u) + ">"; // fine-grained path is injected by callers
+    const std::string usage_path = "<" + primaryAlias(u) + ">";
 
-    // 1) Positionals
+    // 1) Positionals – prefer existing ctx values if present
     for (const auto& pos : u->positionals) {
-        // In your new model, Positional.label is the token name (e.g., "role_id").
-        // Try provider by label; else by first alias; else fallback.
         std::string token_name = pos.label.empty() && !pos.aliases.empty() ? pos.aliases.front() : pos.label;
         if (token_name.empty()) token_name = "arg";
-        auto val = provider_->valueFor(token_name, usage_path);
-        if (!val) {
-            // try aliases
+
+        std::optional<std::string> val;
+        if (auto it = ctx.find(token_name); it != ctx.end()) {
+            val = it->second;
+        } else {
+            // try aliases pre-seeded first
             for (const auto& a : pos.aliases) {
-                val = provider_->valueFor(a, usage_path);
-                if (val) { token_name = a; break; }
+                if (auto it2 = ctx.find(a); it2 != ctx.end()) { val = it2->second; token_name = a; break; }
+            }
+            // fallback to provider
+            if (!val) {
+                val = provider_->valueFor(token_name, usage_path);
+                if (!val) {
+                    for (const auto& a : pos.aliases) {
+                        val = provider_->valueFor(a, usage_path);
+                        if (val) { token_name = a; break; }
+                    }
+                }
             }
         }
         if (!val) return std::nullopt;
@@ -236,33 +254,42 @@ std::optional<std::string> CLITestRunner::buildArgs(const std::shared_ptr<Comman
         args << ' ' << *val;
     }
 
-    // 2) Required flags (boolean)
+    // 2) Required flags (bools)
     for (const auto& f : u->required_flags) {
         const auto tok = !f.aliases.empty() ? pickBestToken(f.aliases) : dashify(f.label);
         if (!tok.empty()) args << ' ' << tok;
     }
 
-    // 3) Required options (with values)
+    // 3) Required options – prefer ctx for any of the value tokens
     for (const auto& o : u->required) {
         const auto opt_tok = !o.option_tokens.empty() ? pickBestToken(o.option_tokens)
                                                       : dashify(o.label);
         if (opt_tok.empty()) return std::nullopt;
 
-        // choose first value we can source from provider
+        std::optional<std::string> val;
         std::string chosen_value_token;
-        auto val = firstValueFromTokens(o.value_tokens, *provider_, usage_path, ctx, &chosen_value_token);
+
+        // If ctx already contains *any* of the advertised value tokens, use it
+        for (const auto& vt : o.value_tokens) {
+            if (auto it = ctx.find(vt); it != ctx.end()) { val = it->second; chosen_value_token = vt; break; }
+        }
+
         if (!val) {
-            // fallback hard default
+            val = firstValueFromTokens(o.value_tokens, *provider_, usage_path, ctx, &chosen_value_token);
+        }
+        if (!val) {
             std::string fallback = "1";
             if (!o.value_tokens.empty()) ctx[o.value_tokens.front()] = fallback;
             else ctx["value"] = fallback;
             args << ' ' << opt_tok << ' ' << fallback;
         } else {
+            // Record chosen token to ctx if it wasn’t already
+            if (!chosen_value_token.empty()) ctx[chosen_value_token] = *val;
             args << ' ' << opt_tok << ' ' << *val;
         }
     }
 
-    // 4) Groups (Optional | Flag) – keep minimal for happy-path; we only enable default-on flags
+    // 4) Groups – same as before (enable default-on flags only)
     for (const auto& g : u->groups) {
         for (const auto& v : g.items) {
             if (std::holds_alternative<Flag>(v)) {
@@ -560,6 +587,7 @@ void CLITestRunner::genMatrixVariants(const std::vector<std::string>& path_alias
     // Variant C: toggle one optional flag if present
     if (produced < cfg.max_variants_per_cmd && !u->optional_flags.empty()) {
         const auto& f = u->optional_flags.front();
+        if (f.label.contains("interactive")) return; // skip interactive toggles
         const auto tok = !f.aliases.empty() ? pickBestToken(f.aliases) : dashify(f.label);
 
         std::ostringstream cmd; Context ctx;
@@ -626,6 +654,128 @@ int CLITestRunner::runAll(std::ostream& out) {
     out << "\nSummary: " << (tests_.size() - failures) << " passed, "
         << failures << " failed, total " << tests_.size() << "\n";
     return failures;
+}
+
+std::vector<std::string> CLITestRunner::pathAliasesOf(const std::shared_ptr<CommandUsage>& u) {
+    std::vector<std::string> rev;
+    auto cur = u;
+    while (cur) {
+        const auto a = primaryAlias(cur);
+        if (!a.empty() && a != "vh") rev.push_back(a);
+        cur = cur->parent.lock();
+    }
+    std::reverse(rev.begin(), rev.end());
+    return rev;
+}
+
+Context CLITestRunner::mergedOpenContext_() const {
+    Context merged;
+    for (const auto& [path, stack] : open_objects_) {
+        if (!stack.empty()) {
+            const auto& top = stack.back();
+            for (const auto& kv : top) {
+                // only set if not already present
+                if (!merged.contains(kv.first)) merged.emplace(kv.first, kv.second);
+            }
+        }
+    }
+    return merged;
+}
+
+void CLITestRunner::genTestUsageScenarios(const std::shared_ptr<CommandUsage>& root,
+                                          const GenerateConfig& cfg) {
+    if (!root) return;
+
+    // DFS walking; whenever a node has test_usage content, emit a scenario block
+    std::function<void(const std::shared_ptr<CommandUsage>&)> walk =
+        [&](const std::shared_ptr<CommandUsage>& node) {
+            if (!node) return;
+
+            const bool has_scenario =
+                (!node->test_usage.setup.empty() ||
+                 !node->test_usage.lifecycle.empty() ||
+                 !node->test_usage.teardown.empty());
+
+            if (has_scenario && cfg.test_usage_scenarios) {
+                // Phase 1: setup -> push ctx into open_objects_
+                emitPhaseRun_(pathAliasesOf(node), node->test_usage.setup, cfg, /*is_teardown=*/false);
+                // Phase 2: lifecycle -> reuse ctx
+                emitPhaseRun_(pathAliasesOf(node), node->test_usage.lifecycle, cfg, /*is_teardown=*/false);
+                // Phase 3: teardown -> pop ctx
+                emitPhaseRun_(pathAliasesOf(node), node->test_usage.teardown, cfg, /*is_teardown=*/true);
+            }
+
+            for (const auto& sub : node->subcommands) walk(sub);
+    };
+
+    walk(root);
+}
+
+void CLITestRunner::emitPhaseRun_(const std::vector<std::string>& base_path,
+                                  const std::vector<vh::shell::TestCommandUsage>& phase,
+                                  const GenerateConfig& cfg,
+                                  bool is_teardown) {
+    if (phase.empty()) return;
+    if (base_path.empty()) logging::LogRegistry::vaulthalla()->warn("[CLITestRunner] emitPhaseRun_ called with empty base_path");
+
+    for (const auto& step : phase) {
+        std::vector<std::string> path;
+        if (auto cmd = step.command.lock()) path = pathAliasesOf(cmd);
+        if (path.empty()) {
+            logging::LogRegistry::vaulthalla()->warn("[CLITestRunner] skipping lifecycle step with no command");
+            continue;
+        }
+
+        const auto path_str = joinPath(path);
+
+        // choose repetition count
+        const unsigned int reps = cfg.lifecycle_use_max_iters ? step.max_iter : step.minIter;
+        for (unsigned int i = 0; i < std::max(1u, reps); ++i) {
+            // Seed ctx from open objects so subsequent steps can reference IDs/names
+            Context ctx = mergedOpenContext_();
+
+            // Synthesize command lineR
+            std::ostringstream cmd;
+            cmd << "vh";
+            for (const auto& seg : path) cmd << ' ' << seg;
+
+            // Let buildArgs fill in missing values, keeping seeded ones intact
+            std::optional<std::string> args_opt;
+            if (auto cmd_ = step.command.lock()) args_opt = buildArgs(cmd_, ctx);
+            if (!args_opt) continue; // cannot satisfy; skip emission
+            cmd << *args_opt;
+
+            TestCase t;
+            t.name        = (is_teardown ? "teardown: " : "scenario: ") + path_str;
+            t.path        = path_str;
+            t.command     = cmd.str();
+            t.expect_exit = 0;
+            t.ctx         = ctx;
+
+            // inherit any per-path checks/validators already registered
+            if (per_path_stdout_contains_.count(t.path))
+                for (auto& s : per_path_stdout_contains_[t.path]) t.must_contain.push_back(s);
+            if (per_path_stdout_not_contains_.count(t.path))
+                for (auto& s : per_path_stdout_not_contains_[t.path]) t.must_not_contain.push_back(s);
+            if (per_path_validators_.count(t.path))
+                for (auto& v : per_path_validators_[t.path]) t.validators.push_back(v);
+
+            tests_.push_back(std::move(t));
+
+            // Maintain lifecycle stacks
+            if (!is_teardown) {
+                // SETUP/LIFECYCLE — push/refresh a handle for this path
+                open_objects_[path_str].push_back(ctx);
+            } else {
+                // TEARDOWN — try to pop if any open
+                auto it = open_objects_.find(path_str);
+                if (it != open_objects_.end() && !it->second.empty()) {
+                    it->second.pop_back();
+                    if (it->second.empty()) open_objects_.erase(it);
+                }
+            }
+        }
+    }
 }
 
 }

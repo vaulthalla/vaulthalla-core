@@ -64,7 +64,6 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         if (!nameOpt || nameOpt->empty()) errors.emplace_back("Missing required option: --name");
         if (!accessKeyOpt || accessKeyOpt->empty()) errors.emplace_back("Missing required option: --access");
         if (!secretOpt || secretOpt->empty()) errors.emplace_back("Missing required option: --secret");
-        if (!regionOpt || regionOpt->empty()) errors.emplace_back("Missing required option: --region");
         if (!endpointOpt || endpointOpt->empty()) errors.emplace_back("Missing required option: --endpoint");
         if (!providerOpt || providerOpt->empty()) {
             errors.emplace_back("Missing required option: --provider");
@@ -81,7 +80,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         key->name = *nameOpt;
         key->access_key = *accessKeyOpt;
         key->secret_access_key = *secretOpt;
-        key->region = *regionOpt;
+        key->region = regionOpt ? *regionOpt : "auto";
         key->endpoint = *endpointOpt;
         key->provider = s3_provider_from_shell_input(*providerOpt);
 

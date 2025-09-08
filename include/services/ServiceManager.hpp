@@ -49,6 +49,8 @@ public:
     void setCtlSocketPath(const std::string& path) const;
     [[nodiscard]] std::string getCtlSocketPath() const;
 
+    void startTestServices();
+
 private:
     ServiceManager();
 

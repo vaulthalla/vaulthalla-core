@@ -9,6 +9,7 @@
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::shell;
+using namespace vh::args;
 
 namespace {
 // trim helpers

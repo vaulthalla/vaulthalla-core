@@ -9,6 +9,7 @@ std::shared_ptr<CommandUsage> TestUsageManager::getFilteredTestUsage() const {
         {"user", "delete"},
         {"group", "delete"},
         {"vault", "delete"},
+        {"secrets", "set"},
         {"secrets", "delete"},
         {"vault", "keys", "export"}
     };

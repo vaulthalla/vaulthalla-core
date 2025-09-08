@@ -1,4 +1,5 @@
 #include "usages.hpp"
+#include "ArgsGenerator.hpp"
 
 using namespace vh::shell;
 

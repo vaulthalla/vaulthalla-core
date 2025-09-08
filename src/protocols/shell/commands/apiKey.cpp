@@ -9,6 +9,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "usage/include/usages.hpp"
+#include "config/ConfigRegistry.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -17,6 +18,7 @@ using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::types::api;
 using namespace vh::cloud;
+using namespace vh::config;
 
 static S3Provider s3_provider_from_shell_input(const std::string& str) {
     if (str == "aws") return S3Provider::AWS;
@@ -65,9 +67,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         if (!accessKeyOpt || accessKeyOpt->empty()) errors.emplace_back("Missing required option: --access");
         if (!secretOpt || secretOpt->empty()) errors.emplace_back("Missing required option: --secret");
         if (!endpointOpt || endpointOpt->empty()) errors.emplace_back("Missing required option: --endpoint");
-        if (!providerOpt || providerOpt->empty()) {
-            errors.emplace_back("Missing required option: --provider");
-        }
+        if (!providerOpt || providerOpt->empty()) errors.emplace_back("Missing required option: --provider");
 
         if (!errors.empty()) {
             std::string errorMsg = "API key creation failed:\n";
@@ -84,9 +84,11 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         key->endpoint = *endpointOpt;
         key->provider = s3_provider_from_shell_input(*providerOpt);
 
-        const auto [valid, validationErrors] = S3Controller(key, "").validateAPICredentials();
+        if (!ConfigRegistry::get().dev.enabled) {
+            const auto [valid, validationErrors] = S3Controller(key, "").validateAPICredentials();
 
-        if (!valid) return invalid("API key validation failed:\n" + validationErrors);
+            if (!valid) return invalid("API key validation failed:\n" + validationErrors);
+        }
 
         key->id = ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
 

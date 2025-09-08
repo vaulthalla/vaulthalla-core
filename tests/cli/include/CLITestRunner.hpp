@@ -1,6 +1,7 @@
 #pragma once
 
 #include "protocols/shell/types.hpp"
+#include "ArgsGenerator.hpp"
 
 #include <functional>
 #include <unordered_map>
@@ -19,7 +20,27 @@ class CommandUsage;
 struct TestCommandUsage;
 }
 
+namespace vh::types {
+struct User;
+struct APIKey;
+struct Vault;
+struct Role;
+struct Group;
+}
+
 namespace vh::test {
+
+struct CLITestContext {
+    std::vector<types::User> users;
+    std::vector<types::APIKey> api_keys;
+    std::vector<types::Vault> vaults;
+    std::vector<types::Role> roles;
+    std::vector<types::Group> groups;
+
+    std::shared_ptr<types::User> pickRandomUser();
+    std::shared_ptr<types::Vault> pickVaultOwnedBy(const std::shared_ptr<types::User>& user);
+    std::shared_ptr<types::Role> pickRoleByName(std::string_view);
+};
 
 class TestUsageManager;
 
@@ -48,42 +69,6 @@ struct TestCase {
     Context ctx;                                // generated values (e.g., name/email)
 };
 
-class ArgValueProvider {
-public:
-    virtual ~ArgValueProvider() = default;
-    // token is the name inside <angle_brackets>, e.g. "name", "email", "role", "uid"
-    virtual std::optional<std::string> valueFor(const std::string& token,
-                                                const std::string& usage_path) = 0;
-};
-
-class DefaultArgValueProvider : public ArgValueProvider {
-public:
-    std::optional<std::string> valueFor(const std::string& token,
-                                        const std::string& /*usage_path*/) override {
-        auto rnd = []() -> std::string {
-            static thread_local std::mt19937_64 rng(
-                std::chrono::high_resolution_clock::now().time_since_epoch().count());
-            return std::to_string(rng() % 1000000ULL);
-        };
-        if (token == "name" || token == "username") return "user_" + rnd();
-        if (token == "new_name") return "user_new_" + rnd();
-        if (token == "email") return "user_" + rnd() + "@example.org";
-        if (token == "role") return "admin";          // override per-env if needed
-        if (token == "uid" || token == "linux-uid") return "2000";
-        if (token == "vault_id" || token == "id") return "1";
-        if (token == "size" || token == "quota") return "10G";
-        if (token == "permissions") return "15"; // 0b1111
-        if (token == "access") return "ehwguawlei-3183103j1-3fjl13j3ilj1";
-        if (token == "secret") return "asdasd-123123-123123-123123";
-        if (token == "region") return "us-west-1";
-        if (token == "endpoint") return "https://s3.example.org";
-        if (token == "pattern") return "^/path/to/something/.*$";
-        if (token == "provider") return "aws";
-        // Unknown token → give nothing; caller decides whether to skip positive test
-        return std::nullopt;
-    }
-};
-
 struct GenerateConfig {
     bool help_tests = true;
     bool happy_path = true;
@@ -102,7 +87,7 @@ class CLITestRunner {
 public:
     explicit CLITestRunner(TestUsageManager& usage,
                            ExecFn exec,
-                           std::shared_ptr<ArgValueProvider> provider = std::make_shared<DefaultArgValueProvider>());
+                           std::shared_ptr<args::ArgValueProvider> provider = std::make_shared<args::ArgsGeneratorProvider>(args::ArgsGenerator::WithDefaults()));
 
     // Generate tests by traversing the usage tree
     void generateFromUsage(bool help_tests = true,
@@ -131,7 +116,7 @@ public:
 private:
     TestUsageManager& usage_;
     ExecFn exec_;
-    std::shared_ptr<ArgValueProvider> provider_;
+    std::shared_ptr<args::ArgValueProvider> provider_;
     std::unordered_map<std::string, std::vector<Context>> open_objects_;
 
     std::unordered_map<std::string, std::vector<ValidatorFn>> per_path_validators_;
@@ -142,7 +127,7 @@ private:
     static std::string dashify(const std::string& t);
     static std::string pickBestToken(const std::vector<std::string>& tokens); // prefers long
     static std::optional<std::string> firstValueFromTokens(const std::vector<std::string>& value_tokens,
-                                                           ArgValueProvider& provider,
+                                                           args::ArgValueProvider& provider,
                                                            const std::string& usage_path,
                                                            Context& ctx,
                                                            std::string* chosen_token_out = nullptr);

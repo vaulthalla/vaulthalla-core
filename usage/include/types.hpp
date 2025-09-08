@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ArgsGenerator.hpp"
+
 #include <string>
 #include <vector>
 #include <optional>
@@ -19,54 +21,53 @@ struct Entry {
     Entry() = default;
 };
 
-struct Positional : Entry {
+struct Positional final : Entry {
     std::vector<std::string> aliases;
+    std::shared_ptr<args::IGenerator> generator = nullptr;
 
     Positional(std::string label_, std::string desc_)
         : Entry(std::move(label_), std::move(desc_)) {}
 
-    Positional(std::string label_, std::string desc_, std::vector<std::string> aliases_)
-        : Entry(std::move(label_), std::move(desc_)), aliases(std::move(aliases_)) {}
+    Positional(std::string label_, std::string desc_, std::vector<std::string> aliases_,
+               std::shared_ptr<args::IGenerator> generator_ = nullptr)
+        : Entry(std::move(label_), std::move(desc_)), aliases(std::move(aliases_)), generator(std::move(generator_)) {}
 
     Positional() = default;
 
     // 🏗️ Factory Methods
 
-    static Positional Same(const std::string& label, std::string desc) {
-        return {label, std::move(desc), {label}};
-    }
-
-    // No aliases
-    static Positional Required(std::string label, std::string desc) {
-        return {std::move(label), std::move(desc)};
+    static Positional Same(const std::string& label, std::string desc, std::shared_ptr<args::IGenerator> generator_ = nullptr) {
+        return {label, std::move(desc), {label}, std::move(generator_)};
     }
 
     // With aliases
-    static Positional WithAliases(std::string label, std::string desc, std::vector<std::string> aliases) {
+    static Positional WithAliases(std::string label, std::string desc, std::vector<std::string> aliases, std::shared_ptr<args::IGenerator> generator_ = nullptr) {
         Positional p;
         p.label = std::move(label);
         p.desc = std::move(desc);
         p.aliases = std::move(aliases);
+        p.generator = std::move(generator_);
         return p;
     }
 
     // Shortcut for one alias
-    static Positional Alias(std::string label, std::string desc, std::string alias) {
-        return Positional(std::move(label), std::move(desc), {std::move(alias)});
+    static Positional Alias(std::string label, std::string desc, std::string alias, std::shared_ptr<args::IGenerator> generator_ = nullptr) {
+        return Positional(std::move(label), std::move(desc), {std::move(alias)}, std::move(generator_));
     }
 };
 
-struct Flag : Positional {
+struct Flag : Entry {
+    std::vector<std::string> aliases;
     bool default_state = false;
 
     Flag(std::string label_, std::string desc_)
-        : Positional(std::move(label_), std::move(desc_)) {}
+        : Entry(std::move(label_), std::move(desc_)) {}
 
     Flag(std::string label_, std::string desc_, std::string alias_, const bool default_state_ = false)
-        : Positional(std::move(label_), std::move(desc_), std::vector{std::move(alias_)}), default_state(default_state_) {}
+        : Entry(std::move(label_), std::move(desc_)), aliases({std::move(alias_)}), default_state(default_state_) {}
 
     Flag(std::string label_, std::string desc_, std::vector<std::string> aliases_, const bool default_state_)
-        : Positional(std::move(label_), std::move(desc_), std::move(aliases_)), default_state(default_state_) {}
+        : Entry(std::move(label_), std::move(desc_)), aliases(std::move(aliases_)), default_state(default_state_) {}
 
     Flag() = default;
 
@@ -85,11 +86,16 @@ struct Flag : Positional {
     }
 
     static Flag WithAliases(std::string label, std::string desc, std::vector<std::string> aliases, const bool default_state = false) {
-        return {std::move(label), std::move(desc), std::move(aliases), default_state};
+        Flag f;
+        f.label = std::move(label);
+        f.desc = std::move(desc);
+        f.aliases = std::move(aliases);
+        f.default_state = default_state;
+        return f;
     }
 
     static Flag Toggle(std::string label, std::string desc, bool default_state) {
-        return {std::move(label), std::move(desc), std::vector<std::string>{}, default_state};
+        return Flag{std::move(label), std::move(desc), std::vector<std::string>{}, default_state};
     }
 };
 
@@ -139,7 +145,7 @@ struct Option : Entry {
                       {std::move(option)}, std::move(value_tokens));
     }
 
-    static Option Same(std::string token,
+    static Option Same(const std::string& token,
                            std::string desc) {
         return Option(token, std::move(desc), {token}, {token});
     }
@@ -207,14 +213,14 @@ struct Optional : Option {
 
     static Optional Mirrored(std::string label,
                              std::string desc,
-                             std::string token,
+                             const std::string& token,
                              std::optional<std::string> def = std::nullopt) {
         return Optional(std::move(label), std::move(desc),
                         {token}, {token}, std::move(def));
     }
 
     // 🆕 new factory
-    static Optional Same(std::string token,
+    static Optional Same(const std::string& token,
                          std::string desc,
                          std::optional<std::string> def = std::nullopt) {
         return Optional(token, std::move(desc), {token}, {token}, std::move(def));

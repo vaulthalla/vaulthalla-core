@@ -23,6 +23,8 @@ struct Role {
     explicit Role(const pqxx::row& row);
     explicit Role(const nlohmann::json& j);
     Role(std::string name, std::string description, std::string type, uint16_t permissions);
+
+    virtual ~Role() = default;
 };
 
 void to_json(nlohmann::json& j, const Role& r);

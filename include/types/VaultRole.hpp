@@ -29,12 +29,16 @@ struct VaultRole final : Role {
     std::vector<std::shared_ptr<PermissionOverride> > permission_overrides;
 
     VaultRole() = default;
+    ~VaultRole() override = default;
 
     VaultRole(const pqxx::row& row, const pqxx::result& overrides);
 
     VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrides);
 
     explicit VaultRole(const nlohmann::json& j);
+    explicit VaultRole(const Role& r) : Role(r) {
+        if (type != "vault") throw std::runtime_error("VaultRole: invalid role type");
+    }
 
     [[nodiscard]] std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
 

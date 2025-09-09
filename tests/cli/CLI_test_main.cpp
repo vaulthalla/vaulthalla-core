@@ -30,18 +30,6 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::seed;
 
-// --- Example DB/cache validators -------------------------------------------
-// Keep these in C++, call your real prepared statements and caches — no duplication.
-static vh::test::AssertionResult assert_user_exists(const vh::test::Context& ctx) {
-    const auto name = ctx.contains("name") ? ctx.at("name") : "";
-    if (name.empty()) return vh::test::AssertionResult::Fail("No 'name' in context");
-
-    if (!UserQueries::userExists(name))
-        return vh::test::AssertionResult::Fail("User '" + name + "' not found in DB");
-
-    return vh::test::AssertionResult::Pass(); // stub
-}
-
 int main() {
     ConfigRegistry::init("config.yaml");
     LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
@@ -92,7 +80,7 @@ int main() {
     // Example: For "user/create" positive path, assert DB contains the user we created
     runner.registerValidator("user/create", [](const std::string& /*cmd*/,
                                                const CommandResult& /*res*/,
-                                               const vh::test::Context& ctx) {
+                                               const std::shared_ptr<void>& ctx) {
         return assert_user_exists(ctx);
     });
 

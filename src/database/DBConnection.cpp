@@ -798,6 +798,8 @@ void DBConnection::initPreparedRoles() const {
 
     conn_->prepare("get_permissions_type", "SELECT type FROM role WHERE id = $1");
 
+    conn_->prepare("role_exists", "SELECT EXISTS(SELECT 1 FROM role WHERE name = $1) AS exists");
+
     conn_->prepare("get_role",
                    "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
                    "p.permissions::int AS permissions "

@@ -40,6 +40,9 @@ struct User {
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides);
 
+    bool operator==(const User& other) const;
+    bool operator!=(const User& other) const;
+
     [[nodiscard]] std::shared_ptr<VaultRole> getRole(unsigned int vaultId) const;
 
     void updateUser(const nlohmann::json& j);

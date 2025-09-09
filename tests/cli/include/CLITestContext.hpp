@@ -3,9 +3,7 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <functional>
 #include <unordered_map>
-#include <array>
 
 namespace vh::types {
 struct User;
@@ -27,21 +25,9 @@ struct CLITestContext;
 struct TestUsageManager;
 enum class EntityType;
 
-struct TestStage {
-    std::string name;
-    std::function<void(CLITestContext&)> run;
-};
-
-static constexpr std::array<TestStage, 3> kDefaultTestStages = {{
-    {"phase0: seed baseline", [](CLITestContext& ctx) {}},
-    {"phase1: generate entities", [](CLITestContext& ctx) {}},
-    {"phase2: run tests", [](CLITestContext& ctx) {}},
-}};
-
 struct CLITestContext {
     CLITestContext();
 
-    std::shared_ptr<TestStage> stage;
     std::vector<std::shared_ptr<types::User>> users;
     std::vector<std::shared_ptr<types::APIKey>> api_keys;
     std::vector<std::shared_ptr<types::Vault>> vaults;

@@ -55,6 +55,13 @@ std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
     });
 }
 
+bool PermsQueries::roleExists(const std::string& name) {
+    return Transactions::exec("PermsQueries::roleExists", [&](pqxx::work& txn) -> bool {
+        const auto res = txn.exec(pqxx::prepped{"role_exists"}, pqxx::params{name});
+        return !res.empty() && res[0]["exists"].as<bool>();
+    });
+}
+
 std::vector<std::shared_ptr<Role>> PermsQueries::listRoles(ListQueryParams&& params) {
     return Transactions::exec("PermsQueries::listRoles", [&](pqxx::work& txn) {
         const auto sql = appendPaginationAndFilter(

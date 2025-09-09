@@ -34,6 +34,7 @@ struct PermsQueries {
     static std::vector<std::shared_ptr<types::Role>> listRoles(types::ListQueryParams&& params = {});
     static std::vector<std::shared_ptr<types::Role>> listUserRoles(types::ListQueryParams&& params = {});
     static std::vector<std::shared_ptr<types::Role>> listVaultRoles(types::ListQueryParams&& params = {});
+    [[nodiscard]] static bool roleExists(const std::string& name);
 
     // Vault Role CRUD
     static void assignVaultRole(const std::shared_ptr<types::VaultRole>& roleAssignment);

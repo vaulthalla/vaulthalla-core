@@ -48,6 +48,16 @@ User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vau
     this->roles = vault_roles_from_pq_result(vaultRoles, overrides);
 }
 
+bool User::operator==(const User& other) const {
+    return linux_uid == other.linux_uid &&
+           name == other.name &&
+           email == other.email;
+}
+
+bool User::operator!=(const User& other) const {
+    return !(*this == other);
+}
+
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     const auto it = std::ranges::find_if(roles.begin(), roles.end(),
                        [vaultId](const std::shared_ptr<VaultRole>& role) {

@@ -30,18 +30,6 @@ struct Group;
 
 namespace vh::test {
 
-struct CLITestContext {
-    std::vector<types::User> users;
-    std::vector<types::APIKey> api_keys;
-    std::vector<types::Vault> vaults;
-    std::vector<types::Role> roles;
-    std::vector<types::Group> groups;
-
-    std::shared_ptr<types::User> pickRandomUser();
-    std::shared_ptr<types::Vault> pickVaultOwnedBy(const std::shared_ptr<types::User>& user);
-    std::shared_ptr<types::Role> pickRoleByName(std::string_view);
-};
-
 class TestUsageManager;
 
 using ExecFn = std::function<shell::CommandResult(const std::string& line)>;

@@ -22,7 +22,7 @@ struct Vault {
     unsigned int id{};
     unsigned int owner_id{};
     std::string name, description{};
-    unsigned long long quota{};
+    uintmax_t quota{};
     VaultType type{VaultType::Local};
     std::filesystem::path mount_point;
     bool is_active{true};
@@ -31,6 +31,9 @@ struct Vault {
     Vault() = default;
     virtual ~Vault() = default;
     explicit Vault(const pqxx::row& row);
+
+    std::string quotaStr() const;
+    void setQuotaFromStr(const std::string& str);
 };
 
 void to_json(nlohmann::json& j, const Vault& v);

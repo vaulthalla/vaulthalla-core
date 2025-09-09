@@ -21,6 +21,7 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
+#include <ranges>
 
 namespace vh::test::cli {
 
@@ -55,10 +56,7 @@ inline std::string generate_now(args::Gen g, std::string_view token, std::string
 // ------------------------------------------------------------
 class CommandBuilder {
 public:
-    // `usage` is the leaf command; `path_aliases` is the textual path, e.g. {"user","create"}
-    CommandBuilder(std::shared_ptr<shell::CommandUsage> usage,
-                   std::vector<std::string> path_aliases)
-        : usage_(std::move(usage)), path_aliases_(std::move(path_aliases)) {}
+    explicit CommandBuilder(std::shared_ptr<shell::CommandUsage> usage) : usage_(std::move(usage)) {}
 
     // Provide a global token → value override
     CommandBuilder& withOverride(std::string token, std::string value) {
@@ -82,10 +80,22 @@ public:
         return *this;
     }
 
+    static std::vector<std::string> constructPath(const std::shared_ptr<shell::CommandUsage>& cmd) {
+        std::vector<std::string> path_aliases;
+        auto current = cmd;
+        while (current) {
+            path_aliases.push_back(current->aliases.at(0));
+            current = current->parent.lock();
+        }
+        std::ranges::reverse(path_aliases);
+        return path_aliases;
+    }
+
     // Build: "vh <path> [positionals] [flags] [options] [groups]"
     std::string build() const {
         std::ostringstream cmd;
         cmd << "vh ";
+        const auto path_aliases_ = constructPath(usage_);
         for (size_t i = 0; i < path_aliases_.size(); ++i) {
             if (i) cmd << ' ';
             cmd << path_aliases_[i];
@@ -135,7 +145,6 @@ public:
 
 private:
     std::shared_ptr<shell::CommandUsage> usage_;
-    std::vector<std::string> path_aliases_;
 
     std::unordered_map<std::type_index, std::function<std::optional<std::string>(const std::string&)>> binders_;
     std::unordered_map<std::string, std::string> overrides_;
@@ -247,7 +256,7 @@ private:
 
     static void emit_group_item(std::ostringstream& cmd, const shell::Flag& f, const std::string&) {
         if (f.default_state) {
-            if (auto sw = pick_flag_alias(f)) cmd << ' ' << *sw;
+            if (const auto sw = pick_flag_alias(f)) cmd << ' ' << *sw;
         }
     }
 

@@ -42,6 +42,8 @@ public:
 
     [[nodiscard]] bool matches(const std::string& alias) const;
 
+    [[nodiscard]] std::shared_ptr<CommandUsage> findSubcommand(const std::string& alias) const;
+
 private:
     static constexpr std::string_view binName_ = "vh";
 

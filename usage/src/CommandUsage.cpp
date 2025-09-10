@@ -595,4 +595,15 @@ std::string CommandUsage::markdown() const {
     return md.str();
 }
 
+std::shared_ptr<CommandUsage> CommandUsage::findSubcommand(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        subcommands,
+        [&](const std::shared_ptr<CommandUsage>& c) {
+            return std::ranges::any_of(c->aliases, [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    return it != subcommands.end() ? *it : nullptr;
+}
+
 } // namespace vh::shell

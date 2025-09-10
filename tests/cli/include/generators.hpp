@@ -2,6 +2,7 @@
 
 #include "ArgsGenerator.hpp"
 #include "EntityType.hpp"
+#include "permsUtil.hpp"
 
 #include <string>
 #include <string_view>
@@ -71,6 +72,44 @@ static std::string generateQuotaStr(const std::string& usage) {
     return generateNow(args::ArgGenerator::Join({
         args::ArgGenerator::OneOf({"unlimited", "100MB", "1G", "10G", "100G", "1T"})
     }, ""), "quota", usage);
+}
+
+static std::string randomAlias(const std::vector<std::string>& aliases) {
+    if (aliases.empty()) throw std::runtime_error("AliasHandler: no aliases provided");
+    return aliases[generateRandomIndex(aliases.size())];
+}
+
+static std::string randomAllowDenyOrNoOptMakeFlag(const std::string& flag) {
+    const auto choice = generateRandomIndex(3);
+    if (choice == 0) return "--allow-" + flag;
+    if (choice == 1) return "--deny-" + flag;
+    return "--" + flag;
+}
+
+static std::vector<std::string> randomUserPermsFlags() {
+    const auto numFlags = std::max(static_cast<size_t>(1), generateRandomIndex(ADMIN_SHELL_PERMS.size()));
+    std::unordered_set<std::string> chosen;
+    std::vector<std::string> userPerms;
+    while (chosen.size() < numFlags) {
+        const auto perm = std::string(ADMIN_SHELL_PERMS[generateRandomIndex(ADMIN_SHELL_PERMS.size())]);
+        if (chosen.contains(perm)) continue;
+        chosen.insert(perm);
+        userPerms.push_back(randomAllowDenyOrNoOptMakeFlag(perm));
+    }
+    return userPerms;
+}
+
+static std::vector<std::string> randomVaultPermsFlags() {
+    const auto numFlags = std::max(static_cast<size_t>(1), generateRandomIndex(VAULT_SHELL_PERMS.size()));
+    std::unordered_set<std::string> chosen;
+    std::vector<std::string> vaultPerms;
+    while (chosen.size() < numFlags) {
+        const auto perm = std::string(VAULT_SHELL_PERMS[generateRandomIndex(VAULT_SHELL_PERMS.size())]);
+        if (chosen.contains(perm)) continue;
+        chosen.insert(perm);
+        vaultPerms.push_back(randomAllowDenyOrNoOptMakeFlag(perm));
+    }
+    return vaultPerms;
 }
 
 }

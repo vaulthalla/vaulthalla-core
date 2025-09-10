@@ -6,6 +6,7 @@
 #include "EntityRegistrar.hpp"
 #include "TestCase.hpp"
 #include "CommandRouter.hpp"
+#include "CommandBuilderRegistry.hpp"
 
 #include <sstream>
 #include <iomanip>
@@ -25,7 +26,9 @@ CLITestRunner::CLITestRunner(CLITestConfig&& config)
     : config_(config),
       ctx_(std::make_shared<CLITestContext>()),
       usage_(std::make_shared<TestUsageManager>()),
-      router_(std::make_shared<CommandRouter>(ctx_, usage_)){}
+      router_(std::make_shared<CommandRouter>(ctx_, usage_)) {
+    CommandBuilderRegistry::init(usage_);
+}
 
 void CLITestRunner::registerStdoutContains(const std::string& path, std::string s) {
     per_path_stdout_contains_[path].push_back(std::move(s));
@@ -119,7 +122,6 @@ void CLITestRunner::seedRoles() {
                 ctx_->vaultRoles.push_back(role);
             }
         } else {
-            std::cerr << "Failed to extract ID from output: " << r->result.stdout_text << std::endl;
             r->assertion = AssertionResult::Fail("Seed: failed to extract ID from output for " + r->name);
         }
     }

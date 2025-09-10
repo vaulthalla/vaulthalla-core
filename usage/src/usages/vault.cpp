@@ -113,7 +113,6 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing vault.";
     cmd->positionals = {vaultPos};
-    cmd->optional_flags = {interactiveFlag};
     cmd->optional = {descriptionOpt, quotaOpt, owner, apiKeyOpt, s3BucketOpt, syncStrategyOpt, s3ConflictOpt};
     cmd->optional_flags = {interactiveFlag, enableS3Encryption, disableS3Encryption, acceptOverwriteWaiver,
                            acceptDecryptionWaiver};

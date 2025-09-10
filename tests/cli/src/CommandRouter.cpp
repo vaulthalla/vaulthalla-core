@@ -7,6 +7,12 @@
 #include "TestUsageManager.hpp"
 #include "protocols/shell/Router.hpp"
 
+#include "types/User.hpp"
+#include "types/Vault.hpp"
+#include "types/Group.hpp"
+#include "types/UserRole.hpp"
+#include "types/VaultRole.hpp"
+
 using namespace vh::test::cli;
 using namespace vh::shell;
 using namespace vh::types;
@@ -98,23 +104,23 @@ void CommandRouter::registerAll() {
     });
 
     registerRoute("user/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list(EntityType::USER);
+        return list_info_handler_->list<User>(EntityType::USER);
     });
 
     registerRoute("group/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list(EntityType::GROUP);
+        return list_info_handler_->list<User>(EntityType::GROUP);
     });
 
     registerRoute("vault/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list(EntityType::VAULT);
+        return list_info_handler_->list<User>(EntityType::VAULT);
     });
 
     registerRoute("role/list/user", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list(EntityType::USER_ROLE);
+        return list_info_handler_->list<User>(EntityType::USER_ROLE);
     });
 
     registerRoute("role/list/vault", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list(EntityType::VAULT_ROLE);
+        return list_info_handler_->list<User>(EntityType::VAULT_ROLE);
     });
 
     registerRoute("user/info", [&](const std::shared_ptr<void>& entity) -> EntityResult {

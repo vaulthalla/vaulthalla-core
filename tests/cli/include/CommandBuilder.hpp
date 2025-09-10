@@ -20,7 +20,7 @@ struct TestUsageManager;
 template <typename T = void>
 struct CommandBuilder {
     explicit CommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::string& rootTopLevelAlias);
-    virtual ~CommandBuilder() = default;
+    virtual ~CommandBuilder() = 0;
 
     virtual std::string create(const std::shared_ptr<T>& entity) = 0;
     virtual std::string update(const std::shared_ptr<T>& entity) = 0;
@@ -43,14 +43,28 @@ struct UserCommandBuilder final : CommandBuilder<types::User> {
 };
 
 struct VaultCommandBuilder final : CommandBuilder<types::Vault> {
-    explicit VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage);
-    ~VaultCommandBuilder() override = default;
+    explicit VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage)
+        : CommandBuilder(usage, "vault") {}
 
-    std::string create(const std::shared_ptr<types::Vault>& entity) override;
-    std::string update(const std::shared_ptr<types::Vault>& entity) override;
-    std::string remove(const std::shared_ptr<types::Vault>& entity) override;
-    std::string info(const std::shared_ptr<types::Vault>& entity) override;
+    std::string create(const std::shared_ptr<types::Vault>& v) override;
+    std::string update(const std::shared_ptr<types::Vault>& v) override;
+    std::string remove(const std::shared_ptr<types::Vault>& v) override;
+    std::string info  (const std::shared_ptr<types::Vault>& v) override;
     std::string list() override;
+
+    std::string sync_set   (const std::shared_ptr<types::Vault>& v);
+    std::string sync_info  (const std::shared_ptr<types::Vault>& v);
+    std::string sync_trigger(const std::shared_ptr<types::Vault>& v);
+
+    std::string key_export(const std::shared_ptr<types::Vault>& v);
+    std::string key_rotate(const std::shared_ptr<types::Vault>& v);
+
+private:
+    static std::string vaultRef(const std::shared_ptr<types::Vault>& v, bool& usedName);
+    static void emitOwnerIfName(std::ostringstream& oss, const std::shared_ptr<types::Vault>& v, bool usedName);
+
+    // picks "local" or "s3";
+    static std::string chooseVaultType();
 };
 
 struct GroupCommandBuilder final : CommandBuilder<types::Group> {

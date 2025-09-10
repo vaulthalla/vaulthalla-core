@@ -6,6 +6,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/SocketIO.hpp"
+#include "CommandBuilderRegistry.hpp"
 
 #include <memory>
 #include <string>
@@ -17,10 +18,11 @@ public:
     explicit ListInfoHandler(const std::shared_ptr<CLITestContext>& ctx,
                              const std::shared_ptr<shell::Router>& router) : ctx_(ctx), router_(router) {}
 
+    template <typename T>
     EntityResult list(const EntityType& type) const {
         const auto cmd = ctx_->getCommand(type, "list");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for listing");
-        const auto command = CommandBuilder(cmd).build();
+        const auto command = CommandBuilderRegistry::instance().getBuilder<T>(type)->list();
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
@@ -31,8 +33,7 @@ public:
     EntityResult info(const EntityType& type, const std::shared_ptr<T>& entity) const {
         const auto cmd = ctx_->getCommand(type, "info");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for info");
-
-        const auto command = CommandBuilder(cmd).withEntity(*entity).build();
+        const auto command = CommandBuilderRegistry::instance().getBuilder<T>(type)->info(entity);
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);

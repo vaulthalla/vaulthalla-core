@@ -26,7 +26,8 @@ struct TestUsageManager;
 enum class EntityType;
 
 struct CLITestContext {
-    CLITestContext();
+    static constexpr std::array<std::string, 4> ENTITIES = {"user", "vault", "group", "role"};
+    static constexpr std::array<std::string, 5> ACTIONS = {"create", "update", "delete", "list", "info"};
 
     std::vector<std::shared_ptr<types::User>> users;
     std::vector<std::shared_ptr<types::APIKey>> api_keys;
@@ -36,6 +37,8 @@ struct CLITestContext {
     std::vector<std::shared_ptr<types::Group>> groups;
     std::shared_ptr<TestUsageManager> usage;
     std::unordered_map<std::string, std::shared_ptr<shell::CommandUsage>> commands;
+
+    CLITestContext();
 
     [[nodiscard]] std::shared_ptr<types::User> pickRandomUser() const;
     [[nodiscard]] std::shared_ptr<types::Vault> pickVaultOwnedBy(const std::shared_ptr<types::User>& user) const;

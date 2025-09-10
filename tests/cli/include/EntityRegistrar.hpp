@@ -15,6 +15,7 @@
 #include <memory>
 #include <chrono>
 #include <stdexcept>
+#include <iostream>
 
 #include "EntityFactory.hpp"
 #include "database/Queries/UserQueries.hpp"
@@ -27,11 +28,6 @@ struct SeedContext {
     unsigned int numGroups = 5;
     unsigned int numUserRoles = 7;
     unsigned int numVaultRoles = 7;
-};
-
-struct EntityResult {
-    shell::CommandResult result;
-    std::shared_ptr<void> entity;
 };
 
 class EntityRegistrar {
@@ -52,7 +48,7 @@ public:
         const auto io = std::make_unique<shell::SocketIO>(fd);
 
         if (type == EntityType::USER) {
-            const auto user = factory_->create<types::User>(EntityType::USER);
+            const auto user = factory_->create(EntityType::USER);
             const auto command = CommandBuilder(cmd).build();
             return { router_->executeLine(command, admin, io.get()), user };
         }
@@ -60,30 +56,83 @@ public:
         const auto owner = ctx_->users.empty() ? admin : ctx_->pickRandomUser();
 
         if (type == EntityType::VAULT) {
-            const auto vault = factory_->create<types::Vault>(EntityType::VAULT, owner);
+            const auto vault = factory_->create(EntityType::VAULT, owner);
             const auto command = CommandBuilder(cmd).withEntity(*owner).build();
             return { router_->executeLine(command, admin, io.get()), vault };
         }
 
         if (type == EntityType::GROUP) {
-            const auto group = factory_->create<types::Group>(EntityType::GROUP);
+            const auto group = factory_->create(EntityType::GROUP);
             const auto command = CommandBuilder(cmd).build();
             return { router_->executeLine(command, admin, io.get()), group };
         }
 
         if (type == EntityType::USER_ROLE) {
-            const auto role = factory_->create<types::UserRole>(EntityType::USER_ROLE);
+            const auto role = factory_->create(EntityType::USER_ROLE);
             const auto command = CommandBuilder(cmd).build();
+            std::cout << "Creating user role: " << command << std::endl;
             return { router_->executeLine(command, admin, io.get()), role };
         }
 
         if (type == EntityType::VAULT_ROLE) {
-            const auto role = factory_->create<types::VaultRole>(EntityType::VAULT_ROLE);
+            const auto role = factory_->create(EntityType::VAULT_ROLE);
             const auto command = CommandBuilder(cmd).build();
             return { router_->executeLine(command, admin, io.get()), role };
         }
 
         throw std::runtime_error("EntityFactory: unsupported entity type for creation");
+    }
+
+    [[nodiscard]] std::vector<EntityResult> create(const EntityType& type, const std::size_t count) const {
+        std::vector<EntityResult> results;
+        for (std::size_t i = 0; i < count; ++i) results.push_back(create(type));
+        return results;
+    }
+
+    [[nodiscard]] EntityResult remove(const EntityType& type, const std::shared_ptr<void>& entity) const {
+        const auto cmd = ctx_->getCommand(type, "delete");
+        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for deletion");
+
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+
+        if (type == EntityType::USER) {
+            const auto user = std::static_pointer_cast<types::User>(entity);
+            if (!user) throw std::runtime_error("EntityFactory: invalid user entity for deletion");
+            const auto command = CommandBuilder(cmd).withEntity(*user).build();
+            return { router_->executeLine(command, admin, io.get()), user };
+        }
+
+        if (type == EntityType::VAULT) {
+            const auto vault = std::static_pointer_cast<types::Vault>(entity);
+            if (!vault) throw std::runtime_error("EntityFactory: invalid vault entity for deletion");
+            const auto command = CommandBuilder(cmd).withEntity(*vault).build();
+            return { router_->executeLine(command, admin, io.get()), vault };
+        }
+
+        if (type == EntityType::GROUP) {
+            const auto group = std::static_pointer_cast<types::Group>(entity);
+            if (!group) throw std::runtime_error("EntityFactory: invalid group entity for deletion");
+            const auto command = CommandBuilder(cmd).withEntity(*group).build();
+            return { router_->executeLine(command, admin, io.get()), group };
+        }
+
+        if (type == EntityType::USER_ROLE) {
+            const auto role = std::static_pointer_cast<types::UserRole>(entity);
+            if (!role) throw std::runtime_error("EntityFactory: invalid user role entity for deletion");
+            const auto command = CommandBuilder(cmd).withEntity(*role).build();
+            return { router_->executeLine(command, admin, io.get()), role };
+        }
+
+        if (type == EntityType::VAULT_ROLE) {
+            const auto role = std::static_pointer_cast<types::VaultRole>(entity);
+            if (!role) throw std::runtime_error("EntityFactory: invalid vault role entity for deletion");
+            const auto command = CommandBuilder(cmd).withEntity(*role).build();
+            return { router_->executeLine(command, admin, io.get()), role };
+        }
+
+        throw std::runtime_error("EntityFactory: unsupported entity type for deletion");
     }
 
     void teardown() const {

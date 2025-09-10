@@ -176,6 +176,8 @@ void DBConnection::initPreparedGroups() const {
                    "FROM users u "
                    "JOIN group_members gm ON u.id = gm.user_id "
                    "WHERE gm.group_id = $1");
+
+    conn_->prepare("group_exists", "SELECT EXISTS(SELECT 1 FROM groups WHERE name = $1) AS exists");
 }
 
 void DBConnection::initPreparedWaivers() const {

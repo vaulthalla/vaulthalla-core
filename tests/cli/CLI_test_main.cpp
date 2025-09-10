@@ -1,6 +1,5 @@
 #include "CLITestRunner.hpp"
-#include "TestUsageManager.hpp"
-#include "protocols/shell/Router.hpp"
+#include "CLITestContext.hpp"
 #include "database/Transactions.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "seed/include/init_db_tables.hpp"
@@ -29,6 +28,7 @@ using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::seed;
+using namespace vh::test::cli;
 
 int main() {
     ConfigRegistry::init("config.yaml");
@@ -59,48 +59,37 @@ int main() {
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
     ServiceManager::instance().startTestServices();
 
-    const auto router = ServiceManager::instance().getCLIRouter();
-
-    TestUsageManager usage;
-
-    const auto admin = UserQueries::getUserByName("admin");
-    if (!admin) {
+    if (!UserQueries::getUserByName("admin")) {
         LogRegistry::vaulthalla()->error("No admin user found; cannot run CLI tests");
         return 1;
     }
 
-    vh::test::CLITestRunner runner(
-        usage,
-        /*exec*/ [&](const std::string& cmd) {
-            constexpr std::unique_ptr<SocketIO> io;
-            return router->executeLine(cmd, admin, io.get());
+    CLITestRunner runner(CLITestConfig::Default());
+
+    const std::vector<std::string> user_info_fields = {"ID", "Name", "Email", "Role", "Created At", "Updated At"};
+    const std::vector<std::string> vault_info_fields = {"ID", "Name", "Owner ID", "Quota", "Used", "Created At", "Updated At"};
+    const std::vector<std::string> group_info_fields = {"ID", "Name", "Created At", "Updated At"};
+    const std::vector<std::string> role_info_fields = {"ID", "Name", "Type", "Permissions", "Created At", "Updated At"};
+
+    for (const auto& entity : CLITestContext::ENTITIES) {
+        for (const auto& action : CLITestContext::ACTIONS) {
+            const auto path = entity + "/" + action;
+            runner.registerStdoutNotContains(path, {"Traceback", "Exception", "Error", "invalid", "not found", "failed", "unrecognized"});
+            if (action == "info") {
+                if (entity == "user") runner.registerStdoutContains(path, user_info_fields);
+                else if (entity == "vault") runner.registerStdoutContains(path, vault_info_fields);
+                else if (entity == "group") runner.registerStdoutContains(path, group_info_fields);
+                else if (entity == "role") runner.registerStdoutContains(path, role_info_fields);
+            } else if (action == "list") {
+                if (entity == "user") runner.registerStdoutContains(path, {"ID", "Name", "Email", "Role"});
+                else if (entity == "vault") runner.registerStdoutContains(path, {"ID", "Name", "Owner ID", "Quota", "Used"});
+                else if (entity == "group") runner.registerStdoutContains(path, {std::string("ID"), "Name"});
+                else if (entity == "role") runner.registerStdoutContains(path, {"ID", "Name", "Type", "Permissions"});
+            }
         }
-    );
+    }
 
-    // Example: For "user/create" positive path, assert DB contains the user we created
-    runner.registerValidator("user/create", [](const std::string& /*cmd*/,
-                                               const CommandResult& /*res*/,
-                                               const std::shared_ptr<void>& ctx) {
-        return assert_user_exists(ctx);
-    });
-
-    // Auto-generate tests from your Usage tree (help + happy + negative)
-    runner.generateFromUsage(
-        /*help_tests     =*/ false,
-        /*happy_path     =*/ true,
-        /*negative_reqs  =*/ true,
-        /*max_examples   =*/ 2
-    );
-
-    vh::test::TestCase t;
-    t.name = "manual: users alias lists";
-    t.path = "user/list";
-    t.command = "users";     // if your router supports plural alias mapping
-    t.expect_exit = 0;
-    runner.addTest(std::move(t));
-
-    // Run
-    int exit_status = runner.runAll(std::cout) == 0 ? 0 : 1;
+    const int exit_status = runner() == 0 ? 0 : 1;
 
     ServiceManager::instance().stopAll(SIGKILL);
     ThreadPoolManager::instance().shutdown();

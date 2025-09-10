@@ -15,13 +15,21 @@ using namespace vh::test::cli;
 using namespace vh::types;
 
 CLITestContext::CLITestContext()
-    : stage(std::make_shared<TestStage>(kDefaultTestStages[0])),
-      usage(std::make_shared<TestUsageManager>()) {
-    const std::array<std::string, 3> entities = {"user", "vault", "group"};
-    const std::array<std::string, 5> actions = {"create", "update", "delete", "list", "info"};
-
-    for (const auto& entity : entities) {
-        for (const auto& action : actions) {
+    : usage(std::make_shared<TestUsageManager>()) {
+    for (const auto& entity : ENTITIES) {
+        for (const auto& action : ACTIONS) {
+            if (entity == "role") {
+                const auto cmdBase = entity + " " + action;
+                const auto userCmd = cmdBase + " user";
+                const auto vaultCmd = cmdBase + " vault";
+                const auto userUsage = usage->resolve({entity, action});
+                const auto vaultUsage = usage->resolve({entity, action});
+                if (!userUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + userCmd);
+                if (!vaultUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + vaultCmd);
+                commands[userCmd] = userUsage;
+                commands[vaultCmd] = vaultUsage;
+                continue;
+            }
             const auto cmdName = entity + " " + action;
             const auto cmdUsage = usage->resolve({entity, action});
             if (!cmdUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + cmdName);
@@ -35,6 +43,8 @@ std::string CLITestContext::getCommandName(const EntityType& type, const std::st
         case EntityType::USER:  return "user " + action;
         case EntityType::VAULT: return "vault " + action;
         case EntityType::GROUP: return "group " + action;
+        case EntityType::USER_ROLE: return "role " + action + " user";
+        case EntityType::VAULT_ROLE: return "role " + action + " vault";
         default: throw std::runtime_error("EntityFactory: unsupported entity type for command name");
     }
 }

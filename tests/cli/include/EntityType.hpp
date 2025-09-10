@@ -1,5 +1,7 @@
 #pragma once
 
+#include "protocols/shell/types.hpp"
+
 namespace vh::test::cli {
 
 enum class EntityType {
@@ -16,6 +18,11 @@ enum class CommandType {
     DELETE,
     LIST,
     INFO
+};
+
+struct EntityResult {
+    shell::CommandResult result{};
+    std::shared_ptr<void> entity{};
 };
 
 inline std::string EntityTypeToString(const EntityType& type) {

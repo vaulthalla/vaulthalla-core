@@ -26,15 +26,14 @@ class EntityFactory {
 public:
     explicit EntityFactory(const std::shared_ptr<CLITestContext>& ctx) : ctx_(ctx) {}
 
-    template <typename T>
-    std::shared_ptr<T> create(const EntityType& type, const std::shared_ptr<types::User>& owner = nullptr) {
+    std::shared_ptr<void> create(const EntityType& type, const std::shared_ptr<types::User>& owner = nullptr) {
         if (type == EntityType::USER) {
             const std::string usage = "user/create";
             const auto user = std::make_shared<types::User>();
             user->name = generateName(usage);
             if (rand() < 0.5) user->email = generateEmail(usage);
             user->role = ctx_->randomUserRole();
-            return std::static_pointer_cast<T>(user);
+            return user;
         }
 
         if (type == EntityType::VAULT) {
@@ -43,13 +42,13 @@ public:
             vault->name = generateName(usage);
             vault->setQuotaFromStr(generateQuotaStr(usage));
             if (owner) vault->owner_id = owner->id;
-            return std::static_pointer_cast<T>(vault);
+            return vault;
         }
 
         if (type == EntityType::GROUP) {
             const auto group = std::make_shared<types::Group>();
             group->name = generateName("group/create");
-            return std::static_pointer_cast<T>(group);
+            return group;
         }
 
         if (type == EntityType::USER_ROLE) {
@@ -58,7 +57,7 @@ public:
             role->description = "Auto-generated user role";
             role->type = "user";
             role->permissions = generateBitmask(ADMIN_SHELL_PERMS.size());
-            return std::static_pointer_cast<T>(role);
+            return role;
         }
 
         if (type == EntityType::VAULT_ROLE) {
@@ -67,16 +66,15 @@ public:
             role->description = "Auto-generated vault role";
             role->type = "vault";
             role->permissions = generateBitmask(VAULT_SHELL_PERMS.size());
-            return std::static_pointer_cast<T>(role);
+            return role;
         }
 
         return nullptr;
     }
 
-    template <typename T>
-    std::vector<std::shared_ptr<T>> create(const EntityType& type, const std::size_t count, const std::shared_ptr<types::User>& owner = nullptr) {
-        std::vector<std::shared_ptr<T>> entities;
-        for (std::size_t i = 0; i < count; ++i) if (auto e = create<T>(type, owner)) entities.push_back(e);
+    std::vector<std::shared_ptr<void>> create(const EntityType& type, const std::size_t count, const std::shared_ptr<types::User>& owner = nullptr) {
+        std::vector<std::shared_ptr<void>> entities;
+        for (std::size_t i = 0; i < count; ++i) if (auto e = create(type, owner)) entities.push_back(e);
         return entities;
     }
 

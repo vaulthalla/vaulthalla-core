@@ -56,6 +56,13 @@ public:
         else throw std::runtime_error("EntityFactory: unsupported group field for update: " + field);
     }
 
+    void handleVaultUpdate(const std::shared_ptr<types::Vault>& vault, const std::string& field) const {
+        const std::string usagePath = "vault/update";
+        if (vaultAliases_.isName(field)) vault->name = generateName(usagePath);
+        else if (vaultAliases_.isQuota(field)) vault->setQuotaFromStr(generateQuotaStr(usagePath));
+        else throw std::runtime_error("EntityFactory: unsupported vault field for update: " + field);
+    }
+
     void handleUserRoleUpdate(const std::shared_ptr<types::UserRole>& role, const std::string& field) const {
         const std::string usagePath = "role/update";
         if (userRoleAliases_.isName(field)) role->name = generateRoleName(EntityType::USER_ROLE, usagePath);
@@ -170,24 +177,22 @@ public:
         return updated;
     }
 
-    void commitUpdate(const std::function<std::string()>& builder) const {
+    shell::CommandResult commitUpdate(const std::function<std::string()>& builder) const {
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
-        router_->executeLine(builder(), admin, io.get());
+        return router_->executeLine(builder(), admin, io.get());
     }
 
-    template <typename T>
-    void update(const std::shared_ptr<T>& entity, const std::function<void(const std::string& field)>& handler,
+    shell::CommandResult update(const std::function<void(const std::string& field)>& handler,
                        const std::function<std::string(const std::unordered_set<std::string>& updated)>& baseBuilder,
-                       const std::shared_ptr<shell::CommandUsage>& cmd) {
+                       const std::shared_ptr<shell::CommandUsage>& cmd) const {
         const auto updated = handleUpdate(handler, cmd);
         const auto builder = [baseBuilder, &updated]() { return baseBuilder(updated); };
-        commitUpdate(builder);
+        return commitUpdate(builder);
     }
 
-    template <typename T>
-    void update(const EntityType& type, const std::shared_ptr<T> entity, const std::shared_ptr<types::User>& owner = nullptr) {
+    EntityResult update(const EntityType& type, const std::shared_ptr<void>& entity, const std::shared_ptr<types::User>& owner = nullptr) {
         const auto cmd = ctx_->getCommand(type, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for update");
 
@@ -195,41 +200,39 @@ public:
             const auto user = std::static_pointer_cast<types::User>(entity);
             const auto handler = [this, &user](const std::string& field) { handleUserUpdate(user, field); };
             const auto builder = [this, &user](const std::unordered_set<std::string>& updated) { return buildUserUpdate(user, updated); };
-            update<types::User>(user, handler, builder, cmd);
-            return;
+            return {update(handler, builder, cmd), user};
         }
 
         if (type == EntityType::VAULT) {
             const auto vault = std::static_pointer_cast<types::Vault>(entity);
+            if (owner) vault->owner_id = owner->id;
             const auto handler = [this, &vault](const std::string& field) { handleVaultUpdate(vault, field); };
             const auto builder = [this, &vault](const std::unordered_set<std::string>& updated) { return buildVaultUpdate(vault, updated); };
-            update<types::Vault>(vault, handler, builder, cmd);
-            return;
+            return {update(handler, builder, cmd), vault};
         }
 
         if (type == EntityType::GROUP) {
             const auto group = std::static_pointer_cast<types::Group>(entity);
             const auto handler = [this, &group](const std::string& field) { handleGroupUpdate(group, field); };
             const auto builder = [this, &group](const std::unordered_set<std::string>& updated) { return buildGroupUpdate(group, updated); };
-            update<types::Group>(group, handler, builder, cmd);
-            return;
+            return {update(handler, builder, cmd), group};
         }
 
         if (type == EntityType::USER_ROLE) {
             const auto role = std::static_pointer_cast<types::UserRole>(entity);
             const auto handler = [this, &role](const std::string& field) { handleUserRoleUpdate(role, field); };
             const auto builder = [this, &role](const std::unordered_set<std::string>& updated) { return buildUserRoleUpdate(role, updated); };
-            update<types::UserRole>(role, handler, builder, cmd);
-            return;
+            return {update(handler, builder, cmd), role};
         }
 
         if (type == EntityType::VAULT_ROLE) {
             const auto role = std::static_pointer_cast<types::VaultRole>(entity);
             const auto handler = [this, &role](const std::string& field) { handleVaultRoleUpdate(role, field); };
             const auto builder = [this, &role](const std::unordered_set<std::string>& updated) { return buildVaultRoleUpdate(role, updated); };
-            update<types::VaultRole>(role, handler, builder, cmd);
-            return;
+            return {update(handler, builder, cmd), role};
         }
+
+        throw std::runtime_error("EntityFactory: unsupported entity type for update");
     }
 
 private:
@@ -239,8 +242,8 @@ private:
 
     UserAliases userAliases_;
     GroupAliases groupAliases_;
-    UserRoleAliases userRoleAliases_;
     VaultRoleAliases vaultRoleAliases_;
+    UserRoleAliases userRoleAliases_;
     S3VaultAliases vaultAliases_;
 };
 

@@ -84,7 +84,11 @@ public:
         std::vector<std::string> path_aliases;
         auto current = cmd;
         while (current) {
-            path_aliases.push_back(current->aliases.at(0));
+            // Prefer primary() if defined, otherwise first alias, otherwise the label
+            std::string piece;
+            if (!current->aliases.empty()) piece = current->aliases.front();
+            else                           piece = current->primary(); // falls back to something sane in your impl
+            path_aliases.push_back(std::move(piece));
             current = current->parent.lock();
         }
         std::ranges::reverse(path_aliases);
@@ -94,7 +98,6 @@ public:
     // Build: "vh <path> [positionals] [flags] [options] [groups]"
     std::string build() const {
         std::ostringstream cmd;
-        cmd << "vh ";
         const auto path_aliases_ = constructPath(usage_);
         for (size_t i = 0; i < path_aliases_.size(); ++i) {
             if (i) cmd << ' ';
@@ -223,7 +226,7 @@ private:
 
         if (opts.empty() || vals.empty()) return;
 
-        // Case A: 1 option, many values → `--opt v1 v2` ...
+        // Case A: 1 option, many values → `--opt v1 v2 ...`
         if (opts.size() == 1 && vals.size() >= 1) {
             if (auto joined = resolve_values(vals, usage_path, o); joined) {
                 cmd << ' ' << "--" << dashify(opts.front()) << ' ' << *joined;
@@ -247,8 +250,8 @@ private:
         const size_t n = std::min(opts.size(), vals.size());
         for (size_t i = 0; i < n; ++i) {
             auto v = resolve_token(vals[i], usage_path);
-            if (!v && constexpr_has_default<OptLike>()) {
-                if (o.default_value) v = o.default_value;
+            if constexpr (std::is_same_v<OptLike, shell::Optional>) {
+                if (!v && o.default_value) v = o.default_value;
             }
             if (v) cmd << ' ' << "--" << dashify(opts[i]) << ' ' << *v;
         }
@@ -268,14 +271,24 @@ private:
     static constexpr bool constexpr_has_default() { return std::is_same_v<T, shell::Optional>; }
 
     std::optional<std::string> resolve_values(const std::vector<std::string>& tokens,
-                                              const std::string& usage_path,
-                                              const shell::Optional& o) const {
+                                          const std::string& usage_path,
+                                          const shell::Optional& o) const {
         std::ostringstream oss; bool first = true; bool any = false;
         for (const auto& t : tokens) {
-            if (auto v = resolve_token(t, usage_path)) { if (!first) oss << ' '; first=false; oss << *v; any = true; }
-            else if (o.default_value) { if (!first) oss << ' '; first=false; oss << *o.default_value; any = true; }
+            if (auto v = resolve_token(t, usage_path)) {
+                if (!first) oss << ' ';
+                first = false;
+                oss << *v;
+                any = true;
+            } else if (o.default_value) {
+                if (!first) oss << ' ';
+                first = false;
+                oss << *o.default_value;
+                any = true;
+            }
         }
-        if (!any) return std::nullopt; return oss.str();
+        if (!any) return std::nullopt;
+        return oss.str();
     }
 
     std::optional<std::string> resolve_values(const std::vector<std::string>& tokens,
@@ -283,9 +296,15 @@ private:
                                               const shell::Option&) const {
         std::ostringstream oss; bool first = true; bool any = false;
         for (const auto& t : tokens) {
-            if (auto v = resolve_token(t, usage_path)) { if (!first) oss << ' '; first=false; oss << *v; any = true; }
+            if (auto v = resolve_token(t, usage_path)) {
+                if (!first) oss << ' ';
+                first = false;
+                oss << *v;
+                any = true;
+            }
         }
-        if (!any) return std::nullopt; return oss.str();
+        if (!any) return std::nullopt;
+        return oss.str();
     }
 
     // ---------- Entity token extractors ----------

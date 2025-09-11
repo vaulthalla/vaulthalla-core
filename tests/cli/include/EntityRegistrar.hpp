@@ -43,21 +43,21 @@ public:
         const auto io = std::make_unique<shell::SocketIO>(fd);
 
         const auto buildCommand = [&](const std::shared_ptr<void>& entity) {
-            return CommandBuilderRegistry::instance().buildCommand(type, CommandType::CREATE, entity);
+            const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::CREATE, entity);
+            std::cout << command << std::endl;
+            return command;
         };
 
         if (type == EntityType::USER) {
             const auto user = factory_->create(EntityType::USER);
             const auto command = buildCommand(user);
-            std::cout << "Creating user with command: " << command << std::endl;
             return { router_->executeLine(command, admin, io.get()), user };
         }
 
-        const auto owner = ctx_->users.empty() ? admin : ctx_->pickRandomUser();
-
         if (type == EntityType::VAULT) {
-            const auto vault = factory_->create(EntityType::VAULT, owner);
+            const auto vault = factory_->create(EntityType::VAULT);
             const auto command = buildCommand(vault);
+            std::cout << "Creating vault owned by user ID " << command << std::endl;
             return { router_->executeLine(command, admin, io.get()), vault };
         }
 
@@ -91,6 +91,7 @@ public:
     template <typename T>
     [[nodiscard]] EntityResult update(const EntityType& type, const std::shared_ptr<T>& entity) const {
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::UPDATE, entity);
+        std::cout << command << std::endl;
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
@@ -101,6 +102,7 @@ public:
         const auto cmd = ctx_->getCommand(type, "list");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for listing");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::LIST, nullptr);
+        std::cout << command << std::endl;
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
@@ -112,6 +114,7 @@ public:
         const auto cmd = ctx_->getCommand(type, "info");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for info");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::INFO, entity);
+        std::cout << command << std::endl;
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
@@ -127,6 +130,7 @@ public:
         const auto io = std::make_unique<shell::SocketIO>(fd);
 
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::DELETE, entity);
+        std::cout << command << std::endl;
         return { router_->executeLine(command, admin, io.get()), entity };
     }
 

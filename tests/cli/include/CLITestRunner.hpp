@@ -41,12 +41,14 @@ private:
 
     std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_contains_;
     std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_not_contains_;
-    std::array<TestStage, 5> kDefaultTestStages;
+    std::array<TestStage, 7> kDefaultTestStages;
 
     void validateResponse(unsigned int stage) const;
 
     void seedRoles();
-    void seed();
+    void seedUsers();
+    void seedGroups();
+    void seedVaults();
     void update();
     void read();
     void teardown();

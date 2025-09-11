@@ -203,7 +203,9 @@ bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::p
 std::string to_string(const std::shared_ptr<User>& user) {
     if (!user) return "No user found\n";
 
-    std::string out = "User: " + user->name + "\n";
+    std::string out;
+    out += "User ID: " + std::to_string(user->id) + "\n";
+    out += "User: " + user->name + "\n";
     out += "Email: " + user->email.value_or("N/A") + "\n";
     if (user->linux_uid) out += "Linux UID: " + std::to_string(*user->linux_uid) + "\n";
     else out += "Linux UID: Not set\n";

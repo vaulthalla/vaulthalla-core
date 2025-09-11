@@ -38,11 +38,11 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->required = {role};
     cmd->optional = {emailOpt, linuxUidOpt};
     cmd->examples = {
-        {"vh user create --name alice --role admin --email alice123@icann.org --linux-uid 1001",
+        {"vh user create alice --role admin --email alice123@icann.org --linux-uid 1001",
          "Create a new user named 'alice' with admin role, email, and Linux UID."},
-        {"vh user new --name bob --role user --email bon@icann.org --linux-uid 1002",
+        {"vh user new bob --role user --email bon@icann.org --linux-uid 1002",
          "Create a new user named 'bob' with user role, email, and Linux UID (using alias)."},
-        {"vh u mk --name charlie --role 2", "Create a new user named 'charlie' with role ID 2 (using shortest alias)."}
+        {"vh u mk charlie --role 2", "Create a new user named 'charlie' with role ID 2 (using shortest alias)."}
     };
     return cmd;
 }

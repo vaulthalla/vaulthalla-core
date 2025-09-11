@@ -18,6 +18,8 @@ class FUSEBridge;
 namespace vh::services {
 
 class FUSE final : public AsyncService {
+    friend class ServiceManager;
+
 public:
     explicit FUSE(std::filesystem::path  mount = paths::getMountPath());
 
@@ -25,7 +27,6 @@ public:
 
     [[nodiscard]] fuse_session* session() const noexcept { return session_; }
 
-    void setMountPoint(const std::filesystem::path& mount) { mountPoint_ = mount; }
     [[nodiscard]] const std::filesystem::path& mountPoint() const noexcept { return mountPoint_; }
 
 protected:
@@ -34,6 +35,12 @@ protected:
 private:
     fuse_session* session_{nullptr};
     std::filesystem::path mountPoint_;
+    bool testMode_ = false;
+
+    void setTestMode(const std::filesystem::path& mount) {
+        testMode_ = true;
+        mountPoint_ = mount;
+    }
 };
 
 }

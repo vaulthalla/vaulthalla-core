@@ -52,7 +52,7 @@ std::string VaultCommandBuilder::vaultRef(const std::shared_ptr<Vault>& v, bool&
 void VaultCommandBuilder::emitOwnerIfName(std::ostringstream& oss, const std::shared_ptr<Vault>& v, bool usedName) {
     if (!usedName) return;
     // your usage allows --owner id|name; we’ll pass an id if we have it
-    if (v->owner_id > 0) oss << " --owner id "   << v->owner_id;
+    if (v->owner_id > 0) oss << " --owner "   << v->owner_id;
     else if (const auto owner = UserQueries::getUserById(v->owner_id)) oss << " --owner name " << owner->name;
     else oss << " --owner id 1"; // last-resort: test user 1
 }

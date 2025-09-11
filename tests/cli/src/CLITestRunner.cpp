@@ -49,7 +49,9 @@ void CLITestRunner::registerStdoutNotContains(const std::string& path, std::vect
 
 int CLITestRunner::operator()() {
     seedRoles();
-    seed();
+    seedUsers();
+    seedGroups();
+    seedVaults();
     read();
     update();
     validateTestObjects();
@@ -134,45 +136,82 @@ void CLITestRunner::seedRoles() {
     validateResponse(0);
 }
 
-void CLITestRunner::seed() {
+void CLITestRunner::seedUsers() {
     std::vector<std::shared_ptr<TestCase>> tests;
-    const size_t numTests = config_.numUsers + config_.numVaults + config_.numGroups;
-    tests.reserve(numTests);
+    tests.reserve(config_.numUsers);
 
-    for (size_t i = 0; i < config_.numGroups; ++i)
-        tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::GROUP, CommandType::CREATE)));
     for (size_t i = 0; i < config_.numUsers; ++i)
         tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::USER, CommandType::CREATE)));
-    for (size_t i = 0; i < config_.numVaults; ++i)
-        tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::VAULT, CommandType::CREATE)));
 
     const auto res = router_->route(tests);
+    if (res.empty()) throw std::runtime_error("Seed Users: no test results from routing");
     for (const auto& r : res) {
-        if (const auto id = extractId(r->result.stdout_text); id.has_value() && r->entity) {
-            if (r->path.contains("user")) {
-                const auto user = std::static_pointer_cast<User>(r->entity);
-                user->id = *id;
-                ctx_->users.push_back(user);
-            } else if (r->path.contains("vault")) {
-                const auto vault = std::static_pointer_cast<Vault>(r->entity);
-                vault->id = *id;
-                ctx_->vaults.push_back(vault);
-            } else if (r->path.contains("group")) {
-                const auto group = std::static_pointer_cast<Group>(r->entity);
-                group->id = *id;
-                ctx_->groups.push_back(group);
-            }
-        } else {
-            r->assertion = AssertionResult::Fail("Seed: failed to extract ID from output for " + r->name);
-        }
+        if (!r->result.stderr_text.empty()) std::cerr << r->result.stderr_text << std::endl;
+        if (const auto id = extractId(r->result.stdout_text, "User ID:"); id.has_value() && r->entity) {
+            const auto user = std::static_pointer_cast<User>(r->entity);
+            user->id = *id;
+            ctx_->users.push_back(user);
+        } else std::cerr << "Seed Users: failed to extract ID from output for " + r->name + " - output:\n" << r->result.stdout_text << std::endl;
     }
 
     kDefaultTestStages[1] = TestStage{
-        .name = "Seed",
+        .name = "Seed Users",
         .tests = res
     };
 
     validateResponse(1);
+}
+
+void CLITestRunner::seedGroups() {
+    std::vector<std::shared_ptr<TestCase>> tests;
+    tests.reserve(config_.numGroups);
+
+    for (size_t i = 0; i < config_.numGroups; ++i)
+        tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::GROUP, CommandType::CREATE)));
+
+    const auto res = router_->route(tests);
+    if (res.empty()) throw std::runtime_error("Seed Groups: no test results from routing");
+    for (const auto& r : res) {
+        if (!r->result.stderr_text.empty()) std::cerr << r->result.stderr_text << std::endl;
+        if (const auto id = extractId(r->result.stdout_text); id.has_value() && r->entity) {
+            const auto group = std::static_pointer_cast<Group>(r->entity);
+            group->id = *id;
+            ctx_->groups.push_back(group);
+        } else std::cerr << "Seed Groups: failed to extract ID from output for " + r->name << " - output:\n" << r->result.stdout_text << std::endl;
+    }
+
+    kDefaultTestStages[2] = TestStage{
+        .name = "Seed Groups",
+        .tests = res
+    };
+
+    validateResponse(2);
+}
+
+void CLITestRunner::seedVaults() {
+    std::vector<std::shared_ptr<TestCase>> tests;
+    tests.reserve(config_.numVaults);
+
+    for (size_t i = 0; i < config_.numVaults; ++i)
+        tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::VAULT, CommandType::CREATE)));
+
+    const auto res = router_->route(tests);
+    if (res.empty()) throw std::runtime_error("Seed Vaults: no test results from routing");
+    for (const auto& r : res) {
+        if (!r->result.stderr_text.empty()) std::cerr << r->result.stderr_text << std::endl;
+        if (const auto id = extractId(r->result.stdout_text); id.has_value() && r->entity) {
+            const auto vault = std::static_pointer_cast<Vault>(r->entity);
+            vault->id = *id;
+            ctx_->vaults.push_back(vault);
+        } else std::cerr << "Seed Vaults: failed to extract ID from output for " + r->name << " - output:\n" << r->result.stdout_text << std::endl;
+    }
+
+    kDefaultTestStages[3] = TestStage{
+        .name = "Seed Vaults",
+        .tests = res
+    };
+
+    validateResponse(3);
 }
 
 void CLITestRunner::read() {
@@ -198,12 +237,12 @@ void CLITestRunner::read() {
     tests.push_back(std::make_shared<TestCase>(TestCase::List(EntityType::USER_ROLE)));
     tests.push_back(std::make_shared<TestCase>(TestCase::List(EntityType::VAULT_ROLE)));
 
-    kDefaultTestStages[2] = TestStage{
+    kDefaultTestStages[4] = TestStage{
         .name = "Read",
         .tests = router_->route(tests)
     };
 
-    validateResponse(2);
+    validateResponse(4);
 }
 
 void CLITestRunner::update() {
@@ -223,12 +262,12 @@ void CLITestRunner::update() {
     for (const auto& r : ctx_->vaultRoles)
         tests.push_back(std::make_shared<TestCase>(TestCase::Generate(EntityType::VAULT_ROLE, CommandType::UPDATE, r)));
 
-    kDefaultTestStages[3] = TestStage{
+    kDefaultTestStages[5] = TestStage{
         .name = "Update",
         .tests = router_->route(tests)
     };
 
-    validateResponse(3);
+    validateResponse(5);
 }
 
 void CLITestRunner::validateTestObjects() const {
@@ -256,12 +295,12 @@ void CLITestRunner::teardown() {
     for (const auto& v : ctx_->vaults)
         tests.push_back(std::make_shared<TestCase>(TestCase::Delete(EntityType::VAULT, v)));
 
-    kDefaultTestStages[4] = TestStage{
+    kDefaultTestStages[6] = TestStage{
         .name = "Teardown",
         .tests = router_->route(tests)
     };
 
-    validateResponse(4);
+    validateResponse(6);
 }
 
 int CLITestRunner::printResults() const {

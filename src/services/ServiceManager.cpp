@@ -145,7 +145,7 @@ void ServiceManager::stopWatchdog() {
 }
 
 void ServiceManager::setFuseMountPoint(const std::filesystem::path& mount) const {
-    if (fuseService && !fuseService->isRunning()) fuseService->setMountPoint(mount);
+    if (fuseService && !fuseService->isRunning()) fuseService->setTestMode(mount);
     else throw std::runtime_error("Cannot set FUSE mount point while FUSE service is running");
 }
 

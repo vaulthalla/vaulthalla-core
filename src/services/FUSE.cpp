@@ -59,6 +59,14 @@ void FUSE::runLoop() {
             LogRegistry::fuse()->error("[FUSE] Failed to create mountpoint {}: {}", mountPoint_.string(), ec.message());
             return;
         }
+
+        if (testMode_) {
+            fs::permissions(mountPoint_,
+        fs::perms::owner_all | fs::perms::group_all | fs::perms::others_all,
+        fs::perm_options::replace, ec);
+        }
+
+        if (ec) throw std::runtime_error("Failed to chmod mountpoint: " + ec.message());
     }
 
     std::vector<std::string> argsStr = {

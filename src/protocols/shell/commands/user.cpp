@@ -22,16 +22,18 @@ using namespace vh::crypto;
 static CommandResult createUser(const CommandCall& subcall) {
     constexpr const auto* ERR = "user create";
 
+    if (subcall.positionals.empty()) return invalid("Usage: user create <name> [--email email] [--linux-uid uid] [--role role]");
+
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
 
-    const auto nameOpt = optVal(subcall, "name");
+    const auto name = subcall.positionals[0];
+
     const auto emailOpt = optVal(subcall, "email");
     const auto linuxUidOpt = optVal(subcall, "linux-uid");
-    const auto roleOpt = optVal(subcall, "role");
+    auto roleOpt = optVal(subcall, "role");
 
     std::vector<std::string> errors;
-    if (!nameOpt) errors.emplace_back("Missing required option: --name");
-    if (nameOpt && nameOpt->empty()) errors.emplace_back("Option --name cannot be empty");
+    if (!roleOpt) roleOpt = optVal(subcall, "r");
     if (!roleOpt) errors.emplace_back("Missing required option: --role");
     if (roleOpt && roleOpt->empty()) errors.emplace_back("Option --role cannot be empty");
 
@@ -42,7 +44,7 @@ static CommandResult createUser(const CommandCall& subcall) {
     }
 
     const auto user = std::make_shared<User>();
-    user->name = *nameOpt;
+    user->name = name;
     user->email = emailOpt;
     if (linuxUidOpt) user->linux_uid = parseInt(*linuxUidOpt);
     user->role = std::make_shared<UserRole>();
@@ -78,7 +80,7 @@ static CommandResult createUser(const CommandCall& subcall) {
         user->setPasswordHash(hashPassword(password));
         user->id = UserQueries::createUser(user);
 
-        std::string out = "User created successfully: " + user->name + "\n";
+        std::string out = "User created successfully: " + to_string(user) + "\n";
         out += "Password: " + password + "\n";
         return ok(out);
 

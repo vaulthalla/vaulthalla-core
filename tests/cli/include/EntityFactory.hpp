@@ -12,10 +12,8 @@
 #include "permsUtil.hpp"
 
 #include <string>
-#include <vector>
 #include <memory>
 #include <optional>
-#include <cstdlib>
 
 namespace vh::test::cli {
 
@@ -23,7 +21,7 @@ class EntityFactory {
 public:
     explicit EntityFactory(const std::shared_ptr<CLITestContext>& ctx) : ctx_(ctx) {}
 
-    std::shared_ptr<void> create(const EntityType& type, const std::shared_ptr<types::User>& owner = nullptr) {
+    std::shared_ptr<void> create(const EntityType& type) {
         if (type == EntityType::USER) {
             const std::string usage = "user/create";
             const auto user = std::make_shared<types::User>();
@@ -38,7 +36,7 @@ public:
             const auto vault = std::make_shared<types::Vault>();
             vault->name = generateName(usage);
             vault->setQuotaFromStr(generateQuotaStr(usage));
-            if (owner) vault->owner_id = owner->id;
+            vault->owner_id = ctx_->pickRandomUser()->id;
             return vault;
         }
 
@@ -67,12 +65,6 @@ public:
         }
 
         return nullptr;
-    }
-
-    std::vector<std::shared_ptr<void>> create(const EntityType& type, const std::size_t count, const std::shared_ptr<types::User>& owner = nullptr) {
-        std::vector<std::shared_ptr<void>> entities;
-        for (std::size_t i = 0; i < count; ++i) if (auto e = create(type, owner)) entities.push_back(e);
-        return entities;
     }
 
     void seedBaseline(const std::shared_ptr<CLITestContext>& ctx);

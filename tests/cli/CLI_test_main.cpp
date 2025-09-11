@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <paths.h>
 
 namespace fs = std::filesystem;
 using namespace vh::shell;

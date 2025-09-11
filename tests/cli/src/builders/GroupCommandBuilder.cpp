@@ -27,22 +27,6 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
     throw std::runtime_error("GroupCommandBuilder: unsupported group field for resolveVar: " + name);
 }
 
-static std::optional<std::string> resolveAndSetRandomVar(const std::string& name, const std::shared_ptr<Group>& group) {
-    if (name == "name" || name == "group_name") {
-        group->name = generateName("group/create");
-        return group->name;
-    }
-    if (name == "description" || name == "desc") {
-        if (coin()) {
-            group->description = "This is a description for group " + group->name;
-            return group->description;
-        }
-        return std::string(""); // clear description
-    }
-    throw std::runtime_error("GroupCommandBuilder: unsupported group field for resolveAndSetRandomVar: " + name);
-
-}
-
 static std::string randomizePrimaryPositional(const std::shared_ptr<Group>& entity) {
     if (coin()) return std::to_string(entity->id);
     return entity->name;
@@ -53,7 +37,7 @@ std::string GroupCommandBuilder::create(const std::shared_ptr<Group>& entity) {
     if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'create' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ' << entity->name;
     for (const auto& opt : cmd->required) {
         oss << ' ' << randomAlias(opt.option_tokens);
         if (auto val = resolveVar(opt.option_tokens[0], entity); val) oss << ' ' << *val;
@@ -68,21 +52,17 @@ std::string GroupCommandBuilder::update(const std::shared_ptr<Group>& entity) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
-    oss << ' ' << (coin() ? std::to_string(entity->id) : entity->name);
-    const auto numFieldsToUpdate = std::max(static_cast<size_t>(1), generateRandomIndex(cmd->optional.size()));
-    std::unordered_set<std::string> updated;
-    while (updated.size() < numFieldsToUpdate) {
-        const auto opt = cmd->optional[generateRandomIndex(cmd->optional.size())];
-        for (const auto& t : opt.option_tokens) {
-            if (!updated.contains(t)) {
-                oss << ' ' << t;
-                if (auto val = resolveAndSetRandomVar(t, entity); val) oss << ' ' << *val;
-                else throw std::runtime_error("GroupCommandBuilder: unsupported group field for update: " + t);
-                updated.insert(t);
-                break;
-            }
+    oss << ' ' << randomizePrimaryPositional(entity);
+
+    unsigned int updated = 0;
+    for (const auto& opt : cmd->optional) {
+        if (coin() || updated == 0) {
+            oss << ' ' << randomAlias(opt.option_tokens);
+            oss << ' ' << updateAndResolveVar(entity, opt.option_tokens[0]);
+            ++updated;
         }
     }
+
     return oss.str();
 }
 

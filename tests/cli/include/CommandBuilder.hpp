@@ -12,11 +12,10 @@
 
 namespace vh::shell {
 class CommandUsage;
+class UsageManager;
 }
 
 namespace vh::test::cli {
-
-struct UsageManager;
 
 template <typename T = void>
 class CommandBuilder {

@@ -9,4 +9,4 @@ runs:
       run: |
         export PATH_TO_TEST_DATA="$GITHUB_WORKSPACE/test-assets"
         echo "Using test data path $PATH_TO_TEST_DATA"
-        ./build/test_all
+        ./build/vh_unit_tests

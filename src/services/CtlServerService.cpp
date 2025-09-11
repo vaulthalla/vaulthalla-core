@@ -1,5 +1,4 @@
 #include "services/CtlServerService.hpp"
-#include "services/ServiceDepsRegistry.hpp"  // Jetbrains is probably lying to you, this may be needed
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "protocols/shell/commands/all.hpp"

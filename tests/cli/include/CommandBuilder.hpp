@@ -6,6 +6,7 @@
 #include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
 #include "updateAliases.hpp"
+#include "UsageManager.hpp"
 
 #include <memory>
 #include <string>

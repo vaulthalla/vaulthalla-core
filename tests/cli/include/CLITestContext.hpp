@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <array>
 
 namespace vh::types {
 struct User;
@@ -26,8 +27,8 @@ struct TestUsageManager;
 enum class EntityType;
 
 struct CLITestContext {
-    static constexpr std::array<std::string, 4> ENTITIES = {"user", "vault", "group", "role"};
-    static constexpr std::array<std::string, 5> ACTIONS = {"create", "update", "delete", "list", "info"};
+    static constexpr std::array<std::string_view, 4> ENTITIES = {"user", "vault", "group", "role"};
+    static constexpr std::array<std::string_view, 5> ACTIONS = {"create", "update", "delete", "list", "info"};
 
     std::vector<std::shared_ptr<types::User>> users;
     std::vector<std::shared_ptr<types::APIKey>> api_keys;

@@ -9,6 +9,7 @@
 
 namespace vh::test::cli {
 
+struct CLITestContext;
 class CommandRouter;
 struct TestUsageManager;
 class EntityRegistrar;

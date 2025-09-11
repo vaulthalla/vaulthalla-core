@@ -73,7 +73,7 @@ int main() {
 
     for (const auto& entity : CLITestContext::ENTITIES) {
         for (const auto& action : CLITestContext::ACTIONS) {
-            const auto path = entity + "/" + action;
+            const auto path = std::string(entity) + "/" + std::string(action);
             runner.registerStdoutNotContains(path, {"Traceback", "Exception", "Error", "invalid", "not found", "failed", "unrecognized"});
             if (action == "info") {
                 if (entity == "user") runner.registerStdoutContains(path, user_info_fields);

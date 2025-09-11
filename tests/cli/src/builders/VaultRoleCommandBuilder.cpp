@@ -6,14 +6,36 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage)
-    : CommandBuilder(usage, "role") {}
+VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+    : CommandBuilder(usage, ctx, "role"), vaultRoleAliases_(ctx) {}
+
+std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<VaultRole>& entity, const std::string& field) {
+    const std::string usagePath = "vault/update";
+
+    if (vaultRoleAliases_.isName(field)) {
+        entity->name = generateRoleName(EntityType::VAULT_ROLE, usagePath);
+        return entity->name;
+    }
+
+    if (vaultRoleAliases_.isDescription(field)) {
+        entity->description = "Updated vault role description";
+        return entity->description;
+    }
+
+    if (vaultRoleAliases_.isPermissions(field)) {
+        entity->permissions = generateBitmask(ADMIN_SHELL_PERMS.size());
+        return entity->permissions_to_flags_string();
+    }
+
+    throw std::runtime_error("EntityFactory: unsupported vault role field for update: " + field);
+}
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<VaultRole>& role) {
     if (name == "id" || name == "role_id") return std::to_string(role->id);
     if (name == "name" || name == "role_name") return role->name;
     if (name == "description" || name == "desc") return role->description;
     if (name == "permissions" || name == "perms") return std::to_string(role->permissions);
+    if (name == "type" || name == "role_type") return role->type;
     throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for resolveVar: " + name);
 }
 
@@ -27,17 +49,22 @@ std::string VaultRoleCommandBuilder::create(const std::shared_ptr<VaultRole>& en
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'create' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " vault ";
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " vault " << entity->name;
 
     for (const auto& opt : cmd->required) {
-        if (opt.label == "type") continue; // skip type, always "vault" for vault roles
-        oss << ' ' << randomAlias(opt.option_tokens);
+        oss << ' ' << randomFlagAlias(opt.option_tokens);
         if (auto val = resolveVar(opt.option_tokens[0], entity); val) oss << ' ' << *val;
         else throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for create: " + opt.option_tokens[0]);
     }
 
     for (const auto& option : cmd->optional) {
-        if (rand() % 2 == 0) {
+        if (coin()) {
+            if (option.option_tokens[0] == "from") {
+                if (!ctx_->vaultRoles.empty() && coin())
+                    oss << ' ' << randomFlagAlias(option.option_tokens) << ' ' << std::to_string(ctx_->randomVaultRole()->id);
+                continue;
+            }
+
             oss << ' ' << randomAlias(option.option_tokens);
             if (auto val = resolveVar(option.option_tokens[0], entity); val) oss << ' ' << *val;
             else throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for create: " + option.option_tokens[0]);
@@ -59,12 +86,9 @@ std::string VaultRoleCommandBuilder::update(const std::shared_ptr<VaultRole>& en
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " vault ";
     oss << randomizePrimaryPositional(entity);
 
-    if (generateRandomIndex(20000) < 11000) {
-        entity->name = generateRoleName(EntityType::VAULT_ROLE, "role/update");
-        oss << " --name " << entity->name;
-    }
-
-    for (const auto& flag : randomVaultPermsFlags()) oss << ' ' << flag;
+    if (coin()) oss << " --name " << updateAndResolveVar(entity, "name");
+    if (coin()) oss << " --desc " << quoted(updateAndResolveVar(entity, "description"));
+    if (coin()) oss << " --perms " << updateAndResolveVar(entity, "permissions");
 
     return oss.str();
 }

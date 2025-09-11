@@ -5,6 +5,7 @@
 #include "types/Group.hpp"
 #include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
+#include "updateAliases.hpp"
 
 #include <memory>
 #include <string>
@@ -18,9 +19,16 @@ namespace vh::test::cli {
 struct TestUsageManager;
 
 template <typename T = void>
-struct CommandBuilder {
-    explicit CommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::string& rootTopLevelAlias);
-    virtual ~CommandBuilder() = 0;
+class CommandBuilder {
+public:
+    virtual ~CommandBuilder() = default;
+    explicit CommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx, const std::string& rootTopLevelAlias)
+        : ctx_(ctx) {
+        if (!usage) throw std::runtime_error("CommandBuilder: usage manager is null");
+        const auto cmd = usage->resolve(rootTopLevelAlias);
+        if (!cmd) throw std::runtime_error("CommandBuilder: command usage not found for root: " + rootTopLevelAlias);
+        root_ = cmd;
+    }
 
     virtual std::string create(const std::shared_ptr<T>& entity) = 0;
     virtual std::string update(const std::shared_ptr<T>& entity) = 0;
@@ -28,11 +36,16 @@ struct CommandBuilder {
     virtual std::string info(const std::shared_ptr<T>& entity) = 0;
     virtual std::string list() = 0;
 
+protected:
     std::shared_ptr<shell::CommandUsage> root_;
+    std::shared_ptr<CLITestContext> ctx_;
+
+    virtual std::string updateAndResolveVar(const std::shared_ptr<T>& entity, const std::string& field) = 0;
 };
 
-struct UserCommandBuilder final : CommandBuilder<types::User> {
-    explicit UserCommandBuilder(const std::shared_ptr<TestUsageManager>& usage);
+class UserCommandBuilder final : CommandBuilder<types::User> {
+public:
+    explicit UserCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~UserCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::User>& entity) override;
@@ -40,11 +53,18 @@ struct UserCommandBuilder final : CommandBuilder<types::User> {
     std::string remove(const std::shared_ptr<types::User>& entity) override;
     std::string info(const std::shared_ptr<types::User>& entity) override;
     std::string list() override;
+
+protected:
+    std::string updateAndResolveVar(const std::shared_ptr<types::User>& entity, const std::string& field) override;
+
+private:
+    UserAliases userAliases_;
 };
 
-struct VaultCommandBuilder final : CommandBuilder<types::Vault> {
-    explicit VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage)
-        : CommandBuilder(usage, "vault") {}
+class VaultCommandBuilder final : CommandBuilder<types::Vault> {
+public:
+    explicit VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    ~VaultCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::Vault>& v) override;
     std::string update(const std::shared_ptr<types::Vault>& v) override;
@@ -59,7 +79,12 @@ struct VaultCommandBuilder final : CommandBuilder<types::Vault> {
     std::string key_export(const std::shared_ptr<types::Vault>& v);
     std::string key_rotate(const std::shared_ptr<types::Vault>& v);
 
+protected:
+    std::string updateAndResolveVar(const std::shared_ptr<types::Vault>& entity, const std::string& field) override;
+
 private:
+    S3VaultAliases vaultAliases_;
+
     static std::string vaultRef(const std::shared_ptr<types::Vault>& v, bool& usedName);
     static void emitOwnerIfName(std::ostringstream& oss, const std::shared_ptr<types::Vault>& v, bool usedName);
 
@@ -67,8 +92,9 @@ private:
     static std::string chooseVaultType();
 };
 
-struct GroupCommandBuilder final : CommandBuilder<types::Group> {
-    explicit GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage);
+class GroupCommandBuilder final : CommandBuilder<types::Group> {
+public:
+    explicit GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~GroupCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::Group>& entity) override;
@@ -76,10 +102,18 @@ struct GroupCommandBuilder final : CommandBuilder<types::Group> {
     std::string remove(const std::shared_ptr<types::Group>& entity) override;
     std::string info(const std::shared_ptr<types::Group>& entity) override;
     std::string list() override;
+
+protected:
+    std::string updateAndResolveVar(const std::shared_ptr<types::Group>& entity, const std::string& field) override;
+
+private:
+    GroupAliases groupAliases_;
 };
 
-struct UserRoleCommandBuilder final : CommandBuilder<types::UserRole> {
-    explicit UserRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage);
+class UserRoleCommandBuilder final : CommandBuilder<types::UserRole> {
+public:
+
+    explicit UserRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~UserRoleCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::UserRole>& entity) override;
@@ -87,10 +121,17 @@ struct UserRoleCommandBuilder final : CommandBuilder<types::UserRole> {
     std::string remove(const std::shared_ptr<types::UserRole>& entity) override;
     std::string info(const std::shared_ptr<types::UserRole>& entity) override;
     std::string list() override;
+
+protected:
+    std::string updateAndResolveVar(const std::shared_ptr<types::UserRole>& entity, const std::string& field) override;
+
+private:
+    UserRoleAliases userRoleAliases_;
 };
 
-struct VaultRoleCommandBuilder final : CommandBuilder<types::VaultRole> {
-    explicit VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage);
+class VaultRoleCommandBuilder final : CommandBuilder<types::VaultRole> {
+public:
+    explicit VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~VaultRoleCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::VaultRole>& entity) override;
@@ -98,6 +139,12 @@ struct VaultRoleCommandBuilder final : CommandBuilder<types::VaultRole> {
     std::string remove(const std::shared_ptr<types::VaultRole>& entity) override;
     std::string info(const std::shared_ptr<types::VaultRole>& entity) override;
     std::string list() override;
+
+protected:
+    std::string updateAndResolveVar(const std::shared_ptr<types::VaultRole>& entity, const std::string& field) override;
+
+private:
+    VaultRoleAliases vaultRoleAliases_;
 };
 
 }

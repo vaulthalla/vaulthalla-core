@@ -18,20 +18,22 @@ CLITestContext::CLITestContext()
     : usage(std::make_shared<TestUsageManager>()) {
     for (const auto& entity : ENTITIES) {
         for (const auto& action : ACTIONS) {
+            const auto eStr = std::string(entity);
+            const auto aStr = std::string(action);
             if (entity == "role") {
-                const auto cmdBase = entity + " " + action;
+                const auto cmdBase = eStr + " " + aStr;
                 const auto userCmd = cmdBase + " user";
                 const auto vaultCmd = cmdBase + " vault";
-                const auto userUsage = usage->resolve({entity, action});
-                const auto vaultUsage = usage->resolve({entity, action});
+                const auto userUsage = usage->resolve({eStr, aStr});
+                const auto vaultUsage = usage->resolve({eStr, aStr});
                 if (!userUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + userCmd);
                 if (!vaultUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + vaultCmd);
                 commands[userCmd] = userUsage;
                 commands[vaultCmd] = vaultUsage;
                 continue;
             }
-            const auto cmdName = entity + " " + action;
-            const auto cmdUsage = usage->resolve({entity, action});
+            const auto cmdName = eStr + " " + aStr;
+            const auto cmdUsage = usage->resolve({eStr, aStr});
             if (!cmdUsage) throw std::runtime_error("EntityFactory: unknown command usage: " + cmdName);
             commands[cmdName] = cmdUsage;
         }

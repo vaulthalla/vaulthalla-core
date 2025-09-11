@@ -26,8 +26,8 @@ CLITestRunner::CLITestRunner(CLITestConfig&& config)
     : config_(config),
       ctx_(std::make_shared<CLITestContext>()),
       usage_(std::make_shared<TestUsageManager>()),
-      router_(std::make_shared<CommandRouter>(ctx_, usage_)) {
-    CommandBuilderRegistry::init(usage_);
+      router_(std::make_shared<CommandRouter>(ctx_)) {
+    CommandBuilderRegistry::init(usage_, ctx_);
 }
 
 void CLITestRunner::registerStdoutContains(const std::string& path, std::string s) {
@@ -85,8 +85,7 @@ void CLITestRunner::validateResponse(const unsigned int stage) const {
     }
 }
 
-static std::optional<unsigned int> extractId(const std::string& output) {
-    const std::string idPrefix = "ID: ";
+static std::optional<unsigned int> extractId(const std::string& output, const std::string& idPrefix = "ID: ") {
     const auto pos = output.find(idPrefix);
     if (pos == std::string::npos) return std::nullopt;
     const auto start = pos + idPrefix.size();
@@ -111,7 +110,8 @@ void CLITestRunner::seedRoles() {
 
     const auto res = router_->route(tests);
     for (const auto& r : res) {
-        if (const auto id = extractId(r->result.stdout_text); id.has_value() && r->entity) {
+        if (!r->result.stderr_text.empty()) std::cerr << r->result.stderr_text << std::endl;
+        if (const auto id = extractId(r->result.stdout_text, "Role ID:"); id.has_value() && r->entity) {
             if (r->path.contains("user")) {
                 const auto role = std::static_pointer_cast<UserRole>(r->entity);
                 role->id = *id;

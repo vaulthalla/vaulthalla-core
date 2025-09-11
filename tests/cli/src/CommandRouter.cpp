@@ -1,11 +1,7 @@
 #include "CommandRouter.hpp"
 #include "TestCase.hpp"
 #include "EntityRegistrar.hpp"
-#include "ListInfoHandler.hpp"
-#include "UpdateHandler.hpp"
 #include "CLITestContext.hpp"
-#include "TestUsageManager.hpp"
-#include "protocols/shell/Router.hpp"
 
 #include "types/User.hpp"
 #include "types/Vault.hpp"
@@ -17,11 +13,8 @@ using namespace vh::test::cli;
 using namespace vh::shell;
 using namespace vh::types;
 
-CommandRouter::CommandRouter(const std::shared_ptr<CLITestContext>& ctx, const std::shared_ptr<TestUsageManager>& usage) {
-    const auto router = std::make_shared<Router>();
-    registrar_ = std::make_shared<EntityRegistrar>(router, ctx);
-    list_info_handler_ = std::make_shared<ListInfoHandler>(ctx, router);
-    update_handler_ = std::make_shared<UpdateHandler>(usage, router, ctx);
+CommandRouter::CommandRouter(const std::shared_ptr<CLITestContext>& ctx)
+    : registrar_(std::make_shared<EntityRegistrar>(ctx)) {
     registerAll();
 }
 
@@ -76,81 +69,81 @@ void CommandRouter::registerAll() {
     registerRoute("user/update", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user entity provided for update");
         const auto user = std::static_pointer_cast<User>(entity);
-        return update_handler_->update(EntityType::USER, user);
+        return registrar_->update(EntityType::USER, user);
     });
 
     registerRoute("vault/update", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault entity provided for update");
         const auto vault = std::static_pointer_cast<Vault>(entity);
-        return update_handler_->update(EntityType::VAULT, vault);
+        return registrar_->update(EntityType::VAULT, vault);
     });
 
     registerRoute("group/update", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no group entity provided for update");
         const auto group = std::static_pointer_cast<Group>(entity);
-        return update_handler_->update(EntityType::GROUP, group);
+        return registrar_->update(EntityType::GROUP, group);
     });
 
     registerRoute("role/update/user", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user role entity provided for update");
         const auto role = std::static_pointer_cast<UserRole>(entity);
-        return update_handler_->update(EntityType::USER_ROLE, role);
+        return registrar_->update(EntityType::USER_ROLE, role);
     });
 
     registerRoute("role/update/vault", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for update");
         const auto role = std::static_pointer_cast<VaultRole>(entity);
-        return update_handler_->update(EntityType::VAULT_ROLE, role);
+        return registrar_->update(EntityType::VAULT_ROLE, role);
     });
 
     registerRoute("user/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list<User>(EntityType::USER);
+        return registrar_->list(EntityType::USER);
     });
 
     registerRoute("group/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list<User>(EntityType::GROUP);
+        return registrar_->list(EntityType::GROUP);
     });
 
     registerRoute("vault/list", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list<User>(EntityType::VAULT);
+        return registrar_->list(EntityType::VAULT);
     });
 
     registerRoute("role/list/user", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list<User>(EntityType::USER_ROLE);
+        return registrar_->list(EntityType::USER_ROLE);
     });
 
     registerRoute("role/list/vault", [&](const std::shared_ptr<void>&) -> EntityResult {
-        return list_info_handler_->list<User>(EntityType::VAULT_ROLE);
+        return registrar_->list(EntityType::VAULT_ROLE);
     });
 
     registerRoute("user/info", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user entity provided for info");
         const auto user = std::static_pointer_cast<User>(entity);
-        return list_info_handler_->info(EntityType::USER, user);
+        return registrar_->info(EntityType::USER, user);
     });
 
     registerRoute("group/info", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no group entity provided for info");
         const auto group = std::static_pointer_cast<Group>(entity);
-        return list_info_handler_->info(EntityType::GROUP, group);
+        return registrar_->info(EntityType::GROUP, group);
     });
 
     registerRoute("vault/info", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault entity provided for info");
         const auto vault = std::static_pointer_cast<Vault>(entity);
-        return list_info_handler_->info(EntityType::VAULT, vault);
+        return registrar_->info(EntityType::VAULT, vault);
     });
 
     registerRoute("role/info/user", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user role entity provided for info");
         const auto role = std::static_pointer_cast<UserRole>(entity);
-        return list_info_handler_->info(EntityType::USER_ROLE, role);
+        return registrar_->info(EntityType::USER_ROLE, role);
     });
 
     registerRoute("role/info/vault", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for info");
         const auto role = std::static_pointer_cast<VaultRole>(entity);
-        return list_info_handler_->info(EntityType::VAULT_ROLE, role);
+        return registrar_->info(EntityType::VAULT_ROLE, role);
     });
 
     registerRoute("user/delete", [&](const std::shared_ptr<void>& entity) -> EntityResult {

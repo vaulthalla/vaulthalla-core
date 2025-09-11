@@ -121,7 +121,7 @@ static CommandResult handleRoleCreateUser(const CommandCall& call, std::string_v
         role->type = "user";
         role->permissions = perms;
 
-        PermsQueries::addRole(role);
+        role->id = PermsQueries::addRole(role);
         return ok("Role created successfully: " + to_string(role));
     } catch (const std::exception& e) {
         return invalid(std::string("roles create user: ") + e.what());
@@ -142,10 +142,7 @@ static CommandResult handleRoleCreateVault(const CommandCall& call, const std::s
         role->type = "vault";
         role->permissions = perms;
 
-        if (const auto vid = optIntFlag(call, "vault-id")) role->vault_id = *vid;
-        else return invalid("roles create vault: missing required --vault-id <vid>");
-
-        PermsQueries::addRole(role);
+        role->id = PermsQueries::addRole(role);
         return ok("Role created successfully: " + to_string(role));
     } catch (const std::exception& e) {
         return invalid(std::string("roles create vault: ") + e.what());

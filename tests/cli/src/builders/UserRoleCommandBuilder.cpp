@@ -6,14 +6,36 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-UserRoleCommandBuilder::UserRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage)
-    : CommandBuilder(usage, "role") {}
+UserRoleCommandBuilder::UserRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+    : CommandBuilder(usage, ctx, "role"), userRoleAliases_(ctx) {}
+
+std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<UserRole>& entity, const std::string& field) {
+    const std::string usagePath = "role/update";
+
+    if (userRoleAliases_.isName(field)) {
+        entity->name = generateRoleName(EntityType::USER_ROLE, usagePath);
+        return entity->name;
+    }
+
+    if (userRoleAliases_.isDescription(field)) {
+        entity->description = "Updated user role description";
+        return entity->description;
+    }
+
+    if (userRoleAliases_.isPermissions(field)) {
+        entity->permissions = generateBitmask(ADMIN_SHELL_PERMS.size());
+        return entity->permissions_to_flags_string();
+    }
+
+    throw std::runtime_error("EntityFactory: unsupported user role field for update: " + field);
+}
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<UserRole>& role) {
     if (name == "id" || name == "role_id") return std::to_string(role->id);
     if (name == "name" || name == "role_name") return role->name;
     if (name == "description" || name == "desc") return role->description;
-    if (name == "permissions" || name == "perms") return std::to_string(role->permissions);
+    if (name == "permissions" || name == "perms") return role->permissions_to_flags_string();
+    if (name == "type" || name == "role_type") return role->type;
     throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for resolveVar: " + name);
 }
 
@@ -27,17 +49,24 @@ std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& enti
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'create' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " user ";
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " user " << entity->name;
+
     for (const auto& opt : cmd->required) {
         if (opt.label == "type") continue; // skip type, always "user" for user roles
-        oss << ' ' << randomAlias(opt.option_tokens);
+        oss << ' ' << randomFlagAlias(opt.option_tokens);
         if (auto val = resolveVar(opt.option_tokens[0], entity); val) oss << ' ' << *val;
         else throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for create: " + opt.option_tokens[0]);
     }
 
     for (const auto& option : cmd->optional) {
-        if (generateRandomIndex(15000) < 10000) {
-            oss << ' ' << randomAlias(option.option_tokens);
+        if (coin()) {
+            if (option.option_tokens[0] == "from") {
+                if (!ctx_->userRoles.empty() && coin())
+                    oss << ' ' << randomFlagAlias(option.option_tokens) << ' ' << std::to_string(ctx_->randomUserRole()->id);
+                continue;
+            }
+
+            oss << ' ' << randomFlagAlias(option.option_tokens);
             if (auto val = resolveVar(option.option_tokens[0], entity); val) oss << ' ' << *val;
             else throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for create: " + option.option_tokens[0]);
         }
@@ -58,12 +87,9 @@ std::string UserRoleCommandBuilder::update(const std::shared_ptr<types::UserRole
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " user ";
     oss << randomizePrimaryPositional(entity);
 
-    if (generateRandomIndex(20000) < 11000) {
-        entity->name = generateRoleName(EntityType::USER_ROLE, "role/update");
-        oss << " --name " << entity->name;
-    }
-
-    for (const auto& flag : randomUserPermsFlags()) oss << ' ' << flag;
+    if (coin()) oss << " --name " << updateAndResolveVar(entity, "name");
+    if (coin()) oss << " --desc " << quoted(updateAndResolveVar(entity, "description"));
+    if (coin()) oss << ' ' << updateAndResolveVar(entity, "permissions");
 
     return oss.str();
 }

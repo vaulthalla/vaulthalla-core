@@ -26,6 +26,8 @@ struct UserRole final : Role {
     explicit UserRole(const Role& r) : Role(r) {
         if (type != "user") throw std::runtime_error("UserRole: invalid role type");
     }
+
+    std::string permissions_to_flags_string() const override;
 };
 
 void to_json(nlohmann::json& j, const UserRole& r);

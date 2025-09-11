@@ -6,8 +6,19 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage)
-    : CommandBuilder(usage, "group") {}
+GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+    : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}
+
+std::string GroupCommandBuilder::updateAndResolveVar(const std::shared_ptr<Group>& entity, const std::string& field) {
+    const std::string usagePath = "group/update";
+
+    if (groupAliases_.isName(field)) {
+        entity->name = generateName(usagePath);
+        return entity->name;
+    }
+
+    throw std::runtime_error("EntityFactory: unsupported group field for update: " + field);
+}
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<Group>& group) {
     if (name == "id" || name == "group_id") return std::to_string(group->id);
@@ -16,8 +27,24 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
     throw std::runtime_error("GroupCommandBuilder: unsupported group field for resolveVar: " + name);
 }
 
+static std::optional<std::string> resolveAndSetRandomVar(const std::string& name, const std::shared_ptr<Group>& group) {
+    if (name == "name" || name == "group_name") {
+        group->name = generateName("group/create");
+        return group->name;
+    }
+    if (name == "description" || name == "desc") {
+        if (coin()) {
+            group->description = "This is a description for group " + group->name;
+            return group->description;
+        }
+        return std::string(""); // clear description
+    }
+    throw std::runtime_error("GroupCommandBuilder: unsupported group field for resolveAndSetRandomVar: " + name);
+
+}
+
 static std::string randomizePrimaryPositional(const std::shared_ptr<Group>& entity) {
-    if (generateRandomIndex(10000) < 5000) return std::to_string(entity->id);
+    if (coin()) return std::to_string(entity->id);
     return entity->name;
 }
 
@@ -41,7 +68,7 @@ std::string GroupCommandBuilder::update(const std::shared_ptr<Group>& entity) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
-    oss << ' ' << (generateRandomIndex(10000) < 5000 ? std::to_string(entity->id) : entity->name);
+    oss << ' ' << (coin() ? std::to_string(entity->id) : entity->name);
     const auto numFieldsToUpdate = std::max(static_cast<size_t>(1), generateRandomIndex(cmd->optional.size()));
     std::unordered_set<std::string> updated;
     while (updated.size() < numFieldsToUpdate) {
@@ -49,7 +76,7 @@ std::string GroupCommandBuilder::update(const std::shared_ptr<Group>& entity) {
         for (const auto& t : opt.option_tokens) {
             if (!updated.contains(t)) {
                 oss << ' ' << t;
-                if (auto val = resolveVar(t, entity); val) oss << ' ' << *val;
+                if (auto val = resolveAndSetRandomVar(t, entity); val) oss << ' ' << *val;
                 else throw std::runtime_error("GroupCommandBuilder: unsupported group field for update: " + t);
                 updated.insert(t);
                 break;

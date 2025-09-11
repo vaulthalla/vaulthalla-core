@@ -25,6 +25,10 @@ struct Role {
     Role(std::string name, std::string description, std::string type, uint16_t permissions);
 
     virtual ~Role() = default;
+
+    virtual std::string permissions_to_flags_string() const;
+
+    static std::string underscore_to_hyphens(const std::string& s);
 };
 
 void to_json(nlohmann::json& j, const Role& r);

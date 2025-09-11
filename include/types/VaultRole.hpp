@@ -40,6 +40,8 @@ struct VaultRole final : Role {
         if (type != "vault") throw std::runtime_error("VaultRole: invalid role type");
     }
 
+    std::string permissions_to_flags_string() const override;
+
     [[nodiscard]] std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
 
     template <typename T> bool validatePermission(const uint16_t mask, T perm,

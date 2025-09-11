@@ -32,6 +32,8 @@ struct UserAliases {
                 emailAliases.insert(emailAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "role" || t == "role_id"; })) {
                 roleAliases.insert(roleAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "linux_uid" || t == "uid"; })) {
+                roleAliases.insert(roleAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
     }
@@ -39,6 +41,7 @@ struct UserAliases {
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
     bool isEmail (const std::string& field) const { return isFieldMatch(field, emailAliases); }
     bool isRole (const std::string& field) const { return isFieldMatch(field, roleAliases); }
+    bool isLinuxUID (const std::string& field) const { return isFieldMatch(field, roleAliases); }
 };
 
 struct GroupAliases {
@@ -110,6 +113,8 @@ struct VaultAliases {
         for (const auto& opt : cmd->optional) {
             if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "name" || t == "vault_name"; })) {
                 nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "description" || t == "desc"; })) {
+                nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "quota"; })) {
                 quotaAliases.insert(quotaAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "owner" || t == "owner_id"; })) {
@@ -121,6 +126,7 @@ struct VaultAliases {
     }
 
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
+    bool isDescription (const std::string& field) const { return isFieldMatch(field, nameAliases); }
     bool isQuota (const std::string& field) const { return isFieldMatch(field, quotaAliases); }
     bool isOwner (const std::string& field) const { return isFieldMatch(field, ownerAliases); }
     bool isConflictPolicy (const std::string& field) const { return isFieldMatch(field, conflictPolicyAliases); }

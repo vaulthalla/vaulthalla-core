@@ -2,10 +2,12 @@
 #include "types/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
 #include "util/cmdLineHelpers.hpp"
+#include "permsUtil.hpp"
 
 #include <pqxx/row>
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 using namespace vh::types;
 using namespace vh::util;
@@ -43,6 +45,17 @@ VaultRole::VaultRole(const nlohmann::json& j)
       subject_type(j.at("subject_type").get<std::string>()),
       assigned_at(parsePostgresTimestamp(j.at("assigned_at").get<std::string>())),
       permission_overrides(j.at("permission_overrides")) {
+}
+
+std::string VaultRole::permissions_to_flags_string() const {
+    std::ostringstream oss;
+    for (unsigned int i = 0; i < VAULT_SHELL_PERMS.size(); ++i) {
+        const auto bit = 1 << i;
+        if (oss.tellp() > 0) oss << ' ';
+        if (permissions & bit) oss << "--allow-" << VAULT_SHELL_PERMS[i];
+        else oss << "--deny-" << VAULT_SHELL_PERMS[i];
+    }
+    return oss.str();
 }
 
 void vh::types::to_json(nlohmann::json& j, const VaultRole& r) {
@@ -168,6 +181,7 @@ bool VaultRole::canList(const std::filesystem::path& path) const {
 
 std::string vh::types::to_string(const std::shared_ptr<VaultRole>& role) {
     std::string out = snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
+    out += " - Role ID: " + std::to_string(role->id) + "\n";
     out += " - Description: " + role->description + "\n";
     out += " - Type: " + role->type + "\n";
     out += " - Subject Type: " + role->subject_type + "\n";

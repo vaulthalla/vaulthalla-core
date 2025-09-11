@@ -46,7 +46,6 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new role with specified permissions.";
     cmd->positionals = { typePos, newRolePos };
-    cmd->required = { roleType };
     cmd->optional_flags = { permissionsFlags };
     cmd->optional = { inheritFrom };
     cmd->examples.push_back({"vh role create editor --type user --set-manage-users --set-manage-groups",

@@ -1,4 +1,6 @@
 #include "types/Role.hpp"
+#include "types/UserRole.hpp"
+#include "types/VaultRole.hpp"
 #include "types/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
 #include "protocols/shell/Table.hpp"
@@ -101,4 +103,16 @@ std::string vh::types::to_string(const std::vector<std::shared_ptr<Role>>& roles
     }
 
     return "Roles:\n" + tbl.render();
+}
+
+std::string Role::underscore_to_hyphens(const std::string& s) {
+    std::string result = s;
+    std::ranges::replace(result.begin(), result.end(), '_', '-');
+    return result;
+}
+
+std::string Role::permissions_to_flags_string() const {
+    if (type == "user") return static_cast<UserRole>(*this).permissions_to_flags_string();
+    if (type == "vault") return static_cast<VaultRole>(*this).permissions_to_flags_string();
+    throw std::runtime_error("Role: unknown role type for permissions_to_flags_string");
 }

@@ -16,7 +16,7 @@ class UpdateHandler;
 
 class CommandRouter {
 public:
-    CommandRouter(const std::shared_ptr<CLITestContext>& ctx, const std::shared_ptr<TestUsageManager>& usage);
+    CommandRouter(const std::shared_ptr<CLITestContext>& ctx);
 
     void registerRoute(const std::string& path, const std::function<EntityResult(const std::shared_ptr<void>& entity)>& handler);
 
@@ -25,8 +25,6 @@ public:
 
 private:
     std::shared_ptr<EntityRegistrar> registrar_;
-    std::shared_ptr<ListInfoHandler> list_info_handler_;
-    std::shared_ptr<UpdateHandler> update_handler_;
     std::pmr::unordered_map<std::string, std::function<EntityResult(const std::shared_ptr<void>& entity)>> routes_{};
 
     void registerAll();

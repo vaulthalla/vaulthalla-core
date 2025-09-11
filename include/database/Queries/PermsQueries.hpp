@@ -26,7 +26,7 @@ struct VPermOverrideQuery {
 
 struct PermsQueries {
     // Role CRUD
-    static void addRole(const std::shared_ptr<types::Role>& role);
+    static unsigned int addRole(const std::shared_ptr<types::Role>& role);
     static void deleteRole(unsigned int id);
     static void updateRole(const std::shared_ptr<types::Role>& role);
     static std::shared_ptr<types::Role> getRole(unsigned int id);

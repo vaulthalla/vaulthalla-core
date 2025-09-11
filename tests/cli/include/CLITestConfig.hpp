@@ -3,7 +3,7 @@
 namespace vh::test::cli {
 
 struct CLITestConfig {
-    size_t numUsers = 10,
+    unsigned int numUsers = 10,
            numVaults = 15,
            numGroups = 5,
            numUserRoles = 7,

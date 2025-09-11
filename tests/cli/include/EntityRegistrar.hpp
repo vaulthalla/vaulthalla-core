@@ -1,19 +1,14 @@
 #pragma once
 
-#include "protocols/shell/types.hpp"
-#include "types/User.hpp"
-#include "types/Vault.hpp"
-#include "types/Group.hpp"
-#include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
 #include "protocols/shell/Router.hpp"
 #include "CLITestContext.hpp"
-#include "CommandBuilder.hpp"
+#include "CommandBuilderRegistry.hpp"
+#include "protocols/shell/commands/all.hpp"
 
 #include <string>
 #include <vector>
 #include <memory>
-#include <chrono>
 #include <stdexcept>
 #include <iostream>
 
@@ -32,11 +27,11 @@ struct SeedContext {
 
 class EntityRegistrar {
 public:
-    EntityRegistrar(const std::shared_ptr<shell::Router>& router,
-                  const std::shared_ptr<CLITestContext>& ctx)
+    explicit EntityRegistrar(const std::shared_ptr<CLITestContext>& ctx)
         : factory_(std::make_shared<EntityFactory>(ctx)),
-          router_(router), ctx_(ctx) {
+          router_(std::make_shared<shell::Router>()), ctx_(ctx) {
         if (!router_) throw std::runtime_error("EntityFactory: router is null");
+        shell::commands::registerAllCommands(router_);
     }
 
         [[nodiscard]] EntityResult create(const EntityType& type) const {
@@ -47,9 +42,14 @@ public:
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
 
+        const auto buildCommand = [&](const std::shared_ptr<void>& entity) {
+            return CommandBuilderRegistry::instance().buildCommand(type, CommandType::CREATE, entity);
+        };
+
         if (type == EntityType::USER) {
             const auto user = factory_->create(EntityType::USER);
-            const auto command = CommandBuilder(cmd).build();
+            const auto command = buildCommand(user);
+            std::cout << "Creating user with command: " << command << std::endl;
             return { router_->executeLine(command, admin, io.get()), user };
         }
 
@@ -57,26 +57,25 @@ public:
 
         if (type == EntityType::VAULT) {
             const auto vault = factory_->create(EntityType::VAULT, owner);
-            const auto command = CommandBuilder(cmd).withEntity(*owner).build();
+            const auto command = buildCommand(vault);
             return { router_->executeLine(command, admin, io.get()), vault };
         }
 
         if (type == EntityType::GROUP) {
             const auto group = factory_->create(EntityType::GROUP);
-            const auto command = CommandBuilder(cmd).build();
+            const auto command = buildCommand(group);
             return { router_->executeLine(command, admin, io.get()), group };
         }
 
         if (type == EntityType::USER_ROLE) {
             const auto role = factory_->create(EntityType::USER_ROLE);
-            const auto command = CommandBuilder(cmd).build();
-            std::cout << "Creating user role: " << command << std::endl;
+            const auto command = buildCommand(role);
             return { router_->executeLine(command, admin, io.get()), role };
         }
 
         if (type == EntityType::VAULT_ROLE) {
             const auto role = factory_->create(EntityType::VAULT_ROLE);
-            const auto command = CommandBuilder(cmd).build();
+            const auto command = buildCommand(role);
             return { router_->executeLine(command, admin, io.get()), role };
         }
 
@@ -89,6 +88,36 @@ public:
         return results;
     }
 
+    template <typename T>
+    [[nodiscard]] EntityResult update(const EntityType& type, const std::shared_ptr<T>& entity) const {
+        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::UPDATE, entity);
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+        return {router_->executeLine(command, admin, io.get()), entity};
+    }
+
+    [[nodiscard]] EntityResult list(const EntityType& type) const {
+        const auto cmd = ctx_->getCommand(type, "list");
+        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for listing");
+        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::LIST, nullptr);
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+        return {router_->executeLine(command, admin, io.get())};
+    }
+
+    template <typename T>
+    [[nodiscard]] EntityResult info(const EntityType& type, const std::shared_ptr<T>& entity) const {
+        const auto cmd = ctx_->getCommand(type, "info");
+        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for info");
+        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::INFO, entity);
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+        return {router_->executeLine(command, admin, io.get())};
+    }
+
     [[nodiscard]] EntityResult remove(const EntityType& type, const std::shared_ptr<void>& entity) const {
         const auto cmd = ctx_->getCommand(type, "delete");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for deletion");
@@ -97,100 +126,8 @@ public:
         int fd;
         const auto io = std::make_unique<shell::SocketIO>(fd);
 
-        if (type == EntityType::USER) {
-            const auto user = std::static_pointer_cast<types::User>(entity);
-            if (!user) throw std::runtime_error("EntityFactory: invalid user entity for deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*user).build();
-            return { router_->executeLine(command, admin, io.get()), user };
-        }
-
-        if (type == EntityType::VAULT) {
-            const auto vault = std::static_pointer_cast<types::Vault>(entity);
-            if (!vault) throw std::runtime_error("EntityFactory: invalid vault entity for deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*vault).build();
-            return { router_->executeLine(command, admin, io.get()), vault };
-        }
-
-        if (type == EntityType::GROUP) {
-            const auto group = std::static_pointer_cast<types::Group>(entity);
-            if (!group) throw std::runtime_error("EntityFactory: invalid group entity for deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*group).build();
-            return { router_->executeLine(command, admin, io.get()), group };
-        }
-
-        if (type == EntityType::USER_ROLE) {
-            const auto role = std::static_pointer_cast<types::UserRole>(entity);
-            if (!role) throw std::runtime_error("EntityFactory: invalid user role entity for deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*role).build();
-            return { router_->executeLine(command, admin, io.get()), role };
-        }
-
-        if (type == EntityType::VAULT_ROLE) {
-            const auto role = std::static_pointer_cast<types::VaultRole>(entity);
-            if (!role) throw std::runtime_error("EntityFactory: invalid vault role entity for deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*role).build();
-            return { router_->executeLine(command, admin, io.get()), role };
-        }
-
-        throw std::runtime_error("EntityFactory: unsupported entity type for deletion");
-    }
-
-    void teardown() const {
-        for (const auto& role : ctx_->userRoles) {
-            const auto cmd = ctx_->getCommand(EntityType::USER_ROLE, "delete");
-            if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for user role deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*role).build();
-            const auto admin = database::UserQueries::getUserByName("admin");
-            int fd;
-            const auto io = std::make_unique<shell::SocketIO>(fd);
-            router_->executeLine(command, admin, io.get());
-        }
-
-        for (const auto& role : ctx_->vaultRoles) {
-            const auto cmd = ctx_->getCommand(EntityType::VAULT_ROLE, "delete");
-            if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for vault role deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*role).build();
-            const auto admin = database::UserQueries::getUserByName("admin");
-            int fd;
-            const auto io = std::make_unique<shell::SocketIO>(fd);
-            router_->executeLine(command, admin, io.get());
-        }
-
-        for (const auto& user : ctx_->users) {
-            const auto cmd = ctx_->getCommand(EntityType::USER, "delete");
-            if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for user deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*user).build();
-            const auto admin = database::UserQueries::getUserByName("admin");
-            int fd;
-            const auto io = std::make_unique<shell::SocketIO>(fd);
-            router_->executeLine(command, admin, io.get());
-        }
-
-        for (const auto& vault : ctx_->vaults) {
-            const auto cmd = ctx_->getCommand(EntityType::VAULT, "delete");
-            if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for vault deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*vault).build();
-            const auto admin = database::UserQueries::getUserByName("admin");
-            int fd;
-            const auto io = std::make_unique<shell::SocketIO>(fd);
-            router_->executeLine(command, admin, io.get());
-        }
-
-        for (const auto& group : ctx_->groups) {
-            const auto cmd = ctx_->getCommand(EntityType::GROUP, "delete");
-            if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for group deletion");
-            const auto command = CommandBuilder(cmd).withEntity(*group).build();
-            const auto admin = database::UserQueries::getUserByName("admin");
-            int fd;
-            const auto io = std::make_unique<shell::SocketIO>(fd);
-            router_->executeLine(command, admin, io.get());
-        }
-
-        ctx_->users.clear();
-        ctx_->vaults.clear();
-        ctx_->groups.clear();
-        ctx_->userRoles.clear();
-        ctx_->vaultRoles.clear();
+        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::DELETE, entity);
+        return { router_->executeLine(command, admin, io.get()), entity };
     }
 
 private:

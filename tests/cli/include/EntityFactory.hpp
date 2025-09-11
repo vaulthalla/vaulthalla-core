@@ -1,9 +1,7 @@
 #pragma once
 
-#include "ArgsGenerator.hpp"
 #include "EntityType.hpp"
 #include "generators.hpp"
-#include "protocols/shell/types.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
 #include "types/Group.hpp"
@@ -17,7 +15,6 @@
 #include <vector>
 #include <memory>
 #include <optional>
-#include <chrono>
 #include <cstdlib>
 
 namespace vh::test::cli {
@@ -31,7 +28,7 @@ public:
             const std::string usage = "user/create";
             const auto user = std::make_shared<types::User>();
             user->name = generateName(usage);
-            if (rand() < 0.5) user->email = generateEmail(usage);
+            if (coin()) user->email = generateEmail(usage);
             user->role = ctx_->randomUserRole();
             return user;
         }

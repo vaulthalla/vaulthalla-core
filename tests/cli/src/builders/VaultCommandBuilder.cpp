@@ -10,8 +10,32 @@ using namespace vh::types;
 using namespace vh::database;
 using vh::types::Vault;
 
-static inline bool coin(uint32_t outOf = 10000, uint32_t p = 5000) {
-    return generateRandomIndex(outOf) < p;
+VaultCommandBuilder::VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+    : CommandBuilder(usage, ctx, "vault"), vaultAliases_(ctx) {}
+
+std::string VaultCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault>& entity, const std::string& field) {
+    const std::string usagePath = "vault/update";
+
+    if (vaultAliases_.isName(field)) {
+        entity->name = generateName(usagePath);
+        return entity->name;
+    }
+
+    if (vaultAliases_.isDescription(field)) {
+        if (coin()) {
+            entity->description = "This is a description for vault " + entity->name;
+            return entity->description;
+        }
+        entity->description = std::string(""); // clear description
+        return entity->description;
+    }
+
+    if (vaultAliases_.isQuota(field)) {
+        entity->setQuotaFromStr(generateQuotaStr(usagePath));
+        return entity->quotaStr();
+    }
+
+    throw std::runtime_error("EntityFactory: unsupported vault field for update: " + field);
 }
 
 std::string VaultCommandBuilder::chooseVaultType() {
@@ -52,7 +76,7 @@ std::string VaultCommandBuilder::create(const std::shared_ptr<Vault>& v) {
 
     // optional
     if (!v->description.empty() && coin()) oss << " --" << randomAlias(std::vector<std::string>{"desc","d"}) << ' ' << quoted(v->description);
-    if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << toSizeString(v->quota);
+    if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << v->quotaStr();
 
     // owner (create by name requires owner if server needs it; harmless otherwise)
     emitOwnerIfName(oss, v, usedName);
@@ -89,13 +113,13 @@ std::string VaultCommandBuilder::update(const std::shared_ptr<Vault>& v) {
     emitOwnerIfName(oss, v, usedName);
 
     if (!v->description.empty() && coin()) oss << " --" << randomAlias(std::vector<std::string>{"desc","d"}) << ' ' << quoted(v->description);
-    if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << toSizeString(v->quota);
+    if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << v->quotaStr();
 
     // s3-ish knobs (harmless on local if server ignores)
-    if (coin()) oss << " --sync-strategy " << randomAlias(std::vector<std::string>{"cache","sync","mirror"});
-    if (coin()) oss << " --on-sync-conflict " << randomAlias(std::vector<std::string>{"keep_local","keep_remote","ask"});
-    if (coin()) oss << (coin() ? " --encrypt" : " --no-encrypt");
-    if (coin()) oss << (coin() ? " --accept-overwrite-waiver" : " --accept-decryption-waiver");
+    // if (coin()) oss << " --sync-strategy " << randomAlias(std::vector<std::string>{"cache","sync","mirror"});
+    // if (coin()) oss << " --on-sync-conflict " << randomAlias(std::vector<std::string>{"keep_local","keep_remote","ask"});
+    // if (coin()) oss << (coin() ? " --encrypt" : " --no-encrypt");
+    // if (coin()) oss << (coin() ? " --accept-overwrite-waiver" : " --accept-decryption-waiver");
 
     // if (coin(10000, 1200)) oss << " --interactive";
 

@@ -14,9 +14,10 @@ using namespace vh::logging;
 // ############################################ Role  #############################################
 // #################################################################################################
 
-void PermsQueries::addRole(const std::shared_ptr<Role>& role) {
-    Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
-        txn.exec(pqxx::prepped{"insert_role"}, pqxx::params{role->name, role->description, role->type});
+unsigned int PermsQueries::addRole(const std::shared_ptr<Role>& role) {
+    return Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
+        return txn.exec(pqxx::prepped{"insert_role"},
+            pqxx::params{role->name, role->description, role->type}).one_field().as<unsigned int>();
     });
 }
 

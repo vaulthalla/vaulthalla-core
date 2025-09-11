@@ -16,13 +16,13 @@ class CommandUsage;
 
 namespace vh::test::cli {
 
-struct TestUsageManager;
+struct UsageManager;
 
 template <typename T = void>
 class CommandBuilder {
 public:
     virtual ~CommandBuilder() = default;
-    explicit CommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx, const std::string& rootTopLevelAlias)
+    explicit CommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx, const std::string& rootTopLevelAlias)
         : ctx_(ctx) {
         if (!usage) throw std::runtime_error("CommandBuilder: usage manager is null");
         const auto cmd = usage->resolve(rootTopLevelAlias);
@@ -45,7 +45,7 @@ protected:
 
 class UserCommandBuilder final : CommandBuilder<types::User> {
 public:
-    explicit UserCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    explicit UserCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~UserCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::User>& entity) override;
@@ -63,7 +63,7 @@ private:
 
 class VaultCommandBuilder final : CommandBuilder<types::Vault> {
 public:
-    explicit VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    explicit VaultCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~VaultCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::Vault>& v) override;
@@ -94,7 +94,7 @@ private:
 
 class GroupCommandBuilder final : CommandBuilder<types::Group> {
 public:
-    explicit GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    explicit GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~GroupCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::Group>& entity) override;
@@ -113,7 +113,7 @@ private:
 class UserRoleCommandBuilder final : CommandBuilder<types::UserRole> {
 public:
 
-    explicit UserRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    explicit UserRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~UserRoleCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::UserRole>& entity) override;
@@ -131,7 +131,7 @@ private:
 
 class VaultRoleCommandBuilder final : CommandBuilder<types::VaultRole> {
 public:
-    explicit VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
+    explicit VaultRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx);
     ~VaultRoleCommandBuilder() override = default;
 
     std::string create(const std::shared_ptr<types::VaultRole>& entity) override;

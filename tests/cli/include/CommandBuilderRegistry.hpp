@@ -2,6 +2,7 @@
 
 #include "CommandBuilder.hpp"
 #include "EntityType.hpp"
+#include "UsageManager.hpp"
 
 #include <memory>
 
@@ -24,7 +25,7 @@ public:
         return instance;
     }
 
-    static void init(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx) {
+    static void init(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx) {
         auto& registry = instance();
         registry.userBuilder = std::make_shared<UserCommandBuilder>(usage, ctx);
         registry.vaultBuilder = std::make_shared<VaultCommandBuilder>(usage, ctx);
@@ -33,7 +34,7 @@ public:
         registry.vaultRoleBuilder = std::make_shared<VaultRoleCommandBuilder>(usage, ctx);
     }
 
-    std::string buildCommand(const EntityType& entityType, const CommandType& cmdType, const std::shared_ptr<void>& entity) const {
+    [[nodiscard]] std::string buildCommand(const EntityType& entityType, const CommandType& cmdType, const std::shared_ptr<void>& entity) const {
         switch (entityType) {
             case EntityType::USER:
                 switch (cmdType) {

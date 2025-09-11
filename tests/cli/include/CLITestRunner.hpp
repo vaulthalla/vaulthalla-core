@@ -7,11 +7,14 @@
 #include <unordered_map>
 #include <vector>
 
+namespace vh::shell {
+class UsageManager;
+}
+
 namespace vh::test::cli {
 
 struct CLITestContext;
 class CommandRouter;
-struct TestUsageManager;
 struct TestCase;
 
 struct TestStage {
@@ -40,7 +43,7 @@ public:
 private:
     CLITestConfig config_;
     std::shared_ptr<CLITestContext>   ctx_;
-    std::shared_ptr<TestUsageManager> usage_;
+    std::shared_ptr<shell::UsageManager> usage_;
     std::shared_ptr<CommandRouter>    router_;
 
     // Expectations are keyed by command path

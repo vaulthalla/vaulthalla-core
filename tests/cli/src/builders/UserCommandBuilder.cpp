@@ -1,5 +1,5 @@
 #include "CommandBuilder.hpp"
-#include "TestUsageManager.hpp"
+#include "UsageManager.hpp"
 #include "CommandUsage.hpp"
 #include "generators.hpp"
 
@@ -7,7 +7,7 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "user"), userAliases_(ctx) {}
 
 std::string UserCommandBuilder::updateAndResolveVar(const std::shared_ptr<User>& entity, const std::string& field) {

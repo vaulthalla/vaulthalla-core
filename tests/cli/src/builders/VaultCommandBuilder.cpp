@@ -10,7 +10,7 @@ using namespace vh::types;
 using namespace vh::database;
 using vh::types::Vault;
 
-VaultCommandBuilder::VaultCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+VaultCommandBuilder::VaultCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "vault"), vaultAliases_(ctx) {}
 
 std::string VaultCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault>& entity, const std::string& field) {

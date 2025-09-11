@@ -6,7 +6,7 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}
 
 std::string GroupCommandBuilder::updateAndResolveVar(const std::shared_ptr<Group>& entity, const std::string& field) {

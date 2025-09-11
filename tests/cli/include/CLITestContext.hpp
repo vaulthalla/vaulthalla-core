@@ -18,12 +18,12 @@ struct Group;
 
 namespace vh::shell {
 class CommandUsage;
+class UsageManager;
 }
 
 namespace vh::test::cli {
 
 struct CLITestContext;
-struct TestUsageManager;
 enum class EntityType;
 
 struct CLITestContext {
@@ -36,7 +36,7 @@ struct CLITestContext {
     std::vector<std::shared_ptr<types::UserRole>> userRoles;
     std::vector<std::shared_ptr<types::VaultRole>> vaultRoles;
     std::vector<std::shared_ptr<types::Group>> groups;
-    std::shared_ptr<TestUsageManager> usage;
+    std::shared_ptr<shell::UsageManager> usage;
     std::unordered_map<std::string, std::shared_ptr<shell::CommandUsage>> commands;
 
     CLITestContext();

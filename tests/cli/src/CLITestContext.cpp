@@ -1,5 +1,5 @@
 #include "CLITestContext.hpp"
-#include "TestUsageManager.hpp"
+#include "UsageManager.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
 #include "types/Group.hpp"
@@ -13,9 +13,10 @@
 
 using namespace vh::test::cli;
 using namespace vh::types;
+using namespace vh::shell;
 
 CLITestContext::CLITestContext()
-    : usage(std::make_shared<TestUsageManager>()) {
+    : usage(std::make_shared<UsageManager>()) {
     for (const auto& entity : ENTITIES) {
         for (const auto& action : ACTIONS) {
             const auto eStr = std::string(entity);

@@ -1,6 +1,6 @@
 #include "CLITestRunner.hpp"
 
-#include "TestUsageManager.hpp"
+#include "UsageManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "CLITestContext.hpp"
 #include "Validator.hpp"
@@ -186,7 +186,7 @@ static void harvestIdsIntoContext(
 CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
     : config_(cfg),
       ctx_(std::make_shared<CLITestContext>()),
-      usage_(std::make_shared<TestUsageManager>()),
+      usage_(std::make_shared<shell::UsageManager>()),
       router_(std::make_shared<CommandRouter>(ctx_)) {
     CommandBuilderRegistry::init(usage_, ctx_);
 }

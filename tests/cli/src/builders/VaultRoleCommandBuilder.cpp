@@ -6,7 +6,7 @@ using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
 
-VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<TestUsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "role"), vaultRoleAliases_(ctx) {}
 
 std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<VaultRole>& entity, const std::string& field) {

@@ -6,6 +6,7 @@
 #include "logging/LogRegistry.hpp"
 
 #include <fstream>
+#include <paths.h>
 
 using namespace vh::crypto;
 using namespace vh::logging;
@@ -42,7 +43,21 @@ static std::optional<std::string> getFirstInitDBPass() {
     return pass;
 }
 
-DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>("postgres")) {
+DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
+    if (paths::testMode) {
+        const auto user = std::getenv("VH_TEST_DB_USER");
+        const auto pass = std::getenv("VH_TEST_DB_PASS");
+        const auto host = std::getenv("VH_TEST_DB_HOST");
+        const auto port = std::getenv("VH_TEST_DB_PORT");
+        const auto name = std::getenv("VH_TEST_DB_NAME");
+        if (user && pass && host && port && name) {
+            DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host) + ":" + std::string(port) + "/" + std::string(name);
+            conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
+            LogRegistry::vaulthalla()->info("[DBConnection] Test mode: using connection string from environment variables");
+            return;
+        }
+    }
+
     if (tpmKeyProvider_->sealedExists()) tpmKeyProvider_->init();
     else {
         const auto initPass = getFirstInitDBPass();

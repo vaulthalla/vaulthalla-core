@@ -4,9 +4,12 @@
 #include "crypto/encrypt.hpp"
 #include "crypto/PasswordHash.hpp"
 
+#include <paths.h>
+
 using namespace vh::crypto;
 
-InternalSecretManager::InternalSecretManager() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>()) {
+InternalSecretManager::InternalSecretManager()
+: tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_master" : "master")) {
     tpmKeyProvider_->init();
 }
 

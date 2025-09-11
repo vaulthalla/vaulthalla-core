@@ -22,16 +22,15 @@
 namespace fs = std::filesystem;
 using namespace vh::shell;
 using namespace vh::types;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::logging;
 using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::storage;
-using namespace vh::seed;
 using namespace vh::test::cli;
 
 int main() {
+    vh::paths::enableTestMode();
     ConfigRegistry::init("config.yaml");
     LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
 
@@ -44,10 +43,11 @@ int main() {
 
     ThreadPoolManager::instance().init();
 
-    Transactions::init();
-    seed::init_tables_if_not_exists();
-    Transactions::dbPool_->initPreparedStatements();
-    if (!UserQueries::adminUserExists()) init();
+    vh::database::Transactions::init();
+    vh::database::seed::wipe_all_data_restart_identity();
+    vh::database::seed::init_tables_if_not_exists();
+    vh::database::Transactions::dbPool_->initPreparedStatements();
+    vh::seed::seed_database();
 
     ServiceDepsRegistry::init();
     ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
@@ -60,7 +60,7 @@ int main() {
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
     ServiceManager::instance().startTestServices();
 
-    if (!UserQueries::getUserByName("admin")) {
+    if (!vh::database::UserQueries::getUserByName("admin")) {
         LogRegistry::vaulthalla()->error("No admin user found; cannot run CLI tests");
         return 1;
     }

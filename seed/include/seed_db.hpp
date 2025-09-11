@@ -2,7 +2,7 @@
 
 namespace vh::seed {
 
-void init();
+void seed_database();
 void initPermissions();
 void initRoles();
 void initAdmin();

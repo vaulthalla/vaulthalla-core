@@ -5,13 +5,14 @@
 
 #include <sodium.h>
 #include <stdexcept>
+#include <paths.h>
 
 using namespace vh::crypto;
 using namespace vh::types::api;
 
 APIKeyManager::APIKeyManager() {
-    // Initialize TPM master key provider
-    tpmKeyProvider_ = std::make_unique<crypto::TPMKeyProvider>();
+    const std::string tpmKeyName = paths::testMode ? "test_ak_master" : "ak_master";
+    tpmKeyProvider_ = std::make_unique<crypto::TPMKeyProvider>(tpmKeyName);
     tpmKeyProvider_->init();
 
     initAPIKeys();

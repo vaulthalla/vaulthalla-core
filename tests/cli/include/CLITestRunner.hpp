@@ -2,9 +2,9 @@
 
 #include "CLITestConfig.hpp"
 
-#include <unordered_map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace vh::test::cli {
@@ -12,9 +12,6 @@ namespace vh::test::cli {
 struct CLITestContext;
 class CommandRouter;
 struct TestUsageManager;
-class EntityRegistrar;
-class ListInfoHandler;
-class UpdateHandler;
 struct TestCase;
 
 struct TestStage {
@@ -22,9 +19,14 @@ struct TestStage {
     std::vector<std::shared_ptr<TestCase>> tests;
 };
 
+struct Expectations {
+    std::vector<std::string> must_have;
+    std::vector<std::string> must_not_have;
+};
+
 class CLITestRunner {
 public:
-    explicit CLITestRunner(CLITestConfig&& config = CLITestConfig::Default());
+    explicit CLITestRunner(CLITestConfig&& cfg = CLITestConfig::Default());
 
     void registerStdoutContains(const std::string& path, std::string needle);
     void registerStdoutNotContains(const std::string& path, std::string needle);
@@ -33,28 +35,34 @@ public:
 
     int operator()();
 
+    static std::optional<unsigned int> extractId(std::string_view output, std::string_view idPrefix);
+
 private:
     CLITestConfig config_;
-    std::shared_ptr<CLITestContext> ctx_;
+    std::shared_ptr<CLITestContext>   ctx_;
     std::shared_ptr<TestUsageManager> usage_;
-    std::shared_ptr<CommandRouter> router_;
+    std::shared_ptr<CommandRouter>    router_;
 
-    std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_contains_;
-    std::unordered_map<std::string, std::vector<std::string>> per_path_stdout_not_contains_;
-    std::array<TestStage, 7> kDefaultTestStages;
+    // Expectations are keyed by command path
+    std::unordered_map<std::string, Expectations> expectations_by_path_;
 
-    void validateResponse(unsigned int stage) const;
+    // Pipeline stages executed in order
+    std::vector<TestStage> stages_;
 
-    void seedRoles();
+    // Pipeline steps
+    void seedUserRoles();
+    void seedVaultRoles();
     void seedUsers();
     void seedGroups();
     void seedVaults();
-    void update();
-    void read();
-    void teardown();
-    int printResults() const;
+    void readStage();
+    void updateStage();
+    void teardownStage();
 
-    void validateTestObjects() const;
+    // Helpers
+    void validateStage(const TestStage& stage) const;
+    void validateAllTestObjects() const;
+    int  printResults() const;
 };
 
 }

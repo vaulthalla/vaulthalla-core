@@ -24,6 +24,7 @@
 
 using namespace vh::shell;
 using namespace vh::args;
+using namespace vh::types;
 
 
 // forward decls so casts compile even if headers aren’t pulled here

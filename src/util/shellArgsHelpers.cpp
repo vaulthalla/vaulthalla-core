@@ -44,6 +44,11 @@ std::optional<std::string> vh::shell::optVal(const CommandCall& c, const std::st
     return std::nullopt;
 }
 
+std::optional<std::string> vh::shell::optVal(const CommandCall& c, const std::vector<std::string>& args) {
+    for (const auto& k : args) if (const auto v = optVal(c, k)) return v;
+    return std::nullopt;
+}
+
 bool vh::shell::hasFlag(const CommandCall& c, const std::string& key) {
     for (const auto& [k, v] : c.options) if (k == key) return !v.has_value();
     return false;

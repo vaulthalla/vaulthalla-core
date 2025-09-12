@@ -71,7 +71,7 @@ std::vector<std::shared_ptr<Role>> vh::types::roles_from_pq_res(const pqxx::resu
 
 std::string vh::types::to_string(const std::shared_ptr<Role>& r) {
     std::string out = "Role:\n";
-    out += "ID: " + std::to_string(r->id) + "\n";
+    out += "Role ID: " + std::to_string(r->id) + "\n";
     out += "Name: " + r->name + "\n";
     out += "Type: " + r->type + "\n";
     out += "Description: " + r->description + "\n";

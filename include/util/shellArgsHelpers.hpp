@@ -53,6 +53,7 @@ CommandResult invalid(const std::vector<std::string>& args, std::string msg);
 CommandResult ok(std::string out);
 CommandResult usage(const std::vector<std::string>& args = {});
 
+std::optional<std::string> optVal(const CommandCall& c, const std::vector<std::string>& args);
 std::optional<std::string> optVal(const CommandCall& c, const std::string& key);
 
 std::optional<unsigned int> parseUInt(const std::string& sv);

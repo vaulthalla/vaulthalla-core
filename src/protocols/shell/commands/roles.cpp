@@ -9,6 +9,7 @@
 #include "types/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
+#include "CommandUsage.hpp"
 
 using namespace vh::shell::commands;
 using namespace vh::shell;
@@ -99,71 +100,54 @@ static std::shared_ptr<Role> resolveFromRoleSameType(const std::string& from,
     return r;
 }
 
-static CommandResult handleRoleCreateUser(const CommandCall& call, std::string_view name) {
-    try {
-        uint16_t base = 0;
-        if (const auto fromOpt = optVal(call, "from")) {
-            const auto from = resolveFromRoleSameType(*fromOpt, "user");
-            base = from->permissions;
-        }
-        const uint16_t perms = parseUserRolePermissions(call, base);
-
-        const auto role = std::make_shared<UserRole>();
-        role->name = std::string(name);
-        role->type = "user";
-        role->permissions = perms;
-
-        role->id = PermsQueries::addRole(role);
-        return ok("Role created successfully: " + to_string(role));
-    } catch (const std::exception& e) {
-        return invalid(std::string("roles create user: ") + e.what());
-    }
-}
-
-static CommandResult handleRoleCreateVault(const CommandCall& call, const std::string_view name) {
-    try {
-        uint16_t base = 0;
-        if (const auto fromOpt = optVal(call, "from")) {
-            const auto from = resolveFromRoleSameType(*fromOpt, "vault");
-            base = from->permissions;
-        }
-        const uint16_t perms = parseVaultRolePermissions(call, base);
-
-        const auto role = std::make_shared<VaultRole>();
-        role->name = std::string(name);
-        role->type = "vault";
-        role->permissions = perms;
-
-        role->id = PermsQueries::addRole(role);
-        return ok("Role created successfully: " + to_string(role));
-    } catch (const std::exception& e) {
-        return invalid(std::string("roles create vault: ") + e.what());
-    }
-}
-
 static CommandResult handleRoleCreate(const CommandCall& call) {
-    if (call.positionals.size() < 2)
-        return invalid("roles create: missing <vault | user> <name>");
+    const std::vector<std::string> callPath{"role", "create"};
+    const auto usage = ServiceDepsRegistry::instance().shellUsageManager->resolve(callPath);
+    if (!usage) exit(33); // should never happen
 
-    const auto type = std::string(call.positionals[0]);
-    const auto name = std::string(call.positionals[1]);
+    if (call.positionals.size() != usage->positionals.size())
+        return invalid("roles create: incorrect number of arguments");
 
-    if (type == "user")  return handleRoleCreateUser(call, name);
-    if (type == "vault") return handleRoleCreateVault(call, name);
+    const auto type = call.positionals[0];
+    const auto name = call.positionals[1];
 
-    return invalid("roles create: first argument must be 'vault' or 'user'");
+    if (type != "user" && type != "vault")
+        return invalid("roles create: type must be either 'user' or 'vault'");
+
+    uint16_t base = 0;
+    const auto fromAliases = usage->resolveOptional("from")->option_tokens;
+    if (const auto fromOpt = optVal(call, fromAliases)) {
+        const auto from = resolveFromRoleSameType(*fromOpt, type);
+        base = from->permissions;
+    }
+
+    const auto role = std::make_shared<Role>();
+    role->name = name,
+    role->type = type;
+    role->permissions = type == "user"
+        ? parseUserRolePermissions(call, base)
+        : parseVaultRolePermissions(call, base);
+
+    const auto descAliases = usage->resolveOptional("description")->option_tokens;
+    if (const auto descOpt = optVal(call, descAliases))
+        role->description = *descOpt;
+
+    role->id = PermsQueries::addRole(role);
+
+    return ok("Role created successfully: " + to_string(role));
 }
 
 static CommandResult handleRoleUpdate(const CommandCall& call) {
     constexpr const auto* ERR = "roles update";
 
-    // TODO: integrate with UsageManager
-    const auto usage = ServiceDepsRegistry::instance().shellUsageManager->resolve(std::vector<std::string>{"role", "update"});
+    const std::vector<std::string> callPath{"role", "update"};
+    const auto usage = ServiceDepsRegistry::instance().shellUsageManager->resolve(callPath);
+    if (!usage) throw std::runtime_error("No usage found for 'role update'");
+
+    if (call.positionals.size() != usage->positionals.size())
+        return invalid("roles update: incorrect number of arguments");
 
     if (!call.user->canManageRoles()) return invalid("roles update: can't manage");
-
-    if (call.positionals.empty()) return invalid("roles update: missing <id> or <name>");
-    if (call.positionals.size() > 1) return invalid("roles update: too many arguments");
 
     const auto roleArg = call.positionals[0];
 
@@ -181,16 +165,14 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
         ? parseUserRolePermissions(call, role->permissions)
         : parseVaultRolePermissions(call, role->permissions);
 
-    if (const auto newNameOpt = optVal(call, "name")) {
+    const auto nameAliases = usage->resolveOptional("name")->option_tokens;
+    if (const auto newNameOpt = optVal(call, nameAliases)) {
         if (newNameOpt->empty()) return invalid("roles update: --name cannot be empty");
         role->name = *newNameOpt;
     }
 
-    if (const auto descriptionOpt = optVal(call, "desc")) {
-        role->description = *descriptionOpt;
-    } else if (const auto descriptionOpt = optVal(call, "description")) {
-        role->description = *descriptionOpt;
-    }
+    const auto descAliases = usage->resolveOptional("description")->option_tokens;
+    if (const auto descriptionOpt = optVal(call, descAliases)) role->description = *descriptionOpt;
 
     role->permissions = role->type == "user"
         ? parseUserRolePermissions(call, role->permissions)

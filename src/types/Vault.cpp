@@ -13,6 +13,38 @@ using namespace vh::types;
 using namespace vh::shell;
 using namespace vh::database;
 
+std::string Vault::quotaStr() const {
+    if (quota == 0) return "unlimited";
+    if (quota < 1024) return fmt::format("{}B", static_cast<unsigned long long>(quota));
+    if (quota < 1024 * 1024) return fmt::format("{:.2f}K", static_cast<double>(quota) / 1024);
+    if (quota < 1024 * 1024 * 1024) return fmt::format("{:.2f}M", static_cast<double>(quota) / (1024 * 1024));
+    if (quota < 1024ull * 1024 * 1024 * 1024) return fmt::format("{:.2f}G", static_cast<double>(quota) / (1024 * 1024 * 1024));
+    return fmt::format("{:.2f}T", static_cast<double>(quota) / (1024ull * 1024 * 1024 * 1024));
+}
+
+void Vault::setQuotaFromStr(const std::string& str) {
+    const auto identifier = str.back();
+    if (str == "unlimited") {
+        quota = 0;
+        return;
+    }
+    try {
+        if (identifier == 'B' || identifier == 'b') quota = std::stoull(str.substr(0, str.size() - 1));
+        else if (identifier == 'K' || identifier == 'k')
+            quota = static_cast<uintmax_t>(std::stoull(str.substr(0, str.size() - 1)) * 1024ULL);
+        else if (identifier == 'M' || identifier == 'm')
+            quota = static_cast<uintmax_t>(std::stoull(str.substr(0, str.size() - 1)) * 1024ULL * 1024ULL);
+        else if (identifier == 'G' || identifier == 'g')
+            quota = static_cast<uintmax_t>(std::stoull(str.substr(0, str.size() - 1)) * 1024ULL * 1024ULL * 1024ULL);
+        else if (identifier == 'T' || identifier == 't')
+            quota = static_cast<uintmax_t>(std::stoull(str.substr(0, str.size() - 1)) * 1024ULL * 1024ULL * 1024ULL * 1024ULL);
+        else quota = std::stoull(str);
+    } catch (const std::exception& e) {
+        throw std::invalid_argument("Invalid quota string: " + str);
+    }
+}
+
+
 std::string vh::types::to_string(const VaultType& type) {
     switch (type) {
         case VaultType::Local: return "local";

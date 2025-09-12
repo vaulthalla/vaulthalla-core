@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ColorTheme.hpp"
+#include "types.hpp"
 
 #include <string>
 #include <vector>
@@ -10,36 +11,6 @@
 
 namespace vh::shell {
 
-struct Entry {
-    std::string label;
-    std::string desc;
-    std::vector<std::string> aliases;
-
-    // Constructors to support brace-initialization with or without aliases
-    Entry(std::string l, std::string d)
-        : label(std::move(l)), desc(std::move(d)), aliases{} {}
-
-    Entry(std::string l, std::string d, std::vector<std::string> a)
-        : label(std::move(l)), desc(std::move(d)), aliases(std::move(a)) {}
-
-    Entry() = default;
-};
-
-struct GroupedOptions {
-    std::string title;
-    std::vector<Entry> items;
-
-    GroupedOptions(std::string t, std::vector<Entry> i)
-        : title(std::move(t)), items(std::move(i)) {}
-
-    GroupedOptions() = default;
-};
-
-struct Example {
-    std::string cmd;
-    std::string note;
-};
-
 class CommandUsage : public std::enable_shared_from_this<CommandUsage> {
 public:
     std::vector<std::string> aliases;
@@ -47,15 +18,21 @@ public:
     std::optional<std::string> synopsis;  // if empty, synthesized
     std::weak_ptr<CommandUsage> parent;
     std::vector<std::shared_ptr<CommandUsage>> subcommands;
-    std::vector<Entry> positionals, required, optional;
+    std::vector<Positional> positionals;
+    std::vector<Flag> optional_flags, required_flags;
+    std::vector<Optional> optional;
+    std::vector<Option> required;
     std::vector<GroupedOptions> groups;
     std::vector<Example> examples;
+    TestUsage test_usage;
     bool pluralAliasImpliesList = false;
 
     int term_width = 100;  // target width for str()
     std::size_t max_key_col = 30; // cap left column width
     bool show_aliases = true;
     ColorTheme theme{};
+
+    CommandUsage() = default;
 
     [[nodiscard]] std::string primary() const;
 
@@ -64,6 +41,13 @@ public:
     [[nodiscard]] std::string markdown() const;
 
     [[nodiscard]] bool matches(const std::string& alias) const;
+
+    [[nodiscard]] std::shared_ptr<CommandUsage> findSubcommand(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Positional> resolvePositional(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Flag> resolveFlag(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Optional> resolveOptional(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Option> resolveRequired(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<GroupedOptions> resolveGroup(const std::string& alias) const;
 
 private:
     static constexpr std::string_view binName_ = "vh";

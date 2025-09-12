@@ -4,17 +4,22 @@
 #include "types/VaultRole.hpp"
 #include "types/Permission.hpp"
 #include "types/PermissionOverride.hpp"
+#include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::logging;
 
 // #################################################################################################
 // ############################################ Role  #############################################
 // #################################################################################################
 
-void PermsQueries::addRole(const std::shared_ptr<Role>& role) {
-    Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
-        txn.exec(pqxx::prepped{"insert_role"}, pqxx::params{role->name, role->description, role->type});
+unsigned int PermsQueries::addRole(const std::shared_ptr<Role>& role) {
+    return Transactions::exec("PermsQueries::addRole", [&](pqxx::work& txn) {
+        const auto role_id = txn.exec(pqxx::prepped{"insert_role"},
+            pqxx::params{role->name, role->description, role->type}).one_field().as<unsigned int>();
+        txn.exec(pqxx::prepped("insert_role_permission"), pqxx::params{role_id, bitStringFromMask(role->permissions)});
+        return role_id;
     });
 }
 
@@ -29,23 +34,34 @@ void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
         pqxx::params p{role->id, role->name, role->description, role->type};
         txn.exec(pqxx::prepped{"update_role"}, p);
 
-        const pqxx::params perms_params{role->id, role->permissions};
-        txn.exec(pqxx::prepped{"upsert_permissions"}, perms_params);
+        LogRegistry::db()->trace("[PermsQueries] Updating permissions for role ID {} to mask {}",
+            role->id, bitStringFromMask(role->permissions));
+
+        const pqxx::params perms_params{role->id, bitStringFromMask(role->permissions)};
+        txn.exec(pqxx::prepped{"update_role_permissions"}, perms_params);
     });
 }
 
 std::shared_ptr<Role> PermsQueries::getRole(const unsigned int id) {
-    return Transactions::exec("PermsQueries::getRole", [&](pqxx::work& txn) {
-        const auto row = txn.exec("SELECT * FROM role WHERE id = " + txn.quote(id)).one_row();
-        return std::make_shared<Role>(row);
+    return Transactions::exec("PermsQueries::getRole", [&](pqxx::work& txn) -> std::shared_ptr<Role> {
+        const auto res = txn.exec(pqxx::prepped{"get_role"}, pqxx::params{id});
+        if (res.empty()) return nullptr;
+        return std::make_shared<Role>(res.one_row());
     });
 }
 
 std::shared_ptr<Role> PermsQueries::getRoleByName(const std::string& name) {
-    return Transactions::exec("PermsQueries::getRoleByName", [&](pqxx::work& txn) {
+    return Transactions::exec("PermsQueries::getRoleByName", [&](pqxx::work& txn) -> std::shared_ptr<Role> {
         const auto res = txn.exec(pqxx::prepped{"get_role_by_name"}, pqxx::params{name});
-        if (res.empty()) throw std::runtime_error("Role not found: " + name);
+        if (res.empty()) return nullptr;
         return std::make_shared<Role>(res.one_row());
+    });
+}
+
+bool PermsQueries::roleExists(const std::string& name) {
+    return Transactions::exec("PermsQueries::roleExists", [&](pqxx::work& txn) -> bool {
+        const auto res = txn.exec(pqxx::prepped{"role_exists"}, pqxx::params{name});
+        return !res.empty() && res[0]["exists"].as<bool>();
     });
 }
 
@@ -116,7 +132,7 @@ std::shared_ptr<VaultRole> PermsQueries::getVaultRoleBySubjectAndRoleId(const un
     return Transactions::exec("PermsQueries::getSubjectAssignedRole", [&](pqxx::work& txn) {
         pqxx::params role_params{subjectType, subjectId, roleId};
         const auto role = txn.exec(pqxx::prepped{"get_subject_assigned_vault_role"}, role_params).one_row();
-        const auto overrides = txn.exec(pqxx::prepped{"get_vault_permission_overrides"}, pqxx::params{roleId});
+        const auto overrides = txn.exec(pqxx::prepped{"list_vault_permission_overrides"}, pqxx::params{roleId});
         return std::make_shared<VaultRole>(role, overrides);
     });
 }
@@ -125,7 +141,7 @@ std::shared_ptr<VaultRole> PermsQueries::getVaultRoleBySubjectAndVaultId(const u
     return Transactions::exec("PermsQueries::getSubjectAssignedRoleByVault", [&](pqxx::work& txn) {
         pqxx::params role_params{subjectType, subjectId, vaultId};
         const auto role = txn.exec(pqxx::prepped{"get_subject_assigned_vault_role_by_vault"}, role_params).one_row();
-        const auto overrides = txn.exec(pqxx::prepped{"get_vault_permission_overrides"}, pqxx::params{role["role_id"].as<unsigned int>()});
+        const auto overrides = txn.exec(pqxx::prepped{"list_vault_permission_overrides"}, pqxx::params{role["role_id"].as<unsigned int>()});
         return std::make_shared<VaultRole>(role, overrides);
     });
 }
@@ -142,7 +158,7 @@ std::vector<std::shared_ptr<VaultRole>> PermsQueries::listVaultAssignedRoles(con
     return Transactions::exec("PermsQueries::listAssignedRoles", [&](pqxx::work& txn) {
         pqxx::params p{vaultId};
         const auto roles = txn.exec(pqxx::prepped{"get_vault_assigned_roles"}, p);
-        const auto overrides = txn.exec(pqxx::prepped{"get_vault_permissions_overrides"}, p);
+        const auto overrides = txn.exec(pqxx::prepped{"list_vault_permission_overrides"}, p);
         return vault_roles_from_pq_result(roles, overrides);
     });
 }

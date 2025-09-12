@@ -1,12 +1,12 @@
 #include "config/ConfigRegistry.hpp"
+
 #include <stdexcept>
-#include <paths.h>
 
 namespace vh::config {
 
-void ConfigRegistry::init() {
+void ConfigRegistry::init(const std::filesystem::path& path) {
     std::call_once(init_flag_, [&]() {
-        config_ = loadConfig(paths::getConfigPath());
+        config_ = loadConfig(path);
         initialized_ = true;
     });
 }

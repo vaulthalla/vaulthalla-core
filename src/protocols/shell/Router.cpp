@@ -57,7 +57,7 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
     if (call.name.empty()) return invalid("No command provided.");
     const auto canonical = canonicalFor(call.name);
 
-    if (pluralMap_.contains(call.name) && call.positionals.empty()) {
+    if (call.positionals.empty() && pluralMap_.contains(call.name)) {
         call.name = canonical;
         call.positionals.emplace_back("list");
     }

@@ -11,11 +11,10 @@ using namespace vh::types;
 
 unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                                        const std::shared_ptr<Sync>& sync) {
-    if (!sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
+    const auto exists = vault->id != 0;
+    if (!exists && !sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-        const auto exists = vault->id != 0;
-
         pqxx::params p{
             vault->name,
             to_string(vault->type),
@@ -90,7 +89,9 @@ void VaultQueries::removeVault(const unsigned int vaultId) {
 std::shared_ptr<Vault> VaultQueries::getVault(unsigned int vaultID) {
     return Transactions::exec("VaultQueries::getVault",
                               [vaultID](pqxx::work& txn) -> std::shared_ptr<Vault> {
-                                  const auto row = txn.exec(pqxx::prepped{"get_vault"}, pqxx::params{vaultID}).one_row();
+                                  const auto res = txn.exec(pqxx::prepped{"get_vault"}, pqxx::params{vaultID});
+                                  if (res.empty()) return nullptr;
+                                  const auto row = res.one_row();
                                   const auto typeStr = row["type"].as<std::string>();
 
                                   switch (from_string(typeStr)) {

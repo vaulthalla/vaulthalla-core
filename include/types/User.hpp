@@ -27,7 +27,7 @@ struct User {
 
     unsigned int id{};
     std::optional<unsigned int> linux_uid{std::nullopt}, last_modified_by{std::nullopt};
-    std::string name, password_hash;
+    std::string name{}, password_hash{};
     std::optional<std::string> email{std::nullopt};
     std::time_t created_at{}, updated_at{};
     std::optional<std::time_t> last_login;
@@ -39,6 +39,9 @@ struct User {
     explicit User(std::string name, std::string email = "", bool isActive = true);
     explicit User(const pqxx::row& row);
     User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides);
+
+    bool operator==(const User& other) const;
+    bool operator!=(const User& other) const;
 
     [[nodiscard]] std::shared_ptr<VaultRole> getRole(unsigned int vaultId) const;
 

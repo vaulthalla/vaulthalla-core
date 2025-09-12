@@ -60,7 +60,7 @@ int main() {
         Transactions::init();
         seed::init_tables_if_not_exists();
         Transactions::dbPool_->initPreparedStatements();
-        if (!UserQueries::adminUserExists()) vh::seed::init();
+        if (!UserQueries::adminUserExists()) vh::seed::seed_database();
 
         LogRegistry::vaulthalla()->info("[*] Initializing service dependencies...");
         ServiceDepsRegistry::init();

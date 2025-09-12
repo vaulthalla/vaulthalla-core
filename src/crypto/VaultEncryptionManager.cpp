@@ -16,7 +16,7 @@ using namespace vh::types;
 
 VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
     : vault_id_(vault_id) {
-    tpmKeyProvider_ = std::make_unique<TPMKeyProvider>();
+    tpmKeyProvider_ = std::make_unique<TPMKeyProvider>(paths::testMode ? "test_vault_master" : "vault_master");
     tpmKeyProvider_->init();
     load_key();
 }

@@ -42,26 +42,35 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("vault update: too many arguments");
 
     const auto nameOrId = call.positionals[0];
-    const auto idOpt = parseInt(nameOrId);
+    const auto idOpt = parseUInt(nameOrId);
 
     std::shared_ptr<Vault> vault;
-    if (idOpt) vault = VaultQueries::getVault(*idOpt);
-    else {
-        if (call.positionals.size() < 2) return invalid(
-            "vault update: missing required <owner-id> for vault name update");
-
-        const auto ownerId = std::stoi(call.positionals[1]);
-        vault = VaultQueries::getVault(nameOrId, ownerId);
+    if (idOpt) {
+        vault = VaultQueries::getVault(*idOpt);
+        if (!vault) return invalid("vault update: vault with ID " + std::to_string(*idOpt) + " not found");
     }
-
-    if (!vault) return invalid("vault update: vault with ID " + std::to_string(*idOpt) + " not found");
+    else {
+        if (const auto ownerOpt = optVal(call, "owner")) {
+            if (ownerOpt->empty()) return invalid("vault update: --owner requires a value");
+            if (const auto ownerIdOpt = parseUInt(*ownerOpt)) {
+                if (*ownerIdOpt <= 0) return invalid("vault update: --owner <id> must be a positive integer");
+                vault = VaultQueries::getVault(nameOrId, *ownerIdOpt);
+                if (!vault) return invalid("vault update: vault not found with name '" + nameOrId +
+                                            "' for user ID " + std::to_string(*ownerIdOpt));
+            } else if (const auto owner = UserQueries::getUserByName(*ownerOpt)) {
+                vault = VaultQueries::getVault(nameOrId, owner->id);
+                if (!vault) return invalid("vault update: vault not found with name '" + nameOrId +
+                                            "' for user '" + *ownerOpt + "'");
+            } else return invalid("vault update: user not found: " + *ownerOpt);
+        }
+    }
 
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
         "vault update: you do not have permission to update this vault");
 
     const auto descOpt = optVal(call, "desc");
     const auto quotaOpt = optVal(call, "quota");
-    const auto ownerIdOpt = optVal(call, "owner-id");
+    const auto ownerIdOpt = optVal(call, "owner");
     const auto syncStrategyOpt = optVal(call, "sync-strategy");
     const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
     const auto apiKeyOpt = optVal(call, "api-key");
@@ -78,7 +87,7 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
     }
 
     if (ownerIdOpt) {
-        const auto ownerId = parseInt(*ownerIdOpt);
+        const auto ownerId = parseUInt(*ownerIdOpt);
         if (!ownerId || *ownerId <= 0) return invalid("vault update: --owner <id> must be a positive integer");
         vault->owner_id = *ownerId;
     }
@@ -112,7 +121,7 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
         const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
 
         if (apiKeyOpt) {
-            const auto apiKeyId = parseInt(*apiKeyOpt);
+            const auto apiKeyId = parseUInt(*apiKeyOpt);
             if (apiKeyId && APIKeyQueries::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
             else {
                 const auto apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);

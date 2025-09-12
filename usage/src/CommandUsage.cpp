@@ -5,13 +5,18 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <variant>
 #include <ranges>
+#include <optional>
+#include <functional>
 
 #include <fmt/format.h>
 
 namespace vh::shell {
 
-// ---------- internal helpers (anonymous namespace) ----------
+// ======================================================
+// helpers (anonymous namespace)
+// ======================================================
 
 namespace {
 
@@ -67,104 +72,186 @@ void emitWrapped(std::ostringstream& out, const std::string& text,
     }
 }
 
-std::size_t computeKeyWidth(const std::vector<Entry>& items, std::size_t cap, bool show_aliases) {
-    auto visibleLen = [](const std::string& s) -> std::size_t { return s.size(); };
-    std::size_t w = 0;
-    for (const auto& it : items) {
-        const std::string full = show_aliases
-            ? fmt::format("{}{}", it.label,
-                          it.aliases.empty() ? "" : fmt::format(" | {}", fmt::join(it.aliases, " | ")))
-            : it.label;
-        w = std::max<std::size_t>(w, visibleLen(full));
-    }
-    return std::min(w, cap);
-}
-
 std::string padRight(const std::string& s, std::size_t width) {
     if (s.size() >= width) return s;
     return s + std::string(width - s.size(), ' ');
 }
 
-void emitTwoCol(std::ostringstream& out,
-                const std::vector<Entry>& items,
-                std::size_t indent, std::size_t gap,
-                int width, std::size_t keyw,
-                const ColorTheme& theme,
-                bool show_aliases) {
-    if (items.empty()) return;
-    const int rightw = width - static_cast<int>(indent + keyw + gap);
-    for (const auto& it : items) {
-        const std::string keyPlain = show_aliases
-            ? fmt::format("{}{}", it.label,
-                          it.aliases.empty() ? "" : fmt::format(" | {}", fmt::join(it.aliases, " | ")))
-            : it.label;
-        const auto desc_lines = wrap(it.desc, std::max(20, rightw));
-
-        // first line
-        out << std::string(indent, ' ');
-        // Colorize the key, but align using plain-length padding.
-        out << theme.K() << padRight(keyPlain, keyw) << theme.R();
-        out << std::string(gap, ' ');
-        if (!desc_lines.empty()) {
-            out << desc_lines[0] << "\n";
-            // continuation lines
-            for (std::size_t i = 1; i < desc_lines.size(); ++i) {
-                out << std::string(indent + keyw + gap, ' ') << desc_lines[i] << "\n";
-            }
-        } else {
-            out << "\n";
-        }
-    }
+std::string dashifyToken(const std::string& t) {
+    if (t.empty()) return t;
+    return (t.size() == 1 ? "-" : "--") + t;
 }
 
-void emitTwoColSection(std::ostringstream& out,
-                       const std::string& title,
-                       const std::vector<Entry>& items,
-                       const std::size_t indent, const std::size_t gap, const int width,
-                       const std::size_t max_key_col,
-                       const ColorTheme& theme,
-                       const bool show_aliases) {
-    if (items.empty()) return;
-    out << theme.H() << title << theme.R() << "\n";
-    const auto keyw = computeKeyWidth(items, max_key_col, show_aliases);
-    emitTwoCol(out, items, indent, gap, width, keyw, theme, show_aliases);
-    out << "\n";
+std::string join(const std::vector<std::string>& v, std::string_view sep) {
+    std::ostringstream ss;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (i) ss << sep;
+        ss << v[i];
+    }
+    return ss.str();
 }
 
-std::string escapePipes(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s) {
-        if (c == '|') out += "\\|";
-        else out += c;
-    }
+std::vector<std::string> dashifyTokens(const std::vector<std::string>& toks) {
+    std::vector<std::string> out;
+    out.reserve(toks.size());
+    for (auto& t : toks) out.push_back(dashifyToken(t));
     return out;
 }
 
-void emitMarkdownTable(std::ostringstream& md, const std::vector<Entry>& items, bool show_aliases) {
+std::string angleChoice(const std::vector<std::string>& choices) {
+    if (choices.empty()) return std::string{};
+    return fmt::format("<{}>", join(choices, " | "));
+}
+
+std::string parenChoice(const std::vector<std::string>& choices) {
+    if (choices.empty()) return std::string{};
+    if (choices.size() == 1) return choices.front();
+    return fmt::format("({})", join(choices, " | "));
+}
+
+struct KeyDesc {
+    std::string key;
+    std::string desc;
+};
+
+// Escape pipes for Markdown table cells
+std::string escapePipes(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char c : s) out += (c == '|' ? "\\|" : std::string(1, c));
+    return out;
+}
+
+template <class T, class F>
+std::size_t visibleKeyWidth(const std::vector<T>& items,
+                            std::size_t cap,
+                            F&& render) {
+    std::size_t w = 0;
+    for (const auto& it : items) {
+        auto kd = render(it);
+        w = std::max<std::size_t>(w, kd.key.size());
+    }
+    return std::min(w, cap);
+}
+
+template <class T, class F>
+void emitTwoCol(std::ostringstream& out,
+                const std::vector<T>& items,
+                std::size_t indent, std::size_t gap,
+                int width, std::size_t keyw,
+                const ColorTheme& theme,
+                F&& render) {
+    if (items.empty()) return;
+    const int rightw = width - static_cast<int>(indent + keyw + gap);
+    for (const auto& it : items) {
+        auto kd = render(it);
+        const auto desc_lines = wrap(kd.desc, std::max(20, rightw));
+
+        out << std::string(indent, ' ');
+        out << theme.K() << padRight(kd.key, keyw) << theme.R();
+        out << std::string(gap, ' ');
+
+        if (!desc_lines.empty()) {
+            out << desc_lines[0] << "\n";
+            for (std::size_t i = 1; i < desc_lines.size(); ++i) {
+                out << std::string(indent + keyw + gap, ' ') << desc_lines[i] << "\n";
+            }
+        } else out << "\n";
+    }
+}
+
+template <class T, class F>
+void emitTwoColSection(std::ostringstream& out,
+                       const std::string& title,
+                       const std::vector<T>& items,
+                       std::size_t indent, std::size_t gap,
+                       int width, std::size_t max_key_col,
+                       const ColorTheme& theme,
+                       F&& render) {
+    if (items.empty()) return;
+    out << theme.H() << title << theme.R() << "\n";
+    const auto keyw = visibleKeyWidth(items, max_key_col, render);
+    emitTwoCol(out, items, indent, gap, width, keyw, theme, render);
+    out << "\n";
+}
+
+template <class T, class F>
+void emitMarkdownTable(std::ostringstream& md,
+                       const std::vector<T>& items,
+                       F&& render) {
     if (items.empty()) return;
     md << "| Option | Description |\n";
     md << "|:------ |:----------- |\n";
     for (const auto& it : items) {
-        const std::string keyCell = show_aliases
-            ? fmt::format("{}{}", fmt::format("`{}`", escapePipes(it.label)),
-                          it.aliases.empty() ? "" :
-                              fmt::format(" ({})",
-                                          fmt::format("{}", fmt::join(
-                                              [&]() {
-                                                  std::vector<std::string> quoted;
-                                                  quoted.reserve(it.aliases.size());
-                                                  for (auto& a : it.aliases) quoted.push_back("`" + escapePipes(a) + "`");
-                                                  return quoted;
-                                              }(), ", "))))
-            : fmt::format("`{}`", escapePipes(it.label));
-        md << "| " << keyCell << " | " << escapePipes(it.desc) << " |\n";
+        auto kd = render(it);
+        md << "| `" << escapePipes(kd.key) << "` | " << escapePipes(kd.desc) << " |\n";
     }
 }
 
+// ---------- formatting for each type ----------
+
+KeyDesc renderPositional(const Positional& p, bool show_aliases) {
+    std::vector<std::string> names;
+    names.push_back(p.label);
+    for (auto& a : p.aliases) names.push_back(a);
+    return { angleChoice(show_aliases ? names : std::vector<std::string>{names.front()}), p.desc };
 }
 
-// ---------- CommandUsage internals ----------
+KeyDesc renderFlag(const Flag& f, bool show_aliases) {
+    std::vector<std::string> toks = f.aliases.empty() ? std::vector<std::string>{f.label} : f.aliases;
+    auto dash = dashifyTokens(toks);
+    std::string key = show_aliases ? parenChoice(dash) : dash.front();
+    // Hint default
+    std::string d = f.desc;
+    d += fmt::format(" (default: {})", f.default_state ? "on" : "off");
+    return { key, d };
+}
+
+KeyDesc renderOption(const Option& o, bool show_aliases) {
+    std::vector<std::string> toks = o.option_tokens.empty() ? std::vector<std::string>{o.label} : o.option_tokens;
+    auto dash = dashifyTokens(toks);
+    const std::string K = show_aliases ? parenChoice(dash) : dash.front();
+
+    std::string V;
+    if (!o.value_tokens.empty()) V = " " + angleChoice(o.value_tokens);
+
+    return { K + V, o.desc };
+}
+
+KeyDesc renderOptional(const Optional& o, bool show_aliases) {
+    auto kd = renderOption(o, show_aliases);
+    if (o.default_value && !o.default_value->empty()) {
+        kd.desc += fmt::format(" (default: {})", *o.default_value);
+    }
+    return kd;
+}
+
+KeyDesc renderGrouped(const std::variant<Optional, Flag>& v, bool show_aliases) {
+    return std::visit([&](auto&& x)->KeyDesc {
+        using T = std::decay_t<decltype(x)>;
+        if constexpr (std::is_same_v<T, Optional>) return renderOptional(x, show_aliases);
+        else return renderFlag(x, show_aliases);
+    }, v);
+}
+
+// Escape-aware line break
+static std::string lineBreak(int tw = 100, int padding = 3) {
+    if (tw - 2 * padding < 10) return std::string(tw, '-');
+    return std::string(padding, ' ') + std::string(tw - 2 * padding, '-') + std::string(padding, ' ');
+}
+
+// synopsis helpers
+std::string synopsisTokenList(const std::vector<std::string>& tokens, bool show_aliases) {
+    if (tokens.empty()) return {};
+    auto dash = dashifyTokens(tokens);
+    return show_aliases ? parenChoice(dash) : dash.front();
+}
+
+} // anonymous
+
+// ======================================================
+// CommandUsage internals
+// ======================================================
 
 bool CommandUsage::matches(const std::string& alias) const {
     return std::ranges::any_of(aliases, [&](const std::string& a){ return a == alias; });
@@ -209,12 +296,6 @@ std::string CommandUsage::constructCmdString() const {
     return ss.str();
 }
 
-std::string CommandUsage::normalizePositional_(const std::string& s) {
-    // If caller already used <> or [] leave it; else wrap as <name>
-    if (s.find('<') != std::string::npos || s.find('[') != std::string::npos) return s;
-    return fmt::format("<{}>", s);
-}
-
 std::vector<const CommandUsage*> CommandUsage::lineage_() const {
     std::vector<const CommandUsage*> chain;
     const CommandUsage* cur = this;
@@ -228,7 +309,6 @@ std::vector<const CommandUsage*> CommandUsage::lineage_() const {
 }
 
 std::string CommandUsage::tokenFor_(const CommandUsage* node) const {
-    // Use node’s own alias policy
     return show_aliases ? node->joinAliasesInline_(" | ") : node->primary();
 }
 
@@ -276,26 +356,7 @@ void CommandUsage::appendWrapped_(std::ostringstream& out,
     }
 }
 
-// If Entry has aliases, treat them as a <choice|list|...>
-std::string CommandUsage::renderEntryPrimary_(const Entry& e, bool squareIfOptional) {
-    // e.label can be "--flag <arg>" or just "--flag" or "name"
-    // If e.aliases non-empty, treat them as the value choices.
-    std::string rhs;
-    if (!e.aliases.empty()) rhs = "<" + join_(e.aliases, "|") + ">";
-
-    // If the label already contains <...> or [...] keep it verbatim
-    const bool preWrapped = (e.label.find('<') != std::string::npos) || (e.label.find('[') != std::string::npos);
-    std::string base = e.label;
-    if (!preWrapped && !rhs.empty()) base += " " + rhs;
-
-    // Wrap only if caller didn’t already
-    if (!preWrapped) {
-        if (squareIfOptional) return "[" + base + "]";
-        return "<" + base + ">";
-    }
-    return base; // already bracketed upstream
-}
-
+// New synopsis that understands Options/Optional/Flags/Positionals
 std::string CommandUsage::buildSynopsis_() const {
     if (synopsis) return *synopsis;
 
@@ -306,39 +367,78 @@ std::string CommandUsage::buildSynopsis_() const {
     constexpr size_t startIdx = 1;  // Skip root (vh) at index 0
 
     for (size_t i = startIdx; i < chain.size(); ++i) {
-        // Collapse adjacent nodes if they render to the same token set
         if (i > startIdx && sameAliases_(chain[i], chain[i - 1])) continue;
         syn << ' ' << tokenFor_(chain[i]);
     }
 
-    for (const auto& p : positionals) syn << ' ' << normalizePositional_(p.label);
-    for (const auto& r : required) syn << ' ' << renderEntryPrimary_(r, false);
-    for (const auto& o : optional) syn << ' ' << renderEntryPrimary_(o, true);
+    // Positionals
+    for (const auto& p : positionals) {
+        // Prefer canonical label for synopsis
+        syn << ' ' << fmt::format("<{}>", p.label);
+    }
+
+    // Required flags
+    for (const auto& f : required_flags) {
+        const std::vector<std::string> toks = f.aliases.empty()
+            ? std::vector<std::string>{f.label}
+            : f.aliases;
+        syn << ' ' << synopsisTokenList(toks, show_aliases);
+    }
+
+    // Required options
+    for (const auto& o : required) {
+        const std::vector<std::string> toks = o.option_tokens.empty()
+            ? std::vector<std::string>{o.label}
+            : o.option_tokens;
+        syn << ' ' << synopsisTokenList(toks, show_aliases);
+        if (!o.value_tokens.empty()) {
+            syn << ' ' << angleChoice(o.value_tokens);
+        } else {
+            // If no explicit value token names, show a generic placeholder
+            syn << " <value>";
+        }
+    }
+
+    // Optional flags
+    for (const auto& f : optional_flags) {
+        const std::vector<std::string> toks = f.aliases.empty()
+            ? std::vector<std::string>{f.label}
+            : f.aliases;
+        syn << ' ' << '[' << synopsisTokenList(toks, show_aliases) << ']';
+    }
+
+    // Optional options
+    for (const auto& o : optional) {
+        syn << ' ' << '[';
+        const std::vector<std::string> toks = o.option_tokens.empty()
+            ? std::vector<std::string>{o.label}
+            : o.option_tokens;
+        syn << synopsisTokenList(toks, show_aliases);
+        if (!o.value_tokens.empty())
+            syn << ' ' << angleChoice(o.value_tokens);
+        else
+            syn << " <value>";
+        syn << ']';
+    }
 
     return syn.str();
 }
 
-// ---------- CommandUsage impl ----------
-
-static std::string lineBreak(const int tw = 100, const int padding = 3) {
-    if (tw - 2 * padding < 10) return std::string(tw, '-');
-    return std::string(padding, ' ') + std::string(tw - 2 * padding, '-') + std::string(padding, ' ');
-}
-
-void CommandUsage::emitCommand(std::ostringstream& out, const std::shared_ptr<CommandUsage>& command, const bool spaceLines) const {
+// Emit the command header + description + usage section
+void CommandUsage::emitCommand(std::ostringstream& out,
+                               const std::shared_ptr<CommandUsage>& command,
+                               const bool spaceLines) const {
     const auto cmd = command ? command : shared_from_this();
     const int tw = term_width > 40 ? term_width : 100;
 
     {
         std::ostringstream head;
-
-        if (!show_aliases || aliases.size() < 2) head << cmd->constructCmdString();
-        else head << cmd->constructCmdString();
-
+        head << cmd->constructCmdString();
         out << theme.C() << head.str() << theme.R() << "\n";
         if (spaceLines) out << "\n";
+
         out << theme.A2() << "Description:" << theme.R();
-        const auto needsSpace = cmd->description.contains("\n");
+        const bool needsSpace = cmd->description.contains("\n");
         if (needsSpace) out << "\n";
         if (cmd->description.empty()) out << "  No description provided.\n";
         else emitWrapped(out, cmd->description, needsSpace ? 2 : 1, tw);
@@ -355,6 +455,9 @@ void CommandUsage::emitCommand(std::ostringstream& out, const std::shared_ptr<Co
     out << "\n";
 }
 
+// ======================================================
+// CommandUsage public API
+// ======================================================
 
 std::string CommandUsage::str() const {
     const int tw = term_width > 40 ? term_width : 100;
@@ -363,15 +466,31 @@ std::string CommandUsage::str() const {
 
     std::ostringstream out;
 
-    const auto emit = [&](const std::shared_ptr<CommandUsage>& command = nullptr) {
+    const auto emitOne = [&](const std::shared_ptr<CommandUsage>& command = nullptr) {
         const auto cmd = command ? command : shared_from_this();
 
         emitCommand(out, command, true);
 
-        emitTwoColSection(out, "Required:", cmd->required, indent, gap, tw, max_key_col, theme, show_aliases);
-        emitTwoColSection(out, "Optional:", cmd->optional, indent, gap, tw, max_key_col, theme, show_aliases);
-        for (const auto& g : cmd->groups)
-            emitTwoColSection(out, g.title + ":", g.items, indent, gap, tw, max_key_col, theme, show_aliases);
+        // Sections in a sensible order
+        emitTwoColSection(out, "Positionals:", cmd->positionals, indent, gap, tw, max_key_col, theme,
+            [&](const Positional& p){ return renderPositional(p, show_aliases); });
+
+        emitTwoColSection(out, "Required Flags:", cmd->required_flags, indent, gap, tw, max_key_col, theme,
+            [&](const Flag& f){ return renderFlag(f, show_aliases); });
+
+        emitTwoColSection(out, "Required Options:", cmd->required, indent, gap, tw, max_key_col, theme,
+            [&](const Option& o){ return renderOption(o, show_aliases); });
+
+        emitTwoColSection(out, "Optional Flags:", cmd->optional_flags, indent, gap, tw, max_key_col, theme,
+            [&](const Flag& f){ return renderFlag(f, show_aliases); });
+
+        emitTwoColSection(out, "Optional Options:", cmd->optional, indent, gap, tw, max_key_col, theme,
+            [&](const Optional& o){ return renderOptional(o, show_aliases); });
+
+        for (const auto& g : cmd->groups) {
+            emitTwoColSection(out, g.title + ":", g.items, indent, gap, tw, max_key_col, theme,
+                [&](const std::variant<Optional,Flag>& v){ return renderGrouped(v, show_aliases); });
+        }
 
         if (!examples.empty()) {
             out << theme.A3() << "Examples:" << theme.R() << "\n";
@@ -383,10 +502,10 @@ std::string CommandUsage::str() const {
         }
     };
 
-    emit();
+    emitOne();
     for (unsigned int i = 0; i < subcommands.size(); ++i) {
-        emit(subcommands[i]);
-        if (i + 1 < subcommands.size()) out << "\n" << lineBreak() << "\n\n";
+        emitOne(subcommands[i]);
+        if (i + 1 < subcommands.size()) out << "\n" << lineBreak(tw) << "\n\n";
     }
 
     return out.str();
@@ -397,10 +516,8 @@ std::string CommandUsage::basicStr() const {
 
     std::ostringstream out;
     out << "\n";
-
     emitCommand(out);
     for (const auto& c : subcommands) emitCommand(out, c);
-
     return out.str();
 }
 
@@ -434,20 +551,35 @@ std::string CommandUsage::markdown() const {
     md << "```bash\n" << buildSynopsis_() << "\n```\n\n";
 
     // Sections
+    if (!positionals.empty()) {
+        md << "## Positionals\n\n";
+        emitMarkdownTable(md, positionals, [&](const Positional& p){ return renderPositional(p, show_aliases); });
+        md << "\n";
+    }
+    if (!required_flags.empty()) {
+        md << "## Required Flags\n\n";
+        emitMarkdownTable(md, required_flags, [&](const Flag& f){ return renderFlag(f, show_aliases); });
+        md << "\n";
+    }
     if (!required.empty()) {
         md << "## Required Options\n\n";
-        emitMarkdownTable(md, required, show_aliases);
+        emitMarkdownTable(md, required, [&](const Option& o){ return renderOption(o, show_aliases); });
+        md << "\n";
+    }
+    if (!optional_flags.empty()) {
+        md << "## Optional Flags\n\n";
+        emitMarkdownTable(md, optional_flags, [&](const Flag& f){ return renderFlag(f, show_aliases); });
         md << "\n";
     }
     if (!optional.empty()) {
         md << "## Optional Options\n\n";
-        emitMarkdownTable(md, optional, show_aliases);
+        emitMarkdownTable(md, optional, [&](const Optional& o){ return renderOptional(o, show_aliases); });
         md << "\n";
     }
     for (const auto& g : groups) {
         if (!g.items.empty()) {
             md << "## " << g.title << "\n\n";
-            emitMarkdownTable(md, g.items, show_aliases);
+            emitMarkdownTable(md, g.items, [&](const std::variant<Optional,Flag>& v){ return renderGrouped(v, show_aliases); });
             md << "\n";
         }
     }
@@ -461,6 +593,89 @@ std::string CommandUsage::markdown() const {
     }
 
     return md.str();
+}
+
+std::shared_ptr<CommandUsage> CommandUsage::findSubcommand(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        subcommands,
+        [&](const std::shared_ptr<CommandUsage>& c) {
+            return std::ranges::any_of(c->aliases, [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    if (it != subcommands.end()) return *it;
+    return nullptr;
+}
+
+std::shared_ptr<Positional> CommandUsage::resolvePositional(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        positionals,
+        [&](const Positional& p) {
+            return p.label == alias || std::ranges::any_of(p.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    if (it != positionals.end()) return std::make_shared<Positional>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<Flag> CommandUsage::resolveFlag(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        optional_flags,
+        [&](const Flag& f) {
+            return f.label == alias || std::ranges::any_of(f.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+    if (it != optional_flags.end()) return std::make_shared<Flag>(*it);
+
+    const auto it2 = std::ranges::find_if(
+        required_flags,
+        [&](const Flag& f) {
+            return f.label == alias || std::ranges::any_of(f.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    if (it2 != required_flags.end()) return std::make_shared<Flag>(*it2);
+    return nullptr;
+}
+
+std::shared_ptr<Optional> CommandUsage::resolveOptional(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        optional,
+        [&](const Optional& o) {
+            return o.label == alias || std::ranges::any_of(o.option_tokens,
+                [&](const std::string& t) { return t == alias; });
+        }
+    );
+
+    if (it != optional.end()) return std::make_shared<Optional>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<Option> CommandUsage::resolveRequired(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        required,
+        [&](const Option& o) {
+            return o.label == alias || std::ranges::any_of(o.option_tokens,
+                [&](const std::string& t) { return t == alias; });
+        }
+    );
+
+    if (it != required.end()) return std::make_shared<Option>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<GroupedOptions> CommandUsage::resolveGroup(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        groups,
+        [&](const GroupedOptions& g) { return g.title == alias; }
+    );
+
+    if (it != groups.end()) return std::make_shared<GroupedOptions>(*it);
+    return nullptr;
 }
 
 }

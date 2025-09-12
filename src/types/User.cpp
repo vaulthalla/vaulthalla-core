@@ -48,6 +48,16 @@ User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vau
     this->roles = vault_roles_from_pq_result(vaultRoles, overrides);
 }
 
+bool User::operator==(const User& other) const {
+    return linux_uid == other.linux_uid &&
+           name == other.name &&
+           email == other.email;
+}
+
+bool User::operator!=(const User& other) const {
+    return !(*this == other);
+}
+
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     const auto it = std::ranges::find_if(roles.begin(), roles.end(),
                        [vaultId](const std::shared_ptr<VaultRole>& role) {
@@ -101,7 +111,10 @@ nlohmann::json to_json(const std::shared_ptr<User>& user) { return {*user}; }
 
 
 // --- User role checks ---
-bool User::isSuperAdmin() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
+bool User::isSuperAdmin() const {
+    return hasPermission(role->permissions, AdminPermission::ManageAdmins)
+    && hasPermission(role->permissions, AdminPermission::ManageEncryptionKeys);
+}
 bool User::isAdmin() const { return isSuperAdmin() || role->permissions == ADMIN_MASK; }
 
 
@@ -193,7 +206,9 @@ bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::p
 std::string to_string(const std::shared_ptr<User>& user) {
     if (!user) return "No user found\n";
 
-    std::string out = "User: " + user->name + "\n";
+    std::string out;
+    out += "User ID: " + std::to_string(user->id) + "\n";
+    out += "User: " + user->name + "\n";
     out += "Email: " + user->email.value_or("N/A") + "\n";
     if (user->linux_uid) out += "Linux UID: " + std::to_string(*user->linux_uid) + "\n";
     else out += "Linux UID: Not set\n";
@@ -210,6 +225,7 @@ std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
     if (users.empty()) return "No users found\n";
 
     Table tbl({
+        {"ID", Align::Right, 4, 4, false, false},
         {"Name", Align::Left, 4, 32, false, false},
         {"Email", Align::Left, 4, 32, false, false},
         {"Role", Align::Left, 4, 16, false, false},
@@ -221,6 +237,7 @@ std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
     for (const auto& user : users) {
         if (!user) continue; // Skip null pointers
         tbl.add_row({
+            std::to_string(user->id),
             user->name,
             user->email.value_or("N/A"),
             user->role ? snake_case_to_title(user->role->name) : "No Role",

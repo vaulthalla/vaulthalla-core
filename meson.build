@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.13.0',
+        version: '0.13.1',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
@@ -7,7 +7,7 @@ project('vaulthalla', 'cpp',
             'werror=true',
             'cpp_std=c++23',
             'unity=on',
-            'unity_size=10',
+            'unity_size=9',
             'prefix=/usr',
             'cpp_args=-D_GLIBCXX_USE_CXX11_ABI=1'
         ]
@@ -92,7 +92,7 @@ test_deps = deps + dependency('gtest', required: true, main: false)
 inc         = include_directories('include', 'vendor', 'usage/include')
 source_root = meson.project_source_root()
 src         = join_paths(source_root, 'src')
-tests_src   = join_paths(source_root, 'tests')
+tests_src   = join_paths(source_root, 'tests/unit')
 main        = files(join_paths(source_root, 'main/main.cpp'))
 
 sources = []
@@ -246,8 +246,22 @@ foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check
     all_test_sources += files(f)
 endforeach
 
-test('test_all',
-     executable('test_all', all_test_sources,
+test('vh_unit_tests',
+     executable('vh_unit_tests', all_test_sources,
                 link_with: [lib_core, lib_seed, lib_usage],
                 include_directories: inc,
                 dependencies: test_deps))
+
+cli_test_inc = include_directories('tests/cli/include', 'usage/include', 'include', 'vendor')
+cli_test_src = join_paths(source_root, 'tests/cli/src')
+cli_test_sources = []
+foreach f : run_command('find', cli_test_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+    cli_test_sources += files(f)
+endforeach
+
+vh_cli_tests = executable('vh_cli_tests', cli_test_sources + files('tests/cli/CLI_test_main.cpp'),
+                         include_directories: cli_test_inc,
+                         link_with: [lib_core, lib_seed, lib_usage],
+                         dependencies: test_deps,
+                         install: false
+)

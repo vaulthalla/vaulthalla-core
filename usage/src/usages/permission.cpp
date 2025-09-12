@@ -47,11 +47,23 @@ std::string usage_vault_permissions() {
     return os.str();
 }
 
+static const auto typeFilter = Optional::OneToMany(
+    "type_filter",
+    "Filter permissions by type",
+    "type",
+    {"user", "vault"},
+    "both"
+    );
+
+static const auto userFlag = Flag::WithAliases("user_filter", "Filter permissions for user roles", {"user", "u"});
+static const auto vaultFlag = Flag::WithAliases("vault_filter", "Filter permissions for vault roles", {"vault", "v"});
+
 static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();
     cmd->parent = parent;
-    cmd->aliases = {"permission", "permissions", "perm", "perms"};
-    cmd->optional = {{"<type>", "Type of permissions to display: 'user'/'u' or 'vault'/'v' (default: both)"}};
+    cmd->aliases = {"permission", "perm"};
+    cmd->optional = { typeFilter };
+    cmd->optional_flags = { userFlag, vaultFlag };
     cmd->description = "Display available permission flags for user and vault roles.";
     cmd->examples.push_back({"vh permissions", "Show all available permission flags."});
     return cmd;

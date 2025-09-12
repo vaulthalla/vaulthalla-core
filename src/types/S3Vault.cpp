@@ -17,7 +17,7 @@ S3Vault::S3Vault(const std::string& name, const unsigned int apiKeyID, std::stri
 
 S3Vault::S3Vault(const pqxx::row& row)
     : Vault(row),
-      api_key_id(row["api_key_id"].as<unsigned short>()),
+      api_key_id(row["api_key_id"].as<unsigned int>()),
       bucket(row["bucket"].as<std::string>()),
       encrypt_upstream(row["encrypt_upstream"].as<bool>()) {}
 
@@ -30,7 +30,7 @@ void to_json(nlohmann::json& j, const S3Vault& v) {
 
 void from_json(const nlohmann::json& j, S3Vault& v) {
     from_json(j, static_cast<Vault&>(v));
-    v.api_key_id = j.at("api_key_id").get<unsigned short>();
+    v.api_key_id = j.at("api_key_id").get<unsigned int>();
     v.bucket = j.at("bucket").get<std::string>();
     v.encrypt_upstream = j.value("encrypt_upstream", true);
 }

@@ -1,4 +1,9 @@
 #pragma once
+
+#include "services/ServiceDepsRegistry.hpp"
+#include "UsageManager.hpp"
+#include "CommandUsage.hpp"
+
 #include <string>
 #include <vector>
 #include <string_view>
@@ -16,7 +21,7 @@ inline bool looks_negative_number(std::string_view s) {
     if (s.size() < 2 || s[0] != '-') return false;
     bool dot = false, digit = false;
     for (size_t i = 1; i < s.size(); ++i) {
-        char c = s[i];
+        const char c = s[i];
         if (c >= '0' && c <= '9') { digit = true; continue; }
         if (c == '.' && !dot) { dot = true; continue; }
         return false;
@@ -80,6 +85,16 @@ inline std::vector<Token> tokenize(const std::string& line) {
     const char* s = line.c_str();
     const char* e = s + line.size();
     const char* p = s;
+
+    // Strip command prefix if present
+    // e.g. "vh", "vaulthalla", or any alias
+    for (const auto& aliases : services::ServiceDepsRegistry::instance().shellUsageManager->root()->aliases) {
+        size_t len = aliases.size();
+        if (line.size() >= len && line.compare(0, len, aliases) == 0) {
+            p += len;
+            break;
+        }
+    }
 
     skip_ws(p, e);
     while (p < e) {

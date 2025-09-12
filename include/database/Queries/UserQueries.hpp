@@ -40,6 +40,7 @@ class UserQueries {
     static void revokeAndPurgeRefreshTokens(unsigned int userId);
     static std::shared_ptr<types::User> getUserByRefreshToken(const std::string& jti);
 
+    [[nodiscard]] static bool userExists(const std::string& name);
     [[nodiscard]] static bool adminUserExists();
     [[nodiscard]] static bool adminPasswordIsDefault();
 };

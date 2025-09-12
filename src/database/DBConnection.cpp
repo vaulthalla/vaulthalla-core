@@ -6,6 +6,7 @@
 #include "logging/LogRegistry.hpp"
 
 #include <fstream>
+#include <paths.h>
 
 using namespace vh::crypto;
 using namespace vh::logging;
@@ -42,7 +43,21 @@ static std::optional<std::string> getFirstInitDBPass() {
     return pass;
 }
 
-DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>("postgres")) {
+DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
+    if (paths::testMode) {
+        const auto user = std::getenv("VH_TEST_DB_USER");
+        const auto pass = std::getenv("VH_TEST_DB_PASS");
+        const auto host = std::getenv("VH_TEST_DB_HOST");
+        const auto port = std::getenv("VH_TEST_DB_PORT");
+        const auto name = std::getenv("VH_TEST_DB_NAME");
+        if (user && pass && host && port && name) {
+            DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host) + ":" + std::string(port) + "/" + std::string(name);
+            conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
+            LogRegistry::vaulthalla()->info("[DBConnection] Test mode: using connection string from environment variables");
+            return;
+        }
+    }
+
     if (tpmKeyProvider_->sealedExists()) tpmKeyProvider_->init();
     else {
         const auto initPass = getFirstInitDBPass();
@@ -103,6 +118,8 @@ void DBConnection::initPreparedUsers() const {
     conn_->prepare("get_user", "SELECT * FROM users WHERE id = $1");
 
     conn_->prepare("get_user_by_name", "SELECT * FROM users WHERE name = $1");
+
+    conn_->prepare("user_exists", "SELECT EXISTS(SELECT 1 FROM users WHERE name = $1) AS exists");
 
     conn_->prepare("get_user_by_refresh_token",
                    "SELECT u.* FROM users u "
@@ -174,6 +191,8 @@ void DBConnection::initPreparedGroups() const {
                    "FROM users u "
                    "JOIN group_members gm ON u.id = gm.user_id "
                    "WHERE gm.group_id = $1");
+
+    conn_->prepare("group_exists", "SELECT EXISTS(SELECT 1 FROM groups WHERE name = $1) AS exists");
 }
 
 void DBConnection::initPreparedWaivers() const {
@@ -790,9 +809,13 @@ void DBConnection::initPreparedRoles() const {
                    "UPDATE role SET name = $2, description = $3, type = $4 "
                    "WHERE id = $1");
 
+    conn_->prepare("update_role_permissions", "UPDATE permissions SET permissions = $2 WHERE role_id = $1");
+
     conn_->prepare("delete_role", "DELETE FROM role WHERE id = $1");
 
     conn_->prepare("get_permissions_type", "SELECT type FROM role WHERE id = $1");
+
+    conn_->prepare("role_exists", "SELECT EXISTS(SELECT 1 FROM role WHERE name = $1) AS exists");
 
     conn_->prepare("get_role",
                    "SELECT r.id as role_id, r.name, r.description, r.type, r.created_at, "
@@ -817,9 +840,8 @@ void DBConnection::initPreparedPermissions() const {
                    "INSERT INTO permission (bit_position, name, description, category) "
                    "VALUES ($1, $2, $3, $4)");
 
-    conn_->prepare("upsert_permission",
-                   "INSERT INTO permissions (role_id, permissions) "
-                   "VALUES ($1, $2) ON CONFLICT (role_id) DO UPDATE SET permissions = $2");
+    conn_->prepare("insert_role_permission",
+        "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
 
     conn_->prepare("update_permission", "UPDATE permissions SET permissions = $2 WHERE role_id = $1");
 

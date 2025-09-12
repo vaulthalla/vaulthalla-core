@@ -15,12 +15,19 @@ class result;
 namespace vh::types {
 
 struct UserRole final : Role {
-    unsigned int assignment_id, user_id;
-    std::time_t assigned_at;
+    unsigned int assignment_id{}, user_id{};
+    std::time_t assigned_at{};
 
     UserRole() = default;
+    ~UserRole() override = default;
     explicit UserRole(const pqxx::row& row);
     explicit UserRole(const nlohmann::json& j);
+
+    explicit UserRole(const Role& r) : Role(r) {
+        if (type != "user") throw std::runtime_error("UserRole: invalid role type");
+    }
+
+    std::string permissions_to_flags_string() const override;
 };
 
 void to_json(nlohmann::json& j, const UserRole& r);

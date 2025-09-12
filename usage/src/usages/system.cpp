@@ -9,9 +9,6 @@ static std::shared_ptr<CommandUsage> help_base(const std::weak_ptr<CommandUsage>
     cmd->parent = parent;
     cmd->aliases = {"help", "-h", "--h", "--help"};
     cmd->description = "Explicitly show help about a command or namespace (optional).";
-    cmd->optional = {
-        {"<command>", "Optional command name to get detailed help"}
-    };
     cmd->examples = {
         {"vh help", "Show general help information."},
         {"vh help api-keys", "Show detailed help for the 'api-keys' command."},

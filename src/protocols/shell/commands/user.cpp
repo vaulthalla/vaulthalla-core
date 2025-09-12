@@ -22,16 +22,18 @@ using namespace vh::crypto;
 static CommandResult createUser(const CommandCall& subcall) {
     constexpr const auto* ERR = "user create";
 
+    if (subcall.positionals.empty()) return invalid("Usage: user create <name> [--email email] [--linux-uid uid] [--role role]");
+
     if (!subcall.user->canManageUsers()) return invalid("You do not have permission to create users.");
 
-    const auto nameOpt = optVal(subcall, "name");
+    const auto name = subcall.positionals[0];
+
     const auto emailOpt = optVal(subcall, "email");
     const auto linuxUidOpt = optVal(subcall, "linux-uid");
-    const auto roleOpt = optVal(subcall, "role");
+    auto roleOpt = optVal(subcall, "role");
 
     std::vector<std::string> errors;
-    if (!nameOpt) errors.emplace_back("Missing required option: --name");
-    if (nameOpt && nameOpt->empty()) errors.emplace_back("Option --name cannot be empty");
+    if (!roleOpt) roleOpt = optVal(subcall, "r");
     if (!roleOpt) errors.emplace_back("Missing required option: --role");
     if (roleOpt && roleOpt->empty()) errors.emplace_back("Option --role cannot be empty");
 
@@ -42,9 +44,9 @@ static CommandResult createUser(const CommandCall& subcall) {
     }
 
     const auto user = std::make_shared<User>();
-    user->name = *nameOpt;
+    user->name = name;
     user->email = emailOpt;
-    if (linuxUidOpt) user->linux_uid = parseInt(*linuxUidOpt);
+    if (linuxUidOpt) user->linux_uid = parseUInt(*linuxUidOpt);
     user->role = std::make_shared<UserRole>();
     user->last_modified_by = subcall.user->id;
 
@@ -78,7 +80,7 @@ static CommandResult createUser(const CommandCall& subcall) {
         user->setPasswordHash(hashPassword(password));
         user->id = UserQueries::createUser(user);
 
-        std::string out = "User created successfully: " + user->name + "\n";
+        std::string out = "User created successfully: " + to_string(user) + "\n";
         out += "Password: " + password + "\n";
         return ok(out);
 
@@ -88,18 +90,19 @@ static CommandResult createUser(const CommandCall& subcall) {
 }
 
 static CommandResult deleteUser(const CommandCall& subcall) {
+    if (subcall.positionals.empty()) return invalid("Usage: user delete <name>");
+
     try {
-        auto name = subcall.positionals.empty() ? "" : subcall.positionals[0];
-        if (name.empty()) {
-            const auto nameOpt = optVal(subcall, "name");
-            if (!nameOpt || nameOpt->empty()) return invalid("Usage: user delete <name>");
-            name = *nameOpt;
-        }
+        const auto nameOrId = subcall.positionals[0];
 
-        if (name.empty()) return invalid("Usage: user delete <name>");
+        std::shared_ptr<User> user;
 
-        const auto user = UserQueries::getUserByName(std::string(name));
-        if (!user) return invalid("User not found: " + std::string(name));
+        if (const auto idOpt = parseUInt(nameOrId)) {
+            if (*idOpt <= 0) return invalid("Invalid user ID: " + std::to_string(*idOpt));
+            user = UserQueries::getUserById(*idOpt);
+        } else user = UserQueries::getUserByName(nameOrId);
+
+        if (!user) return invalid("User not found: " + nameOrId);
 
         if (user->isSuperAdmin()) {
             LogRegistry::audit()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
@@ -128,6 +131,8 @@ static CommandResult deleteUser(const CommandCall& subcall) {
 static CommandResult handleUserInfo(const CommandCall& subcall) {
     constexpr const auto* ERR = "user info";
 
+    if (subcall.positionals.empty()) return invalid("Usage: user info <name>");
+
     const auto userArg = subcall.positionals[0];
 
     const auto uLkp = resolveUser(userArg, ERR);
@@ -151,9 +156,15 @@ static CommandResult handleUpdateUser(const CommandCall& subcall) {
 
     if (subcall.positionals.empty()) return invalid("Usage: user update <name> [--name <new_name>] [--email <email>] [--role <role>] [--linux-uid <uid>]");
 
-    const auto name = subcall.positionals[0];
-    const auto user = UserQueries::getUserByName(name);
-    if (!user) return invalid("User not found: " + name);
+    const auto nameOrId = subcall.positionals[0];
+
+    std::shared_ptr<User> user;
+    if (const auto idOpt = parseUInt(nameOrId)) {
+        if (*idOpt <= 0) return invalid("Invalid user ID: " + std::to_string(*idOpt));
+        user = UserQueries::getUserById(*idOpt);
+    } else user = UserQueries::getUserByName(nameOrId);
+
+    if (!user) return invalid("User not found: " + nameOrId);
 
     if (subcall.user->id != user->id) {
         if (user->isSuperAdmin())
@@ -188,7 +199,7 @@ static CommandResult handleUpdateUser(const CommandCall& subcall) {
     }
 
     if (const auto newLinuxUidOpt = optVal(subcall, "linux-uid")) {
-        const auto linuxUid = parseInt(*newLinuxUidOpt);
+        const auto linuxUid = parseUInt(*newLinuxUidOpt);
         if (!linuxUid) return invalid("Invalid Linux UID: " + *newLinuxUidOpt);
         user->linux_uid = linuxUid;
     }
@@ -210,7 +221,8 @@ static bool isUserMatch(const std::string& cmd, const std::string_view input) {
 }
 
 static CommandResult handle_user(const CommandCall& call) {
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
+    if (call.positionals.empty() || hasFlag(call, "h") || hasFlag(call, "help"))
+        return usage(call.constructFullArgs());
 
     const auto [sub, subcall] = descend(call);
 

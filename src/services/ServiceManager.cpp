@@ -6,6 +6,8 @@
 #include "services/ConnectionLifecycleManager.hpp"
 #include "services/LogRotationService.hpp"
 
+#include <paths.h>
+
 using namespace vh::logging;
 using namespace vh::services;
 
@@ -18,16 +20,19 @@ ServiceManager::ServiceManager()
     : syncController(std::make_shared<SyncController>()),
       fuseService(std::make_shared<FUSE>()),
       vaulthallaService(std::make_shared<Vaulthalla>()),
-      ctlServerService(std::make_shared<CtlServerService>()),
       connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>()),
       logRotationService(std::make_shared<LogRotationService>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;
     services_["Vaulthalla"] = vaulthallaService;
-    services_["CtlServer"] = ctlServerService;
     services_["ConnectionLifecycleManager"] = connectionLifecycleManager;
     services_["LogRotationService"] = logRotationService;
+
+    if (!paths::testMode) {
+        ctlServerService = std::make_shared<CtlServerService>();
+        services_["CtlServer"] = ctlServerService;
+    }
 }
 
 void ServiceManager::startAll() {
@@ -43,6 +48,13 @@ void ServiceManager::startAll() {
 
     startWatchdog();
 }
+
+void ServiceManager::startTestServices() {
+    std::scoped_lock lock(mutex_);
+    tryStart("FUSE", fuseService);
+    tryStart("CtlServer", ctlServerService);
+}
+
 
 void ServiceManager::stopAll(const int signal) {
     LogRegistry::vaulthalla()->debug("[ServiceManager] Stopping all services...");
@@ -111,6 +123,9 @@ void ServiceManager::startWatchdog() {
                 for (auto& [name, svc] : services_) {
                     if (svc && !svc->isRunning()) {
                         LogRegistry::vaulthalla()->warn("[Watchdog] {} is down, restarting...", name);
+                        if (name == "FUSE") system(fmt::format("fusermount3 -u {} > /dev/null 2>&1 || fusermount -u {} > /dev/null 2>&1",
+                   getFuseMountPoint().string(), getFuseMountPoint().string()).c_str());
+
                         restartService(name);
                     }
                 }
@@ -132,4 +147,29 @@ void ServiceManager::stopWatchdog() {
     stopAll(SIGTERM);
     LogRegistry::vaulthalla()->error("[ServiceManager] Exiting with failure status.");
     std::_Exit(EXIT_FAILURE);
+}
+
+void ServiceManager::setFuseMountPoint(const std::filesystem::path& mount) const {
+    if (fuseService && !fuseService->isRunning()) fuseService->setTestMode(mount);
+    else throw std::runtime_error("Cannot set FUSE mount point while FUSE service is running");
+}
+
+std::filesystem::path ServiceManager::getFuseMountPoint() const {
+    if (fuseService) return fuseService->mountPoint();
+    return {};
+}
+
+std::shared_ptr<vh::shell::Router> ServiceManager::getCLIRouter() const {
+    if (ctlServerService) return ctlServerService->get_router();
+    return nullptr;
+}
+
+void ServiceManager::setCtlSocketPath(const std::string& path) const {
+    if (ctlServerService && !ctlServerService->isRunning()) ctlServerService->setSocketPath(path);
+    else throw std::runtime_error("Cannot set CtlServer socket path while CtlServer service is running");
+}
+
+std::string ServiceManager::getCtlSocketPath() const {
+    if (ctlServerService) return ctlServerService->socketPath();
+    return {};
 }

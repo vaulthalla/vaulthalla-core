@@ -44,7 +44,7 @@ using namespace vh::logging;
 using namespace vh::services;
 using namespace vh::crypto;
 
-void vh::seed::init() {
+void vh::seed::seed_database() {
     LogRegistry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);
     LogRegistry::vaulthalla()->debug("Initializing database for Vaulthalla v{}", VH_VERSION);
 

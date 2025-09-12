@@ -1,0 +1,115 @@
+#include "CommandBuilder.hpp"
+#include "CommandUsage.hpp"
+#include "generators.hpp"
+
+using namespace vh::test::cli;
+using namespace vh::types;
+using namespace vh::shell;
+
+GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+    : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}
+
+std::string GroupCommandBuilder::updateAndResolveVar(const std::shared_ptr<Group>& entity, const std::string& field) {
+    const std::string usagePath = "group/update";
+
+    if (groupAliases_.isName(field)) {
+        entity->name = generateName(usagePath);
+        return entity->name;
+    }
+
+    if (groupAliases_.isDescription(field)) {
+        if (coin()) {
+            const auto desc = generateDescription(usagePath);
+            entity->description = std::make_optional(desc);
+            return desc;
+        }
+        entity->description = std::make_optional(std::string(""));
+        return "";
+    }
+
+    if (groupAliases_.isLinuxGID(field)) {
+        const auto gid = randomLinuxId();
+        entity->linux_gid = std::make_optional(gid);
+        return std::to_string(gid);
+    }
+
+    throw std::runtime_error("GroupCommandBuilder: unsupported group field for update: " + field);
+}
+
+static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<Group>& group) {
+    if (name == "id" || name == "group_id") return std::to_string(group->id);
+    if (name == "name" || name == "group_name") return group->name;
+    if (name == "description" || name == "desc") return group->description;
+    throw std::runtime_error("GroupCommandBuilder: unsupported group field for resolveVar: " + name);
+}
+
+static std::string randomizePrimaryPositional(const std::shared_ptr<Group>& entity) {
+    if (coin()) return std::to_string(entity->id);
+    return entity->name;
+}
+
+std::string GroupCommandBuilder::create(const std::shared_ptr<Group>& entity) {
+    const auto cmd = root_->findSubcommand("create");
+    if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'create' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ' << entity->name;
+    for (const auto& opt : cmd->required) {
+        oss << ' ' << randomAlias(opt.option_tokens);
+        if (auto val = resolveVar(opt.option_tokens[0], entity); val) oss << ' ' << *val;
+        else throw std::runtime_error("GroupCommandBuilder: unsupported group field for create: " + opt.option_tokens[0]);
+    }
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::update(const std::shared_ptr<Group>& entity) {
+    const auto cmd = root_->findSubcommand("update");
+    if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'update' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
+
+    unsigned int updated = 0;
+    for (const auto& opt : cmd->optional) {
+        if (coin() || updated == 0) {
+            oss << ' ' << randomFlagAlias(opt.option_tokens);
+            if (opt.label.contains("description")) oss << ' ' << quoted(updateAndResolveVar(entity, opt.option_tokens[0]));
+            else oss << ' ' << updateAndResolveVar(entity, opt.option_tokens[0]);
+            ++updated;
+        }
+    }
+
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::remove(const std::shared_ptr<Group>& entity) {
+    const auto cmd = root_->findSubcommand("delete");
+    if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'delete' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::info(const std::shared_ptr<Group>& entity) {
+    const auto cmd = root_->findSubcommand("info");
+    if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'info' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::list() {
+    const auto cmd = root_->findSubcommand("list");
+    if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'list' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    for (const auto& flag : cmd->optional_flags)
+        if (generateRandomIndex(10000) < 5000) oss << " --" << randomAlias(flag.aliases);
+    return oss.str();
+}

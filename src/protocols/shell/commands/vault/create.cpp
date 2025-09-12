@@ -147,7 +147,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
         const auto owner = io->prompt("Enter owner user ID or username (leave blank for yourself):");
         if (owner.empty()) v->owner_id = call.user->id;
         else {
-            if (const auto ownerIdOpt = parseInt(owner)) {
+            if (const auto ownerIdOpt = parseUInt(owner)) {
                 if (*ownerIdOpt <= 0) return invalid("vault create: owner ID must be a positive integer");
                 v->owner_id = *ownerIdOpt;
             } else {
@@ -180,7 +180,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
             if (apiKeyStr.empty()) return invalid("vault create: API key is required for S3 vaults");
 
             std::shared_ptr<api::APIKey> apiKey;
-            if (const auto apiKeyIdOpt = parseInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
+            if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
             else apiKey = APIKeyQueries::getAPIKey(apiKeyStr);
 
             if (!apiKey) return invalid("vault create: API key not found: " + apiKeyStr);
@@ -253,20 +253,21 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
 
         const std::string name = call.positionals[0];
 
-        const bool f_local = hasFlag(call, "local");
+        bool f_local = hasFlag(call, "local");
         const bool f_s3 = hasFlag(call, "s3");
         if (f_local && f_s3) return invalid("vault create: --local and --s3 are mutually exclusive");
+        if (!f_local && ! f_s3) f_local = true; // Default to local
 
         const auto descOpt = optVal(call, "desc");
         const auto quotaOpt = optVal(call, "quota");
         const auto ownerOpt = optVal(call, "owner");
-        const auto syncStrategyOpt = optVal(call, "sync-strategy");
         const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
+        const auto intervalOpt = optVal(call, "interval");
 
         if (!ownerOpt) return invalid("vault create: invalid owner");
 
         unsigned int ownerId = call.user->id;
-        if (const auto ownerIdOpt = parseInt(*ownerOpt)) {
+        if (const auto ownerIdOpt = parseUInt(*ownerOpt)) {
             if (*ownerIdOpt <= 0) return invalid("vault create: --owner <id> must be a positive integer");
             ownerId = *ownerIdOpt;
         }
@@ -294,7 +295,7 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
                     "vault create: missing required --api-key <name | id> for S3 vault");
 
             std::shared_ptr<api::APIKey> apiKey;
-            if (const auto apiKeyIdOpt = parseInt(*apiKeyOpt)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
+            if (const auto apiKeyIdOpt = parseUInt(*apiKeyOpt)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
             else apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
 
             if (!apiKey) return invalid("vault create: API key not found: " + *apiKeyOpt);
@@ -323,7 +324,8 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
             s3Vault->bucket = *bucketOpt;
 
             const auto rsync = std::make_shared<RSync>();
-            if (syncStrategyOpt) rsync->strategy = strategyFromString(*syncStrategyOpt);
+            if (const auto syncStrategyOpt = optVal(call, "sync-strategy"))
+                rsync->strategy = strategyFromString(*syncStrategyOpt);
             else rsync->strategy = RSync::Strategy::Cache;
 
             if (onSyncConflictOpt) rsync->conflict_policy = rsConflictPolicyFromString(*onSyncConflictOpt);
@@ -332,6 +334,11 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
             sync = rsync;
             vault = s3Vault;
         }
+
+        if (!sync) return invalid("vault create: internal error, sync not initialized");
+
+        if (intervalOpt) sync->interval = parseSyncInterval(*intervalOpt);
+        else sync->interval = std::chrono::seconds(300);
 
         vault->name = name;
         vault->description = descOpt ? *descOpt : "";

@@ -11,6 +11,8 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 
+#include <paths.h>
+
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::crypto;
@@ -38,7 +40,7 @@ static CommandResult handle_secrets_set(const CommandCall& call) {
     const auto secret = trimSecret(readFileToVector(*fileOpt));
 
     if (secretArg == "db-password") {
-        TPMKeyProvider tpm("postgres");
+        TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
         tpm.init();
         tpm.updateMasterKey(secret);
         return ok("Successfully updated database password secret (sealed with TPM)");
@@ -107,7 +109,7 @@ static nlohmann::json generateSecretOutput(const std::string& name, const std::s
 }
 
 static nlohmann::json getDBPassword() {
-    TPMKeyProvider tpm("postgres");
+    TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
     tpm.init();
     return generateSecretOutput("db-password", tpm.getMasterKey());
 }

@@ -103,3 +103,11 @@ std::shared_ptr<Group> GroupQueries::getGroupByName(const std::string& name) {
             return std::make_shared<Group>(groupRow, members);
         });
 }
+
+bool GroupQueries::groupExists(const std::string& name) {
+    return Transactions::exec("GroupQueries::groupExists", [&](pqxx::work& txn) {
+        const auto res = txn.exec(pqxx::prepped{"group_exists"}, name);
+        if (res.empty()) return false;
+        return res.one_field().as<bool>();
+    });
+}

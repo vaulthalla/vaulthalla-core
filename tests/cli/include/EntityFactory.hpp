@@ -8,6 +8,7 @@
 #include "types/Role.hpp"
 #include "types/UserRole.hpp"
 #include "types/VaultRole.hpp"
+#include "types/FSync.hpp"
 #include "CLITestContext.hpp"
 #include "permsUtil.hpp"
 
@@ -21,7 +22,7 @@ class EntityFactory {
 public:
     explicit EntityFactory(const std::shared_ptr<CLITestContext>& ctx) : ctx_(ctx) {}
 
-    std::shared_ptr<void> create(const EntityType& type) {
+    [[nodiscard]] std::shared_ptr<void> create(const EntityType& type) const {
         if (type == EntityType::USER) {
             const std::string usage = "user/create";
             const auto user = std::make_shared<types::User>();

@@ -21,6 +21,7 @@ struct UserAliases {
     std::vector<std::string> nameAliases;
     std::vector<std::string> emailAliases;
     std::vector<std::string> roleAliases;
+    std::vector<std::string> linuxUidAliases;
 
     explicit UserAliases(const std::shared_ptr<CLITestContext>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::USER, "update");
@@ -32,8 +33,8 @@ struct UserAliases {
                 emailAliases.insert(emailAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "role" || t == "role_id"; })) {
                 roleAliases.insert(roleAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
-            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "linux_uid" || t == "uid"; })) {
-                roleAliases.insert(roleAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t.contains("uid"); })) {
+                linuxUidAliases.insert(linuxUidAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
     }
@@ -41,11 +42,11 @@ struct UserAliases {
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
     bool isEmail (const std::string& field) const { return isFieldMatch(field, emailAliases); }
     bool isRole (const std::string& field) const { return isFieldMatch(field, roleAliases); }
-    bool isLinuxUID (const std::string& field) const { return isFieldMatch(field, roleAliases); }
+    bool isLinuxUID (const std::string& field) const { return isFieldMatch(field, linuxUidAliases); }
 };
 
 struct GroupAliases {
-    std::vector<std::string> nameAliases;
+    std::vector<std::string> nameAliases, descAliases, gidAliases;
 
     explicit GroupAliases(const std::shared_ptr<CLITestContext>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::GROUP, "update");
@@ -53,11 +54,17 @@ struct GroupAliases {
         for (const auto& opt : cmd->optional) {
             if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "name" || t == "group_name"; })) {
                 nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "description" || t == "desc"; })) {
+                descAliases.insert(descAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t.contains("gid"); })) {
+                gidAliases.insert(gidAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
     }
 
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
+    bool isDescription (const std::string& field) const { return isFieldMatch(field, descAliases); }
+    bool isLinuxGID (const std::string& field) const { return isFieldMatch(field, gidAliases); }
 };
 
 struct UserRoleAliases {
@@ -69,12 +76,13 @@ struct UserRoleAliases {
         for (const auto& opt : cmd->optional) {
             if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "name" || t == "role_name"; })) {
                 nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
-            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "permissions" || t == "perms"; })) {
-                permAliases.insert(permAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "description" || t == "desc"; })) {
                 descAliases.insert(descAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
+
+        permAliases.emplace_back("permissions");
+        permAliases.emplace_back("perms");
     }
 
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
@@ -91,12 +99,13 @@ struct VaultRoleAliases {
         for (const auto& opt : cmd->optional) {
             if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "name" || t == "role_name"; })) {
                 nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
-            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "permissions" || t == "perms"; })) {
-                permAliases.insert(permAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "description" || t == "desc"; })) {
                 descAliases.insert(descAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
+
+        permAliases.emplace_back("permissions");
+        permAliases.emplace_back("perms");
     }
 
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
@@ -105,7 +114,7 @@ struct VaultRoleAliases {
 };
 
 struct VaultAliases {
-    std::vector<std::string> nameAliases, quotaAliases, ownerAliases, conflictPolicyAliases;
+    std::vector<std::string> nameAliases, descAliases, quotaAliases, ownerAliases, conflictPolicyAliases, intervalAliases;
 
     explicit VaultAliases(const std::shared_ptr<CLITestContext>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::VAULT, "update");
@@ -114,22 +123,25 @@ struct VaultAliases {
             if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "name" || t == "vault_name"; })) {
                 nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "description" || t == "desc"; })) {
-                nameAliases.insert(nameAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+                descAliases.insert(descAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "quota"; })) {
                 quotaAliases.insert(quotaAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "owner" || t == "owner_id"; })) {
                 ownerAliases.insert(ownerAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
-            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "conflict_policy" || t == "conflict"; })) {
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "on_sync_conflict" || t == "conflict_policy" || t == "conflict"; })) {
                 conflictPolicyAliases.insert(conflictPolicyAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
+            } else if (std::ranges::any_of(opt.option_tokens, [](const std::string& t){ return t == "interval" || t == "sync_interval"; })) {
+                intervalAliases.insert(intervalAliases.end(), opt.option_tokens.begin(), opt.option_tokens.end());
             }
         }
     }
 
     bool isName (const std::string& field) const { return isFieldMatch(field, nameAliases); }
-    bool isDescription (const std::string& field) const { return isFieldMatch(field, nameAliases); }
+    bool isDescription (const std::string& field) const { return isFieldMatch(field, descAliases); }
     bool isQuota (const std::string& field) const { return isFieldMatch(field, quotaAliases); }
     bool isOwner (const std::string& field) const { return isFieldMatch(field, ownerAliases); }
     bool isConflictPolicy (const std::string& field) const { return isFieldMatch(field, conflictPolicyAliases); }
+    bool isInterval (const std::string& field) const { return isFieldMatch(field, intervalAliases); }
 };
 
 struct S3VaultAliases : VaultAliases {

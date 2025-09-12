@@ -35,26 +35,17 @@ std::string VaultCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault
         return entity->quotaStr();
     }
 
-    throw std::runtime_error("EntityFactory: unsupported vault field for update: " + field);
+    throw std::runtime_error("VaultCommandBuilder: unsupported vault field for update: " + field);
+}
+
+static std::string randomizePrimaryPositional(const std::shared_ptr<Vault>& entity) {
+    if (coin()) return std::to_string(entity->id);
+    return entity->name + " --owner " + std::to_string(entity->owner_id);
 }
 
 std::string VaultCommandBuilder::chooseVaultType() {
     // Bias to local so tests don’t demand S3 specifics unless you want them to
     return coin() ? "local" : "local"; // flip second to "s3" when you’re ready
-}
-
-std::string VaultCommandBuilder::vaultRef(const std::shared_ptr<Vault>& v, bool& usedName) {
-    // Prefer ID for stability; sometimes exercise the name path (requires owner)
-    if (v->id > 0 && !coin()) { usedName = false; return std::to_string(v->id); }
-    usedName = true; return v->name;
-}
-
-void VaultCommandBuilder::emitOwnerIfName(std::ostringstream& oss, const std::shared_ptr<Vault>& v, bool usedName) {
-    if (!usedName) return;
-    // your usage allows --owner id|name; we’ll pass an id if we have it
-    if (v->owner_id > 0) oss << " --owner "   << v->owner_id;
-    else if (const auto owner = UserQueries::getUserById(v->owner_id)) oss << " --owner name " << owner->name;
-    else oss << " --owner id 1"; // last-resort: test user 1
 }
 
 // ---------------- core ----------------
@@ -64,22 +55,34 @@ std::string VaultCommandBuilder::create(const std::shared_ptr<Vault>& v) {
     if (!cmd) throw std::runtime_error("vault.create usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ';
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ' << v->name;
 
-    // positional: vault name or id (prefer name on create)
-    bool usedName = true;
-    oss << v->name << ' ';
+    oss << " --owner " << v->owner_id;
 
     // required flags: type
     const auto type = chooseVaultType(); // "local" or "s3"
-    oss << "--" << type;
+    oss << " --" << type;
 
     // optional
     if (!v->description.empty() && coin()) oss << " --" << randomAlias(std::vector<std::string>{"desc","d"}) << ' ' << quoted(v->description);
     if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << v->quotaStr();
 
-    // owner (create by name requires owner if server needs it; harmless otherwise)
-    emitOwnerIfName(oss, v, usedName);
+    // if (type == "local") {
+    //     const auto it = std::ranges::find_if(cmd->groups, [](const auto& g){ return g.title == "Local Vault Options"; });
+    //     if (it == cmd->groups.end()) throw std::runtime_error("vault.create usage missing Local Vault Options group");
+    //     const auto localOpts = *it;
+    //     for (const auto& opt : localOpts.items) {
+    //         if (coin()) {
+    //             if (const auto option = std::get_if<Optional>(&opt)) {
+    //                 oss << ' ' << randomAlias(option->option_tokens);
+    //             } else if (const auto flag = std::get_if<Flag>(&opt)) {
+    //                 oss << ' ' << randomFlagAlias(flag->aliases);
+    //             } else {
+    //                 throw std::runtime_error("vault.create Local Vault Options group has unsupported item type");
+    //             }
+    //         }
+    //     }
+    // }
 
     // s3 group (only if you start returning "s3" in chooseVaultType)
     // if (type == "s3") {
@@ -108,12 +111,12 @@ std::string VaultCommandBuilder::update(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
 
-    if (!v->description.empty() && coin()) oss << " --" << randomAlias(std::vector<std::string>{"desc","d"}) << ' ' << quoted(v->description);
-    if (v->quota > 0 && coin())           oss << " --" << randomAlias(std::vector<std::string>{"quota","q"}) << ' ' << v->quotaStr();
+    for (const auto& opt : cmd->optional) {
+        if (opt.label.contains("owner")) continue; // already handled above
+        if (coin()) oss << ' ' << randomFlagAlias(opt.option_tokens) << ' ' << quoted(updateAndResolveVar(v, opt.label));
+    }
 
     // s3-ish knobs (harmless on local if server ignores)
     // if (coin()) oss << " --sync-strategy " << randomAlias(std::vector<std::string>{"cache","sync","mirror"});
@@ -132,11 +135,7 @@ std::string VaultCommandBuilder::remove(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ';
-    if (coin()) oss << v->id;
-    else {
-        oss << v->name;
-        emitOwnerIfName(oss, v, /*usedName=*/true);
-    }
+    oss << randomizePrimaryPositional(v);
     return oss.str();
 }
 
@@ -146,9 +145,7 @@ std::string VaultCommandBuilder::info(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
     return oss.str();
 }
 
@@ -159,7 +156,7 @@ std::string VaultCommandBuilder::list() {
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
     if (coin()) oss << " --local";
-    if (coin()) oss << " --s3";
+    // if (coin()) oss << " --s3";
     if (coin()) oss << " --limit " << (5 + (generateRandomIndex(1000) % 10));
     if (coin(10000, 2000)) oss << " --json";
     return oss.str();
@@ -173,9 +170,7 @@ std::string VaultCommandBuilder::sync_set(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(sync->aliases) << ' ' << randomAlias(set->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
 
     oss << " --sync-strategy " << randomAlias(std::vector<std::string>{"cache","sync","mirror"});
     oss << " --on-sync-conflict " << randomAlias(std::vector<std::string>{"keep_local","keep_remote","ask"});
@@ -188,9 +183,7 @@ std::string VaultCommandBuilder::sync_info(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(sync->aliases) << ' ' << randomAlias(info->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
     return oss.str();
 }
 
@@ -200,9 +193,7 @@ std::string VaultCommandBuilder::sync_trigger(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(sync->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
     return oss.str();
 }
 
@@ -212,10 +203,7 @@ std::string VaultCommandBuilder::key_export(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(key->aliases) << ' ' << randomAlias(exp->aliases) << ' ';
-    // your usage allows "all" as positional; we’ll target a single vault
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
 
     if (coin()) oss << " --output " << (v->name.empty() ? "vault_key.pem" : v->name + "_key.pem");
     if (coin()) oss << " --recipient " << "ABCDEF1234567890";
@@ -228,9 +216,7 @@ std::string VaultCommandBuilder::key_rotate(const std::shared_ptr<Vault>& v) {
 
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(key->aliases) << ' ' << randomAlias(rot->aliases) << ' ';
-    bool usedName = false;
-    oss << vaultRef(v, usedName);
-    emitOwnerIfName(oss, v, usedName);
+    oss << randomizePrimaryPositional(v);
     if (coin()) oss << " --sync-now";
     return oss.str();
 }

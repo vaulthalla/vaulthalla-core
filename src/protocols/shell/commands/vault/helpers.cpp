@@ -20,7 +20,7 @@ using namespace vh::services;
 namespace vh::shell::commands::vault {
 
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut) {
-    if (const auto v = parseInt(s)) {
+    if (const auto v = parseUInt(s)) {
         if (*v <= 0) { errOut = std::string(errLabel) + " must be a positive integer"; return std::nullopt; }
         return static_cast<unsigned int>(*v);
     }
@@ -35,7 +35,7 @@ Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& er
         out.error = errPrefix + ": when using a vault name, you must specify --owner <id|name>";
         return out;
     }
-    if (const auto idOpt = parseInt(*ownerOpt)) {
+    if (const auto idOpt = parseUInt(*ownerOpt)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": --owner must be a positive integer"; return out; }
         out.ptr = UserQueries::getUserById(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": owner id not found: " + *ownerOpt;
@@ -48,7 +48,7 @@ Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& er
 
 Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
     Lookup<Vault> out;
-    if (const auto idOpt = parseInt(vaultArg)) {
+    if (const auto idOpt = parseUInt(vaultArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": vault ID must be a positive integer"; return out; }
         out.ptr = VaultQueries::getVault(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": vault with id " + std::to_string(*idOpt) + " not found";
@@ -90,7 +90,7 @@ Lookup<VaultRole> resolveVRole(const std::string& roleArg,
                               const Subject* subjectOrNull,
                               const std::string& errPrefix) {
     Lookup<VaultRole> out;
-    if (const auto idOpt = parseInt(roleArg)) {
+    if (const auto idOpt = parseUInt(roleArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": role ID must be a positive integer"; return out; }
         out.ptr = PermsQueries::getVaultRole(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": role with id " + std::to_string(*idOpt) + " not found";

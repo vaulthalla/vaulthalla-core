@@ -18,13 +18,13 @@ static const auto inheritFrom = Optional::OneToMany("inherit_from", "Inherit per
 static const auto roleNameOpt = Optional::Single("role_name", "New name for the role", "name", "new_name");
 static const auto newRolePos = Positional::Alias("role_name", "Name for the new role", "name");
 static const auto typePos = Positional::WithAliases("role_type", "Type of the role (user | vault)", {"user", "vault"});
+static const auto descriptionOpt = Optional::ManyToOne("description", "Description of the role", {"description", "desc", "d"}, "description");
 
 static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all roles in the system.";
-    cmd->optional_flags = { jsonFlag };
-    cmd->optional_flags = { userFlag, vaultFlag };
+    cmd->optional_flags = { jsonFlag, userFlag, vaultFlag };
     cmd->examples.push_back({"vh roles", "List all roles."});
     cmd->examples.push_back({"vh roles --user --json", "List all user roles in JSON format."});
     return cmd;
@@ -35,7 +35,6 @@ static std::shared_ptr<CommandUsage> info(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"info", "show", "get"};
     cmd->description = "Display detailed information about a specific role.";
     cmd->positionals = { rolePos };
-    cmd->optional_flags = { userFlag, vaultFlag };
     cmd->examples.push_back({"vh role info 42", "Show information for the role with ID 42."});
     cmd->examples.push_back({"vh role info admin --user", "Show information for the user role named 'admin'."});
     return cmd;
@@ -47,7 +46,7 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->description = "Create a new role with specified permissions.";
     cmd->positionals = { typePos, newRolePos };
     cmd->optional_flags = { permissionsFlags };
-    cmd->optional = { inheritFrom };
+    cmd->optional = { descriptionOpt, inheritFrom };
     cmd->examples.push_back({"vh role create editor --type user --set-manage-users --set-manage-groups",
                            "Create a new user role named 'editor' with user and group management permissions."});
     cmd->examples.push_back({"vh role create vault-admin --type vault --from 3 --set-manage-access",
@@ -60,7 +59,6 @@ static std::shared_ptr<CommandUsage> remove(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"delete", "remove", "del", "rm"};
     cmd->description = "Delete an existing role by ID.";
     cmd->positionals = { rolePos };
-    cmd->optional_flags = { userFlag, vaultFlag };
     cmd->examples.push_back({"vh role delete 42", "Delete the role with ID 42."});
     cmd->examples.push_back({"vh role rm 42", "Delete the role with ID 42 (using alias)."});
     return cmd;
@@ -71,8 +69,8 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties and permissions of an existing role.";
     cmd->positionals = { rolePos };
-    cmd->optional_flags = { permissionsFlags, userFlag, vaultFlag };
-    cmd->optional = { roleNameOpt };
+    cmd->optional_flags = { permissionsFlags };
+    cmd->optional = { descriptionOpt, roleNameOpt };
     cmd->examples.push_back({"vh role update 42 --name superadmin --set-manage-admins",
                            "Rename role ID 42 to 'superadmin' and add admin management permission."});
     cmd->examples.push_back({"vh role update 3 --unset-manage-users",

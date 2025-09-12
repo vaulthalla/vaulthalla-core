@@ -111,7 +111,10 @@ nlohmann::json to_json(const std::shared_ptr<User>& user) { return {*user}; }
 
 
 // --- User role checks ---
-bool User::isSuperAdmin() const { return hasPermission(role->permissions, AdminPermission::ManageAdmins); }
+bool User::isSuperAdmin() const {
+    return hasPermission(role->permissions, AdminPermission::ManageAdmins)
+    && hasPermission(role->permissions, AdminPermission::ManageEncryptionKeys);
+}
 bool User::isAdmin() const { return isSuperAdmin() || role->permissions == ADMIN_MASK; }
 
 
@@ -222,6 +225,7 @@ std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
     if (users.empty()) return "No users found\n";
 
     Table tbl({
+        {"ID", Align::Right, 4, 4, false, false},
         {"Name", Align::Left, 4, 32, false, false},
         {"Email", Align::Left, 4, 32, false, false},
         {"Role", Align::Left, 4, 16, false, false},
@@ -233,6 +237,7 @@ std::string to_string(const std::vector<std::shared_ptr<User>>& users) {
     for (const auto& user : users) {
         if (!user) continue; // Skip null pointers
         tbl.add_row({
+            std::to_string(user->id),
             user->name,
             user->email.value_or("N/A"),
             user->role ? snake_case_to_title(user->role->name) : "No Role",

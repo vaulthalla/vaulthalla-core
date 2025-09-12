@@ -55,7 +55,7 @@ CommandResult usage(const std::vector<std::string>& args = {});
 
 std::optional<std::string> optVal(const CommandCall& c, const std::string& key);
 
-std::optional<int> parseInt(const std::string& sv);
+std::optional<unsigned int> parseUInt(const std::string& sv);
 
 uintmax_t parseSize(const std::string& s);
 

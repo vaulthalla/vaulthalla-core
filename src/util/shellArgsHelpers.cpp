@@ -13,6 +13,7 @@
 #include <string>
 #include <cctype>
 #include <algorithm>
+#include <limits>
 
 using namespace vh::shell;
 using namespace vh::services;
@@ -51,16 +52,19 @@ bool vh::shell::hasKey(const CommandCall& c, const std::string& key) {
     return std::ranges::any_of(c.options, [&key](const auto& kv) { return kv.key == key; });
 }
 
-std::optional<int> vh::shell::parseInt(const std::string& sv) {
+std::optional<unsigned int> vh::shell::parseUInt(const std::string& sv) {
     if (sv.empty()) return std::nullopt;
-    int v = 0; bool neg = false; size_t i = 0;
-    if (sv[0] == '-') { neg = true; i = 1; }
-    for (; i < sv.size(); ++i) {
-        char c = sv[i];
+
+    unsigned long long v = 0; // wide enough for overflow check
+    for (const char c : sv) {
         if (c < '0' || c > '9') return std::nullopt;
-        v = v*10 + (c - '0');
+        v = v * 10 + static_cast<unsigned>(c - '0');
+        if (v > std::numeric_limits<unsigned int>::max()) {
+            return std::nullopt; // overflow
+        }
     }
-    return neg ? -v : v;
+
+    return static_cast<unsigned int>(v);
 }
 
 uintmax_t vh::shell::parseSize(const std::string& s) {
@@ -91,7 +95,7 @@ Lookup<Subject> vh::shell::parseSubject(const CommandCall& call, const std::stri
     const std::vector<std::string> userFlags = {"user", "u"};
     for (const auto& f : userFlags) {
         if (const auto v = optVal(call, f)) {
-            if (const auto idOpt = parseInt(*v)) {
+            if (const auto idOpt = parseUInt(*v)) {
                 if (*idOpt <= 0) { out.error = errPrefix + ": user ID must be a positive integer"; return out; }
                 out.ptr = std::make_shared<Subject>(Subject{"user", static_cast<unsigned int>(*idOpt)});
                 return out;
@@ -106,7 +110,7 @@ Lookup<Subject> vh::shell::parseSubject(const CommandCall& call, const std::stri
     const std::vector<std::string> groupFlags = {"group", "g"};
     for (const auto& f : groupFlags) {
         if (const auto v = optVal(call, f)) {
-            if (const auto idOpt = parseInt(*v)) {
+            if (const auto idOpt = parseUInt(*v)) {
                 if (*idOpt <= 0) { out.error = errPrefix + ": group ID must be a positive integer"; return out; }
                 out.ptr = std::make_shared<Subject>(Subject{"group", static_cast<unsigned int>(*idOpt)});
                 return out;
@@ -125,7 +129,7 @@ Lookup<Subject> vh::shell::parseSubject(const CommandCall& call, const std::stri
 Lookup<Role> vh::shell::resolveRole(const std::string& roleArg, const std::string& errPrefix) {
     Lookup<Role> out;
 
-    if (const auto roleIdOpt = parseInt(roleArg)) {
+    if (const auto roleIdOpt = parseUInt(roleArg)) {
         if (*roleIdOpt <= 0) {
             out.error = errPrefix + ": role ID must be a positive integer";
             return out;
@@ -133,7 +137,7 @@ Lookup<Role> vh::shell::resolveRole(const std::string& roleArg, const std::strin
         out.ptr = PermsQueries::getRole(*roleIdOpt);
     } else out.ptr = PermsQueries::getRoleByName(roleArg);
 
-    if (!out.ptr) out.error = errPrefix + ": role not found";
+    if (!out.ptr) out.error = errPrefix + ": role not found '" + roleArg + "'";
     return out;
 }
 
@@ -164,7 +168,7 @@ ListQueryParams vh::shell::parseListQuery(const CommandCall& call) {
 
     if (const auto limitOpt = optVal(call, "limit")) {
         if (limitOpt->empty()) throw std::invalid_argument("Invalid --limit value: cannot be empty");
-        const auto limitParsed = parseInt(*limitOpt);
+        const auto limitParsed = parseUInt(*limitOpt);
         if (!limitParsed || *limitParsed <= 0)
             throw std::invalid_argument("Invalid --limit value: must be a positive integer");
         p.limit = *limitParsed;
@@ -172,7 +176,7 @@ ListQueryParams vh::shell::parseListQuery(const CommandCall& call) {
 
     if (const auto pageOpt = optVal(call, "page")) {
         if (pageOpt->empty()) throw std::invalid_argument("Invalid --page value: cannot be empty");
-        const auto pageParsed = parseInt(*pageOpt);
+        const auto pageParsed = parseUInt(*pageOpt);
         if (!pageParsed || *pageParsed <= 0)
             throw std::invalid_argument("Invalid --page value: must be a positive integer");
         p.page = *pageParsed;
@@ -184,7 +188,7 @@ ListQueryParams vh::shell::parseListQuery(const CommandCall& call) {
 Lookup<User> vh::shell::resolveUser(const std::string& userArg, const std::string& errPrefix) {
     Lookup<User> out;
 
-    if (const auto idOpt = parseInt(userArg)) {
+    if (const auto idOpt = parseUInt(userArg)) {
         if (*idOpt <= 0) {
             out.error = errPrefix + ": user ID must be a positive integer";
             return out;

@@ -31,13 +31,13 @@ static CommandResult handle_group_create(const CommandCall& call) {
     group->description = optVal(call, "desc").value_or("");
 
     if (const auto linuxGidOpt = optVal(call, "linux-gid")) {
-        const auto parsed = parseInt(*linuxGidOpt);
+        const auto parsed = parseUInt(*linuxGidOpt);
         if (!parsed || *parsed <= 0) return invalid("group create: --linux-gid must be a positive integer");
         group->linux_gid = *parsed;
     }
 
     try {
-        GroupQueries::createGroup(group);
+        group->id = GroupQueries::createGroup(group);
         return ok("Successfully created new group:\n" + to_string(group));
     } catch (const std::exception& e) {
         return invalid("group create: " + std::string(e.what()));
@@ -50,7 +50,7 @@ static CommandResult handle_group_update(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("group update: too many arguments");
 
     const std::string arg = call.positionals[0];
-    const auto gidOpt = parseInt(arg);
+    const auto gidOpt = parseUInt(arg);
 
     std::shared_ptr<Group> group;
 
@@ -69,7 +69,7 @@ static CommandResult handle_group_update(const CommandCall& call) {
     if (const auto desc = optVal(call, "desc")) group->description = *desc;
 
     if (const auto linuxGid = optVal(call, "linux-gid")) {
-        const auto parsed = parseInt(*linuxGid);
+        const auto parsed = parseUInt(*linuxGid);
         if (!parsed || *parsed <= 0) return invalid("group update: --linux-gid must be a positive integer");
         group->linux_gid = *parsed;
     }
@@ -88,12 +88,12 @@ static CommandResult handle_group_delete(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("group delete: too many arguments");
 
     const std::string arg = call.positionals[0];
-    const auto gidOpt = parseInt(arg);
+    const auto gidOpt = parseUInt(arg);
 
     std::shared_ptr<Group> group;
 
     if (gidOpt) {
-        if (*gidOpt <= 0) return invalid("group delete: <id> must be a positive integer");
+        if (*gidOpt <= 0) return invalid("group delete: <id> must be a positive integer, got " + std::to_string(*gidOpt));
         group = GroupQueries::getGroup(*gidOpt);
     } else group = GroupQueries::getGroupByName(arg);
 
@@ -109,7 +109,7 @@ static CommandResult handle_group_info(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("group info: too many arguments");
 
     const auto arg = call.positionals[0];
-    const auto gidOpt = parseInt(arg);
+    const auto gidOpt = parseUInt(arg);
 
     std::shared_ptr<Group> group;
 
@@ -138,10 +138,10 @@ static CommandResult handle_group_add_user(const CommandCall& call) {
     if (call.positionals.size() != 2) return invalid("group add-user: usage: group add-user <group_name> <user_name>");
 
     const std::string groupArg = call.positionals[0];
-    const auto groupIdOpt = parseInt(groupArg);
+    const auto groupIdOpt = parseUInt(groupArg);
 
     const std::string userArg = call.positionals[1];
-    const auto userIdOpt = parseInt(userArg);
+    const auto userIdOpt = parseUInt(userArg);
 
     std::shared_ptr<Group> group;
 
@@ -171,10 +171,10 @@ static CommandResult handle_group_remove_user(const CommandCall& call) {
     if (call.positionals.size() != 2) return invalid("group remove-user: usage: group remove-user <group_name> <user_name>");
 
     const auto groupArg = call.positionals[0];
-    const auto groupIdOpt = parseInt(groupArg);
+    const auto groupIdOpt = parseUInt(groupArg);
 
     const auto userArg = call.positionals[1];
-    const auto userIdOpt = parseInt(userArg);
+    const auto userIdOpt = parseUInt(userArg);
 
     std::shared_ptr<Group> group;
     if (groupIdOpt) {
@@ -216,7 +216,7 @@ static CommandResult handle_group_list_users(const CommandCall& call) {
     if (call.positionals.size() > 1) return invalid("group list-users: too many arguments");
 
     const std::string groupArg = call.positionals[0];
-    const auto groupIdOpt = parseInt(groupArg);
+    const auto groupIdOpt = parseUInt(groupArg);
 
     std::shared_ptr<Group> group;
 

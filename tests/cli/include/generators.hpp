@@ -35,8 +35,10 @@ inline std::string generateNow(args::Gen g,
 }
 
 inline std::string generateName(const std::string& usage) {
+    const auto it = std::views::split(usage, '/').front();
+    const std::string entity(it.begin(), it.end());
     return generateNow(args::ArgGenerator::Join({
-        args::ArgGenerator::Constant(std::string("user_")),
+        args::ArgGenerator::Constant(std::string(entity + "_")),
         args::ArgGenerator::RandomString(6, 10, "abcdefghijklmnopqrstuvwxyz0123456789")
     }, ""), "name", usage);
 }
@@ -67,7 +69,15 @@ inline std::string generateRoleName(const EntityType& type, const std::string& u
 inline uint16_t generateBitmask(const std::size_t numBits) {
     if (numBits == 0 || numBits > 16) throw std::runtime_error("EntityFactory: invalid bitmask size");
     uint16_t mask = 0;
-    for (std::size_t i = 0; i < numBits; ++i) if (generateRandomIndex(10000) < 5000) mask |= (1 << i);
+    for (std::size_t i = 0; i < numBits; ++i) if (coin()) mask |= (1 << i);
+    do {
+        mask = 0;
+        for (std::size_t i = 0; i < numBits; ++i)
+            if (coin()) mask |= (1 << i);
+
+        mask |= (1 << (1 + generateRandomIndex(numBits - 1))); // force at least one nonzero
+        mask &= ~0b0000000000000011;
+    } while (mask == 0 || mask == 0b0000001111111111); // forbid super_admin
     return mask;
 }
 
@@ -96,30 +106,11 @@ inline std::string randomAllowDenyOrNoOptMakeFlag(const std::string& flag) {
     return "--" + flag;
 }
 
-inline std::vector<std::string> randomUserPermsFlags() {
-    const auto numFlags = std::max(static_cast<size_t>(1), generateRandomIndex(ADMIN_SHELL_PERMS.size()));
-    std::unordered_set<std::string> chosen;
-    std::vector<std::string> userPerms;
-    while (chosen.size() < numFlags) {
-        const auto perm = std::string(ADMIN_SHELL_PERMS[generateRandomIndex(ADMIN_SHELL_PERMS.size())]);
-        if (chosen.contains(perm)) continue;
-        chosen.insert(perm);
-        userPerms.push_back(randomAllowDenyOrNoOptMakeFlag(perm));
-    }
-    return userPerms;
-}
-
-inline std::vector<std::string> randomVaultPermsFlags() {
-    const auto numFlags = std::max(static_cast<size_t>(1), generateRandomIndex(VAULT_SHELL_PERMS.size()));
-    std::unordered_set<std::string> chosen;
-    std::vector<std::string> vaultPerms;
-    while (chosen.size() < numFlags) {
-        const auto perm = std::string(VAULT_SHELL_PERMS[generateRandomIndex(VAULT_SHELL_PERMS.size())]);
-        if (chosen.contains(perm)) continue;
-        chosen.insert(perm);
-        vaultPerms.push_back(randomAllowDenyOrNoOptMakeFlag(perm));
-    }
-    return vaultPerms;
+inline std::string generateDescription(const std::string& usage) {
+    return generateNow(args::ArgGenerator::Join({
+        args::ArgGenerator::Constant(std::string("Auto-generated description ")),
+        args::ArgGenerator::RandomString(10, 100, "abcdefghijklmnopqrstuvwxyz0123456789 ")
+    }, ""), "description", usage);
 }
 
 inline unsigned int randomLinuxId() { return 1000 + generateRandomIndex(30000); }

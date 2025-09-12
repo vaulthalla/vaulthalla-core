@@ -104,7 +104,9 @@ void vh::types::to_json(nlohmann::json& j, const GroupMember& gm) {
 }
 
 std::string vh::types::to_string(const std::shared_ptr<Group>& g) {
-    std::string out = "Group: " + g->name + " (ID: " + std::to_string(g->id) + ")";
+    std::string out;
+    out += "Group Name: " + g->name + "\n";
+    out += "Group ID: " + std::to_string(g->id) + "\n";
     if (g->description) out += "\nDescription: " + *g->description;
     out += "\nCreated at: " + util::timestampToString(g->created_at);
     if (g->updated_at) out += "\nUpdated at: " + util::timestampToString(*g->updated_at);

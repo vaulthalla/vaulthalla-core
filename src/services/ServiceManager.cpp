@@ -6,6 +6,8 @@
 #include "services/ConnectionLifecycleManager.hpp"
 #include "services/LogRotationService.hpp"
 
+#include <paths.h>
+
 using namespace vh::logging;
 using namespace vh::services;
 
@@ -18,16 +20,19 @@ ServiceManager::ServiceManager()
     : syncController(std::make_shared<SyncController>()),
       fuseService(std::make_shared<FUSE>()),
       vaulthallaService(std::make_shared<Vaulthalla>()),
-      ctlServerService(std::make_shared<CtlServerService>()),
       connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>()),
       logRotationService(std::make_shared<LogRotationService>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;
     services_["Vaulthalla"] = vaulthallaService;
-    services_["CtlServer"] = ctlServerService;
     services_["ConnectionLifecycleManager"] = connectionLifecycleManager;
     services_["LogRotationService"] = logRotationService;
+
+    if (!paths::testMode) {
+        ctlServerService = std::make_shared<CtlServerService>();
+        services_["CtlServer"] = ctlServerService;
+    }
 }
 
 void ServiceManager::startAll() {

@@ -11,11 +11,10 @@ using namespace vh::types;
 
 unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                                        const std::shared_ptr<Sync>& sync) {
-    if (!sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
+    const auto exists = vault->id != 0;
+    if (!exists && !sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
     return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
-        const auto exists = vault->id != 0;
-
         pqxx::params p{
             vault->name,
             to_string(vault->type),

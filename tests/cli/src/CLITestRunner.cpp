@@ -78,7 +78,7 @@ template <> struct EntityTraits<EntityType::USER> {
 template <> struct EntityTraits<EntityType::GROUP> {
     using Type = vh::types::Group;
     static constexpr std::string_view kStage = "Groups";
-    static constexpr std::string_view kIdPrefix = "ID:";
+    static constexpr std::string_view kIdPrefix = "Group ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.groups; }
 };
 
@@ -331,11 +331,11 @@ void CLITestRunner::teardownStage() {
         auto append = [&](auto&& vec) {
             tests.insert(tests.end(), vec.begin(), vec.end());
         };
-        append(makeDeleteTests<EntityType::USER_ROLE>(C.userRoles));
-        append(makeDeleteTests<EntityType::GROUP>(C.groups));
-        append(makeDeleteTests<EntityType::USER>(C.users));
-        append(makeDeleteTests<EntityType::VAULT_ROLE>(C.vaultRoles));
         append(makeDeleteTests<EntityType::VAULT>(C.vaults));
+        append(makeDeleteTests<EntityType::USER>(C.users));
+        append(makeDeleteTests<EntityType::GROUP>(C.groups));
+        append(makeDeleteTests<EntityType::USER_ROLE>(C.userRoles));
+        append(makeDeleteTests<EntityType::VAULT_ROLE>(C.vaultRoles));
     }
 
     auto res = router_->route(tests);
@@ -451,6 +451,7 @@ int CLITestRunner::printResults() const {
             if (t->expect_exit != t->result.exit_code) {
                 os << ' ' << yellow << "[exit " << t->result.exit_code
                    << " ≠ expected " << t->expect_exit << ']' << reset;
+                os << '\n' << cyan << "          " <<  t->result.stderr_text << reset;
             }
             os << '\n';
 

@@ -19,15 +19,17 @@ static const Optional localConflictOpt = Optional::Multi("local_conflict",
                                                          {"overwrite", "keep_both", "ask"}, "overwrite");
 static const Optional syncStrategyOpt = Optional::Multi("sync_strategy", "Sync strategy for S3 vaults",
                                                         {"sync-strategy", "strategy"}, {"cache", "sync", "mirror"});
-static const Optional s3ConflictOpt = Optional::Multi("on_sync_conflict", "Conflict resolution strategy",
+static const Optional s3ConflictOpt = Optional::Multi("s3_conflict", "Conflict resolution strategy",
                                                       {"on-sync-conflict", "conflict"},
                                                       {"keep_local", "keep_remote", "ask"});
+
+static const auto intervalOpt = Optional::ManyToOne("interval", "Sync interval in seconds (default 5m)", {"interval", "sync-interval"}, "interval");
 
 static const auto interactiveFlag = Flag::WithAliases("interactive_mode",
                                                       "Run in interactive mode, prompting for missing information",
                                                       {"interactive", "i"});
 
-static const auto descriptionOpt = Optional::ManyToOne("description", "Description of the vault", {"desc", "d"},
+static const auto descriptionOpt = Optional::ManyToOne("description", "Description of the vault", {"description", "desc", "d"},
                                                        "description");
 
 static const auto quotaOpt = Optional::Multi(
@@ -98,7 +100,7 @@ static std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& p
     cmd->positionals = {vaultPos};
     cmd->required_flags = {vaultType};
     cmd->optional_flags = {interactiveFlag};
-    cmd->optional = {descriptionOpt, quotaOpt, owner};
+    cmd->optional = {descriptionOpt, quotaOpt,  owner};
     cmd->groups = {localVaultOpts, s3VaultOpts};
     cmd->examples = {
         {"vh vault create myvault --local --desc \"My Local Vault\" --quota 10G",
@@ -113,9 +115,9 @@ static std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& p
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing vault.";
     cmd->positionals = {vaultPos};
-    cmd->optional = {descriptionOpt, quotaOpt, owner, apiKeyOpt, s3BucketOpt, syncStrategyOpt, s3ConflictOpt};
-    cmd->optional_flags = {interactiveFlag, enableS3Encryption, disableS3Encryption, acceptOverwriteWaiver,
-                           acceptDecryptionWaiver};
+    cmd->optional = {descriptionOpt, quotaOpt, owner};
+    cmd->optional_flags = {interactiveFlag};
+    cmd->groups = {localVaultOpts, s3VaultOpts};
     cmd->examples = {
         {"vh vault update 42 --desc \"Updated Description\" --quota 20G",
          "Update the description and quota of the vault with ID 42."},

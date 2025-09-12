@@ -54,7 +54,6 @@ int main() {
 
     const auto mountPoint = fs::temp_directory_path() / "vaulthalla-test-mnt";
     ServiceManager::instance().setFuseMountPoint(mountPoint);
-    ServiceManager::instance().setCtlSocketPath("/tmp/vaulthalla-cli-test.sock");
 
     Filesystem::init(ServiceDepsRegistry::instance().storageManager);
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
@@ -67,9 +66,10 @@ int main() {
 
     CLITestRunner runner(CLITestConfig::Default());
 
-    const std::vector<std::string> user_info_fields = {"ID", "Name", "Email", "Role", "Created At", "Updated At"};
-    const std::vector<std::string> vault_info_fields = {"ID", "Name", "Owner ID", "Quota", "Used", "Created At", "Updated At"};
-    const std::vector<std::string> group_info_fields = {"ID", "Name", "Created At", "Updated At"};
+    const std::vector<std::string> user_info_fields = {"User ID", "User", "Email", "Role"};
+    const std::vector<std::string> vault_info_fields = {"ID", "Name", "Owner ID", "Quota"};
+    const std::vector<std::string> vault_list_fields = {"ID", "NAME", "OWNER", "QUOTA", "DESCRIPTION"};
+    const std::vector<std::string> group_info_fields = {"Group ID", "Name"};
     const std::vector<std::string> role_info_fields = {"ID", "Name", "Type", "Permissions", "Created At", "Updated At"};
 
     for (const auto& entity : CLITestContext::ENTITIES) {
@@ -83,7 +83,7 @@ int main() {
                 else if (entity == "role") runner.registerStdoutContains(path, role_info_fields);
             } else if (action == "list") {
                 if (entity == "user") runner.registerStdoutContains(path, {"ID", "Name", "Email", "Role"});
-                else if (entity == "vault") runner.registerStdoutContains(path, {"ID", "Name", "Owner ID", "Quota", "Used"});
+                else if (entity == "vault") runner.registerStdoutContains(path, vault_list_fields);
                 else if (entity == "group") runner.registerStdoutContains(path, {std::string("ID"), "Name"});
                 else if (entity == "role") runner.registerStdoutContains(path, {"ID", "Name", "Type", "Permissions"});
             }

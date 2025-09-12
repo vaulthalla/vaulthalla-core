@@ -2,6 +2,8 @@
 #include "CommandUsage.hpp"
 #include "generators.hpp"
 
+#include <iomanip>
+
 using namespace vh::test::cli;
 using namespace vh::types;
 using namespace vh::shell;
@@ -27,7 +29,7 @@ std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<V
         return entity->permissions_to_flags_string();
     }
 
-    throw std::runtime_error("EntityFactory: unsupported vault role field for update: " + field);
+    throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for update: " + field);
 }
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<VaultRole>& role) {
@@ -41,7 +43,7 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
 
 static std::string randomizePrimaryPositional(const std::shared_ptr<VaultRole>& entity) {
     if (generateRandomIndex(10000) < 5000) return std::to_string(entity->id);
-    return entity->name + " --vault";
+    return entity->name;
 }
 
 std::string VaultRoleCommandBuilder::create(const std::shared_ptr<VaultRole>& entity) {
@@ -65,15 +67,18 @@ std::string VaultRoleCommandBuilder::create(const std::shared_ptr<VaultRole>& en
                 continue;
             }
 
+            if (option.label.contains("description")) {
+                oss << ' ' << randomFlagAlias(option.option_tokens) << ' ' << quoted(updateAndResolveVar(entity, option.option_tokens[0]));
+                continue;
+            }
+
             oss << ' ' << randomAlias(option.option_tokens);
             if (auto val = resolveVar(option.option_tokens[0], entity); val) oss << ' ' << *val;
             else throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for create: " + option.option_tokens[0]);
         }
     }
 
-    const auto permsFlags = randomVaultPermsFlags();
-    if (permsFlags.empty()) throw std::runtime_error("VaultRoleCommandBuilder: failed to generate random permissions flags for vault role creation");
-    for (const auto& pf : permsFlags) oss << ' ' << pf;
+    oss << ' ' << entity->permissions_to_flags_string();
 
     return oss.str();
 }
@@ -83,12 +88,32 @@ std::string VaultRoleCommandBuilder::update(const std::shared_ptr<VaultRole>& en
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'update' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " vault ";
-    oss << randomizePrimaryPositional(entity);
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
 
-    if (coin()) oss << " --name " << updateAndResolveVar(entity, "name");
-    if (coin()) oss << " --desc " << quoted(updateAndResolveVar(entity, "description"));
-    if (coin()) oss << " --perms " << updateAndResolveVar(entity, "permissions");
+    unsigned int numUpdated = 0;
+    for (const auto& opt : cmd->optional) {
+        if (coin() || numUpdated == 0) {
+            if (opt.label.contains("description")) {
+                oss << ' ' << randomFlagAlias(opt.option_tokens) << ' ' << quoted(updateAndResolveVar(entity, opt.option_tokens[0]));
+                continue;
+            }
+
+            oss << ' ' << randomFlagAlias(opt.option_tokens);
+            oss << ' ' << updateAndResolveVar(entity, opt.option_tokens[0]);
+            ++numUpdated;
+        }
+    }
+
+    numUpdated = 0;
+    for (const auto& flag : cmd->optional_flags) {
+        if (flag.label.contains("filter")) continue;
+        if (coin() || numUpdated == 0) {
+            if (flag.label.contains("permissions")) oss << ' ' << updateAndResolveVar(entity, flag.label);
+            else oss << ' ' << randomFlagAlias(flag.aliases);
+            ++numUpdated;
+        }
+    }
 
     return oss.str();
 }
@@ -98,8 +123,8 @@ std::string VaultRoleCommandBuilder::info(const std::shared_ptr<VaultRole>& enti
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'info' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " vault ";
-    oss << randomizePrimaryPositional(entity);
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
 
     return oss.str();
 }

@@ -49,7 +49,7 @@ inline std::chrono::seconds parseSyncInterval(const std::string& intervalStr) {
 
     if (!std::isalpha(intervalStr.back())) {
         // If the last character is not a letter, assume it's a number of seconds
-        const auto parsed = shell::parseInt(intervalStr);
+        const auto parsed = shell::parseUInt(intervalStr);
         if (!parsed || *parsed <= 0) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
         return std::chrono::seconds(*parsed);
     }
@@ -58,7 +58,7 @@ inline std::chrono::seconds parseSyncInterval(const std::string& intervalStr) {
     const std::string numStr = intervalStr.substr(0, intervalStr.size() - 1);
     if (numStr.empty()) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
 
-    if (const auto numOpt = shell::parseInt(numStr)) {
+    if (const auto numOpt = shell::parseUInt(numStr)) {
         if (*numOpt <= 0) throw std::invalid_argument("vault sync update: --interval must be a positive integer");
         if (unit == 's') return std::chrono::seconds(*numOpt);
         if (unit == 'm') return std::chrono::minutes(*numOpt);

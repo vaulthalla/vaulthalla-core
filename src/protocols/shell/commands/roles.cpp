@@ -75,7 +75,7 @@ static CommandResult handleRoleInfo(const CommandCall& call) {
     const auto& arg = call.positionals[0];
     std::shared_ptr<Role> role;
 
-    if (const auto roleIdOpt = parseInt(arg)) {
+    if (const auto roleIdOpt = parseUInt(arg)) {
         role = PermsQueries::getRole(*roleIdOpt);
         if (!role) return invalid("roles info: role with ID " + std::to_string(*roleIdOpt) + " not found");
     } else {
@@ -89,7 +89,7 @@ static CommandResult handleRoleInfo(const CommandCall& call) {
 static std::shared_ptr<Role> resolveFromRoleSameType(const std::string& from,
                                                      const std::string_view expected_type) {
     std::shared_ptr<Role> r;
-    if (const auto idOpt = parseInt(from)) r = PermsQueries::getRole(*idOpt);
+    if (const auto idOpt = parseUInt(from)) r = PermsQueries::getRole(*idOpt);
     else r = PermsQueries::getRoleByName(from);
 
     if (!r) throw std::runtime_error("role with name or id '" + from + "' not found");
@@ -97,14 +97,6 @@ static std::shared_ptr<Role> resolveFromRoleSameType(const std::string& from,
         throw std::runtime_error("mismatched --from type: expected '" +
                                  std::string(expected_type) + "', got '" + r->type + "'");
     return r;
-}
-
-static std::optional<int> optIntFlag(const CommandCall& call, std::string key) {
-    if (auto v = optVal(call, key)) {
-        if (auto i = parseInt(*v)) return *i;
-        throw std::runtime_error("invalid integer for --" + std::string(key) + ": " + std::string(*v));
-    }
-    return std::nullopt;
 }
 
 static CommandResult handleRoleCreateUser(const CommandCall& call, std::string_view name) {
@@ -165,6 +157,9 @@ static CommandResult handleRoleCreate(const CommandCall& call) {
 static CommandResult handleRoleUpdate(const CommandCall& call) {
     constexpr const auto* ERR = "roles update";
 
+    // TODO: integrate with UsageManager
+    const auto usage = ServiceDepsRegistry::instance().shellUsageManager->resolve(std::vector<std::string>{"role", "update"});
+
     if (!call.user->canManageRoles()) return invalid("roles update: can't manage");
 
     if (call.positionals.empty()) return invalid("roles update: missing <id> or <name>");
@@ -186,18 +181,20 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
         ? parseUserRolePermissions(call, role->permissions)
         : parseVaultRolePermissions(call, role->permissions);
 
-    if (role->type == "vault") {
-        const auto vaultRole = std::static_pointer_cast<VaultRole>(role);
-
-        const auto sLkp = parseSubject(call, ERR);
-        if (!sLkp) return invalid(sLkp.error);
-        const auto [subjectType, subjectId] = *sLkp.ptr;
-
-        vaultRole->subject_type = subjectType;
-        vaultRole->subject_id = subjectId;
-
-        if (const auto vid = optIntFlag(call, "vault-id")) vaultRole->vault_id = *vid;
+    if (const auto newNameOpt = optVal(call, "name")) {
+        if (newNameOpt->empty()) return invalid("roles update: --name cannot be empty");
+        role->name = *newNameOpt;
     }
+
+    if (const auto descriptionOpt = optVal(call, "desc")) {
+        role->description = *descriptionOpt;
+    } else if (const auto descriptionOpt = optVal(call, "description")) {
+        role->description = *descriptionOpt;
+    }
+
+    role->permissions = role->type == "user"
+        ? parseUserRolePermissions(call, role->permissions)
+        : parseVaultRolePermissions(call, role->permissions);
 
     PermsQueries::updateRole(role);
 

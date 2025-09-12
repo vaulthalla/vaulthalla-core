@@ -32,7 +32,7 @@ const auto outputFile = Optional::ManyToOne("output", "Output file for the expor
 const auto subjectOption = Option::Multi("subject", "Specify the user or group the command is targeting", {"user", "u", "group", "g"},
                       {"id", "name"});
 
-const auto permissionsFlags = Flag::WithAliases("permissions_flags", "Permission flags to set for the new role (see 'vh permissions') min=1",
+const auto permissionsFlags = Flag::WithAliases("permissions", "Permission flags to set for the new role (see 'vh permissions') min=1",
                           ALL_SHELL_PERMS_STR);
 
 const auto jsonFlag = Flag::WithAliases("json_output", "Output the list in JSON format", {"json", "j"});

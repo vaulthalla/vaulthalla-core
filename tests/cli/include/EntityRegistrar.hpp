@@ -30,13 +30,13 @@ public:
     explicit EntityRegistrar(const std::shared_ptr<CLITestContext>& ctx)
         : factory_(std::make_shared<EntityFactory>(ctx)),
           router_(std::make_shared<shell::Router>()), ctx_(ctx) {
-        if (!router_) throw std::runtime_error("EntityFactory: router is null");
+        if (!router_) throw std::runtime_error("EntityRegistrar: router is null");
         shell::commands::registerAllCommands(router_);
     }
 
         [[nodiscard]] EntityResult create(const EntityType& type) const {
         const auto cmd = ctx_->getCommand(type, "create");
-        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for creation");
+        if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for creation");
 
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
@@ -57,7 +57,6 @@ public:
         if (type == EntityType::VAULT) {
             const auto vault = factory_->create(EntityType::VAULT);
             const auto command = buildCommand(vault);
-            std::cout << "Creating vault owned by user ID " << command << std::endl;
             return { router_->executeLine(command, admin, io.get()), vault };
         }
 
@@ -79,7 +78,7 @@ public:
             return { router_->executeLine(command, admin, io.get()), role };
         }
 
-        throw std::runtime_error("EntityFactory: unsupported entity type for creation");
+        throw std::runtime_error("EntityRegistrar: unsupported entity type for creation");
     }
 
     [[nodiscard]] std::vector<EntityResult> create(const EntityType& type, const std::size_t count) const {
@@ -100,7 +99,7 @@ public:
 
     [[nodiscard]] EntityResult list(const EntityType& type) const {
         const auto cmd = ctx_->getCommand(type, "list");
-        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for listing");
+        if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for listing");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::LIST, nullptr);
         std::cout << command << std::endl;
         const auto admin = database::UserQueries::getUserByName("admin");
@@ -112,7 +111,7 @@ public:
     template <typename T>
     [[nodiscard]] EntityResult info(const EntityType& type, const std::shared_ptr<T>& entity) const {
         const auto cmd = ctx_->getCommand(type, "info");
-        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for info");
+        if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for info");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::INFO, entity);
         std::cout << command << std::endl;
         const auto admin = database::UserQueries::getUserByName("admin");
@@ -123,7 +122,7 @@ public:
 
     [[nodiscard]] EntityResult remove(const EntityType& type, const std::shared_ptr<void>& entity) const {
         const auto cmd = ctx_->getCommand(type, "delete");
-        if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for deletion");
+        if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for deletion");
 
         const auto admin = database::UserQueries::getUserByName("admin");
         int fd;
@@ -148,7 +147,7 @@ private:
         std::smatch match;
         if (std::regex_search(output, match, toRegex(ID_REGEX)) && match.size() > 1)
             return std::stoi(match.str(1));
-        throw std::runtime_error("EntityFactory: failed to parse ID from output");
+        throw std::runtime_error("EntityRegistrar: failed to parse ID from output");
     }
 };
 

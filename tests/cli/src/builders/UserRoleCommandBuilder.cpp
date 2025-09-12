@@ -18,7 +18,7 @@ std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<Us
     }
 
     if (userRoleAliases_.isDescription(field)) {
-        entity->description = "Updated user role description";
+        entity->description = generateDescription(usagePath);
         return entity->description;
     }
 
@@ -27,7 +27,7 @@ std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<Us
         return entity->permissions_to_flags_string();
     }
 
-    throw std::runtime_error("EntityFactory: unsupported user role field for update: " + field);
+    throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for update: " + field);
 }
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<UserRole>& role) {
@@ -41,7 +41,7 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
 
 static std::string randomizePrimaryPositional(const std::shared_ptr<UserRole>& entity) {
     if (generateRandomIndex(10000) < 5000) return std::to_string(entity->id);
-    return entity->name + " --user";
+    return entity->name;
 }
 
 std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& entity) {
@@ -66,15 +66,18 @@ std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& enti
                 continue;
             }
 
+            if (option.label.contains("description")) {
+                oss << ' ' << randomFlagAlias(option.option_tokens) << ' ' << quoted(updateAndResolveVar(entity, option.option_tokens[0]));
+                continue;
+            }
+
             oss << ' ' << randomFlagAlias(option.option_tokens);
             if (auto val = resolveVar(option.option_tokens[0], entity); val) oss << ' ' << *val;
             else throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for create: " + option.option_tokens[0]);
         }
     }
 
-    const auto permsFlags = randomUserPermsFlags();
-    if (permsFlags.empty()) throw std::runtime_error("UserRoleCommandBuilder: failed to generate random permissions flags for user role creation");
-    for (const auto& pf : permsFlags) oss << ' ' << pf;
+    oss << ' ' << entity->permissions_to_flags_string();
 
     return oss.str();
 }
@@ -84,12 +87,32 @@ std::string UserRoleCommandBuilder::update(const std::shared_ptr<types::UserRole
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'update' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " user ";
-    oss << randomizePrimaryPositional(entity);
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
 
-    if (coin()) oss << " --name " << updateAndResolveVar(entity, "name");
-    if (coin()) oss << " --desc " << quoted(updateAndResolveVar(entity, "description"));
-    if (coin()) oss << ' ' << updateAndResolveVar(entity, "permissions");
+    unsigned int numUpdated = 0;
+    for (const auto& opt : cmd->optional) {
+        if (coin() || numUpdated == 0) {
+            if (opt.label.contains("description")) {
+                oss << ' ' << randomFlagAlias(opt.option_tokens) << ' ' << quoted(updateAndResolveVar(entity, opt.option_tokens[0]));
+                continue;
+            }
+
+            oss << ' ' << randomFlagAlias(opt.option_tokens);
+            oss << ' ' << updateAndResolveVar(entity, opt.option_tokens[0]);
+            ++numUpdated;
+        }
+    }
+
+    numUpdated = 0;
+    for (const auto& flag : cmd->optional_flags) {
+        if (flag.label.contains("filter")) continue;
+        if (coin() || numUpdated == 0) {
+            if (flag.label.contains("permissions")) oss << ' ' << updateAndResolveVar(entity, flag.label);
+            else oss << ' ' << randomFlagAlias(flag.aliases);
+            ++numUpdated;
+        }
+    }
 
     return oss.str();
 }
@@ -99,8 +122,8 @@ std::string UserRoleCommandBuilder::info(const std::shared_ptr<UserRole>& entity
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'info' command usage not found");
 
     std::ostringstream oss;
-    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases) << " user ";
-    oss << randomizePrimaryPositional(entity);
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
+    oss << ' ' << randomizePrimaryPositional(entity);
 
     return oss.str();
 }

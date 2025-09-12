@@ -27,7 +27,7 @@ std::string UserCommandBuilder::updateAndResolveVar(const std::shared_ptr<User>&
     }
 
     if (userAliases_.isRole(field)) {
-        if (ctx_->userRoles.empty()) throw std::runtime_error("EntityFactory: no user roles available to assign");
+        if (ctx_->userRoles.empty()) throw std::runtime_error("UserCommandBuilder: no user roles available to assign");
         entity->role = ctx_->randomUserRole();
         return std::to_string(entity->role->id);
     }
@@ -38,7 +38,7 @@ std::string UserCommandBuilder::updateAndResolveVar(const std::shared_ptr<User>&
         return std::to_string(linuxUid);
     }
 
-    throw std::runtime_error("EntityFactory: unsupported user field for update: " + field);
+    throw std::runtime_error("UserCommandBuilder: unsupported user field for update: " + field);
 }
 
 static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<User>& user) {
@@ -94,7 +94,7 @@ std::string UserCommandBuilder::remove(const std::shared_ptr<User>& entity) {
     if (!cmd) throw std::runtime_error("UserCommandBuilder: 'delete' command usage not found");
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
-    oss << ' ' << (generateRandomIndex(10000) < 5000 ? std::to_string(entity->id) : entity->name);
+    oss << ' ' << randomizePrimaryPositional(entity);
     return oss.str();
 }
 
@@ -103,7 +103,7 @@ std::string UserCommandBuilder::info(const std::shared_ptr<User>& entity) {
     if (!cmd) throw std::runtime_error("UserCommandBuilder: 'info' command usage not found");
     std::ostringstream oss;
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
-    oss << ' ' << (generateRandomIndex(10000) < 5000 ? std::to_string(entity->id) : entity->name);
+    oss << ' ' << randomizePrimaryPositional(entity);
     return oss.str();
 }
 

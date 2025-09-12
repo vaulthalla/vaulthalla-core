@@ -13,10 +13,11 @@ struct TestCase;
 class EntityRegistrar;
 class ListInfoHandler;
 class UpdateHandler;
+struct CLITestContext;
 
 class CommandRouter {
 public:
-    CommandRouter(const std::shared_ptr<CLITestContext>& ctx);
+    explicit CommandRouter(const std::shared_ptr<CLITestContext>& ctx);
 
     void registerRoute(const std::string& path, const std::function<EntityResult(const std::shared_ptr<void>& entity)>& handler);
 

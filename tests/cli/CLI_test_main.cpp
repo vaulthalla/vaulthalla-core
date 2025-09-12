@@ -65,31 +65,6 @@ int main() {
     }
 
     CLITestRunner runner(CLITestConfig::Default());
-
-    const std::vector<std::string> user_info_fields = {"User ID", "User", "Email", "Role"};
-    const std::vector<std::string> vault_info_fields = {"ID", "Name", "Owner ID", "Quota"};
-    const std::vector<std::string> vault_list_fields = {"ID", "NAME", "OWNER", "QUOTA", "DESCRIPTION"};
-    const std::vector<std::string> group_info_fields = {"Group ID", "Name"};
-    const std::vector<std::string> role_info_fields = {"ID", "Name", "Type", "Permissions", "Created At", "Updated At"};
-
-    for (const auto& entity : CLITestContext::ENTITIES) {
-        for (const auto& action : CLITestContext::ACTIONS) {
-            const auto path = std::string(entity) + "/" + std::string(action);
-            runner.registerStdoutNotContains(path, {"Traceback", "Exception", "Error", "invalid", "not found", "failed", "unrecognized"});
-            if (action == "info") {
-                if (entity == "user") runner.registerStdoutContains(path, user_info_fields);
-                else if (entity == "vault") runner.registerStdoutContains(path, vault_info_fields);
-                else if (entity == "group") runner.registerStdoutContains(path, group_info_fields);
-                else if (entity == "role") runner.registerStdoutContains(path, role_info_fields);
-            } else if (action == "list") {
-                if (entity == "user") runner.registerStdoutContains(path, {"ID", "Name", "Email", "Role"});
-                else if (entity == "vault") runner.registerStdoutContains(path, vault_list_fields);
-                else if (entity == "group") runner.registerStdoutContains(path, {std::string("ID"), "Name"});
-                else if (entity == "role") runner.registerStdoutContains(path, {"ID", "Name", "Type", "Permissions"});
-            }
-        }
-    }
-
     const int exit_status = runner() == 0 ? 0 : 1;
 
     ServiceManager::instance().stopAll(SIGKILL);

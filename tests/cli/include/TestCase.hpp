@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EntityType.hpp"
+#include "AssertionResult.hpp"
 
 #include <string>
 #include <vector>

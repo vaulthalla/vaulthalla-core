@@ -603,7 +603,79 @@ std::shared_ptr<CommandUsage> CommandUsage::findSubcommand(const std::string& al
         }
     );
 
-    return it != subcommands.end() ? *it : nullptr;
+    if (it != subcommands.end()) return *it;
+    return nullptr;
 }
 
-} // namespace vh::shell
+std::shared_ptr<Positional> CommandUsage::resolvePositional(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        positionals,
+        [&](const Positional& p) {
+            return p.label == alias || std::ranges::any_of(p.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    if (it != positionals.end()) return std::make_shared<Positional>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<Flag> CommandUsage::resolveFlag(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        optional_flags,
+        [&](const Flag& f) {
+            return f.label == alias || std::ranges::any_of(f.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+    if (it != optional_flags.end()) return std::make_shared<Flag>(*it);
+
+    const auto it2 = std::ranges::find_if(
+        required_flags,
+        [&](const Flag& f) {
+            return f.label == alias || std::ranges::any_of(f.aliases,
+                [&](const std::string& a) { return a == alias; });
+        }
+    );
+
+    if (it2 != required_flags.end()) return std::make_shared<Flag>(*it2);
+    return nullptr;
+}
+
+std::shared_ptr<Optional> CommandUsage::resolveOptional(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        optional,
+        [&](const Optional& o) {
+            return o.label == alias || std::ranges::any_of(o.option_tokens,
+                [&](const std::string& t) { return t == alias; });
+        }
+    );
+
+    if (it != optional.end()) return std::make_shared<Optional>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<Option> CommandUsage::resolveRequired(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        required,
+        [&](const Option& o) {
+            return o.label == alias || std::ranges::any_of(o.option_tokens,
+                [&](const std::string& t) { return t == alias; });
+        }
+    );
+
+    if (it != required.end()) return std::make_shared<Option>(*it);
+    return nullptr;
+}
+
+std::shared_ptr<GroupedOptions> CommandUsage::resolveGroup(const std::string& alias) const {
+    const auto it = std::ranges::find_if(
+        groups,
+        [&](const GroupedOptions& g) { return g.title == alias; }
+    );
+
+    if (it != groups.end()) return std::make_shared<GroupedOptions>(*it);
+    return nullptr;
+}
+
+}

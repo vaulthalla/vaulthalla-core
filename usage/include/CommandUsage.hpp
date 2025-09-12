@@ -43,6 +43,11 @@ public:
     [[nodiscard]] bool matches(const std::string& alias) const;
 
     [[nodiscard]] std::shared_ptr<CommandUsage> findSubcommand(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Positional> resolvePositional(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Flag> resolveFlag(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Optional> resolveOptional(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Option> resolveRequired(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<GroupedOptions> resolveGroup(const std::string& alias) const;
 
 private:
     static constexpr std::string_view binName_ = "vh";

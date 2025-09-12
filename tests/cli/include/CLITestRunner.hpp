@@ -16,6 +16,7 @@ namespace vh::test::cli {
 struct CLITestContext;
 class CommandRouter;
 struct TestCase;
+enum class EntityType;
 
 struct TestStage {
     std::string name;
@@ -52,12 +53,10 @@ private:
     // Pipeline stages executed in order
     std::vector<TestStage> stages_;
 
+    void registerAllContainsAssertions();
+
     // Pipeline steps
-    void seedUserRoles();
-    void seedVaultRoles();
-    void seedUsers();
-    void seedGroups();
-    void seedVaults();
+    void seed();
     void readStage();
     void updateStage();
     void teardownStage();
@@ -66,6 +65,9 @@ private:
     void validateStage(const TestStage& stage) const;
     void validateAllTestObjects() const;
     int  printResults() const;
+
+    template <EntityType E>
+    void seed(size_t count);
 };
 
 }

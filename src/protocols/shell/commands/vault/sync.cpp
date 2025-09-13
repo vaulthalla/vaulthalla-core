@@ -10,6 +10,7 @@
 #include "types/RSync.hpp"
 #include "types/Sync.hpp"
 #include "util/interval.hpp"
+#include "CommandUsage.hpp"
 
 #include <optional>
 #include <string>

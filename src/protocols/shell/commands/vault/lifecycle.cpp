@@ -15,6 +15,7 @@
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "CommandUsage.hpp"
 
 #include <string>
 #include <vector>

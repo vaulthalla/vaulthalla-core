@@ -9,6 +9,7 @@
 #include "types/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
+#include "CommandUsage.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;

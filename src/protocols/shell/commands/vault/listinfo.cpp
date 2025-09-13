@@ -14,6 +14,7 @@
 #include "types/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
+#include "CommandUsage.hpp"
 
 #include <optional>
 #include <string>

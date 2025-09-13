@@ -20,6 +20,7 @@
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "util/interval.hpp"
+#include "CommandUsage.hpp"
 
 #include <algorithm>
 #include <optional>

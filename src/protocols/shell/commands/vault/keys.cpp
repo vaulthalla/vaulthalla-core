@@ -1,6 +1,7 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "CommandUsage.hpp"
 
 #include "database/Queries/VaultKeyQueries.hpp"
 

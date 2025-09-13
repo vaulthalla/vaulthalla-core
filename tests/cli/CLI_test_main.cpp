@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <chrono>
 #include <paths.h>
 
 namespace fs = std::filesystem;
@@ -64,8 +65,14 @@ int main() {
         return 1;
     }
 
+    const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
     CLITestRunner runner(CLITestConfig::Default());
     const int exit_status = runner() == 0 ? 0 : 1;
+
+    const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "CLI tests completed in " << static_cast<double>(duration) / 1000.0 << " seconds" << std::endl;
 
     ServiceManager::instance().stopAll(SIGKILL);
     ThreadPoolManager::instance().shutdown();

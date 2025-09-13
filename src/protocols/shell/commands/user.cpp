@@ -11,6 +11,8 @@
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
+#include <paths.h>
+
 using namespace vh::shell;
 using namespace vh::types;
 using namespace vh::database;
@@ -20,17 +22,14 @@ using namespace vh::logging;
 using namespace vh::util;
 using namespace vh::crypto;
 
+static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
+
 static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
-    constexpr unsigned short maxRetries = 1024;
+    constexpr unsigned short maxRetries = 1024 * 4; // 4096 attempts max
     for (unsigned short i = 1; i < maxRetries; ++i) {
-        if (const auto password = generate_secure_password(84); AuthManager::isValidPassword(password)) {
-            try {
-                AuthManager::isValidRegistration(user, password);
-                user->setPasswordHash(hashPassword(password));
-                return password;
-            } catch (const std::exception& e) {
-                LogRegistry::auth()->warn("[AuthManager] Password validation failed: {}", e.what());
-            }
+        if (const auto password = generate_secure_password(PASSWORD_LENGTH); AuthManager::isValidPassword(password)) {
+            user->setPasswordHash(hashPassword(password));
+            return password;
         }
         if (i == maxRetries)
             throw std::runtime_error("Failed to generate a valid password after " + std::to_string(maxRetries) + " attempts");

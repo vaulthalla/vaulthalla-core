@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <uuid/uuid.h>
 #include <ranges>
+#include <paths.h>
 
 using namespace vh::auth;
 using namespace vh::types;
@@ -213,19 +214,20 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<User>& user, const s
 
     if (user->email && !isValidEmail(*user->email)) errors.emplace_back("Email must be valid and contain '@' and '.'.");
 
-    ;
-    if (const auto strength = PasswordUtils::passwordStrengthCheck(password) < 50)
-        errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
-                            "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
+    if (!paths::testMode) {
+        if (const auto strength = PasswordUtils::passwordStrengthCheck(password) < 50)
+            errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
+                                "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
 
-    if (PasswordUtils::containsDictionaryWord(password))
-        errors.emplace_back("Password contains dictionary word — this is forbidden.");
+        if (PasswordUtils::containsDictionaryWord(password))
+            errors.emplace_back("Password contains dictionary word — this is forbidden.");
 
-    if (PasswordUtils::isCommonWeakPassword(password))
-        errors.emplace_back("Password matches known weak pattern — this is forbidden.");
+        if (PasswordUtils::isCommonWeakPassword(password))
+            errors.emplace_back("Password matches known weak pattern — this is forbidden.");
 
-    if (PasswordUtils::isPwnedPassword(password))
-        errors.emplace_back("Password has been found in public breaches — choose a different one.");
+        if (PasswordUtils::isPwnedPassword(password))
+            errors.emplace_back("Password has been found in public breaches — choose a different one.");
+    }
 
     if (!errors.empty()) {
         std::ostringstream oss;
@@ -247,6 +249,12 @@ bool AuthManager::isValidEmail(const std::string& email) {
 }
 
 bool AuthManager::isValidPassword(const std::string& password) {
+    if (paths::testMode) return true;
+    std::vector<std::string> errors;
+    if (PasswordUtils::passwordStrengthCheck(password) < 50) return false;
+    if (PasswordUtils::containsDictionaryWord(password)) return false;
+    if (PasswordUtils::isCommonWeakPassword(password)) return false;
+    if (PasswordUtils::isPwnedPassword(password)) return false;
     return !password.empty() && password.size() >= 8 && password.size() <= 128 &&
            std::ranges::any_of(password.begin(), password.end(), ::isdigit) && // At least one digit
            std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter

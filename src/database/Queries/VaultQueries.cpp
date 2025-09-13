@@ -227,19 +227,6 @@ bool VaultQueries::vaultExists(const std::string& name, const unsigned int owner
     });
 }
 
-std::shared_ptr<Sync> VaultQueries::getVaultSyncConfig(const unsigned int vaultId) {
-    return Transactions::exec("VaultQueries::getVaultSyncConfig", [&](pqxx::work& txn) -> std::shared_ptr<Sync> {
-        const auto res = txn.exec(pqxx::prepped{"get_vault_sync_config"}, pqxx::params{vaultId});
-        if (res.empty()) return nullptr;
-
-        const auto isS3 = txn.exec(pqxx::prepped{"is_s3_vault"}, vaultId).one_field().as<bool>();
-
-        const auto row = res.one_row();
-        if (isS3) return std::make_shared<RSync>(row);
-        return std::make_shared<FSync>(row);
-    });
-}
-
 bool VaultQueries::vaultRootExists(const unsigned int vaultId) {
     return Transactions::exec("VaultQueries::vaultRootExists", [&](pqxx::work& txn) {
         return txn.exec(pqxx::prepped{"vault_root_exists"}, vaultId).one_field().as<bool>();

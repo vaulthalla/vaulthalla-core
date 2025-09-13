@@ -29,8 +29,6 @@ struct VaultQueries {
 
     static void updateVaultSync(const std::shared_ptr<types::Sync>& sync, const types::VaultType& type);
 
-    [[nodiscard]] static std::shared_ptr<types::Sync> getVaultSyncConfig(unsigned int vaultId);
-
     [[nodiscard]] static bool vaultExists(const std::string& name, unsigned int ownerId);
 
     [[nodiscard]] static bool vaultRootExists(unsigned int vaultId);

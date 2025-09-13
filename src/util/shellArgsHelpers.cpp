@@ -53,6 +53,12 @@ bool vh::shell::hasFlag(const CommandCall& c, const std::string& key) {
     for (const auto& [k, v] : c.options) if (k == key) return !v.has_value();
     return false;
 }
+
+bool vh::shell::hasFlag(const CommandCall& c, const std::vector<std::string>& keys) {
+    for (const auto& k : keys) if (hasFlag(c, k)) return true;
+    return false;
+}
+
 bool vh::shell::hasKey(const CommandCall& c, const std::string& key) {
     return std::ranges::any_of(c.options, [&key](const auto& kv) { return kv.key == key; });
 }

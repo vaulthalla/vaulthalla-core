@@ -678,4 +678,24 @@ std::shared_ptr<GroupedOptions> CommandUsage::resolveGroup(const std::string& al
     return nullptr;
 }
 
+std::shared_ptr<Optional> CommandUsage::resolveGroupOptional(const std::string& groupAlias, const std::string& optionalAlias) const {
+    const auto group = resolveGroup(groupAlias);
+    if (!group) return nullptr;
+
+    const auto it = std::ranges::find_if(
+        group->items,
+        [&](const std::variant<Optional, Flag>& v) {
+            return std::holds_alternative<Optional>(v) &&
+                   (std::get<Optional>(v).label == optionalAlias ||
+                    std::ranges::any_of(std::get<Optional>(v).option_tokens,
+                        [&](const std::string& t) { return t == optionalAlias; }));
+        }
+    );
+
+    if (it != group->items.end() && std::holds_alternative<Optional>(*it)) {
+        return std::make_shared<Optional>(std::get<Optional>(*it));
+    }
+    return nullptr;
+}
+
 }

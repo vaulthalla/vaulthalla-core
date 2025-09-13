@@ -76,10 +76,11 @@ static std::shared_ptr<CommandUsage> user_list(const std::weak_ptr<CommandUsage>
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"list", "ls"};
     cmd->description = "List all users in a specific group.";
+    cmd->pluralAliasImpliesList = true;
     cmd->positionals = { groupPos };
     cmd->examples = {
-        {"vh group users devs", "List all users in the 'devs' group."},
-        {"vh group users 42", "List all users in the group with ID 42."}
+        {"vh group user list devs", "List all users in the 'devs' group."},
+        {"vh group users 42", "List all users in the group with ID 42 (using alias)."}
     };
     return cmd;
 }

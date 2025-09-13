@@ -12,13 +12,13 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
 
 static const auto secretPos = Positional::WithAliases("secret", "Name of the secret to manage (db-password)", {"db-password", "jwt-secret"});
 static const auto fileOpt = Optional::Same("file", "Path to a file containing the secret value (default=/run/vaulthalla/<secret>) (deleted after reading)");
+static const auto filePos = Positional::Alias("file", "Path to a file containing the secret value", "path");
 
 static std::shared_ptr<CommandUsage> set(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Set or update an internal secret";
-    cmd->positionals = { secretPos };
-    cmd->optional = { fileOpt };
+    cmd->positionals = { secretPos, filePos };
     cmd->examples = {
         {"vh secret set db-password --file /path/to/password.txt", "Set the database password from the specified file."},
         {"vh secret set jwt-secret --file /path/to/jwt_secret.txt", "Set the JWT secret from the specified file."},

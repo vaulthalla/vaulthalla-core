@@ -92,21 +92,22 @@ Sync Interval:
   Default is 15 minutes (15m).
 )";
 
-static CommandResult finish_vault_create(const CommandCall& call, std::shared_ptr<Vault>& v, const std::shared_ptr<Sync>& s) {
-    const auto [okToProceed, waiver] = handle_encryption_waiver({call, v, false});
-    if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
+static CommandResult finish_vault_create(const CommandCall& call, std::shared_ptr<Vault>& v,
+                                         const std::shared_ptr<Sync>& s) {
+    try {
+        const auto [okToProceed, waiver] = handle_encryption_waiver({call, v, false});
+        if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
 
-    v = ServiceDepsRegistry::instance().storageManager->addVault(v, s);
-    if (waiver) WaiverQueries::addWaiver(waiver);
+        v = ServiceDepsRegistry::instance().storageManager->addVault(v, s);
+        if (waiver) WaiverQueries::addWaiver(waiver);
 
-    return ok("\nSuccessfully created new vault!\n" + to_string(v));
-}
+        return ok("\nSuccessfully created new vault!\n" + to_string(v));
+    } catch (const std::exception& e) {
+        if (VaultQueries::vaultExists(v->name, v->owner_id))
+            ServiceDepsRegistry::instance().storageManager->removeVault(v->id);
 
-static CommandResult handle_vault_create_failure(const std::shared_ptr<Vault>& v, const std::string& err) {
-    if (VaultQueries::vaultExists(v->name, v->owner_id))
-        ServiceDepsRegistry::instance().storageManager->removeVault(v->id);
-
-    return invalid("\nvault create error: " + err);
+        return invalid("\nvault create error: " + std::string(e.what()) + "\n");
+    }
 }
 
 static std::string stripLeadingDashes(const std::string& s) {
@@ -119,237 +120,149 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
     const auto& io = call.io;
 
     std::shared_ptr<Vault> v;
+    std::shared_ptr<Sync> sync;
 
     const auto helpOptions = std::vector<std::string>{"help", "h", "?"};
 
-    try {
-        std::shared_ptr<Sync> sync;
+    const auto usage = resolveUsage({"vault", "create"});
+    validatePositionals(call, usage);
 
-        const auto type = io->prompt("Select vault type (local/s3) [local]:", "local");
-        if (type == "local") {
-            v = std::make_shared<Vault>();
-            v->type = VaultType::Local;
+    const auto type = io->prompt("Select vault type (local/s3) [local]:", "local");
+    if (type == "local") {
+        v = std::make_shared<Vault>();
+        v->type = VaultType::Local;
+    } else if (type == "s3") {
+        v = std::make_shared<S3Vault>();
+        v->type = VaultType::S3;
+    } else return invalid("vault create: invalid vault type");
+
+    v->name = io->prompt("Enter vault name (required):");
+    if (v->name.empty()) return invalid("vault create: vault name is required");
+
+    v->description = io->prompt("Enter vault description (optional):");
+
+    const auto quotaStr = io->prompt("Enter vault quota (e.g. 10G, 500M) or leave blank for unlimited:");
+    v->quota = quotaStr.empty() ? 0 : parseSize(quotaStr);
+
+    const auto ownerPrompt = io->prompt("Enter owner user ID or username (leave blank for yourself):");
+    const auto owner = resolveOwner(call, usage);
+    v->owner_id = owner->id;
+
+    if (v->owner_id != call.user->id && !call.user->canCreateVaults())
+        return invalid("vault create: user ID " + std::to_string(call.user->id) +
+            " does not have permission to create vaults for other users");
+
+    if (v->type == VaultType::Local) {
+        auto fSync = std::make_shared<FSync>();
+
+        auto conflictStr = io->prompt(
+            "Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite] --help for details:", "overwrite");
+        while (conflictStr == "help") {
+            io->print(LOCAL_CONFLICT_POLICY_HELP);
+            conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite]:",
+                                     "overwrite");
         }
-        else if (type == "s3") {
-            v = std::make_shared<S3Vault>();
-            v->type = VaultType::S3;
-        }
-        else return invalid("vault create: invalid vault type");
-
-        v->name = io->prompt("Enter vault name (required):");
-        if (v->name.empty()) return invalid("vault create: vault name is required");
-
-        v->description = io->prompt("Enter vault description (optional):");
-
-        const auto quotaStr = io->prompt("Enter vault quota (e.g. 10G, 500M) or leave blank for unlimited:");
-        v->quota = quotaStr.empty() ? 0 : parseSize(quotaStr);
-
-        const auto owner = io->prompt("Enter owner user ID or username (leave blank for yourself):");
-        if (owner.empty()) v->owner_id = call.user->id;
-        else {
-            if (const auto ownerIdOpt = parseUInt(owner)) {
-                if (*ownerIdOpt <= 0) return invalid("vault create: owner ID must be a positive integer");
-                v->owner_id = *ownerIdOpt;
-            } else {
-                const auto ownerUser = UserQueries::getUserByName(owner);
-                if (!ownerUser) return invalid("vault create: user not found: " + owner);
-                v->owner_id = ownerUser->id;
-            }
-        }
-
-        if (v->owner_id != call.user->id && !call.user->canCreateVaults())
-            return invalid(
-                "vault create: user ID " + std::to_string(call.user->id) +
-                " does not have permission to create vaults for other users");
-
-        if (v->type == VaultType::Local) {
-            auto fSync = std::make_shared<FSync>();
-
-            auto conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite] --help for details:", "overwrite");
-            while (conflictStr == "help") {
-                io->print(LOCAL_CONFLICT_POLICY_HELP);
-                conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite]:", "overwrite");
-            }
-            fSync->conflict_policy = fsConflictPolicyFromString(conflictStr);
-            sync = fSync;
-        }
-
-        if (v->type == VaultType::S3) {
-            const auto s3Vault = std::static_pointer_cast<S3Vault>(v);
-            const auto apiKeyStr = io->prompt("Enter API key name or ID (required):");
-            if (apiKeyStr.empty()) return invalid("vault create: API key is required for S3 vaults");
-
-            std::shared_ptr<api::APIKey> apiKey;
-            if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
-            else apiKey = APIKeyQueries::getAPIKey(apiKeyStr);
-
-            if (!apiKey) return invalid("vault create: API key not found: " + apiKeyStr);
-            if (apiKey->user_id != v->owner_id) {
-                if (!call.user->canManageAPIKeys())
-                    return invalid(
-                        "vault create: user ID " + std::to_string(call.user->id) +
-                        " does not have permission to assign API keys to other users vaults"
-                        );
-
-                const auto ownerUser = UserQueries::getUserById(v->owner_id);
-                if (!ownerUser) return invalid("vault create: owner user ID not found: " + std::to_string(v->owner_id));
-
-                if (apiKey->user_id != ownerUser->id && !ownerUser->canManageAPIKeys())
-                    return invalid("vault create: API key '" + apiKeyStr + "' does not belong to user ID " +
-                                   std::to_string(v->owner_id));
-            }
-
-            s3Vault->api_key_id = apiKey->id;
-
-            s3Vault->bucket = io->prompt("Enter S3 bucket name (required):");
-            if (s3Vault->bucket.empty()) return invalid("vault create: S3 bucket name is required");
-
-            auto strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache] --help for details:", "cache");
-            while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(strategyStr)) != helpOptions.end()) {
-                io->print(SYNC_STRATEGY_HELP);
-                strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache]:", "cache");
-            }
-            const auto rsync = std::make_shared<RSync>();
-            rsync->strategy = strategyFromString(strategyStr);
-
-            auto conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask] --help for details:", "ask");
-            while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(conflictStr)) != helpOptions.end()) {
-                io->print(REMOTE_CONFLICT_POLICY_HELP);
-                conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask]:", "ask");
-            }
-            rsync->conflict_policy = rsConflictPolicyFromString(conflictStr);
-
-            sync = rsync;
-
-            s3Vault->encrypt_upstream = io->confirm("Enable upstream encryption? (yes/no) [yes]", false);
-        }
-
-        auto interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m] --help for details:", "15m");
-        while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(interval)) != helpOptions.end()) {
-            io->print(SYNC_INTERVAL_HELP);
-            interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m]:", "15m");
-        }
-        sync->interval = parseSyncInterval(interval);
-
-        return finish_vault_create(call, v, sync);
-
-    } catch (const std::exception& e) {
-        return handle_vault_create_failure(v, e.what());
+        fSync->conflict_policy = fsConflictPolicyFromString(conflictStr);
+        sync = fSync;
     }
+
+    if (v->type == VaultType::S3) {
+        const auto s3Vault = std::static_pointer_cast<S3Vault>(v);
+        const auto apiKeyStr = io->prompt("Enter API key name or ID (required):");
+        if (apiKeyStr.empty()) return invalid("vault create: API key is required for S3 vaults");
+
+        std::shared_ptr<api::APIKey> apiKey;
+        if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
+        else apiKey = APIKeyQueries::getAPIKey(apiKeyStr);
+
+        if (!apiKey) return invalid("vault create: API key not found: " + apiKeyStr);
+        if (apiKey->user_id != v->owner_id) {
+            if (!call.user->canManageAPIKeys())
+                return invalid(
+                    "vault create: user ID " + std::to_string(call.user->id) +
+                    " does not have permission to assign API keys to other users vaults"
+                    );
+
+            const auto ownerUser = UserQueries::getUserById(v->owner_id);
+            if (!ownerUser) return invalid("vault create: owner user ID not found: " + std::to_string(v->owner_id));
+
+            if (apiKey->user_id != ownerUser->id && !ownerUser->canManageAPIKeys())
+                return invalid("vault create: API key '" + apiKeyStr + "' does not belong to user ID " +
+                               std::to_string(v->owner_id));
+        }
+
+        s3Vault->api_key_id = apiKey->id;
+
+        s3Vault->bucket = io->prompt("Enter S3 bucket name (required):");
+        if (s3Vault->bucket.empty()) return invalid("vault create: S3 bucket name is required");
+
+        auto strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache] --help for details:",
+                                      "cache");
+        while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(strategyStr)) !=
+               helpOptions.end()) {
+            io->print(SYNC_STRATEGY_HELP);
+            strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache]:", "cache");
+        }
+        const auto rsync = std::make_shared<RSync>();
+        rsync->strategy = strategyFromString(strategyStr);
+
+        auto conflictStr = io->prompt(
+            "Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask] --help for details:", "ask");
+        while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(conflictStr)) !=
+               helpOptions.end()) {
+            io->print(REMOTE_CONFLICT_POLICY_HELP);
+            conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask]:", "ask");
+        }
+        rsync->conflict_policy = rsConflictPolicyFromString(conflictStr);
+
+        sync = rsync;
+
+        s3Vault->encrypt_upstream = io->confirm("Enable upstream encryption? (yes/no) [yes]", false);
+    }
+
+    auto interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m] --help for details:", "15m");
+    while (std::ranges::find(helpOptions.begin(), helpOptions.end(), stripLeadingDashes(interval)) != helpOptions.
+           end()) {
+        io->print(SYNC_INTERVAL_HELP);
+        interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m]:", "15m");
+    }
+    sync->interval = parseSyncInterval(interval);
+
+    return finish_vault_create(call, v, sync);
 }
 
 CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
+    if (!call.user->canCreateVaults()) return invalid(
+        "vault create: user ID " + std::to_string(call.user->id) + " does not have permission to create vaults");
+
+    if (hasFlag(call, "interactive")) return handle_vault_create_interactive(call);
+
+    const auto usage = resolveUsage({"vault", "create"});
+    validatePositionals(call, usage);
+    const auto owner = resolveOwner(call, usage);
+
+    const auto type = parseVaultType(call);
     std::shared_ptr<Vault> vault;
+    if (*type == VaultType::Local) vault = std::make_shared<Vault>();
+    else if (*type == VaultType::S3) vault = std::make_shared<S3Vault>();
+    else return invalid("vault create: unknown vault type");
 
-    try {
-        if (!call.user->canCreateVaults())
-            return invalid(
-                "vault create: user ID " + std::to_string(call.user->id) +
-                " does not have permission to create vaults");
+    vault->type = *type;
+    vault->name = call.positionals[0];
+    vault->owner_id = owner->id;
+    assignDescIfAvailable(call, usage, vault);
+    assignQuotaIfAvailable(call, usage, vault);
 
-        if (hasFlag(call, "interactive")) return handle_vault_create_interactive(call);
-        if (call.positionals.empty()) return invalid("vault create: missing <name>");
-        if (call.positionals.size() > 1) return invalid("vault create: too many arguments");
+    if (VaultQueries::vaultExists(vault->name, owner->id)) return invalid(
+        "vault create: vault with name '" + vault->name + "' already exists for user ID " + std::to_string(owner->id));
 
-        const std::string name = call.positionals[0];
+    std::shared_ptr<Sync> sync;
+    if (vault->type == VaultType::Local) sync = std::make_shared<FSync>();
+    else if (vault->type == VaultType::S3) sync = std::make_shared<RSync>();
+    else return invalid("vault create: unknown vault type");
 
-        bool f_local = hasFlag(call, "local");
-        const bool f_s3 = hasFlag(call, "s3");
-        if (f_local && f_s3) return invalid("vault create: --local and --s3 are mutually exclusive");
-        if (!f_local && ! f_s3) f_local = true; // Default to local
+    parseSync(call, usage, vault, sync);
+    parseS3API(call, usage, vault, owner->id, true);
 
-        const auto descOpt = optVal(call, "desc");
-        const auto quotaOpt = optVal(call, "quota");
-        const auto ownerOpt = optVal(call, "owner");
-        const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
-        const auto intervalOpt = optVal(call, "interval");
-
-        if (!ownerOpt) return invalid("vault create: invalid owner");
-
-        unsigned int ownerId = call.user->id;
-        if (const auto ownerIdOpt = parseUInt(*ownerOpt)) {
-            if (*ownerIdOpt <= 0) return invalid("vault create: --owner <id> must be a positive integer");
-            ownerId = *ownerIdOpt;
-        }
-
-        if (VaultQueries::vaultExists(name, ownerId))
-            return invalid(
-                "vault create: vault with name '" + name + "' already exists for user ID " + std::to_string(ownerId));
-
-        std::shared_ptr<Sync> sync;
-
-        if (f_local) {
-            vault = std::make_shared<Vault>();
-            const auto fsync = std::make_shared<FSync>();
-
-            if (onSyncConflictOpt) fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
-            else fsync->conflict_policy = FSync::ConflictPolicy::Overwrite; // Default
-
-            sync = fsync;
-        } else if (f_s3) {
-            const auto s3Vault = std::make_shared<S3Vault>();
-
-            const auto apiKeyOpt = optVal(call, "api-key");
-            if (!apiKeyOpt || apiKeyOpt->empty())
-                return invalid(
-                    "vault create: missing required --api-key <name | id> for S3 vault");
-
-            std::shared_ptr<api::APIKey> apiKey;
-            if (const auto apiKeyIdOpt = parseUInt(*apiKeyOpt)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
-            else apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
-
-            if (!apiKey) return invalid("vault create: API key not found: " + *apiKeyOpt);
-
-            if (ownerId != call.user->id) {
-                if (!call.user->canManageAPIKeys())
-                    return invalid(
-                        "vault create: user ID " + std::to_string(call.user->id) +
-                        " does not have permission to assign API keys to other users vaults"
-                        );
-
-                const auto owner = UserQueries::getUserById(ownerId);
-
-                if (ownerId != apiKey->user_id && !owner->canManageAPIKeys())
-                    return invalid("vault create: API key '" + *apiKeyOpt + "' does not belong to user ID " +
-                                   std::to_string(ownerId));
-            }
-
-            s3Vault->api_key_id = apiKey->id;
-
-            const auto bucketOpt = optVal(call, "bucket");
-            if (!bucketOpt || bucketOpt->empty())
-                return invalid(
-                    "vault create: missing required --bucket <name> for S3 vault");
-
-            s3Vault->bucket = *bucketOpt;
-
-            const auto rsync = std::make_shared<RSync>();
-            if (const auto syncStrategyOpt = optVal(call, "sync-strategy"))
-                rsync->strategy = strategyFromString(*syncStrategyOpt);
-            else rsync->strategy = RSync::Strategy::Cache;
-
-            if (onSyncConflictOpt) rsync->conflict_policy = rsConflictPolicyFromString(*onSyncConflictOpt);
-            else rsync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
-
-            sync = rsync;
-            vault = s3Vault;
-        }
-
-        if (!sync) return invalid("vault create: internal error, sync not initialized");
-
-        if (intervalOpt) sync->interval = parseSyncInterval(*intervalOpt);
-        else sync->interval = std::chrono::seconds(300);
-
-        vault->name = name;
-        vault->description = descOpt ? *descOpt : "";
-        vault->owner_id = ownerId;
-        vault->type = f_local ? VaultType::Local : VaultType::S3;
-        if (quotaOpt) vault->quota = parseSize(*quotaOpt);
-        else vault->quota = 0; // 0 means unlimited
-
-        return finish_vault_create(call, vault, sync);
-
-    } catch (const std::exception& e) {
-        return handle_vault_create_failure(vault, e.what());
-    }
+    return finish_vault_create(call, vault, sync);
 }

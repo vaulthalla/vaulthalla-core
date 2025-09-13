@@ -1,11 +1,8 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"
-#include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
@@ -13,8 +10,6 @@
 #include "types/RSync.hpp"
 #include "types/Sync.hpp"
 #include "util/interval.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "usage/include/UsageManager.hpp"
 
 #include <optional>
 #include <string>
@@ -34,12 +29,10 @@ using namespace vh::logging;
 static CommandResult handle_vault_sync(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync";
 
-    if (call.positionals.size() > 1)
-        return invalid(call.constructFullArgs(), "vault sync: too many arguments");
+    const auto usage = resolveUsage({"vault", "sync"});
+    validatePositionals(call, usage);
 
-    const auto vaultArg = call.positionals[0];
-
-    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, call.positionals[0], usage, ERR);
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
@@ -54,11 +47,10 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
 static CommandResult handle_vault_sync_update(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync update";
 
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
-    if (call.positionals.size() > 1)
-        return invalid(call.constructFullArgs(), "vault sync update: too many arguments");
+    const auto usage = resolveUsage({"vault", "sync", "update"});
+    validatePositionals(call, usage);
 
-    const auto eLkp = resolveEngine(call, call.positionals[0], ERR);
+    const auto eLkp = resolveEngine(call, call.positionals[0], usage, ERR);
     if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
     const auto engine = eLkp.ptr;
 
@@ -77,9 +69,7 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     }
 
     if (engine->vault->type == VaultType::Local) {
-        if (hasFlag(call, "sync-strategy")) return invalid(
-            "vault sync update: --sync-strategy is not valid for local vaults");
-        if (const auto onSyncConflictOpt = optVal(call, "on-sync-conflict")) {
+        if (const auto onSyncConflictOpt = optVal(call, usage->resolveOptional("on-sync-conflict")->option_tokens)) {
             const auto fsync = std::static_pointer_cast<FSync>(sync);
 
             try {
@@ -91,7 +81,7 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     } else if (engine->vault->type == VaultType::S3) {
         const auto rsync = std::static_pointer_cast<RSync>(sync);
 
-        if (const auto syncStrategyOpt = optVal(call, "sync-strategy")) {
+        if (const auto syncStrategyOpt = optVal(call, usage->resolveOptional("sync-strategy")->option_tokens)) {
             try {
                 rsync->strategy = strategyFromString(*syncStrategyOpt);
             } catch (const std::exception& e) {
@@ -99,7 +89,7 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
             }
         }
 
-        if (const auto onSyncConflictOpt = optVal(call, "on-sync-conflict")) {
+        if (const auto onSyncConflictOpt = optVal(call, usage->resolveOptional("on-sync-conflict")->option_tokens)) {
             try {
                 rsync->conflict_policy = rsConflictPolicyFromString(*onSyncConflictOpt);
             } catch (const std::exception& e) {
@@ -123,26 +113,21 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 
 static CommandResult handle_vault_sync_info(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync info";
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
-    if (call.positionals.size() > 1)
-        return invalid(call.constructFullArgs(), "vault sync info: too many arguments");
 
-    try {
-        const auto eLkp = resolveEngine(call, call.positionals[0], ERR);
-        if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
-        const auto engine = eLkp.ptr;
+    const auto usage = resolveUsage({"vault", "sync", "info"});
+    validatePositionals(call, usage);
 
-        if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
-            !call.user->canSyncVaultData(engine->vault->id))
-            return invalid("vault sync info: you do not have permission to view this vault's sync configuration");
+    const auto eLkp = resolveEngine(call, call.positionals[0], usage, ERR);
+    if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
+    const auto engine = eLkp.ptr;
 
-        if (!engine->sync) return invalid("vault sync info: vault does not have a sync configuration");
+    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
+        !call.user->canSyncVaultData(engine->vault->id))
+        return invalid("vault sync info: you do not have permission to view this vault's sync configuration");
 
-        return ok(to_string(engine->sync));
+    if (!engine->sync) return invalid("vault sync info: vault does not have a sync configuration");
 
-    } catch (const std::invalid_argument& e) {
-        return invalid("vault sync info: " + std::string(e.what()));
-    }
+    return ok(to_string(engine->sync));
 }
 
 static bool isVaultSyncMatch(const std::string& cmd, const std::string_view input) {
@@ -150,14 +135,8 @@ static bool isVaultSyncMatch(const std::string& cmd, const std::string_view inpu
 }
 
 CommandResult commands::vault::handle_sync(const CommandCall& call) {
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
-    if (call.positionals.size() > 2)
-        return invalid(call.constructFullArgs(), "vault sync: too many arguments");
-
     const auto [arg, subcall] = descend(call);
-
     if (call.positionals.size() == 1) return handle_vault_sync(call);
-
     if (isVaultSyncMatch("update", arg)) return handle_vault_sync_update(subcall);
     if (isVaultSyncMatch("info", arg)) return handle_vault_sync_info(subcall);
 

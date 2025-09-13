@@ -1,9 +1,9 @@
 #include "protocols/shell/commands/all.hpp"
+#include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/types.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/GroupQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
 #include "types/Group.hpp"
 #include "types/User.hpp"
 #include "auth/AuthManager.hpp"
@@ -18,112 +18,84 @@ using namespace vh::util;
 using namespace vh::types;
 using namespace vh::services;
 
+static std::shared_ptr<Group> resolveGroup(const std::string& groupNameOrId) {
+    if (const auto gidOpt = parseUInt(groupNameOrId)) {
+        if (*gidOpt <= 0) throw std::runtime_error("Group ID must be a positive integer");
+        return GroupQueries::getGroup(*gidOpt);
+    }
+    return GroupQueries::getGroupByName(groupNameOrId);
+}
+
+static void assignGidIfAvailable(const CommandCall& call, const std::shared_ptr<Group>& group, const std::shared_ptr<CommandUsage>& usage) {
+    if (const auto linuxGidOpt = optVal(call, usage->resolveOptional("linux-gid")->option_tokens)) {
+        const auto parsed = parseUInt(*linuxGidOpt);
+        if (!parsed || *parsed <= 0) throw std::runtime_error("group create: --linux-gid must be a positive integer");
+        group->linux_gid = *parsed;
+    }
+}
+
 static CommandResult handle_group_create(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group create: you do not have permission to create groups");
-    if (call.positionals.empty()) return invalid("group create: missing <name>");
-    if (call.positionals.size() > 1) return invalid("group create: too many arguments");
+
+    const auto usage = resolveUsage({"group", "create"});
+    validatePositionals(call, usage);
 
     const std::string name = call.positionals[0];
     if (!AuthManager::isValidGroup(name)) return invalid("group create: invalid group name '" + name + "'");
 
     const auto group = std::make_shared<Group>();
     group->name = name;
-    group->description = optVal(call, "desc").value_or("");
+    group->description = optVal(call, usage->resolveOptional("description")->option_tokens).value_or("");
 
-    if (const auto linuxGidOpt = optVal(call, "linux-gid")) {
-        const auto parsed = parseUInt(*linuxGidOpt);
-        if (!parsed || *parsed <= 0) return invalid("group create: --linux-gid must be a positive integer");
-        group->linux_gid = *parsed;
-    }
+    assignGidIfAvailable(call, group, usage);
 
-    try {
-        group->id = GroupQueries::createGroup(group);
-        return ok("Successfully created new group:\n" + to_string(group));
-    } catch (const std::exception& e) {
-        return invalid("group create: " + std::string(e.what()));
-    }
+    group->id = GroupQueries::createGroup(group);
+    return ok("Successfully created new group:\n" + to_string(group));
 }
 
 static CommandResult handle_group_update(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group update: you do not have permission to update groups");
-    if (call.positionals.empty()) return invalid("group update: missing <name>");
-    if (call.positionals.size() > 1) return invalid("group update: too many arguments");
 
-    const std::string arg = call.positionals[0];
-    const auto gidOpt = parseUInt(arg);
+    const auto usage = resolveUsage({"group", "update"});
+    validatePositionals(call, usage);
 
-    std::shared_ptr<Group> group;
+    const auto group = resolveGroup(call.positionals[0]);
 
-    if (gidOpt) {
-        if (*gidOpt <= 0) return invalid("group update: <id> must be a positive integer");
-        group = GroupQueries::getGroup(*gidOpt);
-    } else group = GroupQueries::getGroupByName(arg);
-
-    if (!group) return invalid("group update: group '" + arg + "' not found");
-
-    if (const auto newName = optVal(call, "name")) {
+    if (const auto newName = optVal(call, usage->resolveOptional("name")->option_tokens)) {
         if (!AuthManager::isValidGroup(*newName)) return invalid("group update: invalid group name '" + *newName + "'");
         group->name = *newName;
     }
 
-    if (const auto desc = optVal(call, "desc")) group->description = *desc;
+    if (const auto desc = optVal(call, usage->resolveOptional("description")->option_tokens))
+        group->description = *desc;
 
-    if (const auto linuxGid = optVal(call, "linux-gid")) {
-        const auto parsed = parseUInt(*linuxGid);
-        if (!parsed || *parsed <= 0) return invalid("group update: --linux-gid must be a positive integer");
-        group->linux_gid = *parsed;
-    }
+    assignGidIfAvailable(call, group, usage);
 
-    try {
-        GroupQueries::updateGroup(group);
-        return ok("Successfully updated group:\n" + to_string(group));
-    } catch (const std::exception& e) {
-        return invalid("group update: " + std::string(e.what()));
-    }
+    GroupQueries::updateGroup(group);
+    return ok("Successfully updated group:\n" + to_string(group));
 }
 
 static CommandResult handle_group_delete(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group delete: you do not have permission to delete groups");
-    if (call.positionals.empty()) return invalid("group delete: missing <name>");
-    if (call.positionals.size() > 1) return invalid("group delete: too many arguments");
-
-    const std::string arg = call.positionals[0];
-    const auto gidOpt = parseUInt(arg);
-
-    std::shared_ptr<Group> group;
-
-    if (gidOpt) {
-        if (*gidOpt <= 0) return invalid("group delete: <id> must be a positive integer, got " + std::to_string(*gidOpt));
-        group = GroupQueries::getGroup(*gidOpt);
-    } else group = GroupQueries::getGroupByName(arg);
-
-    if (!group) return invalid("group delete: group '" + arg + "' not found");
-
+    const auto usage = resolveUsage({"group", "delete"});
+    validatePositionals(call, usage);
+    const auto group = resolveGroup(call.positionals[0]);
     GroupQueries::deleteGroup(group->id);
     return ok("Successfully deleted group '" + group->name + "' (ID: " + std::to_string(group->id) + ")");
 }
 
 static CommandResult handle_group_info(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group info: you do not have permission to view group information");
-    if (call.positionals.empty()) return invalid("group info: missing <name>");
-    if (call.positionals.size() > 1) return invalid("group info: too many arguments");
-
-    const auto arg = call.positionals[0];
-    const auto gidOpt = parseUInt(arg);
-
-    std::shared_ptr<Group> group;
-
-    if (gidOpt) {
-        if (*gidOpt <= 0) return invalid("group info: <id> must be a positive integer");
-        group = GroupQueries::getGroup(*gidOpt);
-    } else group = GroupQueries::getGroupByName(arg);
-
-    if (!group) return invalid("group info: group '" + arg + "' not found");
-
+    const auto usage = resolveUsage({"group", "info"});
+    validatePositionals(call, usage);
+    const auto group = resolveGroup(call.positionals[0]);
     return ok(to_string(group));
 }
 
 static CommandResult handle_group_list(const CommandCall& call) {
+    const auto usage = resolveUsage({"group", "list"});
+    validatePositionals(call, usage);
+
     auto params = parseListQuery(call);
 
     std::vector<std::shared_ptr<Group>> groups;
@@ -134,32 +106,18 @@ static CommandResult handle_group_list(const CommandCall& call) {
 }
 
 static CommandResult handle_group_add_user(const CommandCall& call) {
+    constexpr const auto* ERR = "group add user";
+
     if (!call.user->canManageGroups()) return invalid("group add-user: you do not have permission to add users to groups");
-    if (call.positionals.size() != 2) return invalid("group add-user: usage: group add-user <group_name> <user_name>");
 
-    const std::string groupArg = call.positionals[0];
-    const auto groupIdOpt = parseUInt(groupArg);
+    const auto usage = resolveUsage({"group", "add", "user"});
+    validatePositionals(call, usage);
 
-    const std::string userArg = call.positionals[1];
-    const auto userIdOpt = parseUInt(userArg);
+    const auto group = resolveGroup(call.positionals[0]);
 
-    std::shared_ptr<Group> group;
-
-    if (groupIdOpt) {
-        if (*groupIdOpt <= 0) return invalid("group add-user: <id> must be a positive integer");
-        group = GroupQueries::getGroup(*groupIdOpt);
-    } else group = GroupQueries::getGroupByName(groupArg);
-
-    if (!group) return invalid("group add-user: group '" + groupArg + "' not found");
-
-    std::shared_ptr<User> user;
-
-    if (userIdOpt) {
-        if (*userIdOpt <= 0) return invalid("group add-user: <id> must be a positive integer");
-        user = UserQueries::getUserById(*userIdOpt);
-    } else user = UserQueries::getUserByName(userArg);
-
-    if (!user) return invalid("group add-user: user '" + userArg + "' not found");
+    const auto uLkp = resolveUser(call.positionals[1], ERR);
+    if (!uLkp || !uLkp.ptr) return invalid(uLkp.error);
+    const auto user = uLkp.ptr;
 
     GroupQueries::addMemberToGroup(group->id, user->id);
 
@@ -167,67 +125,41 @@ static CommandResult handle_group_add_user(const CommandCall& call) {
 }
 
 static CommandResult handle_group_remove_user(const CommandCall& call) {
+    constexpr const auto* ERR = "group remove user";
+
     if (!call.user->canManageGroups()) return invalid("group remove-user: you do not have permission to remove users from groups");
-    if (call.positionals.size() != 2) return invalid("group remove-user: usage: group remove-user <group_name> <user_name>");
 
-    const auto groupArg = call.positionals[0];
-    const auto groupIdOpt = parseUInt(groupArg);
+    const auto usage = resolveUsage({"group", "remove", "user"});
+    validatePositionals(call, usage);
 
-    const auto userArg = call.positionals[1];
-    const auto userIdOpt = parseUInt(userArg);
+    const auto group = resolveGroup(call.positionals[0]);
 
-    std::shared_ptr<Group> group;
-    if (groupIdOpt) {
-        if (*groupIdOpt <= 0) return invalid("group remove-user: <id> must be a positive integer");
-        group = GroupQueries::getGroup(*groupIdOpt);
-    } else group = GroupQueries::getGroupByName(groupArg);
-
-    if (!group) return invalid("group remove-user: group '" + groupArg + "' not found");
-
-    std::shared_ptr<User> user;
-
-    if (userIdOpt) {
-        if (*userIdOpt <= 0) return invalid("group remove-user: <id> must be a positive integer");
-        user = UserQueries::getUserById(*userIdOpt);
-    } else user = UserQueries::getUserByName(userArg);
-
-    if (!user) return invalid("group remove-user: user '" + userArg + "' not found");
+    const auto uLkp = resolveUser(call.positionals[1], ERR);
+    if (!uLkp || !uLkp.ptr) return invalid(uLkp.error);
+    const auto user = uLkp.ptr;
 
     GroupQueries::removeMemberFromGroup(group->id, user->id);
 
     return ok("Successfully removed user '" + user->name + "' from group '" + group->name + "'");
 }
 
-static CommandResult handle_group_user(const CommandCall& call) {
-    if (call.positionals.size() != 3) return invalid("group user: usage: group user <add|remove> <group_name> <user_name>");
-
-    const std::string_view action = call.positionals[0];
-    CommandCall subcall = call;
-    subcall.positionals.erase(subcall.positionals.begin());
-
-    if (action == "add") return handle_group_add_user(subcall);
-    if (action == "remove") return handle_group_remove_user(subcall);
-    return invalid(call.constructFullArgs(), "Unknown group user action: '" + std::string(action) + "'");
-}
-
 static CommandResult handle_group_list_users(const CommandCall& call) {
     if (!call.user->canManageGroups()) return invalid("group list-users: you do not have permission to view group users");
-    if (call.positionals.empty()) return invalid("group list-users: missing <group_name>");
-    if (call.positionals.size() > 1) return invalid("group list-users: too many arguments");
-
-    const std::string groupArg = call.positionals[0];
-    const auto groupIdOpt = parseUInt(groupArg);
-
-    std::shared_ptr<Group> group;
-
-    if (groupIdOpt) {
-        if (*groupIdOpt <= 0) return invalid("group list-users: <id> must be a positive integer");
-        group = GroupQueries::getGroup(*groupIdOpt);
-    } else group = GroupQueries::getGroupByName(groupArg);
-
-    if (!group) return invalid("group list-users: group '" + groupArg + "' not found");
-
+    const auto usage = resolveUsage({"group", "list-users"});
+    const auto group = resolveGroup(call.positionals[0]);
     return ok(to_string(group->members));
+}
+
+static bool isGroupUserMatch(const std::string& cmd, const std::string_view input) {
+    return isCommandMatch({"group", "user", cmd}, input);
+}
+
+static CommandResult handle_group_user(const CommandCall& call) {
+    const auto [action, subcall] = descend(call);
+    if (isGroupUserMatch("add", action)) return handle_group_add_user(subcall);
+    if (isGroupUserMatch("remove", action)) return handle_group_remove_user(subcall);
+    if (isGroupUserMatch("list", action)) return handle_group_list_users(subcall);
+    return invalid(call.constructFullArgs(), "Unknown group user action: '" + std::string(action) + "'");
 }
 
 static bool isGroupMatch(const std::string& cmd, const std::string_view input) {
@@ -246,7 +178,6 @@ static CommandResult handle_group(const CommandCall& call) {
     if (isGroupMatch("info", sub)) return handle_group_info(subcall);
     if (isGroupMatch("list", sub)) return handle_group_list(subcall);
     if (isGroupMatch("user", sub)) return handle_group_user(subcall);
-    if (isGroupMatch("list-users", sub)) return handle_group_list_users(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown group subcommand: '" + std::string(sub) + "'");
 }

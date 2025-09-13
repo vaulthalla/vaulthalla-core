@@ -14,6 +14,7 @@
 #include "types/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
+#include "CommandUsage.hpp"
 
 #include <optional>
 #include <string>
@@ -34,12 +35,10 @@ using namespace vh::logging;
 CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
     constexpr const auto* ERR = "vault info";
 
-    if (call.positionals.empty()) return invalid("vault info: missing <name>");
-    if (call.positionals.size() > 1) return invalid("vault info: too many arguments");
+    const auto usage = resolveUsage({"vault", "info"});
+    validatePositionals(call, usage);
 
-    const std::string vaultArg = call.positionals[0];
-
-    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, call.positionals[0], usage, ERR);
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
@@ -53,30 +52,29 @@ CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
 }
 
 CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
-    if (!call.positionals.empty()) return invalid("vaults: unexpected positional arguments");
+    const auto usage = resolveUsage({"vault", "list"});
+    validatePositionals(call, usage);
 
-    const auto user = call.user;
-
-    const bool f_local = hasFlag(call, "local");
-    const bool f_s3 = hasFlag(call, "s3");
+    const bool f_local = hasFlag(call, usage->resolveFlag("local")->aliases);
+    const bool f_s3 = hasFlag(call, usage->resolveFlag("s3")->aliases);
     if (f_local && f_s3) return invalid("vaults: --local and --s3 are mutually exclusive");
 
     std::optional<VaultType> typeFilter = std::nullopt;
     if (f_local) typeFilter = VaultType::Local;
     else if (f_s3) typeFilter = VaultType::S3;
 
-    const auto canListAll = user->isAdmin() || user->canManageVaults();
+    const auto canListAll = call.user->isAdmin() || call.user->canManageVaults();
 
     auto vaults = canListAll
                       ? VaultQueries::listVaults(typeFilter, parseListQuery(call))
-                      : VaultQueries::listUserVaults(user->id, typeFilter, parseListQuery(call));
+                      : VaultQueries::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
 
     if (!canListAll) {
         for (const auto& r : call.user->roles) {
             if (r->canList({})) {
                 const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
                 if (!vault) continue;
-                if (vault->owner_id == user->id) continue; // Already added
+                if (vault->owner_id == call.user->id) continue; // Already added
                 vaults.push_back(vault);
             }
         }

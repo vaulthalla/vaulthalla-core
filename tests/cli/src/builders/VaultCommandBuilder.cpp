@@ -35,6 +35,11 @@ std::string VaultCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault
         return entity->quotaStr();
     }
 
+    if (vaultAliases_.isInterval(field)) {
+        // TODO: add sync as var to vault or track, and track lifecycle
+        return randomAlias(std::vector<std::string>{"15m","30m","1h","2h","6h","12h","24h"});
+    }
+
     throw std::runtime_error("VaultCommandBuilder: unsupported vault field for update: " + field);
 }
 

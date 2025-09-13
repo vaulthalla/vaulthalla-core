@@ -24,7 +24,8 @@ std::string usage_provider() {
     return options;
 }
 
-static const auto keyName = Option::Mirrored("api_key_name", "Name for the new API key", "name");
+static const auto keyNamePos = Positional::Alias("api_key_name", "Name for the new API key", "name");
+static const auto keyNameOpt = Optional::Mirrored("api_key_name", "Name for the new API key", "name");
 static const auto accessKey = Option::Single("access_key", "Access key for the S3 provider", "access", "accessKey");
 static const auto secretKey = Option::Single("secret_key", "Secret key for the S3 provider", "secret", "secret");
 static const auto provider = Option::Mirrored("s3_provider", "S3 provider (" + usage_provider() + ")", "provider");
@@ -50,7 +51,8 @@ std::shared_ptr<CommandUsage> create(const std::weak_ptr<CommandUsage>& parent) 
     auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"create", "new", "add", "mk"};
     cmd->description = "Create a new API key for accessing S3 storage.";
-    cmd->required = { keyName, accessKey, secretKey, provider, endpoint };
+    cmd->positionals = { keyNamePos };
+    cmd->required = { accessKey, secretKey, provider, endpoint };
     cmd->optional = { region };
     cmd->examples = {
         {"vh api-key create --name mykey --access AKIA... --secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY --provider aws --region us-east-1",
@@ -90,7 +92,7 @@ std::shared_ptr<CommandUsage> update(const std::weak_ptr<CommandUsage>& parent) 
     cmd->aliases = {"update", "set", "modify", "edit"};
     cmd->description = "Update properties of an existing API key.";
     cmd->positionals = { apiKeyPos };
-    cmd->optional = { Optional(keyName), Optional(accessKey), Optional(secretKey), Optional(provider), Optional(endpoint), region };
+    cmd->optional = { keyNameOpt, Optional(accessKey), Optional(secretKey), Optional(provider), Optional(endpoint), region };
     cmd->examples = {
         {"vh api-key update 42 --name newname --region us-east-1", "Update the name and region of the API key with ID 42."},
         {"vh api-key set 42 --secret newsecretkey", "Update the secret key of the API key with ID 42 (using alias)."}

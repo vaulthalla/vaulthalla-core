@@ -1,6 +1,7 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/Router.hpp"
+#include "CommandUsage.hpp"
 
 using namespace vh::shell;
 

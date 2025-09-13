@@ -11,8 +11,8 @@ using namespace vh::services;
 static CommandResult handle_permission(const CommandCall& call) {
     if (call.positionals.empty() || call.positionals.size() > 1) return usage(call.constructFullArgs());
     const std::string_view sub = call.positionals[0];
-    if (sub == "user") return ok(permissions::usage_user_permissions());
-    if (sub == "vault") return ok(permissions::usage_vault_permissions());
+    if (sub == "user" || sub == "u") return ok(permissions::usage_user_permissions());
+    if (sub == "vault" || sub == "v") return ok(permissions::usage_vault_permissions());
     return invalid(call.constructFullArgs(), "Unknown permission subcommand: '" + std::string(sub) + "'");
 }
 

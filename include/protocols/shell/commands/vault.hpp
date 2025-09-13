@@ -2,6 +2,7 @@
 
 #include "protocols/shell/types.hpp"
 #include "util/shellArgsHelpers.hpp"
+#include "helpers.hpp"
 
 #include <memory>
 #include <optional>
@@ -10,6 +11,7 @@
 
 namespace vh::shell {
 class Router;
+class CommandUsage;
 }
 
 namespace vh::types {
@@ -20,7 +22,12 @@ struct User;
 struct Waiver;
 struct VaultRole;
 struct Role;
+enum class VaultType;
 enum class OverrideOpt;
+
+namespace api {
+struct APIKey;
+}
 }
 
 namespace vh::storage {
@@ -69,11 +76,12 @@ CommandResult handle_sync(const CommandCall& call);
 // helpers.cpp
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut);
 
-Lookup<types::User> resolveOwnerRequired(const CommandCall& call, const std::string& errPrefix);
+std::shared_ptr<types::User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage);
+Lookup<types::User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
-Lookup<types::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix);
+Lookup<types::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
-Lookup<storage::StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix);
+Lookup<storage::StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
 std::optional<std::string> checkOverridePermissions(const CommandCall& call,
                                                     const std::shared_ptr<types::Vault>& vault,
@@ -89,5 +97,17 @@ PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::
 EnableParse parseEnableDisableOpt(const CommandCall& call, const std::string& errPrefix);
 
 EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& errPrefix);
+
+std::unique_ptr<types::VaultType> parseVaultType(const CommandCall& call);
+
+void assignDescIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+
+void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+
+void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<types::Sync>& sync);
+
+void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, unsigned int ownerId, bool required = false);
 
 }

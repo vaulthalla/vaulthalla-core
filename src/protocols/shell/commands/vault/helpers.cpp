@@ -1,7 +1,6 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "types/Vault.hpp"
 #include "types/User.hpp"
-#include "types/Role.hpp"
 #include "types/VaultRole.hpp"
 #include "types/PermissionOverride.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -10,6 +9,10 @@
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
+#include "CommandUsage.hpp"
+#include "types/FSync.hpp"
+#include "types/RSync.hpp"
+#include "util/interval.hpp"
 
 using namespace vh::shell;
 using namespace vh::types;
@@ -28,9 +31,24 @@ std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* 
     return std::nullopt;
 }
 
-Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& errPrefix) {
+std::shared_ptr<User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage) {
+    if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
+        if (const auto idOpt = parseUInt(*ownerOpt)) {
+            if (*idOpt <= 0) throw std::runtime_error("owner must be a positive integer");
+            const auto user = UserQueries::getUserById(*idOpt);
+            if (!user) throw std::runtime_error("owner id not found: " + *ownerOpt);
+            return user;
+        }
+        const auto user = UserQueries::getUserByName(*ownerOpt);
+        if (!user) throw std::runtime_error("owner not found: " + *ownerOpt);
+        return user;
+    }
+    return call.user;
+}
+
+Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
     Lookup<User> out;
-    const auto ownerOpt = optVal(call, "owner");
+    const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens);
     if (!ownerOpt || ownerOpt->empty()) {
         out.error = errPrefix + ": when using a vault name, you must specify --owner <id|name>";
         return out;
@@ -46,7 +64,7 @@ Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::string& er
     return out;
 }
 
-Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
+Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
     Lookup<Vault> out;
     if (const auto idOpt = parseUInt(vaultArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": vault ID must be a positive integer"; return out; }
@@ -55,17 +73,17 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
         return out;
     }
 
-    auto ownerLkp = resolveOwnerRequired(call, errPrefix);
+    auto ownerLkp = resolveOwnerRequired(call, usage, errPrefix);
     if (!ownerLkp) { out.error = std::move(ownerLkp.error); return out; }
     out.ptr = VaultQueries::getVault(vaultArg, ownerLkp.ptr->id);
     if (!out.ptr) out.error = errPrefix + ": vault named '" + vaultArg + "' (owner id " + std::to_string(ownerLkp.ptr->id) + ") not found";
     return out;
 }
 
-Lookup<StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::string& errPrefix) {
+Lookup<StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
     Lookup<StorageEngine> out;
 
-    const auto vLkp = resolveVault(call, vaultArg, errPrefix);
+    const auto vLkp = resolveVault(call, vaultArg, usage, errPrefix);
     if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }
     const auto vault = vLkp.ptr;
 
@@ -151,6 +169,90 @@ EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& err
     if (denyFlag)  out.value = OverrideOpt::DENY;
     out.ok = true;
     return out;
+}
+
+std::unique_ptr<VaultType> parseVaultType(const CommandCall& call) {
+    const bool local = hasFlag(call, "local");
+    const bool s3    = hasFlag(call, "s3");
+    if (local && s3) throw std::runtime_error("--local and --s3 are mutually exclusive");
+    if (local) return std::make_unique<VaultType>(VaultType::Local);
+    if (s3)    return std::make_unique<VaultType>(VaultType::S3);
+
+    throw std::runtime_error("Vault type not specified: must provide either --local or --s3");
+}
+
+void assignDescIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault) {
+    if (const auto descOpt = optVal(call, usage->resolveOptional("description")->option_tokens))
+        vault->description = *descOpt;
+}
+
+void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault) {
+    if (const auto quotaOpt = optVal(call, usage->resolveOptional("quota")->option_tokens)) {
+        if (*quotaOpt == "none" || *quotaOpt == "unlimited") vault->quota = 0;
+        else vault->quota = parseSize(*quotaOpt);
+    }
+}
+
+void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault) {
+    if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
+        Lookup<User> ownerLkp;
+        if (const auto idOpt = parseUInt(*ownerOpt)) {
+            if (*idOpt <= 0) throw std::runtime_error("vault create: --owner must be a positive integer");
+            ownerLkp.ptr = UserQueries::getUserById(*idOpt);
+        } else ownerLkp.ptr = UserQueries::getUserByName(*ownerOpt);
+        if (!ownerLkp.ptr) throw std::runtime_error("vault create: owner not found: " + *ownerOpt);
+        vault->owner_id = ownerLkp.ptr->id;
+    }
+}
+
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const std::shared_ptr<Sync>& sync) {
+    if (const auto syncIntervalOpt = optVal(call, usage->resolveOptional("interval")->option_tokens))
+        sync->interval = util::parseSyncInterval(*syncIntervalOpt);
+
+    if (vault->type == VaultType::Local) {
+        if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("Local Vault Options", "conflict")->option_tokens)) {
+            const auto fsync = std::static_pointer_cast<FSync>(sync);
+            fsync->conflict_policy = fsConflictPolicyFromString(*conflictOpt);
+        }
+    } else if (vault->type == VaultType::S3) {
+        if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "conflict")->option_tokens)) {
+            const auto rsync = std::static_pointer_cast<RSync>(sync);
+            rsync->conflict_policy = rsConflictPolicyFromString(*conflictOpt);
+        }
+    }
+
+    if (vault->type == VaultType::S3) {
+        const auto rsync = std::static_pointer_cast<RSync>(sync);
+        if (const auto syncStrategyOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "strategy")->option_tokens))
+            rsync->strategy = strategyFromString(*syncStrategyOpt);
+    }
+}
+
+void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const unsigned int ownerId, const bool required) {
+    if (vault->type == VaultType::Local) return;
+
+    const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
+
+    if (const auto apiKeyOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "api-key")->option_tokens)) {
+        if (const auto apiKeyId = parseUInt(*apiKeyOpt); APIKeyQueries::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
+        else {
+            const auto apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
+            if (!apiKey) throw std::runtime_error("API key not found: " + *apiKeyOpt);
+
+            if ((ownerId != call.user->id || call.user->id != apiKey->user_id) && !call.user->canManageAPIKeys())
+                throw std::runtime_error("you do not have permission to use an API key for another user");
+
+            if (call.user->id != apiKey->user_id && !call.user->canManageAPIKeys())
+                throw std::runtime_error("you do not have permission to use this API key");
+
+            s3Vault->api_key_id = apiKey->id;
+        }
+    } else if (required) throw std::runtime_error("--api-key is required for S3 vaults");
+
+    if (const auto bucketOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "bucket")->option_tokens)) {
+        if (bucketOpt->empty()) throw std::runtime_error("--bucket cannot be empty");
+        s3Vault->bucket = *bucketOpt;
+    } else if (required) throw std::runtime_error("--bucket is required for S3 vaults");
 }
 
 }

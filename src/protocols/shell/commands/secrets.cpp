@@ -1,4 +1,5 @@
 #include "protocols/shell/commands/all.hpp"
+#include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "types/User.hpp"
@@ -10,6 +11,7 @@
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
+#include "CommandUsage.hpp"
 
 #include <paths.h>
 
@@ -29,15 +31,15 @@ static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
 }
 
 static CommandResult handle_secrets_set(const CommandCall& call) {
-    if (call.positionals.size() != 1) return usage(call.constructFullArgs());
+    const auto usage = resolveUsage({"secrets", "set"});
+    validatePositionals(call, usage);
 
     const auto secretArg = call.positionals[0];
+    const auto fileArg = call.positionals[1];
 
-    const auto fileOpt = optVal(call, "file");
-    if (!fileOpt) return invalid("secrets set: missing required --file <path> (or use default /run/vaulthalla/<secret>)");
-    if (!std::filesystem::exists(*fileOpt)) return invalid("secrets set: file does not exist: " + *fileOpt);
+    if (!std::filesystem::exists(fileArg)) return invalid("secrets set: file does not exist: " + fileArg);
 
-    const auto secret = trimSecret(readFileToVector(*fileOpt));
+    const auto secret = trimSecret(readFileToVector(fileArg));
 
     if (secretArg == "db-password") {
         TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
@@ -56,10 +58,11 @@ static CommandResult handle_secrets_set(const CommandCall& call) {
 }
 
 static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
-                                                     const nlohmann::json& output) {
-    const auto outputOpt = optVal(call, "output");
+                                                     const nlohmann::json& output,
+                                                     const std::shared_ptr<CommandUsage>& usage) {
+    const auto outputOpt = optVal(call, usage->resolveOptional("output")->option_tokens);
 
-    if (const auto recipientOpt = optVal(call, "recipient")) {
+    if (const auto recipientOpt = optVal(call, usage->resolveOptional("recipient")->option_tokens)) {
         if (recipientOpt->empty()) return invalid("secrets export: --recipient requires a value");
         if (!outputOpt) return invalid("secrets export: --recipient requires --output to specify the output file");
 
@@ -120,7 +123,8 @@ static nlohmann::json getJWTSecret() {
 }
 
 static CommandResult handle_secrets_export(const CommandCall& call) {
-    if (call.positionals.size() != 1) return usage(call.constructFullArgs());
+    const auto usage = resolveUsage({"secrets", "export"});
+    validatePositionals(call, usage);
 
     const auto secretArg = call.positionals[0];
 
@@ -130,7 +134,7 @@ static CommandResult handle_secrets_export(const CommandCall& call) {
     if (secretArg == "jwt-secret" || secretArg == "all") out.push_back(getJWTSecret());
 
     if (out.empty()) return invalid("secrets export: unknown secret '" + std::string(secretArg) + "'. Valid secrets are: db-password, jwt-secret, all");
-    return handle_secret_encrypt_and_response(call, out);
+    return handle_secret_encrypt_and_response(call, out, usage);
 }
 
 static bool isSecretsMatch(const std::string& cmd, const std::string_view input) {

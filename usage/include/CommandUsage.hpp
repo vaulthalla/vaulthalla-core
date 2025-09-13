@@ -48,6 +48,7 @@ public:
     [[nodiscard]] std::shared_ptr<Optional> resolveOptional(const std::string& alias) const;
     [[nodiscard]] std::shared_ptr<Option> resolveRequired(const std::string& alias) const;
     [[nodiscard]] std::shared_ptr<GroupedOptions> resolveGroup(const std::string& alias) const;
+    [[nodiscard]] std::shared_ptr<Optional> resolveGroupOptional(const std::string& groupAlias, const std::string& optionalAlias) const;
 
 private:
     static constexpr std::string_view binName_ = "vh";

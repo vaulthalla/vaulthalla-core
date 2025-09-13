@@ -6,6 +6,8 @@
 
 namespace vh::shell {
 
+struct CommandCall;
+
 namespace aku { [[nodiscard]] std::string usage_cloud_provider(); }
 
 namespace permissions {

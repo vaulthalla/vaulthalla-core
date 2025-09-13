@@ -12,6 +12,7 @@
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "CommandUsage.hpp"
 
 #include <optional>
 #include <string>
@@ -83,13 +84,13 @@ static ParsedPermsResult parseExplicitVaultPermissionFlags(const CommandCall& ca
 static CommandResult handle_vault_role_override_add(const CommandCall& call) {
     constexpr const char* ERR = "vault role override add";
 
-    if (call.positionals.size() < 2) return invalid(std::string(ERR) + ": missing <vault_id|vault_name> and <role_id|role_hint>");
-    if (call.positionals.size() > 2) return invalid(std::string(ERR) + ": too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "override", "add"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
 
-    auto vLkp = resolveVault(call, vaultArg, ERR);
+    auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
@@ -134,16 +135,14 @@ static CommandResult handle_vault_role_override_add(const CommandCall& call) {
 static CommandResult handle_vault_role_override_update(const CommandCall& call) {
     constexpr const char* ERR = "vault role override update";
 
-    if (call.positionals.size() < 3)
-        return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint> <bit_position>");
-    if (call.positionals.size() > 3)
-        return invalid(std::string(ERR) + ": too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "override", "update"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
     const auto bitArg   = call.positionals.at(2);
 
-    auto vLkp = resolveVault(call, vaultArg, ERR);
+    auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
@@ -219,16 +218,14 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
 static CommandResult handle_vault_role_override_remove(const CommandCall& call) {
     constexpr const char* ERR = "vault override remove";
 
-    if (call.positionals.size() < 3)
-        return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint> <bit_position>");
-    if (call.positionals.size() > 3)
-        return invalid(std::string(ERR) + ": too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "override", "remove"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
     const auto bitArg   = call.positionals.at(2);
 
-    auto vLkp = resolveVault(call, vaultArg, ERR);
+    auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp) return invalid(vLkp.error);
     auto vault = vLkp.ptr;
 
@@ -275,27 +272,25 @@ static CommandResult handle_vault_role_override_remove(const CommandCall& call) 
 static CommandResult handle_vault_role_override_list(const CommandCall& call) {
     constexpr const auto* ERR = "vault override list";
 
-    if (call.positionals.size() < 2)
-        return invalid(std::string(ERR) + ": missing <vault-id|vault-name> <role_id|role_hint>");
-    if (call.positionals.size() > 2)
-        return invalid(std::string(ERR) + ": too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "override", "list"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg  = call.positionals.at(1);
 
-    auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp) return invalid(vLkp.error);
-    auto vault = vLkp.ptr;
+    const auto vault = vLkp.ptr;
 
-    if (auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
+    if (const auto err = checkOverridePermissions(call, vault, ERR)) return invalid(*err);
 
-    auto subjLkp = parseSubject(call, ERR);
+    const auto subjLkp = parseSubject(call, ERR);
     if (!subjLkp) return invalid(subjLkp.error);
     const Subject subj = *subjLkp.ptr;
 
-    auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
+    const auto roleLkp = resolveVRole(roleArg, vault, &subj, ERR);
     if (!roleLkp) return invalid(roleLkp.error);
-    auto role = roleLkp.ptr;
+    const auto role = roleLkp.ptr;
 
     const auto& ovs = role->permission_overrides;
 
@@ -316,13 +311,13 @@ static CommandResult handle_vault_role_override_list(const CommandCall& call) {
 static CommandResult handle_vault_role_assign(const CommandCall& call) {
     constexpr const auto* ERR = "vault role override update";
 
-    if (call.positionals.size() < 2) return invalid("vault assign: missing <vault_id> and <role_id>");
-    if (call.positionals.size() > 2) return invalid("vault assign: too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "assign"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg = call.positionals.at(1);
 
-    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
@@ -355,13 +350,13 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
 static CommandResult handle_vault_role_remove(const CommandCall& call) {
     constexpr const auto* ERR = "vault role remove";
 
-    if (call.positionals.size() < 2) return invalid("vault remove: missing <vault_id> and <role_id>");
-    if (call.positionals.size() > 2) return invalid("vault remove: too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "remove"});
+    validatePositionals(call, usage);
 
     const auto vaultArg = call.positionals.at(0);
     const auto roleArg = call.positionals.at(1);
 
-    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, vaultArg, usage, ERR);
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
@@ -388,13 +383,14 @@ static CommandResult handle_vault_role_remove(const CommandCall& call) {
 static CommandResult handle_vault_role_list(const CommandCall& call) {
     constexpr const auto* ERR = "vault role list";
 
-    if (call.positionals.size() > 1) return invalid("vault list: too many arguments");
+    const auto usage = resolveUsage({"vault", "role", "list"});
+    validatePositionals(call, usage);
 
     std::shared_ptr<Vault> vault;
     if (!call.positionals.empty()) {
         const auto vaultArg = call.positionals.at(0);
 
-        const auto vLkp = resolveVault(call, vaultArg, ERR);
+        const auto vLkp = resolveVault(call, vaultArg, usage, ERR);
         if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
         vault = vLkp.ptr;
 
@@ -425,9 +421,7 @@ static bool isVaultRoleOverrideMatch(const std::string& cmd, const std::string_v
 }
 
 static CommandResult handle_vault_role_override(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault override: missing <add|remove|list>");
-    if (call.positionals.size() < 2 && call.positionals[0] != "list") return invalid("vault override: missing <vault_id> and <role_id>");
-    if (call.positionals.size() > 3) return invalid("vault override: too many arguments");
+    if (call.positionals.empty()) return usage(call.constructFullArgs());
 
     const auto [sub, subcall] = descend(call);
 
@@ -441,10 +435,6 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
 
 CommandResult handle_vault_role(const CommandCall& call) {
     const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
-
-    if (call.positionals.empty()) return usage(call.constructFullArgs());
-    if (call.positionals.size() > 1) return invalid(call.constructFullArgs(), "vault role: too many arguments");
-
     const auto [sub, subcall] = descend(call);
 
     if (isVaultRoleMatch({"assign"}, sub)) return handle_vault_role_assign(subcall);

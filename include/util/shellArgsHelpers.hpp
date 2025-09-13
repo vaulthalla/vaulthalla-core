@@ -61,6 +61,8 @@ std::optional<unsigned int> parseUInt(const std::string& sv);
 uintmax_t parseSize(const std::string& s);
 
 [[nodiscard]] bool hasFlag(const CommandCall& c, const std::string& key);
+[[nodiscard]] bool hasFlag(const CommandCall& c, const std::vector<std::string>& keys);
+
 [[nodiscard]] bool hasKey(const CommandCall& c, const std::string& key);
 
 bool isCommandMatch(const std::vector<std::string>& path, std::string_view subcmd);

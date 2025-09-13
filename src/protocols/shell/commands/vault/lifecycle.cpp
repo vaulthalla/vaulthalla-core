@@ -3,23 +3,20 @@
 #include "services/ServiceDepsRegistry.hpp"
 
 #include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
 #include "database/Queries/WaiverQueries.hpp"
+#include "database/Queries/SyncQueries.hpp"
 
 #include "storage/StorageManager.hpp"
 #include "storage/cloud/s3/S3Controller.hpp"
 
 #include "types/Vault.hpp"
-#include "types/S3Vault.hpp"
 #include "types/APIKey.hpp"
-#include "types/FSync.hpp"
-#include "types/RSync.hpp"
 #include "types/User.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
+#include "CommandUsage.hpp"
 
-#include <optional>
 #include <string>
 #include <vector>
 #include <memory>
@@ -37,101 +34,26 @@ using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 
-CommandResult vault::handle_vault_update(const CommandCall& call) {
-    if (call.positionals.empty()) return invalid("vault update: missing <id> or <name>");
-    if (call.positionals.size() > 1) return invalid("vault update: too many arguments");
+CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
+    constexpr const auto* ERR = "vault update";
 
-    const auto nameOrId = call.positionals[0];
-    const auto idOpt = parseUInt(nameOrId);
+    const auto usage = resolveUsage({"vault", "update"});
+    validatePositionals(call, usage);
 
-    std::shared_ptr<Vault> vault;
-    if (idOpt) {
-        vault = VaultQueries::getVault(*idOpt);
-        if (!vault) return invalid("vault update: vault with ID " + std::to_string(*idOpt) + " not found");
-    }
-    else {
-        if (const auto ownerOpt = optVal(call, "owner")) {
-            if (ownerOpt->empty()) return invalid("vault update: --owner requires a value");
-            if (const auto ownerIdOpt = parseUInt(*ownerOpt)) {
-                if (*ownerIdOpt <= 0) return invalid("vault update: --owner <id> must be a positive integer");
-                vault = VaultQueries::getVault(nameOrId, *ownerIdOpt);
-                if (!vault) return invalid("vault update: vault not found with name '" + nameOrId +
-                                            "' for user ID " + std::to_string(*ownerIdOpt));
-            } else if (const auto owner = UserQueries::getUserByName(*ownerOpt)) {
-                vault = VaultQueries::getVault(nameOrId, owner->id);
-                if (!vault) return invalid("vault update: vault not found with name '" + nameOrId +
-                                            "' for user '" + *ownerOpt + "'");
-            } else return invalid("vault update: user not found: " + *ownerOpt);
-        }
-    }
+    const auto vLkp = resolveVault(call, call.positionals[0], usage, ERR);
+    if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
+    const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
-        "vault update: you do not have permission to update this vault");
+    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
+        return invalid("vault update: you do not have permission to update this vault");
 
-    const auto descOpt = optVal(call, "desc");
-    const auto quotaOpt = optVal(call, "quota");
-    const auto ownerIdOpt = optVal(call, "owner");
-    const auto syncStrategyOpt = optVal(call, "sync-strategy");
-    const auto onSyncConflictOpt = optVal(call, "on-sync-conflict");
-    const auto apiKeyOpt = optVal(call, "api-key");
-    const auto bucketOpt = optVal(call, "bucket");
+    assignDescIfAvailable(call, usage, vault);
+    assignQuotaIfAvailable(call, usage, vault);
+    assignOwnerIfAvailable(call, usage, vault);
 
-    if (vault->type == VaultType::Local && (apiKeyOpt || bucketOpt)) return invalid(
-        "vault update: --api-key and --bucket are not valid for local vaults");
-
-    if (descOpt) vault->description = *descOpt;
-
-    if (quotaOpt) {
-        if (*quotaOpt == "unlimited") vault->quota = 0; // 0 means unlimited
-        else vault->quota = parseSize(*quotaOpt);
-    }
-
-    if (ownerIdOpt) {
-        const auto ownerId = parseUInt(*ownerIdOpt);
-        if (!ownerId || *ownerId <= 0) return invalid("vault update: --owner <id> must be a positive integer");
-        vault->owner_id = *ownerId;
-    }
-
-    std::shared_ptr<Sync> sync;
-    if (syncStrategyOpt || onSyncConflictOpt) {
-        sync = VaultQueries::getVaultSyncConfig(vault->id);
-        if (!sync) return invalid("vault update: vault does not have a sync configuration");
-
-        if (vault->type == VaultType::Local) {
-            if (syncStrategyOpt) return invalid("vault update: --sync-strategy is not valid for local vaults");
-            if (onSyncConflictOpt) {
-                const auto fsync = std::static_pointer_cast<FSync>(sync);
-                fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
-            }
-        }
-
-        if (syncStrategyOpt) {
-            const auto strategy = strategyFromString(*syncStrategyOpt);
-            if (vault->type == VaultType::S3) {
-                const auto rsync = std::static_pointer_cast<RSync>(sync);
-                rsync->strategy = strategy;
-            }
-        }
-    }
-
-    if (apiKeyOpt || bucketOpt) {
-        if (vault->type == VaultType::Local) return invalid(
-            "vault update: --api-key and --bucket are not valid for local vaults");
-
-        const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
-
-        if (apiKeyOpt) {
-            const auto apiKeyId = parseUInt(*apiKeyOpt);
-            if (apiKeyId && APIKeyQueries::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
-            else {
-                const auto apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
-                if (!apiKey) return invalid("vault update: API key not found: " + *apiKeyOpt);
-                s3Vault->api_key_id = apiKey->id;
-            }
-        }
-
-        if (bucketOpt) s3Vault->bucket = *bucketOpt;
-    }
+    const auto sync = SyncQueries::getSync(vault->id);
+    parseSync(call, usage, vault, sync);
+    parseS3API(call, usage, vault, vault->owner_id, false);
 
     const auto [okToProceed, waiver] = handle_encryption_waiver({call, vault, true});
     if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
@@ -143,15 +65,13 @@ CommandResult vault::handle_vault_update(const CommandCall& call) {
 }
 
 
-CommandResult vault::handle_vault_delete(const CommandCall& call) {
+CommandResult commands::vault::handle_vault_delete(const CommandCall& call) {
     constexpr const auto* ERR = "vault delete";
 
-    if (call.positionals.empty()) return invalid("vault delete: missing <name>");
-    if (call.positionals.size() > 1) return invalid("vault delete: too many arguments");
+    const auto usage = resolveUsage({"vault", "delete"});
+    validatePositionals(call, usage);
 
-    const std::string vaultArg = call.positionals[0];
-
-    const auto vLkp = resolveVault(call, vaultArg, ERR);
+    const auto vLkp = resolveVault(call, call.positionals[0], usage, ERR);
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 

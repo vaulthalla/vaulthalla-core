@@ -18,14 +18,30 @@ CommandRouter::CommandRouter(const std::shared_ptr<CLITestContext>& ctx)
     registerAll();
 }
 
-void CommandRouter::registerRoute(const std::string& path, const std::function<EntityResult(const std::shared_ptr<void>& entity)>& handler) {
+void CommandRouter::registerRoute(const std::string& path, const CallType& handler) {
     if (routes_.contains(path)) throw std::runtime_error("CommandRouter: route already registered for path: " + path);
     routes_[path] = handler;
 }
 
 std::shared_ptr<TestCase> CommandRouter::route(const std::shared_ptr<TestCase>& test) const {
     if (!routes_.contains(test->path)) throw std::runtime_error("CommandRouter: no route registered for path: " + test->path);
-    const auto [result, entity] = routes_.at(test->path)(test->entity);
+
+    if (test->target) {
+        if (!std::holds_alternative<dualArgFunc>(routes_.at(test->path)))
+            throw std::runtime_error("CommandRouter: route does not support target entity for path: " + test->path);
+
+        const auto func = std::get<dualArgFunc>(routes_.at(test->path));
+        const auto [result, entity] = func(test->entity, test->target);
+        test->result = result;
+        test->entity = entity;
+        return test;
+    }
+
+    if (!std::holds_alternative<singleArgFunc>(routes_.at(test->path)))
+        throw std::runtime_error("CommandRouter: route requires target entity for path: " + test->path);
+
+    const auto func = std::get<singleArgFunc>(routes_.at(test->path));
+    const auto [result, entity] = func(test->entity);
     test->result = result;
     test->entity = entity;
     return test;
@@ -33,15 +49,7 @@ std::shared_ptr<TestCase> CommandRouter::route(const std::shared_ptr<TestCase>& 
 
 std::vector<std::shared_ptr<TestCase>> CommandRouter::route(const std::vector<std::shared_ptr<TestCase>>& tests) const {
     std::vector<std::shared_ptr<TestCase>> results;
-
-    for (auto& t : tests) {
-        if (!routes_.contains(t->path)) throw std::runtime_error("CommandRouter: no route registered for path: " + t->path);
-        const auto [result, entity] = routes_.at(t->path)(t->entity);
-        t->result = result;
-        t->entity = entity;
-        results.push_back(t);
-    }
-
+    for (auto& t : tests) results.push_back(route(t));
     return results;
 }
 
@@ -174,6 +182,20 @@ void CommandRouter::registerAll() {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for deletion");
         const auto role = std::static_pointer_cast<VaultRole>(entity);
         return registrar_->remove(EntityType::VAULT_ROLE, role);
+    });
+
+    registerRoute("group/user/add", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target) -> EntityResult {
+        if (!entity) throw std::runtime_error("CommandRouter: no group-user entity pair provided for addition");
+        const auto group = std::static_pointer_cast<Group>(entity);
+        const auto user = std::static_pointer_cast<User>(target);
+        return registrar_->manageGroup(EntityType::USER, ActionType::ADD, group, user);
+    });
+
+    registerRoute("group/user/remove", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target) -> EntityResult {
+        if (!entity) throw std::runtime_error("CommandRouter: no group-user entity pair provided for removal");
+        const auto group = std::static_pointer_cast<Group>(entity);
+        const auto user = std::static_pointer_cast<User>(target);
+        return registrar_->manageGroup(EntityType::USER, ActionType::REMOVE, group, user);
     });
 }
 

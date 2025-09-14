@@ -188,6 +188,7 @@ CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
 
 int CLITestRunner::operator()() {
     seed();
+    assign();
     readStage();
     updateStage();
     validateAllTestObjects();
@@ -237,15 +238,27 @@ void CLITestRunner::readStage() {
     tests.push_back(makeListTest<EntityType::USER_ROLE>());
     tests.push_back(makeListTest<EntityType::VAULT_ROLE>());
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Read", res });
+    validateStage(stages_.back());
+}
+
+void CLITestRunner::assign() {
+    std::vector<std::shared_ptr<TestCase>> tests;
+
+    for (const auto& user : ctx_->users)
+        tests.push_back(std::make_shared<TestCase>(
+                TestCase::Generate(EntityType::GROUP, EntityType::USER, ActionType::ADD, ctx_->pickRandomGroup(), user)));
+
+    const auto res = router_->route(tests);
+    stages_.push_back(TestStage{ "Assign", res });
     validateStage(stages_.back());
 }
 
 void CLITestRunner::updateStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
-    auto& C = *ctx_;
+    const auto& C = *ctx_;
     auto append = [&](auto&& vec) {
         tests.insert(tests.end(), vec.begin(), vec.end());
     };
@@ -255,7 +268,7 @@ void CLITestRunner::updateStage() {
     append(makeUpdateTests<EntityType::USER_ROLE>(C.userRoles));
     append(makeUpdateTests<EntityType::VAULT_ROLE>(C.vaultRoles));
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Update", res });
     validateStage(stages_.back());
 }
@@ -276,7 +289,7 @@ void CLITestRunner::teardownStage() {
         append(makeDeleteTests<EntityType::VAULT_ROLE>(C.vaultRoles));
     }
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Teardown", res });
     validateStage(stages_.back());
 }

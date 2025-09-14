@@ -133,6 +133,20 @@ public:
         return { router_->executeLine(command, admin, io.get()), entity };
     }
 
+    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<types::Group>& group, const std::shared_ptr<User>& user) const {
+        if (type != EntityType::USER && type != EntityType::VAULT)
+            throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
+
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+
+        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::GROUP, type, action, group, user);
+
+        std::cout << command << std::endl;
+        return { router_->executeLine(command, admin, io.get()), group };
+    }
+
 private:
     static constexpr std::string_view ID_REGEX = R"(ID:\s*(\d+))";
     std::shared_ptr<EntityFactory> factory_;

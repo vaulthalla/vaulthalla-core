@@ -15,18 +15,23 @@ class ListInfoHandler;
 class UpdateHandler;
 struct CLITestContext;
 
+using singleArgFunc = std::function<EntityResult(const std::shared_ptr<void>& entity)>;
+using dualArgFunc = std::function<EntityResult(const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target)>;
+
+using CallType = std::variant<singleArgFunc, dualArgFunc>;
+
 class CommandRouter {
 public:
     explicit CommandRouter(const std::shared_ptr<CLITestContext>& ctx);
 
-    void registerRoute(const std::string& path, const std::function<EntityResult(const std::shared_ptr<void>& entity)>& handler);
+    void registerRoute(const std::string& path, const CallType& handler);
 
     std::shared_ptr<TestCase> route(const std::shared_ptr<TestCase>& test) const;
     std::vector<std::shared_ptr<TestCase>> route(const std::vector<std::shared_ptr<TestCase>>& tests) const;
 
 private:
     std::shared_ptr<EntityRegistrar> registrar_;
-    std::pmr::unordered_map<std::string, std::function<EntityResult(const std::shared_ptr<void>& entity)>> routes_{};
+    std::pmr::unordered_map<std::string, CallType> routes_{};
 
     void registerAll();
 };

@@ -14,7 +14,7 @@ struct TestCase {
     int expect_exit{0};
     std::vector<std::string> must_contain{};     // stdout contains
     std::vector<std::string> must_not_contain{}; // stdout must NOT contain
-    std::shared_ptr<void> entity{nullptr}; // optional entity to be used in the test
+    std::shared_ptr<void> entity{nullptr}, target{nullptr}; // optional entity to be used in the tes
     shell::CommandResult result{}; // filled after execution
     AssertionResult assertion{};
 
@@ -64,9 +64,9 @@ struct TestCase {
         };
     }
 
-    static TestCase Generate(const EntityType& type, const CommandType& action, const std::shared_ptr<void>& entity = nullptr) {
+    static TestCase Generate(const EntityType& type, const CommandType& command, const std::shared_ptr<void>& entity = nullptr) {
         const auto typeStr = EntityTypeToString(type);
-        const auto actionStr = CommandTypeToString(action);
+        const auto actionStr = CommandTypeToString(command);
         auto name = actionStr + " " + typeStr;
         auto path = typeStr + "/" + actionStr;
         if (type == EntityType::USER_ROLE) {
@@ -83,6 +83,24 @@ struct TestCase {
             .must_contain = {},
             .must_not_contain = {},
             .entity = entity,
+            .assertion = {}
+        };
+    }
+
+    static TestCase Generate(const EntityType& type, const EntityType& targetType, const ActionType& action, const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target) {
+        const auto typeStr = EntityTypeToString(type);
+        const auto targetTypeStr = EntityTypeToString(targetType);
+        const auto actionStr = ActionTypeToString(action);
+        const auto name = typeStr + " " + actionStr + " " + targetTypeStr;
+        const auto path = typeStr + "/" + targetTypeStr + "/" + actionStr;
+        return TestCase{
+            .name = name,
+            .path = path,
+            .expect_exit = 0,
+            .must_contain = {},
+            .must_not_contain = {},
+            .entity = entity,
+            .target = target,
             .assertion = {}
         };
     }

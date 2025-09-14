@@ -54,6 +54,10 @@ public:
     std::string info(const std::shared_ptr<types::User>& entity) override;
     std::string list() override;
 
+    std::string assignVaultRole(const std::shared_ptr<types::User>& entity);
+    std::string unassignVaultRole(const std::shared_ptr<types::Group>& entity);
+    std::string updateVaultRole(const std::shared_ptr<types::Group>& entity);
+
 protected:
     std::string updateAndResolveVar(const std::shared_ptr<types::User>& entity, const std::string& field) override;
 
@@ -102,6 +106,12 @@ public:
     std::string remove(const std::shared_ptr<types::Group>& entity) override;
     std::string info(const std::shared_ptr<types::Group>& entity) override;
     std::string list() override;
+
+    std::string assignVaultRole(const std::shared_ptr<types::Group>& entity);
+    std::string unassignVaultRole(const std::shared_ptr<types::Group>& entity);
+    std::string updateVaultRole(const std::shared_ptr<types::Group>& entity);
+    std::string addUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const;
+    std::string removeUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const;
 
 protected:
     std::string updateAndResolveVar(const std::shared_ptr<types::Group>& entity, const std::string& field) override;

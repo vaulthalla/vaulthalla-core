@@ -57,6 +57,7 @@ private:
 
     // Pipeline steps
     void seed();
+    void assign();
     void readStage();
     void updateStage();
     void teardownStage();

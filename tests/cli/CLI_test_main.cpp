@@ -74,7 +74,7 @@ int main() {
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     std::cout << "CLI tests completed in " << static_cast<double>(duration) / 1000.0 << " seconds" << std::endl;
 
-    ServiceManager::instance().stopAll(SIGKILL);
+    ServiceManager::instance().stopAll(SIGTERM);
     ThreadPoolManager::instance().shutdown();
     FPDF_DestroyLibrary();
 

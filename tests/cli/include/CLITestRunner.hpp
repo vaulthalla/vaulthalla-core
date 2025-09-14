@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <atomic>
 
 namespace vh::shell {
 class UsageManager;
@@ -13,6 +14,7 @@ class UsageManager;
 
 namespace vh::test::cli {
 
+class TestThreadPool;
 struct CLITestContext;
 class CommandRouter;
 struct TestCase;
@@ -43,9 +45,11 @@ public:
 
 private:
     CLITestConfig config_;
-    std::shared_ptr<CLITestContext>   ctx_;
+    std::shared_ptr<CLITestContext> ctx_;
     std::shared_ptr<shell::UsageManager> usage_;
-    std::shared_ptr<CommandRouter>    router_;
+    std::shared_ptr<CommandRouter> router_;
+    std::shared_ptr<std::atomic<bool>> interruptFlag;
+    std::shared_ptr<TestThreadPool> threadPool_;
 
     // Expectations are keyed by command path
     std::unordered_map<std::string, Expectations> expectations_by_path_;
@@ -68,7 +72,7 @@ private:
     int  printResults() const;
 
     template <EntityType E>
-    void seed(size_t count);
+    void finish_seed(const std::vector<std::shared_ptr<TestCase>>& res);
 };
 
 }

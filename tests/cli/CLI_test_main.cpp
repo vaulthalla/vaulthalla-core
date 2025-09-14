@@ -67,7 +67,7 @@ int main() {
 
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    CLITestRunner runner(CLITestConfig::Default());
+    CLITestRunner runner(CLITestConfig::NG_STRESS());
     const int exit_status = runner() == 0 ? 0 : 1;
 
     const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

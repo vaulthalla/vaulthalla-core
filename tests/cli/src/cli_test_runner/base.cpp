@@ -10,6 +10,10 @@
 #include "CommandBuilderRegistry.hpp"
 #include "EntityType.hpp"
 
+#include "TestThreadPool.hpp"
+#include "TestTask.hpp"
+#include "CLITestTask.hpp"
+
 #include "types/User.hpp"
 #include "types/Group.hpp"
 #include "types/Vault.hpp"
@@ -21,6 +25,8 @@
 #include <iostream>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <future>
 
 using namespace vh::shell;
 using namespace vh::args;
@@ -179,7 +185,9 @@ CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
     : config_(cfg),
       ctx_(std::make_shared<CLITestContext>()),
       usage_(std::make_shared<shell::UsageManager>()),
-      router_(std::make_shared<CommandRouter>(ctx_)) {
+      router_(std::make_shared<CommandRouter>(ctx_)),
+      interruptFlag(std::make_shared<std::atomic<bool>>(false)),
+      threadPool_(std::make_shared<TestThreadPool>(interruptFlag, std::thread::hardware_concurrency())) {
     CommandBuilderRegistry::init(usage_, ctx_);
     registerAllContainsAssertions();
 }
@@ -196,21 +204,81 @@ int CLITestRunner::operator()() {
     return printResults();
 }
 
+static std::vector<std::vector<std::shared_ptr<TestCase>>> split(const std::vector<std::shared_ptr<TestCase>>& tests, const std::size_t n) {
+    std::vector<std::vector<std::shared_ptr<TestCase>>> result;
+    if (n == 0) return result;
+    result.resize(n);
+    for (std::size_t i = 0; i < tests.size(); ++i) result[i % n].push_back(tests[i]);
+    return result;
+}
+
 void CLITestRunner::seed() {
-    seed<EntityType::USER_ROLE>(config_.numUserRoles);
-    seed<EntityType::VAULT_ROLE>(config_.numVaultRoles);
-    seed<EntityType::USER>(config_.numUsers);
-    seed<EntityType::GROUP>(config_.numGroups);
-    seed<EntityType::VAULT>(config_.numVaults);
+    const auto numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
+
+    const struct SeedJob {
+        EntityType type;
+        std::vector<std::shared_ptr<TestCase>> tests;
+    } jobs[] = {
+        { EntityType::USER_ROLE,  makeCreateTests<EntityType::USER_ROLE>(config_.numUserRoles) },
+        { EntityType::VAULT_ROLE, makeCreateTests<EntityType::VAULT_ROLE>(config_.numVaultRoles) },
+        { EntityType::USER,       makeCreateTests<EntityType::USER>(config_.numUsers) },
+        { EntityType::GROUP,      makeCreateTests<EntityType::GROUP>(config_.numGroups) },
+        { EntityType::VAULT,      makeCreateTests<EntityType::VAULT>(config_.numVaults) }
+    };
+
+    for (const auto& [type, tests] : jobs) {
+        const auto splits = split(tests, numThreads);
+
+        std::vector<std::pair<std::optional<std::future<TestFuture>>, EntityType>> futures;
+
+        for (const auto& splitVec : splits) {
+            if (splitVec.empty()) continue;
+
+            const auto task = std::make_shared<CLITestTask>(router_, splitVec);
+            futures.emplace_back(task->getFuture(), type);
+            threadPool_->submit(task);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50)); // light stagger
+        }
+
+        // Recombine results across splits
+        std::vector<std::shared_ptr<TestCase>> combined;
+
+        for (auto& [fut, futType] : futures) {
+            if (!fut.has_value()) continue;
+            const auto res = fut->get();
+
+            const auto* ptr = std::get_if<std::vector<std::shared_ptr<TestCase>>>(&res);
+            if (!ptr) continue;
+
+            combined.insert(combined.end(), ptr->begin(), ptr->end());
+        }
+
+        // Finish stage once per entity type
+        switch (type) {
+            case EntityType::USER:
+                finish_seed<EntityType::USER>(combined);
+                break;
+            case EntityType::GROUP:
+                finish_seed<EntityType::GROUP>(combined);
+                break;
+            case EntityType::USER_ROLE:
+                finish_seed<EntityType::USER_ROLE>(combined);
+                break;
+            case EntityType::VAULT:
+                finish_seed<EntityType::VAULT>(combined);
+                break;
+            case EntityType::VAULT_ROLE:
+                finish_seed<EntityType::VAULT_ROLE>(combined);
+                break;
+            default:
+                throw std::runtime_error("Unknown EntityType in seed()");
+        }
+    }
 }
 
 template <EntityType E>
-void CLITestRunner::seed(const size_t count) {
-    const auto tests = makeCreateTests<E>(count);
-    const auto res   = router_->route(tests);
-
+void CLITestRunner::finish_seed(const std::vector<std::shared_ptr<TestCase>>& res) {
     harvestIdsIntoContext<E>(*ctx_, res, EntityTraits<E>::kIdPrefix, std::cerr);
-
     stages_.push_back(TestStage(std::string("Seed ") + std::string(EntityTraits<E>::kStage), res));
     validateStage(stages_.back());
 }

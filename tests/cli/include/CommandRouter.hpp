@@ -17,8 +17,10 @@ struct CLITestContext;
 
 using singleArgFunc = std::function<EntityResult(const std::shared_ptr<void>& entity)>;
 using dualArgFunc = std::function<EntityResult(const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target)>;
+using tripleArgFunc = std::function<EntityResult(const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target, const std::shared_ptr<void>& subject)>;
+using tripleArgWithSubjTypeFunc = std::function<EntityResult(const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target, const EntityType& subjectType, const std::shared_ptr<void>& subject)>;
 
-using CallType = std::variant<singleArgFunc, dualArgFunc>;
+using CallType = std::variant<singleArgFunc, dualArgFunc, tripleArgFunc, tripleArgWithSubjTypeFunc>;
 
 class CommandRouter {
 public:

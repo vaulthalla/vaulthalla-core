@@ -147,6 +147,26 @@ public:
         return { router_->executeLine(command, admin, io.get()), group };
     }
 
+    [[nodiscard]] EntityResult manageVaultRoleAssignments(const EntityType& type, const CommandType& cmdType,
+                                                          const std::shared_ptr<types::Vault>& vault,
+                                                          const std::shared_ptr<types::VaultRole>& role,
+                                                          const std::shared_ptr<void>& entity) const {
+        if (type != EntityType::USER && type != EntityType::GROUP)
+            throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports USER and GROUP entity types");
+
+        if (cmdType != CommandType::ASSIGN && cmdType != CommandType::UNASSIGN)
+            throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports ASSIGN and UNASSIGN command types");
+
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+
+        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::VAULT, EntityType::VAULT_ROLE, type, cmdType, vault, role, entity);
+
+        std::cout << command << std::endl;
+        return { router_->executeLine(command, admin, io.get()), role };
+    }
+
 private:
     static constexpr std::string_view ID_REGEX = R"(ID:\s*(\d+))";
     std::shared_ptr<EntityFactory> factory_;

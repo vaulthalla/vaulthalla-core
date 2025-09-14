@@ -43,6 +43,7 @@ struct CLITestContext {
 
     [[nodiscard]] std::shared_ptr<types::User> pickRandomUser() const;
     [[nodiscard]] std::shared_ptr<types::Group> pickRandomGroup() const;
+    [[nodiscard]] std::shared_ptr<types::Vault> pickRandomVault() const;
     [[nodiscard]] std::shared_ptr<types::Vault> pickVaultOwnedBy(const std::shared_ptr<types::User>& user) const;
     [[nodiscard]] std::shared_ptr<types::UserRole> randomUserRole() const;
     [[nodiscard]] std::shared_ptr<types::VaultRole> randomVaultRole() const;

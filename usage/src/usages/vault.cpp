@@ -170,7 +170,7 @@ static std::shared_ptr<CommandUsage> list(const std::weak_ptr<CommandUsage>& par
 
 static std::shared_ptr<CommandUsage> role_assign(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
-    cmd->aliases = {"assign", "add", "new", "create", "mk"};
+    cmd->aliases = {"assign"};
     cmd->description = "Assign a role to a user or group for a specific vault.";
     cmd->positionals = {vaultPos, roleId};
     cmd->required = {subjectOption};
@@ -185,7 +185,7 @@ static std::shared_ptr<CommandUsage> role_assign(const std::weak_ptr<CommandUsag
 
 static std::shared_ptr<CommandUsage> role_unassign(const std::weak_ptr<CommandUsage>& parent) {
     auto cmd = buildBaseUsage(parent);
-    cmd->aliases = {"unassign", "remove", "del", "rm"};
+    cmd->aliases = {"unassign", "rm-assn"};
     cmd->description = "Remove a role assignment from a user or group for a specific vault.";
     cmd->positionals = {vaultPos, roleId};
     cmd->required = {subjectOption};

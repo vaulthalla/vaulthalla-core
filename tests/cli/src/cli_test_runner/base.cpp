@@ -250,6 +250,14 @@ void CLITestRunner::assign() {
         tests.push_back(std::make_shared<TestCase>(
                 TestCase::Generate(EntityType::GROUP, EntityType::USER, ActionType::ADD, ctx_->pickRandomGroup(), user)));
 
+    for (const auto& user : ctx_->users)
+        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::USER, CommandType::ASSIGN,
+                ctx_->pickRandomVault(), ctx_->randomVaultRole(), user));
+
+    for (const auto& group : ctx_->groups)
+        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::GROUP, CommandType::ASSIGN,
+                ctx_->pickRandomVault(), ctx_->randomVaultRole(), group));
+
     const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Assign", res });
     validateStage(stages_.back());

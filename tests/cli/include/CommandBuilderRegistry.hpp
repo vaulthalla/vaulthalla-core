@@ -87,6 +87,32 @@ public:
 
     [[nodiscard]] std::string buildCommand(const EntityType& entityType,
                                            const EntityType& targetType,
+                                           const EntityType& subjectType,
+                                           const CommandType& cmdType,
+                                           const std::shared_ptr<void>& entity,
+                                           const std::shared_ptr<void>& target,
+                                           const std::shared_ptr<void>& subject) const {
+        if (entityType != EntityType::VAULT) throw std::runtime_error("CommandBuilderRegistry: only VAULT supports role assignments");
+        if (targetType != EntityType::VAULT_ROLE) throw std::runtime_error("CommandBuilderRegistry: only VAULT_ROLE supported as target for role assignments");
+        if (cmdType != CommandType::ASSIGN && cmdType != CommandType::UNASSIGN)
+            throw std::runtime_error("CommandBuilderRegistry: only ASSIGN and UNASSIGN supported for role assignments");
+        if (subjectType != EntityType::USER && subjectType != EntityType::GROUP)
+            throw std::runtime_error("CommandBuilderRegistry: only USER and GROUP supported for role assignments");
+
+        if (cmdType == CommandType::ASSIGN)
+            return vaultBuilder->assignVaultRole(std::static_pointer_cast<types::Vault>(entity),
+                                            std::static_pointer_cast<types::VaultRole>(target),
+                                            subjectType,
+                                            subject);
+
+        return vaultBuilder->unassignVaultRole(std::static_pointer_cast<types::Vault>(entity),
+                                              std::static_pointer_cast<types::VaultRole>(target),
+                                              subjectType,
+                                              subject);
+    }
+
+    [[nodiscard]] std::string buildCommand(const EntityType& entityType,
+                                           const EntityType& targetType,
                                            const ActionType& actionType,
                                            const std::shared_ptr<void>& entity,
                                            const std::shared_ptr<void>& target) const {

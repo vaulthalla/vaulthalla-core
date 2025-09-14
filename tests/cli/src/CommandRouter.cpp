@@ -26,6 +26,28 @@ void CommandRouter::registerRoute(const std::string& path, const CallType& handl
 std::shared_ptr<TestCase> CommandRouter::route(const std::shared_ptr<TestCase>& test) const {
     if (!routes_.contains(test->path)) throw std::runtime_error("CommandRouter: no route registered for path: " + test->path);
 
+    if (test->subject && test->subjectType) {
+        if (!std::holds_alternative<tripleArgWithSubjTypeFunc>(routes_.at(test->path)))
+            throw std::runtime_error("CommandRouter: route does not support subject type for path: " + test->path);
+
+        const auto func = std::get<tripleArgWithSubjTypeFunc>(routes_.at(test->path));
+        const auto [result, entity] = func(test->entity, test->target, *test->subjectType, test->subject);
+        test->result = result;
+        test->entity = entity;
+        return test;
+    }
+
+    if (test->subject) {
+        if (!std::holds_alternative<tripleArgFunc>(routes_.at(test->path)))
+            throw std::runtime_error("CommandRouter: route does not support subject for path: " + test->path);
+
+        const auto func = std::get<tripleArgFunc>(routes_.at(test->path));
+        const auto [result, entity] = func(test->entity, test->target, test->subject);
+        test->result = result;
+        test->entity = entity;
+        return test;
+    }
+
     if (test->target) {
         if (!std::holds_alternative<dualArgFunc>(routes_.at(test->path)))
             throw std::runtime_error("CommandRouter: route does not support target entity for path: " + test->path);
@@ -196,6 +218,36 @@ void CommandRouter::registerAll() {
         const auto group = std::static_pointer_cast<Group>(entity);
         const auto user = std::static_pointer_cast<User>(target);
         return registrar_->manageGroup(EntityType::USER, ActionType::REMOVE, group, user);
+    });
+
+    registerRoute("vault/role/assign", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target, const EntityType& subjectType, const std::shared_ptr<void>& subject) -> EntityResult {
+        if (!entity) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for assignment");
+        if (!target) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for assignment");
+        if (!subject) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for assignment");
+        const auto vault = std::static_pointer_cast<Vault>(entity);
+        const auto role = std::static_pointer_cast<VaultRole>(target);
+
+        if (subjectType == EntityType::USER)
+            return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::ASSIGN, vault, role, subject);
+        if (subjectType == EntityType::GROUP)
+            return registrar_->manageVaultRoleAssignments(EntityType::GROUP, CommandType::ASSIGN, vault, role, subject);
+
+        throw std::runtime_error("CommandRouter: unsupported subject type for vault role assignment");
+    });
+
+    registerRoute("vault/role/unassign", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target, const EntityType& subjectType, const std::shared_ptr<void>& subject) -> EntityResult {
+        if (!entity) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for unassignment");
+        if (!target) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for unassignment");
+        if (!subject) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for unassignment");
+        const auto vault = std::static_pointer_cast<Vault>(entity);
+        const auto role = std::static_pointer_cast<VaultRole>(target);
+
+        if (subjectType == EntityType::USER)
+            return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::UNASSIGN, vault, role, subject);
+        if (subjectType == EntityType::GROUP)
+            return registrar_->manageVaultRoleAssignments(EntityType::GROUP, CommandType::UNASSIGN, vault, role, subject);
+
+        throw std::runtime_error("CommandRouter: unsupported subject type for vault role unassignment");
     });
 }
 

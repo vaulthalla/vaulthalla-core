@@ -18,7 +18,8 @@ enum class CommandType {
     DELETE,
     LIST,
     INFO,
-    ASSIGN
+    ASSIGN,
+    UNASSIGN
 };
 
 enum class ActionType {
@@ -51,6 +52,7 @@ inline std::string CommandTypeToString(const CommandType& type) {
     case CommandType::LIST: return "list";
     case CommandType::INFO: return "info";
     case CommandType::ASSIGN: return "assign";
+    case CommandType::UNASSIGN: return "unassign";
     default: return "unknown";
     }
 }

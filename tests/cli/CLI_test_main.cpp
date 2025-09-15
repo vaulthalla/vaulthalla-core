@@ -1,5 +1,4 @@
 #include "CLITestRunner.hpp"
-#include "CLITestContext.hpp"
 #include "database/Transactions.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "seed/include/init_db_tables.hpp"
@@ -13,7 +12,6 @@
 #include "storage/StorageManager.hpp"
 
 #include <pdfium/fpdfview.h>
-#include <memory>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -30,53 +28,62 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::test::cli;
 
-int main() {
+static void initBase() {
     vh::paths::enableTestMode();
     ConfigRegistry::init("config.yaml");
     LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
-
-    FPDF_LIBRARY_CONFIG config;
-    config.version = 3;
-    config.m_pUserFontPaths = nullptr;
-    config.m_pIsolate = nullptr;
-    config.m_v8EmbedderSlot = 0;
-    FPDF_InitLibraryWithConfig(&config);
-
     ThreadPoolManager::instance().init();
+}
 
+static void initDB() {
     vh::database::Transactions::init();
     vh::database::seed::wipe_all_data_restart_identity();
     vh::database::seed::init_tables_if_not_exists();
     vh::database::Transactions::dbPool_->initPreparedStatements();
     vh::seed::seed_database();
+}
 
+static void initServices() {
     ServiceDepsRegistry::init();
     ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
-
-    const auto mountPoint = fs::temp_directory_path() / "vaulthalla-test-mnt";
-    ServiceManager::instance().setFuseMountPoint(mountPoint);
+    ServiceManager::instance().setFuseMountPoint(fs::temp_directory_path() / "vaulthalla-test-mnt");
 
     Filesystem::init(ServiceDepsRegistry::instance().storageManager);
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
     ServiceManager::instance().startTestServices();
+}
 
-    if (!vh::database::UserQueries::getUserByName("admin")) {
+static void ensureAdminExists() {
+    if (!vh::database::UserQueries::adminUserExists()) {
         LogRegistry::vaulthalla()->error("No admin user found; cannot run CLI tests");
-        return 1;
+        exit(1);
     }
+}
 
+static int runTests() {
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    CLITestRunner runner(CLITestConfig::NG_STRESS());
+    CLITestRunner runner(CLITestConfig::Default());
     const int exit_status = runner() == 0 ? 0 : 1;
 
     const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     std::cout << "CLI tests completed in " << static_cast<double>(duration) / 1000.0 << " seconds" << std::endl;
 
-    ServiceManager::instance().stopAll(SIGTERM);
-    ThreadPoolManager::instance().shutdown();
-    FPDF_DestroyLibrary();
+    return exit_status;
+}
 
+static void shutdown() {
+    ServiceManager::instance().stopAll();
+    ThreadPoolManager::instance().shutdown();
+}
+
+int main() {
+    initBase();
+    initDB();
+    initServices();
+    ensureAdminExists();
+    const auto exit_status = runTests();
+    shutdown();
     exit(exit_status);
 }

@@ -11,7 +11,6 @@
 #include "storage/Filesystem.hpp"
 #include "storage/StorageManager.hpp"
 
-#include <pdfium/fpdfview.h>
 #include <filesystem>
 #include <iostream>
 #include <string>

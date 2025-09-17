@@ -221,14 +221,14 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
 
     Transactions::exec("FileQueries::markFileAsTrashed", [&](pqxx::work& txn) {
         const auto res = txn.exec(pqxx::prepped{"get_file_parent_id_and_size_by_path"},
-                                           pqxx::params{vaultId, to_utf8_string(relPath.u8string()), to_utf8_string(file->backing_path.u8string())});
+                                           pqxx::params{vaultId, to_utf8_string(relPath.u8string())});
         if (res.empty()) throw std::runtime_error("[markFileAsTrashed] File not found: " + to_utf8_string(relPath.u8string()));
 
         const auto row = res[0];
         const auto parentId = row["parent_id"].as<std::optional<unsigned int> >();
         const auto sizeBytes = row["size_bytes"].as<unsigned int>();
 
-        txn.exec(pqxx::prepped{"mark_file_trashed"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string()), userId});
+        txn.exec(pqxx::prepped{"mark_file_trashed"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string()), userId, to_utf8_string(file->backing_path.u8string())});
 
         updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
     });
@@ -272,7 +272,7 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
             --subDirsDeleted;
         }
         if (parentRes.empty()) break;
-        parentId = parentRes.one_field().as<std::optional<unsigned int>>();;
+        parentId = parentRes.one_field().as<std::optional<unsigned int>>();
     }
 }
 

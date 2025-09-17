@@ -41,21 +41,13 @@ public:
     ServiceManager(const ServiceManager&) = delete;
     ServiceManager& operator=(const ServiceManager&) = delete;
 
-    void setFuseMountPoint(const std::filesystem::path& mount) const;
-    [[nodiscard]] std::filesystem::path getFuseMountPoint() const;
-
-    std::shared_ptr<vh::shell::Router> getCLIRouter() const;
-
-    void setCtlSocketPath(const std::string& path) const;
-    [[nodiscard]] std::string getCtlSocketPath() const;
-
     void startTestServices();
 
 private:
     ServiceManager();
 
     void tryStart(const std::string& name, const std::shared_ptr<AsyncService>& svc);
-    void stopService(const std::string& name, const std::shared_ptr<AsyncService>& svc, int signal);
+    static void stopService(const std::string& name, const std::shared_ptr<AsyncService>& svc, int signal);
 
     void startWatchdog();
     void stopWatchdog();

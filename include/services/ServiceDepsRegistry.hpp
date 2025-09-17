@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "storage/FSCache.hpp"
+
 namespace vh::storage {
     class StorageManager;
     class FSCache;
@@ -30,7 +32,9 @@ struct ServiceDepsRegistry {
     std::shared_ptr<SyncController> syncController;
     std::shared_ptr<storage::FSCache> fsCache;
     std::shared_ptr<shell::UsageManager> shellUsageManager;
+    fuse_session* fuseSession = nullptr;
 
+    void setFuseSession(fuse_session* fuseSession) { this->fuseSession = fuseSession; }
 
     ServiceDepsRegistry(const ServiceDepsRegistry&) = delete;
     ServiceDepsRegistry& operator=(const ServiceDepsRegistry&) = delete;

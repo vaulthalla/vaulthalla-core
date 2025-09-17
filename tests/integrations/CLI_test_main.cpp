@@ -1,4 +1,4 @@
-#include "CLITestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 #include "database/Transactions.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "seed/include/init_db_tables.hpp"
@@ -29,7 +29,7 @@ using namespace vh::test::cli;
 
 static void initBase() {
     vh::paths::enableTestMode();
-    ConfigRegistry::init("config.yaml");
+    ConfigRegistry::init();
     LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
     ThreadPoolManager::instance().init();
 }
@@ -45,8 +45,6 @@ static void initDB() {
 static void initServices() {
     ServiceDepsRegistry::init();
     ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
-    ServiceManager::instance().setFuseMountPoint(fs::temp_directory_path() / "vaulthalla-test-mnt");
-
     Filesystem::init(ServiceDepsRegistry::instance().storageManager);
     ServiceDepsRegistry::instance().storageManager->initStorageEngines();
     ServiceManager::instance().startTestServices();
@@ -62,7 +60,7 @@ static void ensureAdminExists() {
 static int runTests() {
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    CLITestRunner runner(CLITestConfig::Default());
+    IntegrationsTestRunner runner(CLITestConfig::Default());
     const int exit_status = runner() == 0 ? 0 : 1;
 
     const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

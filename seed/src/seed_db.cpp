@@ -34,6 +34,12 @@
 // Libraries
 #include <memory>
 #include <version.h>
+#include <optional>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include <spdlog/spdlog.h>
+#include <paths.h>
 
 using namespace vh::seed;
 using namespace vh::config;
@@ -109,6 +115,7 @@ void vh::seed::initRoles() {
     std::vector<Role> roles{
         {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
         {"admin", "System administrator with all non-root administrative powers", "user", 0b0000001111111100},
+        {"unprivileged", "User with no admin privileges", "user", 0b0000000000000000},
         {"power_user", "Advanced user with full vault level control", "vault", 0b0011111111111111},
         {"user", "Standard user with basic file operations", "vault", 0b0000000111101000},
         {"guest", "Minimal access: can download files and list directories", "vault", 0b0000000000101000}
@@ -125,16 +132,10 @@ void vh::seed::initRoles() {
     });
 }
 
-#include <optional>
-#include <fstream>
-#include <string>
-#include <filesystem>
-#include <spdlog/spdlog.h>
-
 namespace vh::seed {
 
 static std::optional<unsigned int> loadPendingSuperAdminUid() {
-    const std::filesystem::path uidFile{"/run/vaulthalla/superadmin_uid"};
+    const std::filesystem::path uidFile{paths::getRuntimePath() / "superadmin_uid"};
 
     if (!std::filesystem::exists(uidFile)) {
         LogRegistry::vaulthalla()->debug("[seed] No pending super-admin UID file at {}", uidFile.string());
@@ -153,11 +154,13 @@ static std::optional<unsigned int> loadPendingSuperAdminUid() {
         return std::nullopt;
     }
 
-    try {
-        std::filesystem::remove(uidFile);
-        LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending super-admin UID file (uid={})", uid);
-    } catch (const std::exception& e) {
-        LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", uidFile.string(), e.what());
+    if (!paths::testMode) {
+        try {
+            std::filesystem::remove(uidFile);
+            LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending super-admin UID file (uid={})", uid);
+        } catch (const std::exception& e) {
+            LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", uidFile.string(), e.what());
+        }
     }
 
     return uid;
@@ -206,7 +209,7 @@ void vh::seed::initAdminDefaultVault() {
     LogRegistry::vaulthalla()->debug("[initdb] Initializing admin default vault...");
 
     const auto vault = std::make_shared<Vault>();
-    vault->name = "Admin Default Vault";
+    vault->name = ADMIN_DEFAULT_VAULT_NAME;
     vault->description = "Default vault for the admin user";
     vault->type = VaultType::Local;
     vault->owner_id = 1;

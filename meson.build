@@ -252,14 +252,14 @@ test('vh_unit_tests',
                 include_directories: inc,
                 dependencies: test_deps))
 
-cli_test_inc = include_directories('tests/cli/include', 'usage/include', 'include', 'vendor')
-cli_test_src = join_paths(source_root, 'tests/cli/src')
+cli_test_inc = include_directories('tests/integrations/include', 'usage/include', 'include', 'vendor')
+cli_test_src = join_paths(source_root, 'tests/integrations/src')
 cli_test_sources = []
 foreach f : run_command('find', cli_test_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
     cli_test_sources += files(f)
 endforeach
 
-vh_cli_tests = executable('vh_cli_tests', cli_test_sources + files('tests/cli/CLI_test_main.cpp'),
+vh_cli_tests = executable('vh_integration_tests', cli_test_sources + files('tests/integrations/CLI_test_main.cpp'),
                          include_directories: cli_test_inc,
                          link_with: [lib_core, lib_seed, lib_usage],
                          dependencies: test_deps,

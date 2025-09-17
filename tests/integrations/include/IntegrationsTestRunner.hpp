@@ -12,6 +12,10 @@ namespace vh::shell {
 class UsageManager;
 }
 
+namespace vh::types {
+struct User;
+}
+
 namespace vh::test::cli {
 
 class TestThreadPool;
@@ -30,9 +34,9 @@ struct Expectations {
     std::vector<std::string> must_not_have;
 };
 
-class CLITestRunner {
+class IntegrationsTestRunner {
 public:
-    explicit CLITestRunner(CLITestConfig&& cfg = CLITestConfig::Default());
+    explicit IntegrationsTestRunner(CLITestConfig&& cfg = CLITestConfig::Default());
 
     void registerStdoutContains(const std::string& path, std::string needle);
     void registerStdoutNotContains(const std::string& path, std::string needle);
@@ -57,6 +61,10 @@ private:
     // Pipeline stages executed in order
     std::vector<TestStage> stages_;
 
+    // Open Linux users
+    std::vector<unsigned int> linux_uids_;
+    std::vector<unsigned int> linux_gids_;
+
     void registerAllContainsAssertions();
 
     // Pipeline steps
@@ -65,6 +73,14 @@ private:
     void readStage();
     void updateStage();
     void teardownStage();
+
+    // FUSE steps
+    std::shared_ptr<types::User> createUser(unsigned int vaultId, uint16_t vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides = {});
+    void runFUSETests();
+    void testFUSECRUD();
+    void testFUSEAllow();
+    void testFUSEDeny();
+    void testFUSEPermissionOverrides();
 
     // Helpers
     void validateStage(const TestStage& stage) const;

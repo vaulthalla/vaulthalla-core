@@ -1,4 +1,4 @@
-#include "CLITestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 
 #include "UsageManager.hpp"
 #include "logging/LogRegistry.hpp"
@@ -48,7 +48,7 @@ namespace vh::test::cli {
 // ---------- Small utilities
 
 std::optional<unsigned int>
-CLITestRunner::extractId(std::string_view output, std::string_view idPrefix) {
+IntegrationsTestRunner::extractId(std::string_view output, std::string_view idPrefix) {
     const auto pos = output.find(idPrefix);
     if (pos == std::string_view::npos) return std::nullopt;
     const auto start = pos + idPrefix.size();
@@ -168,7 +168,7 @@ static void harvestIdsIntoContext(
         if (!r) continue;
         if (!r->result.stderr_text.empty()) err << r->result.stderr_text << '\n';
 
-        if (const auto id = CLITestRunner::extractId(r->result.stdout_text, idPrefix); id.has_value() && r->entity) {
+        if (const auto id = IntegrationsTestRunner::extractId(r->result.stdout_text, idPrefix); id.has_value() && r->entity) {
             const auto obj = std::static_pointer_cast<T>(r->entity);
             obj->id = *id;
             bucket.push_back(obj);
@@ -181,7 +181,7 @@ static void harvestIdsIntoContext(
 
 // ---------- Runner
 
-CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
+IntegrationsTestRunner::IntegrationsTestRunner(CLITestConfig&& cfg)
     : config_(cfg),
       ctx_(std::make_shared<CLITestContext>()),
       usage_(std::make_shared<shell::UsageManager>()),
@@ -194,12 +194,13 @@ CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
 
 // ----- pipeline
 
-int CLITestRunner::operator()() {
+int IntegrationsTestRunner::operator()() {
     seed();
     assign();
     readStage();
     updateStage();
     validateAllTestObjects();
+    runFUSETests();
     teardownStage();
     return printResults();
 }
@@ -212,7 +213,7 @@ static std::vector<std::vector<std::shared_ptr<TestCase>>> split(const std::vect
     return result;
 }
 
-void CLITestRunner::seed() {
+void IntegrationsTestRunner::seed() {
     const auto numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
 
     const struct SeedJob {
@@ -277,13 +278,13 @@ void CLITestRunner::seed() {
 }
 
 template <EntityType E>
-void CLITestRunner::finish_seed(const std::vector<std::shared_ptr<TestCase>>& res) {
+void IntegrationsTestRunner::finish_seed(const std::vector<std::shared_ptr<TestCase>>& res) {
     harvestIdsIntoContext<E>(*ctx_, res, EntityTraits<E>::kIdPrefix, std::cerr);
     stages_.push_back(TestStage(std::string("Seed ") + std::string(EntityTraits<E>::kStage), res));
     validateStage(stages_.back());
 }
 
-void CLITestRunner::readStage() {
+void IntegrationsTestRunner::readStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
     // INFO for each entity
@@ -311,7 +312,7 @@ void CLITestRunner::readStage() {
     validateStage(stages_.back());
 }
 
-void CLITestRunner::assign() {
+void IntegrationsTestRunner::assign() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
     for (const auto& user : ctx_->users)
@@ -331,7 +332,7 @@ void CLITestRunner::assign() {
     validateStage(stages_.back());
 }
 
-void CLITestRunner::updateStage() {
+void IntegrationsTestRunner::updateStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
     const auto& C = *ctx_;
@@ -349,7 +350,7 @@ void CLITestRunner::updateStage() {
     validateStage(stages_.back());
 }
 
-void CLITestRunner::teardownStage() {
+void IntegrationsTestRunner::teardownStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
     auto& C = *ctx_;
 
@@ -372,7 +373,7 @@ void CLITestRunner::teardownStage() {
 
 // ---------- Validation
 
-void CLITestRunner::validateAllTestObjects() const {
+void IntegrationsTestRunner::validateAllTestObjects() const {
     Validator<EntityType::USER,       User>::assert_all_exist(ctx_->users);
     Validator<EntityType::VAULT,      Vault>::assert_all_exist(ctx_->vaults);
     Validator<EntityType::GROUP,      Group>::assert_all_exist(ctx_->groups);

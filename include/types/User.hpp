@@ -32,7 +32,7 @@ struct User {
     std::time_t created_at{}, updated_at{};
     std::optional<std::time_t> last_login;
     bool is_active{true};
-    std::shared_ptr<UserRole> role;
+    std::shared_ptr<UserRole> role{};
     std::vector<std::shared_ptr<VaultRole>> roles;
 
     User();

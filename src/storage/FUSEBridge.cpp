@@ -123,6 +123,12 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     (void)fi;
 
     const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    if (!listDirEntry) {
+        LogRegistry::fuse()->error("[readdir] No entry found for inode {}", ino);
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
     const auto entries = ServiceDepsRegistry::instance().fsCache->listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
@@ -274,15 +280,30 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
 void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
                        const size_t size, const off_t off, fuse_file_info* fi) {
+    LogRegistry::fuse()->debug("[write] Called for inode: {}, size: {}, offset: {}, file handle: {}",
+        ino, size, off, fi->fh);
+
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     (void)ino; // unused
 
+    LogRegistry::fuse()->debug("[write] Writing to fd={} offset={} size={}", fh->fd, off, size);
+
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
     if (res < 0) fuse_reply_err(req, errno);
-    else fuse_reply_write(req, res);
+
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    entry->size_bytes = std::filesystem::file_size(entry->backing_path);
+    ServiceDepsRegistry::instance().fsCache->updateEntry(entry);
+
+    fuse_lowlevel_notify_inval_inode(ServiceDepsRegistry::instance().fuseSession, ino, 0, 0);
+
+    fuse_reply_write(req, res);
 }
 
 void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
+    LogRegistry::fuse()->debug("[read] Called for inode: {}, size: {}, offset: {}, file handle: {}",
+        ino, size, off, fi->fh);
+
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     (void)ino; // unused
 
@@ -411,9 +432,9 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        auto backingPath = paths::getBackingPath() / stripLeadingSlash(fullPath);
-        if (::unlink(backingPath.c_str()) < 0) {
-            LogRegistry::fuse()->error("[unlink] Failed to remove backing file: {}: {}", backingPath.string(), strerror(errno));
+        const auto file = cache->getEntry(fullPath);
+        if (::unlink(file->backing_path.c_str()) < 0) {
+            LogRegistry::fuse()->error("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
@@ -557,7 +578,7 @@ fuse_lowlevel_ops getOperations() {
 }
 
 struct stat statFromEntry(const std::shared_ptr<FSEntry>& entry, const fuse_ino_t& ino) {
-    struct stat st = {};
+    struct stat st{};
     st.st_ino = ino;
     st.st_mode = entry->isDirectory() ? S_IFDIR | 0755 : S_IFREG | 0644;
     st.st_size = static_cast<off_t>(entry->size_bytes);

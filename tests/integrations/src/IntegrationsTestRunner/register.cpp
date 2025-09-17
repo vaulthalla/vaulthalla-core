@@ -1,28 +1,28 @@
-#include "CLITestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 #include "CLITestContext.hpp"
 
 using namespace vh::test::cli;
 
-void CLITestRunner::registerStdoutContains(const std::string& path, std::string needle) {
+void IntegrationsTestRunner::registerStdoutContains(const std::string& path, std::string needle) {
     expectations_by_path_[path].must_have.push_back(std::move(needle));
 }
-void CLITestRunner::registerStdoutNotContains(const std::string& path, std::string needle) {
+void IntegrationsTestRunner::registerStdoutNotContains(const std::string& path, std::string needle) {
     expectations_by_path_[path].must_not_have.push_back(std::move(needle));
 }
-void CLITestRunner::registerStdoutContains(const std::string& path, std::vector<std::string> needles) {
+void IntegrationsTestRunner::registerStdoutContains(const std::string& path, std::vector<std::string> needles) {
     auto& e = expectations_by_path_[path].must_have;
     e.insert(e.end(),
              std::make_move_iterator(needles.begin()),
              std::make_move_iterator(needles.end()));
 }
-void CLITestRunner::registerStdoutNotContains(const std::string& path, std::vector<std::string> needles) {
+void IntegrationsTestRunner::registerStdoutNotContains(const std::string& path, std::vector<std::string> needles) {
     auto& e = expectations_by_path_[path].must_not_have;
     e.insert(e.end(),
              std::make_move_iterator(needles.begin()),
              std::make_move_iterator(needles.end()));
 }
 
-void CLITestRunner::registerAllContainsAssertions() {
+void IntegrationsTestRunner::registerAllContainsAssertions() {
     const std::vector<std::string> user_info_fields = {"User ID", "User", "Email", "Role"};
     const std::vector<std::string> vault_info_fields = {"ID", "Name", "Owner ID", "Quota"};
     const std::vector<std::string> vault_list_fields = {"ID", "NAME", "OWNER", "QUOTA", "DESCRIPTION"};

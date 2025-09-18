@@ -1,9 +1,6 @@
 #include "storage/FUSEBridge.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/Vault.hpp"
 #include "types/FSEntry.hpp"
 #include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -256,22 +253,15 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     ServiceDepsRegistry::instance().storageManager->registerOpenHandle(ino);
 
     try {
-        const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
-        const auto backingPath = paths::getBackingPath() / stripLeadingSlash(path);
         const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
-        if (!entry) {
-            LogRegistry::fuse()->error("[open] No entry found for inode {}", ino);
-            fuse_reply_err(req, ENOENT);
-            return;
-        }
 
-        const int fd = ::open(backingPath.c_str(), fi->flags, 0644);
+        const int fd = ::open(entry->backing_path.c_str(), fi->flags, 0644);
         if (fd < 0) {
             fuse_reply_err(req, errno);
             return;
         }
 
-        auto* fh = new FileHandle{backingPath.string(), fd};
+        auto* fh = new FileHandle{entry->backing_path.string(), fd};
         fi->fh = reinterpret_cast<uint64_t>(fh);
 
         fi->direct_io = 1;

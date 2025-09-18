@@ -6,9 +6,9 @@
 #include <optional>
 #include <variant>
 
-typedef std::variant<std::vector<std::shared_ptr<TestCase>>> TestFuture;
-
 namespace vh::test::cli {
+
+typedef std::variant<std::vector<std::shared_ptr<TestCase>>> TestFuture;
 
 struct TestTask {
     virtual ~TestTask() = default;

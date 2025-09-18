@@ -259,9 +259,10 @@ foreach f : run_command('find', cli_test_src, '-type', 'f', '-name', '*.cpp', ch
     cli_test_sources += files(f)
 endforeach
 
-vh_cli_tests = executable('vh_integration_tests', cli_test_sources + files('tests/integrations/CLI_test_main.cpp'),
-                         include_directories: cli_test_inc,
-                         link_with: [lib_core, lib_seed, lib_usage],
-                         dependencies: test_deps,
-                         install: false
+vh_integration_tests = executable('vh_integration_tests',
+                                  cli_test_sources + files('tests/integrations/CLI_test_main.cpp'),
+                                  include_directories: cli_test_inc,
+                                  link_with: [lib_core, lib_seed, lib_usage],
+                                  dependencies: test_deps,
+                                  install: false,
 )

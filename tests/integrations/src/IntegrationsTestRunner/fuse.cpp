@@ -31,11 +31,15 @@ static unsigned int uid_index = 1001;
 
 void IntegrationsTestRunner::runFUSETests() {
     testFUSECRUD();
-    // testFUSEAllow();
-    // testFUSEDeny();
+
+    // FUSE permission tests require root to change the effective uid
+    if (geteuid() == 0) {
+        testFUSEAllow();
+        testFUSEDeny();
+    }
 }
 
-std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaultId, const uint16_t vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides) {
+std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaultId, const std::optional<uint16_t>& vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides) {
     const auto user = std::make_shared<User>();
     user->name = "testuser_" + generateRandomIndex(50000);
 
@@ -51,16 +55,18 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
 
-    const auto vaultRole = std::make_shared<VaultRole>();
-    vaultRole->name = "vault_role_" + generateRandomIndex(50000);
-    vaultRole->permissions = vaultPerms;
-    vaultRole->description = "Vault role for user " + user->name;
-    vaultRole->type = "vault";
-    vaultRole->vault_id = vaultId;
-    vaultRole->permissions = vaultPerms;
-    vaultRole->permission_overrides = overrides;
-    vaultRole->role_id = PermsQueries::addRole(std::static_pointer_cast<Role>(vaultRole));
-    user->roles.push_back(vaultRole);
+    if (vaultPerms) {
+        const auto vaultRole = std::make_shared<VaultRole>();
+        vaultRole->name = "vault_role_" + generateRandomIndex(50000);
+        vaultRole->permissions = *vaultPerms;
+        vaultRole->description = "Vault role for user " + user->name;
+        vaultRole->type = "vault";
+        vaultRole->vault_id = vaultId;
+        vaultRole->permission_overrides = overrides;
+        vaultRole->role_id = PermsQueries::addRole(std::static_pointer_cast<Role>(vaultRole));
+        user->roles.push_back(vaultRole);
+    }
+
     user->id = UserQueries::createUser(user);
     return user;
 }
@@ -140,6 +146,7 @@ void IntegrationsTestRunner::testFUSEAllow() {
     // Create user with vault perms (power_user)
     const auto powerUserRole = PermsQueries::getRoleByName("power_user");
     if (!powerUserRole) throw std::runtime_error("Power user role not found");
+    if (powerUserRole->permissions == 0) throw std::runtime_error("Power user role has no permissions");
     const auto user = createUser(engine->vault->id, powerUserRole->permissions, {});
     if (!user || !user->linux_uid) throw std::runtime_error("Failed to create user / uid");
 
@@ -178,7 +185,7 @@ void IntegrationsTestRunner::testFUSEDeny() {
     seed_vault_tree(*admin->linux_uid, root);
 
     // Create user with NO perms
-    const auto user = createUser(engine->vault->id, /*vaultPerms=*/0, /*overrides=*/{});
+    const auto user = createUser(engine->vault->id);
     if (!user || !user->linux_uid) throw std::runtime_error("Failed to create user / uid");
 
     std::vector<FuseStep> steps;

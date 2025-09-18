@@ -22,7 +22,7 @@ namespace vh::types {
 struct UserRole;
 struct VaultRole;
 
-struct User {
+struct User : public std::enable_shared_from_this<User> {
     static constexpr uint16_t ADMIN_MASK = 0xFFFE;
 
     unsigned int id{};

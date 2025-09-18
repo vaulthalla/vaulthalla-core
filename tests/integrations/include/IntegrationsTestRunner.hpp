@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 #include <atomic>
+#include <optional>
 
 namespace vh::shell {
 class UsageManager;
@@ -76,7 +77,7 @@ private:
     void teardownStage();
 
     // FUSE steps
-    std::shared_ptr<types::User> createUser(unsigned int vaultId, uint16_t vaultPerms, const std::vector<std::shared_ptr<types::PermissionOverride>>& overrides = {});
+    std::shared_ptr<types::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<types::PermissionOverride>>& overrides = {});
     void runFUSETests();
     void testFUSECRUD();
     void testFUSEAllow();

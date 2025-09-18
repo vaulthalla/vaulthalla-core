@@ -4,18 +4,18 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/basic_file_sink.h>
-
+#include <paths.h>
 #include <filesystem>
 
 namespace vh::logging {
 
-void LogRegistry::init(const std::filesystem::path& logDir) {
+void LogRegistry::init() {
     if (initialized_) {
         spdlog::warn("[LogRegistry] Already initialized, ignoring second init()");
         return;
     }
 
-    log_dir_ = logDir;
+    log_dir_ = paths::getLogPath();
     main_log_path_  = log_dir_ / "vaulthalla.log";
     audit_log_path_ = log_dir_ / "audit.log";
 

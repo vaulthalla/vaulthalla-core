@@ -7,7 +7,6 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <paths.h>
 #include <filesystem>
 
 namespace vh::logging {
@@ -15,7 +14,7 @@ namespace vh::logging {
 class LogRegistry {
 public:
     // Initialize all loggers with sinks/levels.
-    static void init(const std::filesystem::path& logDir = paths::getLogPath());
+    static void init();
 
     // Generic access by name
     static std::shared_ptr<spdlog::logger> get(const std::string& name);

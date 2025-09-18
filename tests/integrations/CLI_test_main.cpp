@@ -30,7 +30,7 @@ using namespace vh::test::cli;
 static void initBase() {
     vh::paths::enableTestMode();
     ConfigRegistry::init();
-    LogRegistry::init(fs::temp_directory_path() / "vaulthalla-test");
+    LogRegistry::init();
     ThreadPoolManager::instance().init();
 }
 

@@ -140,6 +140,8 @@ void FUSE::stop() {
     LogRegistry::fuse()->info("[FUSE] Stopping FUSE connection...");
     interruptFlag_.store(true);
 
+    if (paths::testMode) lazyUmount(paths::mountPath);
+
     // Only wake the loop. Do NOT unmount/destroy here.
     if (session_) fuse_session_exit(session_);
 
@@ -216,7 +218,7 @@ void FUSE::runLoop() {
 
     LogRegistry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
 
-    while (!fuse_session_exited(session_) && running_) {
+    while (!fuse_session_exited(session_) && running_ && !interruptFlag_.load()) {
         fuse_buf buf{};
         const int res = fuse_session_receive_buf(session_, &buf);
         if (res == -EINTR) continue;
@@ -227,8 +229,8 @@ void FUSE::runLoop() {
 
     LogRegistry::fuse()->info("[FUSE] FUSE service loop exiting");
 
-    fuse_session_unmount(session_);
     fuse_remove_signal_handlers(session_);
+    fuse_session_unmount(session_);
     fuse_session_destroy(session_);
     session_ = nullptr;
 

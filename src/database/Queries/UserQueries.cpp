@@ -82,7 +82,7 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
         txn.exec(pqxx::prepped{"assign_user_role"}, pqxx::params{userId, user->role->id});
 
         for (const auto& role : user->roles) {
-            pqxx::params role_params{"user", role->vault_id, userId, role->role_id};
+            pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
             txn.exec(pqxx::prepped{"assign_vault_role"}, role_params);
         }
 

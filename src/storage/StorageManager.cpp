@@ -118,7 +118,9 @@ std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
     vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
     vault->id = VaultQueries::upsertVault(vault, sync);
     vault = VaultQueries::getVault(vault->id);
-    vaultToEngine_[vault->id] = std::make_shared<StorageEngine>(vault);
+    const auto engine = std::make_shared<StorageEngine>(vault);
+    engines_[engine->paths->absRelToRoot(engine->paths->vaultRoot, PathType::FUSE_ROOT)] = engine;
+    vaultToEngine_[vault->id] = engine;
 
     LogRegistry::storage()->info("[StorageManager] Added new vault with ID: {}, Name: {}, Type: {}",
                                               vault->id, vault->name, to_string(vault->type));

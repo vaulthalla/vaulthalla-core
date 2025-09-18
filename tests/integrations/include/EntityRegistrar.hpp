@@ -136,7 +136,7 @@ public:
         return { router_->executeLine(command, admin, io.get()), entity };
     }
 
-    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<types::Group>& group, const std::shared_ptr<User>& user) const {
+    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<types::Group>& group, const std::shared_ptr<types::User>& user) const {
         if (type != EntityType::USER && type != EntityType::VAULT)
             throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
 

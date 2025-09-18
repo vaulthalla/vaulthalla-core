@@ -14,6 +14,7 @@ class UsageManager;
 
 namespace vh::types {
 struct User;
+struct PermissionOverride;
 }
 
 namespace vh::test::cli {
@@ -75,7 +76,7 @@ private:
     void teardownStage();
 
     // FUSE steps
-    std::shared_ptr<types::User> createUser(unsigned int vaultId, uint16_t vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides = {});
+    std::shared_ptr<types::User> createUser(unsigned int vaultId, uint16_t vaultPerms, const std::vector<std::shared_ptr<types::PermissionOverride>>& overrides = {});
     void runFUSETests();
     void testFUSECRUD();
     void testFUSEAllow();

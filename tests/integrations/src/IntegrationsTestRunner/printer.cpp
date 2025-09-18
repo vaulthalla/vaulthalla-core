@@ -1,4 +1,4 @@
-#include "CLITestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 #include "TestCase.hpp"
 #include "Validator.hpp"
 
@@ -19,7 +19,7 @@ static std::string joinLines(const std::vector<std::string>& lines) {
     return oss.str();
 }
 
-void CLITestRunner::validateStage(const TestStage& stage) const {
+void IntegrationsTestRunner::validateStage(const TestStage& stage) const {
     for (const auto& t : stage.tests) {
         if (!t) continue;
 
@@ -60,7 +60,7 @@ void CLITestRunner::validateStage(const TestStage& stage) const {
     }
 }
 
-int CLITestRunner::printResults() const {
+int IntegrationsTestRunner::printResults() const {
     std::ostream& os = std::cout;
 
     // color / TTY

@@ -40,6 +40,7 @@ void ServiceManager::startAll() {
     std::lock_guard lock(mutex_);
     tryStart("Vaulthalla", vaulthallaService);
     tryStart("FUSE", fuseService);
+    ServiceDepsRegistry::instance().setFuseSession(fuseService->session());
     tryStart("SyncController", syncController);
     tryStart("CtlServer", ctlServerService);
     tryStart("ConnectionLifecycleManager", connectionLifecycleManager);
@@ -124,7 +125,7 @@ void ServiceManager::startWatchdog() {
                     if (svc && !svc->isRunning()) {
                         LogRegistry::vaulthalla()->warn("[Watchdog] {} is down, restarting...", name);
                         if (name == "FUSE") system(fmt::format("fusermount3 -u {} > /dev/null 2>&1 || fusermount -u {} > /dev/null 2>&1",
-                   getFuseMountPoint().string(), getFuseMountPoint().string()).c_str());
+                   paths::getMountPath().string(), paths::getMountPath().string()).c_str());
 
                         restartService(name);
                     }
@@ -147,29 +148,4 @@ void ServiceManager::stopWatchdog() {
     stopAll(SIGTERM);
     LogRegistry::vaulthalla()->error("[ServiceManager] Exiting with failure status.");
     std::_Exit(EXIT_FAILURE);
-}
-
-void ServiceManager::setFuseMountPoint(const std::filesystem::path& mount) const {
-    if (fuseService && !fuseService->isRunning()) fuseService->setTestMode(mount);
-    else throw std::runtime_error("Cannot set FUSE mount point while FUSE service is running");
-}
-
-std::filesystem::path ServiceManager::getFuseMountPoint() const {
-    if (fuseService) return fuseService->mountPoint();
-    return {};
-}
-
-std::shared_ptr<vh::shell::Router> ServiceManager::getCLIRouter() const {
-    if (ctlServerService) return ctlServerService->get_router();
-    return nullptr;
-}
-
-void ServiceManager::setCtlSocketPath(const std::string& path) const {
-    if (ctlServerService && !ctlServerService->isRunning()) ctlServerService->setSocketPath(path);
-    else throw std::runtime_error("Cannot set CtlServer socket path while CtlServer service is running");
-}
-
-std::string ServiceManager::getCtlSocketPath() const {
-    if (ctlServerService) return ctlServerService->socketPath();
-    return {};
 }

@@ -25,7 +25,6 @@ struct VaultQueries {
     static std::shared_ptr<types::Vault> getVault(const std::string& name, unsigned int ownerId);
     static std::vector<std::shared_ptr<types::Vault>> listVaults(const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
-    static std::string getVaultOwnersName(unsigned int vaultId);
 
     static void updateVaultSync(const std::shared_ptr<types::Sync>& sync, const types::VaultType& type);
 
@@ -38,6 +37,9 @@ struct VaultQueries {
     static bool localDiskVaultExists();
 
     [[nodiscard]] static std::string getVaultMountPoint(unsigned int vaultId);
+
+    static std::string getVaultOwnersName(unsigned int vaultId);
+    [[nodiscard]] static unsigned int getVaultOwnerId(unsigned int vaultId);
 };
 
 } // namespace vh::database

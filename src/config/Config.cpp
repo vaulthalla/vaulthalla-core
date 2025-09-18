@@ -28,6 +28,8 @@ Config loadConfig(const std::string& path) {
     if (auto node = root["auditing"]) YAML::convert<AuditConfig>::decode(node, cfg.auditing);
     if (auto node = root["dev"]) YAML::convert<DevConfig>::decode(node, cfg.dev);
 
+    if (auto node = root["logging"]) YAML::convert<LoggingConfig>::decode(node, cfg.logging);
+
     return cfg;
 }
 

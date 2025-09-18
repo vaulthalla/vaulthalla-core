@@ -10,14 +10,115 @@
 #include <thread>
 #include <atomic>
 #include <utility>
+#include <paths.h>
+#include <sys/mount.h>    // umount2, MNT_DETACH
+#include <sys/stat.h>     // lstat
+#include <chrono>
+#include <thread>
 
+namespace fs = std::filesystem;
 using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::fuse;
 using namespace vh::logging;
 
-FUSE::FUSE(std::filesystem::path mount)
-    : AsyncService("FUSE"), mountPoint_(std::move(mount)) {}
+namespace fs = std::filesystem;
+
+// Best-effort guard: only allow nuking test mountpoints under /tmp
+static bool isSafeTestMountpoint(const fs::path& p) {
+    const auto s = p.string();
+    return s.rfind("/tmp/", 0) == 0; // starts_with("/tmp/")
+}
+
+static bool isMountedOrStale(const fs::path& p) {
+    // If lstat returns ENOTCONN, it’s a stale FUSE endpoint => treat as mounted.
+    struct stat st{}, pst{};
+    if (::lstat(p.c_str(), &st) != 0) return (errno == ENOTCONN);
+    const auto parent = p.parent_path().empty() ? fs::path("/") : p.parent_path();
+
+    // If parent can't be stat'ed, be conservative.
+    if (::lstat(parent.c_str(), &pst) != 0) return true;
+
+    // Different st_dev than parent => mountpoint boundary
+    return st.st_dev != pst.st_dev;
+}
+
+static void lazyUmount(const fs::path& p) {
+    // 1) Try kernel lazy detach
+    if (::umount2(p.c_str(), MNT_DETACH) == 0) return;
+
+    // 2) Fallbacks (some distros prefer fusermount3)
+    (void)std::system(std::string("fusermount3 -uz " + p.string() + " >/dev/null 2>&1").c_str());
+    (void)std::system(std::string("fusermount  -uz " + p.string() + " >/dev/null 2>&1").c_str());
+    (void)std::system(std::string("umount     -l  " + p.string() + " >/dev/null 2>&1").c_str());
+}
+
+static void waitUnmounted(const fs::path& p, std::chrono::milliseconds timeout = std::chrono::milliseconds(1500)) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (!isMountedOrStale(p)) return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+}
+
+static void ensureFreshMountpoint() {
+    const auto mountPath = vh::paths::getMountPath();
+    std::error_code ec;
+
+    if (vh::paths::testMode) {
+        if (!isSafeTestMountpoint(mountPath)) {
+            throw std::runtime_error("Refusing to clear non-/tmp mount in test mode: " + mountPath.string());
+        }
+
+        if (fs::exists(mountPath, ec)) {
+            // If it’s a mountpoint (or stale), detach it first.
+            if (isMountedOrStale(mountPath)) {
+                lazyUmount(mountPath);
+                waitUnmounted(mountPath);
+            }
+
+            // Now it should be a normal dir entry; remove it entirely.
+            ec.clear();
+            fs::remove_all(mountPath, ec);
+            if (ec && ec.value() != ENOENT) {
+                vh::logging::LogRegistry::fuse()->warn(
+                    "[FUSE] Failed to remove old mount dir {}: {}", mountPath.string(), ec.message());
+                ec.clear();
+            }
+        }
+    }
+
+    // Create fresh directory (handle ENOTCONN paranoia: retry once after forced detach)
+    fs::create_directories(mountPath, ec);
+    if (ec) {
+        if (ec.value() == ENOTCONN || ec == std::errc::not_connected) {
+            // One more forceful pass if a stale endpoint just got noticed late
+            lazyUmount(mountPath);
+            waitUnmounted(mountPath);
+            ec.clear();
+            fs::remove_all(mountPath, ec); // ignore errors
+            ec.clear();
+            fs::create_directories(mountPath, ec);
+        }
+    }
+    if (ec) {
+        throw std::runtime_error("Failed to create mountpoint " + mountPath.string() + ": " + ec.message());
+    }
+
+    if (vh::paths::testMode) {
+        fs::permissions(mountPath,
+                        fs::perms::owner_all | fs::perms::group_all | fs::perms::others_all,
+                        fs::perm_options::replace,
+                        ec);
+        if (ec) {
+            throw std::runtime_error("Failed to chmod mountpoint " + mountPath.string() + ": " + ec.message());
+        }
+    }
+}
+
+// -- FUSE class implementation --
+
+FUSE::FUSE() : AsyncService("FUSE") {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     (void)userdata;
@@ -39,6 +140,8 @@ void FUSE::stop() {
     LogRegistry::fuse()->info("[FUSE] Stopping FUSE connection...");
     interruptFlag_.store(true);
 
+    if (paths::testMode) lazyUmount(paths::mountPath);
+
     // Only wake the loop. Do NOT unmount/destroy here.
     if (session_) fuse_session_exit(session_);
 
@@ -53,27 +156,14 @@ void FUSE::stop() {
 void FUSE::runLoop() {
     LogRegistry::fuse()->debug("[FUSE] Running FUSE service");
 
-    if (!fs::exists(mountPoint_)) {
-        std::error_code ec;
-        if (!fs::create_directories(mountPoint_, ec)) {
-            LogRegistry::fuse()->error("[FUSE] Failed to create mountpoint {}: {}", mountPoint_.string(), ec.message());
-            return;
-        }
+    ensureFreshMountpoint();
 
-        if (testMode_) {
-            fs::permissions(mountPoint_,
-        fs::perms::owner_all | fs::perms::group_all | fs::perms::others_all,
-        fs::perm_options::replace, ec);
-        }
-
-        if (ec) throw std::runtime_error("Failed to chmod mountpoint: " + ec.message());
-    }
-
-    std::vector<std::string> argsStr = {
+    const std::vector<std::string> argsStr = {
         "vaulthalla-fuse",
         "-f",
         "-o", "allow_other",
-        mountPoint_
+        "-o", "auto_unmount",
+        paths::getMountPath()
     };
 
     std::vector<std::unique_ptr<char[]>> ownedCStrs;
@@ -128,7 +218,7 @@ void FUSE::runLoop() {
 
     LogRegistry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
 
-    while (!fuse_session_exited(session_) && running_) {
+    while (!fuse_session_exited(session_) && running_ && !interruptFlag_.load()) {
         fuse_buf buf{};
         const int res = fuse_session_receive_buf(session_, &buf);
         if (res == -EINTR) continue;
@@ -139,8 +229,8 @@ void FUSE::runLoop() {
 
     LogRegistry::fuse()->info("[FUSE] FUSE service loop exiting");
 
-    fuse_session_unmount(session_);
     fuse_remove_signal_handlers(session_);
+    fuse_session_unmount(session_);
     fuse_session_destroy(session_);
     session_ = nullptr;
 

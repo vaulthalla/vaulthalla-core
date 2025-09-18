@@ -111,7 +111,7 @@ static CommandResult handle_group_add_user(const CommandCall& call) {
 
     if (!call.user->canManageGroups()) return invalid("group add-user: you do not have permission to add users to groups");
 
-    const auto usage = resolveUsage({"group", "add", "user"});
+    const auto usage = resolveUsage({"group", "user", "add"});
     validatePositionals(call, usage);
 
     const auto group = resolveGroup(call.positionals[0]);
@@ -130,7 +130,7 @@ static CommandResult handle_group_remove_user(const CommandCall& call) {
 
     if (!call.user->canManageGroups()) return invalid("group remove-user: you do not have permission to remove users from groups");
 
-    const auto usage = resolveUsage({"group", "remove", "user"});
+    const auto usage = resolveUsage({"group", "user", "remove"});
     validatePositionals(call, usage);
 
     const auto group = resolveGroup(call.positionals[0]);

@@ -17,7 +17,15 @@ enum class CommandType {
     UPDATE,
     DELETE,
     LIST,
-    INFO
+    INFO,
+    ASSIGN,
+    UNASSIGN
+};
+
+enum class ActionType {
+    ADD,
+    REMOVE,
+    SET
 };
 
 struct EntityResult {
@@ -43,6 +51,17 @@ inline std::string CommandTypeToString(const CommandType& type) {
     case CommandType::DELETE: return "delete";
     case CommandType::LIST: return "list";
     case CommandType::INFO: return "info";
+    case CommandType::ASSIGN: return "assign";
+    case CommandType::UNASSIGN: return "unassign";
+    default: return "unknown";
+    }
+}
+
+inline std::string ActionTypeToString(const ActionType& type) {
+    switch (type) {
+    case ActionType::ADD: return "add";
+    case ActionType::REMOVE: return "remove";
+    case ActionType::SET: return "set";
     default: return "unknown";
     }
 }

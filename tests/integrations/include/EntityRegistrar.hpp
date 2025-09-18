@@ -1,6 +1,9 @@
 #pragma once
 
 #include "types/VaultRole.hpp"
+#include "types/Group.hpp"
+#include "types/User.hpp"
+#include "types/Vault.hpp"
 #include "protocols/shell/Router.hpp"
 #include "CLITestContext.hpp"
 #include "CommandBuilderRegistry.hpp"
@@ -131,6 +134,40 @@ public:
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::DELETE, entity);
         std::cout << command << std::endl;
         return { router_->executeLine(command, admin, io.get()), entity };
+    }
+
+    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<types::Group>& group, const std::shared_ptr<types::User>& user) const {
+        if (type != EntityType::USER && type != EntityType::VAULT)
+            throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
+
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+
+        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::GROUP, type, action, group, user);
+
+        std::cout << command << std::endl;
+        return { router_->executeLine(command, admin, io.get()), group };
+    }
+
+    [[nodiscard]] EntityResult manageVaultRoleAssignments(const EntityType& type, const CommandType& cmdType,
+                                                          const std::shared_ptr<types::Vault>& vault,
+                                                          const std::shared_ptr<types::VaultRole>& role,
+                                                          const std::shared_ptr<void>& entity) const {
+        if (type != EntityType::USER && type != EntityType::GROUP)
+            throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports USER and GROUP entity types");
+
+        if (cmdType != CommandType::ASSIGN && cmdType != CommandType::UNASSIGN)
+            throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports ASSIGN and UNASSIGN command types");
+
+        const auto admin = database::UserQueries::getUserByName("admin");
+        int fd;
+        const auto io = std::make_unique<shell::SocketIO>(fd);
+
+        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::VAULT, EntityType::VAULT_ROLE, type, cmdType, vault, role, entity);
+
+        std::cout << command << std::endl;
+        return { router_->executeLine(command, admin, io.get()), role };
     }
 
 private:

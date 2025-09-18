@@ -14,7 +14,7 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
     const auto exists = vault->id != 0;
     if (!exists && !sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
-    return Transactions::exec("VaultQueries::addVault", [&](pqxx::work& txn) {
+    return Transactions::exec("VaultQueries::upsertVault", [&](pqxx::work& txn) {
         pqxx::params p{
             vault->name,
             to_string(vault->type),
@@ -255,5 +255,13 @@ std::string VaultQueries::getVaultMountPoint(unsigned int vaultId) {
         const auto res = txn.exec(pqxx::prepped{"get_vault_mount_point"}, pqxx::params{vaultId});
         if (res.empty()) throw std::runtime_error("Vault not found for ID: " + std::to_string(vaultId));
         return res.one_field().as<std::string>();
+    });
+}
+
+unsigned int VaultQueries::getVaultOwnerId(unsigned int vaultId) {
+    return Transactions::exec("VaultQueries::getVaultOwnerId", [&](pqxx::work& txn) {
+        const auto res = txn.exec(pqxx::prepped{"get_vault_owner_id"}, pqxx::params{vaultId});
+        if (res.empty()) throw std::runtime_error("Vault not found for ID: " + std::to_string(vaultId));
+        return res.one_field().as<unsigned int>();
     });
 }

@@ -61,6 +61,16 @@ std::shared_ptr<User> CLITestContext::pickRandomUser() const {
     return users[generateRandomIndex(users.size())];
 }
 
+std::shared_ptr<Group> CLITestContext::pickRandomGroup() const {
+    if (groups.empty()) throw std::runtime_error("CLITestContext: no groups available to pick from");
+    return groups[generateRandomIndex(groups.size())];
+}
+
+std::shared_ptr<Vault> CLITestContext::pickRandomVault() const {
+    if (vaults.empty()) throw std::runtime_error("CLITestContext: no vaults available to pick from");
+    return vaults[generateRandomIndex(vaults.size())];
+}
+
 std::shared_ptr<Vault> CLITestContext::pickVaultOwnedBy(const std::shared_ptr<User>& user) const {
     if (vaults.empty()) throw std::runtime_error("CLITestContext: no vaults available to pick from");
     std::vector<std::shared_ptr<Vault>> owned;

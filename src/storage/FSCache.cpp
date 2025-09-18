@@ -194,6 +194,8 @@ std::shared_ptr<FSEntry> FSCache::getEntryFromInode(const fuse_ino_t ino) const 
 void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFirstSeeding) {
     if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
 
+    LogRegistry::storage()->debug("[FSCache] Caching entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
+
     if (*entry->inode != FUSE_ROOT_ID) {
         if (!entry->vault_id) {
             LogRegistry::storage()->error("[FSCache] Entry {} has no vault_id, cannot cache", entry->id);
@@ -257,6 +259,13 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
     }
 
     LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
+}
+
+void FSCache::updateEntry(const std::shared_ptr<types::FSEntry>& entry) {
+    LogRegistry::fs()->debug("[FSCache] Updating entry: {} with inode {}", entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
+    FSEntryQueries::updateFSEntry(entry);
+    cacheEntry(entry);
+    LogRegistry::fs()->debug("[FSCache] Updated entry: {} with inode {}", entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
 }
 
 void FSCache::evictIno(fuse_ino_t ino) {

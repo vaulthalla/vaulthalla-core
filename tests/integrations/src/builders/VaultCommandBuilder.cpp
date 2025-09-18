@@ -2,6 +2,8 @@
 #include "CommandUsage.hpp"
 #include "generators.hpp"
 #include "types/Vault.hpp"
+#include "types/User.hpp"
+#include "types/Group.hpp"
 #include "database/Queries/UserQueries.hpp"
 
 using namespace vh::test::cli;
@@ -166,6 +168,51 @@ std::string VaultCommandBuilder::list() {
     if (coin(10000, 2000)) oss << " --json";
     return oss.str();
 }
+
+static std::string manageRole(const std::shared_ptr<Vault>& vault, const std::shared_ptr<VaultRole>& role, const EntityType& entityType, const std::shared_ptr<void>& entity, const std::shared_ptr<CommandUsage>& root, std::string action) {
+    const auto cmdBase = root->findSubcommand("role");
+    if (!cmdBase) throw std::runtime_error("vault.roles usage not found");
+    const auto cmd = cmdBase->findSubcommand(action);
+    if (!cmd) throw std::runtime_error("vault.roles.assign usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root->aliases) << ' ' << randomAlias(cmdBase->aliases) << ' ' << randomAlias(cmd->aliases);
+
+    bool useVaultName = coin();
+    for (const auto& pos : cmd->positionals) {
+        if (pos.label.contains("vault")) oss << ' ' << (useVaultName ? vault->name : std::to_string(vault->id));
+        else if (pos.label.contains("role")) oss << ' ' << role->id;
+        else throw std::runtime_error("VaultCommandBuilder: unsupported positional in vault.roles.assign: " + pos.label);
+    }
+
+    if (useVaultName) oss << " --owner " << vault->owner_id;
+
+    for (const auto& req : cmd->required) {
+        if (req.label.contains("subject")) {
+            if (!entity) throw std::runtime_error("VaultCommandBuilder: no entity provided for vault.roles.assign subject");
+            if (entityType == EntityType::USER) {
+                const auto user = std::static_pointer_cast<User>(entity);
+                if (coin()) oss << " --user " << user->id;
+                else       oss << " --user " << user->name;
+            } else if (entityType == EntityType::GROUP) {
+                const auto group = std::static_pointer_cast<Group>(entity);
+                if (coin()) oss << " --group " << group->id;
+                else       oss << " --group " << group->name;
+            } else throw std::runtime_error("VaultCommandBuilder: unsupported entity type for vault.roles.assign subject");
+        } else throw std::runtime_error("VaultCommandBuilder: unsupported required option in vault.roles.assign: " + req.label);
+    }
+
+    return oss.str();
+}
+
+std::string VaultCommandBuilder::assignVaultRole(const std::shared_ptr<Vault>& vault, const std::shared_ptr<VaultRole>& role, const EntityType& entityType, const std::shared_ptr<void>& entity) const {
+    return manageRole(vault, role, entityType, entity, root_, "assign");
+}
+
+std::string VaultCommandBuilder::unassignVaultRole(const std::shared_ptr<Vault>& vault, const std::shared_ptr<VaultRole>& role, const EntityType& entityType, const std::shared_ptr<void>& entity) const {
+    return manageRole(vault, role, entityType, entity, root_, "unassign");
+}
+
 
 // ---------------- extras ----------------
 

@@ -105,7 +105,7 @@ std::vector<std::shared_ptr<VaultRole> > vh::types::vault_roles_from_pq_result(
     }
 
     for (const auto& item : res) {
-        const auto roleId = item["id"].as<unsigned int>();
+        const auto roleId = item["role_id"].as<unsigned int>();
         const auto& roleOverrides = overrideMap[roleId];
         roles.push_back(std::make_shared<VaultRole>(item, roleOverrides));
     }

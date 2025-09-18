@@ -40,6 +40,7 @@ public:
     void decrementInodeRef(fuse_ino_t ino, uint64_t nlookup);
 
     void cacheEntry(const std::shared_ptr<types::FSEntry>& entry, bool isFirstSeeding = false);
+    void updateEntry(const std::shared_ptr<types::FSEntry>& entry);
     [[nodiscard]] bool entryExists(const fs::path& absPath) const;
     std::shared_ptr<types::FSEntry> getEntryFromInode(fuse_ino_t ino) const;
 

@@ -378,6 +378,8 @@ void DBConnection::initPreparedVaults() const {
                    "JOIN vault v ON u.id = v.owner_id "
                    "WHERE v.id = $1");
 
+    conn_->prepare("get_vault_owner_id", "SELECT owner_id FROM vault WHERE id = $1");
+
     conn_->prepare("get_max_vault_id", "SELECT MAX(id) FROM vault");
 
     conn_->prepare("get_vault_root_dir_id_by_vault_id", "SELECT id FROM fs_entry WHERE vault_id = $1 AND path = '/'");
@@ -853,7 +855,7 @@ void DBConnection::initPreparedVaultRoles() const {
 
     conn_->prepare("get_vault_assigned_role",
                    "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
-                   "r.name, r.description, r.type, p.permissions::int AS permissions "
+                   "r.name, r.description, r.type, p.permissions::int AS permissions, r.created_at, vra.vault_id "
                    "FROM role r "
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
                    "JOIN permissions p ON r.id = p.role_id "
@@ -862,7 +864,7 @@ void DBConnection::initPreparedVaultRoles() const {
     conn_->prepare("get_vault_assigned_roles",
                    "SELECT r.name, r.description, r.type, "
                    "vra.role_id, vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.assigned_at, "
-                   "p.permissions::int as permissions "
+                   "p.permissions::int as permissions, r.created_at, vra.vault_id "
                    "FROM role r "
                    "JOIN permissions p ON r.id = p.role_id "
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
@@ -870,7 +872,7 @@ void DBConnection::initPreparedVaultRoles() const {
 
     conn_->prepare("get_subject_assigned_vault_roles",
                    "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
-                   "r.name, r.description, r.type, p.permissions::int AS permissions "
+                   "r.name, r.description, r.type, p.permissions::int AS permissions, r.created_at, vra.vault_id "
                    "FROM role r "
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
                    "JOIN permissions p ON r.id = p.role_id "
@@ -878,7 +880,7 @@ void DBConnection::initPreparedVaultRoles() const {
 
     conn_->prepare("get_subject_assigned_vault_role",
                    "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
-                   "r.name, r.description, r.type, p.permissions::int AS permissions "
+                   "r.name, r.description, r.type, p.permissions::int AS permissions, r.created_at, vra.vault_id "
                    "FROM role r "
                    "JOIN vault_role_assignments vra ON r.id = vra.role_id "
                    "JOIN permissions p ON r.id = p.role_id "

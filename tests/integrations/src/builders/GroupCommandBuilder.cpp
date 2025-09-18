@@ -48,6 +48,11 @@ static std::string randomizePrimaryPositional(const std::shared_ptr<Group>& enti
     return entity->name;
 }
 
+static std::string randomizeSecondaryPositional(const std::shared_ptr<User>& entity) {
+    if (coin()) return std::to_string(entity->id);
+    return entity->name;
+}
+
 std::string GroupCommandBuilder::create(const std::shared_ptr<Group>& entity) {
     const auto cmd = root_->findSubcommand("create");
     if (!cmd) throw std::runtime_error("GroupCommandBuilder: 'create' command usage not found");
@@ -111,5 +116,39 @@ std::string GroupCommandBuilder::list() {
     oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(cmd->aliases);
     for (const auto& flag : cmd->optional_flags)
         if (generateRandomIndex(10000) < 5000) oss << " --" << randomAlias(flag.aliases);
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::addUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const {
+    const auto baseCmd = root_->findSubcommand("user");
+    if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
+    const auto addCmd = baseCmd->findSubcommand("add");
+    if (!addCmd) throw std::runtime_error("GroupCommandBuilder: 'group user add' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(baseCmd->aliases) << ' ' << randomAlias(addCmd->aliases);
+
+    for (const auto& pos : addCmd->positionals) {
+        if (pos.label == "group") oss << ' ' << randomizePrimaryPositional(entity);
+        else if (pos.label == "user") oss << ' ' << randomizeSecondaryPositional(user);
+        else throw std::runtime_error("GroupCommandBuilder: unsupported positional in 'group user add': " + pos.label);
+    }
+
+    return oss.str();
+}
+
+std::string GroupCommandBuilder::removeUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const {
+    const auto baseCmd = root_->findSubcommand("user");
+    if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
+    const auto rmCmd = baseCmd->findSubcommand("remove");
+    if (!rmCmd) throw std::runtime_error("GroupCommandBuilder: 'group user remove' command usage not found");
+
+    std::ostringstream oss;
+    oss << "vh " << randomAlias(root_->aliases) << ' ' << randomAlias(baseCmd->aliases) << ' ' << randomAlias(rmCmd->aliases);
+    for (const auto& pos : rmCmd->positionals) {
+        if (pos.label == "group") oss << ' ' << randomizePrimaryPositional(entity);
+        else if (pos.label == "user") oss << ' ' << randomizeSecondaryPositional(user);
+        else throw std::runtime_error("GroupCommandBuilder: unsupported positional in 'group user remove': " + pos.label);
+    }
     return oss.str();
 }

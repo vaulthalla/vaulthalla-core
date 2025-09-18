@@ -22,7 +22,7 @@ namespace vh::types {
 struct UserRole;
 struct VaultRole;
 
-struct User {
+struct User : public std::enable_shared_from_this<User> {
     static constexpr uint16_t ADMIN_MASK = 0xFFFE;
 
     unsigned int id{};
@@ -32,7 +32,7 @@ struct User {
     std::time_t created_at{}, updated_at{};
     std::optional<std::time_t> last_login;
     bool is_active{true};
-    std::shared_ptr<UserRole> role;
+    std::shared_ptr<UserRole> role{};
     std::vector<std::shared_ptr<VaultRole>> roles;
 
     User();

@@ -1,4 +1,4 @@
-#include "CLITestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 
 #include "UsageManager.hpp"
 #include "logging/LogRegistry.hpp"
@@ -9,6 +9,10 @@
 #include "CommandRouter.hpp"
 #include "CommandBuilderRegistry.hpp"
 #include "EntityType.hpp"
+
+#include "TestThreadPool.hpp"
+#include "TestTask.hpp"
+#include "CLITestTask.hpp"
 
 #include "types/User.hpp"
 #include "types/Group.hpp"
@@ -21,6 +25,8 @@
 #include <iostream>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <future>
 
 using namespace vh::shell;
 using namespace vh::args;
@@ -42,7 +48,7 @@ namespace vh::test::cli {
 // ---------- Small utilities
 
 std::optional<unsigned int>
-CLITestRunner::extractId(std::string_view output, std::string_view idPrefix) {
+IntegrationsTestRunner::extractId(std::string_view output, std::string_view idPrefix) {
     const auto pos = output.find(idPrefix);
     if (pos == std::string_view::npos) return std::nullopt;
     const auto start = pos + idPrefix.size();
@@ -162,7 +168,7 @@ static void harvestIdsIntoContext(
         if (!r) continue;
         if (!r->result.stderr_text.empty()) err << r->result.stderr_text << '\n';
 
-        if (const auto id = CLITestRunner::extractId(r->result.stdout_text, idPrefix); id.has_value() && r->entity) {
+        if (const auto id = IntegrationsTestRunner::extractId(r->result.stdout_text, idPrefix); id.has_value() && r->entity) {
             const auto obj = std::static_pointer_cast<T>(r->entity);
             obj->id = *id;
             bucket.push_back(obj);
@@ -175,46 +181,110 @@ static void harvestIdsIntoContext(
 
 // ---------- Runner
 
-CLITestRunner::CLITestRunner(CLITestConfig&& cfg)
+IntegrationsTestRunner::IntegrationsTestRunner(CLITestConfig&& cfg)
     : config_(cfg),
       ctx_(std::make_shared<CLITestContext>()),
       usage_(std::make_shared<shell::UsageManager>()),
-      router_(std::make_shared<CommandRouter>(ctx_)) {
+      router_(std::make_shared<CommandRouter>(ctx_)),
+      interruptFlag(std::make_shared<std::atomic<bool>>(false)),
+      threadPool_(std::make_shared<TestThreadPool>(interruptFlag, std::thread::hardware_concurrency())) {
     CommandBuilderRegistry::init(usage_, ctx_);
     registerAllContainsAssertions();
 }
 
 // ----- pipeline
 
-int CLITestRunner::operator()() {
+int IntegrationsTestRunner::operator()() {
     seed();
+    assign();
     readStage();
     updateStage();
     validateAllTestObjects();
+    runFUSETests();
     teardownStage();
     return printResults();
 }
 
-void CLITestRunner::seed() {
-    seed<EntityType::USER_ROLE>(config_.numUserRoles);
-    seed<EntityType::VAULT_ROLE>(config_.numVaultRoles);
-    seed<EntityType::USER>(config_.numUsers);
-    seed<EntityType::GROUP>(config_.numGroups);
-    seed<EntityType::VAULT>(config_.numVaults);
+static std::vector<std::vector<std::shared_ptr<TestCase>>> split(const std::vector<std::shared_ptr<TestCase>>& tests, const std::size_t n) {
+    std::vector<std::vector<std::shared_ptr<TestCase>>> result;
+    if (n == 0) return result;
+    result.resize(n);
+    for (std::size_t i = 0; i < tests.size(); ++i) result[i % n].push_back(tests[i]);
+    return result;
+}
+
+void IntegrationsTestRunner::seed() {
+    const auto numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
+
+    const struct SeedJob {
+        EntityType type;
+        std::vector<std::shared_ptr<TestCase>> tests;
+    } jobs[] = {
+        { EntityType::USER_ROLE,  makeCreateTests<EntityType::USER_ROLE>(config_.numUserRoles) },
+        { EntityType::VAULT_ROLE, makeCreateTests<EntityType::VAULT_ROLE>(config_.numVaultRoles) },
+        { EntityType::USER,       makeCreateTests<EntityType::USER>(config_.numUsers) },
+        { EntityType::GROUP,      makeCreateTests<EntityType::GROUP>(config_.numGroups) },
+        { EntityType::VAULT,      makeCreateTests<EntityType::VAULT>(config_.numVaults) }
+    };
+
+    for (const auto& [type, tests] : jobs) {
+        const auto splits = split(tests, numThreads);
+
+        std::vector<std::pair<std::optional<std::future<TestFuture>>, EntityType>> futures;
+
+        for (const auto& splitVec : splits) {
+            if (splitVec.empty()) continue;
+
+            const auto task = std::make_shared<CLITestTask>(router_, splitVec);
+            futures.emplace_back(task->getFuture(), type);
+            threadPool_->submit(task);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50)); // light stagger
+        }
+
+        // Recombine results across splits
+        std::vector<std::shared_ptr<TestCase>> combined;
+
+        for (auto& [fut, futType] : futures) {
+            if (!fut.has_value()) continue;
+            const auto res = fut->get();
+
+            const auto* ptr = std::get_if<std::vector<std::shared_ptr<TestCase>>>(&res);
+            if (!ptr) continue;
+
+            combined.insert(combined.end(), ptr->begin(), ptr->end());
+        }
+
+        // Finish stage once per entity type
+        switch (type) {
+            case EntityType::USER:
+                finish_seed<EntityType::USER>(combined);
+                break;
+            case EntityType::GROUP:
+                finish_seed<EntityType::GROUP>(combined);
+                break;
+            case EntityType::USER_ROLE:
+                finish_seed<EntityType::USER_ROLE>(combined);
+                break;
+            case EntityType::VAULT:
+                finish_seed<EntityType::VAULT>(combined);
+                break;
+            case EntityType::VAULT_ROLE:
+                finish_seed<EntityType::VAULT_ROLE>(combined);
+                break;
+            default:
+                throw std::runtime_error("Unknown EntityType in seed()");
+        }
+    }
 }
 
 template <EntityType E>
-void CLITestRunner::seed(const size_t count) {
-    const auto tests = makeCreateTests<E>(count);
-    const auto res   = router_->route(tests);
-
+void IntegrationsTestRunner::finish_seed(const std::vector<std::shared_ptr<TestCase>>& res) {
     harvestIdsIntoContext<E>(*ctx_, res, EntityTraits<E>::kIdPrefix, std::cerr);
-
     stages_.push_back(TestStage(std::string("Seed ") + std::string(EntityTraits<E>::kStage), res));
     validateStage(stages_.back());
 }
 
-void CLITestRunner::readStage() {
+void IntegrationsTestRunner::readStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
     // INFO for each entity
@@ -237,15 +307,35 @@ void CLITestRunner::readStage() {
     tests.push_back(makeListTest<EntityType::USER_ROLE>());
     tests.push_back(makeListTest<EntityType::VAULT_ROLE>());
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Read", res });
     validateStage(stages_.back());
 }
 
-void CLITestRunner::updateStage() {
+void IntegrationsTestRunner::assign() {
     std::vector<std::shared_ptr<TestCase>> tests;
 
-    auto& C = *ctx_;
+    for (const auto& user : ctx_->users)
+        tests.push_back(std::make_shared<TestCase>(
+                TestCase::Generate(EntityType::GROUP, EntityType::USER, ActionType::ADD, ctx_->pickRandomGroup(), user)));
+
+    for (const auto& user : ctx_->users)
+        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::USER, CommandType::ASSIGN,
+                ctx_->pickRandomVault(), ctx_->randomVaultRole(), user));
+
+    for (const auto& group : ctx_->groups)
+        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::GROUP, CommandType::ASSIGN,
+                ctx_->pickRandomVault(), ctx_->randomVaultRole(), group));
+
+    const auto res = router_->route(tests);
+    stages_.push_back(TestStage{ "Assign", res });
+    validateStage(stages_.back());
+}
+
+void IntegrationsTestRunner::updateStage() {
+    std::vector<std::shared_ptr<TestCase>> tests;
+
+    const auto& C = *ctx_;
     auto append = [&](auto&& vec) {
         tests.insert(tests.end(), vec.begin(), vec.end());
     };
@@ -255,12 +345,12 @@ void CLITestRunner::updateStage() {
     append(makeUpdateTests<EntityType::USER_ROLE>(C.userRoles));
     append(makeUpdateTests<EntityType::VAULT_ROLE>(C.vaultRoles));
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Update", res });
     validateStage(stages_.back());
 }
 
-void CLITestRunner::teardownStage() {
+void IntegrationsTestRunner::teardownStage() {
     std::vector<std::shared_ptr<TestCase>> tests;
     auto& C = *ctx_;
 
@@ -276,14 +366,14 @@ void CLITestRunner::teardownStage() {
         append(makeDeleteTests<EntityType::VAULT_ROLE>(C.vaultRoles));
     }
 
-    auto res = router_->route(tests);
+    const auto res = router_->route(tests);
     stages_.push_back(TestStage{ "Teardown", res });
     validateStage(stages_.back());
 }
 
 // ---------- Validation
 
-void CLITestRunner::validateAllTestObjects() const {
+void IntegrationsTestRunner::validateAllTestObjects() const {
     Validator<EntityType::USER,       User>::assert_all_exist(ctx_->users);
     Validator<EntityType::VAULT,      Vault>::assert_all_exist(ctx_->vaults);
     Validator<EntityType::GROUP,      Group>::assert_all_exist(ctx_->groups);

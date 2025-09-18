@@ -12,20 +12,46 @@
 namespace vh::paths {
 
 inline bool testMode = false;
+inline std::filesystem::path configPath = VH_CONFIG_PATH;
+inline std::filesystem::path logPath = VH_LOG_PATH;
 inline std::filesystem::path backingPath = VH_BACKING_PATH;
+inline std::filesystem::path mountPath = VH_MOUNT_PATH;
+inline std::filesystem::path runtimePath = VH_RUNTIME_PATH;
+
+inline void setLogPathForTesting() {
+    logPath = std::filesystem::temp_directory_path() / "vh_log";
+    if (!std::filesystem::exists(logPath)) {
+        std::filesystem::create_directories(logPath);
+        std::filesystem::permissions(
+            logPath,
+            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::others_read,
+            std::filesystem::perm_options::replace
+        );
+    }
+}
 
 inline void enableTestMode() {
     testMode = true;
     backingPath = std::filesystem::temp_directory_path() / "vh_backing";
+    mountPath = std::filesystem::temp_directory_path() / "vh_mount";
+
+    setLogPathForTesting();
+
+    constexpr const char* envVar = "VH_PATH_TO_SUPERADMIN_UID";
+    if (std::getenv(envVar)) runtimePath = std::getenv(envVar);
+    else runtimePath = std::filesystem::temp_directory_path() / "vh_runtime";  // this may cause errors if not set
+
+    constexpr const char* envVar2 = "VH_PATH_TO_CONFIG";
+    if (std::getenv(envVar2)) configPath = std::getenv(envVar2);
 }
 
 inline bool isTestMode() { return testMode; }
 
-inline std::filesystem::path getConfigPath() { return VH_CONFIG_PATH; }
-inline std::filesystem::path getLogPath() { return VH_LOG_PATH; }
-inline std::filesystem::path getMountPath() { return VH_MOUNT_PATH; }
+inline std::filesystem::path getConfigPath() { return configPath; }
+inline std::filesystem::path getLogPath() { return logPath; }
+inline std::filesystem::path getMountPath() { return mountPath; }
 inline std::filesystem::path getBackingPath() { return backingPath; }
-inline std::filesystem::path getRuntimePath() { return VH_RUNTIME_PATH; }
+inline std::filesystem::path getRuntimePath() { return runtimePath; }
 inline std::filesystem::path getCachePath() { return VH_CACHE_PATH; }
 
 }

@@ -16,6 +16,7 @@
 #include "protocols/shell/types.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/files.hpp"
+#include "AssertionResult.hpp"
 
 namespace vh::test::fuse {
 

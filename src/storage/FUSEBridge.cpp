@@ -258,8 +258,14 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     try {
         const fs::path path = ServiceDepsRegistry::instance().fsCache->resolvePath(ino);
         const auto backingPath = paths::getBackingPath() / stripLeadingSlash(path);
+        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+        if (!entry) {
+            LogRegistry::fuse()->error("[open] No entry found for inode {}", ino);
+            fuse_reply_err(req, ENOENT);
+            return;
+        }
 
-        const int fd = ::open(backingPath.c_str(), fi->flags & O_ACCMODE);
+        const int fd = ::open(backingPath.c_str(), fi->flags, 0644);
         if (fd < 0) {
             fuse_reply_err(req, errno);
             return;
@@ -406,6 +412,7 @@ void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) 
 
 void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
     LogRegistry::fuse()->debug("[access] Called for inode: {}, mask: {}", ino, mask);
+    // TODO: Implement access checks based on user permissions and file mode
     fuse_reply_err(req, 0); // Access checks are not implemented, always allow
 }
 

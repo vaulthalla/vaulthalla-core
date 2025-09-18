@@ -215,8 +215,8 @@ run_fuse_steps(const std::vector<FuseStep>& steps) {
                 if (s.tc->result.stdout_text.find(bad) != std::string::npos) { ok = false; break; }
             }
         }
-        s.tc->assertion = ok ? AssertionResult::Pass()
-                             : AssertionResult::Fail("FUSE: expectation mismatch (exit/stdout)");
+        s.tc->assertion = ok ? cli::AssertionResult::Pass()
+                             : cli::AssertionResult::Fail("FUSE: expectation mismatch (exit/stdout)");
 
         out.push_back(s.tc);
     }

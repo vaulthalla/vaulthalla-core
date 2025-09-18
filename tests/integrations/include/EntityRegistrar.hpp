@@ -1,6 +1,9 @@
 #pragma once
 
 #include "types/VaultRole.hpp"
+#include "types/Group.hpp"
+#include "types/User.hpp"
+#include "types/Vault.hpp"
 #include "protocols/shell/Router.hpp"
 #include "CLITestContext.hpp"
 #include "CommandBuilderRegistry.hpp"

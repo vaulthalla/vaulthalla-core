@@ -18,11 +18,7 @@ inline std::filesystem::path backingPath = VH_BACKING_PATH;
 inline std::filesystem::path mountPath = VH_MOUNT_PATH;
 inline std::filesystem::path runtimePath = VH_RUNTIME_PATH;
 
-inline void enableTestMode() {
-    testMode = true;
-    backingPath = std::filesystem::temp_directory_path() / "vh_backing";
-    mountPath = std::filesystem::temp_directory_path() / "vh_mount";
-
+inline void setLogPathForTesting() {
     logPath = std::filesystem::temp_directory_path() / "vh_log";
     if (!std::filesystem::exists(logPath)) {
         std::filesystem::create_directories(logPath);
@@ -32,6 +28,14 @@ inline void enableTestMode() {
             std::filesystem::perm_options::replace
         );
     }
+}
+
+inline void enableTestMode() {
+    testMode = true;
+    backingPath = std::filesystem::temp_directory_path() / "vh_backing";
+    mountPath = std::filesystem::temp_directory_path() / "vh_mount";
+
+    setLogPathForTesting();
 
     constexpr const char* envVar = "VH_PATH_TO_SUPERADMIN_UID";
     if (std::getenv(envVar)) runtimePath = std::getenv(envVar);

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <filesystem>
+#include <paths.h>
 
 #include "config/ConfigRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -10,9 +11,9 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
 
     try {
+        vh::paths::setLogPathForTesting();
         vh::config::ConfigRegistry::init();
-        const auto logPath = fs::temp_directory_path() / "vaulthalla-test";
-        vh::logging::LogRegistry::init(logPath);
+        vh::logging::LogRegistry::init();
 
     } catch (const std::exception& e) {
         std::cerr << "Failed to initialize Vaulthalla test environment: " << e.what() << std::endl;

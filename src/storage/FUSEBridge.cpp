@@ -4,7 +4,6 @@
 #include "types/FSEntry.hpp"
 #include "types/User.hpp"
 #include "types/Group.hpp"
-#include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -16,7 +15,6 @@
 #include <cstring>
 #include <sys/statvfs.h>
 #include <unistd.h>
-#include <paths.h>
 
 using namespace vh::database;
 using namespace vh::types;

@@ -209,22 +209,23 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     else DirectoryQueries::upsertDirectory(std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry)));
 }
 
-void Filesystem::remove(const fs::path& path, const unsigned int userId, std::shared_ptr<StorageEngine> engine) {
-    if (!engine) engine = storageManager_->resolveStorageEngine(path);
-    if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for remove operation");
-
+void Filesystem::remove(const fs::path& path, const unsigned int userId, const bool isFuseCall) {
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
-    const auto vaultPath = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+    const auto entry = cache->getEntry(path);
+    if (!entry) throw std::runtime_error("[Filesystem] Path does not exist in cache: " + path.string());
+    if (!entry->vault_id) throw std::runtime_error("[Filesystem] Entry has no associated vault ID: " + path.string());
 
-    if (engine->isFile(vaultPath)) {
-        FileQueries::markFileAsTrashed(userId, engine->vault->id, vaultPath);
-        cache->evictPath(path);
-    } else if (engine->isDirectory(vaultPath))
-        for (const auto& file : FileQueries::listFilesInDir(engine->vault->id, vaultPath, true)) {
-            FileQueries::markFileAsTrashed(userId, file->id);
+    if (entry->isDirectory())
+        for (const auto& file : FileQueries::listFilesInDir(*entry->vault_id, entry->path, true)) {
+            FileQueries::markFileAsTrashed(userId, file->id, isFuseCall);
             cache->evictPath(file->fuse_path);
         }
-    else throw std::runtime_error("[StorageEngine] Path does not exist: " + vaultPath.string());
+    else {
+        FileQueries::markFileAsTrashed(userId, *entry->vault_id, entry->path, isFuseCall);
+        cache->evictPath(path);
+    }
+
+    if (!isFuseCall && std::filesystem::exists(entry->backing_path)) std::filesystem::remove_all(entry->backing_path);
 }
 
 std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode) {

@@ -52,8 +52,8 @@ struct Permission {
     Permission(unsigned int bitPos, std::string name, std::string description);
 };
 
-inline unsigned short adminPermToBit(const AdminPermission& perm) { return static_cast<unsigned short>(perm); }
-inline unsigned short vaultPermToBit(const VaultPermission& perm) { return static_cast<unsigned short>(perm); }
+unsigned int adminPermToBit(const AdminPermission& perm);
+unsigned int vaultPermToBit(const VaultPermission& perm);
 
 // String conversions
 std::string to_string(AdminPermission p);
@@ -82,7 +82,7 @@ uint16_t toBitmask(const std::vector<T>& perms) {
 }
 
 template <typename T>
-std::vector<T> permsFromBitmask(uint16_t mask) {
+std::vector<T> permsFromBitmask(const uint16_t mask) {
     std::vector<T> result;
     for (uint16_t bit = 0; bit < 64; ++bit) {
         uint16_t val = (1ULL << bit);

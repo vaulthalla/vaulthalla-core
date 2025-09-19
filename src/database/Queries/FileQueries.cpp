@@ -215,7 +215,7 @@ std::vector<std::shared_ptr<TrashedFile>> FileQueries::listTrashedFiles(unsigned
 }
 
 void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned int vaultId,
-                                    const std::filesystem::path& relPath) {
+                                    const std::filesystem::path& relPath, const bool isFuseCall) {
     const auto file = getFileByPath(vaultId, relPath);
     if (!file) throw std::runtime_error("[markFileAsTrashed] File not found: " + to_utf8_string(relPath.u8string()));
 
@@ -230,11 +230,11 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
 
         txn.exec(pqxx::prepped{"mark_file_trashed"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string()), userId, to_utf8_string(file->backing_path.u8string())});
 
-        updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
+        updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes, isFuseCall);
     });
 }
 
-void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned int fsId) {
+void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned int fsId, const bool isFuseCall) {
     const auto file = getFileById(fsId);
     if (!file) throw std::runtime_error("[markFileAsTrashed] File not found with ID: " + std::to_string(fsId));
 
@@ -246,20 +246,21 @@ void FileQueries::markFileAsTrashed(const unsigned int userId, const unsigned in
         pqxx::params p{fsId, userId, to_utf8_string(file->backing_path.u8string())};
         txn.exec(pqxx::prepped{"mark_file_trashed_by_id"}, p);
 
-        updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes);
+        updateParentStatsAndCleanEmptyDirs(txn, parentId, sizeBytes, isFuseCall);
     });
 }
 
 void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
                                                      std::optional<unsigned int> parentId,
-                                                     const unsigned int sizeBytes) {
+                                                     const unsigned int sizeBytes,
+                                                     const bool isFuseCall) {
     const auto vaultId = txn.exec("SELECT vault_id FROM fs_entry WHERE id = $1", parentId).one_field().as<std::optional<unsigned int>>();
     const auto stopAt = vaultId ?
     txn.exec(pqxx::prepped{"get_vault_root_dir_id_by_vault_id"}, *vaultId).one_field().as<unsigned int>()
     : txn.exec(pqxx::prepped{"get_fs_entry_id_by_path"}, pqxx::params{vaultId, "/"}).one_field().as<unsigned int>();
 
     int subDirsDeleted = 0;
-    bool deleteDirs = true;
+    bool deleteDirs = !isFuseCall;
     while (parentId) {
         pqxx::params stats_params{parentId, -static_cast<long long>(sizeBytes), -1, subDirsDeleted};
         const auto fsCount = txn.exec(pqxx::prepped{"update_dir_stats"}, stats_params).one_field().as<unsigned int>();

@@ -52,12 +52,6 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
                 return;
             }
 
-            if (!user->canManageVaults() && entry->vault_id && !user->canListVaultData(*entry->vault_id, entry->path)) {
-                LogRegistry::fuse()->warn("[getattr] Access denied for user {} on root directory", user->name);
-                fuse_reply_err(req, EACCES);
-                return;
-            }
-
             struct stat st = statFromEntry(entry, ino);
             st.st_uid = getuid();  // explicitly set ownership
             st.st_gid = getgid();
@@ -71,6 +65,12 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
         if (!entry) {
             LogRegistry::fuse()->error("[getattr] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
+            return;
+        }
+
+        if (!user->canManageVaults() && entry->vault_id && !user->canListVaultData(*entry->vault_id, entry->path)) {
+            LogRegistry::fuse()->warn("[getattr] Access denied for user {} on root directory", user->name);
+            fuse_reply_err(req, EACCES);
             return;
         }
 
@@ -636,6 +636,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         const auto fullPath   = parentPath / name;
 
         if (!cache->entryExists(fullPath)) {
+            LogRegistry::fuse()->debug("[unlink] Entry does not exist for path: {}", fullPath.string());
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -665,7 +666,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid));
+        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
@@ -722,7 +723,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid));
+        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {

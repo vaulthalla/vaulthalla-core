@@ -888,7 +888,7 @@ void DBConnection::initPreparedVaultRoles() const {
 
     conn_->prepare("assign_vault_role",
                    "INSERT INTO vault_role_assignments (subject_type, subject_id, vault_id, role_id, assigned_at) "
-                   "VALUES ($1, $2, $3, $4, NOW())");
+                   "VALUES ($1, $2, $3, $4, NOW()) RETURNING id");
 
     conn_->prepare("upsert_assigned_vault_role",
                    "INSERT INTO vault_role_assignments (subject_type, vault_id, subject_id, role_id, assigned_at) "

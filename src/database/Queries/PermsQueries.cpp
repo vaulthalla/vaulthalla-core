@@ -251,13 +251,13 @@ std::shared_ptr<PermissionOverride> PermsQueries::getVPermOverride(const VPermOv
 
 std::shared_ptr<Permission> PermsQueries::getPermission(const unsigned int id) {
     return Transactions::exec("PermsQueries::getPermission", [&](pqxx::work& txn) {
-        return std::make_shared<Permission>(txn.exec("SELECT * FROM permissions WHERE id = " + txn.quote(id)).one_row());
+        return std::make_shared<Permission>(txn.exec("SELECT * FROM permission WHERE id = " + txn.quote(id)).one_row());
     });
 }
 
 std::shared_ptr<Permission> PermsQueries::getPermissionByName(const std::string& name) {
     return Transactions::exec("PermsQueries::getPermissionByName", [&](pqxx::work& txn) {
-        return std::make_shared<Permission>(txn.exec("SELECT * FROM permissions WHERE name = " + txn.quote(name)).one_row());
+        return std::make_shared<Permission>(txn.exec("SELECT * FROM permission WHERE name = " + txn.quote(name)).one_row());
     });
 }
 

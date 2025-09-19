@@ -82,7 +82,8 @@ private:
     void testFUSECRUD();
     void testFUSEAllow();
     void testFUSEDeny();
-    void testFUSEPermissionOverrides();
+    void testVaultPermOverridesAllow();
+    void testVaultPermOverridesDeny();
 
     // Helpers
     void validateStage(const TestStage& stage) const;

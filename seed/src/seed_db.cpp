@@ -118,7 +118,8 @@ void vh::seed::initRoles() {
         {"unprivileged", "User with no admin privileges", "user", 0b0000000000000000},
         {"power_user", "Advanced user with full vault level control", "vault", 0b0011111111111111},
         {"user", "Standard user with basic file operations", "vault", 0b0000000111101000},
-        {"guest", "Minimal access: can download files and list directories", "vault", 0b0000000000101000}
+        {"guest", "Minimal access: can download files and list directories", "vault", 0b0000000000101000},
+        {"implicit_deny", "Role that denies all permissions", "vault", 0b0000000000000000}
     };
 
     Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {

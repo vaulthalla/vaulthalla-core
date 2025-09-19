@@ -22,7 +22,7 @@ struct PermissionOverride {
     Permission permission;
     OverrideOpt effect{OverrideOpt::ALLOW};
     unsigned int assignment_id{0}; // ID of the vault_role_assignment this override is assigned to
-    bool enabled{false};
+    bool enabled{true};
     std::string patternStr;
     std::regex pattern;
 

@@ -90,7 +90,7 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[setattr] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -152,10 +152,26 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
     LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
+    const fuse_ctx* ctx = fuse_req_ctx(req);
+    const uid_t uid = ctx->uid;
+
     const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
     if (!listDirEntry) {
         LogRegistry::fuse()->error("[readdir] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    const auto user = UserQueries::getUserByLinuxUID(uid);
+    if (!user) {
+        LogRegistry::fuse()->error("[readdir] No user found for UID: {}", uid);
+        fuse_reply_err(req, EACCES);
+        return;
+    }
+
+    if (!user->canManageVaults() && listDirEntry->vault_id && !user->canListVaultData(*listDirEntry->vault_id, listDirEntry->path)) {
+        LogRegistry::fuse()->warn("[readdir] Access denied for user {} on path {}", user->name, listDirEntry->path.string());
+        fuse_reply_err(req, EACCES);
         return;
     }
 
@@ -213,7 +229,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[lookup] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -276,7 +292,7 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         const auto vaultPath = engine->paths->absRelToAbsRel(fullPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+            LogRegistry::fuse()->error("[create] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -332,7 +348,7 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[open] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -388,7 +404,7 @@ void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[write] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -432,7 +448,7 @@ void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const o
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[read] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -458,7 +474,7 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[mkdir] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -547,7 +563,7 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+            LogRegistry::fuse()->error("[rename] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -595,7 +611,7 @@ void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[access] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -649,7 +665,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+            LogRegistry::fuse()->error("[unlink] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -703,7 +719,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+            LogRegistry::fuse()->error("[rmdir] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -766,7 +782,7 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        LogRegistry::fuse()->error("[fsync] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -815,7 +831,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+            LogRegistry::fuse()->error("[statfs] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }

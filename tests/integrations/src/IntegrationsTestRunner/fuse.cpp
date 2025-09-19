@@ -73,6 +73,10 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
 
     do {
         try {
+            if (nameException) {
+                user->name = generateName("user/create");
+                nameException = false;
+            }
             user->id = UserQueries::createUser(user);
         } catch (const std::exception& e) {
             if (std::string(e.what()).contains("Key (name)=() already exists")) nameException = true;

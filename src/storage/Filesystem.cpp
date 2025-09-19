@@ -179,6 +179,11 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     if (!engine) engine = storageManager_->resolveStorageEngine(from);
     if (!engine) throw std::runtime_error("[Filesystem] No storage engine found for copy operation");
 
+    const auto toEngine = storageManager_->resolveStorageEngine(to);
+    if (!toEngine) throw std::runtime_error("[Filesystem] No storage engine found for destination of copy operation");
+    if (toEngine->vault->id != engine->vault->id)
+        throw std::runtime_error("[Filesystem] Cross-vault copy operations are not supported");
+
     const auto fromVaultPath = engine->paths->absRelToAbsRel(from, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     const auto toVaultPath = engine->paths->absRelToAbsRel(to, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
@@ -381,6 +386,11 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
             std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
+    const auto toEngine = storageManager_->resolveStorageEngine(newPath);
+    if (!toEngine) throw std::runtime_error("[Filesystem] No storage engine found for destination of copy operation");
+    if (toEngine->vault->id != engine->vault->id)
+        throw std::runtime_error("[Filesystem] Cross-vault copy operations are not supported");
+
     Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
         std::vector<uint8_t> buffer;
         if (entry->isDirectory()) {
@@ -415,7 +425,7 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
 
         txn.commit();
 
-        std::filesystem::remove_all(engine->paths->absPath(oldPath, PathType::BACKING_ROOT));
+        std::filesystem::remove_all(entry->backing_path);
     });
 
     ServiceDepsRegistry::instance().fsCache->evictPath(oldPath);

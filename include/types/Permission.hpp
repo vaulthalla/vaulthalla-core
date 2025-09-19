@@ -52,8 +52,8 @@ struct Permission {
     Permission(unsigned int bitPos, std::string name, std::string description);
 };
 
-inline unsigned short adminPermToBit(const AdminPermission& perm) { return static_cast<unsigned short>(perm); }
-inline unsigned short vaultPermToBit(const VaultPermission& perm) { return static_cast<unsigned short>(perm); }
+unsigned int adminPermToBit(const AdminPermission& perm);
+unsigned int vaultPermToBit(const VaultPermission& perm);
 
 // String conversions
 std::string to_string(AdminPermission p);
@@ -66,13 +66,6 @@ void from_json(const nlohmann::json& j, Permission& p);
 
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions);
 
-inline std::string bitStringFromMask(const uint16_t mask) {
-    std::string out = "B";
-    for (int i = 15; i >= 0; --i) out += (mask & (1 << i)) ? '1' : '0';
-    out += "";
-    return out;
-}
-
 // Bitmask utilities
 template <typename T>
 uint16_t toBitmask(const std::vector<T>& perms) {
@@ -82,7 +75,7 @@ uint16_t toBitmask(const std::vector<T>& perms) {
 }
 
 template <typename T>
-std::vector<T> permsFromBitmask(uint16_t mask) {
+std::vector<T> permsFromBitmask(const uint16_t mask) {
     std::vector<T> result;
     for (uint16_t bit = 0; bit < 64; ++bit) {
         uint16_t val = (1ULL << bit);

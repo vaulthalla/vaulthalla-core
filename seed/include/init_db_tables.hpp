@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users
 (
     id               SERIAL             PRIMARY KEY,
     linux_uid        INTEGER            UNIQUE,
-    name             VARCHAR(50)        UNIQUE NOT NULL,
+    name             VARCHAR(80)        UNIQUE NOT NULL,
     email            VARCHAR(255)       UNIQUE DEFAULT NULL,
     password_hash    VARCHAR(255)       NOT NULL,
     created_at       TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,

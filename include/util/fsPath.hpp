@@ -22,6 +22,16 @@ inline fs::path common_path_prefix(const fs::path& a, const fs::path& b) {
     return result;
 }
 
+inline std::string trim(const std::string& str) {
+    const auto strBegin = str.find_first_not_of(" \t\n\r");
+    if (strBegin == std::string::npos) return ""; // no content
+
+    const auto strEnd = str.find_last_not_of(" \t\n\r");
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
+
 inline fs::path makeAbsolute(const fs::path& path) {
     if (path.empty()) return "/";
     if (path.is_absolute()) return path.lexically_normal();

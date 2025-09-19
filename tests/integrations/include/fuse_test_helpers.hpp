@@ -239,10 +239,10 @@ make_fuse_case(std::string name, std::string path, int expect_exit,
 }
 
 // Seeding helper (write a small tree as a specific UID, typically admin)
-inline void seed_vault_tree(uid_t admin_uid, const std::filesystem::path& root) {
-    (void)mkdir_as(admin_uid, root / "perm_seed" / "docs");
-    (void)write_as(admin_uid, root / "perm_seed" / "docs" / "secret.txt", "TOP SECRET\n");
-    (void)write_as(admin_uid, root / "perm_seed" / "note.txt", "hello\n");
+inline void seed_vault_tree(uid_t admin_uid, const std::filesystem::path& root, const std::string& base = "perm_seed") {
+    (void)mkdir_as(admin_uid, root / base / "docs");
+    (void)write_as(admin_uid, root / base / "docs" / "secret.txt", "TOP SECRET\n");
+    (void)write_as(admin_uid, root / base / "note.txt", "hello\n");
 }
 
 } // namespace vh::test::fuse

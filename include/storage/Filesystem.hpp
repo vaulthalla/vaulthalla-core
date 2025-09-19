@@ -46,7 +46,7 @@ public:
     static bool exists(const fs::path& absPath);
 
     static void copy(const fs::path& from, const fs::path& to, unsigned int userId, std::shared_ptr<StorageEngine> engine = nullptr);
-    static void remove(const fs::path& path, unsigned int userId, std::shared_ptr<StorageEngine> engine = nullptr);
+    static void remove(const fs::path& path, unsigned int userId, bool isFuseCall = false);
     static void rename(const fs::path& oldPath, const fs::path& newPath, const std::optional<unsigned int>& userId = std::nullopt, std::shared_ptr<StorageEngine> engine = nullptr);
 
     static std::shared_ptr<types::FSEntry> createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode = 0644);

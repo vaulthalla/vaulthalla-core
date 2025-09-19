@@ -50,7 +50,7 @@ struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     void move(const fs::path& from, const fs::path& to, unsigned int userId);
     void rename(const fs::path& from, const fs::path& to, unsigned int userId);
     void copy(const fs::path& from, const fs::path& to, unsigned int userId);
-    void remove(const fs::path& rel_path, unsigned int userId);
+    void remove(const fs::path& rel_path, unsigned int userId) const;
 
     void rotateEncryptionKey();
 

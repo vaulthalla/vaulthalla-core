@@ -43,13 +43,14 @@ public:
 
     static std::vector<std::shared_ptr<types::TrashedFile>> listTrashedFiles(unsigned int vaultId);
 
-    static void markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath);
+    static void markFileAsTrashed(unsigned int userId, unsigned int vaultId, const std::filesystem::path& relPath, bool isFuseCall = false);
 
-    static void markFileAsTrashed(unsigned int userId, unsigned int fsId);
+    static void markFileAsTrashed(unsigned int userId, unsigned int fsId, bool isFuseCall = false);
 
     static void updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
                                                std::optional<unsigned int> parentId,
-                                               unsigned int sizeBytes);
+                                               unsigned int sizeBytes,
+                                               bool isFuseCall = false);
 
     [[nodiscard]] static std::optional<std::pair<std::string, unsigned int>> getEncryptionIVAndVersion(unsigned int vaultId, const std::filesystem::path& relPath);
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Role.hpp"
+#include "PermissionOverride.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <string>
 #include <ctime>
@@ -10,8 +12,6 @@
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
 #include <pqxx/result.hxx>
-
-#include "PermissionOverride.hpp"
 
 namespace pqxx {
 class row;
@@ -52,7 +52,10 @@ struct VaultRole final : Role {
         const auto pathStr = path.string();
         const auto bit = vaultPermToBit(perm);
         auto overrides = getPermissionOverrides(bit);
-        if (overrides.empty()) return isEnabled;
+        if (overrides.empty()) {
+            logging::LogRegistry::auth()->debug("[VaultRole::validatePermission] No overrides for permission on path {}", pathStr);
+            return isEnabled;
+        }
 
         // Sort: best match first
         std::sort(overrides.begin(), overrides.end(),
@@ -67,7 +70,10 @@ struct VaultRole final : Role {
 
         // Apply first matching override
         for (const auto& ovr : overrides)
-            if (std::regex_match(pathStr, ovr->pattern)) return ovr->enabled;
+            if (std::regex_match(pathStr, ovr->pattern)) {
+                if (!ovr->enabled) continue;
+                return ovr->effect == OverrideOpt::ALLOW;
+            }
 
         return isEnabled;
     }

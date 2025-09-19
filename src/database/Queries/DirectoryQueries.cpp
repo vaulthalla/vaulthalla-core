@@ -17,7 +17,7 @@ unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>&
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));
     return Transactions::exec("DirectoryQueries::addDirectory", [&](pqxx::work& txn) {
         const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, directory->inode).one_field().as<bool>();
-        if (directory->inode) txn.exec(pqxx::prepped{"delete_fs_entry_by_inode"}, directory->inode);
+        if (directory->inode && *directory->inode != 1) txn.exec(pqxx::prepped{"delete_fs_entry_by_inode"}, directory->inode);
 
         pqxx::params p;
         p.append(directory->vault_id);

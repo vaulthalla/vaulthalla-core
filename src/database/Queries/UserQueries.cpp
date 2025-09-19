@@ -83,7 +83,21 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
 
         for (const auto& role : user->roles) {
             pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
-            txn.exec(pqxx::prepped{"assign_vault_role"}, role_params);
+            const auto res = txn.exec(pqxx::prepped{"assign_vault_role"}, role_params);
+            if (res.empty()) continue;
+            role->assignment_id = res.one_field().as<unsigned int>();
+
+            for (const auto& override : role->permission_overrides) {
+                override->assignment_id = role->assignment_id;
+                pqxx::params overrideParams{
+                    override->assignment_id,
+                    override->permission.id,
+                    override->patternStr,
+                    override->enabled,
+                    to_string(override->effect)
+                };
+                const auto res = txn.exec(pqxx::prepped{"insert_vault_permission_override"}, overrideParams);
+            }
         }
 
         return userId;

@@ -116,8 +116,10 @@ std::vector<std::shared_ptr<VaultRole> > vh::types::vault_roles_from_pq_result(
 
 std::vector<std::shared_ptr<PermissionOverride> > VaultRole::getPermissionOverrides(const unsigned short bit) const {
     std::vector<std::shared_ptr<PermissionOverride>> overrides;
-    for (const auto& override : permission_overrides)
+    for (const auto& override : permission_overrides) {
         if (override->permission.bit_position == bit) overrides.push_back(override);
+        logging::LogRegistry::auth()->debug("Checking override: {} for bit {}", to_string(override), bit);
+    }
     return overrides;
 }
 

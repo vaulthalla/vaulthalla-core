@@ -176,6 +176,38 @@ uint16_t vaultMaskFromJson(const nlohmann::json& j) {
     return mask;
 }
 
+unsigned int adminPermToBit(const AdminPermission& perm) {
+    if (perm == AdminPermission::ManageEncryptionKeys) return 0;
+    if (perm == AdminPermission::ManageAdmins) return 1;
+    if (perm == AdminPermission::ManageUsers) return 2;
+    if (perm == AdminPermission::ManageGroups) return 3;
+    if (perm == AdminPermission::ManageRoles) return 4;
+    if (perm == AdminPermission::ManageSettings) return 5;
+    if (perm == AdminPermission::ManageVaults) return 6;
+    if (perm == AdminPermission::ManageAPIKeys) return 7;
+    if (perm == AdminPermission::AuditLogAccess) return 8;
+    if (perm == AdminPermission::CreateVaults) return 9;
+    return 16; // Invalid
+}
+
+unsigned int vaultPermToBit(const VaultPermission& perm) {
+    if (perm == VaultPermission::ManageVault) return 0;
+    if (perm == VaultPermission::ManageAccess) return 1;
+    if (perm == VaultPermission::ManageTags) return 2;
+    if (perm == VaultPermission::ManageMetadata) return 3;
+    if (perm == VaultPermission::ManageVersions) return 4;
+    if (perm == VaultPermission::ManageFileLocks) return 5;
+    if (perm == VaultPermission::Share) return 6;
+    if (perm == VaultPermission::Sync) return 7;
+    if (perm == VaultPermission::Create) return 8;
+    if (perm == VaultPermission::Download) return 9;
+    if (perm == VaultPermission::Delete) return 10;
+    if (perm == VaultPermission::Rename) return 11;
+    if (perm == VaultPermission::Move) return 12;
+    if (perm == VaultPermission::List) return 13;
+    return 16; // Invalid
+}
+
 std::string admin_perms_to_string(const uint16_t mask, const unsigned short indent) {
     const auto perms = permsFromBitmask<AdminPermission>(mask);
     if (perms.empty()) return "No admin permissions";

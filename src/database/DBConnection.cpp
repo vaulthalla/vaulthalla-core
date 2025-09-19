@@ -675,10 +675,7 @@ void DBConnection::initPreparedDirectories() const {
 
     conn_->prepare("get_dir_file_count", "SELECT file_count FROM directories WHERE fs_entry_id = $1");
 
-    conn_->prepare("delete_empty_dir",
-                   "DELETE FROM fs_entry f "
-                   "USING directories d "
-                   "WHERE f.id = d.fs_entry_id AND f.id = $1 AND d.file_count = 0 AND d.subdirectory_count = 0");
+    conn_->prepare("delete_empty_dir", "DELETE FROM directories WHERE fs_entry_id = $1 AND file_count = 0 AND subdirectory_count = 0");
 
     conn_->prepare("upsert_directory",
                    "WITH inserted AS ( "

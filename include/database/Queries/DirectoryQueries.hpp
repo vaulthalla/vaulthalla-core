@@ -39,6 +39,8 @@ public:
     static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int parentId, bool recursive = false);
 
     [[nodiscard]] static pqxx::result collectParentStats(unsigned int parentId);
+
+    static void deleteEmptyDirectory(unsigned int id);
 };
 
 } // namespace vh::database

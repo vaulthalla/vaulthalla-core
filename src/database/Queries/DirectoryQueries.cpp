@@ -54,6 +54,12 @@ unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>&
     });
 }
 
+void DirectoryQueries::deleteEmptyDirectory(const unsigned int id) {
+    Transactions::exec("DirectoryQueries::deleteDirectory", [&](pqxx::work& txn) {
+        txn.exec(pqxx::prepped{"delete_empty_dir"}, pqxx::params{id});
+    });
+}
+
 void DirectoryQueries::moveDirectory(const std::shared_ptr<Directory>& directory, const std::filesystem::path& newPath, unsigned int userId) {
     if (!directory) throw std::invalid_argument("Directory cannot be null");
     if (!newPath.string().starts_with("/")) throw std::invalid_argument("New path must start with '/'");

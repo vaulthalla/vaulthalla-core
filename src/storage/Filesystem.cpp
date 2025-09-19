@@ -495,7 +495,11 @@ void Filesystem::handleRename(const RenameContext& ctx) {
             buffer = readFileToVector(tmp);
         } else buffer = readFileToVector(oldBackingPath);
 
-        if (!buffer.empty()) {
+        if (buffer.empty()) {
+            std::ofstream(newBackingPath).close();
+            if (!std::filesystem::exists(newBackingPath))
+                throw std::runtime_error("Failed to create real file at: " + newBackingPath.string());
+        } else {
             const auto ciphertext = ctx.engine->encryptionManager->encrypt(buffer, f);
             if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldBackingPath.string());
             writeFile(newBackingPath, ciphertext);

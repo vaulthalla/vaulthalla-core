@@ -660,11 +660,8 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        if (::unlink(file->backing_path.c_str()) < 0) {
-            LogRegistry::fuse()->error("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
-            fuse_reply_err(req, errno);
-            return;
-        }
+        if (::unlink(file->backing_path.c_str()) < 0)
+            LogRegistry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
 
         Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 
@@ -717,11 +714,8 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        if (::rmdir(entry->backing_path.c_str()) < 0) {
-            LogRegistry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
-            fuse_reply_err(req, errno);
-            return;
-        }
+        if (::rmdir(entry->backing_path.c_str()) < 0)
+            LogRegistry::fuse()->debug("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
 
         Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 

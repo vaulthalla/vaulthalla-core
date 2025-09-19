@@ -18,7 +18,6 @@
 #include "storage/StorageEngine.hpp"
 #include "storage/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
-#include "crypto/Hash.hpp"
 #include "util/fsPath.hpp"
 
 using namespace vh::test::cli;

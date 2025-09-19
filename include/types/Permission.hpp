@@ -66,13 +66,6 @@ void from_json(const nlohmann::json& j, Permission& p);
 
 void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Permission>>& permissions);
 
-inline std::string bitStringFromMask(const uint16_t mask) {
-    std::string out = "B";
-    for (int i = 15; i >= 0; --i) out += (mask & (1 << i)) ? '1' : '0';
-    out += "";
-    return out;
-}
-
 // Bitmask utilities
 template <typename T>
 uint16_t toBitmask(const std::vector<T>& perms) {

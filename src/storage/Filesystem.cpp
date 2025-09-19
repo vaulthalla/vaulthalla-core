@@ -122,12 +122,11 @@ void Filesystem::mkdir(const fs::path& absPath, mode_t mode, const std::optional
 }
 
 void Filesystem::mkVault(const fs::path& absPath, unsigned int vaultId, mode_t mode) {
+    if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
     LogRegistry::fs()->debug("Creating vault directory at: {}", absPath.string());
 
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
-
-    if (absPath.empty()) throw std::runtime_error("Cannot create directory at empty path");
 
     const auto vault = VaultQueries::getVault(vaultId);
     if (!vault) throw std::runtime_error("Vault with ID " + std::to_string(vaultId) + " does not exist");

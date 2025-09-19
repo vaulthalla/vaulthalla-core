@@ -5,10 +5,12 @@
 #include "types/Permission.hpp"
 #include "types/PermissionOverride.hpp"
 #include "logging/LogRegistry.hpp"
+#include "util/bitmask.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
 using namespace vh::logging;
+using namespace vh::util::bitmask;
 
 // #################################################################################################
 // ############################################ Role  #############################################

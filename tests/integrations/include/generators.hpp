@@ -50,6 +50,17 @@ inline std::string generateEmail(const std::string& usage) {
     }, ""), "email", usage);
 }
 
+inline std::string generateVaultName(const std::string& usage, const bool prefix = true) {
+    if (prefix) {
+        return generateNow(args::ArgGenerator::Join({
+            args::ArgGenerator::Constant(std::string("vault_")),
+            args::ArgGenerator::RandomString(6, 18, "abcdefghijklmnopqrstuvwxyz0123456789")
+        }, ""), "vault_name", usage);
+    }
+    return generateNow(args::ArgGenerator::RandomString(8, 22, "abcdefghijklmnopqrstuvwxyz0123456789"),
+                           "vault_name", usage);
+}
+
 inline std::string generateRoleName(const EntityType& type, const std::string& usage) {
     if (type == EntityType::USER_ROLE) {
         return generateNow(args::ArgGenerator::Join({

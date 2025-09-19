@@ -18,6 +18,7 @@
 #include "storage/StorageEngine.hpp"
 #include "storage/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
+#include "crypto/Hash.hpp"
 #include "util/fsPath.hpp"
 
 using namespace vh::test::cli;
@@ -43,7 +44,7 @@ void IntegrationsTestRunner::runFUSETests() {
 
 std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaultId, const std::optional<uint16_t>& vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides) {
     const auto user = std::make_shared<User>();
-    user->name = "testuser_" + generateRandomIndex(50000);
+    user->name = generateName("user/create");
 
     const auto userRole = PermsQueries::getRoleByName("unprivileged");
     if (!userRole) throw std::runtime_error("Admin role not found");
@@ -59,7 +60,7 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
 
     if (vaultPerms) {
         const auto vaultRole = std::make_shared<VaultRole>();
-        vaultRole->name = "vault_role_" + generateRandomIndex(50000);
+        vaultRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create");
         vaultRole->permissions = *vaultPerms;
         vaultRole->description = "Vault role for user " + user->name;
         vaultRole->type = "vault";
@@ -69,15 +70,27 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
         user->roles.push_back(vaultRole);
     }
 
-    user->id = UserQueries::createUser(user);
+    bool nameException = false;
+
+    do {
+        try {
+            user->id = UserQueries::createUser(user);
+        } catch (const std::exception& e) {
+            if (std::string(e.what()).contains("Key (name)=() already exists")) nameException = true;
+            else throw std::runtime_error("Failed to create user: " + std::string(e.what()));
+        }
+    } while (nameException);
+
     return user;
 }
 
 static std::shared_ptr<StorageEngine> createVault() {
     auto vault = std::make_shared<Vault>();
-    vault->name = "testvault_" + generateRandomIndex(50000);
+    vault->name = generateVaultName("vault/create");
     vault->description = "Test Vault";
     vault->owner_id = UserQueries::getUserByName("admin")->id;
+
+    if (vault->name.empty()) throw std::runtime_error("Vault name cannot be empty");
 
     const auto sync = std::make_shared<FSync>();
     sync->interval = std::chrono::minutes(15);
@@ -236,7 +249,7 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
 
     const auto vRole = std::make_shared<VaultRole>();
-    vRole->name = "override_role_" + generateRandomIndex(50000);
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override");
     vRole->permissions = role->permissions; // 0
     vRole->description = "Vault role with override";
     vRole->type = "vault";
@@ -248,7 +261,7 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     if (!userRole) throw std::runtime_error("Admin role not found");
 
     const auto user = std::make_shared<User>();
-    user->name = "override_user_" + generateRandomIndex(50000);
+    user->name = generateName("user/create/override");
     user->role = std::make_shared<UserRole>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
@@ -307,7 +320,7 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
 
     const auto vRole = std::make_shared<VaultRole>();
-    vRole->name = "override_role_" + generateRandomIndex(50000);
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
     vRole->permissions = role->permissions; // 0
     vRole->description = "Vault role with override";
     vRole->type = "vault";
@@ -319,7 +332,7 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     if (!userRole) throw std::runtime_error("Admin role not found");
 
     const auto user = std::make_shared<User>();
-    user->name = "override_user_" + generateRandomIndex(50000);
+    user->name = generateName("user/create/override_deny");
     user->role = std::make_shared<UserRole>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);

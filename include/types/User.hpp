@@ -8,10 +8,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <unordered_map>
+#include <mutex>
 
 #include <nlohmann/json_fwd.hpp> // Forward-decl only
-
-#include "Permission.hpp"
 
 namespace pqxx {
 class row;
@@ -35,6 +34,7 @@ struct User : public std::enable_shared_from_this<User> {
     bool is_active{true};
     std::shared_ptr<UserRole> role{};
     std::unordered_map<unsigned int, std::shared_ptr<VaultRole>> roles{}, group_roles{};
+    mutable std::mutex mutex_{};
 
     User();
     explicit User(std::string name, std::string email = "", bool isActive = true);

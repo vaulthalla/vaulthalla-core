@@ -590,7 +590,14 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
 void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) {
     LogRegistry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
-    ServiceDepsRegistry::instance().fsCache->decrementInodeRef(ino, nlookup);
+    if (const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino)) {
+        LogRegistry::fuse()->debug("[forget] Evicting inode: {} (path: {})", ino, entry->path.string());
+        ServiceDepsRegistry::instance().fsCache->evictIno(ino);
+        fuse_reply_err(req, 0);
+        return;
+    }
+
+    LogRegistry::fuse()->error("[forget] No entry found for inode {}", ino);
     fuse_reply_none(req); // no return value
 }
 
@@ -674,10 +681,10 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
+        FileQueries::markFileAsTrashed(user->id, *file->vault_id, file->path, true);
+
         if (::unlink(file->backing_path.c_str()) < 0)
             LogRegistry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
-
-        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
@@ -728,10 +735,10 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
+        DirectoryQueries::deleteEmptyDirectory(entry->id);
+
         if (::rmdir(entry->backing_path.c_str()) < 0)
             LogRegistry::fuse()->debug("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
-
-        Filesystem::remove(fullPath, UserQueries::getUserIdByLinuxUID(uid), true);
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {

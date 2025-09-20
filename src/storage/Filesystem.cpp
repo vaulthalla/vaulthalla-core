@@ -213,23 +213,27 @@ void Filesystem::copy(const fs::path& from, const fs::path& to, unsigned int use
     else DirectoryQueries::upsertDirectory(std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry)));
 }
 
-void Filesystem::remove(const fs::path& path, const unsigned int userId, const bool isFuseCall) {
+void Filesystem::remove(const fs::path& path, const unsigned int userId) {
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
     const auto entry = cache->getEntry(path);
     if (!entry) throw std::runtime_error("[Filesystem] Path does not exist in cache: " + path.string());
     if (!entry->vault_id) throw std::runtime_error("[Filesystem] Entry has no associated vault ID: " + path.string());
 
+    // !!! DO NOT CALL THIS FUNCTION DIRECTLY FROM FUSE CALLBACKS - WEBSOCKET OR INTERNAL ONLY !!!
+    // This function recursively marks files as trashed in the database and deletes their backing paths
+    // which is incompatible with how FUSE expects unlink/rmdir to behave.
+
     if (entry->isDirectory())
         for (const auto& file : FileQueries::listFilesInDir(*entry->vault_id, entry->path, true)) {
-            FileQueries::markFileAsTrashed(userId, file->id, isFuseCall);
+            FileQueries::markFileAsTrashed(userId, file->id);
             cache->evictPath(file->fuse_path);
         }
     else {
-        FileQueries::markFileAsTrashed(userId, *entry->vault_id, entry->path, isFuseCall);
+        FileQueries::markFileAsTrashed(userId, *entry->vault_id, entry->path);
         cache->evictPath(path);
     }
 
-    if (!isFuseCall && std::filesystem::exists(entry->backing_path)) std::filesystem::remove_all(entry->backing_path);
+    if (std::filesystem::exists(entry->backing_path)) std::filesystem::remove_all(entry->backing_path);
 }
 
 std::shared_ptr<FSEntry> Filesystem::createFile(const fs::path& path, uid_t uid, gid_t gid, mode_t mode) {

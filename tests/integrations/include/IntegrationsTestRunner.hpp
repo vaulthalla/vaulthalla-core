@@ -84,6 +84,9 @@ private:
     void testFUSEDeny();
     void testVaultPermOverridesAllow();
     void testVaultPermOverridesDeny();
+    void testFUSEGroupPermissions();
+    void testGroupPermOverrides();
+    void testFUSEUserOverridesGroupOverride();
 
     // Helpers
     void validateStage(const TestStage& stage) const;

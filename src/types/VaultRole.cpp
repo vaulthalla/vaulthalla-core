@@ -145,7 +145,15 @@ VRolePair vh::types::vault_roles_from_pq_result(
     for (const auto& item : res) {
         const auto role = std::make_shared<VaultRole>(item, overrideMap[item["role_id"].as<unsigned int>()]);
         if (role->subject_type == "user") rolesPair.roles[role->vault_id] = role;
-        else if (role->subject_type == "group") rolesPair.group_roles[role->vault_id] = role;
+        else if (role->subject_type == "group") {
+            if (rolesPair.group_roles.contains(role->vault_id)) {
+                const auto existingRole = rolesPair.group_roles[role->vault_id];
+                const auto combinedPerms = existingRole->permissions | role->permissions;
+                rolesPair.group_roles[role->vault_id]->permissions = combinedPerms;
+                logging::LogRegistry::auth()->warn("Combining group role permissions for vault ID {}: existing perms {:04x} + new perms {:04x} = combined perms {:04x}",
+                    role->vault_id, existingRole->permissions, role->permissions, combinedPerms);
+            } else rolesPair.group_roles[role->vault_id] = role;
+        }
         else logging::LogRegistry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
     }
 

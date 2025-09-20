@@ -6,6 +6,7 @@
 #include "util/cmdLineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
 #include "database/Queries/VaultQueries.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -15,6 +16,7 @@
 using namespace vh::shell;
 using namespace vh::database;
 using namespace vh::util;
+using namespace vh::logging;
 
 namespace vh::types {
 
@@ -66,8 +68,19 @@ bool User::operator!=(const User& other) const {
 
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
-    if (roles.contains(vaultId)) return roles.at(vaultId);
-    if (group_roles.contains(vaultId)) return group_roles.at(vaultId);
+    if (roles.contains(vaultId)) {
+        LogRegistry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
+        return roles.at(vaultId);
+    }
+    if (group_roles.contains(vaultId)) {
+        LogRegistry::auth()->debug("User {} has group role for vault {}", name, vaultId);
+        return group_roles.at(vaultId);
+    }
+    LogRegistry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
+    for (const auto& [id, role] : roles)
+        LogRegistry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
+    for (const auto& [id, role] : group_roles)
+        LogRegistry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
     return nullptr;
 }
 

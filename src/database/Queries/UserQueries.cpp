@@ -63,6 +63,32 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
     });
 }
 
+std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
+    return Transactions::exec("UserQueries::getUserByLinuxUID", [&](pqxx::work& txn) -> std::shared_ptr<User> {
+        const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
+        if (res.empty()) {
+            LogRegistry::db()->error("[UserQueries] No user found with Linux UID: {}", linuxUid);
+            return nullptr;
+        }
+        const auto userRow = res.one_row();
+        const auto userId = userRow["id"].as<unsigned int>();
+        const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
+
+        const auto rolesRes = txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, userId);
+        const auto overridesRes = txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, userId);
+
+        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
+    });
+}
+
+unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
+    return Transactions::exec("UserQueries::getUserIdByLinuxUID", [&](pqxx::work& txn) {
+        const pqxx::result res = txn.exec(pqxx::prepped{"get_user_id_by_linux_uid"}, pqxx::params{linuxUid});
+        if (res.empty()) throw std::runtime_error("No user found with Linux UID: " + std::to_string(linuxUid));
+        return res.one_field().as<unsigned int>();
+    });
+}
+
 unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
     LogRegistry::db()->debug("[UserQueries] Creating user: {}", user->name);
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
@@ -82,25 +108,6 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
         for (const auto& [_, role] : user->roles) {
             pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
             const auto res = txn.exec(pqxx::prepped{"assign_vault_role"}, role_params);
-            if (res.empty()) continue;
-            role->assignment_id = res.one_field().as<unsigned int>();
-
-            for (const auto& override : role->permission_overrides) {
-                override->assignment_id = role->assignment_id;
-                pqxx::params overrideParams{
-                    override->assignment_id,
-                    override->permission.id,
-                    override->patternStr,
-                    override->enabled,
-                    to_string(override->effect)
-                };
-                txn.exec(pqxx::prepped{"insert_vault_permission_override"}, overrideParams);
-            }
-        }
-
-        for (const auto& [_, role] : user->group_roles) {
-            pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
-            const auto res = txn.exec(pqxx::prepped{"assign_vault_role_to_user_from_group"}, role_params);
             if (res.empty()) continue;
             role->assignment_id = res.one_field().as<unsigned int>();
 
@@ -157,33 +164,6 @@ void UserQueries::updateUserPassword(const unsigned int userId, const std::strin
 void UserQueries::deleteUser(const unsigned int userId) {
     Transactions::exec("UserQueries::deleteUser", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM users WHERE id = " + txn.quote(userId));
-    });
-}
-
-unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
-    return Transactions::exec("UserQueries::getUserIdByLinuxUID", [&](pqxx::work& txn) {
-        const pqxx::result res = txn.exec(pqxx::prepped{"get_user_id_by_linux_uid"}, pqxx::params{linuxUid});
-        if (res.empty()) throw std::runtime_error("No user found with Linux UID: " + std::to_string(linuxUid));
-        return res.one_field().as<unsigned int>();
-    });
-}
-
-std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
-    return Transactions::exec("UserQueries::getUserByLinuxUID", [&](pqxx::work& txn) -> std::shared_ptr<User> {
-        const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
-        if (res.empty()) {
-            LogRegistry::db()->error("[UserQueries] No user found with Linux UID: {}", linuxUid);
-            return nullptr;
-        }
-        const auto userRow = res.one_row();
-        const auto userId = userRow["id"].as<unsigned int>();
-        const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
-
-        pqxx::params p{"user", userId};
-        const auto rolesRes = txn.exec(pqxx::prepped{"get_subject_assigned_vault_roles"}, p);
-        const auto overridesRes = txn.exec(pqxx::prepped{"list_subject_permission_overrides"}, p);
-
-        return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 

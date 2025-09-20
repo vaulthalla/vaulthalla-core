@@ -120,7 +120,21 @@ void PermsQueries::assignVaultRole(const std::shared_ptr<VaultRole>& roleAssignm
         p.append(roleAssignment->vault_id);
         p.append(roleAssignment->role_id);
 
-        txn.exec(pqxx::prepped{"assign_vault_role"}, p);
+        roleAssignment->id = txn.exec(pqxx::prepped{"assign_vault_role"}, p).one_field().as<unsigned int>();
+
+        if (!roleAssignment->permission_overrides.empty()) {
+            for (const auto& override : roleAssignment->permission_overrides) {
+                override->assignment_id = roleAssignment->id;
+                pqxx::params override_params{
+                    override->assignment_id,
+                    override->permission.id,
+                    override->patternStr,
+                    override->enabled,
+                    to_string(override->effect)
+                };
+                const auto res = txn.exec(pqxx::prepped{"insert_vault_permission_override"}, override_params);
+            }
+        }
     });
 }
 

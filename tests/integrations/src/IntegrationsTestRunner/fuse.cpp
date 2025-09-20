@@ -18,6 +18,7 @@
 #include "storage/StorageEngine.hpp"
 #include "storage/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
+#include "database/Queries/GroupQueries.hpp"
 #include "util/fsPath.hpp"
 
 using namespace vh::test::cli;
@@ -38,6 +39,9 @@ void IntegrationsTestRunner::runFUSETests() {
         testFUSEDeny();
         testVaultPermOverridesAllow();
         testVaultPermOverridesDeny();
+        testFUSEGroupPermissions();
+        testGroupPermOverrides();
+        testFUSEUserOverridesGroupOverride();
     }
 }
 
@@ -365,5 +369,240 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
 
     const auto cases = run_fuse_steps(steps);
     stages_.push_back(TestStage{ "FUSE: Vault Permission Overrides Deny", cases });
+    validateStage(stages_.back());
+}
+
+void IntegrationsTestRunner::testFUSEGroupPermissions() {
+    const auto admin = UserQueries::getUserByName("admin");
+    if (!admin || !admin->linux_uid) throw std::runtime_error("Admin user/uid not found");
+
+    const auto engine = createVault();
+    if (!engine) throw std::runtime_error("Failed to create vault");
+
+    const auto root = std::filesystem::path(engine->paths->fuseRoot / to_snake_case(engine->vault->name));
+
+    const std::string baseDir = "group_seed";
+    seed_vault_tree(*admin->linux_uid, root, baseDir);
+
+    const auto user = createUser(engine->vault->id);
+    if (!user || !user->linux_uid) throw std::runtime_error("Failed to create user / uid");
+
+    const auto powerUserRole = PermsQueries::getRoleByName("power_user");
+    if (!powerUserRole) throw std::runtime_error("Power user role not found");
+    if (powerUserRole->permissions == 0) throw std::runtime_error("Power user role has no permissions");
+
+    const auto group = std::make_shared<Group>();
+    group->name = generateName("group/create");
+    group->description = "Test group for FUSE perms";
+    group->id = GroupQueries::createGroup(group);
+
+    GroupQueries::addMemberToGroup(group->id, user->id);
+
+    const auto vRole = std::make_shared<VaultRole>();
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create");
+    vRole->role_id = powerUserRole->id;
+    vRole->permissions = powerUserRole->permissions;
+    vRole->description = "Vault role for testing group perms";
+    vRole->vault_id = engine->vault->id;
+    vRole->subject_type = "group";
+    vRole->subject_id = group->id;
+    vRole->type = "vault";
+
+    PermsQueries::assignVaultRole(vRole);
+
+    const auto verify = UserQueries::getUserById(user->id);
+    if (!verify) throw std::runtime_error("Failed to verify created user");
+    if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
+    if (!verify->roles.empty()) throw std::runtime_error("Created user roles size != 0");
+    if (verify->group_roles.size() != 1) throw std::runtime_error("Created user group_roles size != 1");
+
+    std::vector<FuseStep> steps;
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: ls seed", "fuse/ls", 0 /* allow */),
+        [=]{ return ls_as(*user->linux_uid, root / baseDir); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: read secret", "fuse/read", 0 /* allow */),
+        [=]{ return read_as(*user->linux_uid, root / baseDir / "docs" / "secret.txt"); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: write user_note", "fuse/write", 0, {"OK write"}),
+        [=]{ return write_as(*user->linux_uid, root / baseDir / "docs" / "user_note.txt", "hey\n"); }
+    });
+
+    const auto cases = run_fuse_steps(steps);
+    stages_.push_back(TestStage{ "FUSE: Group Permissions Allow", cases });
+    validateStage(stages_.back());
+}
+
+void IntegrationsTestRunner::testGroupPermOverrides() {
+    const auto admin = UserQueries::getUserByName("admin");
+    if (!admin || !admin->linux_uid) throw std::runtime_error("Admin user/uid not found");
+
+    const auto engine = createVault();
+    if (!engine) throw std::runtime_error("Failed to create vault");
+
+    const auto root = std::filesystem::path(engine->paths->fuseRoot / to_snake_case(engine->vault->name));
+    const std::string baseDir = "group_perm_override_deny_seed";
+    seed_vault_tree(*admin->linux_uid, root, baseDir);
+
+    const auto role = PermsQueries::getRoleByName("power_user");
+    if (!role) throw std::runtime_error("Power user role not found");
+    if (role->permissions == 0) throw std::runtime_error("Power user role has no permissions");
+
+    const auto override = std::make_shared<PermissionOverride>();
+    const auto perm = PermsQueries::getPermissionByName("download");
+    if (!perm) throw std::runtime_error("Download permission not found");
+    override->permission = *perm;
+    override->effect = OverrideOpt::DENY;
+    override->patternStr = R"(^/group_perm_override_deny_seed/docs/[^/]+\.txt$)";
+    override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
+
+    const auto group = std::make_shared<Group>();
+    group->name = generateName("group/create/override_deny");
+    group->description = "Test group for FUSE perms";
+    group->id = GroupQueries::createGroup(group);
+
+    const auto user = createUser(engine->vault->id);
+
+    GroupQueries::addMemberToGroup(group->id, user->id);
+
+    const auto vRole = std::make_shared<VaultRole>();
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
+    vRole->permissions = role->permissions;
+    vRole->description = "Vault role with override";
+    vRole->type = "vault";
+    vRole->vault_id = engine->vault->id;
+    vRole->permission_overrides = { override };
+    vRole->role_id = role->id;
+    vRole->subject_type = "group";
+    vRole->subject_id = group->id;
+
+    PermsQueries::assignVaultRole(vRole);
+
+    const auto verify = UserQueries::getUserById(user->id);
+    if (!verify) throw std::runtime_error("Failed to verify created user");
+    if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
+    if (verify->group_roles.size() != 1) throw std::runtime_error("Created group roles size != 1");
+    if (verify->getRole(engine->vault->id)->permission_overrides.empty()) throw std::runtime_error("Created user role overrides size != 1");
+
+    std::vector<FuseStep> steps;
+
+    steps.push_back({
+        make_fuse_case("FUSE override deny: read secret", "fuse/read", EACCES /* deny due to override */),
+        [=]{ return read_as(*user->linux_uid, root / baseDir / "docs" / "secret.txt"); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: read note", "fuse/read", 0 /* allow due to power_user */),
+        [=]{ return read_as(*user->linux_uid, root / baseDir / "note.txt"); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: rm -rf seed", "fuse/rmrf", 0 /* allow due to power_user */),
+        [=]{ return rmrf_as(*user->linux_uid, root / baseDir); }
+    });
+
+    const auto cases = run_fuse_steps(steps);
+    stages_.push_back(TestStage{ "FUSE: Group Vault Permission Overrides Deny", cases });
+    validateStage(stages_.back());
+}
+
+void IntegrationsTestRunner::testFUSEUserOverridesGroupOverride() {
+    const auto admin = UserQueries::getUserByName("admin");
+    if (!admin || !admin->linux_uid) throw std::runtime_error("Admin user/uid not found");
+
+    const auto engine = createVault();
+    if (!engine) throw std::runtime_error("Failed to create vault");
+
+    const auto root = std::filesystem::path(engine->paths->fuseRoot / to_snake_case(engine->vault->name));
+    const std::string baseDir = "user_group_perm_override_seed";
+    seed_vault_tree(*admin->linux_uid, root, baseDir);
+
+    const auto role = std::make_shared<Role>();
+    role->name = "override_only";
+    role->description = "Role with no base perms, just override";
+    role->permissions = 0;
+    role->type = "vault";
+    role->id = PermsQueries::addRole(role);
+
+    const auto override = std::make_shared<PermissionOverride>();
+    const auto perm = PermsQueries::getPermissionByName("download");
+    if (!perm) throw std::runtime_error("Download permission not found");
+    override->permission = *perm;
+    override->effect = OverrideOpt::DENY;
+    override->patternStr = R"(^/user_group_perm_override_seed/docs/[^/]+\.txt$)";
+    override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
+
+    const auto group = std::make_shared<Group>();
+    group->name = generateName("group/create/override_deny");
+    group->description = "Test group for FUSE perms";
+    group->id = GroupQueries::createGroup(group);
+
+    const auto vRole = std::make_shared<VaultRole>();
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
+    vRole->permissions = role->permissions;
+    vRole->description = "Vault role with override";
+    vRole->type = "vault";
+    vRole->vault_id = engine->vault->id;
+    vRole->permission_overrides = { override };
+    vRole->role_id = role->id;
+    vRole->subject_type = "group";
+    vRole->subject_id = group->id;
+
+    PermsQueries::assignVaultRole(vRole);
+
+    // Manipulate the override to be ALLOW for the user
+
+    override->effect = OverrideOpt::ALLOW; // User override should take precedence
+
+    vRole->subject_type = "user";
+    vRole->subject_id = 0; // Will be set after user creation
+    vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny_user");
+    vRole->permissions = role->permissions; // 0
+    vRole->permission_overrides = { override };
+
+    const auto userRole = PermsQueries::getRoleByName("unprivileged");
+    if (!userRole) throw std::runtime_error("Admin role not found");
+
+    const auto user = std::make_shared<User>();
+    user->name = generateName("user/create/override_deny");
+    user->role = std::make_shared<UserRole>(*userRole);
+    user->linux_uid = uid_index++;
+    linux_uids_.push_back(*user->linux_uid);
+    user->roles[engine->vault->id] = vRole;
+    user->id = UserQueries::createUser(user);
+
+    GroupQueries::addMemberToGroup(group->id, user->id);
+
+    const auto verify = UserQueries::getUserById(user->id);
+    if (!verify) throw std::runtime_error("Failed to verify created user");
+    if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
+    if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1, actual: " + std::to_string(verify->roles.size()));
+    if (verify->group_roles.size() != 1) throw std::runtime_error("Created group roles size != 1, actual: " + std::to_string(verify->group_roles.size()));
+    if (verify->getRole(engine->vault->id)->permission_overrides.empty()) throw std::runtime_error("Created user role overrides size != 1");
+
+    std::vector<FuseStep> steps;
+
+    steps.push_back({
+        make_fuse_case("FUSE override deny: read secret", "fuse/read", 0 /* allow due to user override */),
+        [=]{ return read_as(*user->linux_uid, root / baseDir / "docs" / "secret.txt"); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: read note", "fuse/read", EACCES),
+        [=]{ return read_as(*user->linux_uid, root / baseDir / "note.txt"); }
+    });
+
+    steps.push_back({
+        make_fuse_case("FUSE allow: rm -rf seed", "fuse/rmrf", EACCES),
+        [=]{ return rmrf_as(*user->linux_uid, root / baseDir); }
+    });
+
+    const auto cases = run_fuse_steps(steps);
+    stages_.push_back(TestStage{ "FUSE: User Perm Overrides Group Perm Override", cases });
     validateStage(stages_.back());
 }

@@ -41,6 +41,8 @@ public:
     [[nodiscard]] static pqxx::result collectParentStats(unsigned int parentId);
 
     static void deleteEmptyDirectory(unsigned int id);
+
+    [[nodiscard]] static bool isDirectoryEmpty(unsigned int id);
 };
 
 } // namespace vh::database

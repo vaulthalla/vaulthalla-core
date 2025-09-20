@@ -54,6 +54,13 @@ unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>&
     });
 }
 
+bool DirectoryQueries::isDirectoryEmpty(unsigned int id) {
+    return Transactions::exec("DirectoryQueries::isDirectoryEmpty", [&](pqxx::work& txn) -> bool {
+        const auto res = txn.exec(pqxx::prepped{"is_dir_empty"}, id);
+        return res.one_field().as<bool>();
+    });
+}
+
 void DirectoryQueries::deleteEmptyDirectory(const unsigned int id) {
     Transactions::exec("DirectoryQueries::deleteDirectory", [&](pqxx::work& txn) {
         const auto parent = txn.exec(pqxx::prepped{"get_fs_entry_parent_id"}, id).one_field().as<std::optional<unsigned int>>();

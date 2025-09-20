@@ -722,6 +722,11 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
+        if (!DirectoryQueries::isDirectoryEmpty(entry->id)) {
+            fuse_reply_err(req, ENOTEMPTY);
+            return;
+        }
+
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
             LogRegistry::fuse()->error("[rmdir] No user found for UID: {}", uid);

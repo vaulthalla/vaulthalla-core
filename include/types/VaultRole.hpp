@@ -12,6 +12,8 @@
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
 #include <pqxx/result.hxx>
+#include <regex>
+#include <unordered_map>
 
 namespace pqxx {
 class row;
@@ -95,19 +97,30 @@ struct VaultRole final : Role {
 
 };
 
+struct VRolePair {
+    std::unordered_map<unsigned int, std::shared_ptr<VaultRole>> roles, group_roles;
+};
+
 // JSON + DB helpers
 void to_json(nlohmann::json& j, const VaultRole& r);
 
 void from_json(const nlohmann::json& j, VaultRole& r);
 
-void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<VaultRole> >& roles);
+void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles);
 
-std::vector<std::shared_ptr<VaultRole> > vault_roles_from_json(const nlohmann::json& j);
-
-std::vector<std::shared_ptr<VaultRole> > vault_roles_from_pq_result(const pqxx::result& res,
-                                                                          const pqxx::result& overrides);
+VRolePair vault_roles_from_json(const nlohmann::json& j);
+VRolePair vault_roles_from_pq_result(const pqxx::result& res, const pqxx::result& overrides);
 
 std::string to_string(const std::shared_ptr<VaultRole>& role);
+std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles);
+
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<VaultRole> >& roles);
+
+std::vector<std::shared_ptr<VaultRole>> vault_roles_vector_from_json(const nlohmann::json& j);
+
+std::vector<std::shared_ptr<VaultRole>> vault_roles_vector_from_pq_result(const pqxx::result& res,
+                                                                          const pqxx::result& overrides);
+
 std::string to_string(const std::vector<std::shared_ptr<VaultRole>>& roles);
 
 } // namespace vh::types

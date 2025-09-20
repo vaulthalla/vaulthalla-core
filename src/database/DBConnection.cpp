@@ -43,7 +43,8 @@ static std::optional<std::string> getFirstInitDBPass() {
     return pass;
 }
 
-DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
+DBConnection::DBConnection() : tpmKeyProvider_(
+    std::make_unique<TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
     if (paths::testMode) {
         const auto user = std::getenv("VH_TEST_DB_USER");
         const auto pass = std::getenv("VH_TEST_DB_PASS");
@@ -51,9 +52,11 @@ DBConnection::DBConnection() : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(
         const auto port = std::getenv("VH_TEST_DB_PORT");
         const auto name = std::getenv("VH_TEST_DB_NAME");
         if (user && pass && host && port && name) {
-            DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host) + ":" + std::string(port) + "/" + std::string(name);
+            DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host)
+                                + ":" + std::string(port) + "/" + std::string(name);
             conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
-            LogRegistry::vaulthalla()->info("[DBConnection] Test mode: using connection string from environment variables");
+            LogRegistry::vaulthalla()->info(
+                "[DBConnection] Test mode: using connection string from environment variables");
             return;
         }
     }
@@ -676,9 +679,10 @@ void DBConnection::initPreparedDirectories() const {
     conn_->prepare("get_dir_file_count", "SELECT file_count FROM directories WHERE fs_entry_id = $1");
 
     conn_->prepare("is_dir_empty",
-        "SELECT NOT EXISTS (SELECT 1 FROM fs_entry WHERE parent_id = $1 AND id != 1) AS is_empty");
+                   "SELECT NOT EXISTS (SELECT 1 FROM fs_entry WHERE parent_id = $1 AND id != 1) AS is_empty");
 
-    conn_->prepare("delete_empty_dir", "DELETE FROM directories WHERE fs_entry_id = $1 AND file_count = 0 AND subdirectory_count = 0");
+    conn_->prepare("delete_empty_dir",
+                   "DELETE FROM directories WHERE fs_entry_id = $1 AND file_count = 0 AND subdirectory_count = 0");
 
     conn_->prepare("upsert_directory",
                    "WITH inserted AS ( "
@@ -843,7 +847,7 @@ void DBConnection::initPreparedPermissions() const {
                    "VALUES ($1, $2, $3, $4)");
 
     conn_->prepare("insert_role_permission",
-        "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
+                   "INSERT INTO permissions (role_id, permissions) VALUES ($1, $2::bit(16))");
 
     conn_->prepare("update_permission", "UPDATE permissions SET permissions = $2 WHERE role_id = $1");
 
@@ -886,6 +890,27 @@ void DBConnection::initPreparedVaultRoles() const {
                    "JOIN permissions p ON r.id = p.role_id "
                    "WHERE vra.subject_type = $1 AND vra.subject_id = $2 AND vra.role_id = $3");
 
+    conn_->prepare("get_user_and_group_assigned_vault_roles",
+                   "("
+                   "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
+                   "       r.name, r.description, r.type, p.permissions::int AS permissions, r.created_at, vra.vault_id "
+                   "FROM role r "
+                   "JOIN vault_role_assignments vra ON r.id = vra.role_id "
+                   "JOIN permissions p ON r.id = p.role_id "
+                   "WHERE vra.subject_type = 'user' AND vra.subject_id = $1"
+                   ") "
+                   "UNION ALL "
+                   "("
+                   "SELECT vra.id as assignment_id, vra.subject_type, vra.subject_id, vra.role_id, vra.assigned_at, "
+                   "       r.name, r.description, r.type, p.permissions::int AS permissions, r.created_at, vra.vault_id "
+                   "FROM role r "
+                   "JOIN vault_role_assignments vra ON r.id = vra.role_id "
+                   "JOIN permissions p ON r.id = p.role_id "
+                   "JOIN group_members gm ON vra.subject_type = 'group' AND vra.subject_id = gm.group_id "
+                   "WHERE gm.user_id = $1"
+                   ")"
+        );
+
     conn_->prepare("assign_vault_role",
                    "INSERT INTO vault_role_assignments (subject_type, subject_id, vault_id, role_id, assigned_at) "
                    "VALUES ($1, $2, $3, $4, NOW()) RETURNING id");
@@ -924,6 +949,25 @@ void DBConnection::initPreparedPermOverrides() const {
                    "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
                    "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
                    "WHERE vra.subject_type = $1 AND vra.subject_id = $2");
+
+    conn_->prepare("list_user_and_group_permission_overrides",
+                   "("
+                   "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
+                   "FROM permission p "
+                   "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
+                   "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
+                   "WHERE vra.subject_type = 'user' AND vra.subject_id = $1"
+                   ") "
+                   "UNION ALL "
+                   "("
+                   "SELECT p.*, vpo.enabled, vpo.pattern, vpo.assignment_id, vpo.effect, vra.role_id "
+                   "FROM permission p "
+                   "JOIN vault_permission_overrides vpo ON p.id = vpo.permission_id "
+                   "JOIN vault_role_assignments vra ON vpo.assignment_id = vra.id "
+                   "JOIN group_members gm ON vra.subject_type = 'group' AND vra.subject_id = gm.group_id "
+                   "WHERE gm.user_id = $1"
+                   ")"
+        );
 
     conn_->prepare("insert_vault_permission_override",
                    "INSERT INTO vault_permission_overrides (assignment_id, permission_id, pattern, enabled, effect) "

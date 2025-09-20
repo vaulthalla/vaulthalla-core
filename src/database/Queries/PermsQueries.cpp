@@ -161,7 +161,7 @@ std::vector<std::shared_ptr<VaultRole>> PermsQueries::listVaultAssignedRoles(con
         pqxx::params p{vaultId};
         const auto roles = txn.exec(pqxx::prepped{"get_vault_assigned_roles"}, p);
         const auto overrides = txn.exec(pqxx::prepped{"list_vault_permission_overrides"}, p);
-        return vault_roles_from_pq_result(roles, overrides);
+        return vault_roles_vector_from_pq_result(roles, overrides);
     });
 }
 

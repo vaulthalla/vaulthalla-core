@@ -7,6 +7,7 @@
 #include <ctime>
 #include <cstdint>
 #include <filesystem>
+#include <unordered_map>
 
 #include <nlohmann/json_fwd.hpp> // Forward-decl only
 
@@ -33,7 +34,7 @@ struct User : public std::enable_shared_from_this<User> {
     std::optional<std::time_t> last_login;
     bool is_active{true};
     std::shared_ptr<UserRole> role{};
-    std::vector<std::shared_ptr<VaultRole>> roles;
+    std::unordered_map<unsigned int, std::shared_ptr<VaultRole>> roles{}, group_roles{};
 
     User();
     explicit User(std::string name, std::string email = "", bool isActive = true);

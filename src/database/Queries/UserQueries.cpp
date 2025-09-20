@@ -25,9 +25,8 @@ std::shared_ptr<User> UserQueries::getUserByName(const std::string& name) {
         const auto userId = userRow["id"].as<unsigned int>();
         const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
 
-        pqxx::params p{"user", userId};
-        const auto rolesRes = txn.exec(pqxx::prepped{"get_subject_assigned_vault_roles"}, p);
-        const auto overridesRes = txn.exec(pqxx::prepped{"list_subject_permission_overrides"}, p);
+        const auto rolesRes = txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, userId);
+        const auto overridesRes = txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, userId);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -38,9 +37,8 @@ std::shared_ptr<User> UserQueries::getUserById(const unsigned int id) {
         const auto userRow = txn.exec(pqxx::prepped{"get_user"}, pqxx::params{id}).one_row();
         const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{id}).one_row();
 
-        pqxx::params p{"user", id};
-        const auto rolesRes = txn.exec(pqxx::prepped{"get_subject_assigned_vault_roles"}, p);
-        const auto overridesRes = txn.exec(pqxx::prepped{"list_subject_permission_overrides"}, p);
+        const auto rolesRes = txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, id);
+        const auto overridesRes = txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, id);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
@@ -58,15 +56,15 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
         const auto userId = userRow["id"].as<unsigned int>();
         const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
 
-        pqxx::params p{"user", userId};
-        const auto rolesRes = txn.exec(pqxx::prepped{"get_subject_assigned_vault_roles"}, p);
-        const auto overridesRes = txn.exec(pqxx::prepped{"list_subject_permission_overrides"}, p);
+        const auto rolesRes = txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, userId);
+        const auto overridesRes = txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, userId);
 
         return std::make_shared<User>(userRow, userRoleRow, rolesRes, overridesRes);
     });
 }
 
 unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
+    LogRegistry::db()->debug("[UserQueries] Creating user: {}", user->name);
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     return Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         pqxx::params p{
@@ -81,7 +79,7 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
 
         txn.exec(pqxx::prepped{"assign_user_role"}, pqxx::params{userId, user->role->id});
 
-        for (const auto& role : user->roles) {
+        for (const auto& [_, role] : user->roles) {
             pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
             const auto res = txn.exec(pqxx::prepped{"assign_vault_role"}, role_params);
             if (res.empty()) continue;
@@ -96,7 +94,26 @@ unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
                     override->enabled,
                     to_string(override->effect)
                 };
-                const auto res = txn.exec(pqxx::prepped{"insert_vault_permission_override"}, overrideParams);
+                txn.exec(pqxx::prepped{"insert_vault_permission_override"}, overrideParams);
+            }
+        }
+
+        for (const auto& [_, role] : user->group_roles) {
+            pqxx::params role_params{"user", userId, role->vault_id, role->role_id};
+            const auto res = txn.exec(pqxx::prepped{"assign_vault_role_to_user_from_group"}, role_params);
+            if (res.empty()) continue;
+            role->assignment_id = res.one_field().as<unsigned int>();
+
+            for (const auto& override : role->permission_overrides) {
+                override->assignment_id = role->assignment_id;
+                pqxx::params overrideParams{
+                    override->assignment_id,
+                    override->permission.id,
+                    override->patternStr,
+                    override->enabled,
+                    to_string(override->effect)
+                };
+                txn.exec(pqxx::prepped{"insert_vault_permission_override"}, overrideParams);
             }
         }
 

@@ -15,6 +15,7 @@
 
 using namespace vh::shell;
 using namespace vh::database;
+using namespace vh::util;
 
 namespace vh::types {
 
@@ -48,7 +49,9 @@ User::User(const pqxx::row& row)
 User::User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides)
 : User(user) {
     this->role = std::make_shared<UserRole>(role);
-    this->roles = vault_roles_from_pq_result(vaultRoles, overrides);
+    const auto [roles, group_roles] = vault_roles_from_pq_result(vaultRoles, overrides);
+    this->roles = roles;
+    this->group_roles = group_roles;
 }
 
 bool User::operator==(const User& other) const {
@@ -62,11 +65,9 @@ bool User::operator!=(const User& other) const {
 }
 
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
-    const auto it = std::ranges::find_if(roles.begin(), roles.end(),
-                       [vaultId](const std::shared_ptr<VaultRole>& role) {
-                           return role->vault_id == vaultId;
-                       });
-    return it != roles.end() ? *it : nullptr;
+    if (roles.contains(vaultId)) return roles.at(vaultId);
+    if (group_roles.contains(vaultId)) return group_roles.at(vaultId);
+    return nullptr;
 }
 
 void User::setPasswordHash(const std::string& hash) {
@@ -84,8 +85,8 @@ void to_json(nlohmann::json& j, const User& u) {
         {"id", u.id},
         {"name", u.name},
         {"email", u.email},
-        {"last_login", u.last_login.has_value() ? util::timestampToString(u.last_login.value()) : ""},
-        {"created_at", util::timestampToString(u.created_at)},
+        {"last_login", u.last_login.has_value() ? timestampToString(u.last_login.value()) : ""},
+        {"created_at", timestampToString(u.created_at)},
         {"is_active", u.is_active},
         {"role", *u.role}
     };
@@ -233,7 +234,11 @@ std::string to_string(const std::shared_ptr<User>& user) {
     out += "Last Login: " + (user->last_login ? util::timestampToString(*user->last_login) : "Never") + "\n";
     out += "Active: " + std::string(user->is_active ? "Yes" : "No") + "\n";
     out += "Role: " + to_string(user->role);
-    out += "Vault Roles: " + to_string(user->roles);
+    out += "Vault Roles:\n";
+    out += "  - User Level:\n";
+    out += "    " + to_string(user->roles);
+    out += "  - Group Level:\n";
+    out += "    " + to_string(user->group_roles);
 
     return out;
 }

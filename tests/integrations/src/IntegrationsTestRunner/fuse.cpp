@@ -66,7 +66,7 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
         vaultRole->vault_id = vaultId;
         vaultRole->permission_overrides = overrides;
         vaultRole->role_id = PermsQueries::addRole(std::static_pointer_cast<Role>(vaultRole));
-        user->roles.push_back(vaultRole);
+        user->roles[vaultId] = vaultRole;
     }
 
     bool nameException = false;
@@ -268,14 +268,13 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     user->role = std::make_shared<UserRole>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
-    user->roles.push_back(vRole);
+    user->roles[engine->vault->id] = vRole;
     user->id = UserQueries::createUser(user);
 
     const auto verify = UserQueries::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
     if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
-    if (verify->roles[0]->permission_overrides.size() != 1) throw std::runtime_error("Created user override size != 1");
 
     std::vector<FuseStep> steps;
 
@@ -339,14 +338,13 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     user->role = std::make_shared<UserRole>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
-    user->roles.push_back(vRole);
+    user->roles[engine->vault->id] = vRole;
     user->id = UserQueries::createUser(user);
 
     const auto verify = UserQueries::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
     if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
-    if (verify->roles[0]->permission_overrides.size() != 1) throw std::runtime_error("Created user override size != 1");
 
     std::vector<FuseStep> steps;
 

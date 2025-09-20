@@ -70,7 +70,7 @@ CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
                       : VaultQueries::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
 
     if (!canListAll) {
-        for (const auto& r : call.user->roles) {
+        for (const auto& [_, r] : call.user->roles) {
             if (r->canList({})) {
                 const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
                 if (!vault) continue;

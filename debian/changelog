@@ -1,6 +1,6 @@
-vaulthalla (0.11.1-1) unstable; urgency=medium
+vaulthalla (0.14.0-1) unstable; urgency=medium
 
   * Initial Debian upload
-  * A FUSE filesystem back with postgres and robust encryption
+  * A FUSE filesystem backed with postgres and robust encryption
 
  -- Cooper Larson <cooper@valkyrianlabs.com>  Wed, 27 Aug 2025 16:15:45 +0000

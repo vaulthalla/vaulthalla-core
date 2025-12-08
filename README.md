@@ -1,103 +1,131 @@
 # ⚡️ Vaulthalla | The Final Cloud ⚡️
 
 **Military-grade encryption. Lightning-fast performance.**  
-**Your files, your terms, forever.**
+**Your files, your terms — permanently.**
 
 ---
 
-**No plugins. No PHP. No compromises.**  
-**Storage distilled to perfection.**
+## ⚠️ Read This First (Seriously)
+
+Vaulthalla is **not** a user-space toy or a weekend Docker container.
+
+- ✅ **Requires `sudo` / root access** to install and operate  
+- ✅ **Manages its own PostgreSQL instance** (schemas, users, migrations)  
+- ✅ **Mounts a privileged FUSE filesystem backed by `/var/lib` at `/mnt/vaulthalla`**
+- 🧱 **Seals multiple non-exportable TPM2 keys** for encryption, identity, and internal trust domains  
+  (keys are hardware-bound and cannot be recovered if the host or TPM state is lost)
+- ⚠️ **Developer mode (`-d`) is destructive by design**
+
+If you are not testing inside a **sandbox, VM, or disposable environment**,  
+**do not use developer mode.**
+
+This system assumes it owns the machine it’s installed on.
+
+---
 
 ## Why Vaulthalla?
 
-Vaulthalla is engineered from scratch for speed, sovereignty, and unyielding security:
+Vaulthalla is engineered from first principles for **speed, sovereignty, and uncompromising security**:
 
-| Feature                  | Description                                                                                         |
-|--------------------------|-----------------------------------------------------------------------------------------------------|
-| ⚙️ **Compiled Core**      | C++23 codebase, zero runtime overhead. Built for raw performance.                                   |
-| 🔄 **True FUSE Mounts**   | Filesystem integration via libfuse3. Your cloud, your `/mnt`.                                       |
-| 🔐 **AES256-GCM/NI**      | libsodium-backed encryption with hardware AES-NI acceleration.                                      |
-| 🧱 **TPM2 Key Sealing**   | All encryption keys sealed via `tpm2-tss`, never stored in plaintext.                               |
-| 💾 **PostgreSQL Backbone**| Transactional, ACID-compliant metadata persistence.                                                  |
-| 🚫 **No Docker Needed**   | Built Debian-first. No containers required to go live.                                               |
-| ☁️ **S3 Compatible**      | Sync and mirror to AWS, MinIO, R2, and any S3-compatible endpoint.                                   |
-| 🔄 **Zero Trust Sync**    | Local-to-cloud sync with enforced permissions and sealed metadata.                                  |
+| Feature                     | Description                                                                 |
+|----------------------------|-----------------------------------------------------------------------------|
+| ⚙️ **Compiled Core**        | C++23 codebase. Zero runtime overhead. No interpreters.                     |
+| 🔄 **True FUSE Mounts**     | Native filesystem integration via libfuse3. Your cloud, your `/mnt`.        |
+| 🔐 **AES-256-GCM / AES-NI** | libsodium encryption with hardware acceleration.                            |
+| 🧱 **TPM2 Key Sealing**     | Encryption keys sealed via `tpm2-tss`. Never stored plaintext.              |
+| 💾 **PostgreSQL Backbone** | ACID-compliant metadata with transactional guarantees.                      |
+| 🚫 **No Docker Required**  | Debian-first. No containers, no indirection.                                |
+| ☁️ **S3 Compatible**       | AWS, MinIO, R2, and any S3-compatible endpoint.                             |
+| 🔄 **Zero-Trust Sync**     | Permission-aware sync with sealed metadata and enforced policy.             |
+
+---
 
 ## ☁️ Intelligent Synchronization
 
-Three flexible strategies for managing storage:
+Choose the strategy that fits your threat model and storage philosophy:
 
-* **⚡ Smart Cache:** Lazy downloads, automatic eviction, and disk-aware operation.
-* **🔄 Two-Way Sync:** Local and cloud parity. Robust conflict resolution.
-* **🪞 Mirror Mode:** One-direction replication, perfect for backup or cold storage.
+- **⚡ Smart Cache** — Lazy fetch, automatic eviction, disk-aware behavior  
+- **🔄 Two-Way Sync** — Strong conflict resolution, local ↔ cloud parity  
+- **🪞 Mirror Mode** — One-way replication for backups and cold storage  
+
+---
 
 ## 🔐 Security by Design
 
-Everything encrypted. Nothing assumed. Vaulthalla enforces best practices out of the box:
+Nothing optional. Nothing implied.
 
-* AES-256-GCM file encryption with libsodium
-* TPM2-sealed symmetric keys using `tpm2-tss`
-* Role-based access control and permission bitmasks
-* Password hash hardening and live dictionary blacklisting
-* Encrypted API secrets and key metadata
-* JWT-secured sessions
-
----
-
-## 🚀 Quick Installation (Development Mode)
-
-Vaulthalla is under active development. Expect frequent updates. For local testing:
-
-```bash
-git clone https://github.com/vaulthalla/server.git
-cd server
-make install -- -d
-```
-
-The `-d` flag enables developer mode:
-
-* Debug build
-* Auto-created admin user (`vh!adm1n`)
-* Verbose logging
-* Dev vaults and Cloudflare R2 S3 test setup
-
-**⚠️ Warning:** Dev mode will reset your database and overwrite any existing Vaulthalla configs.
+- AES-256-GCM file encryption (libsodium)
+- TPM2-sealed symmetric keys
+- Role-based access control with permission bitmasks
+- Hardened password hashing + live dictionary blacklisting
+- Encrypted API secrets and metadata
+- JWT-secured sessions
 
 ---
 
-## ✅ Verifying Installation
+## 🚀 Installation (Development Preview)
 
-```bash
-systemctl status vaulthalla-core vaulthalla-fuse
-journalctl -f -u vaulthalla-core
-```
+> ⚠️ **Root access required**  
+> Vaulthalla installs system services, manages PostgreSQL, and mounts filesystems.
+
+    git clone https://github.com/vaulthalla/server.git
+    cd server
+    sudo make install -- -d
+
+### About `-d` (Developer Mode)
+
+The `-d` flag enables **volatile development mode** intended **only** for testing:
+
+- Debug builds
+- Auto-provisioned admin user (`vh!adm1n`)
+- Verbose logging
+- Dev vaults and S3 test backends
+- **Automatic database initialization and resets**
+
+**⚠️ WARNING:**  
+Developer mode **can and will wipe or reinitialize** the PostgreSQL database and overwrite existing Vaulthalla configuration.
+
+**Never use `-d` on a system containing real data.**  
+Run it only inside VMs, containers, or disposable test environments.
 
 ---
 
-## ⚠️ Considerations
+## ✅ Verifying Services
 
-* Port 443 must be open for HTTPS.
-* Default config lives in `/etc/vaulthalla/config.yaml`.
-* Back up encryption keys and database state regularly.
+    systemctl status vaulthalla-core vaulthalla-fuse
+    journalctl -f -u vaulthalla-core
+
+---
+
+## ⚙️ System Notes
+
+- HTTPS requires port **443**
+- Default config: `/etc/vaulthalla/config.yaml`
+- PostgreSQL is **managed internally** — do not modify schemas manually
+- Back up **both** encryption keys *and* database state
 
 ---
 
 ## 💡 Support & Contribution
 
-We welcome contributions, issue reports, and feedback. Contributor interest form coming soon.
+Issues, feedback, and battle scars welcome.  
+Contributor intake coming soon.
 
 ---
 
-## 🚧 Development Notes
+## 🚧 Development Status
 
-Full architecture documentation coming soon.
+Public preview.  
+Architecture docs and operator guides inbound.
 
 ---
 
 ### Mission Statement
 
-**Vaulthalla is for those who refuse to rent back their own data.**
+**Vaulthalla is for people who refuse to rent back their own data.**
 
-No subscriptions. No surveillance. No bloat. Just one battle-forged binary—hardened for performance, encrypted like state secrets, and mounted directly into your filesystem.
+No subscriptions.  
+No surveillance.  
+No bloated stacks.
 
-This is storage as it should be: fast, sovereign, and truly yours.
+Just a battle-hardened system daemon — encrypted like state secrets, mounted directly into your filesystem, and fast enough to remind you why compiled software still matters.

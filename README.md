@@ -1,7 +1,7 @@
 # ⚡️ Vaulthalla | The Final Cloud ⚡️
 
 **Military-grade encryption. Lightning-fast performance.**  
-**Your files, your terms — permanently.**
+**Your files, your terms.**
 
 ---
 
@@ -175,4 +175,4 @@ No subscriptions.
 No surveillance.  
 No bloated stacks.
 
-Just a battle-hardened system daemon — encrypted like state secrets, mounted directly into your filesystem, and fast enough to remind you why compiled software still matters.
+Just a battle-hardened system daemon; encrypted like state secrets, mounted directly into your filesystem, and fast enough to remind you why compiled software still matters.

@@ -19,7 +19,7 @@ runs:
     - name: Upload Package to Nexus Sonatype
       shell: bash
       run: |
-        source ~/fuck_github.env  # Load environment variables
+        source ~/runner_local.env  # Load environment variables
         for pkg in ../*.deb; do
           curl -sSf -u "$NEXUS_USER:$NEXUS_PASS" \
             -H "Content-Type: multipart/form-data" \

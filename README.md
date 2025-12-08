@@ -63,10 +63,56 @@ Nothing optional. Nothing implied.
 
 ---
 
-## 🚀 Installation (Development Preview)
+## 🚀 Installation
+
+Vaulthalla can be installed either via the official Debian/Ubuntu package
+(recommended for most users) or built from source for development.
+
+---
+
+### Option 1: Debian / Ubuntu Package (Recommended)
 
 > ⚠️ **Root access required**  
-> Vaulthalla installs system services, manages PostgreSQL, and mounts filesystems.
+> The package installs system services, manages PostgreSQL, and mounts a
+> privileged FUSE filesystem.
+
+    sudo curl -fsSL https://apt.vaulthalla.sh/pubkey.gpg \
+      -o /etc/apt/trusted.gpg.d/vaulthalla.gpg
+
+    echo "deb [arch=amd64] https://apt.vaulthalla.sh stable main" | \
+      sudo tee /etc/apt/sources.list.d/vaulthalla.list > /dev/null
+
+    sudo apt update
+    sudo apt install vaulthalla
+
+#### Debian Install Prompts
+
+During installation, you will be prompted for the following:
+
+**1. Initialize PostgreSQL database?**  
+By default, the installer will attempt to create the required PostgreSQL
+database and user automatically.
+
+- Select **Yes** (recommended) to allow Vaulthalla to initialize PostgreSQL.
+- Select **No** only if you intend to provision the database manually.
+
+Manual setup instructions are available in:  
+`/usr/share/doc/vaulthalla/README.Debian`
+
+**2. Super-admin Linux UID**  
+Vaulthalla maps a privileged internal super-admin account to a Linux user
+for filesystem and administrative operations.
+
+- Leave blank or select **auto** to assign the installing user automatically.
+- Enter a numeric UID to bind super-admin privileges to a specific user.
+
+This UID is assigned once and is not modified automatically thereafter.
+
+---
+
+### Option 2: Build from Source (Development Preview)
+
+> ⚠️ **For development and testing only**
 
     git clone https://github.com/vaulthalla/server.git
     cd server
@@ -83,7 +129,8 @@ The `-d` flag enables **volatile development mode** intended **only** for testin
 - **Automatic database initialization and resets**
 
 **⚠️ WARNING:**  
-Developer mode **can and will wipe or reinitialize** the PostgreSQL database and overwrite existing Vaulthalla configuration.
+Developer mode **can and will wipe or reinitialize** the PostgreSQL database
+and overwrite existing Vaulthalla configuration.
 
 **Never use `-d` on a system containing real data.**  
 Run it only inside VMs, containers, or disposable test environments.

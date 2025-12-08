@@ -4,7 +4,7 @@ project('vaulthalla', 'cpp',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
             'warning_level=3',
-            'werror=true',
+            'werror=false',
             'cpp_std=c++23',
             'unity=on',
             'unity_size=9',

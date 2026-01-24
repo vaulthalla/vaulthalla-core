@@ -667,6 +667,50 @@ void DBConnection::initPreparedFiles() const {
                    "FROM files f "
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND f.encrypted_with_key_version < $2");
+
+    conn_->prepare("get_n_largest_files",
+        "SELECT fs.*, f.* "
+        "FROM files f "
+        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+        "WHERE fs.vault_id = $1 "
+        "ORDER BY f.size_bytes DESC "
+        "LIMIT $2");
+
+    conn_->prepare("get_all_files",
+        "SELECT fs.*, f.* "
+        "FROM files f "
+        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+        "WHERE fs.vault_id = $1");
+
+    conn_->prepare("get_top_extensions_by_size",
+R"SQL(
+    SELECT
+        ext,
+        SUM(f.size_bytes)::bigint AS total_bytes
+    FROM files f
+    JOIN fs_entry fs ON fs.id = f.fs_entry_id
+    CROSS JOIN LATERAL (
+        SELECT
+            CASE
+                -- ignore hidden dotfiles like ".bashrc" (treat as no extension)
+                WHEN fs.name LIKE '.%' THEN NULL
+
+                -- if there's no dot, or dot is last char => no extension
+                WHEN position('.' in fs.name) = 0 THEN NULL
+                WHEN right(fs.name, 1) = '.' THEN NULL
+
+                -- take substring after last dot
+                ELSE lower(regexp_replace(fs.name, '^.*\.', ''))
+            END AS ext
+    ) x
+    WHERE fs.vault_id = $1
+      AND x.ext IS NOT NULL
+      AND x.ext <> ''
+    GROUP BY ext
+    ORDER BY total_bytes DESC
+    LIMIT $2
+)SQL");
+
 }
 
 void DBConnection::initPreparedDirectories() const {

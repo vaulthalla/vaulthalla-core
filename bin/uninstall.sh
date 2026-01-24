@@ -83,6 +83,7 @@ if [[ "$DEV_MODE" == true ]]; then
 REVOKE CONNECT ON DATABASE vaulthalla FROM public;
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'vaulthalla';
 DROP DATABASE IF EXISTS vaulthalla;
+DROP DATABASE IF EXISTS vh_cli_test;
 DROP USER IF EXISTS vaulthalla;
 EOF
 else

@@ -13,6 +13,7 @@ struct File;
 struct TrashedFile;
 struct Directory;
 struct DirectoryStats;
+struct ExtensionStat;
 }
 
 namespace vh::database {
@@ -59,6 +60,14 @@ public:
     static std::vector<std::shared_ptr<types::File>> getFilesOlderThanKeyVersion(unsigned int vaultId, unsigned int keyVersion);
 
     [[nodiscard]] static std::string getContentHash(unsigned int vaultId, const std::filesystem::path& relPath);
+
+    static std::shared_ptr<types::File> getLargestFile(unsigned int vaultId);
+
+    static std::vector<std::shared_ptr<types::File>> getNLargestFiles(unsigned int vaultId, unsigned int n = 1);
+
+    static std::vector<std::shared_ptr<types::File>> getAllFiles(unsigned int vaultId);
+
+    static std::vector<types::ExtensionStat> getTopExtensionsBySize(unsigned int vaultId, unsigned int limit = 10);
 };
 
 } // namespace vh::database

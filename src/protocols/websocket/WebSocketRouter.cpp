@@ -27,8 +27,8 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
         const std::string accessToken = msg.value("token", "");
 
         if (!command.starts_with("auth")) {
-            const auto client = sessionManager_->getClientSession(session.getUUID());
-            if (!client || !client->validateToken(accessToken)) {
+            if (const auto client = sessionManager_->getClientSession(session.getUUID());
+                !client || !client->validateToken(accessToken)) {
                 LogRegistry::ws()->warn("[Router] Unauthorized access attempt for command: {}", command);
                 const json errorResponse = {{"command", "error"},
                                       {"status", "unauthorized"},
@@ -38,8 +38,7 @@ void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
             }
         }
 
-        const auto it = handlers_.find(command);
-        if (it != handlers_.end()) it->second(msg, session);
+        if (const auto it = handlers_.find(command); it != handlers_.end()) it->second(msg, session);
         else {
             LogRegistry::ws()->warn("[Router] Unknown command: {}", command);
             const json errorResponse = {{"command", "error"},

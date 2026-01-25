@@ -224,7 +224,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
     // gid_t gid = ctx->gid;
-
+    
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
         LogRegistry::fuse()->error("[lookup] No user found for UID: {}", uid);

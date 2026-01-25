@@ -30,6 +30,7 @@
 #include "crypto/IdGenerator.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "util/bitmask.hpp"
+#include "auth/SystemUid.hpp"
 
 // Libraries
 #include <memory>
@@ -58,6 +59,7 @@ void vh::seed::seed_database() {
     initRoles();
     initAdmin();
     initAdminGroup();
+    initSystemUser();
     initRoot();
     initAdminDefaultVault();
 
@@ -131,6 +133,105 @@ void vh::seed::initRoles() {
                 pqxx::params{r.id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
         }
     });
+}
+
+void vh::seed::initSystemUser() {
+    LogRegistry::vaulthalla()->debug("[initdb] Initializing system user...");
+
+    // 1) Resolve OS UID of the service account (default: "vaulthalla")
+    // If you want it configurable, pull from ConfigRegistry here.
+    const std::string systemUsername = "vaulthalla";
+
+    // Use your cached helper (or call uid_for_user directly)
+    auth::SystemUid::instance().init(systemUsername);
+    const auto sysUid = static_cast<unsigned int>(vh::auth::SystemUid::instance().uid());
+
+    // 2) If a user already exists for this Linux UID, ensure it's marked as system + has super_admin
+    try {
+        if (const auto existingByUid = UserQueries::getUserByLinuxUID(sysUid); existingByUid) {
+            LogRegistry::vaulthalla()->info(
+                "[initdb] System user already exists for linux_uid={} (name='{}')",
+                sysUid, existingByUid->name
+            );
+
+            const auto role = PermsQueries::getRoleByName("super_admin");
+
+            // If your schema supports updating users, do it.
+            // If you don't have update queries yet, you can just return here.
+            existingByUid->name = "system";
+            existingByUid->email = "no-reply@system";
+            existingByUid->linux_uid = sysUid;
+
+            existingByUid->role = std::make_shared<UserRole>();
+            existingByUid->role->id = role->id;
+            existingByUid->role->name = role->name;
+            existingByUid->role->description = role->description;
+            existingByUid->role->type = role->type;
+            existingByUid->role->permissions = role->permissions;
+
+            // If you have an update query, use it. If not, skip.
+            // UserQueries::updateUser(existingByUid);
+            return;
+        }
+    } catch (...) {
+        // getUserByLinuxUid might throw if not found; ignore and proceed to create
+    }
+
+    // 3) If a user exists by name "system" but no UID match, align it
+    try {
+        if (const auto existingByName = UserQueries::getUserByName("system"); existingByName) {
+            LogRegistry::vaulthalla()->info(
+                "[initdb] Found existing 'system' user (id={}), updating linux_uid to {}",
+                existingByName->id, sysUid
+            );
+
+            const auto role = PermsQueries::getRoleByName("super_admin");
+
+            existingByName->linux_uid = sysUid;
+            existingByName->email = "";
+
+            existingByName->role = std::make_shared<UserRole>();
+            existingByName->role->id = role->id;
+            existingByName->role->name = role->name;
+            existingByName->role->description = role->description;
+            existingByName->role->type = role->type;
+            existingByName->role->permissions = role->permissions;
+
+            // If you have an update query, use it. If not, you can delete+recreate, but updating is better.
+            // UserQueries::updateUser(existingByName);
+            return;
+        }
+    } catch (...) {
+        // getUserByName might throw if not found; ignore and proceed to create
+    }
+
+    // 4) Create a fresh system user
+    const auto user = std::make_shared<User>();
+    user->name = "system";
+    user->email = "no-reply@system";
+
+    // System account shouldn't be used for interactive login.
+    // Still set a password hash to satisfy NOT NULL / validation.
+    // Generate a deterministic-ish strong password seed (or truly random if you prefer).
+    const auto pwSeed = ids::IdGenerator({ .namespace_token = "vaulthalla-system-user" }).generate();
+    user->setPasswordHash(hashPassword(pwSeed));
+
+    user->linux_uid = sysUid;
+
+    const auto role = PermsQueries::getRoleByName("super_admin");
+    user->role = std::make_shared<UserRole>();
+    user->role->id = role->id;
+    user->role->name = role->name;
+    user->role->description = role->description;
+    user->role->type = role->type;
+    user->role->permissions = role->permissions;
+
+    UserQueries::createUser(user);
+
+    LogRegistry::vaulthalla()->info(
+        "[initdb] Created system user mapped to OS account '{}' (linux_uid={})",
+        systemUsername, sysUid
+    );
 }
 
 namespace vh::seed {

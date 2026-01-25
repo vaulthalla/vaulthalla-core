@@ -9,6 +9,7 @@ static constexpr std::string_view ADMIN_DEFAULT_VAULT_NAME = "Admin Default Vaul
 void seed_database();
 void initPermissions();
 void initRoles();
+void initSystemUser();
 void initAdmin();
 void initAdminGroup();
 void initAdminDefaultVault();

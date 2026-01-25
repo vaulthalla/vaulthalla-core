@@ -538,4 +538,3 @@ bool Filesystem::canFastPath(const std::shared_ptr<FSEntry>& entry, const std::s
 bool Filesystem::isPreviewable(const std::string& mimeType) {
     return mimeType.starts_with("image") || mimeType.starts_with("application") || mimeType.contains("pdf");
 }
-

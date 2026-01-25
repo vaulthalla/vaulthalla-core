@@ -32,4 +32,6 @@ std::filesystem::path decrypt_file_to_temp(unsigned int vault_id,
 
 bool isProbablyEncrypted(const std::filesystem::path& path);
 
+std::string bytesToSize(uintmax_t bytes);
+
 }

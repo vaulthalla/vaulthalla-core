@@ -8,12 +8,17 @@
 #include "database/Queries/FileQueries.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
+#include <nlohmann/json.hpp>
+
+#include "util/files.hpp"
+
 using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::database;
+using namespace vh::util;
 
 struct CompareFiles {
-    static bool operator()(const std::pair<std::string, unsigned int>& a, const std::pair<std::string, unsigned int>& b) const {
+    bool operator()(const std::pair<std::string, unsigned int>& a, const std::pair<std::string, unsigned int>& b) const {
         return a.second < b.second;
     }
 };
@@ -36,7 +41,9 @@ CapacityStats::CapacityStats(const unsigned int vaultId) {
 
     capacity = engine->vault->quota;
     logical_size = dir->size_bytes;
-    physical_size = engine->getDirectorySize("/");
+    physical_size = engine->getVaultSize();
+    cache_size = engine->getCacheSize();
+    free_space = engine->freeSpace();
     file_count = dir->file_count;
     directory_count = dir->subdirectory_count;
     average_file_size_bytes = dir->size_bytes / file_count;
@@ -44,4 +51,17 @@ CapacityStats::CapacityStats(const unsigned int vaultId) {
         largest_file_size_bytes = largest->size_bytes;
     top_file_extensions_by_size =
         toTop10Array(FileQueries::getTopExtensionsBySize(engine->vault->id, 10));
+}
+
+void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CapacityStats>& stats) {
+    j["capacity"] = bytesToSize(stats->capacity);
+    j["logical_size"] = bytesToSize(stats->logical_size);
+    j["physical_size"] = bytesToSize(stats->physical_size);
+    j["free_space"] = bytesToSize(stats->free_space);
+    j["cache_size"] = bytesToSize(stats->cache_size);
+    j["file_count"] = stats->file_count;
+    j["directory_count"] = stats->directory_count;
+    j["average_file_size"] = bytesToSize(stats->average_file_size_bytes);
+    j["largest_file_size"] = bytesToSize(stats->largest_file_size_bytes);
+    j["top_file_extensions"] = stats->top_file_extensions_by_size;
 }

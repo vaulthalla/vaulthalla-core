@@ -35,11 +35,13 @@ public:
         unsigned int syncN  = base + (rem > 1 ? 1 : 0);
         unsigned int thumbN = base; // thumb/http get no extra by default
         unsigned int httpN  = base;
+        unsigned int statsN = base;
 
         fuse_  = std::make_shared<ThreadPool>(nullptr, fuseN);
         sync_  = std::make_shared<ThreadPool>(nullptr, syncN);
         thumb_ = std::make_shared<ThreadPool>(nullptr, thumbN);
         http_  = std::make_shared<ThreadPool>(nullptr, httpN);
+        stats_ = std::make_shared<ThreadPool>(nullptr, statsN);
 
         stopFlag_.store(false);
 
@@ -62,6 +64,7 @@ public:
         if (sync_)  sync_->stop();
         if (thumb_) thumb_->stop();
         if (http_)  http_->stop();
+        if (stats_) stats_->stop();
 
         running_.store(false);
     }
@@ -70,6 +73,7 @@ public:
     std::shared_ptr<ThreadPool>& syncPool() { return sync_; }
     std::shared_ptr<ThreadPool>& thumbPool() { return thumb_; }
     std::shared_ptr<ThreadPool>& httpPool() { return http_; }
+    std::shared_ptr<ThreadPool>& statsPool() { return stats_; }
 
     void signalPressureChange() {
         {
@@ -93,18 +97,21 @@ private:
             if (stopFlag_.load()) return;
             pressureFlag_.store(false);
 
-            auto fuseQ  = fuse_->queueDepth();
-            auto syncQ  = sync_->queueDepth();
-            auto httpQ  = http_->queueDepth();
-            auto thumbQ = thumb_->queueDepth();
+            const auto fuseQ  = fuse_->queueDepth();
+            const auto syncQ  = sync_->queueDepth();
+            const auto httpQ  = http_->queueDepth();
+            const auto thumbQ = thumb_->queueDepth();
+            const auto statsQ = stats_->queueDepth();
 
             // Compare backlog/worker ratios
-            auto fuseRatio  = fuseQ  / std::max(1u, fuse_->workerCount());
-            auto syncRatio  = syncQ  / std::max(1u, sync_->workerCount());
-            auto httpRatio  = httpQ  / std::max(1u, http_->workerCount());
-            auto thumbRatio = thumbQ / std::max(1u, thumb_->workerCount());
+            const auto fuseRatio  = fuseQ  / std::max(1u, fuse_->workerCount());
+            const auto syncRatio  = syncQ  / std::max(1u, sync_->workerCount());
+            const auto httpRatio  = httpQ  / std::max(1u, http_->workerCount());
+            const auto thumbRatio = thumbQ / std::max(1u, thumb_->workerCount());
+            const auto statsRatio = statsQ / std::max(1u, stats_->workerCount());
 
             maybeReassign(fuse_, http_, fuseRatio, httpRatio);
+            maybeReassign(fuse_, stats_, fuseRatio, statsRatio);
             maybeReassign(sync_, thumb_, syncRatio, thumbRatio);
         }
     }
@@ -126,7 +133,7 @@ private:
     }
 
     static constexpr unsigned int RESERVE_FACTOR = 3, NUM_POOLS = 4;
-    std::shared_ptr<ThreadPool> fuse_, sync_, thumb_, http_;
+    std::shared_ptr<ThreadPool> fuse_, sync_, thumb_, http_, stats_;
     std::atomic<bool> stopFlag_{false};
     std::atomic<bool> running_{false};
     std::thread monitorThread_;

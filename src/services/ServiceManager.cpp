@@ -5,6 +5,7 @@
 #include "services/CtlServerService.hpp"
 #include "services/ConnectionLifecycleManager.hpp"
 #include "services/LogRotationService.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <paths.h>
 

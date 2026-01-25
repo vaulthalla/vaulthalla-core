@@ -11,6 +11,9 @@
 #include <vector>
 #include <string>
 #include <random>
+#include <array>
+#include <cmath>
+#include <format>
 
 using namespace vh::util;
 using namespace vh::types;
@@ -116,4 +119,29 @@ bool vh::util::isProbablyEncrypted(const std::filesystem::path& path) {
     if (!in) return false;
     const auto size = in.tellg();
     return size >= 12 + 16;  // IV + tag = minimum
+}
+
+std::string vh::util::bytesToSize(uintmax_t bytes) {
+    // Units (binary / IEC-ish labels would be KiB/MiB/GiB/TiB; using KB/MB... to match your style)
+    static constexpr std::array<const char*, 5> suffix = {"B", "KB", "MB", "GB", "TB"};
+
+    // Fast path: tiny
+    if (bytes < 1024) return std::to_string(bytes) + "B";
+
+    // Use double for scaling; uintmax_t may be huge.
+    auto value = static_cast<double>(bytes);
+    std::size_t unit = 0;
+
+    // Divide until we fit, capped at TB so we never go past suffix array.
+    while (value >= 1024.0 && unit + 1 < suffix.size()) {
+        value /= 1024.0;
+        ++unit;
+    }
+
+    // You can choose formatting:
+    // - no decimals for KB+ when it's an integer-ish
+    // - 1 decimal for non-integers (looks nicer)
+    if (value >= 100.0 || std::fabs(value - std::round(value)) < 0.05)
+        return std::format("{:.0f}{}", value, suffix[unit]);
+    return std::format("{:.1f}{}", value, suffix[unit]);
 }

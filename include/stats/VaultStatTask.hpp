@@ -10,7 +10,7 @@ namespace vh::stats {
 
 struct VaultStatTask final : concurrency::PromisedTask {
     unsigned int vaultId;
-    std::unique_ptr<types::VaultStat> stat;
+    std::shared_ptr<types::VaultStat> stat;
 
     explicit VaultStatTask(unsigned int vaultId);
     ~VaultStatTask() override = default;

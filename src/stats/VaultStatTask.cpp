@@ -7,10 +7,6 @@ using namespace vh::types;
 VaultStatTask::VaultStatTask(const unsigned int vaultId) : vaultId(vaultId) {}
 
 void VaultStatTask::operator()() {
-    try {
-        stat = std::make_shared<VaultStat>(vaultId);
-        promise.set_value(stat);
-    } catch (std::exception& e) {
-        promise.set_exception(std::make_exception_ptr(e));
-    }
+    try { promise.set_value(std::make_shared<VaultStat>(vaultId)); }
+    catch (std::exception& e) { promise.set_exception(std::make_exception_ptr(e)); }
 }

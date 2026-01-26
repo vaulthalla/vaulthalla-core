@@ -176,12 +176,22 @@ VAUL_PG_PASS=$(openssl rand -base64 32 | tr -d '\n')
 echo "🔐 Creating PostgreSQL user and database..."
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='vaulthalla'" | grep -q 1 ||
-    sudo -u postgres psql -c "CREATE USER vaulthalla WITH PASSWORD '${VAUL_PG_PASS}';"
+  sudo -u postgres psql -c "CREATE USER vaulthalla WITH PASSWORD '${VAUL_PG_PASS}';"
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vaulthalla'" | grep -q 1 ||
-    sudo -u postgres psql -c "CREATE DATABASE vaulthalla OWNER vaulthalla;"
+  sudo -u postgres psql -c "CREATE DATABASE vaulthalla OWNER vaulthalla;"
 
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vaulthalla TO vaulthalla;"
+sudo -u postgres psql -d vaulthalla -c "GRANT USAGE, CREATE ON SCHEMA public TO vaulthalla;"
+
+if [[ "$DEV_MODE" == true ]]; then
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='vh_cli_test'" | grep -q 1 ||
+    sudo -u postgres psql -c "CREATE DATABASE vh_cli_test OWNER vaulthalla_test;"
+
+  sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vh_cli_test TO vaulthalla_test;"
+  sudo -u postgres psql -d vh_cli_test -c "GRANT USAGE, CREATE ON SCHEMA public TO vaulthalla_test;"
+fi
+
 
 # === 9) Seed DB Password (for runtime TPM sealing) ===
 PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"

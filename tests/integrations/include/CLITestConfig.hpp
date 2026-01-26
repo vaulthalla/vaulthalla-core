@@ -21,6 +21,16 @@ struct CLITestConfig {
         };
     }
 
+    static CLITestConfig Medium() {
+        return CLITestConfig{
+            .numUsers = 15,
+            .numVaults = 20,
+            .numGroups = 10,
+            .numUserRoles = 10,
+            .numVaultRoles = 10
+        };
+    }
+
     static CLITestConfig Large() {
         return CLITestConfig{
             .numUsers = 50,

@@ -8,6 +8,8 @@
 #include <vector>
 #include <algorithm>
 #include <stdexcept>
+#include <format>
+#include <openssl/sha.h>
 
 namespace vh::database::seed {
 
@@ -21,29 +23,19 @@ inline std::string readFileToString(const fs::path& p) {
     return ss.str();
 }
 
-#if __has_include(<openssl/sha.h>)
-  #include <openssl/sha.h>
-  inline std::string sha256Hex(const std::string& s) {
-      unsigned char hash[SHA256_DIGEST_LENGTH];
-      SHA256(reinterpret_cast<const unsigned char*>(s.data()), s.size(), hash);
+inline std::string sha256Hex(const std::string& s) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(s.data()), s.size(), hash);
 
-      static const char* hex = "0123456789abcdef";
-      std::string out;
-      out.resize(SHA256_DIGEST_LENGTH * 2);
-      for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-          out[i * 2 + 0] = hex[(hash[i] >> 4) & 0xF];
-          out[i * 2 + 1] = hex[(hash[i] >> 0) & 0xF];
-      }
-      return out;
-  }
-#else
-  // Fallback: not cryptographic, but stable enough to detect changes in dev.
-  inline std::string sha256Hex(const std::string& s) {
-      std::hash<std::string> h;
-      const auto v = h(s);
-      return std::to_string(static_cast<unsigned long long>(v));
-  }
-#endif
+    static const auto* hex = "0123456789abcdef";
+    std::string out;
+    out.resize(SHA256_DIGEST_LENGTH * 2);
+    for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        out[i * 2 + 0] = hex[(hash[i] >> 4) & 0xF];
+        out[i * 2 + 1] = hex[(hash[i] >> 0) & 0xF];
+    }
+    return out;
+}
 
 struct SqlDeployer {
     // Creates the migrations table if missing.
@@ -59,21 +51,31 @@ struct SqlDeployer {
 
     // Returns true if this exact file hash is already applied.
     static bool isApplied(pqxx::work& txn, const std::string& filename, const std::string& hash) {
-        const auto r = txn.exec_params(
+        const auto r = txn.exec(
             "SELECT 1 FROM schema_migrations WHERE filename = $1 AND sha256 = $2",
-            filename, hash
+            pqxx::params{filename, hash}
         );
         return !r.empty();
     }
 
     // Mark file applied (upsert).
     static void markApplied(pqxx::work& txn, const std::string& filename, const std::string& hash) {
-        txn.exec_params(R"(
+        txn.exec(R"(
             INSERT INTO schema_migrations (filename, sha256)
             VALUES ($1, $2)
             ON CONFLICT (filename)
             DO UPDATE SET sha256 = EXCLUDED.sha256, applied_at = CURRENT_TIMESTAMP
-        )", filename, hash);
+        )", pqxx::params{filename, hash});
+    }
+
+    static bool filenameExists(pqxx::work& txn, const std::string& filename, std::string* existing_hash = nullptr) {
+        const auto r = txn.exec(
+            "SELECT sha256 FROM schema_migrations WHERE filename = $1",
+            pqxx::params{filename}
+        );
+        if (r.empty()) return false;
+        if (existing_hash) *existing_hash = r[0][0].as<std::string>();
+        return true;
     }
 
     // Load *.sql from a directory, sort by filename, execute.
@@ -94,7 +96,7 @@ struct SqlDeployer {
             if (p.extension() == ".sql") files.push_back(p);
         }
 
-        std::sort(files.begin(), files.end(), [](const fs::path& a, const fs::path& b) {
+        std::ranges::sort(files.begin(), files.end(), [](const fs::path& a, const fs::path& b) {
             return a.filename().string() < b.filename().string();
         });
 
@@ -103,12 +105,18 @@ struct SqlDeployer {
             const std::string hash = sha256Hex(sql);
             const std::string filename = p.filename().string();
 
-            if (isApplied(txn, filename, hash)) continue;
+            std::string existing;
+            if (filenameExists(txn, filename, &existing)) {
+                if (existing != hash) {
+                    throw std::runtime_error(std::format("Migration file was modified after being applied: {} "
+                                                         "(db={} file={}). Create a new migration instead.",
+                        filename, existing, hash)
+                    );
+                }
+                continue; // exact match already applied
+            }
 
-            // Execute the whole file. PostgreSQL accepts multi-statement strings.
-            // If something fails, the transaction will roll back.
             txn.exec(sql);
-
             markApplied(txn, filename, hash);
         }
     }

@@ -115,7 +115,7 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
         const auto ino = getOrAssignInode(path);
         auto entry = FSEntryQueries::getFSEntryByInode(ino);
         if (!entry) {
-            LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", path.string());
+            LogRegistry::storage()->debug("[FSCache] No entry found for path: {}", path.string());
             return nullptr;
         }
 
@@ -364,7 +364,7 @@ void FSCache::evictIno(fuse_ino_t ino) {
     std::unique_lock lock(mutex_);
 
     if (!inodeToPath_.contains(ino) || !inodeToId_.contains(ino)) {
-        LogRegistry::fs()->warn("[FSCache] Attempted to destroy references for non-existent inode: {}", ino);
+        LogRegistry::fs()->debug("[FSCache] Attempted to destroy references for non-existent inode: {}", ino);
         return;
     }
 
@@ -400,7 +400,7 @@ void FSCache::evictPath(const fs::path& path) {
     {
         std::unique_lock lock(mutex_);
         if (!pathToInode_.contains(path)) {
-            LogRegistry::fs()->warn("[FSCache] Attempted to evict non-existent path: {}", path.string());
+            LogRegistry::fs()->debug("[FSCache] Attempted to evict non-existent path: {}", path.string());
             return;
         }
         ino = pathToInode_[path];

@@ -1,5 +1,6 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "types/Vault.hpp"
+#include "types/S3Vault.hpp"
 #include "types/User.hpp"
 #include "types/VaultRole.hpp"
 #include "types/PermissionOverride.hpp"

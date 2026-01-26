@@ -2,6 +2,7 @@
 #include "protocols/websocket/handlers/PermissionsHandler.hpp"
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
 #include "protocols/websocket/handlers/GroupHandler.hpp"
+#include "protocols/websocket/handlers/StatsHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -26,6 +27,7 @@ void WebSocketHandler::registerAllHandlers() const {
     registerPermissionsHandlers();
     registerSettingsHandlers();
     registerGroupHandlers();
+    registerStatHandlers();
 
     LogRegistry::ws()->debug("[WebSocketHandler] All handlers registered successfully.");
 }
@@ -244,5 +246,14 @@ void WebSocketHandler::registerGroupHandlers() const {
     });
 }
 
+void WebSocketHandler::registerStatHandlers() const {
+    router_->registerHandler("stats.vault", [this](const json& msg, WebSocketSession& session) {
+        StatsHandler::handleVaultStats(msg, session);
+    });
+
+    router_->registerHandler("stats.cache", [this](const json& msg, WebSocketSession& session) {
+        StatsHandler::handleCacheStats(msg, session);
+    });
+}
 
 } // namespace vh::websocket

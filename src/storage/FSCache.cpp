@@ -1,4 +1,5 @@
 #include "storage/FSCache.hpp"
+
 #include "types/FSEntry.hpp"
 #include "types/Directory.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
@@ -8,9 +9,11 @@
 #include "storage/StorageManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
+#include "types/stats/CacheStats.hpp"
 
 #include <unordered_set>
 #include <mutex>
+#include <limits>
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -18,12 +21,41 @@ using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
 
+namespace {
+
+// “Represented bytes” for cache working-set tracking.
+// This is NOT RAM usage — it’s how much content the cached entries represent.
+uint64_t safeSizeBytes(const std::shared_ptr<vh::types::FSEntry>& e) noexcept {
+    if (!e) return 0;
+    const auto s = static_cast<unsigned long long>(e->size_bytes);
+    return (s > std::numeric_limits<uint64_t>::max())
+        ? std::numeric_limits<uint64_t>::max()
+        : static_cast<uint64_t>(s);
+}
+
+uint64_t addClamp(uint64_t a, uint64_t b) noexcept {
+    constexpr uint64_t max = std::numeric_limits<uint64_t>::max();
+    return (max - a < b) ? max : (a + b);
+}
+
+uint64_t subClamp(uint64_t a, uint64_t b) noexcept {
+    return (a >= b) ? (a - b) : 0;
+}
+
+} // namespace
+
 FSCache::FSCache() {
+    stats_ = std::make_shared<CacheStats>();
+
+    // Seed hard root mapping for FUSE
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
+
     nextInode_ = FSEntryQueries::getNextInode();
+
     initRoot();
     restoreCache();
+
     LogRegistry::storage()->info("[FSCache] Initialized with next inode: {}", nextInode_);
 }
 
@@ -56,11 +88,11 @@ void FSCache::restoreCache() {
             continue;
         }
 
-        if (entry->inode) cacheEntry(entry);
+        if (entry->inode) cacheEntry(entry, true /*isFirstSeeding*/);
         else {
             entry->inode = std::make_optional(getOrAssignInode(entry->fuse_path));
             FSEntryQueries::updateFSEntry(entry);
-            cacheEntry(entry);
+            cacheEntry(entry, true /*isFirstSeeding*/);
         }
     }
 }
@@ -68,8 +100,16 @@ void FSCache::restoreCache() {
 std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
     const auto path = makeAbsolute(absPath);
     LogRegistry::storage()->debug("[FSCache] Retrieving entry for path: {}", path.string());
-    const auto it = pathToEntry_.find(path);
-    if (it != pathToEntry_.end()) return it->second;
+    
+    {
+        std::shared_lock lock(mutex_);
+        if (const auto it = pathToEntry_.find(path); it != pathToEntry_.end()) {
+            stats_->record_hit();
+            return it->second;
+        }
+    }
+
+    stats_->record_miss();
 
     try {
         const auto ino = getOrAssignInode(path);
@@ -84,6 +124,7 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
             entry->inode = std::make_optional(getOrAssignInode(path));
             cacheEntry(entry);
         }
+
         return entry;
     } catch (const std::exception& e) {
         LogRegistry::storage()->error("[FSCache] Error retrieving entry for path {}: {}", path.string(), e.what());
@@ -96,8 +137,13 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fuse_ino_t ino) {
 
     {
         std::shared_lock lock(mutex_);
-        if (inodeToEntry_.contains(ino)) return inodeToEntry_.at(ino);
+        if (const auto it = inodeToEntry_.find(ino); it != inodeToEntry_.end()) {
+            stats_->record_hit();
+            return it->second;
+        }
     }
+
+    stats_->record_miss();
 
     auto entry = FSEntryQueries::getFSEntryByInode(ino);
     if (entry) cacheEntry(entry);
@@ -105,41 +151,45 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fuse_ino_t ino) {
     return entry;
 }
 
-fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
-    std::shared_lock lock(mutex_);
-    auto it = pathToInode_.find(absPath);
-    if (it != pathToInode_.end()) return it->second;
-
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(absPath);
-    if (!entry) {
-        LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
-        return FUSE_ROOT_ID; // or some error code
-    }
-
-    fuse_ino_t ino = entry && entry->inode ? *entry->inode : getOrAssignInode(absPath);
-    if (ino == FUSE_ROOT_ID) {
-        LogRegistry::storage()->error("[FSCache] Failed to resolve inode for path: {}", absPath.string());
-        return FUSE_ROOT_ID; // or some error code
-    }
-
-    // Cache the resolved inode
-    linkPath(absPath, ino);
-    return ino;
-}
-
 std::shared_ptr<FSEntry> FSCache::getEntryById(unsigned int id) {
     std::shared_lock lock(mutex_);
     auto it = idToEntry_.find(id);
-    if (it != idToEntry_.end()) return it->second;
+    if (it != idToEntry_.end()) {
+        stats_->record_hit();
+        return it->second;
+    }
 
+    stats_->record_miss();
     LogRegistry::storage()->warn("[FSCache] No entry found for ID: {}", id);
     return nullptr;
 }
 
+fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
+    // Try hot map first
+    {
+        std::shared_lock lock(mutex_);
+        if (const auto it = pathToInode_.find(absPath); it != pathToInode_.end()) return it->second;
+    }
+
+    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(absPath);
+    if (!entry) {
+        LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
+        return FUSE_ROOT_ID;
+    }
+
+    const fuse_ino_t ino = (entry->inode ? *entry->inode : getOrAssignInode(absPath));
+    if (ino == FUSE_ROOT_ID) {
+        LogRegistry::storage()->error("[FSCache] Failed to resolve inode for path: {}", absPath.string());
+        return FUSE_ROOT_ID;
+    }
+
+    linkPath(absPath, ino);
+    return ino;
+}
+
 fuse_ino_t FSCache::assignInode(const fs::path& path) {
     std::unique_lock lock(mutex_);
-    const auto it = pathToInode_.find(path);
-    if (it != pathToInode_.end()) return it->second;
+    if (const auto it = pathToInode_.find(path); it != pathToInode_.end()) return it->second;
 
     const fuse_ino_t ino = nextInode_++;
     inodeToPath_[ino] = path;
@@ -149,23 +199,12 @@ fuse_ino_t FSCache::assignInode(const fs::path& path) {
 
 fuse_ino_t FSCache::getOrAssignInode(const fs::path& path) {
     std::scoped_lock lock(mutex_);
-    auto it = pathToInode_.find(path);
-    if (it != pathToInode_.end()) return it->second;
+    if (const auto it = pathToInode_.find(path); it != pathToInode_.end()) return it->second;
 
-    fuse_ino_t new_ino = nextInode_++;
-    pathToInode_[path] = new_ino;
-    inodeToPath_[new_ino] = path;
-    return new_ino;
-}
-
-void FSCache::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
-    std::unique_lock lock(mutex_);
-    if (pathToInode_.contains(absPath)) {
-        LogRegistry::storage()->debug("[FSCache] Path {} already linked to inode {}", absPath.string(), ino);
-        return; // Path already exists
-    }
-    pathToInode_[absPath] = ino;
-    inodeToPath_[ino] = absPath;
+    const fuse_ino_t ino = nextInode_++;
+    pathToInode_[path] = ino;
+    inodeToPath_[ino] = path;
+    return ino;
 }
 
 fs::path FSCache::resolvePath(fuse_ino_t ino) {
@@ -174,8 +213,18 @@ fs::path FSCache::resolvePath(fuse_ino_t ino) {
     return inodeToPath_.at(ino);
 }
 
+void FSCache::linkPath(const fs::path& absPath, const fuse_ino_t ino) {
+    std::unique_lock lock(mutex_);
+    if (pathToInode_.contains(absPath)) {
+        LogRegistry::storage()->debug("[FSCache] Path {} already linked to inode {}", absPath.string(), ino);
+        return;
+    }
+    pathToInode_[absPath] = ino;
+    inodeToPath_[ino] = absPath;
+}
+
 void FSCache::decrementInodeRef(const fuse_ino_t ino, const uint64_t nlookup) {
-    if (nlookup > 1) return;  // This is also a no-op, but could be extended
+    if (nlookup > 1) return;
     evictIno(ino);
 }
 
@@ -186,7 +235,7 @@ bool FSCache::entryExists(const fs::path& absPath) const {
 
 std::shared_ptr<FSEntry> FSCache::getEntryFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(mutex_);
-    if (inodeToEntry_.contains(ino)) return inodeToEntry_.at(ino);
+    if (const auto it = inodeToEntry_.find(ino); it != inodeToEntry_.end()) return it->second;
     LogRegistry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
     return nullptr;
 }
@@ -196,6 +245,7 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
 
     LogRegistry::storage()->debug("[FSCache] Caching entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 
+    // Preflight: reconstruct fuse/backing paths when needed
     if (*entry->inode != FUSE_ROOT_ID) {
         if (!entry->vault_id) {
             LogRegistry::storage()->error("[FSCache] Entry {} has no vault_id, cannot cache", entry->id);
@@ -218,10 +268,32 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
         }
     }
 
-    const pqxx::result parentStats = !isFirstSeeding && entry->parent_id && !entry->isDirectory() ?
-            DirectoryQueries::collectParentStats(*entry->parent_id) : pqxx::result{};
+    const pqxx::result parentStats =
+        (!isFirstSeeding && entry->parent_id && !entry->isDirectory())
+            ? DirectoryQueries::collectParentStats(*entry->parent_id)
+            : pqxx::result{};
 
     std::unique_lock lock(mutex_);
+
+    // --- Used-bytes accounting (incremental, no rescans) ---
+    const fuse_ino_t ino = *entry->inode;
+
+    bool existedAlready = false;
+    uint64_t oldSize = 0;
+
+    // Prefer inode match for “old” instance
+    if (const auto it = inodeToEntry_.find(ino); it != inodeToEntry_.end() && it->second) {
+        existedAlready = true;
+        oldSize = safeSizeBytes(it->second);
+    } else if (const auto pit = pathToEntry_.find(entry->fuse_path); pit != pathToEntry_.end() && pit->second) {
+        existedAlready = true;
+        oldSize = safeSizeBytes(pit->second);
+    } else if (const auto iit = idToEntry_.find(entry->id); iit != idToEntry_.end() && iit->second) {
+        existedAlready = true;
+        oldSize = safeSizeBytes(iit->second);
+    }
+
+    const uint64_t newSize = safeSizeBytes(entry);
 
     auto insert = [&](const std::shared_ptr<FSEntry>& e) {
         if (!e) {
@@ -245,7 +317,7 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
 
     insert(entry);
 
-    // Ensure upstream directories stats are updated
+    // Update upstream directory stats (your existing behavior)
     if (!parentStats.empty()) {
         for (const auto& s : parentStats) {
             const auto id = s["id"].as<unsigned int>();
@@ -254,18 +326,38 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
                 dir->size_bytes = s["size_bytes"].as<uintmax_t>();
                 dir->file_count = s["file_count"].as<unsigned int>();
                 dir->subdirectory_count = s["subdirectory_count"].as<unsigned int>();
-            } else insert(FSEntryQueries::getFSEntryById(id));
+            } else {
+                insert(FSEntryQueries::getFSEntryById(id));
+            }
         }
     }
+
+    // Apply bytes delta after insert + upstream updates
+    const uint64_t curUsed = stats_->snapshot().used_bytes;
+    uint64_t updatedUsed = curUsed;
+
+    if (!existedAlready) {
+        updatedUsed = addClamp(curUsed, newSize);
+        stats_->record_insert();
+    } else {
+        if (newSize >= oldSize) updatedUsed = addClamp(curUsed, (newSize - oldSize));
+        else updatedUsed = subClamp(curUsed, (oldSize - newSize));
+    }
+
+    stats_->set_used(updatedUsed);
 
     LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 }
 
 void FSCache::updateEntry(const std::shared_ptr<types::FSEntry>& entry) {
-    LogRegistry::fs()->debug("[FSCache] Updating entry: {} with inode {}", entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
+    LogRegistry::fs()->debug("[FSCache] Updating entry: {} with inode {}",
+                             entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
+
     FSEntryQueries::updateFSEntry(entry);
     cacheEntry(entry);
-    LogRegistry::fs()->debug("[FSCache] Updated entry: {} with inode {}", entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
+
+    LogRegistry::fs()->debug("[FSCache] Updated entry: {} with inode {}",
+                             entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
 }
 
 void FSCache::evictIno(fuse_ino_t ino) {
@@ -278,15 +370,29 @@ void FSCache::evictIno(fuse_ino_t ino) {
 
     const auto path = inodeToPath_.at(ino);
     const auto id = inodeToId_.at(ino);
+
+    // Capture removed size before erasing
+    uint64_t removedSize = 0;
+    if (const auto it = inodeToEntry_.find(ino); it != inodeToEntry_.end()) removedSize = safeSizeBytes(it->second);
+    else if (const auto it2 = pathToEntry_.find(path); it2 != pathToEntry_.end()) removedSize = safeSizeBytes(it2->second);
+    else if (const auto it3 = idToEntry_.find(id); it3 != idToEntry_.end()) removedSize = safeSizeBytes(it3->second);
+
     inodeToPath_.erase(ino);
     pathToInode_.erase(path);
     inodeToEntry_.erase(ino);
     pathToEntry_.erase(path);
     inodeToId_.erase(ino);
     idToEntry_.erase(id);
-    if (childToParent_.contains(ino)) childToParent_.erase(ino);
-}
 
+    // ✅ FIX: childToParent_ is keyed by CHILD ID, not inode.
+    childToParent_.erase(id);
+
+    // Update used bytes (bounded)
+    const uint64_t curUsed = stats_->snapshot().used_bytes;
+    stats_->set_used(subClamp(curUsed, removedSize));
+
+    stats_->record_eviction();
+}
 
 void FSCache::evictPath(const fs::path& path) {
     fuse_ino_t ino;
@@ -300,17 +406,21 @@ void FSCache::evictPath(const fs::path& path) {
         ino = pathToInode_[path];
     }
 
+    stats_->record_invalidation();
     evictIno(ino);
 }
 
 std::vector<std::shared_ptr<FSEntry>> FSCache::listDir(const unsigned int parentId, const bool recursive) const {
     const auto parent = FSEntryQueries::getFSEntryById(parentId);
     if (!parent->isDirectory()) throw std::runtime_error("Parent ID is not a directory");
+
     const auto parentDir = std::static_pointer_cast<Directory>(parent);
+
     unsigned int numEntries = parentDir->file_count + parentDir->subdirectory_count;
-    if (!recursive)
+    if (!recursive) {
         for (const auto& subdir : DirectoryQueries::listDirectoriesInDir(parentId))
             numEntries -= subdir->file_count + subdir->subdirectory_count;
+    }
 
     std::vector<std::shared_ptr<FSEntry>> entries;
     entries.reserve(childToParent_.size()); // cheap upper bound
@@ -318,7 +428,7 @@ std::vector<std::shared_ptr<FSEntry>> FSCache::listDir(const unsigned int parent
     auto append_children = [&](const unsigned int pid) {
         for (const auto& [childId, pId] : childToParent_) {
             if (pId == pid) {
-                if (auto it = idToEntry_.find(childId); it != idToEntry_.end()) {
+                if (const auto it = idToEntry_.find(childId); it != idToEntry_.end()) {
                     entries.push_back(it->second);
                 }
             }
@@ -328,16 +438,13 @@ std::vector<std::shared_ptr<FSEntry>> FSCache::listDir(const unsigned int parent
     append_children(parentId);
 
     if (recursive) {
-        // BFS over 'entries' as it grows. Track visited to guard against bad cycles.
         std::unordered_set<unsigned int> visited;
         visited.reserve(childToParent_.size());
 
-        for (const auto & e : entries) {
+        for (const auto& e : entries) {
             if (!e) continue;
-
             const unsigned int eid = e->id;
             if (!visited.insert(eid).second) continue;
-
             append_children(eid);
         }
     }
@@ -346,12 +453,20 @@ std::vector<std::shared_ptr<FSEntry>> FSCache::listDir(const unsigned int parent
         LogRegistry::fs()->warn("[FSCache] Expected {} entries, but found {}", numEntries, entries.size());
         const auto expected = FSEntryQueries::listDir(parentId, recursive);
         if (expected.size() != numEntries) {
-            if (expected.size() == entries.size()) LogRegistry::fs()->warn("Computed number of entries mismatch with actual");
-            throw std::runtime_error(fmt::format("[FSCache] Inconsistent entry count for parent ID {}: expected: {}, found {}, actual: {}",
-                                                  parentId, numEntries, entries.size(), expected.size()));
+            if (expected.size() == entries.size())
+                LogRegistry::fs()->warn("Computed number of entries mismatch with actual");
+
+            throw std::runtime_error(fmt::format(
+                "[FSCache] Inconsistent entry count for parent ID {}: expected: {}, found {}, actual: {}",
+                parentId, numEntries, entries.size(), expected.size()));
         }
         return expected;
     }
 
     return entries;
+}
+
+std::shared_ptr<CacheStatsSnapshot> FSCache::stats() const {
+    // Snapshot should be atomics-only; safe without locking FSCache maps.
+    return std::make_shared<CacheStatsSnapshot>(stats_->snapshot());
 }

@@ -31,6 +31,7 @@ class WebSocketHandler {
     void registerPermissionsHandlers() const;
     void registerSettingsHandlers() const;
     void registerGroupHandlers() const;
+    void registerStatHandlers() const;
 
     template <typename... Funcs> static void enforcePermissions(
         WebSocketSession& session,

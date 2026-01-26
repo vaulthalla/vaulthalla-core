@@ -395,6 +395,8 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
     if (toEngine->vault->id != engine->vault->id)
         throw std::runtime_error("[Filesystem] Cross-vault copy operations are not supported");
 
+    const auto oldBackingPath = entry->backing_path;
+
     Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
         std::vector<uint8_t> buffer;
         if (entry->isDirectory()) {
@@ -429,7 +431,7 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
 
         txn.commit();
 
-        std::filesystem::remove_all(entry->backing_path);
+        if (entry->backing_path != oldBackingPath) std::filesystem::remove_all(oldBackingPath);
     });
 
     ServiceDepsRegistry::instance().fsCache->evictPath(oldPath);
@@ -442,7 +444,7 @@ void Filesystem::rename(const fs::path& oldPath, const fs::path& newPath, const 
 void Filesystem::handleRename(const RenameContext& ctx) {
     const auto& cache = ServiceDepsRegistry::instance().fsCache;
 
-    const auto& oldBackingPath = ctx.entry->backing_path;
+    const auto oldBackingPath = ctx.entry->backing_path;
     if (!std::filesystem::exists(oldBackingPath)) {
         throw std::filesystem::filesystem_error(
             "[Filesystem] Source path does not exist: " + oldBackingPath.string(),
@@ -472,18 +474,17 @@ void Filesystem::handleRename(const RenameContext& ctx) {
     entry->parent_id = parent->id;
     entry->created_by = entry->last_modified_by = ctx.userId;
 
-    const auto newBackingPath = parent->backing_path / entry->base32_alias;
-    entry->backing_path = newBackingPath;
+    entry->backing_path = parent->backing_path / entry->base32_alias;
 
-    if (entry->isDirectory()) std::filesystem::create_directories(newBackingPath);
+    if (entry->isDirectory()) std::filesystem::create_directories(entry->backing_path);
     else {
-        std::filesystem::create_directories(newBackingPath.parent_path());
+        std::filesystem::create_directories(entry->backing_path.parent_path());
         const auto f = std::static_pointer_cast<File>(entry);
 
         if (canFastPath(entry, ctx.engine)) {
             LogRegistry::fs()->debug("Fast path rename for file: {}", ctx.from.string());
 
-            std::filesystem::rename(oldBackingPath, newBackingPath);
+            std::filesystem::rename(oldBackingPath, entry->backing_path);
             updateFSEntry(ctx.txn, entry);
 
             cache->evictPath(ctx.from);
@@ -500,17 +501,17 @@ void Filesystem::handleRename(const RenameContext& ctx) {
         } else buffer = readFileToVector(oldBackingPath);
 
         if (buffer.empty()) {
-            std::ofstream(newBackingPath).close();
-            if (!std::filesystem::exists(newBackingPath))
-                throw std::runtime_error("Failed to create real file at: " + newBackingPath.string());
+            std::ofstream(entry->backing_path).close();
+            if (!std::filesystem::exists(entry->backing_path))
+                throw std::runtime_error("Failed to create real file at: " + entry->backing_path.string());
         } else {
             const auto ciphertext = ctx.engine->encryptionManager->encrypt(buffer, f);
             if (ciphertext.empty()) throw std::runtime_error("Encryption failed for file: " + oldBackingPath.string());
-            writeFile(newBackingPath, ciphertext);
+            writeFile(entry->backing_path, ciphertext);
 
-            f->size_bytes = std::filesystem::file_size(newBackingPath);
+            f->size_bytes = std::filesystem::file_size(entry->backing_path);
             f->mime_type = Magic::get_mime_type_from_buffer(buffer);
-            f->content_hash = Hash::blake2b(newBackingPath);
+            f->content_hash = Hash::blake2b(entry->backing_path);
 
             if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
                 ThumbnailWorker::enqueue(ctx.engine, buffer, f);
@@ -538,4 +539,3 @@ bool Filesystem::canFastPath(const std::shared_ptr<FSEntry>& entry, const std::s
 bool Filesystem::isPreviewable(const std::string& mimeType) {
     return mimeType.starts_with("image") || mimeType.starts_with("application") || mimeType.contains("pdf");
 }
-

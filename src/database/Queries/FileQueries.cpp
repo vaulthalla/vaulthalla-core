@@ -7,6 +7,7 @@
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/FSCache.hpp"
+#include "types/stats/CapacityStats.hpp"
 
 #include <optional>
 
@@ -309,3 +310,52 @@ std::vector<std::shared_ptr<File>> FileQueries::getFilesOlderThanKeyVersion(unsi
     });
 }
 
+std::shared_ptr<File> FileQueries::getLargestFile(unsigned int vaultId) {
+    return Transactions::exec("FileQueries::getLargestFile", [&](pqxx::work& txn) {
+        const auto res = txn.exec(pqxx::prepped{"get_n_largest_files"}, pqxx::params{vaultId, 1});
+        if (res.empty()) return std::shared_ptr<File>();
+        const auto parentRows = txn.exec(pqxx::prepped{"collect_parent_chain"}, res.one_row()["parent_id"].as<std::optional<unsigned int>>());
+        return std::make_shared<File>(res.one_row(), parentRows);
+    });
+}
+
+std::vector<std::shared_ptr<File>> FileQueries::getNLargestFiles(unsigned int vaultId, unsigned int n) {
+    return Transactions::exec("FileQueries::getNLargestFile", [&](pqxx::work& txn) {
+        const auto res = txn.exec(pqxx::prepped{"get_n_largest_files"}, pqxx::params{vaultId, n});
+        if (res.empty()) return std::vector<std::shared_ptr<File>>();
+        return files_from_pq_res(res);
+    });
+}
+
+std::vector<std::shared_ptr<File> > FileQueries::getAllFiles(unsigned int vaultId) {
+    return Transactions::exec("FileQueries::getAllFiles", [&](pqxx::work& txn) {
+        const auto res = txn.exec(pqxx::prepped{"get_all_files"}, pqxx::params{vaultId});
+        if (res.empty()) return std::vector<std::shared_ptr<File>>();
+        return files_from_pq_res(res);
+    });
+}
+
+std::vector<ExtensionStat> FileQueries::getTopExtensionsBySize(unsigned int vaultId, unsigned int limit) {
+    if (limit == 0) return {};
+
+    return Transactions::exec("FileQueries::getTopExtensionsBySize", [&](pqxx::work& txn) {
+        pqxx::params p;
+        p.append(vaultId);
+        p.append(limit);
+
+        const auto res = txn.exec(pqxx::prepped{"get_top_extensions_by_size"}, p);
+        if (res.empty()) return std::vector<ExtensionStat>{};
+
+        std::vector<ExtensionStat> out;
+        out.reserve(res.size());
+
+        for (const auto& row : res) {
+            ExtensionStat s{};
+            s.extension   = row["ext"].as<std::string>();
+            s.total_bytes = row["total_bytes"].as<std::uint64_t>(0);
+            out.emplace_back(std::move(s));
+        }
+
+        return out;
+    });
+}

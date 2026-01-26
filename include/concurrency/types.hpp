@@ -1,5 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <variant>
 
-typedef std::variant<bool> ExpectedFuture;
+namespace vh::types {
+struct VaultStat;
+}
+
+typedef std::variant<bool, std::shared_ptr<vh::types::VaultStat>> ExpectedFuture;

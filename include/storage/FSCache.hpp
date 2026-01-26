@@ -11,6 +11,8 @@
 
 namespace vh::types {
 struct FSEntry;
+struct CacheStatsSnapshot;
+struct CacheStats;
 }
 
 namespace fs = std::filesystem;
@@ -49,8 +51,11 @@ public:
 
     std::vector<std::shared_ptr<types::FSEntry>> listDir(unsigned int parentId, bool recursive = false) const;
 
+    std::shared_ptr<types::CacheStatsSnapshot> stats() const;
+
 private:
     mutable std::shared_mutex mutex_;
+    std::shared_ptr<types::CacheStats> stats_;
     fuse_ino_t nextInode_ = 2;
     std::unordered_map<fuse_ino_t, fs::path> inodeToPath_;
     std::unordered_map<fs::path, fuse_ino_t> pathToInode_;

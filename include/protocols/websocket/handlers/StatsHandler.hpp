@@ -10,6 +10,7 @@ class WebSocketSession;
 
 struct StatsHandler {
     static void handleVaultStats(const json& msg, WebSocketSession& session);
+    static void handleCacheStats(const json& msg, WebSocketSession& session);
 };
 
 }

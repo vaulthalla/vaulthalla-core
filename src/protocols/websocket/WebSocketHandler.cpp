@@ -250,6 +250,10 @@ void WebSocketHandler::registerStatHandlers() const {
     router_->registerHandler("stats.vault", [this](const json& msg, WebSocketSession& session) {
         StatsHandler::handleVaultStats(msg, session);
     });
+
+    router_->registerHandler("stats.cache", [this](const json& msg, WebSocketSession& session) {
+        StatsHandler::handleCacheStats(msg, session);
+    });
 }
 
 } // namespace vh::websocket

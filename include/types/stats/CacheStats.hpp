@@ -15,7 +15,7 @@ template <typename T>
 struct alignas(kCacheLine) PaddedAtomic {
     std::atomic<T> v{0};
     // pad out the remainder of the cache line (best-effort)
-    char pad[kCacheLine - (sizeof(std::atomic<T>) % kCacheLine ? (sizeof(std::atomic<T>) % kCacheLine) : kCacheLine)];
+    char pad[kCacheLine - (sizeof(std::atomic<T>) % kCacheLine ? (sizeof(std::atomic<T>) % kCacheLine) : kCacheLine)]{};
 };
 
 struct LatencyStats {
@@ -76,7 +76,7 @@ struct CacheStats {
 
     void record_op_us(uint64_t us) noexcept;
 
-    CacheStatsSnapshot snapshot() const noexcept;
+    [[nodiscard]] CacheStatsSnapshot snapshot() const noexcept;
 
     // Derivations should use snapshot values (not atomics)
     static double hit_rate(const CacheStatsSnapshot& s) noexcept;
@@ -86,9 +86,9 @@ struct CacheStats {
 };
 
 // JSON serialization
-void to_json(nlohmann::json& j, const CacheStatsSnapshot& s);
+void to_json(nlohmann::json& j, const std::shared_ptr<CacheStatsSnapshot>& s);
 
 // Optional convenience (serializes snapshot + derived fields)
-void to_json(nlohmann::json& j, const CacheStats& s);
+void to_json(nlohmann::json& j, const std::shared_ptr<CacheStats>& s);
 
 } // namespace vh::types

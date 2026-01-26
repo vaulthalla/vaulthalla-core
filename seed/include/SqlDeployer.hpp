@@ -21,7 +21,6 @@ inline std::string readFileToString(const fs::path& p) {
     return ss.str();
 }
 
-// If you already link OpenSSL, use it. If not, see the fallback below.
 #if __has_include(<openssl/sha.h>)
   #include <openssl/sha.h>
   inline std::string sha256Hex(const std::string& s) {
@@ -83,7 +82,7 @@ struct SqlDeployer {
     //  - If file content hash matches what was applied last => skip.
     //  - If file content changed => execute again, then update schema_migrations.
     //
-    // WARNING: re-executing “schema” files is only safe if your SQL is idempotent.
+    // WARNING: re-executing “schema” files is only safe if the SQL is idempotent.
     static void applyDir(pqxx::work& txn, const fs::path& dir) {
         if (!fs::exists(dir)) throw std::runtime_error("SQL deploy dir does not exist: " + dir.string());
         if (!fs::is_directory(dir)) throw std::runtime_error("SQL deploy path is not a directory: " + dir.string());
@@ -115,8 +114,7 @@ struct SqlDeployer {
     }
 
     // Optional: apply “migrations only once” semantics by using a separate table,
-    // or by never reapplying changed files. If you want that behavior, say so
-    // and I’ll give you the variant.
+    // or by never reapplying changed files (needs implementation if so)
 };
 
 } // namespace vh::database::seed

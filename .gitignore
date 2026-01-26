@@ -7,7 +7,6 @@
 # Server
 /build/
 /deploy/psql/hash_password
-/deploy/psql/
 
 # Production
 /dist/

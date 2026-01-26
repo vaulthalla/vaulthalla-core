@@ -40,6 +40,8 @@ config_dir = join_paths(get_option('sysconfdir'), meson.project_name())
 log_dir = join_paths(get_option('localstatedir'), 'log', meson.project_name())
 state_dir = join_paths(get_option('localstatedir'), 'lib', meson.project_name())
 runtime_dir = join_paths(get_option('localstatedir'), 'run', meson.project_name())
+data_dir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
+psql_dir = join_paths(data_dir, 'psql')
 
 conf = configuration_data()
 conf.set_quoted('VH_MOUNT_PATH', join_paths('/mnt', meson.project_name()))
@@ -48,6 +50,7 @@ conf.set_quoted('VH_LOG_PATH', log_dir)
 conf.set_quoted('VH_BACKING_PATH', state_dir)
 conf.set_quoted('VH_RUNTIME_PATH', runtime_dir)
 conf.set_quoted('VH_CACHE_PATH', '/.cache')
+conf.set_quoted('VH_PSQL_SCHEMAS_PATH', psql_dir)
 
 vh_paths_header = configure_file(
     input: 'deploy/path/paths.h.in',
@@ -215,6 +218,8 @@ install_data('debian/tmpfiles.d/vaulthalla.conf',
 install_data('debian/vaulthalla.udev',
              install_dir: join_paths(get_option('libdir'), 'udev', 'rules.d'),
              rename: '60-vaulthalla-tpm.rules')
+
+install_subdir('deploy/psql', install_dir: data_dir)
 
 configure_file(
     input: 'deploy/systemd/vaulthalla.service.in',

@@ -6,6 +6,7 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
+#include "database/Queries/APIKeyQueries.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"

@@ -6,6 +6,7 @@
 #define VH_BACKING_PATH @VH_BACKING_PATH@
 #define VH_RUNTIME_PATH @VH_RUNTIME_PATH@
 #define VH_CACHE_PATH @VH_CACHE_PATH@
+#define VH_PSQL_SCHEMAS_PATH @VH_PSQL_SCHEMAS_PATH@
 
 #include <filesystem>
 
@@ -17,6 +18,7 @@ inline std::filesystem::path logPath = VH_LOG_PATH;
 inline std::filesystem::path backingPath = VH_BACKING_PATH;
 inline std::filesystem::path mountPath = VH_MOUNT_PATH;
 inline std::filesystem::path runtimePath = VH_RUNTIME_PATH;
+inline std::filesystem::path psqlSchemaPath = VH_PSQL_SCHEMAS_PATH;
 
 inline void setLogPathForTesting() {
     logPath = std::filesystem::temp_directory_path() / "vh_log";
@@ -53,5 +55,6 @@ inline std::filesystem::path getMountPath() { return mountPath; }
 inline std::filesystem::path getBackingPath() { return backingPath; }
 inline std::filesystem::path getRuntimePath() { return runtimePath; }
 inline std::filesystem::path getCachePath() { return VH_CACHE_PATH; }
+inline std::filesystem::path getPsqlSchemasPath() { return VH_PSQL_SCHEMAS_PATH; }
 
 }

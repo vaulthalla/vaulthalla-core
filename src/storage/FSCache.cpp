@@ -14,12 +14,14 @@
 #include <unordered_set>
 #include <mutex>
 #include <limits>
+#include <chrono>
 
 using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace std::chrono;
 
 namespace {
 
@@ -110,20 +112,19 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fs::path& absPath) {
     }
 
     stats_->record_miss();
+    ScopedOpTimer timer(stats_.get());
 
     try {
         const auto ino = getOrAssignInode(path);
-        auto entry = FSEntryQueries::getFSEntryByInode(ino);
-        if (!entry) {
-            LogRegistry::storage()->debug("[FSCache] No entry found for path: {}", path.string());
-            return nullptr;
-        }
+        const auto entry = FSEntryQueries::getFSEntryByInode(ino);
 
-        if (entry->inode) cacheEntry(entry);
-        else {
-            entry->inode = std::make_optional(getOrAssignInode(path));
-            cacheEntry(entry);
-        }
+        if (entry) {
+            if (entry->inode) cacheEntry(entry);
+            else {
+                entry->inode = ino;
+                cacheEntry(entry);
+            }
+        } else LogRegistry::storage()->debug("[FSCache] No entry found for path: {}", path.string());
 
         return entry;
     } catch (const std::exception& e) {
@@ -144,6 +145,7 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fuse_ino_t ino) {
     }
 
     stats_->record_miss();
+    ScopedOpTimer timer(stats_.get());
 
     auto entry = FSEntryQueries::getFSEntryByInode(ino);
     if (entry) cacheEntry(entry);
@@ -153,15 +155,18 @@ std::shared_ptr<FSEntry> FSCache::getEntry(const fuse_ino_t ino) {
 
 std::shared_ptr<FSEntry> FSCache::getEntryById(unsigned int id) {
     std::shared_lock lock(mutex_);
-    auto it = idToEntry_.find(id);
-    if (it != idToEntry_.end()) {
+    if (const auto it = idToEntry_.find(id); it != idToEntry_.end()) {
         stats_->record_hit();
         return it->second;
     }
 
     stats_->record_miss();
+    ScopedOpTimer timer(stats_.get());
+
+    std::shared_ptr<FSEntry> entry = nullptr;
     LogRegistry::storage()->warn("[FSCache] No entry found for ID: {}", id);
-    return nullptr;
+    entry = FSEntryQueries::getFSEntryById(id);
+    return entry;
 }
 
 fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
@@ -171,7 +176,7 @@ fuse_ino_t FSCache::resolveInode(const fs::path& absPath) {
         if (const auto it = pathToInode_.find(absPath); it != pathToInode_.end()) return it->second;
     }
 
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(absPath);
+    const auto entry = getEntry(absPath);
     if (!entry) {
         LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
         return FUSE_ROOT_ID;
@@ -258,7 +263,7 @@ void FSCache::cacheEntry(const std::shared_ptr<FSEntry>& entry, const bool isFir
                 throw std::runtime_error("Entry has no parent_id");
             }
 
-            if (const auto parent = ServiceDepsRegistry::instance().fsCache->getEntryById(*entry->parent_id)) {
+            if (const auto parent = getEntryById(*entry->parent_id)) {
                 entry->fuse_path = parent->fuse_path / entry->name;
                 entry->backing_path = parent->backing_path / entry->base32_alias;
             } else {
@@ -384,7 +389,6 @@ void FSCache::evictIno(fuse_ino_t ino) {
     inodeToId_.erase(ino);
     idToEntry_.erase(id);
 
-    // ✅ FIX: childToParent_ is keyed by CHILD ID, not inode.
     childToParent_.erase(id);
 
     // Update used bytes (bounded)

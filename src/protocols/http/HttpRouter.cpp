@@ -23,15 +23,6 @@ using namespace vh::types;
 
 namespace vh::http {
 
-static PreviewResponse noMimeType(const http::request<http::string_body>& req, const std::filesystem::path& path) {
-    LogRegistry::http()->error("[HttpRouter] File {} has no MIME type", path.string());
-    http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
-    res.set(http::field::content_type, "text/plain");
-    res.body() = "File has no MIME type";
-    res.prepare_payload();
-    return res;
-}
-
 static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const std::filesystem::path& thumbnailRoot,
                                          const unsigned int size) {
     if (const auto thumbnail_sizes = ConfigRegistry::get().caching.thumbnails.sizes;
@@ -81,11 +72,11 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
     const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(fusePath);
     if (!entry) return makeErrorResponse(req, "File not found in cache");
     if (entry->isDirectory())
-        return makeErrorResponse(req, "Requested preview file is a directory",
-                                 http::status::bad_request);
+        return makeErrorResponse(req, "Requested preview file is a directory", http::status::bad_request);
     pr->file = std::static_pointer_cast<File>(entry);
 
-    if (!pr->file->mime_type) return noMimeType(req, pr->rel_path);
+    if (!pr->file->mime_type)
+        return makeErrorResponse(req, "File has no mime type.", http::status::unsupported_media_type);
 
     if (pr->size)
         if (auto data = tryCacheRead(pr->file, pr->engine->paths->thumbnailRoot, *pr->size); !data.empty())

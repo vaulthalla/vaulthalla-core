@@ -10,15 +10,20 @@
 #include "types/Vault.hpp"
 #include "types/Path.hpp"
 #include "logging/LogRegistry.hpp"
+#include "services/ServiceDepsRegistry.hpp"
+#include "types/stats/CacheStats.hpp"
 
 #include <memory>
 #include <string>
 #include <filesystem>
+#include <chrono>
 
 using namespace vh::types;
 using namespace vh::logging;
 using namespace vh::config;
 using namespace vh::database;
+using namespace vh::services;
+using namespace std::chrono;
 
 namespace vh::concurrency {
 
@@ -46,7 +51,10 @@ public:
                     return;
                 }
 
+                const auto now = steady_clock::now();
                 util::generateAndStoreThumbnail(buffer_, cachePath, *file_->mime_type, size);
+                const auto end = steady_clock::now();
+                ServiceDepsRegistry::instance().httpCacheStats->record_op_us(duration_cast<microseconds>(end - now).count());
 
                 auto index = std::make_shared<CacheIndex>();
                 index->vault_id = engine_->vault->id;
@@ -56,6 +64,8 @@ public:
                 index->size = fs::file_size(cachePath);
 
                 CacheQueries::upsertCacheIndex(index);
+
+                ServiceDepsRegistry::instance().httpCacheStats->record_insert(index->size);
             }
         } catch (const std::exception& e) {
             LogRegistry::thumb()->error("[ThumbnailTask] Error generating thumbnail for file ID {}: {}", file_->id, e.what());

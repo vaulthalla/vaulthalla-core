@@ -67,7 +67,7 @@ std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
     return Transactions::exec("UserQueries::getUserByLinuxUID", [&](pqxx::work& txn) -> std::shared_ptr<User> {
         const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
         if (res.empty()) {
-            LogRegistry::db()->error("[UserQueries] No user found with Linux UID: {}", linuxUid);
+            LogRegistry::db()->debug("[UserQueries] No user found with Linux UID: {}", linuxUid);
             return nullptr;
         }
         const auto userRow = res.one_row();

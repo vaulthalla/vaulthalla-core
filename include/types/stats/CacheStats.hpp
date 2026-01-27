@@ -85,10 +85,23 @@ struct CacheStats {
     static double max_op_ms(const CacheStatsSnapshot& s) noexcept;
 };
 
+struct ScopedOpTimer {
+    CacheStats* stats;
+    std::chrono::steady_clock::time_point start{};
+    explicit ScopedOpTimer(CacheStats* s)
+        : stats(s), start(std::chrono::steady_clock::now()) {}
+    ~ScopedOpTimer() {
+        const auto end = std::chrono::steady_clock::now();
+        stats->record_op_us(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+    }
+};
+
 // JSON serialization
 void to_json(nlohmann::json& j, const std::shared_ptr<CacheStatsSnapshot>& s);
+void to_json(nlohmann::json& j, const CacheStatsSnapshot& s);
 
 // Optional convenience (serializes snapshot + derived fields)
 void to_json(nlohmann::json& j, const std::shared_ptr<CacheStats>& s);
+void to_json(nlohmann::json& j, const CacheStats& s);
 
 } // namespace vh::types

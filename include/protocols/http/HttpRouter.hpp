@@ -3,17 +3,9 @@
 #include "protocols/http/PreviewResponse.hpp"
 
 #include <boost/beast/http.hpp>
+#include <boost/beast/http/file_body.hpp>
 #include <memory>
-#include <filesystem>
-
-namespace vh::auth {
-class AuthManager;
-}
-
-namespace vh::storage {
-class StorageManager;
-class StorageEngine;
-}
+#include <string>
 
 namespace vh::types {
 struct File;
@@ -22,30 +14,27 @@ struct File;
 namespace vh::http {
 
 class HttpSession;
-class ImagePreviewHandler;
-class PdfPreviewHandler;
 
 namespace http = boost::beast::http;
 
-class HttpRouter {
-public:
-    HttpRouter();
+struct HttpRouter {
+    static PreviewResponse route(http::request<http::string_body>&& req);
 
-    PreviewResponse route(http::request<http::string_body>&& req) const;
+    static PreviewResponse makeResponse(const http::request<http::string_body>& req,
+                                        std::vector<uint8_t>&& data,
+                                        const std::string& mime_type,
+                                        bool cacheHit = false);
 
-    static http::response<http::string_body> makeErrorResponse(const http::request<http::string_body>& req,
-                                                               const std::string& msg);
+    static PreviewResponse makeResponse(const http::request<http::string_body>& req,
+                                        http::file_body::value_type data,
+                                        const std::string& mime_type,
+                                        bool cacheHit = false);
 
-private:
-    std::shared_ptr<auth::AuthManager> authManager_;
-    std::shared_ptr<storage::StorageManager> storageManager_;
+    static PreviewResponse makeErrorResponse(const http::request<http::string_body>& req,
+                                             const std::string& msg,
+                                             const http::status& status = http::status::not_found);
 
-    std::shared_ptr<ImagePreviewHandler> imagePreviewHandler_;
-    std::shared_ptr<PdfPreviewHandler> pdfPreviewHandler_;
-
-    PreviewResponse handleCachedPreview(const std::shared_ptr<storage::StorageEngine>& engine,
-                             const std::shared_ptr<types::File>& file,
-                             const http::request<http::string_body>& req, unsigned int size) const;
+    static std::string authenticateRequest(const http::request<http::string_body>& req);
 };
 
 }

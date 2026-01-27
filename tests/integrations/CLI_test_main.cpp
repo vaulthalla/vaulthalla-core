@@ -26,6 +26,7 @@ using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::test::cli;
+using namespace vh::database;
 
 static void initBase() {
     vh::paths::enableTestMode();
@@ -35,10 +36,11 @@ static void initBase() {
 }
 
 static void initDB() {
-    vh::database::Transactions::init();
-    vh::database::seed::wipe_all_data_restart_identity();
-    vh::database::seed::init_tables_if_not_exists();
-    vh::database::Transactions::dbPool_->initPreparedStatements();
+    Transactions::init();
+
+    seed::wipe_all_data_restart_identity();
+    seed::init_tables_if_not_exists();
+    Transactions::dbPool_->initPreparedStatements();
     vh::seed::seed_database();
 }
 
@@ -51,7 +53,7 @@ static void initServices() {
 }
 
 static void ensureAdminExists() {
-    if (!vh::database::UserQueries::adminUserExists()) {
+    if (!UserQueries::adminUserExists()) {
         LogRegistry::vaulthalla()->error("No admin user found; cannot run CLI tests");
         exit(1);
     }
@@ -60,8 +62,8 @@ static void ensureAdminExists() {
 static int runTests() {
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    IntegrationsTestRunner runner(CLITestConfig::Default());
-    const int exit_status = runner() == 0 ? 0 : 1;
+    IntegrationsTestRunner runner(CLITestConfig::Medium());
+    const int exit_status = runner();
 
     const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -81,6 +83,6 @@ int main() {
     initServices();
     ensureAdminExists();
     const auto exit_status = runTests();
-    shutdown();
-    exit(exit_status);
+    // dont call shutdown cause it will SIGTERM the thread and exit 1
+    std::_Exit(exit_status);
 }

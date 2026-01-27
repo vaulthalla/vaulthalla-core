@@ -9,16 +9,13 @@ namespace vh::auth { class AuthManager; }
 namespace vh::storage { class StorageManager; }
 namespace vh::http {
 
-class HttpRouter;
-
 namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = boost::asio::ip::tcp;
 
 class HttpSession : public std::enable_shared_from_this<HttpSession> {
 public:
-    HttpSession(tcp::socket socket,
-                std::shared_ptr<HttpRouter> router);
+    HttpSession(tcp::socket socket);
 
     void run();
 
@@ -32,7 +29,6 @@ private:
     beast::flat_buffer buffer_;
     http::request<http::string_body> req_;
 
-    std::shared_ptr<HttpRouter> router_;
     std::shared_ptr<auth::AuthManager> auth_;
     std::shared_ptr<storage::StorageManager> storage_;
 };

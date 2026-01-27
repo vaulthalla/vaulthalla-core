@@ -36,9 +36,9 @@ void AuthHandler::handleLogin(const json& msg, WebSocketSession& session) const 
         const json data = {{"token", token}, {"user", *user}};
 
         const json response = {{"command", "auth.login.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -74,9 +74,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         const json data = {{"token", token}, {"user", *user}};
 
         const json response = {{"command", "auth.register.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -85,9 +85,9 @@ void AuthHandler::handleRegister(const json& msg, WebSocketSession& session) con
         LogRegistry::ws()->error("[AuthHandler] handleRegister error: {}", e.what());
 
         const json response = {{"command", "auth.register.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -105,9 +105,9 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
         const json data = {{"user", *user}};
 
         const json response = {{"command", "auth.user.update.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -116,9 +116,9 @@ void AuthHandler::handleUpdateUser(const json& msg, WebSocketSession& session) c
         LogRegistry::ws()->error("[AuthHandler] handleUpdateUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.update.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -136,8 +136,8 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
         authManager_->changePassword(user->name, oldPassword, newPassword);
 
         const json response = {{"command", "auth.user.change_password.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()}};
 
         session.send(response);
 
@@ -146,9 +146,9 @@ void AuthHandler::handleChangePassword(const json& msg, WebSocketSession& sessio
         LogRegistry::ws()->error("[AuthHandler] handleChangePassword error: {}", e.what());
 
         const json response = {{"command", "auth.user.change_password.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -161,17 +161,17 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
 
         const auto requestId = msg.at("payload").at("id").get<unsigned int>();
 
-        if (user->id != requestId && !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can fetch user data");
+        if (user->id != requestId && !user->canManageRoles()) throw std::runtime_error(
+            "Permission denied: Only admins can fetch user data");
 
         const auto requestedUser = UserQueries::getUserById(requestId);
 
         const json data = {{"user", *requestedUser}};
 
         const json response = {{"command", "auth.user.get.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -180,9 +180,9 @@ void AuthHandler::handleGetUser(const json& msg, WebSocketSession& session) cons
         LogRegistry::ws()->error("[AuthHandler] handleGetUser error: {}", e.what());
 
         const json response = {{"command", "auth.user.get.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -193,16 +193,25 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
     try {
         const auto client = authManager_->validateRefreshToken(session.getRefreshToken(), session.shared_from_this());
 
-        if (!client) throw std::runtime_error("Session not found");
+        if (!client) {
+            const json response = {{"command", "auth.refresh.response"},
+                                   {"status", "unauthorized"},
+                                   {"requestId",
+                                    msg.contains("requestId") ? msg.at("requestId").get<std::string>() : "unknown"},
+                                   {"error",
+                                    "No client attached to current websocket session. Please reauthenticate."}};
+            session.send(response);
+            return;
+        }
 
         client->refreshToken();
 
         const json data = {{"token", client->getRawToken()}, {"user", *client->getUser()}};
 
         const json response = {{"command", "auth.refresh.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -211,9 +220,9 @@ void AuthHandler::handleRefresh(const json& msg, WebSocketSession& session) cons
         LogRegistry::ws()->error("[AuthHandler] handleRefresh error: {}", e.what());
 
         const json response = {{"command", "auth.refresh.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -241,9 +250,9 @@ void AuthHandler::handleLogout(const json& msg, WebSocketSession& session) const
         LogRegistry::ws()->error("[AuthHandler] handleLogout error: {}", e.what());
 
         const json response = {{"command", "auth.logout.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -260,9 +269,9 @@ void AuthHandler::handleListUsers(const json& msg, WebSocketSession& session) {
         };
 
         const json response = {{"command", "auth.users.list.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -283,7 +292,16 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
     try {
         const auto token = msg.at("token").get<std::string>();
         const auto client = sessionManager_->getClientSession(session.getUUID());
-        if (!client) throw std::runtime_error("Session not found for token: " + token);
+        if (!client) {
+            const json response = {{"command", "auth.isAuthenticated.response"},
+                                   {"status", "unauthorized"},
+                                   {"requestId",
+                                    msg.contains("requestId") ? msg.at("requestId").get<std::string>() : "unknown"},
+                                   {"error",
+                                    "No access token attached to current websocket session. Please reauthenticate."}};
+            session.send(response);
+            return;
+        }
 
         const auto user = client->getUser();
         if (!user) throw std::runtime_error("User not found for token: " + token);
@@ -295,9 +313,9 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
         if (isAuthenticated) data["user"] = *user;
 
         const json response = {{"command", "auth.isAuthenticated.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -306,9 +324,9 @@ void AuthHandler::isUserAuthenticated(const json& msg, WebSocketSession& session
         LogRegistry::ws()->error("[AuthHandler] isUserAuthenticated error: {}", e.what());
 
         const json response = {{"command", "auth.isAuthenticated.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -320,17 +338,17 @@ void AuthHandler::handleGetUserByName(const json& msg, WebSocketSession& session
         if (!user) throw std::runtime_error("User not authenticated");
 
         const auto name = msg.at("payload").at("name").get<std::string>();
-        if (user->name != name && !user->canManageRoles())
-            throw std::runtime_error("Permission denied: Only admins can fetch user by name");
+        if (user->name != name && !user->canManageRoles()) throw std::runtime_error(
+            "Permission denied: Only admins can fetch user by name");
 
         const auto retUser = UserQueries::getUserByName(name);
         if (!retUser) throw std::runtime_error("User not found");
 
         const json data = {{"user", *retUser}};
         const json response = {{"command", "auth.user.get.byName.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -339,9 +357,9 @@ void AuthHandler::handleGetUserByName(const json& msg, WebSocketSession& session
         LogRegistry::ws()->error("[AuthHandler] handleGetUserByName error: {}", e.what());
 
         const json response = {{"command", "auth.user.get.byName.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }
@@ -354,9 +372,9 @@ void AuthHandler::doesAdminHaveDefaultPassword(const json& msg, WebSocketSession
         const json data = {{"isDefault", isDefault}};
 
         const json response = {{"command", "auth.admin.default_password.response"},
-                         {"status", "ok"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"data", data}};
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
 
         session.send(response);
 
@@ -365,9 +383,9 @@ void AuthHandler::doesAdminHaveDefaultPassword(const json& msg, WebSocketSession
         LogRegistry::ws()->error("[AuthHandler] doesAdminHaveDefaultPassword error: {}", e.what());
 
         const json response = {{"command", "auth.admin.default_password.response"},
-                         {"status", "error"},
-                         {"requestId", msg.at("requestId").get<std::string>()},
-                         {"error", e.what()}};
+                               {"status", "error"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"error", e.what()}};
 
         session.send(response);
     }

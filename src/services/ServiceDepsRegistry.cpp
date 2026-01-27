@@ -5,6 +5,7 @@
 #include "storage/FSCache.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/stats/CacheStats.hpp"
 #include "usage/include/UsageManager.hpp"
 
 using namespace vh::services;
@@ -12,6 +13,7 @@ using namespace vh::storage;
 using namespace vh::crypto;
 using namespace vh::auth;
 using namespace vh::logging;
+using namespace vh::types;
 
 ServiceDepsRegistry& ServiceDepsRegistry::instance() {
     static ServiceDepsRegistry instance_;
@@ -34,6 +36,7 @@ void ServiceDepsRegistry::init() {
     ctx.authManager = std::make_shared<AuthManager>();
     ctx.fsCache = std::make_shared<FSCache>();
     ctx.shellUsageManager = std::make_shared<shell::UsageManager>();
+    ctx.httpCacheStats = std::make_shared<CacheStats>();
 
     LogRegistry::vaulthalla()->info("[ServiceDepsRegistry] Initialized.");
 }

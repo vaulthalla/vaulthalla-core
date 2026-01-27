@@ -4,6 +4,8 @@
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "logging/LogRegistry.hpp"
+#include "protocols/http/PreviewRequest.hpp"
+#include "protocols/http/HttpRouter.hpp"
 
 #include <boost/beast/http/file_body.hpp>
 
@@ -14,60 +16,24 @@ using namespace vh::database;
 
 namespace vh::http {
 
-PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& req, int vault_id, const std::string& rel_path,
-                                                    const std::unordered_map<std::string, std::string>& params) const {
+PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& req, const std::unique_ptr<PreviewRequest>&& pr) {
     try {
-        const auto scale_it = params.find("scale");
-        const auto size_it = params.find("size");
+        const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
 
-        const auto engine = storageManager_->getEngine(vault_id);
-        const auto tmpPath = decrypt_file_to_temp(vault_id, rel_path, engine);
-
-        std::string mime_type = FileQueries::getMimeType(vault_id, {rel_path});
-
-        if (scale_it != params.end() || size_it != params.end()) {
-            std::optional<std::string> scale, size;
-            if (scale_it != params.end()) scale = scale_it->second;
-            if (size_it != params.end()) size = size_it->second;
-
-            std::vector<uint8_t> resized = resize_and_compress_image(tmpPath, scale, size);
-
-            http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
-            res.set(http::field::content_type, mime_type);
-            res.body() = std::move(resized);
-            res.content_length(res.body().size());
-            res.keep_alive(req.keep_alive());
-            res.prepare_payload();
-            return res;
+        if (pr->size || pr->scale) {
+            std::vector<uint8_t> resized = resize_and_compress_image(tmpPath, pr->scaleStr(), pr->sizeStr());
+            return HttpRouter::makeResponse(req, std::move(resized), "image/jpeg");
         }
 
         boost::beast::error_code ec;
         http::file_body::value_type body;
         body.open(tmpPath.c_str(), boost::beast::file_mode::scan, ec);
-        if (ec) {
-            http::response<http::string_body> res{http::status::not_found, req.version()};
-            res.set(http::field::content_type, "text/plain");
-            res.body() = "File not found";
-            res.prepare_payload();
-            return res;
-        }
+        if (ec) return HttpRouter::makeErrorResponse(req, "File not found.", http::status::not_found);
 
-        http::response<http::file_body> res{
-            std::piecewise_construct,
-            std::make_tuple(std::move(body)),
-            std::make_tuple(http::status::ok, req.version())
-        };
-        res.set(http::field::content_type, mime_type);
-        res.content_length(body.size());
-        res.keep_alive(req.keep_alive());
-        return res;
+        return HttpRouter::makeResponse(req, std::move(body), "image/jpeg");
     } catch (const std::exception& e) {
-        LogRegistry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", rel_path, e.what());
-        http::response<http::string_body> err{http::status::unsupported_media_type, req.version()};
-        err.set(http::field::content_type, "text/plain");
-        err.body() = "Failed to load image: " + std::string(e.what());
-        err.prepare_payload();
-        return err;
+        LogRegistry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", pr->rel_path.string(), e.what());
+        return HttpRouter::makeErrorResponse(req, "Failed to load image: " + std::string(e.what()), http::status::unsupported_media_type);
     }
 }
 

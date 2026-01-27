@@ -53,8 +53,8 @@ void StatsHandler::handleVaultStats(const json& msg, WebSocketSession& session) 
     }
 }
 
-void StatsHandler::handleCacheStats(const json& msg, WebSocketSession& session) {
-    LogRegistry::ws()->debug("[StatsHandler::handleCacheStats] cache stats requested.");
+void StatsHandler::handleFSCacheStats(const json& msg, WebSocketSession& session) {
+    LogRegistry::ws()->debug("[StatsHandler::handleFSCacheStats] cache stats requested.");
     try {
         if (const auto user = session.getAuthenticatedUser(); !user->isAdmin()) throw std::runtime_error(
             "Must be an admin to view cache stats.");
@@ -63,15 +63,35 @@ void StatsHandler::handleCacheStats(const json& msg, WebSocketSession& session) 
         if (!stats) throw std::runtime_error("No cache stats available.");
 
         const json data = {{"stats", stats}};
-        const json response = {{"command", "stats.cache.response"},
+        const json response = {{"command", "stats.fs.cache.response"},
                                {"status", "ok"},
                                {"requestId", msg.at("requestId").get<std::string>()},
                                {"data", data}};
         session.send(response);
-        LogRegistry::ws()->debug("[StatsHandler::handleCacheStats] stats.cache.response");
+        LogRegistry::ws()->debug("[StatsHandler::handleFSCacheStats] stats.fs.cache.response");
     } catch (const std::exception& e) {
-        LogRegistry::ws()->debug("[StatsHandler::handleCacheStats] exception caught: %s", e.what());
-        const json response = {{"command", "stats.cache.response"}, {"status", "error"}, {"error", e.what()}};
+        LogRegistry::ws()->debug("[StatsHandler::handleFSCacheStats] exception caught: %s", e.what());
+        const json response = {{"command", "stats.fs.cache.response"}, {"status", "error"}, {"error", e.what()}};
+        session.send(response);
+    }
+}
+
+void StatsHandler::handleHttpCacheStats(const json& msg, WebSocketSession& session) {
+    LogRegistry::ws()->debug("[StatsHandler::handleHttpCacheStats] http cache stats requested.");
+    try {
+        if (const auto user = session.getAuthenticatedUser(); !user->isAdmin()) throw std::runtime_error(
+            "Must be an admin to view cache stats.");
+
+        const json data = {{"stats", ServiceDepsRegistry::instance().httpCacheStats->snapshot()}};
+        const json response = {{"command", "stats.http.cache.response"},
+                               {"status", "ok"},
+                               {"requestId", msg.at("requestId").get<std::string>()},
+                               {"data", data}};
+        session.send(response);
+        LogRegistry::ws()->debug("[StatsHandler::handleHttpCacheStats] stats.http.cache.response");
+    } catch (const std::exception& e) {
+        LogRegistry::ws()->debug("[StatsHandler::handleHttpCacheStats] exception caught: %s", e.what());
+        const json response = {{"command", "stats.http.cache.response"}, {"status", "error"}, {"error", e.what()}};
         session.send(response);
     }
 }

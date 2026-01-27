@@ -227,7 +227,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[lookup] No user found for UID: {}", uid);
+        LogRegistry::fuse()->debug("[lookup] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -242,7 +242,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
     const auto entry = cache->getEntry(path);
     if (!entry) {
-        LogRegistry::fuse()->error("[lookup] Entry not found for path: {}", path.string());
+        LogRegistry::fuse()->debug("[lookup] Entry not found for path: {}", path.string());
         fuse_reply_err(req, ENOENT);
         return;
     }

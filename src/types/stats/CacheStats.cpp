@@ -89,31 +89,37 @@ double CacheStats::max_op_ms(const CacheStatsSnapshot& s) noexcept {
 }
 
 // Snapshot serialization (best practice)
-void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CacheStatsSnapshot>& s) {
+void vh::types::to_json(nlohmann::json& j, const CacheStatsSnapshot& s) {
     j = nlohmann::json{
-        {"hits", s->hits},
-        {"misses", s->misses},
-        {"evictions", s->evictions},
-        {"inserts", s->inserts},
-        {"invalidations", s->invalidations},
+        {"hits", s.hits},
+        {"misses", s.misses},
+        {"evictions", s.evictions},
+        {"inserts", s.inserts},
+        {"invalidations", s.invalidations},
 
-        {"bytes_read", s->bytes_read},
-        {"bytes_written", s->bytes_written},
+        {"bytes_read", s.bytes_read},
+        {"bytes_written", s.bytes_written},
 
-        {"used_bytes", s->used_bytes},
-        {"capacity_bytes", s->capacity_bytes},
+        {"used_bytes", s.used_bytes},
+        {"capacity_bytes", s.capacity_bytes},
 
         {"op", {
-            {"count", s->op_count},
-            {"total_us", s->op_total_us},
-            {"max_us", s->op_max_us},
+            {"count", s.op_count},
+            {"total_us", s.op_total_us},
+            {"max_us", s.op_max_us},
+            {"avg_ms", CacheStats::avg_op_ms(s)},
+            {"max_ms", CacheStats::max_op_ms(s)},
         }},
     };
 }
 
+void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CacheStatsSnapshot>& s) {
+    j = *s;
+}
+
 // Convenience serialization (snapshot + derived fields)
-void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CacheStats>& s) {
-    const auto snap = s->snapshot();
+void vh::types::to_json(nlohmann::json& j, const CacheStats& s) {
+    const auto snap = s.snapshot();
 
     j = nlohmann::json{
         {"hits", snap.hits},
@@ -139,4 +145,8 @@ void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CacheStats>& s)
             {"max_ms", CacheStats::max_op_ms(snap)},
         }},
     };
+}
+
+void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<CacheStats>& s) {
+    j = *s;
 }

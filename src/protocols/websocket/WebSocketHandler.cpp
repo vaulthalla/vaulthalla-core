@@ -251,8 +251,12 @@ void WebSocketHandler::registerStatHandlers() const {
         StatsHandler::handleVaultStats(msg, session);
     });
 
-    router_->registerHandler("stats.cache", [this](const json& msg, WebSocketSession& session) {
-        StatsHandler::handleCacheStats(msg, session);
+    router_->registerHandler("stats.fs.cache", [this](const json& msg, WebSocketSession& session) {
+        StatsHandler::handleFSCacheStats(msg, session);
+    });
+
+    router_->registerHandler("stats.http.cache", [this](const json& msg, WebSocketSession& session) {
+        StatsHandler::handleHttpCacheStats(msg, session);
     });
 }
 

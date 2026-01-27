@@ -13,6 +13,7 @@
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "storage/FSCache.hpp"
+#include "types/stats/CacheStats.hpp"
 
 #include <ranges>
 
@@ -92,54 +93,37 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) const 
         const auto thumbnail_sizes = config::ConfigRegistry::get().caching.thumbnails.sizes;
         const auto size = std::stoi(size_it->second);
         if (std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
-            try {
-                return handleCachedPreview(engine, file, req, size);
-            } catch (const std::exception& e) {
-                LogRegistry::http()->error("[HttpRouter] Error handling cached preview for {}: {}", rel_path.string(), e.what());
-                http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-                res.set(http::field::content_type, "text/plain");
-                res.body() = "Failed to handle cached preview: " + std::string(e.what());
-                res.prepare_payload();
-                return res;
+            const auto filename = std::to_string(size) + ".jpg";
+            const auto pathToJpegCache = engine->paths->thumbnailRoot / file->base32_alias / filename;
+            if (file->mime_type && (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/"))) {
+                if (std::filesystem::exists(pathToJpegCache)) {
+                    const auto data = util::readFileToVector(pathToJpegCache);
+
+                    // Return decrypted image in memory
+                    http::response<http::string_body> res{
+                        http::status::ok, req.version()
+                    };
+                    res.set(http::field::content_type, "image/jpeg");
+                    res.body() = std::string(data.begin(), data.end());
+                    res.prepare_payload();
+                    res.keep_alive(req.keep_alive());
+                    ServiceDepsRegistry::instance().httpCacheStats->record_hit(data.size());
+                    return res;
+                }
             }
+            ServiceDepsRegistry::instance().httpCacheStats->record_miss();
         }
     }
 
-    if (file->mime_type->starts_with("image/"))
-        return imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+    if (file->mime_type->starts_with("image/") || file->mime_type->ends_with("/pdf")) {
+        ScopedOpTimer timer(ServiceDepsRegistry::instance().httpCacheStats.get());
+        PreviewResponse res;
 
-    if (file->mime_type->ends_with("/pdf")) return pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
-
-    http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
-    res.body() = "Unsupported preview type: " + *file->mime_type;
-    res.prepare_payload();
-    return res;
-}
-
-PreviewResponse HttpRouter::handleCachedPreview(const std::shared_ptr<storage::StorageEngine>& engine,
-                                     const std::shared_ptr<File>& file,
-                                     const http::request<http::string_body>& req,
-                                     const unsigned int size) const {
-    const auto filename = std::to_string(size) + ".jpg";
-    const auto pathToJpegCache = engine->paths->thumbnailRoot / file->base32_alias / filename;
-
-    if (file->mime_type && (file->mime_type->starts_with("image/") || file->mime_type->starts_with("application/"))) {
-        if (std::filesystem::exists(pathToJpegCache)) {
-            const auto data = util::readFileToVector(pathToJpegCache);
-
-            // Return decrypted image in memory
-            http::response<http::string_body> res{
-                http::status::ok, req.version()
-            };
-            res.set(http::field::content_type, "image/jpeg");
-            res.body() = std::string(data.begin(), data.end());
-            res.prepare_payload();
-            res.keep_alive(req.keep_alive());
-            return res;
-        }
-
-        throw std::runtime_error("[PdfPreviewHandler] JPEG file does not exist: " + pathToJpegCache.string());
+        if (file->mime_type->starts_with("image/")) res = imagePreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+        else res = pdfPreviewHandler_->handle(std::move(req), vault_id, rel_path, params);
+        return res;
     }
+
     return makeErrorResponse(req, "Unsupported preview type: " + (file->mime_type ? *file->mime_type : "unknown"));
 }
 

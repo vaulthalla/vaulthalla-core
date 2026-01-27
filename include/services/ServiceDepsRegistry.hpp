@@ -21,6 +21,10 @@ namespace vh::shell {
     class UsageManager;
 }
 
+namespace vh::types {
+struct CacheStats;
+}
+
 namespace vh::services {
 
 class SyncController;
@@ -33,6 +37,7 @@ struct ServiceDepsRegistry {
     std::shared_ptr<storage::FSCache> fsCache;
     std::shared_ptr<shell::UsageManager> shellUsageManager;
     fuse_session* fuseSession = nullptr;
+    std::shared_ptr<types::CacheStats> httpCacheStats;
 
     void setFuseSession(fuse_session* fuseSession) { this->fuseSession = fuseSession; }
 

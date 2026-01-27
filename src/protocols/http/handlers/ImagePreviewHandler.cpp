@@ -45,6 +45,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         http::file_body::value_type body;
         body.open(tmpPath.c_str(), boost::beast::file_mode::scan, ec);
         if (ec) {
+            LogRegistry::http()->error("[ImagePreviewHandler::handle] Error opening temporary file");
             http::response<http::string_body> res{http::status::not_found, req.version()};
             res.set(http::field::content_type, "text/plain");
             res.body() = "File not found";
@@ -52,13 +53,14 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
             return res;
         }
 
+        uintmax_t file_size = body.size();
         http::response<http::file_body> res{
             std::piecewise_construct,
             std::make_tuple(std::move(body)),
             std::make_tuple(http::status::ok, req.version())
         };
         res.set(http::field::content_type, mime_type);
-        res.content_length(body.size());
+        res.content_length(file_size);
         res.keep_alive(req.keep_alive());
         return res;
     } catch (const std::exception& e) {

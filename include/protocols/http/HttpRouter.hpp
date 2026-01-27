@@ -4,7 +4,6 @@
 
 #include <boost/beast/http.hpp>
 #include <memory>
-#include <filesystem>
 
 namespace vh::auth {
 class AuthManager;
@@ -42,10 +41,6 @@ private:
 
     std::shared_ptr<ImagePreviewHandler> imagePreviewHandler_;
     std::shared_ptr<PdfPreviewHandler> pdfPreviewHandler_;
-
-    PreviewResponse handleCachedPreview(const std::shared_ptr<storage::StorageEngine>& engine,
-                             const std::shared_ptr<types::File>& file,
-                             const http::request<http::string_body>& req, unsigned int size) const;
 };
 
 }

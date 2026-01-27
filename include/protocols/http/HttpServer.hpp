@@ -15,7 +15,6 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
 using tcp = net::ip::tcp;
-class HttpRouter;
 
 class HttpServer : public std::enable_shared_from_this<HttpServer> {
 public:
@@ -28,7 +27,6 @@ private:
 
     tcp::acceptor acceptor_;
     tcp::socket socket_;
-    std::shared_ptr<HttpRouter> router_;
     std::shared_ptr<auth::AuthManager> authManager_;
     std::shared_ptr<storage::StorageManager> storageManager_;
 };

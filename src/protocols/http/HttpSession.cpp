@@ -9,10 +9,8 @@ using namespace vh::logging;
 
 namespace vh::http {
 
-HttpSession::HttpSession(tcp::socket socket,
-                         std::shared_ptr<HttpRouter> router)
+HttpSession::HttpSession(tcp::socket socket)
     : socket_(std::move(socket)),
-      router_(std::move(router)),
       auth_(ServiceDepsRegistry::instance().authManager),
       storage_(ServiceDepsRegistry::instance().storageManager) {
     if (!auth_) throw std::invalid_argument("AuthManager cannot be null");
@@ -46,7 +44,7 @@ void HttpSession::on_read(beast::error_code ec, std::size_t bytes) {
     auto self = shared_from_this();
 
     try {
-        auto res = router_->route(std::move(req_));
+        auto res = HttpRouter::route(std::move(req_));
 
         std::visit([self](auto&& response) {
             using T = std::decay_t<decltype(response)>;

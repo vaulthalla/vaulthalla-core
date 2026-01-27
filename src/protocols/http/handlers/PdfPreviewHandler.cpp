@@ -1,31 +1,24 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
+#include "types/File.hpp"
 #include "logging/LogRegistry.hpp"
+#include "protocols/http/PreviewRequest.hpp"
+#include "protocols/http/HttpRouter.hpp"
 
+#include <format>
 #include <pdfium/fpdfview.h>
 
 using namespace vh::logging;
+using namespace vh::util;
 
 namespace vh::http {
 
-PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req,
-                                          int vault_id,
-                                          const std::string& rel_path,
-                                          const std::unordered_map<std::string, std::string>& params) const {
+PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req, const std::unique_ptr<PreviewRequest>&& pr) {
     try {
-        const auto scale_it = params.find("scale");
-        const auto size_it = params.find("size");
-
-        const auto engine = storageManager_->getEngine(vault_id);
-        if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vault_id));
-
         std::string mime_type = "image/jpeg";
 
-        const auto tmpPath = util::decrypt_file_to_temp(vault_id, rel_path, engine);
+        const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
 
         FPDF_DOCUMENT doc = FPDF_LoadDocument(tmpPath.c_str(), nullptr);
         if (!doc) throw std::runtime_error("Failed to load PDF");
@@ -36,59 +29,51 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
             throw std::runtime_error("Failed to load first page");
         }
 
-        int width = static_cast<int>(FPDF_GetPageWidth(page));
-        int height = static_cast<int>(FPDF_GetPageHeight(page));
+        const int width = static_cast<int>(FPDF_GetPageWidth(page));
+        const int height = static_cast<int>(FPDF_GetPageHeight(page));
 
         int new_w = width, new_h = height;
-        if (scale_it != params.end()) {
-            float scale = std::stof(scale_it->second);
-            new_w = static_cast<int>(width * scale);
-            new_h = static_cast<int>(height * scale);
-        } else if (size_it != params.end()) {
-            int max_dim = std::stoi(size_it->second);
-            float ratio = std::min(max_dim / static_cast<float>(width), max_dim / static_cast<float>(height));
-            new_w = static_cast<int>(width * ratio);
-            new_h = static_cast<int>(height * ratio);
+        if (pr->scale) {
+            new_w = static_cast<int>(static_cast<float>(width) * *pr->scale);
+            new_h = static_cast<int>(static_cast<float>(height) * *pr->scale);
+        } else if (pr->size) {
+            const float ratio = std::min(static_cast<float>(*pr->size) / static_cast<float>(width), static_cast<float>(*pr->size) / static_cast<float>(height));
+            new_w = static_cast<int>(static_cast<float>(width) * ratio);
+            new_h = static_cast<int>(static_cast<float>(height) * ratio);
         }
 
         FPDF_BITMAP bitmap = FPDFBitmap_Create(new_w, new_h, 0);
         FPDFBitmap_FillRect(bitmap, 0, 0, new_w, new_h, 0xFFFFFFFF);
         FPDF_RenderPageBitmap(bitmap, page, 0, 0, new_w, new_h, 0, 0);
 
-        auto* buffer = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
+        const auto* buffer = static_cast<uint8_t*>(FPDFBitmap_GetBuffer(bitmap));
         std::vector<uint8_t> rgb_data(new_w * new_h * 3);
+        const int stride = FPDFBitmap_GetStride(bitmap);
+
 
         for (int y = 0; y < new_h; ++y) {
+            const uint8_t* row = buffer + y * stride;
             for (int x = 0; x < new_w; ++x) {
-                int idx = y * new_w + x;
-                rgb_data[idx * 3 + 0] = buffer[idx * 4 + 2]; // R
-                rgb_data[idx * 3 + 1] = buffer[idx * 4 + 1]; // G
-                rgb_data[idx * 3 + 2] = buffer[idx * 4 + 0]; // B
+                const uint8_t* px = row + x * 4;
+                const int idx = (y * new_w + x) * 3;
+                rgb_data[idx + 0] = px[2]; // R
+                rgb_data[idx + 1] = px[1]; // G
+                rgb_data[idx + 2] = px[0]; // B
             }
         }
 
         std::vector<uint8_t> jpeg_buf;
-        util::compress_to_jpeg(rgb_data.data(), new_w, new_h, jpeg_buf);
+        compress_to_jpeg(rgb_data.data(), new_w, new_h, jpeg_buf);
 
         FPDFBitmap_Destroy(bitmap);
         FPDF_ClosePage(page);
         FPDF_CloseDocument(doc);
 
-        http::response<http::vector_body<uint8_t>> res{http::status::ok, req.version()};
-        res.set(http::field::content_type, mime_type);
-        res.body() = std::move(jpeg_buf);
-        res.content_length(res.body().size());
-        res.keep_alive(req.keep_alive());
-        res.prepare_payload();
-        return res;
+        return HttpRouter::makeResponse(req, std::move(jpeg_buf), *pr->file->mime_type);
 
     } catch (const std::exception& e) {
-        LogRegistry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", rel_path, e.what());
-        http::response<http::string_body> res{http::status::unsupported_media_type, req.version()};
-        res.set(http::field::content_type, "text/plain");
-        res.body() = "Failed to preview PDF: " + std::string(e.what());
-        res.prepare_payload();
-        return res;
+        LogRegistry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", pr->rel_path.string(), e.what());
+        return HttpRouter::makeErrorResponse(req, std::string(e.what()), http::status::unsupported_media_type);
     }
 }
 

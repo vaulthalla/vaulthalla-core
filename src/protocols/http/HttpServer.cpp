@@ -1,7 +1,5 @@
 #include "protocols/http/HttpServer.hpp"
 #include "protocols/http/HttpSession.hpp"
-#include "protocols/http/HttpRouter.hpp"
-#include "services/ServiceManager.hpp"
 #include "protocols/http/HttpSessionTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
@@ -16,7 +14,6 @@ namespace vh::http {
 
 HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
     : acceptor_(ioc), socket_(ioc),
-      router_(std::make_shared<HttpRouter>()),
       authManager_(ServiceDepsRegistry::instance().authManager),
       storageManager_(ServiceDepsRegistry::instance().storageManager) {
     beast::error_code ec;
@@ -40,7 +37,7 @@ void HttpServer::run() {
 void HttpServer::do_accept() {
     acceptor_.async_accept(socket_, [self = shared_from_this()](beast::error_code ec) mutable {
         if (!ec) {
-            auto session = std::make_shared<HttpSession>(std::move(self->socket_), self->router_);
+            auto session = std::make_shared<HttpSession>(std::move(self->socket_));
             ThreadPoolManager::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
         }
         self->do_accept();

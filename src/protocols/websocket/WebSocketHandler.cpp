@@ -100,8 +100,8 @@ void WebSocketHandler::registerGroupHandlers() const {
     router_->registerPayload("group.member.remove", &GroupHandler::removeMember);
     router_->registerPayload("group.get", &GroupHandler::get);
     router_->registerPayload("group.get.byName", &GroupHandler::getByName);
-    router_->registerPayload("groups.list", &GroupHandler::list);
     router_->registerPayload("groups.list.byUser", &GroupHandler::listByUser);
+    router_->registerSessionOnlyHandler("groups.list", &GroupHandler::list);
 }
 
 void WebSocketHandler::registerStatHandlers() const {

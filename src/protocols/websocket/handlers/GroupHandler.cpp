@@ -70,7 +70,7 @@ json GroupHandler::removeMember(const json& payload, const WebSocketSession& ses
     return {{"groupId", groupId}, {"userId", userId}};
 }
 
-json GroupHandler::list(const json& payload, const WebSocketSession& session) {
+json GroupHandler::list(const WebSocketSession& session) {
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can list groups");
 

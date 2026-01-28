@@ -52,7 +52,7 @@ public:
 
     void accept(tcp::socket&& socket);
 
-    void requestClose();
+    void close();
 
     void subscribeChannel(const std::string& channel);
 
@@ -113,8 +113,6 @@ private:
     void doWrite();
 
     void onWrite(beast::error_code ec, std::size_t bytesTransferred);
-
-    void close();
 };
 
 } // namespace vh::websocket

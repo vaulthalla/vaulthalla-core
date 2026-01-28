@@ -113,31 +113,36 @@ void WebSocketSession::accept(tcp::socket&& socket) {
     http::async_read(ws_->next_layer(), tmpBuffer_, *req, asio::bind_executor(strand_, onHeadersRead));
 }
 
-void WebSocketSession::requestClose() {
-    // idempotent
+void WebSocketSession::close() {
+    // One-shot gate (thread-safe)
     if (closing_.exchange(true)) return;
 
-    auto self = shared_from_this();
-
-    // IMPORTANT: execute on the websocket stream executor/strand
-    boost::asio::dispatch(ws_->get_executor(), [self]() {
-        boost::system::error_code ec;
-        self->ws_->close(websocket::close_code::normal, ec);
-        // ignore ec or log it; close() can fail if already closed
-    });
-}
-
-void WebSocketSession::close() {
-    if (ws_ && ws_->is_open()) {
-        // close websocket
-        beast::error_code ec;
-        ws_->close(websocket::close_code::normal, ec);
-        if (ec) LogRegistry::ws()->debug("[WebSocketSession] Error closing WebSocket: {}", ec.message());
+    // Strong copy: avoids check-then-use races on ws_
+    auto ws = ws_;
+    if (!ws) {
+        buffer_.consume(buffer_.size());
+        return;
     }
 
-    ws_.reset(); // release FD
-    buffer_.consume(buffer_.size());
-    LogRegistry::ws()->debug("[WebSocketSession] Closed session for IP: {}", getClientIp());
+    auto self = shared_from_this();
+    auto ex   = ws->get_executor();
+
+    // Prefer post() to avoid inline teardown surprises.
+    boost::asio::post(ex, [self, ws]() mutable {
+        boost::system::error_code ec;
+        if (ws->is_open())
+            ws->close(websocket::close_code::normal, ec);
+
+        if (ec) {
+            LogRegistry::ws()->debug("[WebSocketSession] ws close error: {}", ec.message());
+        }
+
+        // Teardown on executor thread
+        self->ws_.reset();
+        self->buffer_.consume(self->buffer_.size());
+
+        LogRegistry::ws()->debug("[WebSocketSession] Closed session for IP: {}", self->getClientIp());
+    });
 }
 
 void WebSocketSession::send(const json& message) {

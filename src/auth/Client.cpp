@@ -87,19 +87,17 @@ void Client::refreshToken() {
     else LogRegistry::ws()->debug("[Client] Cannot refresh token: user is not set.");
 }
 
-void Client::invalidateToken() {
+void Client::invalidateToken() const {
     if (token_) {
         token_->revoke();
         LogRegistry::ws()->debug("[Client] Token invalidated for user: {}", user_ ? user_->name : "unknown");
     } else LogRegistry::ws()->debug("[Client] Cannot invalidate token: token is not set.");
 }
 
-void Client::closeConnection() {
-    if (session_) {
-        invalidateToken();
-        session_->requestClose();
-        LogRegistry::ws()->debug("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
-    } else LogRegistry::ws()->debug("[Client] Cannot close connection: session is not set.");
+void Client::closeConnection() const {
+    invalidateToken();
+    if (session_) session_->close();
+    LogRegistry::ws()->debug("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
 }
 
 bool Client::validateToken(const std::string& token) const {

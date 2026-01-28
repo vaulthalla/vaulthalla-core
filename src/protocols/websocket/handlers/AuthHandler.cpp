@@ -1,4 +1,5 @@
 #include "protocols/websocket/handlers/AuthHandler.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
 #include "auth/Client.hpp"
 #include "database/Queries/PermsQueries.hpp"

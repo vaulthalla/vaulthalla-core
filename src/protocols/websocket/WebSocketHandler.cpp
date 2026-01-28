@@ -1,5 +1,7 @@
 #include "protocols/websocket/WebSocketHandler.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
+#include "protocols/websocket/handlers/AuthHandler.hpp"
+#include "protocols/websocket/handlers/FileSystemHandler.hpp"
 #include "protocols/websocket/handlers/PermissionsHandler.hpp"
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
 #include "protocols/websocket/handlers/GroupHandler.hpp"

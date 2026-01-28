@@ -3,7 +3,7 @@
 #include "storage/StorageEngine.hpp"
 #include "types/FSEntry.hpp"
 #include "types/User.hpp"
-#include "types/Group.hpp"
+#include "types/Path.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"

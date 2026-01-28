@@ -50,11 +50,10 @@ json StorageHandler::removeAPIKey(const json& payload, const WebSocketSession& s
     return {};
 }
 
-json StorageHandler::listAPIKeys(const json& payload, const WebSocketSession& session) {
+json StorageHandler::listAPIKeys(const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
 
-    const auto listAll = payload.value("all", false);
-    const auto keys = user->canManageAPIKeys() && listAll ?
+    const auto keys = user->canManageAPIKeys() ?
         ServiceDepsRegistry::instance().apiKeyManager->listAPIKeys() :
         ServiceDepsRegistry::instance().apiKeyManager->listUserAPIKeys(user->id);
 
@@ -135,11 +134,11 @@ json StorageHandler::getVault(const json& payload, const WebSocketSession& sessi
     return data;
 }
 
-json StorageHandler::listVaults(const json& payload, const WebSocketSession& session) {
+json StorageHandler::listVaults(const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
-    if (user->canManageVaults() && payload.value("all", false))
-        return {{"vaults", VaultQueries::listVaults()}};
-    return {{"vaults", VaultQueries::listUserVaults(user->id)}};
+    return user->canManageVaults() ?
+        json{{"vaults", VaultQueries::listVaults()}} :
+        json{{"vaults", VaultQueries::listUserVaults(user->id)}};
 }
 
 json StorageHandler::syncVault(const json& payload, const WebSocketSession& session) {

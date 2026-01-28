@@ -12,11 +12,11 @@ struct StorageHandler {
     // API commands
     static json addAPIKey(const json& payload, const WebSocketSession& session);
     static json removeAPIKey(const json& payload, const WebSocketSession& session);
-    static json listAPIKeys(const json& payload, const WebSocketSession& session);
+    static json listAPIKeys(const WebSocketSession& session);
     static json getAPIKey(const json& payload, const WebSocketSession& session);
 
     // All Vault commands
-    static json listVaults(const json& payload, const WebSocketSession& session);
+    static json listVaults(const WebSocketSession& session);
     static json addVault(const json& payload, const WebSocketSession& session);
     static json updateVault(const json& payload, const WebSocketSession& session);
     static json removeVault(const json& payload, const WebSocketSession& session);

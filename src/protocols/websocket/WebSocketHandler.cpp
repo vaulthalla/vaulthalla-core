@@ -36,11 +36,12 @@ void WebSocketHandler::registerAuthHandlers() const {
     router_->registerSessionOnlyHandler("auth.logout", &AuthHandler::logout);
     router_->registerPayload("auth.user.update", &AuthHandler::updateUser);
     router_->registerPayload("auth.user.change_password", &AuthHandler::changePassword);
-    router_->registerHandlerWithToken("auth.user.isAuthenticated", &AuthHandler::isUserAuthenticated);
+    router_->registerHandlerWithToken("auth.isAuthenticated", &AuthHandler::isUserAuthenticated);
     router_->registerPayload("auth.user.get", &AuthHandler::getUser);
     router_->registerPayload("auth.user.get.byName", &AuthHandler::getUserByName);
     router_->registerSessionOnlyHandler("auth.users.list", &AuthHandler::listUsers);
     router_->registerEmptyHandler("auth.admin.default_password", &AuthHandler::doesAdminHaveDefaultPassword);
+    router_->registerSessionOnlyHandler("auth.refresh", &AuthHandler::refresh);
 }
 
 void WebSocketHandler::registerFileSystemHandlers() const {
@@ -55,7 +56,7 @@ void WebSocketHandler::registerFileSystemHandlers() const {
 }
 
 void WebSocketHandler::registerStorageHandlers() const {
-    router_->registerPayload("storage.vault.list", &StorageHandler::listVaults);
+    router_->registerSessionOnlyHandler("storage.vault.list", &StorageHandler::listVaults);
     router_->registerPayload("storage.vault.add", &StorageHandler::addVault);
     router_->registerPayload("storage.vault.update", &StorageHandler::updateVault);
     router_->registerPayload("storage.vault.remove", &StorageHandler::removeVault);
@@ -66,7 +67,7 @@ void WebSocketHandler::registerStorageHandlers() const {
 void WebSocketHandler::registerAPIKeyHandlers() const {
     router_->registerPayload("storage.apiKey.add", &StorageHandler::addAPIKey);
     router_->registerPayload("storage.apiKey.remove", &StorageHandler::removeAPIKey);
-    router_->registerPayload("storage.apiKey.list", &StorageHandler::listAPIKeys);
+    router_->registerSessionOnlyHandler("storage.apiKey.list", &StorageHandler::listAPIKeys);
     router_->registerPayload("storage.apiKey.get", &StorageHandler::getAPIKey);
 }
 

@@ -97,7 +97,7 @@ void Client::invalidateToken() {
 void Client::closeConnection() {
     if (session_) {
         invalidateToken();
-        session_->close();
+        session_->requestClose();
         LogRegistry::ws()->debug("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
     } else LogRegistry::ws()->debug("[Client] Cannot close connection: session is not set.");
 }

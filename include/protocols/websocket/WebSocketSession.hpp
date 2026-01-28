@@ -12,6 +12,7 @@
 #include <queue>
 #include <unordered_set>
 #include <fstream>
+#include <atomic>
 
 struct UploadContext {
     std::string path;
@@ -51,7 +52,7 @@ public:
 
     void accept(tcp::socket&& socket);
 
-    void close();
+    void requestClose();
 
     void subscribeChannel(const std::string& channel);
 
@@ -97,6 +98,7 @@ private:
     std::string refreshToken_;
     std::string userAgent_;
     std::string ipAddress_;
+    std::atomic_bool closing_{false};
 
     std::queue<std::string> writeQueue_;
     bool writingInProgress_ = false;
@@ -111,6 +113,8 @@ private:
     void doWrite();
 
     void onWrite(beast::error_code ec, std::size_t bytesTransferred);
+
+    void close();
 };
 
 } // namespace vh::websocket

@@ -1,38 +1,29 @@
 #pragma once
 
-#include <memory>
 #include <nlohmann/json.hpp>
-
-namespace vh::auth {
-class SessionManager;
-class AuthManager;
-} // namespace vh::auth
+#include <string>
 
 namespace vh::websocket {
 
 using json = nlohmann::json;
 
-class WebSocketSession;
+struct WebSocketSession;
 
-class AuthHandler {
-  public:
-    explicit AuthHandler(const std::shared_ptr<auth::AuthManager>& authManager);
+struct AuthHandler {
+    static json login(const json& payload, WebSocketSession& session);
+    static json registerUser(const json& payload, WebSocketSession& session);
+    static json updateUser(const json& payload, const WebSocketSession& session);
+    static json changePassword(const json& payload, const WebSocketSession& session);
+    static json getUser(const json& payload, const WebSocketSession& session);
+    static json getUserByName(const json& payload, const WebSocketSession& session);
 
-    void handleLogin(const json& msg, WebSocketSession& session) const;
-    void handleRegister(const json& msg, WebSocketSession& session) const;
-    void handleUpdateUser(const json& msg, WebSocketSession& session) const;
-    void handleChangePassword(const json& msg, WebSocketSession& session) const;
-    void handleRefresh(const json& msg, WebSocketSession& session) const;
-    void handleLogout(const json& msg, WebSocketSession& session) const;
-    void handleGetUser(const json& msg, WebSocketSession& session) const;
-    void handleListUsers(const json& msg, WebSocketSession& session);
-    static void handleGetUserByName(const json& msg, WebSocketSession& session) ;
-    void isUserAuthenticated(const json& msg, WebSocketSession& session) const;
-    static void doesAdminHaveDefaultPassword(const json& msg, WebSocketSession& session) ;
+    static json isUserAuthenticated(const std::string& token, const WebSocketSession& session);
 
-  private:
-    std::shared_ptr<auth::AuthManager> authManager_;
-    std::shared_ptr<auth::SessionManager> sessionManager_;
+    static json listUsers(const WebSocketSession& session);
+    static json refresh(WebSocketSession& session);
+    static json logout(WebSocketSession& session);
+
+    static json doesAdminHaveDefaultPassword();
 };
 
-} // namespace vh::websocket
+}

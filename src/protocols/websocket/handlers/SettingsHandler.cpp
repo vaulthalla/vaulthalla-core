@@ -8,57 +8,18 @@
 
 using namespace vh::websocket;
 
-void SettingsHandler::handleGetSettings(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageSettings())
-            throw std::runtime_error("Permission denied: Only admins can view settings");
+json SettingsHandler::get(const WebSocketSession& session) {
+    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageSettings())
+        throw std::runtime_error("Permission denied: Only admins can view settings");
 
-        const json data = {{"settings", config::ConfigRegistry::get()}};
-
-        const json response = {
-            {"command", "settings.get.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"data", data}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "settings.get.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
+    return {{"settings", config::ConfigRegistry::get()}};
 }
 
-void SettingsHandler::handleUpdateSettings(const json& msg, WebSocketSession& session) {
-    try {
-        const auto user = session.getAuthenticatedUser();
-        if (!user || !user->canManageSettings())
-            throw std::runtime_error("Permission denied: Only admins can update settings");
+json SettingsHandler::update(const json& payload, const WebSocketSession& session) {
+    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageSettings())
+        throw std::runtime_error("Permission denied: Only admins can update settings");
 
-        const auto& payload = msg.at("payload");
-        const config::Config config(payload);
-        config.save();
-
-        const json response = {
-            {"command", "settings.update.response"},
-            {"status", "ok"},
-            {"requestId", msg.at("requestId").get<std::string>()}
-        };
-
-        session.send(response);
-    } catch (const std::exception& e) {
-        const json response = {
-            {"command", "settings.update.response"},
-            {"status", "error"},
-            {"requestId", msg.at("requestId").get<std::string>()},
-            {"error", e.what()}
-        };
-        session.send(response);
-    }
+    const config::Config config(payload);
+    config.save();
+    return {{"settings", config}};
 }

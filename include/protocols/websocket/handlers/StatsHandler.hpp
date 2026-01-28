@@ -6,12 +6,12 @@ namespace vh::websocket {
 
 using json = nlohmann::json;
 
-class WebSocketSession;
+struct WebSocketSession;
 
 struct StatsHandler {
-    static void handleVaultStats(const json& msg, WebSocketSession& session);
-    static void handleFSCacheStats(const json& msg, WebSocketSession& session);
-    static void handleHttpCacheStats(const json& msg, WebSocketSession& session);
+    static json vault(const json& payload, const WebSocketSession& session);
+    static json fsCache(const WebSocketSession& session);
+    static json httpCache(const WebSocketSession& session);
 };
 
 }

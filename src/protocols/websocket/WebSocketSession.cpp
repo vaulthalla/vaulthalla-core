@@ -8,7 +8,6 @@
 #include "logging/LogRegistry.hpp"
 
 #include <boost/beast/http.hpp>
-#include <regex>
 
 namespace {
 namespace beast = boost::beast;
@@ -112,6 +111,20 @@ void WebSocketSession::accept(tcp::socket&& socket) {
 
     // ── Begin HTTP header read phase ──
     http::async_read(ws_->next_layer(), tmpBuffer_, *req, asio::bind_executor(strand_, onHeadersRead));
+}
+
+void WebSocketSession::requestClose() {
+    // idempotent
+    if (closing_.exchange(true)) return;
+
+    auto self = shared_from_this();
+
+    // IMPORTANT: execute on the websocket stream executor/strand
+    boost::asio::dispatch(ws_->get_executor(), [self]() {
+        boost::system::error_code ec;
+        self->ws_->close(websocket::close_code::normal, ec);
+        // ignore ec or log it; close() can fail if already closed
+    });
 }
 
 void WebSocketSession::close() {

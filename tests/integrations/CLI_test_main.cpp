@@ -72,10 +72,10 @@ static int runTests() {
     return exit_status;
 }
 
-static void shutdown() {
-    ServiceManager::instance().stopAll();
-    ThreadPoolManager::instance().shutdown();
-}
+// static void shutdown() {
+//     ServiceManager::instance().stopAll();
+//     ThreadPoolManager::instance().shutdown();
+// }
 
 int main() {
     initBase();

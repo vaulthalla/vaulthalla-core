@@ -5,11 +5,11 @@
 namespace vh::websocket {
 
 using json = nlohmann::json;
-class WebSocketSession;
+struct WebSocketSession;
 
 struct SettingsHandler {
-    static void handleGetSettings(const json& msg, WebSocketSession& session);
-    static void handleUpdateSettings(const json& msg, WebSocketSession& session);
+    static json get(const WebSocketSession& session);
+    static json update(const json& payload, const WebSocketSession& session);
 };
 
 }

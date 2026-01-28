@@ -1,9 +1,11 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
-#include "auth/SessionManager.hpp"
-#include "protocols/websocket/WebSocketSession.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+
 #include "auth/AuthManager.hpp"
+#include "auth/SessionManager.hpp"
+#include "logging/LogRegistry.hpp"
+#include "protocols/websocket/WebSocketSession.hpp"
+#include "protocols/websocket/WSHandler.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::logging;
@@ -15,44 +17,58 @@ WebSocketRouter::WebSocketRouter()
     if (!sessionManager_) throw std::invalid_argument("SessionManager cannot be null");
 }
 
-void WebSocketRouter::registerHandler(const std::string& command, HandlerFunc handler) {
-    handlers_[command] = std::move(handler);
+void WebSocketRouter::registerWs(const std::string& cmd, RawWsHandler fn) {
+    // wrapper owns cmd + msg lifecycle
+    handlers_[cmd] = makeWsHandler(cmd, std::move(fn));
 }
 
-void WebSocketRouter::routeMessage(const json& msg, WebSocketSession& session) {
+void WebSocketRouter::registerPayload(const std::string& cmd, RawPayloadHandler fn) {
+    handlers_[cmd] = makePayloadHandler(cmd, std::move(fn));
+}
+
+void WebSocketRouter::registerHandlerWithToken(const std::string& cmd, RawHandlerWithToken fn) {
+    handlers_[cmd] = makeHandlerWithToken(cmd, std::move(fn));
+}
+
+void WebSocketRouter::registerSessionOnlyHandler(const std::string& cmd, RawSessionOnly fn) {
+    handlers_[cmd] = makeSessionOnlyHandler(cmd, std::move(fn));
+}
+
+void WebSocketRouter::registerEmptyHandler(const std::string& cmd, RawEmpty fn) {
+    handlers_[cmd] = makeEmptyHandler(cmd, std::move(fn));
+}
+
+void WebSocketRouter::registerHandler(const std::string& cmd, Handler h) {
+    handlers_[cmd] = std::move(h);
+}
+
+void WebSocketRouter::routeMessage(json&& msg, WebSocketSession& session) {
     try {
         LogRegistry::ws()->debug("[Router] Routing message: {}", msg.dump());
 
-        const std::string command = msg.at("command").get<std::string>();
+        auto command = msg.at("command").get<std::string>();
         const std::string accessToken = msg.value("token", "");
 
+        // Gate non-auth commands
         if (!command.starts_with("auth")) {
             if (const auto client = sessionManager_->getClientSession(session.getUUID());
                 !client || !client->validateToken(accessToken)) {
+
                 LogRegistry::ws()->warn("[Router] Unauthorized access attempt for command: {}", command);
-                const json errorResponse = {{"command", "error"},
-                                      {"status", "unauthorized"},
-                                      {"message", "You must be authenticated to perform this action."}};
-                session.send(errorResponse);
+                WSResponse::UNAUTHORIZED(std::move(command), std::move(msg))(session);
                 return;
             }
         }
 
-        if (const auto it = handlers_.find(command); it != handlers_.end()) it->second(msg, session);
+        if (handlers_.contains(command)) handlers_[command](std::move(msg), session);
         else {
             LogRegistry::ws()->warn("[Router] Unknown command: {}", command);
-            const json errorResponse = {{"command", "error"},
-                                        {"status", "unknown_command"},
-                                        {"message", "Unknown command: " + command}};
-            session.send(errorResponse);
+            WSResponse::ERROR(std::move(command), std::move(msg), "Unknown command")(session);
         }
     } catch (const std::exception& e) {
         LogRegistry::ws()->error("[Router] Error routing message: {}", e.what());
-        const json errorResponse = {{"command", "error"},
-                                    {"status", "internal_error"},
-                                    {"message", "An internal error occurred while processing your request."}};
-        session.send(errorResponse);
+        WSResponse::INTERNAL_ERROR(std::move(msg), e.what())(session);
     }
 }
 
-} // namespace vh::websocket
+}

@@ -1,9 +1,14 @@
 #include "protocols/websocket/WebSocketHandler.hpp"
+#include "protocols/websocket/WebSocketRouter.hpp"
+#include "protocols/websocket/handlers/AuthHandler.hpp"
+#include "protocols/websocket/handlers/FileSystemHandler.hpp"
 #include "protocols/websocket/handlers/PermissionsHandler.hpp"
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
 #include "protocols/websocket/handlers/GroupHandler.hpp"
 #include "protocols/websocket/handlers/StatsHandler.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "protocols/websocket/handlers/RolesHandler.hpp"
+#include "protocols/websocket/handlers/VaultHandler.hpp"
+#include "protocols/websocket/handlers/APIKeyHandler.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
@@ -12,18 +17,14 @@ using namespace vh::logging;
 namespace vh::websocket {
 
 WebSocketHandler::WebSocketHandler(const std::shared_ptr<WebSocketRouter>& router)
-    : router_(router) {
-    authHandler_ = std::make_shared<AuthHandler>(ServiceDepsRegistry::instance().authManager);
-    storageHandler_ = std::make_shared<StorageHandler>(ServiceDepsRegistry::instance().storageManager);
-    fsHandler_ = std::make_shared<FileSystemHandler>();
-    registerAllHandlers();
-}
+    : router_(router) { registerAllHandlers(); }
 
 void WebSocketHandler::registerAllHandlers() const {
     registerAuthHandlers();
     registerFileSystemHandlers();
     registerStorageHandlers();
     registerAPIKeyHandlers();
+    registerRoleHandlers();
     registerPermissionsHandlers();
     registerSettingsHandlers();
     registerGroupHandlers();
@@ -33,231 +34,84 @@ void WebSocketHandler::registerAllHandlers() const {
 }
 
 void WebSocketHandler::registerAuthHandlers() const {
-    router_->registerHandler("auth.login", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleLogin(msg, session);
-    });
-
-    router_->registerHandler("auth.refresh", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleRefresh(msg, session);
-    });
-
-    router_->registerHandler("auth.logout", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleLogout(msg, session);
-    });
-
-    router_->registerHandler("auth.user.update", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleUpdateUser(msg, session);
-    });
-
-    router_->registerHandler("auth.user.change_password", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleChangePassword(msg, session);
-    });
-
-    router_->registerHandler("auth.isAuthenticated", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->isUserAuthenticated(msg, session);
-    });
-
-    router_->registerHandler("auth.register", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleRegister(msg, session);
-    });
-
-    router_->registerHandler("auth.user.get", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleGetUser(msg, session);
-    });
-
-    router_->registerHandler("auth.user.get.byName", [this](const json& msg, WebSocketSession& session) {
-        AuthHandler::handleGetUserByName(msg, session);
-    });
-
-    router_->registerHandler("auth.users.list", [this](const json& msg, WebSocketSession& session) {
-        authHandler_->handleListUsers(msg, session);
-    });
-
-    router_->registerHandler("auth.admin.default_password", [this](const json& msg, WebSocketSession& session) {
-        AuthHandler::doesAdminHaveDefaultPassword(msg, session);
-    });
+    router_->registerPayload("auth.login", &AuthHandler::login);
+    router_->registerPayload("auth.register", &AuthHandler::registerUser);
+    router_->registerSessionOnlyHandler("auth.logout", &AuthHandler::logout);
+    router_->registerPayload("auth.user.update", &AuthHandler::updateUser);
+    router_->registerPayload("auth.user.change_password", &AuthHandler::changePassword);
+    router_->registerHandlerWithToken("auth.isAuthenticated", &AuthHandler::isUserAuthenticated);
+    router_->registerPayload("auth.user.get", &AuthHandler::getUser);
+    router_->registerPayload("auth.user.get.byName", &AuthHandler::getUserByName);
+    router_->registerSessionOnlyHandler("auth.users.list", &AuthHandler::listUsers);
+    router_->registerEmptyHandler("auth.admin.default_password", &AuthHandler::doesAdminHaveDefaultPassword);
+    router_->registerSessionOnlyHandler("auth.refresh", &AuthHandler::refresh);
 }
 
 void WebSocketHandler::registerFileSystemHandlers() const {
-    router_->registerHandler("fs.upload.start", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleUploadStart(msg, session);
-    });
-
-    router_->registerHandler("fs.upload.finish", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleUploadFinish(msg, session);
-    });
-
-    router_->registerHandler("fs.dir.create", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleMkdir(msg, session);
-    });
-
-    router_->registerHandler("fs.dir.list", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleListDir(msg, session);
-    });
-
-    router_->registerHandler("fs.entry.delete", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleDelete(msg, session);
-    });
-
-    router_->registerHandler("fs.entry.move", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleMove(msg, session);
-    });
-
-    router_->registerHandler("fs.entry.rename", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleRename(msg, session);
-    });
-
-    router_->registerHandler("fs.entry.copy", [this](const json& msg, WebSocketSession& session) {
-        fsHandler_->handleCopy(msg, session);
-    });
+    router_->registerPayload("fs.upload.start", &FileSystemHandler::startUpload);
+    router_->registerPayload("fs.upload.finish", &FileSystemHandler::finishUpload);
+    router_->registerPayload("fs.dir.create", &FileSystemHandler::mkdir);
+    router_->registerPayload("fs.dir.list", &FileSystemHandler::listDir);
+    router_->registerPayload("fs.entry.delete", &FileSystemHandler::remove);
+    router_->registerPayload("fs.entry.move", &FileSystemHandler::move);
+    router_->registerPayload("fs.entry.rename", &FileSystemHandler::rename);
+    router_->registerPayload("fs.entry.copy", &FileSystemHandler::copy);
 }
 
 void WebSocketHandler::registerStorageHandlers() const {
-    router_->registerHandler("storage.vault.list", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListVaults(msg, session);
-    });
-
-    router_->registerHandler("storage.vault.add", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleAddVault(msg, session);
-    });
-
-    router_->registerHandler("storage.vault.update", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleUpdateVault(msg, session);
-    });
-
-    router_->registerHandler("storage.vault.remove", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleRemoveVault(msg, session);
-    });
-
-    router_->registerHandler("storage.vault.get", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleGetVault(msg, session);
-    });
-
-    router_->registerHandler("storage.vault.sync", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleSyncVault(msg, session);
-    });
+    router_->registerSessionOnlyHandler("storage.vault.list", &VaultHandler::list);
+    router_->registerPayload("storage.vault.add", &VaultHandler::add);
+    router_->registerPayload("storage.vault.update", &VaultHandler::update);
+    router_->registerPayload("storage.vault.remove", &VaultHandler::remove);
+    router_->registerPayload("storage.vault.get", &VaultHandler::get);
+    router_->registerPayload("storage.vault.sync", &VaultHandler::sync);
 }
 
 void WebSocketHandler::registerAPIKeyHandlers() const {
-    router_->registerHandler("storage.apiKey.add", [this](const json& msg, WebSocketSession& session) {
-       storageHandler_->handleAddAPIKey(msg, session);
-   });
+    router_->registerPayload("storage.apiKey.add", &APIKeyHandler::add);
+    router_->registerPayload("storage.apiKey.remove", &APIKeyHandler::remove);
+    router_->registerSessionOnlyHandler("storage.apiKey.list", &APIKeyHandler::list);
+    router_->registerPayload("storage.apiKey.get", &APIKeyHandler::get);
+}
 
-    router_->registerHandler("storage.apiKey.remove", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleRemoveAPIKey(msg, session);
-    });
-
-    router_->registerHandler("storage.apiKey.list", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListAPIKeys(msg, session);
-    });
-
-    router_->registerHandler("storage.apiKey.list.user", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleListUserAPIKeys(msg, session);
-    });
-
-    router_->registerHandler("storage.apiKey.get", [this](const json& msg, WebSocketSession& session) {
-        storageHandler_->handleGetAPIKey(msg, session);
-    });
+void WebSocketHandler::registerRoleHandlers() const {
+    router_->registerPayload("role.add", &RolesHandler::add);
+    router_->registerPayload("role.update", &RolesHandler::update);
+    router_->registerPayload("role.delete", &RolesHandler::remove);
+    router_->registerPayload("role.get", &RolesHandler::get);
+    router_->registerPayload("role.get.byName", &RolesHandler::getByName);
+    router_->registerSessionOnlyHandler("roles.list", &RolesHandler::list);
+    router_->registerSessionOnlyHandler("roles.list.user", &RolesHandler::listUserRoles);
+    router_->registerSessionOnlyHandler("roles.list.vault", &RolesHandler::listVaultRoles);
 }
 
 void WebSocketHandler::registerPermissionsHandlers() const {
-    router_->registerHandler("role.add", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleAddRole(msg, session);
-    });
-
-    router_->registerHandler("role.delete", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleDeleteRole(msg, session);
-    });
-
-    router_->registerHandler("role.update", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleUpdateRole(msg, session);
-    });
-
-    router_->registerHandler("role.get", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleGetRole(msg, session);
-    });
-
-    router_->registerHandler("role.get.byName", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleGetRoleByName(msg, session);
-    });
-
-    router_->registerHandler("roles.list", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleListRoles(msg, session);
-    });
-
-    router_->registerHandler("roles.list.user", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleListUserRoles(msg, session);
-    });
-
-    router_->registerHandler("roles.list.vault", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleListVaultRoles(msg, session);
-    });
-
-    router_->registerHandler("permission.get", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleGetPermission(msg, session);
-    });
-
-    router_->registerHandler("permission.get.byName", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleGetPermissionByName(msg, session);
-    });
-
-    router_->registerHandler("permissions.list", [this](const json& msg, WebSocketSession& session) {
-        PermissionsHandler::handleListPermissions(msg, session);
-    });
+    router_->registerPayload("permission.get", &PermissionsHandler::get);
+    router_->registerPayload("permission.get.byName", &PermissionsHandler::getByName);
+    router_->registerSessionOnlyHandler("permissions.list", &PermissionsHandler::list);
 }
 
 void WebSocketHandler::registerSettingsHandlers() const {
-    router_->registerHandler("settings.get", [this](const json& msg, WebSocketSession& session) {
-        SettingsHandler::handleGetSettings(msg, session);
-    });
-
-    router_->registerHandler("settings.update", [this](const json& msg, WebSocketSession& session) {
-        SettingsHandler::handleUpdateSettings(msg, session);
-    });
+    router_->registerSessionOnlyHandler("settings.get", &SettingsHandler::get);
+    router_->registerPayload("settings.update", &SettingsHandler::update);
 }
 
 void WebSocketHandler::registerGroupHandlers() const {
-    router_->registerHandler("group.add", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleCreateGroup(msg, session);
-    });
-    router_->registerHandler("group.remove", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleDeleteGroup(msg, session);
-    });
-    router_->registerHandler("group.member.add", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleAddMemberToGroup(msg, session);
-    });
-    router_->registerHandler("group.member.remove", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleRemoveMemberFromGroup(msg, session);
-    });
-    router_->registerHandler("group.update", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleUpdateGroup(msg, session);
-    });
-    router_->registerHandler("groups.list", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleListGroups(msg, session);
-    });
-    router_->registerHandler("group.get", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleGetGroup(msg, session);
-    });
-    router_->registerHandler("group.get.byName", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleGetGroupByName(msg, session);
-    });
-    router_->registerHandler("groups.list.byUser", [this](const json& msg, WebSocketSession& session) {
-        GroupHandler::handleListGroupsByUser(msg, session);
-    });
+    router_->registerPayload("group.add", &GroupHandler::add);
+    router_->registerPayload("group.update", &GroupHandler::update);
+    router_->registerPayload("group.remove", &GroupHandler::remove);
+    router_->registerPayload("group.member.add", &GroupHandler::addMember);
+    router_->registerPayload("group.member.remove", &GroupHandler::removeMember);
+    router_->registerPayload("group.get", &GroupHandler::get);
+    router_->registerPayload("group.get.byName", &GroupHandler::getByName);
+    router_->registerPayload("groups.list.byUser", &GroupHandler::listByUser);
+    router_->registerSessionOnlyHandler("groups.list", &GroupHandler::list);
 }
 
 void WebSocketHandler::registerStatHandlers() const {
-    router_->registerHandler("stats.vault", [this](const json& msg, WebSocketSession& session) {
-        StatsHandler::handleVaultStats(msg, session);
-    });
-
-    router_->registerHandler("stats.fs.cache", [this](const json& msg, WebSocketSession& session) {
-        StatsHandler::handleFSCacheStats(msg, session);
-    });
-
-    router_->registerHandler("stats.http.cache", [this](const json& msg, WebSocketSession& session) {
-        StatsHandler::handleHttpCacheStats(msg, session);
-    });
+    router_->registerPayload("stats.vault", &StatsHandler::vault);
+    router_->registerSessionOnlyHandler("stats.fs.cache", &StatsHandler::fsCache);
+    router_->registerSessionOnlyHandler("stats.http.cache", &StatsHandler::httpCache);
 }
 
 } // namespace vh::websocket

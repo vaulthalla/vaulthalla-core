@@ -13,6 +13,7 @@ using namespace vh::auth;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::logging;
+using namespace vh::services;
 
 json AuthHandler::login(const json& payload, WebSocketSession& session) {
     const auto username = payload.at("name").get<std::string>();
@@ -109,7 +110,7 @@ json AuthHandler::isUserAuthenticated(const std::string& token, const WebSocketS
     const auto user = client->getUser();
     if (!user) throw std::runtime_error("User not found for token: " + token);
 
-    const auto isAuthenticated = client->isAuthenticated() && client->validateToken(token);
+    const bool isAuthenticated = client->isAuthenticated() && client->validateToken(token);
     json data = {{"isAuthenticated", isAuthenticated}};
     if (isAuthenticated) data["user"] = *user;
     return data;

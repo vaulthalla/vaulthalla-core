@@ -4,10 +4,13 @@
 #include "types/FSEntry.hpp"
 #include "types/User.hpp"
 #include "types/Path.hpp"
+#include "types/Vault.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "storage/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "database/Queries/FileQueries.hpp"
+#include "database/Queries/DirectoryQueries.hpp"
 #include "logging/LogRegistry.hpp"
 #include "storage/FSCache.hpp"
 

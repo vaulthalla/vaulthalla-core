@@ -5,23 +5,12 @@
 namespace vh::websocket {
 
 using json = nlohmann::json;
-class WebSocketSession;
+struct WebSocketSession;
 
 struct PermissionsHandler {
-
-    static void handleAddRole(const json& msg, WebSocketSession& session);
-    static void handleDeleteRole(const json& msg, WebSocketSession& session);
-    static void handleUpdateRole(const json& msg, WebSocketSession& session);
-    static void handleGetRole(const json& msg, WebSocketSession& session);
-    static void handleGetRoleByName(const json& msg, WebSocketSession& session);
-    static void handleListRoles(const json& msg, WebSocketSession& session);
-    static void handleListUserRoles(const json& msg, WebSocketSession& session);
-    static void handleListVaultRoles(const json& msg, WebSocketSession& session);
-
-    static void handleGetPermission(const json& msg, WebSocketSession& session);
-    static void handleGetPermissionByName(const json& msg, WebSocketSession& session);
-    static void handleListPermissions(const json& msg, WebSocketSession& session);
-
+    static json get(const json& payload, const WebSocketSession& session);
+    static json getByName(const json& payload, const WebSocketSession& session);
+    static json list(const WebSocketSession& session);
 };
 
 }

@@ -45,7 +45,7 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession> {
 public:
     ~WebSocketSession();
 
-    WebSocketSession(const std::shared_ptr<WebSocketRouter>& router);
+    explicit WebSocketSession(const std::shared_ptr<WebSocketRouter>& router);
 
     void send(const json& message);
 

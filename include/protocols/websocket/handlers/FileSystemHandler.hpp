@@ -1,7 +1,6 @@
 #pragma once
 
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "storage/StorageManager.hpp"
 #include "types/User.hpp"
 
 #include <memory>
@@ -13,27 +12,23 @@ using json = nlohmann::json;
 
 class FileSystemHandler {
 public:
-    FileSystemHandler();
+    static json startUpload(const json& payload, WebSocketSession& session);
 
-    void handleUploadStart(const json& msg, WebSocketSession& session);
+    static json finishUpload(const json& payload, WebSocketSession& session);
 
-    void handleUploadFinish(const json& msg, WebSocketSession& session);
+    static json mkdir(const json& payload, WebSocketSession& session);
 
-    void handleMkdir(const json& msg, WebSocketSession& session);
+    static json move(const json& payload, WebSocketSession& session);
 
-    void handleMove(const json& msg, WebSocketSession& session);
+    static json rename(const json& payload, WebSocketSession& session);
 
-    void handleRename(const json& msg, WebSocketSession& session);
+    static json copy(const json& payload, WebSocketSession& session);
 
-    void handleCopy(const json& msg, WebSocketSession& session);
+    static json listDir(const json& payload, WebSocketSession& session);
 
-    void handleListDir(const json& msg, WebSocketSession& session);
-
-    void handleDelete(const json& msg, WebSocketSession& session);
+    static json remove(const json& payload, WebSocketSession& session);
 
 private:
-    std::shared_ptr<storage::StorageManager> storageManager_;
-
     template <typename... Funcs> static void enforcePermissions(
         WebSocketSession& session,
         const unsigned int vaultId,

@@ -1,11 +1,10 @@
-#include "protocols/websocket/handlers/StorageHandler.hpp"
+#include "protocols/websocket/handlers/VaultHandler.hpp"
 #include "types/APIKey.hpp"
 #include "types/User.hpp"
 #include "types/Vault.hpp"
 #include "types/S3Vault.hpp"
 #include "types/Sync.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "crypto/APIKeyManager.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -23,50 +22,7 @@ using namespace vh::logging;
 using namespace vh::services;
 using json = nlohmann::json;
 
-json StorageHandler::addAPIKey(const json& payload, const WebSocketSession& session) {
-    const auto user = session.getAuthenticatedUser();
-    if (!user) throw std::invalid_argument("Invalid user name");
-
-    const auto userID = payload.at("user_id").get<unsigned int>();
-    if (user->id != userID) throw std::invalid_argument("Invalid user ID");
-
-    const auto name = payload.at("name").get<std::string>();
-    const auto provider = api::s3_provider_from_string(payload.at("provider").get<std::string>());
-    const auto accessKey = payload.at("access_key").get<std::string>();
-    const auto secretKey = payload.at("secret_access_key").get<std::string>();
-    const auto region = payload.at("region").get<std::string>();
-    const auto endpoint = payload.at("endpoint").get<std::string>();
-
-    auto key = std::make_shared<api::APIKey>(userID, name, provider, accessKey, secretKey, region, endpoint);
-    ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
-
-    return {};
-}
-
-json StorageHandler::removeAPIKey(const json& payload, const WebSocketSession& session) {
-    const auto keyId = payload.at("id").get<unsigned int>();
-    const auto user = session.getAuthenticatedUser();
-    ServiceDepsRegistry::instance().apiKeyManager->removeAPIKey(keyId, user->id);
-    return {};
-}
-
-json StorageHandler::listAPIKeys(const WebSocketSession& session) {
-    const auto user = session.getAuthenticatedUser();
-
-    const auto keys = user->canManageAPIKeys() ?
-        ServiceDepsRegistry::instance().apiKeyManager->listAPIKeys() :
-        ServiceDepsRegistry::instance().apiKeyManager->listUserAPIKeys(user->id);
-
-    return {{"keys", json(keys).dump(4)}};
-}
-
-json StorageHandler::getAPIKey(const json& payload, const WebSocketSession& session) {
-    const unsigned int keyId = payload.at("id").get<unsigned int>();
-    const auto user = session.getAuthenticatedUser();
-    return {{"api_key", ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(keyId, user->id)}};
-}
-
-json StorageHandler::addVault(const json& payload, const WebSocketSession& session) {
+json VaultHandler::add(const json& payload, const WebSocketSession& session) {
     const std::string name = payload.at("name").get<std::string>();
     const std::string type = payload.at("type").get<std::string>();
     const std::string typeLower = boost::algorithm::to_lower_copy(type);
@@ -91,7 +47,7 @@ json StorageHandler::addVault(const json& payload, const WebSocketSession& sessi
     return {{"vault", *vault}};
 }
 
-json StorageHandler::updateVault(const json& payload, const WebSocketSession& session) {
+json VaultHandler::update(const json& payload, const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
 
     const auto vault = std::make_shared<Vault>(payload);
@@ -101,7 +57,7 @@ json StorageHandler::updateVault(const json& payload, const WebSocketSession& se
     return {{"vault", *vault}};
 }
 
-json StorageHandler::removeVault(const json& payload, const WebSocketSession& session) {
+json VaultHandler::remove(const json& payload, const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
     const auto vaultId = payload.at("id").get<unsigned int>();
     const auto vault = ServiceDepsRegistry::instance().storageManager->getVault(vaultId);
@@ -113,7 +69,7 @@ json StorageHandler::removeVault(const json& payload, const WebSocketSession& se
     return {};
 }
 
-json StorageHandler::getVault(const json& payload, const WebSocketSession& session) {
+json VaultHandler::get(const json& payload, const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
     const auto vaultId = payload.at("id").get<unsigned int>();
     if (!user->canManageVault(vaultId)) throw std::runtime_error("User does not have permission to get vaults.");
@@ -134,14 +90,14 @@ json StorageHandler::getVault(const json& payload, const WebSocketSession& sessi
     return data;
 }
 
-json StorageHandler::listVaults(const WebSocketSession& session) {
+json VaultHandler::list(const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
     return user->canManageVaults() ?
         json{{"vaults", VaultQueries::listVaults()}} :
         json{{"vaults", VaultQueries::listUserVaults(user->id)}};
 }
 
-json StorageHandler::syncVault(const json& payload, const WebSocketSession& session) {
+json VaultHandler::sync(const json& payload, const WebSocketSession& session) {
     const auto user = session.getAuthenticatedUser();
     const auto vaultId = payload.at("id").get<unsigned int>();
     if (!user->canSyncVaultData(vaultId)) throw std::runtime_error("User does not have permission to sync vaults.");

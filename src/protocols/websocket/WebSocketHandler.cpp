@@ -5,7 +5,8 @@
 #include "protocols/websocket/handlers/GroupHandler.hpp"
 #include "protocols/websocket/handlers/StatsHandler.hpp"
 #include "protocols/websocket/handlers/RolesHandler.hpp"
-#include "protocols/websocket/handlers/StorageHandler.hpp"
+#include "protocols/websocket/handlers/VaultHandler.hpp"
+#include "protocols/websocket/handlers/APIKeyHandler.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
@@ -56,19 +57,19 @@ void WebSocketHandler::registerFileSystemHandlers() const {
 }
 
 void WebSocketHandler::registerStorageHandlers() const {
-    router_->registerSessionOnlyHandler("storage.vault.list", &StorageHandler::listVaults);
-    router_->registerPayload("storage.vault.add", &StorageHandler::addVault);
-    router_->registerPayload("storage.vault.update", &StorageHandler::updateVault);
-    router_->registerPayload("storage.vault.remove", &StorageHandler::removeVault);
-    router_->registerPayload("storage.vault.get", &StorageHandler::getVault);
-    router_->registerPayload("storage.vault.sync", &StorageHandler::syncVault);
+    router_->registerSessionOnlyHandler("storage.vault.list", &VaultHandler::list);
+    router_->registerPayload("storage.vault.add", &VaultHandler::add);
+    router_->registerPayload("storage.vault.update", &VaultHandler::update);
+    router_->registerPayload("storage.vault.remove", &VaultHandler::remove);
+    router_->registerPayload("storage.vault.get", &VaultHandler::get);
+    router_->registerPayload("storage.vault.sync", &VaultHandler::sync);
 }
 
 void WebSocketHandler::registerAPIKeyHandlers() const {
-    router_->registerPayload("storage.apiKey.add", &StorageHandler::addAPIKey);
-    router_->registerPayload("storage.apiKey.remove", &StorageHandler::removeAPIKey);
-    router_->registerSessionOnlyHandler("storage.apiKey.list", &StorageHandler::listAPIKeys);
-    router_->registerPayload("storage.apiKey.get", &StorageHandler::getAPIKey);
+    router_->registerPayload("storage.apiKey.add", &APIKeyHandler::add);
+    router_->registerPayload("storage.apiKey.remove", &APIKeyHandler::remove);
+    router_->registerSessionOnlyHandler("storage.apiKey.list", &APIKeyHandler::list);
+    router_->registerPayload("storage.apiKey.get", &APIKeyHandler::get);
 }
 
 void WebSocketHandler::registerRoleHandlers() const {

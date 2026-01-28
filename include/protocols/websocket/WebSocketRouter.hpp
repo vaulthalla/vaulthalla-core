@@ -31,14 +31,14 @@ class WebSocketRouter {
     explicit WebSocketRouter();
 
     // Primary registration APIs (no duplication of cmd in wrappers)
-    void registerWs(std::string cmd, RawWsHandler fn);
-    void registerPayload(std::string cmd, RawPayloadHandler fn);
-    void registerHandlerWithToken(std::string cmd, RawHandlerWithToken fn);
-    void registerSessionOnlyHandler(std::string cmd, RawSessionOnly fn);
-    void registerEmptyHandler(std::string cmd, RawEmpty fn);
+    void registerWs(const std::string& cmd, RawWsHandler fn);
+    void registerPayload(const std::string& cmd, RawPayloadHandler fn);
+    void registerHandlerWithToken(const std::string& cmd, RawHandlerWithToken fn);
+    void registerSessionOnlyHandler(const std::string& cmd, RawSessionOnly fn);
+    void registerEmptyHandler(const std::string& cmd, RawEmpty fn);
 
     // Escape hatch: register an already-wrapped handler
-    void registerHandler(std::string cmd, Handler h);
+    void registerHandler(const std::string& cmd, Handler h);
 
     void routeMessage(json&& msg, WebSocketSession& session);
 

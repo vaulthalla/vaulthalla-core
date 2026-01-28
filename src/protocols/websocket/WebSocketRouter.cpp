@@ -17,29 +17,29 @@ WebSocketRouter::WebSocketRouter()
     if (!sessionManager_) throw std::invalid_argument("SessionManager cannot be null");
 }
 
-void WebSocketRouter::registerWs(std::string cmd, RawWsHandler fn) {
+void WebSocketRouter::registerWs(const std::string& cmd, RawWsHandler fn) {
     // wrapper owns cmd + msg lifecycle
     handlers_[cmd] = makeWsHandler(cmd, std::move(fn));
 }
 
-void WebSocketRouter::registerPayload(std::string cmd, RawPayloadHandler fn) {
+void WebSocketRouter::registerPayload(const std::string& cmd, RawPayloadHandler fn) {
     handlers_[cmd] = makePayloadHandler(cmd, std::move(fn));
 }
 
-void WebSocketRouter::registerHandlerWithToken(std::string cmd, RawHandlerWithToken fn) {
+void WebSocketRouter::registerHandlerWithToken(const std::string& cmd, RawHandlerWithToken fn) {
     handlers_[cmd] = makeHandlerWithToken(cmd, std::move(fn));
 }
 
-void WebSocketRouter::registerSessionOnlyHandler(std::string cmd, RawSessionOnly fn) {
+void WebSocketRouter::registerSessionOnlyHandler(const std::string& cmd, RawSessionOnly fn) {
     handlers_[cmd] = makeSessionOnlyHandler(cmd, std::move(fn));
 }
 
-void WebSocketRouter::registerEmptyHandler(std::string cmd, RawEmpty fn) {
+void WebSocketRouter::registerEmptyHandler(const std::string& cmd, RawEmpty fn) {
     handlers_[cmd] = makeEmptyHandler(cmd, std::move(fn));
 }
 
-void WebSocketRouter::registerHandler(std::string cmd, Handler h) {
-    handlers_[std::move(cmd)] = std::move(h);
+void WebSocketRouter::registerHandler(const std::string& cmd, Handler h) {
+    handlers_[cmd] = std::move(h);
 }
 
 void WebSocketRouter::routeMessage(json&& msg, WebSocketSession& session) {

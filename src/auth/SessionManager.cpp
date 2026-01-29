@@ -22,11 +22,17 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
 
         if (!client || !client->getSession()) throw std::invalid_argument("Client and session must not be null");
 
-        auto refreshToken = client->getRefreshToken();
+        const auto refreshToken = client->getRefreshToken();
         refreshToken->setUserId(client->getUser()->id);
         refreshToken->setUserAgent(client->getSession()->getUserAgent());
         refreshToken->setIpAddress(client->getSession()->getClientIp());
-        UserQueries::addRefreshToken(refreshToken);
+
+        if (const auto dbToken = UserQueries::getRefreshToken(refreshToken->getJti())) {
+            if (dbToken->getUserId() != client->getUser()->id
+                || dbToken->getUserAgent() != client->getSession()->getUserAgent())
+                throw std::invalid_argument("Invalid refresh token");
+        } else UserQueries::addRefreshToken(refreshToken);
+
         client->setRefreshToken(UserQueries::getRefreshToken(refreshToken->getJti()));
         activeSessions_[client->getSession()->getUUID()] = client;
 
@@ -40,23 +46,20 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
 
 std::shared_ptr<Client> SessionManager::getClientSession(const std::string& UUID) {
     std::lock_guard lock(sessionMutex_);
-    auto it = activeSessions_.find(UUID);
-    if (it != activeSessions_.end()) return it->second;
-
+    if (activeSessions_.contains(UUID)) return activeSessions_[UUID];
     return nullptr;
 }
 
 void SessionManager::invalidateSession(const std::string& sessionUUID) {
     std::lock_guard lock(sessionMutex_);
 
-    auto it = activeSessions_.find(sessionUUID);
-    if (it != activeSessions_.end()) {
-        if (it->second->getUser()) {
-            it->second->invalidateToken();
-            UserQueries::revokeAndPurgeRefreshTokens(it->second->getUser()->id);
+    if (activeSessions_.contains(sessionUUID)) {
+        if (const auto user = activeSessions_[sessionUUID]->getUser()) {
+            activeSessions_[sessionUUID]->invalidateToken();
+            UserQueries::revokeAndPurgeRefreshTokens(user->id);
             LogRegistry::ws()->debug("[SessionManager] Invalidated session: {}", sessionUUID);
         }
-        activeSessions_.erase(it);
+        activeSessions_.erase(sessionUUID);
     }
 }
 

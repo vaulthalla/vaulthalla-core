@@ -1,32 +1,34 @@
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "types/User.hpp"
+
 #include "auth/AuthManager.hpp"
+#include "logging/LogRegistry.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
-#include "util/parse.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "types/User.hpp"
+#include "util/parse.hpp"
 
 #include <boost/beast/http.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 namespace {
-namespace beast = boost::beast;
-namespace http = beast::http;
+namespace beast     = boost::beast;
+namespace http      = beast::http;
 namespace websocket = beast::websocket;
-namespace asio = boost::asio;
-
-using tcp = asio::ip::tcp;
-using json = nlohmann::json;
+namespace asio      = boost::asio;
+using json          = nlohmann::json;
 } // namespace
 
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::types;
 
 namespace vh::websocket {
 
 WebSocketSession::WebSocketSession(const std::shared_ptr<WebSocketRouter>& router)
-    : authManager_{ServiceDepsRegistry::instance().authManager},
-      ws_{nullptr}, uploadHandler_(std::make_shared<UploadHandler>(*this)), router_{router} {
+    : uploadHandler_(std::make_shared<UploadHandler>(*this)), router_(router) {
     buffer_.max_size(65536);
 }
 
@@ -46,207 +48,18 @@ std::string WebSocketSession::getClientIp() const {
 
 std::string WebSocketSession::getUserAgent() const {
     const auto it = handshakeRequest_.find(http::field::user_agent);
-    return it != handshakeRequest_.end() ? it->value() : "unknown";
+    return it != handshakeRequest_.end() ? std::string(it->value()) : "unknown";
 }
 
 std::string WebSocketSession::getRefreshToken() const {
     return refreshToken_;
 }
 
-void WebSocketSession::accept(tcp::socket&& socket) {
-    ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
-    strand_ = asio::make_strand(ws_->get_executor());
-
-    auto self = shared_from_this();
-    auto req = std::make_shared<http::request<http::string_body> >();
-
-    // ── Lambda: decorate handshake response with refresh token cookie ──
-    auto setHandshakeResponseHeaders = [self]() {
-        const auto refreshTokenCopy = self->refreshToken_;
-        self->ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
-        self->ws_->set_option(websocket::stream_base::decorator([refreshTokenCopy](websocket::response_type& res) {
-            res.set(http::field::server, "Vaulthalla");
-            res.set(http::field::set_cookie,
-                    "refresh=" + refreshTokenCopy + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
-        }));
-    };
-
-    // ── Lambda: what happens once the WebSocket handshake is accepted ──
-    auto onHandshakeAccepted = [self](beast::error_code ec) {
-        if (ec) {
-            LogRegistry::ws()->debug("[Session] Handshake error: {}", ec.message());
-            return;
-        }
-
-        self->isRegistered_ = true;
-        LogRegistry::ws()->debug("[Session] Handshake accepted from IP: {}", self->getClientIp());
-
-        self->doRead();
-    };
-
-    // ── Lambda: after HTTP headers are read, prepare session & auth ──
-    auto onHeadersRead = [self, req, setHandshakeResponseHeaders, onHandshakeAccepted](beast::error_code ec,
-        std::size_t) {
-        if (ec) {
-            LogRegistry::ws()->debug("[Session] Error reading HTTP headers: {}", ec.message());
-            return;
-        }
-
-        // Metadata from HTTP request
-        self->ipAddress_ = self->ws_->next_layer().remote_endpoint().address().to_string();
-        self->userAgent_ = (*req)[http::field::user_agent];
-        self->handshakeRequest_ = *req;
-        self->refreshToken_ = util::extractCookie(*req, "refresh");
-
-        if (self->refreshToken_.empty()) LogRegistry::ws()->debug("[Session] No refresh token found in Cookie header");
-        else LogRegistry::ws()->debug("[Session] Refresh token found in Cookie header: {}", self->refreshToken_);
-
-        self->authManager_->rehydrateOrCreateClient(self);
-
-        // Set response headers before async_accept
-        setHandshakeResponseHeaders();
-
-        self->ws_->async_accept(*req, asio::bind_executor(self->strand_, onHandshakeAccepted));
-    };
-
-    // ── Begin HTTP header read phase ──
-    http::async_read(ws_->next_layer(), tmpBuffer_, *req, asio::bind_executor(strand_, onHeadersRead));
-}
-
-void WebSocketSession::close() {
-    // One-shot gate (thread-safe)
-    if (closing_.exchange(true)) return;
-
-    // Strong copy: avoids check-then-use races on ws_
-    auto ws = ws_;
-    if (!ws) {
-        buffer_.consume(buffer_.size());
-        return;
-    }
-
-    auto self = shared_from_this();
-    auto ex   = ws->get_executor();
-
-    // Prefer post() to avoid inline teardown surprises.
-    boost::asio::post(ex, [self, ws]() mutable {
-        boost::system::error_code ec;
-        if (ws->is_open())
-            ws->close(websocket::close_code::normal, ec);
-
-        if (ec) {
-            LogRegistry::ws()->debug("[WebSocketSession] ws close error: {}", ec.message());
-        }
-
-        // Teardown on executor thread
-        self->ws_.reset();
-        self->buffer_.consume(self->buffer_.size());
-
-        LogRegistry::ws()->debug("[WebSocketSession] Closed session for IP: {}", self->getClientIp());
-    });
-}
-
-void WebSocketSession::send(const json& message) {
-    const std::string msg = message.dump();
-    asio::post(strand_, [self = shared_from_this(), msg]() {
-        bool startWrite = false;
-        self->writeQueue_.push(msg);
-        if (!self->writingInProgress_) {
-            self->writingInProgress_ = true;
-            startWrite = true;
-        }
-        if (startWrite) self->doWrite();
-    });
-}
-
-void WebSocketSession::doWrite() {
-    const std::string& front = writeQueue_.front();
-    auto self = shared_from_this();
-
-    ws_->async_write(
-        asio::buffer(front),
-        asio::bind_executor(strand_,
-                            [self](beast::error_code ec, std::size_t bytesWritten) {
-                                self->onWrite(ec, bytesWritten);
-                            }));
-}
-
-void WebSocketSession::onWrite(beast::error_code ec, std::size_t bytesWritten) {
-    boost::ignore_unused(bytesWritten);
-    if (ec) {
-        LogRegistry::ws()->debug("[WebSocketSession] Write error: {}", ec.message());
-        return;
-    }
-
-    writeQueue_.pop();
-    if (writeQueue_.empty()) writingInProgress_ = false;
-    else doWrite();
-}
-
-void WebSocketSession::doRead() {
-    auto self = shared_from_this();
-
-    ws_->async_read(
-        buffer_,
-        asio::bind_executor(strand_,
-                            [self](beast::error_code ec, std::size_t bytesRead) {
-                                self->onRead(ec, bytesRead);
-                            }));
-}
-
-void WebSocketSession::onRead(beast::error_code ec, std::size_t) {
-    if (ec == websocket::error::closed) {
-        // graceful close
-        LogRegistry::ws()->debug("[Session] WebSocket closed gracefully by peer");
-        close();
-        return;
-    }
-
-    if (ec == asio::error::eof) {
-        // ungraceful close
-        LogRegistry::ws()->debug("[Session] WebSocket peer vanished (EOF)");
-        close(); // <- **must** clean up
-        return;
-    }
-
-    if (ec) {
-        LogRegistry::ws()->debug("[Session] Read error: {}", ec.message());
-        close(); // defensive cleanup
-        return;
-    }
-
-    if (ws_->got_binary()) uploadHandler_->handleBinaryFrame(buffer_);
-    else {
-        try {
-            router_->routeMessage(json::parse(beast::buffers_to_string(buffer_.data())), *this);
-        } catch (const std::exception& ex) {
-            LogRegistry::ws()->debug("[Session] Error parsing message: {}", ex.what());
-            const json errorResponse = {{"command", "error"},
-                                    {"status", "parse_error"},
-                                    {"message", "Failed to parse message: " + std::string(ex.what())}};
-            send(errorResponse);
-            return;
-        } catch (...) {
-            LogRegistry::ws()->debug("[Session] Unknown error while processing message");
-            const json errorResponse = {{"command", "error"},
-                                    {"status", "internal_error"},
-                                    {"message", "An internal error occurred while processing your request."}};
-            send(errorResponse);
-            return;
-        }
-    }
-
-    buffer_.consume(buffer_.size());
-    doRead();
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// ‑‑ authentication helpers
-// ──────────────────────────────────────────────────────────────────────────────
-std::shared_ptr<types::User> WebSocketSession::getAuthenticatedUser() const {
+std::shared_ptr<User> WebSocketSession::getAuthenticatedUser() const {
     return authenticatedUser_;
 }
 
-void WebSocketSession::setAuthenticatedUser(std::shared_ptr<types::User> user) {
+void WebSocketSession::setAuthenticatedUser(std::shared_ptr<User> user) {
     authenticatedUser_ = std::move(user);
 }
 
@@ -258,23 +71,229 @@ void WebSocketSession::setHandshakeRequest(const RequestType& req) {
     handshakeRequest_ = req;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// ‑‑ pub/sub channels
-// ──────────────────────────────────────────────────────────────────────────────
-void WebSocketSession::subscribeChannel(const std::string& channel) {
-    subscribedChannels_.insert(channel);
+void WebSocketSession::logFail(std::string_view where, const beast::error_code& ec) {
+    if (!ec) return;
+    LogRegistry::ws()->debug("[WebSocketSession] {}: {}", where, ec.message());
 }
 
-void WebSocketSession::unsubscribeChannel(const std::string& channel) {
-    subscribedChannels_.erase(channel);
+void WebSocketSession::accept(tcp::socket&& socket) {
+    ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
+    strand_ = asio::make_strand(ws_->get_executor());
+
+    auto req = std::make_shared<RequestType>();
+    auto self = shared_from_this();
+
+    http::async_read(
+        ws_->next_layer(),
+        tmpBuffer_,
+        *req,
+        asio::bind_executor(
+            strand_,
+            [self, req](const beast::error_code& ec, std::size_t bytesRead) {
+                self->onHeadersRead(req, ec, bytesRead);
+            }));
 }
 
-bool WebSocketSession::isSubscribedTo(const std::string& channel) {
-    return subscribedChannels_.contains(channel);
+void WebSocketSession::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast::error_code& ec, std::size_t) {
+    if (ec) return logFail("Error reading HTTP headers", ec);
+
+    hydrateFromRequest(*req);
+
+    // auth rehydrate/create *before* accept so we can set refresh cookie in decorator
+    ServiceDepsRegistry::instance().authManager->rehydrateOrCreateClient(shared_from_this());
+
+    installHandshakeDecorator();
+
+    auto self = shared_from_this();
+    ws_->async_accept(
+        *req,
+        asio::bind_executor(
+            strand_,
+            [self](const beast::error_code& ec2) {
+                self->onHandshakeAccepted(ec2);
+            }));
 }
 
-std::unordered_set<std::string> WebSocketSession::getSubscribedChannels() {
-    return subscribedChannels_;
+void WebSocketSession::hydrateFromRequest(const RequestType& req) {
+    handshakeRequest_ = req;
+
+    try {
+        ipAddress_ = ws_->next_layer().remote_endpoint().address().to_string();
+    } catch (...) {
+        ipAddress_ = "unknown";
+    }
+
+    userAgent_ = std::string(req[http::field::user_agent]);
+    refreshToken_ = util::extractCookie(req, "refresh");
+
+    if (refreshToken_.empty())
+        LogRegistry::ws()->debug("[Session] No refresh token found in Cookie header");
+    else
+        LogRegistry::ws()->debug("[Session] Refresh token found in Cookie header: {}", refreshToken_);
+}
+
+void WebSocketSession::installHandshakeDecorator() const {
+    // capture by value so it’s stable even if refreshToken_ changes during auth
+    const auto token = refreshToken_;
+
+    ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
+    ws_->set_option(websocket::stream_base::decorator(
+        [token](websocket::response_type& res) {
+            res.set(http::field::server, "Vaulthalla");
+            res.set(http::field::set_cookie,
+                    "refresh=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
+        }));
+}
+
+void WebSocketSession::onHandshakeAccepted(const beast::error_code& ec) {
+    if (ec) return logFail("Handshake error", ec);
+
+    LogRegistry::ws()->debug("[Session] Handshake accepted from IP: {}", getClientIp());
+    startReadLoop();
+}
+
+void WebSocketSession::startReadLoop() {
+    doRead();
+}
+
+void WebSocketSession::close() {
+    if (closing_.exchange(true)) return;
+
+    auto ws = ws_;
+    if (!ws) {
+        buffer_.consume(buffer_.size());
+        return;
+    }
+
+    auto self = shared_from_this();
+    asio::post(strand_, [self, ws]() mutable {
+        boost::system::error_code ec;
+        if (ws->is_open())
+            ws->close(websocket::close_code::normal, ec);
+
+        if (ec)
+            LogRegistry::ws()->debug("[WebSocketSession] ws close error: {}", ec.message());
+
+        self->ws_.reset();
+        self->buffer_.consume(self->buffer_.size());
+
+        LogRegistry::ws()->debug("[WebSocketSession] Closed session for IP: {}", self->getClientIp());
+    });
+}
+
+void WebSocketSession::send(const json& message) {
+    auto payload = message.dump();
+    auto self = shared_from_this();
+
+    asio::post(strand_, [self, payload = std::move(payload)]() mutable {
+        self->writeQueue_.push_back(std::move(payload));
+        self->maybeStartWrite();
+    });
+}
+
+void WebSocketSession::maybeStartWrite() {
+    if (writing_ || writeQueue_.empty()) return;
+    writing_ = true;
+    doWrite();
+}
+
+void WebSocketSession::doWrite() {
+    if (!ws_) {
+        writing_ = false;
+        writeQueue_.clear();
+        return;
+    }
+
+    ws_->async_write(
+        asio::buffer(writeQueue_.front()),
+        asio::bind_executor(
+            strand_,
+            [self = shared_from_this()](const beast::error_code& ec, std::size_t bytesWritten) {
+                self->onWrite(ec, bytesWritten);
+            }));
+}
+
+void WebSocketSession::onWrite(const beast::error_code& ec, std::size_t) {
+    if (ec) {
+        logFail("Write error", ec);
+        writing_ = false;
+        return;
+    }
+
+    writeQueue_.pop_front();
+    if (writeQueue_.empty()) {
+        writing_ = false;
+        return;
+    }
+
+    doWrite();
+}
+
+void WebSocketSession::doRead() {
+    if (!ws_) return;
+
+    ws_->async_read(
+        buffer_,
+        asio::bind_executor(
+            strand_,
+            [self = shared_from_this()](const beast::error_code& ec, const std::size_t bytesRead) {
+                self->onRead(ec, bytesRead);
+            }));
+}
+
+void WebSocketSession::sendParseError(const std::string_view msg) {
+    send({
+        {"command", "error"},
+        {"status", "parse_error"},
+        {"message", std::string(msg)}
+    });
+}
+
+void WebSocketSession::sendInternalError() {
+    send({
+        {"command", "error"},
+        {"status", "internal_error"},
+        {"message", "An internal error occurred while processing your request."}
+    });
+}
+
+void WebSocketSession::onRead(const beast::error_code& ec, std::size_t) {
+    if (ec == websocket::error::closed) {
+        LogRegistry::ws()->debug("[Session] WebSocket closed gracefully by peer");
+        return close();
+    }
+    if (ec == asio::error::eof) {
+        LogRegistry::ws()->debug("[Session] WebSocket peer vanished (EOF)");
+        return close();
+    }
+    if (ec) {
+        logFail("Read error", ec);
+        return close();
+    }
+
+    if (ws_->got_binary()) uploadHandler_->handleBinaryFrame(buffer_);
+    else {
+        try {
+            const auto text = beast::buffers_to_string(buffer_.data());
+            router_->routeMessage(json::parse(text), *this);
+        } catch (const std::exception& ex) {
+            LogRegistry::ws()->debug("[Session] Error parsing message: {}", ex.what());
+            sendParseError(std::string("Failed to parse message: ") + ex.what());
+            // NOTE: we still continue reading (keeps session alive after a bad frame)
+        } catch (...) {
+            LogRegistry::ws()->debug("[Session] Unknown error while processing message");
+            sendInternalError();
+        }
+    }
+
+    buffer_.consume(buffer_.size());
+    doRead();
+}
+
+std::string WebSocketSession::generateUUIDv4() {
+    static boost::uuids::random_generator generator;
+    const boost::uuids::uuid uuid = generator();
+    return boost::uuids::to_string(uuid);
 }
 
 } // namespace vh::websocket

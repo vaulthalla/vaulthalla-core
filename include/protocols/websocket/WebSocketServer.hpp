@@ -29,8 +29,6 @@ private:
     asio::io_context& ioc_;
 
     std::shared_ptr<WebSocketRouter> router_;
-    std::shared_ptr<auth::AuthManager> authManager_;
-    std::shared_ptr<auth::SessionManager> sessionManager_;
 
     void doAccept();
     void onAccept(tcp::socket socket);

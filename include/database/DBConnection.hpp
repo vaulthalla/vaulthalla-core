@@ -24,25 +24,33 @@ class DBConnection {
     std::string DB_CONNECTION_STR;
     std::unique_ptr<pqxx::connection> conn_;
 
+    // Auth
     void initPreparedUsers() const;
-    void initPreparedVaults() const;
-    void initPreparedVaultKeys() const;
-    void initPreparedAPIKeys() const;
-    void initPreparedFsEntries() const;
-    void initPreparedFiles() const;
-    void initPreparedDirectories() const;
-    void initPreparedOperations() const;
+    void initPreparedGroups() const;
+
+    // RBAC
     void initPreparedRoles() const;
     void initPreparedPermissions() const;
     void initPreparedUserRoles() const;
     void initPreparedVaultRoles() const;
     void initPreparedPermOverrides() const;
+
+    // Vaults
+    void initPreparedVaults() const;
+    void initPreparedVaultKeys() const;
+    void initPreparedAPIKeys() const;
     void initPreparedSync() const;
+
+    // Filesystem
+    void initPreparedFsEntries() const;
+    void initPreparedFiles() const;
+    void initPreparedDirectories() const;
+    void initPreparedOperations() const;
     void initPreparedCache() const;
-    void initPreparedGroups() const;
+
+    // Admin
     void initPreparedSecrets() const;
     void initPreparedWaivers() const;
-    void initPreparedVaultPermOverrides() const;
 };
 
 struct PathPatterns {

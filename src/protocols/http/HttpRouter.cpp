@@ -80,8 +80,7 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
 
     if (pr->size)
         if (auto data = tryCacheRead(pr->file, pr->engine->paths->thumbnailRoot, *pr->size); !data.empty())
-            return
-                makeResponse(req, std::move(data), *pr->file->mime_type, true);
+            return makeResponse(req, std::move(data), "image/jpeg", true);
 
     if (pr->file->mime_type->starts_with("image/") || pr->file->mime_type->ends_with("/pdf")) {
         ScopedOpTimer timer(ServiceDepsRegistry::instance().httpCacheStats.get());

@@ -32,8 +32,8 @@ class Client {
     [[nodiscard]] bool isAuthenticated() const;
 
     void refreshToken();
-    void invalidateToken();
-    void closeConnection();
+    void invalidateToken() const;
+    void closeConnection() const;
 
     void setSession(const std::shared_ptr<websocket::WebSocketSession>& session);
 

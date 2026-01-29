@@ -35,13 +35,17 @@ void HttpServer::run() {
 }
 
 void HttpServer::do_accept() {
-    acceptor_.async_accept(socket_, [self = shared_from_this()](beast::error_code ec) mutable {
-        if (!ec) {
-            auto session = std::make_shared<HttpSession>(std::move(self->socket_));
-            ThreadPoolManager::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(std::move(session)));
+    acceptor_.async_accept(
+        [self = shared_from_this()](beast::error_code ec, tcp::socket socket) mutable {
+            if (!ec) {
+                auto session = std::make_shared<HttpSession>(std::move(socket));
+                ThreadPoolManager::instance().httpPool()->submit(
+                    std::make_unique<HttpSessionTask>(session)
+                );
+            }
+            self->do_accept();
         }
-        self->do_accept();
-    });
+    );
 }
 
 } // namespace vh::http

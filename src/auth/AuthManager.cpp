@@ -130,7 +130,6 @@ void AuthManager::validateRefreshToken(const std::string& refreshToken) const {
                              "Session not found for token JTI: " + tokenJti);
 }
 
-
 std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& refreshToken,
                                   const std::shared_ptr<websocket::WebSocketSession>& session) const {
     try {

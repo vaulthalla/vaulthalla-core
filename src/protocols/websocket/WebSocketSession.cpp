@@ -13,6 +13,8 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include "config/ConfigRegistry.hpp"
+
 namespace {
 namespace beast     = boost::beast;
 namespace http      = beast::http;
@@ -133,16 +135,29 @@ void WebSocketSession::hydrateFromRequest(const RequestType& req) {
 }
 
 void WebSocketSession::installHandshakeDecorator() const {
-    // capture by value so it’s stable even if refreshToken_ changes during auth
     const auto token = refreshToken_;
 
     ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
     ws_->set_option(websocket::stream_base::decorator(
         [token](websocket::response_type& res) {
             res.set(http::field::server, "Vaulthalla");
-            res.set(http::field::set_cookie,
-                    "refresh=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800;");
-        }));
+
+            const bool isDev = config::ConfigRegistry::get().dev.enabled;
+            const std::string sameSite = isDev ? "Lax" : "Lax"; // keep Lax unless *need* Strict
+            const bool secure = true; // or: !isDev ? true : config says https-enabled
+
+            std::string cookie = "refresh=" + token +
+                "; Path=/" +
+                "; HttpOnly" +
+                "; SameSite=" + sameSite +
+                "; Max-Age=604800";
+
+            if (secure) cookie += "; Secure";
+
+            // IMPORTANT: use insert to avoid clobbering other Set-Cookie headers
+            res.insert(http::field::set_cookie, cookie);
+        }
+    ));
 }
 
 void WebSocketSession::onHandshakeAccepted(const beast::error_code& ec) {

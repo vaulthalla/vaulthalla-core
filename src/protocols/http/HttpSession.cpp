@@ -1,22 +1,12 @@
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpRouter.hpp"
-#include "auth/AuthManager.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 
-using namespace vh::services;
 using namespace vh::logging;
 
 namespace vh::http {
 
-HttpSession::HttpSession(tcp::socket socket)
-    : socket_(std::move(socket)),
-      auth_(ServiceDepsRegistry::instance().authManager),
-      storage_(ServiceDepsRegistry::instance().storageManager) {
-    if (!auth_) throw std::invalid_argument("AuthManager cannot be null");
-    if (!storage_) throw std::invalid_argument("StorageManager cannot be null");
-    buffer_.max_size(8192);
-}
+HttpSession::HttpSession(tcp::socket socket) : socket_(std::move(socket)) { buffer_.max_size(8192); }
 
 void HttpSession::run() {
     do_read();

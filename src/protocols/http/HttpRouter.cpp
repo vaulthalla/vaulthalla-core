@@ -9,12 +9,14 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/files.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
 #include "types/File.hpp"
 #include "types/FSEntry.hpp"
 #include "storage/FSCache.hpp"
 #include "types/stats/CacheStats.hpp"
 #include "protocols/http/PreviewRequest.hpp"
+#include "logging/LogRegistry.hpp"
+
+#include <nlohmann/json.hpp>
 
 using namespace vh::services;
 using namespace vh::logging;
@@ -38,6 +40,53 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
     return {};
 }
 
+PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
+    if (req.method() != http::verb::get)
+        return makeErrorResponse(req, "Invalid request", http::status::bad_request);
+
+    if (req.target().starts_with("/auth/session"))
+        return handleAuthSession(std::move(req));
+
+    if (req.target().starts_with("/preview"))
+        return handlePreview(std::move(req));
+
+    return makeErrorResponse(req, "Not found", http::status::not_found);
+}
+
+PreviewResponse HttpRouter::handleAuthSession(http::request<http::string_body>&& req) {
+    if (ConfigRegistry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
+
+    try {
+        const auto refresh = util::extractCookie(req, "refresh");
+        if (refresh.empty()) {
+            LogRegistry::http()->warn("[HttpRouter] Refresh token not set");
+            return makeErrorResponse(req, "Refresh token not set", http::status::bad_request);
+        }
+        ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh);
+        const auto session = ServiceDepsRegistry::instance().authManager->sessionManager()->getClientSession(refresh);
+        if (!session || !session->getUser()) {
+            LogRegistry::http()->warn("[HttpRouter]: Invalid refresh token. Unable to locate session.");
+            return makeErrorResponse(req, "Not found", http::status::not_found);
+        }
+
+        // If validateRefreshToken only throws/returns void, extend it to return user/session info.
+        // Optionally mint an access token here:
+        // auto access = authManager->mintAccessToken(session.user_id);
+
+        nlohmann::json j{
+                {"ok", true},
+                {"user_id", session->getUser()->id},
+                // {"access_token", access.token},
+                // {"expires_in", access.expires_in}
+            };
+
+        return makeJsonResponse(req, j);
+    } catch (const std::exception& e) {
+        LogRegistry::http()->warn("[HttpRouter]: Invalid refresh token: %s", e.what());
+        return makeErrorResponse(req, std::string("Unauthorized: ") + e.what(), http::status::unauthorized);
+    }
+}
+
 std::string HttpRouter::authenticateRequest(const http::request<http::string_body>& req) {
     if (ConfigRegistry::get().dev.enabled) return "";
     try {
@@ -49,7 +98,7 @@ std::string HttpRouter::authenticateRequest(const http::request<http::string_bod
     }
 }
 
-PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
+PreviewResponse HttpRouter::handlePreview(http::request<http::string_body>&& req) {
     if (req.method() != http::verb::get || !req.target().starts_with("/preview"))
         return makeErrorResponse(
             req, "Invalid request", http::status::bad_request);
@@ -128,6 +177,15 @@ PreviewResponse HttpRouter::makeResponse(const http::request<http::string_body>&
 
     if (cacheHit) ServiceDepsRegistry::instance().httpCacheStats->record_hit(size);
 
+    return res;
+}
+
+PreviewResponse HttpRouter::makeJsonResponse(const http::request<http::string_body>& req, const nlohmann::json& j) {
+    http::response<http::string_body> res{http::status::ok, req.version()};
+    res.set(http::field::content_type, "application/json");
+    res.body() = j.dump();
+    res.prepare_payload();
+    res.keep_alive(req.keep_alive());
     return res;
 }
 

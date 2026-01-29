@@ -12,7 +12,11 @@ void SessionManager::createSession(const std::shared_ptr<Client>& client) {
 
     if (!client || !client->getSession()) throw std::invalid_argument("Session must not be null");
 
-    activeSessions_[client->getSession()->getUUID()] = client;
+    sessionsByUUID_[client->getSession()->getUUID()] = client;
+    if (const auto rt = client->getRefreshToken(); rt && !rt->getJti().empty())
+        sessionsByRefreshJti_[rt->getJti()] = client;
+    else throw std::invalid_argument("Refresh token not found");
+
     LogRegistry::ws()->debug("[SessionManager] Created session for user: {}", client->getUserName());
 }
 
@@ -33,8 +37,15 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
                 throw std::invalid_argument("Invalid refresh token");
         } else UserQueries::addRefreshToken(refreshToken);
 
+        const std::string oldJti = client->getRefreshToken() ? client->getRefreshToken()->getJti() : "";
+
         client->setRefreshToken(UserQueries::getRefreshToken(refreshToken->getJti()));
-        activeSessions_[client->getSession()->getUUID()] = client;
+        sessionsByUUID_[client->getSession()->getUUID()] = client;
+
+        const std::string newJti = client->getRefreshToken()->getJti();
+
+        if (!oldJti.empty() && oldJti != newJti) sessionsByRefreshJti_.erase(oldJti);
+        sessionsByRefreshJti_[newJti] = client;
 
         LogRegistry::ws()->debug("[SessionManager] Promoted session for user: {}", client->getUserName());
         return client->getRawToken();
@@ -44,26 +55,39 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
     }
 }
 
-std::shared_ptr<Client> SessionManager::getClientSession(const std::string& UUID) {
+std::shared_ptr<Client> SessionManager::getClientSession(const std::string& token) {
     std::lock_guard lock(sessionMutex_);
-    if (activeSessions_.contains(UUID)) return activeSessions_[UUID];
+    if (sessionsByUUID_.contains(token)) return sessionsByUUID_[token];
+    if (sessionsByRefreshJti_.contains(token)) return sessionsByRefreshJti_[token];
     return nullptr;
 }
 
-void SessionManager::invalidateSession(const std::string& sessionUUID) {
+void SessionManager::invalidateSession(const std::string& token) {
     std::lock_guard lock(sessionMutex_);
 
-    if (activeSessions_.contains(sessionUUID)) {
-        if (const auto user = activeSessions_[sessionUUID]->getUser()) {
-            activeSessions_[sessionUUID]->invalidateToken();
-            UserQueries::revokeAndPurgeRefreshTokens(user->id);
-            LogRegistry::ws()->debug("[SessionManager] Invalidated session: {}", sessionUUID);
-        }
-        activeSessions_.erase(sessionUUID);
+    std::shared_ptr<Client> client = nullptr;
+
+    if (sessionsByUUID_.contains(token)) {
+        client = sessionsByUUID_[token];
+        sessionsByUUID_.erase(token);
+        sessionsByRefreshJti_.erase(client->getRefreshToken()->getJti());
+    } else if (sessionsByRefreshJti_.contains(token)) {
+        client = sessionsByRefreshJti_[token];
+        sessionsByRefreshJti_.erase(token);
+        sessionsByUUID_.erase(client->getSession()->getUUID());
+    }
+
+    if (!client || !client->getSession())
+        throw std::invalid_argument("Session must not be null");
+
+    if (const auto user = client->getUser()) {
+        client->invalidateToken();
+        UserQueries::revokeAndPurgeRefreshTokens(user->id);
+        LogRegistry::ws()->debug("[SessionManager] Invalidated session: {}", token);
     }
 }
 
 std::unordered_map<std::string, std::shared_ptr<Client> > SessionManager::getActiveSessions() {
     std::lock_guard lock(sessionMutex_);
-    return activeSessions_;
+    return sessionsByUUID_;
 }

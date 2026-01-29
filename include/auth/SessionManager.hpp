@@ -23,7 +23,8 @@ class SessionManager {
     std::unordered_map<std::string, std::shared_ptr<Client>> getActiveSessions();
 
   private:
-    std::unordered_map<std::string, std::shared_ptr<Client>> activeSessions_;
+    std::unordered_map<std::string, std::shared_ptr<Client>> sessionsByUUID_;
+    std::unordered_map<std::string, std::shared_ptr<Client>> sessionsByRefreshJti_;
     std::mutex sessionMutex_;
 };
 

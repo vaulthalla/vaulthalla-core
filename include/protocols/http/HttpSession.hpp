@@ -5,8 +5,6 @@
 #include <boost/asio.hpp>
 #include <memory>
 
-namespace vh::auth { class AuthManager; }
-namespace vh::storage { class StorageManager; }
 namespace vh::http {
 
 namespace beast = boost::beast;
@@ -28,9 +26,6 @@ private:
     tcp::socket socket_;
     beast::flat_buffer buffer_;
     http::request<http::string_body> req_;
-
-    std::shared_ptr<auth::AuthManager> auth_;
-    std::shared_ptr<storage::StorageManager> storage_;
 };
 
 }

@@ -12,8 +12,7 @@ using namespace vh::shell;
 
 GroupMember::GroupMember(const pqxx::row& row)
     : user(std::make_shared<User>(row)),
-      joined_at(util::parsePostgresTimestamp(row["joined_at"].as<std::string>())) {
-}
+      joined_at(util::parsePostgresTimestamp(row["joined_at"].as<std::string>())) {}
 
 Group::Group(const pqxx::row& gr, const pqxx::result& members)
     : id(gr["id"].as<unsigned int>()),
@@ -85,7 +84,7 @@ void vh::types::from_json(const nlohmann::json& j, Group& g) {
     }
 }
 
-void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group> >& groups) {
+void vh::types::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group>>& groups) {
     j = nlohmann::json::array();
     for (const auto& group : groups) j.push_back(*group);
 }
@@ -98,7 +97,7 @@ std::vector<std::shared_ptr<Group> > vh::types::groups_from_json(const nlohmann:
 
 void vh::types::to_json(nlohmann::json& j, const GroupMember& gm) {
     j = {
-        {"user", *gm.user},
+        {"user", to_public_json(gm.user)},
         {"joined_at", util::timestampToString(gm.joined_at)}
     };
 }

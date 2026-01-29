@@ -99,11 +99,16 @@ void to_json(nlohmann::json& j, const User& u) {
         {"id", u.id},
         {"name", u.name},
         {"email", u.email},
-        {"last_login", u.last_login.has_value() ? timestampToString(u.last_login.value()) : ""},
         {"created_at", timestampToString(u.created_at)},
         {"is_active", u.is_active},
-        {"role", *u.role}
     };
+
+    if (u.last_login) j["last_login"] = timestampToString(*u.last_login);
+    else j["last_login"] = nullptr;
+
+    if (u.role) j["role"] = *u.role;
+    else throw std::logic_error("[User] role is null for user id=" + std::to_string(u.id) +
+                            " name=" + u.name + ". Did you mean to call to_public_json() instead?");
 
     if (u.linux_uid) j["uid"] = *u.linux_uid;
 
@@ -129,6 +134,20 @@ nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users) {
 }
 
 nlohmann::json to_json(const std::shared_ptr<User>& user) { return {*user}; }
+
+nlohmann::json to_public_json(const std::shared_ptr<User>& u) {
+    return {
+        {"id", u->id},
+        {"name", u->name},
+        {"email", u->email},
+    };
+}
+
+nlohmann::json to_public_json(const std::vector<std::shared_ptr<User>>& u) {
+    nlohmann::json j = nlohmann::json::array();
+    for (const auto& user : u) j.push_back(to_public_json(user));
+    return j;
+}
 
 
 // --- User role checks ---

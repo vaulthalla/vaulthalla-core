@@ -1,37 +1,24 @@
 #pragma once
-
-#include "auth/SessionManager.hpp"
-#include "protocols/websocket/WebSocketRouter.hpp"
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/beast/core.hpp>
+#include "protocols/TcpServerBase.hpp"
 #include <memory>
 
-namespace vh::auth {
-class AuthManager;
-}
-
 namespace vh::websocket {
-class NotificationBroadcastManager;
+
+class WebSocketRouter;
 
 namespace asio = boost::asio;
-namespace beast = boost::beast;
 using tcp = asio::ip::tcp;
 
-class WebSocketServer : public std::enable_shared_from_this<WebSocketServer> {
+class WebSocketServer final : public protocols::TcpServerBase {
 public:
     WebSocketServer(asio::io_context& ioc, const tcp::endpoint& endpoint,
-                    const std::shared_ptr<WebSocketRouter>& router);
-
-    void run();
+                    std::shared_ptr<WebSocketRouter> router);
 
 private:
-    tcp::acceptor acceptor_;
-    asio::io_context& ioc_;
+    std::string_view serverName() const noexcept override { return "WebSocketServer"; }
+    void onAccept(tcp::socket socket) override;
 
     std::shared_ptr<WebSocketRouter> router_;
-
-    void doAccept();
-    void onAccept(tcp::socket socket);
 };
 
-} // namespace vh::websocket
+}

@@ -1,51 +1,22 @@
 #include "protocols/http/HttpServer.hpp"
 #include "protocols/http/HttpSession.hpp"
 #include "protocols/http/HttpSessionTask.hpp"
-#include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;
-using namespace vh::services;
-using namespace vh::logging;
 
 namespace vh::http {
 
 HttpServer::HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint)
-    : acceptor_(ioc), socket_(ioc),
-      authManager_(ServiceDepsRegistry::instance().authManager),
-      storageManager_(ServiceDepsRegistry::instance().storageManager) {
-    beast::error_code ec;
-    acceptor_.open(endpoint.protocol(), ec);
-    if (ec) throw beast::system_error(ec);
-    acceptor_.set_option(net::socket_base::reuse_address(true), ec);
-    if (ec) throw beast::system_error(ec);
-    acceptor_.bind(endpoint, ec);
-    if (ec) throw beast::system_error(ec);
-    acceptor_.listen(net::socket_base::max_listen_connections, ec);
-    if (ec) throw beast::system_error(ec);
+    : TcpServerBase(ioc, endpoint, protocols::TcpServerOptions{
+          .acceptConcurrency = 1,
+          .useStrand = true,
+          .channel = protocols::LogChannel::Http
+      }) {}
+
+void HttpServer::onAccept(tcp::socket socket) {
+    auto session = std::make_shared<HttpSession>(std::move(socket));
+    ThreadPoolManager::instance().httpPool()->submit(std::make_unique<HttpSessionTask>(session));
 }
 
-void HttpServer::run() {
-    LogRegistry::http()->info("[HttpServer] Starting HTTP preview server at {}",
-                              acceptor_.local_endpoint().address().to_string() + ":" +
-                              std::to_string(acceptor_.local_endpoint().port()));
-    do_accept();
 }
-
-void HttpServer::do_accept() {
-    acceptor_.async_accept(
-        [self = shared_from_this()](beast::error_code ec, tcp::socket socket) mutable {
-            if (!ec) {
-                auto session = std::make_shared<HttpSession>(std::move(socket));
-                ThreadPoolManager::instance().httpPool()->submit(
-                    std::make_unique<HttpSessionTask>(session)
-                );
-            }
-            self->do_accept();
-        }
-    );
-}
-
-} // namespace vh::http

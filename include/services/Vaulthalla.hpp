@@ -41,7 +41,7 @@ private:
     void initProtocols();
     void initWebsocketServer();
     void initHttpServer();
-    void initThreatIntelligence();
+    static void initThreatIntelligence();
 };
 
 } // namespace vh::services

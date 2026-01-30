@@ -11,7 +11,6 @@
 #include "protocols/websocket/handlers/APIKeyHandler.hpp"
 #include "logging/LogRegistry.hpp"
 
-using namespace vh::services;
 using namespace vh::logging;
 
 namespace vh::websocket {
@@ -114,4 +113,4 @@ void WebSocketHandler::registerStatHandlers() const {
     router_->registerSessionOnlyHandler("stats.http.cache", &StatsHandler::httpCache);
 }
 
-} // namespace vh::websocket
+}

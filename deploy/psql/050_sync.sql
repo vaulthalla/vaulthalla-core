@@ -60,6 +60,26 @@ CREATE TABLE IF NOT EXISTS sync_conflicts
     UNIQUE (sync_id, file_id)
     );
 
+CREATE TABLE IF NOT EXISTS sync_event
+(
+    id          SERIAL PRIMARY KEY,
+    vault_id    INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    sync_id     INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
+    timestamp_begin  TIMESTAMP NOT NULL,
+    timestamp_end    TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sync_throughput
+(
+    id            SERIAL PRIMARY KEY,
+    sync_event    INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
+    metric_type          VARCHAR(12) CHECK (metric_type IN ('upload', 'download', 'rename')),
+    num_ops       INTEGER DEFAULT 0,
+    size_bytes       BIGINT DEFAULT 0,
+    timestamp_begin  TIMESTAMP NOT NULL,
+    timestamp_end    TIMESTAMP DEFAULT NULL
+);
+
 -- ##################################
 -- Triggers
 -- ##################################

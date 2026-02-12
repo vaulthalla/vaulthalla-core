@@ -1,7 +1,7 @@
 #include "storage/FSCache.hpp"
 
-#include "types/FSEntry.hpp"
-#include "types/Directory.hpp"
+#include "types/fs/FSEntry.hpp"
+#include "types/fs/Directory.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "util/fsPath.hpp"

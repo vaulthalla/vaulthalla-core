@@ -1,9 +1,9 @@
 #include "concurrency/fs/LocalDeleteTask.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/TrashedFile.hpp"
+#include "types/fs/TrashedFile.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "types/Path.hpp"
+#include "types/fs/Path.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;

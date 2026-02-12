@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "types/Path.hpp"
+#include "types/fs/Path.hpp"
 #include "util/fsPath.hpp"
 
 #include <filesystem>

@@ -1,8 +1,8 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/FSEntry.hpp"
-#include "types/File.hpp"
-#include "types/Directory.hpp"
+#include "types/fs/FSEntry.hpp"
+#include "types/fs/File.hpp"
+#include "types/fs/Directory.hpp"
 #include "util/u8.hpp"
 #include "logging/LogRegistry.hpp"
 

@@ -9,9 +9,9 @@
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
 
-#include "types/Vault.hpp"
-#include "types/VaultRole.hpp"
-#include "types/User.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/rbac/VaultRole.hpp"
+#include "types/entities/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"

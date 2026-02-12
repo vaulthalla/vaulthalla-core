@@ -1,8 +1,8 @@
 #include "concurrency/sync/MirrorSyncTask.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/File.hpp"
-#include "types/Directory.hpp"
-#include "types/RSync.hpp"
+#include "types/fs/File.hpp"
+#include "types/fs/Directory.hpp"
+#include "types/sync/RSync.hpp"
 #include "util/fsPath.hpp"
 
 #include <filesystem>

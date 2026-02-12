@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types/APIKey.hpp"
-#include "types/ListQueryParams.hpp"
+#include "types/vault/APIKey.hpp"
+#include "types/admin/ListQueryParams.hpp"
 
 #include <memory>
 

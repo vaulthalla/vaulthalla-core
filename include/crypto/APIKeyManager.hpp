@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/APIKey.hpp"
+#include "types/vault/APIKey.hpp"
 #include "TPMKeyProvider.hpp"
 #include <memory>
 #include <mutex>

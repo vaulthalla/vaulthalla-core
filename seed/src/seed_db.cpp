@@ -10,17 +10,17 @@
 #include "database/Transactions.hpp"
 
 // Types
-#include "types/Permission.hpp"
-#include "types/S3Vault.hpp"
-#include "types/RSync.hpp"
-#include "types/FSync.hpp"
-#include "types/User.hpp"
-#include "types/Group.hpp"
-#include "types/Role.hpp"
-#include "types/UserRole.hpp"
-#include "types/VaultRole.hpp"
-#include "types/Vault.hpp"
-#include "types/Directory.hpp"
+#include "types/rbac/Permission.hpp"
+#include "types/vault/S3Vault.hpp"
+#include "types/sync/RSync.hpp"
+#include "types/sync/FSync.hpp"
+#include "types/entities/User.hpp"
+#include "types/entities/Group.hpp"
+#include "types/rbac/Role.hpp"
+#include "types/rbac/UserRole.hpp"
+#include "types/rbac/VaultRole.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/fs/Directory.hpp"
 
 // Misc
 #include "config/ConfigRegistry.hpp"

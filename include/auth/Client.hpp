@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "Token.hpp"
-#include "types/RefreshToken.hpp"
+#include "types/rbac/RefreshToken.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "crypto/InternalSecretManager.hpp"
 #include <memory>

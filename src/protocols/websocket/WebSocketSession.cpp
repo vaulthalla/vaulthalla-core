@@ -5,7 +5,7 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "util/parse.hpp"
 
 #include <boost/beast/http.hpp>

@@ -1,6 +1,6 @@
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/Group.hpp"
+#include "types/entities/Group.hpp"
 
 using namespace vh::database;
 using namespace vh::types;

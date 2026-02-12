@@ -1,6 +1,6 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/APIKey.hpp"
+#include "types/vault/APIKey.hpp"
 #include "util/bytea.hpp"
 
 using namespace vh::database;

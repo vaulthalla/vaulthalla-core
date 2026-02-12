@@ -9,9 +9,9 @@
 #include "concurrency/ThreadPool.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/Sync.hpp"
-#include "types/RSync.hpp"
-#include "types/Vault.hpp"
+#include "types/sync/Sync.hpp"
+#include "types/sync/RSync.hpp"
+#include "types/vault/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 

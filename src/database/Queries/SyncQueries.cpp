@@ -1,7 +1,7 @@
 #include "database/Queries/SyncQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/RSync.hpp"
-#include "types/FSync.hpp"
+#include "types/sync/RSync.hpp"
+#include "types/sync/FSync.hpp"
 
 namespace vh::database {
 

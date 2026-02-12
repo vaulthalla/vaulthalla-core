@@ -1,6 +1,6 @@
 #include "concurrency/sync/DownloadTask.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/File.hpp"
+#include "types/fs/File.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;

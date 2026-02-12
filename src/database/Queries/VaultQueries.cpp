@@ -1,9 +1,9 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/Vault.hpp"
-#include "types/S3Vault.hpp"
-#include "types/FSync.hpp"
-#include "types/RSync.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/vault/S3Vault.hpp"
+#include "types/sync/FSync.hpp"
+#include "types/sync/RSync.hpp"
 #include "util/u8.hpp"
 
 using namespace vh::database;

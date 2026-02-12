@@ -1,7 +1,7 @@
 #pragma once
 
 #include "storage/StorageEngine.hpp"
-#include "types/File.hpp"
+#include "types/fs/File.hpp"
 #include "concurrency/thumbnail/ThumbnailTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"

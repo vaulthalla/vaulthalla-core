@@ -1,7 +1,7 @@
 #include "util/fsDBHelpers.hpp"
 #include "util/u8.hpp"
-#include "types/File.hpp"
-#include "types/FSEntry.hpp"
+#include "types/fs/File.hpp"
+#include "types/fs/FSEntry.hpp"
 
 using namespace vh::database;
 

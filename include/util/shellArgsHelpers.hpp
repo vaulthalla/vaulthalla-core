@@ -1,8 +1,8 @@
 #pragma once
 
 #include "protocols/shell/types.hpp"
-#include "types/PermissionOverride.hpp"
-#include "types/ListQueryParams.hpp"
+#include "types/rbac/PermissionOverride.hpp"
+#include "types/admin/ListQueryParams.hpp"
 
 #include <optional>
 #include <string>

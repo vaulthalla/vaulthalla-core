@@ -1,9 +1,9 @@
 #include "database/Queries/UserQueries.hpp"
-#include "types/User.hpp"
-#include "types/UserRole.hpp"
-#include "types/RefreshToken.hpp"
+#include "types/entities/User.hpp"
+#include "types/rbac/UserRole.hpp"
+#include "types/rbac/RefreshToken.hpp"
 #include "database/Transactions.hpp"
-#include "types/VaultRole.hpp"
+#include "types/rbac/VaultRole.hpp"
 #include "logging/LogRegistry.hpp"
 #include "crypto/PasswordHash.hpp"
 

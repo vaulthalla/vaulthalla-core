@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/ListQueryParams.hpp"
+#include "types/admin/ListQueryParams.hpp"
 
 #include <memory>
 #include <vector>

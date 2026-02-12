@@ -2,7 +2,7 @@
 #include "concurrency/fs/LocalDeleteTask.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/Vault.hpp"
+#include "types/vault/Vault.hpp"
 #include "logging/LogRegistry.hpp"
 #include "concurrency/fs/LocalRotateKeyTask.hpp"
 

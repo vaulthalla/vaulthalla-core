@@ -1,6 +1,6 @@
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/Operation.hpp"
+#include "types/fs/Operation.hpp"
 
 using namespace vh::database;
 using namespace vh::types;

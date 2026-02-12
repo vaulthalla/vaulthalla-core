@@ -5,11 +5,11 @@
 #include "concurrency/sync/CloudDeleteTask.hpp"
 #include "concurrency/sync/CloudTrashedDeleteTask.hpp"
 #include "concurrency/sync/CloudRotateKeyTask.hpp"
-#include "types/Vault.hpp"
+#include "types/vault/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
-#include "types/File.hpp"
-#include "types/Sync.hpp"
+#include "types/fs/File.hpp"
+#include "types/sync/Sync.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <utility>

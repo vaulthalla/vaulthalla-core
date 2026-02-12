@@ -7,7 +7,7 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "stats/VaultStatTask.hpp"
 #include "types/stats/VaultStat.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "types/stats/CacheStats.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/FSCache.hpp"

@@ -15,9 +15,9 @@
 #include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/GPGEncryptor.hpp"
 
-#include "types/Vault.hpp"
-#include "types/APIKey.hpp"
-#include "types/User.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/vault/APIKey.hpp"
+#include "types/entities/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"

@@ -1,10 +1,10 @@
 #include "database/Queries/WaiverQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/Waiver.hpp"
-#include "types/S3Vault.hpp"
-#include "types/User.hpp"
-#include "types/APIKey.hpp"
-#include "types/Role.hpp"
+#include "types/sync/Waiver.hpp"
+#include "types/vault/S3Vault.hpp"
+#include "types/entities/User.hpp"
+#include "types/vault/APIKey.hpp"
+#include "types/rbac/Role.hpp"
 
 using namespace vh::database;
 

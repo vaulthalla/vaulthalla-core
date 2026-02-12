@@ -1,6 +1,6 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/CacheIndex.hpp"
+#include "types/fs/CacheIndex.hpp"
 #include "util/u8.hpp"
 
 using namespace vh::database;

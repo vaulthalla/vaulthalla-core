@@ -1,9 +1,9 @@
 #include "CommandBuilder.hpp"
 #include "CommandUsage.hpp"
 #include "generators.hpp"
-#include "types/Vault.hpp"
-#include "types/User.hpp"
-#include "types/Group.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/entities/User.hpp"
+#include "types/entities/Group.hpp"
 #include "database/Queries/UserQueries.hpp"
 
 using namespace vh::test::cli;

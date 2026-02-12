@@ -1,7 +1,6 @@
 #include "concurrency/sync/CloudDeleteTask.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/File.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "types/fs/File.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::concurrency;

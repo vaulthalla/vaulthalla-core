@@ -1,6 +1,6 @@
 #include "crypto/InternalSecretManager.hpp"
 #include "database/Queries/InternalSecretQueries.hpp"
-#include "types/InternalSecret.hpp"
+#include "types/admin/InternalSecret.hpp"
 #include "crypto/encrypt.hpp"
 #include "crypto/PasswordHash.hpp"
 

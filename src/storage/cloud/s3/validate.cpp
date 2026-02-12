@@ -1,5 +1,5 @@
 #include "storage/cloud/s3/S3Controller.hpp"
-#include "types/APIKey.hpp"
+#include "types/vault/APIKey.hpp"
 
 #include <ctime>
 #include <curl/curl.h>

@@ -1,6 +1,6 @@
 #include "database/Queries/InternalSecretQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/InternalSecret.hpp"
+#include "types/admin/InternalSecret.hpp"
 #include "util/bytea.hpp"
 
 using namespace vh::database;

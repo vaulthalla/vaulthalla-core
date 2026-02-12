@@ -1,7 +1,7 @@
 #pragma once
 
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 
 #include <memory>
 #include <nlohmann/json.hpp>

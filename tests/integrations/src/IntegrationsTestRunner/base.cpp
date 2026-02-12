@@ -14,11 +14,11 @@
 #include "TestTask.hpp"
 #include "CLITestTask.hpp"
 
-#include "types/User.hpp"
-#include "types/Group.hpp"
-#include "types/Vault.hpp"
-#include "types/UserRole.hpp"
-#include "types/VaultRole.hpp"
+#include "types/entities/User.hpp"
+#include "types/entities/Group.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/rbac/UserRole.hpp"
+#include "types/rbac/VaultRole.hpp"
 
 #include <cstdlib>
 #include <cstdio>

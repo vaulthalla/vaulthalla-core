@@ -3,11 +3,11 @@
 #include "EntityRegistrar.hpp"
 #include "CLITestContext.hpp"
 
-#include "types/User.hpp"
-#include "types/Vault.hpp"
-#include "types/Group.hpp"
-#include "types/UserRole.hpp"
-#include "types/VaultRole.hpp"
+#include "types/entities/User.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/entities/Group.hpp"
+#include "types/rbac/UserRole.hpp"
+#include "types/rbac/VaultRole.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::shell;

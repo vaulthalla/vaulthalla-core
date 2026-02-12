@@ -1,7 +1,7 @@
 #include "util/s3Helpers.hpp"
 #include "util/u8.hpp"
 #include "util/timestamp.hpp"
-#include "types/APIKey.hpp"
+#include "types/vault/APIKey.hpp"
 
 #include <openssl/hmac.h>
 #include <openssl/sha.h>

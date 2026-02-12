@@ -1,5 +1,5 @@
 #include "auth/AuthManager.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "auth/Client.hpp"
 #include "auth/SessionManager.hpp"
 #include "crypto/PasswordHash.hpp"

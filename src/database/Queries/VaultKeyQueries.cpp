@@ -1,6 +1,6 @@
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/VaultKey.hpp"
+#include "types/vault/VaultKey.hpp"
 #include "util/bytea.hpp"
 
 using namespace vh::database;

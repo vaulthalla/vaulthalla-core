@@ -1,5 +1,5 @@
 #include "auth/SessionManager.hpp"
-#include "types/RefreshToken.hpp"
+#include "types/rbac/RefreshToken.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 

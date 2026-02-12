@@ -4,7 +4,7 @@
 #include "auth/Client.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 

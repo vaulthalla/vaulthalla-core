@@ -2,8 +2,8 @@
 #include "crypto/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
-#include "types/VaultKey.hpp"
-#include "types/File.hpp"
+#include "types/vault/VaultKey.hpp"
+#include "types/fs/File.hpp"
 
 #include <sodium.h>
 #include <stdexcept>

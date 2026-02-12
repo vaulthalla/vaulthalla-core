@@ -5,7 +5,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/shell/SocketIO.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>

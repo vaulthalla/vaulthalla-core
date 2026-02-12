@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/CacheIndex.hpp"
+#include "types/fs/CacheIndex.hpp"
 
 #include <memory>
 #include <filesystem>

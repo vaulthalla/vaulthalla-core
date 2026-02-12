@@ -1,10 +1,10 @@
 #include "storage/Filesystem.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/Vault.hpp"
-#include "types/Directory.hpp"
-#include "types/File.hpp"
-#include "types/Path.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/fs/Directory.hpp"
+#include "types/fs/File.hpp"
+#include "types/fs/Path.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -24,6 +24,7 @@
 #include "storage/FSCache.hpp"
 
 #include <ranges>
+#include <fstream>
 #include <vector>
 #include <algorithm>
 #include <paths.h>

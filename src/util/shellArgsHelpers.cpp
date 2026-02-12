@@ -5,9 +5,9 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/User.hpp"
-#include "types/Group.hpp"
-#include "types/Role.hpp"
+#include "types/entities/User.hpp"
+#include "types/entities/Group.hpp"
+#include "types/rbac/Role.hpp"
 
 #include <optional>
 #include <string>

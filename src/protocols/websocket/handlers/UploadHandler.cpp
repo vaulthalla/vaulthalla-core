@@ -1,7 +1,7 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "types/User.hpp"
+#include "types/entities/User.hpp"
 #include "logging/LogRegistry.hpp"
 #include "storage/Filesystem.hpp"
 

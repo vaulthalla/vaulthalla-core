@@ -1,7 +1,7 @@
 #include "crypto/APIKeyManager.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
 #include "crypto/encrypt.hpp"
-#include "types/APIKey.hpp"
+#include "types/vault/APIKey.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -12,7 +12,7 @@ using namespace vh::types::api;
 
 APIKeyManager::APIKeyManager() {
     const std::string tpmKeyName = paths::testMode ? "test_ak_master" : "ak_master";
-    tpmKeyProvider_ = std::make_unique<crypto::TPMKeyProvider>(tpmKeyName);
+    tpmKeyProvider_ = std::make_unique<TPMKeyProvider>(tpmKeyName);
     tpmKeyProvider_->init();
 
     initAPIKeys();
@@ -35,7 +35,7 @@ unsigned int APIKeyManager::addAPIKey(std::shared_ptr<APIKey>& key) {
     const auto plaintext = std::vector<uint8_t>(key->secret_access_key.begin(),
                                           key->secret_access_key.end());
 
-    const auto ciphertext = crypto::encrypt_aes256_gcm(plaintext, masterKey, iv);
+    const auto ciphertext = encrypt_aes256_gcm(plaintext, masterKey, iv);
 
     // Replace sensitive data with encrypted representation
     key->encrypted_secret_access_key = ciphertext;

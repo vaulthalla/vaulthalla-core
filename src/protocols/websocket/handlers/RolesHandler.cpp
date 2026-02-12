@@ -1,9 +1,9 @@
 #include "protocols/websocket/handlers/RolesHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/User.hpp"
-#include "types/Role.hpp"
-#include "types/VaultRole.hpp"
+#include "types/entities/User.hpp"
+#include "types/rbac/Role.hpp"
+#include "types/rbac/VaultRole.hpp"
 
 using namespace vh::websocket;
 

@@ -6,7 +6,7 @@
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/UserRole.hpp"
+#include "types/rbac/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"

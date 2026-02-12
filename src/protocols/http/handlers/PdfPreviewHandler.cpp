@@ -1,7 +1,7 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
-#include "types/File.hpp"
+#include "types/fs/File.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "protocols/http/HttpRouter.hpp"

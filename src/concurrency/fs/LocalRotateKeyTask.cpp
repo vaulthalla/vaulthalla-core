@@ -1,6 +1,6 @@
 #include "concurrency/fs/LocalRotateKeyTask.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/File.hpp"
+#include "types/fs/File.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "util/files.hpp"
 #include "crypto/VaultEncryptionManager.hpp"

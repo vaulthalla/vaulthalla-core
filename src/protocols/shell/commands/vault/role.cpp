@@ -4,11 +4,11 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/PermsQueries.hpp"
 
-#include "types/Vault.hpp"
-#include "types/VaultRole.hpp"
-#include "types/User.hpp"
-#include "types/Role.hpp"
-#include "types/Permission.hpp"
+#include "types/vault/Vault.hpp"
+#include "types/rbac/VaultRole.hpp"
+#include "types/entities/User.hpp"
+#include "types/rbac/Role.hpp"
+#include "types/rbac/Permission.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"

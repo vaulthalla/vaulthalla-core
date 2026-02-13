@@ -218,7 +218,6 @@ void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
 
     // Include throughputs (as array of objects)
     nlohmann::json arr = nlohmann::json::array();
-    arr.reserve(e.throughputs.size());
     for (const auto& p : e.throughputs) {
         if (!p) continue;
         nlohmann::json tj;

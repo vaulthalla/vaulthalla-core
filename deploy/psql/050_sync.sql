@@ -60,25 +60,90 @@ CREATE TABLE IF NOT EXISTS sync_conflicts
     UNIQUE (sync_id, file_id)
     );
 
+-- -----------------------------------
+-- Sync Event (per-run health + audit)
+-- -----------------------------------
 CREATE TABLE IF NOT EXISTS sync_event
 (
-    id          SERIAL PRIMARY KEY,
-    vault_id    INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    sync_id     INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
-    timestamp_begin  TIMESTAMP NOT NULL,
-    timestamp_end    TIMESTAMP DEFAULT NULL
-);
+    id               SERIAL PRIMARY KEY,
+    vault_id          INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    sync_id           INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
 
+    -- core timing
+    timestamp_begin   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    timestamp_end     TIMESTAMP DEFAULT NULL,
+
+    -- run state
+    status            VARCHAR(12) NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running', 'success', 'stalled', 'error', 'cancelled')),
+    trigger           VARCHAR(12) NOT NULL DEFAULT 'schedule'
+    CHECK (trigger IN ('schedule', 'manual', 'startup', 'webhook', 'retry')),
+    retry_attempt     INTEGER NOT NULL DEFAULT 0,
+
+    -- stall/error diagnostics
+    heartbeat_at      TIMESTAMP DEFAULT NULL,
+    stall_reason      TEXT DEFAULT NULL,
+    error_code        TEXT DEFAULT NULL,
+    error_message     TEXT DEFAULT NULL,
+
+    -- summary counters (so dashboards don't need 4 joins)
+    num_ops_total     BIGINT NOT NULL DEFAULT 0,
+    num_failed_ops    BIGINT NOT NULL DEFAULT 0,
+    num_conflicts     BIGINT NOT NULL DEFAULT 0,
+    bytes_up          BIGINT NOT NULL DEFAULT 0,
+    bytes_down        BIGINT NOT NULL DEFAULT 0,
+
+    -- divergence / watermarks (optional but lets "diverged" be provable)
+    divergence_detected      BOOLEAN NOT NULL DEFAULT FALSE,
+    local_change_seq_begin   BIGINT DEFAULT NULL,
+    local_change_seq_end     BIGINT DEFAULT NULL,
+    remote_change_seq_begin  BIGINT DEFAULT NULL,
+    remote_change_seq_end    BIGINT DEFAULT NULL,
+    local_state_hash         TEXT DEFAULT NULL,
+    remote_state_hash        TEXT DEFAULT NULL,
+
+    -- attribution (multi-worker + debugging)
+    worker_id         TEXT DEFAULT NULL,
+    build_version     TEXT DEFAULT NULL,
+    git_sha           TEXT DEFAULT NULL,
+    config_hash       TEXT DEFAULT NULL
+    );
+
+-- -----------------------------------
+-- Throughput metrics (per-run buckets)
+-- -----------------------------------
 CREATE TABLE IF NOT EXISTS sync_throughput
 (
-    id            SERIAL PRIMARY KEY,
-    sync_event    INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
-    metric_type          VARCHAR(12) CHECK (metric_type IN ('upload', 'download', 'rename')),
-    num_ops       INTEGER DEFAULT 0,
-    size_bytes       BIGINT DEFAULT 0,
-    timestamp_begin  TIMESTAMP NOT NULL,
-    timestamp_end    TIMESTAMP DEFAULT NULL
-);
+    id               SERIAL PRIMARY KEY,
+    sync_event_id    INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
+
+    metric_type      VARCHAR(12) NOT NULL
+    CHECK (metric_type IN ('upload', 'download', 'rename', 'copy', 'delete')),
+
+    num_ops          BIGINT NOT NULL DEFAULT 0,
+    size_bytes       BIGINT NOT NULL DEFAULT 0,
+
+    timestamp_begin  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    timestamp_end    TIMESTAMP DEFAULT NULL,
+
+    UNIQUE (sync_event_id, metric_type)
+    );
+
+-- ##################################
+-- Indexes (dashboards + health queries)
+-- ##################################
+
+CREATE INDEX IF NOT EXISTS idx_sync_event_vault_begin
+    ON sync_event (vault_id, timestamp_begin DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sync_event_vault_status_begin
+    ON sync_event (vault_id, status, timestamp_begin DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sync_event_status_heartbeat
+    ON sync_event (status, heartbeat_at);
+
+CREATE INDEX IF NOT EXISTS idx_sync_throughput_event
+    ON sync_throughput (sync_event_id);
 
 -- ##################################
 -- Triggers

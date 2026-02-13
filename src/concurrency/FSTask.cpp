@@ -16,6 +16,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/task.hpp"
+#include "types/sync/Event.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -26,7 +27,8 @@ using namespace std::chrono;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
-  engine_(engine) {}
+  engine_(engine),
+  event_(std::make_shared<sync::Event>()) {}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 

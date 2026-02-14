@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types/sync/ScopedOp.hpp"
+
 #include <ctime>
 #include <cstdint>
 #include <string>
@@ -25,15 +27,16 @@ struct Throughput {
 
     uint64_t num_ops{};
     uint64_t size_bytes{};
+    uint64_t duration_ms{};
 
-    std::time_t timestamp_begin{};
-    std::time_t timestamp_end{};
+    std::vector<ScopedOp> scoped_ops;
 
     Throughput() = default;
     explicit Throughput(const pqxx::row& row);
 
-    void start();
-    void stop();
+    void computeDashboardStats();
+
+    ScopedOp& newOp();
 
     void parseMetric(const std::string& str);
     std::string metricToString() const;

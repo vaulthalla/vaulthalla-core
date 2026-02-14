@@ -4,7 +4,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/sync/Sync.hpp"
-#include "types/fs/Operation.hpp"
+#include "../../include/types/sync/Operation.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/File.hpp"
 #include "types/fs/Path.hpp"
@@ -17,6 +17,8 @@
 #include "logging/LogRegistry.hpp"
 #include "util/task.hpp"
 #include "types/sync/Event.hpp"
+#include "types/sync/Throughput.hpp"
+#include "types/sync/ScopedOp.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -24,6 +26,7 @@ using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace std::chrono;
+using namespace vh::types;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
@@ -64,6 +67,9 @@ void FSTask::push(const std::shared_ptr<Task>& task) {
 
 void FSTask::processOperations() const {
     for (const auto& op : OperationQueries::listOperationsByVault(engine_->vault->id)) {
+        auto& scopedOp = event_->getOrCreateThroughput(op->opToThroughputMetric()).newOp();
+        scopedOp.start();
+
         const auto absSrc = engine_->paths->absPath(op->source_path, PathType::BACKING_VAULT_ROOT);
         const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
@@ -71,11 +77,15 @@ void FSTask::processOperations() const {
         const auto f = FileQueries::getFileByPath(engine_->vault->id, op->destination_path);
         if (!f) {
             LogRegistry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
+            scopedOp.stop();
             continue;
         }
 
+        scopedOp.size_bytes = f->size_bytes;
+
         if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
             LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
+            scopedOp.stop();
             continue;
         }
 
@@ -84,6 +94,7 @@ void FSTask::processOperations() const {
 
         if (buffer.empty()) {
             LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
+            scopedOp.stop();
             continue;
         }
 
@@ -99,6 +110,8 @@ void FSTask::processOperations() const {
         if (op->operation == Operation::Op::Copy) engine_->copyThumbnails(op->source_path, op->destination_path);
         else if (op->operation == Operation::Op::Move || op->operation == Operation::Op::Rename) move();
         else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
+
+        scopedOp.stop();
     }
 }
 

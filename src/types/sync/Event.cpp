@@ -31,6 +31,7 @@ namespace {
 
 using namespace vh::types::sync;
 using namespace vh::util;
+using namespace std::chrono;
 
 Event::Event(const pqxx::row& row)
     : id(row["id"].as<uint32_t>())
@@ -73,6 +74,14 @@ Event::Event(const pqxx::row& row)
         Trigger t = Trigger::SCHEDULE;
         if (tryParseTrigger(as_or_empty(row, "trigger"), t)) trigger = t;
     }
+}
+
+void Event::start() {
+    timestamp_begin = system_clock::to_time_t(system_clock::now());
+}
+
+void Event::stop() {
+    timestamp_end = system_clock::to_time_t(system_clock::now());
 }
 
 void Event::addThroughput(std::unique_ptr<Throughput> t) {

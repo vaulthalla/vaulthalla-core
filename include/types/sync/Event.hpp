@@ -87,6 +87,9 @@ struct Event {
     // -------------------------
     // Convenience helpers
     // -------------------------
+    void start();
+    void stop();
+
     [[nodiscard]] bool hasEnded() const noexcept { return timestamp_end != 0; }
     [[nodiscard]] bool hasHeartbeat() const noexcept { return heartbeat_at != 0; }
 

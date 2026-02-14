@@ -122,9 +122,7 @@ CREATE TABLE IF NOT EXISTS sync_throughput
 
     num_ops          BIGINT NOT NULL DEFAULT 0,
     size_bytes       BIGINT NOT NULL DEFAULT 0,
-
-    timestamp_begin  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    timestamp_end    TIMESTAMP DEFAULT NULL,
+    duration_ms      BIGINT NOT NULL DEFAULT 0,
 
     UNIQUE (sync_event_id, metric_type)
     );

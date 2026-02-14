@@ -14,11 +14,22 @@ Throughput::Throughput(const pqxx::row& row) :
     sync_event_id(row["sync_event_id"].as<uint32_t>()),
     num_ops(row["num_ops"].as<uint64_t>()),
     size_bytes(row["size_bytes"].as<uint64_t>()),
-    timestamp_begin(parsePostgresTimestamp(row["timestamp_begin"].as<std::string>())),
-    timestamp_end(parsePostgresTimestamp(row["timestamp_end"].as<std::string>())) {}
+    duration_ms(row["duration_ms"].as<uint64_t>()) {}
 
-void Throughput::start() { timestamp_begin = system_clock::to_time_t(system_clock::now()); }
-void Throughput::stop() { timestamp_end = system_clock::to_time_t(system_clock::now()); }
+void Throughput::computeDashboardStats() {
+    num_ops = scoped_ops.size();
+    size_bytes = 0;
+    duration_ms = 0;
+    for (const auto& op : scoped_ops) {
+        size_bytes += op.size_bytes;
+        duration_ms += op.duration_ms();
+    }
+}
+
+ScopedOp& Throughput::newOp() {
+    scoped_ops.emplace_back();
+    return scoped_ops.back();
+}
 
 void Throughput::parseMetric(const std::string& str) {
     if (str == "rename") metric_type = RENAME;
@@ -45,8 +56,7 @@ void vh::types::sync::to_json(nlohmann::json& j, const Throughput& t) {
         {"sync_event_id", t.sync_event_id},
         {"num_ops", t.num_ops},
         {"size_bytes", t.size_bytes},
-        {"timestamp_begin", t.timestamp_begin},
-        {"timestamp_end", t.timestamp_end},
+        {"duration_ms", t.duration_ms},
         {"metric_type", t.metricToString()}
     };
 }

@@ -2,6 +2,7 @@
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "types/entities/User.hpp"
+#include "types/rbac/Permission.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -24,7 +25,7 @@ json PermissionsHandler::getByName(const json& payload, const WebSocketSession& 
         throw std::runtime_error("Permission denied: Only admins can get permissions by name");
 
     const auto permissionName = payload.at("name").get<std::string>();
-    auto permission = database::PermsQueries::getPermissionByName(permissionName);
+    auto permission = PermsQueries::getPermissionByName(permissionName);
     if (!permission) throw std::runtime_error("Permission not found");
 
     return {{"permission", *permission}};
@@ -34,7 +35,7 @@ json PermissionsHandler::list(const WebSocketSession& session) {
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can list permissions");
 
-    auto permissions = database::PermsQueries::listPermissions();
+    auto permissions = PermsQueries::listPermissions();
 
     return {{"permissions", permissions}};
 }

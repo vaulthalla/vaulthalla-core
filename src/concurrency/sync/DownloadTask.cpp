@@ -2,6 +2,7 @@
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/fs/File.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/ScopedOp.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;

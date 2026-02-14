@@ -13,7 +13,8 @@ TrashedFile::TrashedFile(const pqxx::row& row)
       path(row["path"].as<std::string>()),
       backing_path(row["backing_path"].as<std::string>()),
       trashed_at(util::parsePostgresTimestamp(row["trashed_at"].as<std::string>())),
-      trashed_by(row["trashed_by"].as<unsigned int>()) {
+      trashed_by(row["trashed_by"].as<unsigned int>()),
+      size_bytes(row["size_bytes"].as<uint64_t>()) {
     if (row["deleted_at"].is_null()) deleted_at = std::nullopt;
     else deleted_at = util::parsePostgresTimestamp(row["deleted_at"].as<std::string>());
 }

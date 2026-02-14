@@ -1,7 +1,7 @@
 #include "storage/StorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/fs/Operation.hpp"
+#include "../../include/types/sync/Operation.hpp"
 #include "types/fs/Path.hpp"
 #include "util/Magic.hpp"
 #include "database/Queries/DirectoryQueries.hpp"

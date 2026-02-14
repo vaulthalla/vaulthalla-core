@@ -1,0 +1,47 @@
+#pragma once
+
+#include "types/sync/ScopedOp.hpp"
+
+#include <ctime>
+#include <cstdint>
+#include <string>
+#include <nlohmann/json_fwd.hpp>
+
+namespace pqxx { class row; }
+
+namespace vh::types::sync {
+
+struct Throughput {
+    enum Metric {
+        UPLOAD,
+        DOWNLOAD,
+        RENAME,
+        COPY,
+        DELETE
+    };
+
+    uint32_t id{};
+    uint32_t sync_event_id{};
+
+    Metric metric_type{RENAME};
+
+    uint64_t num_ops{};
+    uint64_t size_bytes{};
+    uint64_t duration_ms{};
+
+    std::vector<ScopedOp> scoped_ops;
+
+    Throughput() = default;
+    explicit Throughput(const pqxx::row& row);
+
+    void computeDashboardStats();
+
+    ScopedOp& newOp();
+
+    void parseMetric(const std::string& str);
+    std::string metricToString() const;
+};
+
+void to_json(nlohmann::json& j, const Throughput& t);
+
+}

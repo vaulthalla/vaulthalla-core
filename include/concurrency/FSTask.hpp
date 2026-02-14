@@ -19,6 +19,9 @@ class SyncController;
 
 namespace vh::types {
 struct File;
+
+namespace sync { struct Event; }
+
 }
 
 namespace vh::concurrency {
@@ -51,6 +54,7 @@ protected:
     std::vector<std::future<ExpectedFuture>> futures_;
     bool isRunning_ = false;
     std::atomic<bool> interruptFlag_{false};
+    std::shared_ptr<types::sync::Event> event_;
 
     virtual void removeTrashedFiles() = 0;
     virtual void processFutures();

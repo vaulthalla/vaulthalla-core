@@ -13,7 +13,6 @@
 using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::database;
-using namespace vh::util;
 
 struct CompareFiles {
     bool operator()(const std::pair<std::string, unsigned int>& a, const std::pair<std::string, unsigned int>& b) const {

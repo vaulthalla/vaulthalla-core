@@ -1,4 +1,4 @@
-#include "types/fs/Operation.hpp"
+#include "types/sync/Operation.hpp"
 #include "types/fs/FSEntry.hpp"
 #include "util/timestamp.hpp"
 
@@ -29,6 +29,12 @@ Operation::Operation(const std::shared_ptr<FSEntry>& origEntry, const std::files
       target(origEntry->isDirectory() ? Target::Directory : Target::File),
       source_path(origEntry->path),
       destination_path(dest) {}
+
+sync::Throughput::Metric Operation::opToThroughputMetric() const {
+    if (operation == Op::Copy) return sync::Throughput::Metric::COPY;
+    if (operation == Op::Rename || operation == Op::Move) return sync::Throughput::Metric::RENAME;
+    throw std::logic_error("Unsupported operation for throughput metric");
+}
 
 std::string vh::types::to_string(const Operation::Op& op) {
     switch (op) {

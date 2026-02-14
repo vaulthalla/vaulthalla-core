@@ -3,10 +3,12 @@
 #include "types/fs/TrashedFile.hpp"
 #include "types/fs/CacheIndex.hpp"
 #include "types/fs/Path.hpp"
+#include "types/fs/File.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/ScopedOp.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::types;
@@ -17,20 +19,24 @@ using namespace vh::logging;
 
 CloudTrashedDeleteTask::CloudTrashedDeleteTask(std::shared_ptr<CloudStorageEngine> eng,
                                                  std::shared_ptr<TrashedFile> f,
+                                                 sync::ScopedOp& op,
                                                  const Type& type)
-    : engine(std::move(eng)), file(std::move(f)), type(type) {}
+    : engine(std::move(eng)), file(std::move(f)), op(op), type(type) {}
 
 void CloudTrashedDeleteTask::operator()() {
     try {
+        op.start(file->size_bytes);
         const auto vaultPath = engine->paths->absRelToAbsRel(file->backing_path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
         if (type == Type::PURGE) purge(vaultPath);
         else if (type == Type::LOCAL) handleLocalDelete();
         else if (type == Type::REMOTE) engine->removeRemotely(vaultPath);
         else throw std::runtime_error("Unknown delete task type");
         FileQueries::markTrashedFileDeleted(file->id);
+        op.stop();
         promise.set_value(true);
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[CloudTrashedDeleteTask] Failed to delete trashed file: {} - {}", file->backing_path.string(), e.what());
+        op.stop();
         promise.set_value(false);
     }
 }

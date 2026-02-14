@@ -5,6 +5,8 @@
 #include "types/vault/Vault.hpp"
 #include "logging/LogRegistry.hpp"
 #include "concurrency/fs/LocalRotateKeyTask.hpp"
+#include "types/sync/Event.hpp"
+#include "types/sync/Throughput.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::database;
@@ -15,7 +17,7 @@ using namespace std::chrono;
 
 void LocalFSTask::operator()() {
     LogRegistry::sync()->debug("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
-    const auto start = steady_clock::now();
+    event_->start();
 
     try {
         handleInterrupt();
@@ -36,19 +38,20 @@ void LocalFSTask::operator()() {
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[LocalFSTask] Exception during sync: {}", e.what());
         isRunning_ = false;
+        event_->stop();
         requeue();
         return;
     } catch (...) {
         LogRegistry::sync()->error("[LocalFSTask] Unknown exception during sync.");
         isRunning_ = false;
+        event_->stop();
         requeue();
         return;
     }
 
     isRunning_ = false;
-    const auto end = steady_clock::now();
-    const auto duration = duration_cast<milliseconds>(end - start);
-    LogRegistry::sync()->debug("[LocalFSTask] Sync completed for vault '{}' in {}ms", engine_->vault->id, duration.count());
+    event_->stop();
+    LogRegistry::sync()->debug("[LocalFSTask] Sync completed for vault '{}' in {}s", engine_->vault->id, event_->durationSeconds());
     requeue();
 }
 
@@ -60,7 +63,10 @@ void LocalFSTask::removeTrashedFiles() {
     const auto engine = localEngine();
     const auto files = FileQueries::listTrashedFiles(engine_->vault->id);
     futures_.reserve(files.size());
-    for (const auto& file : files) push(std::make_shared<LocalDeleteTask>(engine, file));
+    for (const auto& file : files) {
+        auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::DELETE).newOp();
+        push(std::make_shared<LocalDeleteTask>(engine, file, op));
+    }
     processFutures();
 }
 

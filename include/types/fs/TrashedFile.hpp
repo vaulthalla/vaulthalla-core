@@ -20,6 +20,7 @@ struct TrashedFile {
     fs::path path{}, backing_path{};
     std::time_t trashed_at{}, trashed_by{};
     std::optional<std::time_t> deleted_at{};
+    uint64_t size_bytes{};
 
     explicit TrashedFile(const pqxx::row& row);
 };

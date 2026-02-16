@@ -35,7 +35,7 @@ struct Operation {
     explicit Operation(const pqxx::row& row);
     explicit Operation(const std::shared_ptr<FSEntry>& origEntry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
 
-    sync::Throughput::Metric opToThroughputMetric() const;
+    [[nodiscard]] sync::Throughput::Metric opToThroughputMetric() const;
 };
 
 std::string to_string(const Operation::Op& op);

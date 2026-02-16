@@ -28,4 +28,3 @@ void DownloadTask::operator()() {
         promise.set_value(false);
     }
 }
-

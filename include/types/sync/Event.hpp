@@ -68,18 +68,11 @@ struct Event {
 
     // Divergence / watermarks
     bool divergence_detected{false};
-    std::int64_t local_change_seq_begin{-1};
-    std::int64_t local_change_seq_end{-1};
-    std::int64_t remote_change_seq_begin{-1};
-    std::int64_t remote_change_seq_end{-1};
     std::string local_state_hash;   // optional
     std::string remote_state_hash;  // optional
 
     // Attribution (multi-worker debugging)
-    std::string worker_id;      // optional
-    std::string build_version;  // optional
-    std::string git_sha;        // optional
-    std::string config_hash;    // optional
+    std::string config_hash;
 
     Event() = default;
     explicit Event(const pqxx::row& row);

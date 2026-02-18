@@ -95,17 +95,10 @@ CREATE TABLE IF NOT EXISTS sync_event
 
     -- divergence / watermarks (optional but lets "diverged" be provable)
     divergence_detected      BOOLEAN NOT NULL DEFAULT FALSE,
-    local_change_seq_begin   BIGINT DEFAULT NULL,
-    local_change_seq_end     BIGINT DEFAULT NULL,
-    remote_change_seq_begin  BIGINT DEFAULT NULL,
-    remote_change_seq_end    BIGINT DEFAULT NULL,
     local_state_hash         TEXT DEFAULT NULL,
     remote_state_hash        TEXT DEFAULT NULL,
 
     -- attribution (multi-worker + debugging)
-    worker_id         TEXT DEFAULT NULL,
-    build_version     TEXT DEFAULT NULL,
-    git_sha           TEXT DEFAULT NULL,
     config_hash       TEXT DEFAULT NULL
     );
 

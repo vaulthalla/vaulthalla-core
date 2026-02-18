@@ -54,25 +54,15 @@ Event::Event(const pqxx::row& row)
     , bytes_up(as_or_default<std::uint64_t>(row, "bytes_up", 0))
     , bytes_down(as_or_default<std::uint64_t>(row, "bytes_down", 0))
     , divergence_detected(as_or_default<bool>(row, "divergence_detected", false))
-    , local_change_seq_begin(as_or_default<std::int64_t>(row, "local_change_seq_begin", -1))
-    , local_change_seq_end(as_or_default<std::int64_t>(row, "local_change_seq_end", -1))
-    , remote_change_seq_begin(as_or_default<std::int64_t>(row, "remote_change_seq_begin", -1))
-    , remote_change_seq_end(as_or_default<std::int64_t>(row, "remote_change_seq_end", -1))
     , local_state_hash(as_or_empty(row, "local_state_hash"))
     , remote_state_hash(as_or_empty(row, "remote_state_hash"))
-    , worker_id(as_or_empty(row, "worker_id"))
-    , build_version(as_or_empty(row, "build_version"))
-    , git_sha(as_or_empty(row, "git_sha"))
     , config_hash(as_or_empty(row, "config_hash"))
 {
-    // Parse status + trigger with sane fallbacks
     {
-        State s = State::RUNNING;
-        if (tryParseState(as_or_empty(row, "status"), s)) state = s;
+        if (auto s = State::RUNNING; tryParseState(as_or_empty(row, "status"), s)) state = s;
     }
     {
-        Trigger t = Trigger::SCHEDULE;
-        if (tryParseTrigger(as_or_empty(row, "trigger"), t)) trigger = t;
+        if (auto t = Trigger::SCHEDULE; tryParseTrigger(as_or_empty(row, "trigger"), t)) trigger = t;
     }
 }
 
@@ -117,7 +107,6 @@ Throughput& Event::getOrCreateThroughput(const Throughput::Metric& metric) {
 void Event::computeDashboardStats() {
     // Reset derived values (leave num_failed_ops/num_conflicts as they may be tracked elsewhere too)
     num_ops_total = 0;
-    num_failed_ops = 0;
     bytes_up = 0;
     bytes_down = 0;
 
@@ -216,16 +205,9 @@ void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
         {"bytes_down", e.bytes_down},
 
         {"divergence_detected", e.divergence_detected},
-        {"local_change_seq_begin", e.local_change_seq_begin},
-        {"local_change_seq_end", e.local_change_seq_end},
-        {"remote_change_seq_begin", e.remote_change_seq_begin},
-        {"remote_change_seq_end", e.remote_change_seq_end},
         {"local_state_hash", e.local_state_hash},
         {"remote_state_hash", e.remote_state_hash},
 
-        {"worker_id", e.worker_id},
-        {"build_version", e.build_version},
-        {"git_sha", e.git_sha},
         {"config_hash", e.config_hash},
     };
 

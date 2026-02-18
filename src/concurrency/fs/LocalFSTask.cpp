@@ -16,46 +16,17 @@ using namespace vh::logging;
 using namespace std::chrono;
 
 void LocalFSTask::operator()() {
-    LogRegistry::sync()->debug("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
-
-    if (!engine_) {
-        LogRegistry::sync()->error("[LocalFSTask] Engine is null, cannot proceed with sync.");
-        return;
-    }
-
-    newEvent();
-    event_ = engine_->latestSyncEvent;
-    event_->start();
+    startTask();
 
     try {
-        handleInterrupt();
-
-        isRunning_ = true;
-
-        processOperations();
-        handleInterrupt();
-        removeTrashedFiles();
-        handleInterrupt();
-        handleVaultKeyRotation();
-        handleInterrupt();
+        processSharedOps();
     } catch (const std::exception& e) {
-        LogRegistry::sync()->error("[LocalFSTask] Exception during sync: {}", e.what());
-        isRunning_ = false;
-        event_->stop();
-        requeue();
-        return;
+        handleError(std::format("[LocalFSTask] Exception during sync: {}", e.what()));
     } catch (...) {
-        LogRegistry::sync()->error("[LocalFSTask] Unknown exception during sync.");
-        isRunning_ = false;
-        event_->stop();
-        requeue();
-        return;
+        handleError("[LocalFSTask] Unknown exception during sync.");
     }
 
-    isRunning_ = false;
-    event_->stop();
-    LogRegistry::sync()->debug("[LocalFSTask] Sync completed for vault '{}' in {}s", engine_->vault->id, event_->durationSeconds());
-    requeue();
+    shutdown();
 }
 
 void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {

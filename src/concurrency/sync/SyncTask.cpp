@@ -7,9 +7,7 @@
 #include "concurrency/sync/CloudRotateKeyTask.hpp"
 #include "types/vault/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
 #include "types/fs/File.hpp"
-#include "types/sync/Sync.hpp"
 #include "logging/LogRegistry.hpp"
 #include "types/sync/Event.hpp"
 #include "types/sync/Throughput.hpp"
@@ -24,73 +22,30 @@ using namespace vh::logging;
 using namespace vh::storage;
 
 void SyncTask::operator()() {
-    LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);
-
-    if (!engine_) {
-        LogRegistry::sync()->error("[SyncTask] Engine is null, cannot proceed with sync.");
-        return;
-    }
-
-    newEvent();
-    event_ = engine_->latestSyncEvent;
-    event_->start();
+    startTask();
 
     try {
-        handleInterrupt();
-
-        isRunning_ = true;
-        SyncQueries::reportSyncStarted(engine_->sync->id);
-
-        processOperations();
-        handleInterrupt();
-        removeTrashedFiles();
-        handleInterrupt();
-        handleVaultKeyRotation();
-        handleInterrupt();
-
-        s3Map_ = cloudEngine()->getGroupedFilesFromS3();
-        s3Files_ = uMap2Vector(s3Map_);
-        localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
-        localMap_ = groupEntriesByPath(localFiles_);
-
-        for (const auto& [path, entry] : intersect(s3Map_, localMap_))
-            remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
-
-
-        futures_.clear();
-
+        processSharedOps();
+        initBins();
         sync();
-
-        SyncQueries::reportSyncSuccess(engine_->sync->id);
-        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
-
-        handleInterrupt();
-
-        localFiles_.clear();
-        s3Files_.clear();
-        s3Map_.clear();
-        localMap_.clear();
-        remoteHashMap_.clear();
-
-        requeue();
-        isRunning_ = false;
-
-        LogRegistry::sync()->debug("[SyncTask] Sync task requeued for vault '{}'", engine_->vault->id);
+        clearBins();
     } catch (const std::exception& e) {
-        isRunning_ = false;
-        if (std::string(e.what()).contains("Sync task interrupted")) {
-            LogRegistry::sync()->info("[SyncTask] Sync task interrupted for vault '{}'", engine_->vault->id);
-            return;
-        }
-        LogRegistry::sync()->error("[SyncTask] Exception during sync for vault '{}': {}", engine_->vault->id, e.what());
+        handleError(std::format("[SyncTask] Exception during sync for vault '{}': {}", engine_->vault->id, e.what()));
     } catch (...) {
-        LogRegistry::sync()->error("[SyncTask] Unknown exception during sync for vault '{}'", engine_->vault->id);
-        isRunning_ = false;
+        handleError(std::format("[SyncTask] Unknown exception during sync for vault '{}'", engine_->vault->id));
     }
 
-    event_->stop();
-    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}s",
-                              engine_->vault->id, event_->durationSeconds());
+    shutdown();
+}
+
+void SyncTask::initBins() {
+    s3Map_ = cloudEngine()->getGroupedFilesFromS3();
+    s3Files_ = uMap2Vector(s3Map_);
+    localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
+    localMap_ = groupEntriesByPath(localFiles_);
+
+    for (const auto& [path, entry] : intersect(s3Map_, localMap_))
+        remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
 }
 
 void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
@@ -165,4 +120,12 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::intersect(
     for (const auto& item : a) if (b.contains(item.first)) result.insert(item);
 
     return result;
+}
+
+void SyncTask::clearBins() {
+    localFiles_.clear();
+    s3Files_.clear();
+    s3Map_.clear();
+    localMap_.clear();
+    remoteHashMap_.clear();
 }

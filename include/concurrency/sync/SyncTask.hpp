@@ -58,6 +58,10 @@ protected:
     static std::unordered_map<std::u8string, std::shared_ptr<types::File> > symmetric_diff(
         const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& a,
         const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& b);
+
+private:
+    void initBins();
+    void clearBins();
 };
 
 }

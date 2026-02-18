@@ -75,6 +75,82 @@ void Event::stop() {
     timestamp_end = system_clock::to_time_t(system_clock::now());
 }
 
+void Event::parseCurrentStatus() {
+    // ---- Tunables (keep local for MVP; later pull from config) ----
+    constexpr std::time_t kStallAfterSeconds = 90;  // heartbeat silence threshold
+    constexpr bool kTreatDivergenceAsError   = false; // flip true if you want divergence to hard-fail
+    constexpr bool kFailedOpsRequireEnd      = false; // flip true if failed ops during run shouldn't mark ERROR yet
+
+    // Preserve terminal states. Once you're done, you're done.
+    switch (status) {
+        case Status::SUCCESS:
+        case Status::ERROR:
+        case Status::CANCELLED:
+            return;
+        default:
+            break;
+    }
+
+    // If you haven't started, don't invent drama.
+    if (timestamp_begin == 0) {
+        status = Status::PENDING;
+        return;
+    }
+
+    // Ensure counters are coherent if caller didn't do it.
+    // (If computeDashboardStats() is expensive, you can gate it behind a dirty flag.)
+    // computeDashboardStats();
+
+    const std::time_t now = std::time(nullptr);
+    const bool ended = (timestamp_end != 0);
+
+    // -------------------------
+    // 1) ERROR detection (highest priority)
+    // -------------------------
+    const bool hasExplicitError =
+        (!error_code.empty()) || (!error_message.empty());
+
+    const bool hasFailedOps =
+        (num_failed_ops > 0);
+
+    const bool divergenceError =
+        kTreatDivergenceAsError && divergence_detected;
+
+    const bool errorByFailures =
+        hasFailedOps && (!kFailedOpsRequireEnd || ended);
+
+    if (hasExplicitError || divergenceError || errorByFailures) {
+        status = Status::ERROR;
+        return;
+    }
+
+    // -------------------------
+    // 2) STALLED detection (only meaningful if not ended)
+    // -------------------------
+    if (!ended) {
+        // If heartbeat exists and is stale → stalled
+        if (heartbeat_at != 0) {
+            const std::time_t dt = (now > heartbeat_at) ? (now - heartbeat_at) : 0;
+            if (dt >= kStallAfterSeconds) {
+                status = Status::STALLED;
+                if (stall_reason.empty()) {
+                    stall_reason = "heartbeat timeout";
+                }
+                return;
+            }
+        }
+
+        // If we are mid-run and not errored/stalled, we're RUNNING.
+        status = Status::RUNNING;
+        return;
+    }
+
+    // -------------------------
+    // 3) SUCCESS (ended, no error, no stall)
+    // -------------------------
+    status = Status::SUCCESS;
+}
+
 void Event::addThroughput(std::unique_ptr<Throughput> t) {
     if (!t) return;
     throughputs.emplace_back(std::move(t));

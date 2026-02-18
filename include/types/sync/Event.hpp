@@ -88,6 +88,8 @@ struct Event {
     [[nodiscard]] bool hasEnded() const noexcept { return timestamp_end != 0; }
     [[nodiscard]] bool hasHeartbeat() const noexcept { return heartbeat_at != 0; }
 
+    void parseCurrentStatus();
+
     [[nodiscard]] std::time_t durationSeconds() const noexcept {
         if (timestamp_begin == 0) return 0;
         const std::time_t end = (timestamp_end != 0) ? timestamp_end : std::time(nullptr);

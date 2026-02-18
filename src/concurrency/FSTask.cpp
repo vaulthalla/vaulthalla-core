@@ -4,7 +4,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/sync/Sync.hpp"
-#include "../../include/types/sync/Operation.hpp"
+#include "types/sync/Operation.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/File.hpp"
 #include "types/fs/Path.hpp"
@@ -19,6 +19,7 @@
 #include "types/sync/Event.hpp"
 #include "types/sync/Throughput.hpp"
 #include "types/sync/ScopedOp.hpp"
+#include "database/Queries/SyncQueries.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -44,6 +45,57 @@ bool FSTask::isInterrupted() const { return interruptFlag_.load(); }
 std::shared_ptr<StorageEngine> FSTask::engine() const {
     if (!engine_) throw std::runtime_error("Storage engine is not set");
     return engine_;
+}
+
+void FSTask::startTask() {
+    if (!engine_) {
+        LogRegistry::sync()->error("[FSTask] Engine is null, cannot proceed with sync.");
+        return;
+    }
+
+    LogRegistry::sync()->debug("[FSTask] Starting sync for vault '{}'", engine_->vault->id);
+
+    isRunning_ = true;
+    SyncQueries::reportSyncStarted(engine_->sync->id);
+
+    newEvent();
+    event_ = engine_->latestSyncEvent;
+    event_->status = sync::Event::Status::RUNNING;
+    engine_->saveSyncEvent();
+    event_->start();
+}
+
+void FSTask::processSharedOps() {
+    processOperations();
+    handleInterrupt();
+    removeTrashedFiles();
+    handleInterrupt();
+    handleVaultKeyRotation();
+    handleInterrupt();
+}
+
+void FSTask::handleError(const std::string& message) const {
+    LogRegistry::sync()->error("[FSTask] {}", message);
+    event_->error_message = message;
+    event_->status = sync::Event::Status::ERROR;
+}
+
+void FSTask::shutdown() {
+    isRunning_ = false;
+    futures_.clear();
+    event_->stop();
+    event_->parseCurrentStatus();
+    engine_->saveSyncEvent();
+    if (event_->status == sync::Event::Status::SUCCESS) {
+        SyncQueries::reportSyncSuccess(engine_->sync->id);
+        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
+        requeue();
+        LogRegistry::sync()->debug("[FSTask] Sync task requeued for vault '{}'", engine_->vault->id);
+        LogRegistry::sync()->info("[FSTask] Sync completed for vault '{}' in {}s",
+                              engine_->vault->id, event_->durationSeconds());
+    } else {
+        LogRegistry::sync()->error("[FSTask] Sync failed for vault '{}': {}", engine_->vault->id, event_->error_message);
+    }
 }
 
 void FSTask::newEvent() {

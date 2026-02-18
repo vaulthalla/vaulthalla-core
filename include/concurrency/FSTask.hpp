@@ -59,6 +59,11 @@ protected:
     std::shared_ptr<types::sync::Event> event_;
     uint8_t trigger_{3};
 
+    void startTask();
+    void processSharedOps();
+    void handleError(const std::string& message) const;
+    void shutdown();
+
     void newEvent();
 
     virtual void removeTrashedFiles() = 0;

@@ -26,6 +26,7 @@ struct Throughput {
     Metric metric_type{RENAME};
 
     uint64_t num_ops{};
+    uint64_t failed_ops{};
     uint64_t size_bytes{};
     uint64_t duration_ms{};
 

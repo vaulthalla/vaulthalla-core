@@ -32,13 +32,13 @@ void CloudTrashedDeleteTask::operator()() {
         else if (type == Type::REMOTE) engine->removeRemotely(vaultPath);
         else throw std::runtime_error("Unknown delete task type");
         FileQueries::markTrashedFileDeleted(file->id);
-        op.stop();
-        promise.set_value(true);
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[CloudTrashedDeleteTask] Failed to delete trashed file: {} - {}", file->backing_path.string(), e.what());
-        op.stop();
-        promise.set_value(false);
     }
+
+    op.stop();
+    promise.set_value(op.success);
 }
 
 void CloudTrashedDeleteTask::purge(const std::filesystem::path& path) const {

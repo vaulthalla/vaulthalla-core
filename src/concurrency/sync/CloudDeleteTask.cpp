@@ -21,11 +21,11 @@ void CloudDeleteTask::operator()() {
         else if (type == Type::LOCAL) engine->removeLocally(file->path);
         else if (type == Type::REMOTE) engine->removeRemotely(file->path);
         else throw std::runtime_error("Unknown delete task type");
-        op.stop();
-        promise.set_value(true);
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[CloudDeleteTask] Failed to delete file: {} - {}", file->path.string(), e.what());
-        op.stop();
-        promise.set_value(false);
     }
+
+    op.stop();
+    promise.set_value(op.success);
 }

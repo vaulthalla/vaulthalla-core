@@ -43,11 +43,12 @@ void LocalDeleteTask::operator()() {
         FileQueries::markTrashedFileDeleted(file->id);
 
         op.stop();
-        promise.set_value(true);
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[LocalDeleteTask] Failed to delete trashed file: {} - {}", file->backing_path.string(), e.what());
         op.stop();
-        promise.set_value(false);
     }
+
+    promise.set_value(op.success);
 }
 

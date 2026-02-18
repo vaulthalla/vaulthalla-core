@@ -20,11 +20,11 @@ void DownloadTask::operator()() {
         op.start(file->size_bytes);
         if (freeAfterDownload) engine->indexAndDeleteFile(file->path);
         else engine->downloadFile(file->path);
-        op.stop();
-        promise.set_value(true);
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[DownloadTask] Failed to download file: {} - {}", file->path.string(), e.what());
-        op.stop();
-        promise.set_value(false);
     }
+
+    op.stop();
+    promise.set_value(op.success);
 }

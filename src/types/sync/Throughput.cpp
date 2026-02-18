@@ -13,16 +13,21 @@ Throughput::Throughput(const pqxx::row& row) :
     id(row["id"].as<uint32_t>()),
     sync_event_id(row["sync_event_id"].as<uint32_t>()),
     num_ops(row["num_ops"].as<uint64_t>()),
+    failed_ops(row["failed_ops"].as<uint64_t>()),
     size_bytes(row["size_bytes"].as<uint64_t>()),
     duration_ms(row["duration_ms"].as<uint64_t>()) {}
 
 void Throughput::computeDashboardStats() {
     num_ops = scoped_ops.size();
+    failed_ops = 0;
     size_bytes = 0;
     duration_ms = 0;
     for (const auto& op : scoped_ops) {
-        size_bytes += op.size_bytes;
-        duration_ms += op.duration_ms();
+        if (!op.success) ++failed_ops;
+        else {
+            size_bytes += op.size_bytes;
+            duration_ms += op.duration_ms();
+        }
     }
 }
 

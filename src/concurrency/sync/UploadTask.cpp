@@ -16,12 +16,12 @@ void UploadTask::operator()() {
     try {
         op.start(file->size_bytes);
         engine->upload(file);
-        op.stop();
-        promise.set_value(true);
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[UploadTask] Failed to upload file: {} - {}", file->path.string(), e.what());
-        op.stop();
-        promise.set_value(false);
     }
+
+    op.stop();
+    promise.set_value(op.success);
 }
 

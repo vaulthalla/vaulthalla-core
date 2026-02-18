@@ -117,13 +117,17 @@ Throughput& Event::getOrCreateThroughput(const Throughput::Metric& metric) {
 void Event::computeDashboardStats() {
     // Reset derived values (leave num_failed_ops/num_conflicts as they may be tracked elsewhere too)
     num_ops_total = 0;
+    num_failed_ops = 0;
     bytes_up = 0;
     bytes_down = 0;
 
     for (const auto& p : throughputs) {
         if (!p) continue;
 
+        p->computeDashboardStats();
+
         num_ops_total += p->num_ops;
+        num_failed_ops += p->failed_ops;
 
         switch (p->metric_type) {
             case Throughput::UPLOAD:

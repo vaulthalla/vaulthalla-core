@@ -17,15 +17,18 @@ using namespace std::chrono;
 
 void LocalFSTask::operator()() {
     LogRegistry::sync()->debug("[LocalFSTask] Starting sync for vault '{}'", engine_->vault->id);
+
+    if (!engine_) {
+        LogRegistry::sync()->error("[LocalFSTask] Engine is null, cannot proceed with sync.");
+        return;
+    }
+
+    newEvent();
+    event_ = engine_->latestSyncEvent;
     event_->start();
 
     try {
         handleInterrupt();
-
-        if (!engine_) {
-            LogRegistry::sync()->error("[LocalFSTask] Engine is null, cannot proceed with sync.");
-            return;
-        }
 
         isRunning_ = true;
 

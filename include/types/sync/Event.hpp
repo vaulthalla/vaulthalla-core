@@ -8,10 +8,11 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <pqxx/params>
 
 #include <nlohmann/json_fwd.hpp>
 
-namespace pqxx { class row; }
+namespace pqxx { class row; class result; }
 
 namespace vh::types::sync {
 
@@ -20,7 +21,8 @@ struct Event {
     // status: running/success/stalled/error/cancelled
     // trigger: schedule/manual/startup/webhook/retry
 
-    enum class State : uint8_t {
+    enum class Status : uint8_t {
+        PENDING,
         RUNNING,
         SUCCESS,
         STALLED,
@@ -39,7 +41,7 @@ struct Event {
     // Core identifiers
     uint32_t id{0};
     uint32_t vault_id{0};
-    uint32_t sync_id{0};
+    std::string run_uuid;
 
     // Timing (0 means NULL / not set)
     std::time_t timestamp_begin{0};
@@ -47,7 +49,7 @@ struct Event {
     std::time_t heartbeat_at{0};
 
     // Run metadata
-    State state{State::RUNNING};
+    Status status{Status::RUNNING};
     Trigger trigger{Trigger::SCHEDULE};
     uint32_t retry_attempt{0};
 
@@ -95,7 +97,7 @@ struct Event {
     // "Stalled" heuristic: running + no heartbeat for stall_after_seconds
     [[nodiscard]] bool looksStalled(std::time_t now,
                                     std::time_t stall_after_seconds) const noexcept {
-        if (state != State::RUNNING) return false;
+        if (status != Status::RUNNING) return false;
         if (heartbeat_at == 0) return false;
         return (now > heartbeat_at) && ((now - heartbeat_at) >= stall_after_seconds);
     }
@@ -119,14 +121,18 @@ struct Event {
     // -------------------------
     // Enum ↔ string
     // -------------------------
-    static std::string_view toString(State s) noexcept;
+    static std::string_view toString(Status s) noexcept;
     static std::string_view toString(Trigger t) noexcept;
 
     // Returns false if unrecognized (and leaves out unchanged)
-    static bool tryParseState(std::string_view in, State& out) noexcept;
+    static bool tryParseState(std::string_view in, Status& out) noexcept;
     static bool tryParseTrigger(std::string_view in, Trigger& out) noexcept;
+
+    [[nodiscard]] pqxx::params getParams() const noexcept;
 };
 
 void to_json(nlohmann::json& j, const Event& e);
+
+std::vector<std::shared_ptr<Event>> sync_events_from_pqxx_res(const pqxx::result& res);
 
 }

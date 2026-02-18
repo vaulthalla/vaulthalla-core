@@ -11,7 +11,7 @@ class row;
 
 namespace vh::types {
 
-struct RSync : public Sync {
+struct RSync final : public Sync {
     enum class Strategy { Cache, Sync, Mirror };
 
     enum class ConflictPolicy {
@@ -24,6 +24,7 @@ struct RSync : public Sync {
     ConflictPolicy conflict_policy{ConflictPolicy::KeepLocal};
 
     RSync() = default;
+    ~RSync() override = default;
     explicit RSync(const pqxx::row& row);
 
     void rehash_config() override;

@@ -19,6 +19,7 @@ struct Sync {
     std::string config_hash{};
 
     Sync() = default;
+    virtual ~Sync() = default;
     explicit Sync(const pqxx::row& row);
 
     virtual void rehash_config() = 0;

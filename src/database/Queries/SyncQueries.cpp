@@ -3,9 +3,10 @@
 #include "types/sync/RSync.hpp"
 #include "types/sync/FSync.hpp"
 
-namespace vh::database {
+using namespace vh::database;
+using namespace vh::types;
 
-std::shared_ptr<types::Sync> SyncQueries::getSync(const unsigned int vaultId) {
+std::shared_ptr<Sync> SyncQueries::getSync(const unsigned int vaultId) {
     return Transactions::exec("SyncQueries::getProxySyncConfig", [&](pqxx::work& txn) -> std::shared_ptr<types::Sync> {
         const auto type = txn.exec("SELECT type FROM vault WHERE id = " + txn.quote(vaultId)).one_field().as<std::string>();
 
@@ -31,6 +32,4 @@ void SyncQueries::reportSyncSuccess(const unsigned int syncId) {
     Transactions::exec("SyncQueries::reportSyncSuccess", [&](pqxx::work& txn) {
         txn.exec(pqxx::prepped{"report_sync_success"}, syncId);
     });
-}
-
 }

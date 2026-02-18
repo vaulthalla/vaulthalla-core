@@ -46,6 +46,14 @@ std::shared_ptr<StorageEngine> FSTask::engine() const {
     return engine_;
 }
 
+void FSTask::newEvent() {
+    if (!runNow_) engine_->newSyncEvent();
+    else {
+        engine_->newSyncEvent(trigger_);
+        runNow_ = false;
+    }
+}
+
 void FSTask::processFutures() {
     for (auto& f : futures_)
         if (std::get<bool>(f.get()) == false)
@@ -58,6 +66,12 @@ unsigned int FSTask::vaultId() const { return engine_->vault->id; }
 void FSTask::requeue() {
     next_run = system_clock::now() + seconds(engine_->sync->interval.count());
     ServiceDepsRegistry::instance().syncController->requeue(shared_from_this());
+}
+
+void FSTask::runNow(const uint8_t trigger) {
+    runNow_ = true;
+    trigger_ = trigger;
+    next_run = system_clock::now();
 }
 
 void FSTask::push(const std::shared_ptr<Task>& task) {

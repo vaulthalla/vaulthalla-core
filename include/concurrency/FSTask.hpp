@@ -49,12 +49,17 @@ public:
 
     void requeue();
 
+    void runNow(uint8_t trigger = 3);  // sync::Event::Trigger::WEBHOOK
+
 protected:
     std::shared_ptr<storage::StorageEngine> engine_;
     std::vector<std::future<ExpectedFuture>> futures_;
-    bool isRunning_ = false;
+    bool isRunning_{false}, runNow_{false};
     std::atomic<bool> interruptFlag_{false};
     std::shared_ptr<types::sync::Event> event_;
+    uint8_t trigger_{3};
+
+    void newEvent();
 
     virtual void removeTrashedFiles() = 0;
     virtual void processFutures();

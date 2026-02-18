@@ -14,6 +14,7 @@
 #include "types/vault/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/Event.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <thread>
@@ -94,7 +95,7 @@ void SyncController::runLoop() {
     }
 }
 
-void SyncController::runNow(const unsigned int vaultId) {
+void SyncController::runNow(const unsigned int vaultId, const uint8_t trigger) {
     LogRegistry::sync()->debug("[SyncController] Early sync request for vault ID: {}", vaultId);
 
     std::shared_ptr<FSTask> task;
@@ -114,7 +115,7 @@ void SyncController::runNow(const unsigned int vaultId) {
 
     const auto engine = task->engine();
     task = createTask(engine);
-    task->next_run = std::chrono::system_clock::now();
+    task->runNow(trigger);
 
     {
         std::scoped_lock lock(taskMapMutex_, pqMutex_);

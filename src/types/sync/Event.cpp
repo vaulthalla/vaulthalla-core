@@ -5,6 +5,7 @@
 #include <cctype>
 #include <chrono>
 #include <pqxx/row>
+#include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 namespace {
@@ -36,7 +37,7 @@ using namespace std::chrono;
 Event::Event(const pqxx::row& row)
     : id(row["id"].as<uint32_t>())
     , vault_id(row["vault_id"].as<uint32_t>())
-    , sync_id(row["sync_id"].as<uint32_t>())
+    , run_uuid(row["run_uuid"].as<std::string>())
     , timestamp_begin(parsePostgresTimestamp(row["timestamp_begin"].as<std::string>()))
     , timestamp_end(row["timestamp_end"].is_null()
         ? 0
@@ -59,7 +60,7 @@ Event::Event(const pqxx::row& row)
     , config_hash(as_or_empty(row, "config_hash"))
 {
     {
-        if (auto s = State::RUNNING; tryParseState(as_or_empty(row, "status"), s)) state = s;
+        if (auto s = Status::RUNNING; tryParseState(as_or_empty(row, "status"), s)) status = s;
     }
     {
         if (auto t = Trigger::SCHEDULE; tryParseTrigger(as_or_empty(row, "trigger"), t)) trigger = t;
@@ -97,7 +98,7 @@ Throughput& Event::getOrCreateThroughput(const Throughput::Metric& metric) {
     if (auto* existing = getThroughput(metric)) return *existing;
 
     auto created = std::make_unique<Throughput>();
-    created->sync_event_id = id;
+    created->run_uuid = run_uuid;
     created->metric_type = static_cast<Throughput::Metric>(metric);
 
     throughputs.emplace_back(std::move(created));
@@ -134,13 +135,14 @@ void Event::computeDashboardStats() {
 // -------------------------
 // Enum ↔ string
 // -------------------------
-std::string_view Event::toString(State s) noexcept {
+std::string_view Event::toString(Status s) noexcept {
     switch (s) {
-        case State::RUNNING:   return "running";
-        case State::SUCCESS:   return "success";
-        case State::STALLED:   return "stalled";
-        case State::ERROR:     return "error";
-        case State::CANCELLED: return "cancelled";
+        case Status::RUNNING:   return "running";
+        case Status::SUCCESS:   return "success";
+        case Status::STALLED:   return "stalled";
+        case Status::ERROR:     return "error";
+        case Status::CANCELLED: return "cancelled";
+        case Status::PENDING:   return "pending";
         default:               return "running";
     }
 }
@@ -156,14 +158,15 @@ std::string_view Event::toString(Trigger t) noexcept {
     }
 }
 
-bool Event::tryParseState(std::string_view in, State& out) noexcept {
+bool Event::tryParseState(std::string_view in, Status& out) noexcept {
     const std::string s = lowerCopy(in);
-    if (s == "running")   { out = State::RUNNING; return true; }
-    if (s == "success")   { out = State::SUCCESS; return true; }
-    if (s == "stalled")   { out = State::STALLED; return true; }
-    if (s == "error")     { out = State::ERROR; return true; }
-    if (s == "cancelled") { out = State::CANCELLED; return true; }
-    if (s == "canceled")  { out = State::CANCELLED; return true; }
+    if (s == "running")   { out = Status::RUNNING; return true; }
+    if (s == "success")   { out = Status::SUCCESS; return true; }
+    if (s == "stalled")   { out = Status::STALLED; return true; }
+    if (s == "error")     { out = Status::ERROR; return true; }
+    if (s == "cancelled") { out = Status::CANCELLED; return true; }
+    if (s == "canceled")  { out = Status::CANCELLED; return true; }
+    if (s == "pending")   { out = Status::PENDING; return true; }
     return false;
 }
 
@@ -177,6 +180,37 @@ bool Event::tryParseTrigger(std::string_view in, Trigger& out) noexcept {
     return false;
 }
 
+pqxx::params Event::getParams() const noexcept {
+    return {
+        vault_id,
+        run_uuid,
+
+        timestampToString(timestamp_begin),
+        timestampToString(timestamp_end),
+        heartbeat_at,
+
+        std::string(toString(status)),
+        std::string(toString(trigger)),
+        retry_attempt,
+
+        stall_reason,
+        error_code,
+        error_message,
+
+        num_ops_total,
+        num_failed_ops,
+        num_conflicts,
+        bytes_up,
+        bytes_down,
+
+        divergence_detected,
+        local_state_hash,
+        remote_state_hash,
+
+        config_hash
+    };
+}
+
 // -------------------------
 // JSON
 // -------------------------
@@ -184,13 +218,13 @@ void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
     j = {
         {"id", e.id},
         {"vault_id", e.vault_id},
-        {"sync_id", e.sync_id},
+        {"run_uuid", e.run_uuid},
 
         {"timestamp_begin", e.timestamp_begin},
         {"timestamp_end", e.timestamp_end},
         {"heartbeat_at", e.heartbeat_at},
 
-        {"status", std::string(Event::toString(e.state))},
+        {"status", std::string(Event::toString(e.status))},
         {"trigger", std::string(Event::toString(e.trigger))},
         {"retry_attempt", e.retry_attempt},
 
@@ -220,4 +254,17 @@ void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
         arr.push_back(std::move(tj));
     }
     j["throughputs"] = std::move(arr);
+}
+
+std::vector<std::shared_ptr<Event>> vh::types::sync::sync_events_from_pqxx_res(const pqxx::result& res) {
+    std::vector<std::shared_ptr<Event>> events;
+    for (const auto& row : res) {
+        try {
+            auto event = std::make_shared<Event>(row);
+            events.push_back(std::move(event));
+        } catch (const std::exception& ex) {
+            LogRegistry::types()->error("Failed to parse Event from database row: {}", ex.what());
+        }
+    }
+    return events;
 }

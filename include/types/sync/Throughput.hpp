@@ -21,7 +21,7 @@ struct Throughput {
     };
 
     uint32_t id{};
-    uint32_t sync_event_id{};
+    std::string run_uuid{};
 
     Metric metric_type{RENAME};
 

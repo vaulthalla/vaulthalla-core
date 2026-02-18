@@ -10,10 +10,13 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
+#include "types/sync/Sync.hpp"
 #include "util/files.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/fsPath.hpp"
+#include "database/Queries/SyncEventQueries.hpp"
+#include "types/sync/Event.hpp"
 
 using namespace vh::crypto;
 using namespace vh::types;
@@ -34,6 +37,28 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
       encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
     if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
+}
+
+void StorageEngine::newSyncEvent(const uint8_t trigger) {
+    if (latestSyncEvent) {
+        SyncEventQueries::upsert(latestSyncEvent);
+        if (latestSyncEvent->status != sync::Event::Status::SUCCESS && latestSyncEvent->status != sync::Event::Status::CANCELLED) {
+            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::Event::toString(latestSyncEvent->status)));
+            return;
+        }
+    }
+
+    latestSyncEvent = std::make_shared<sync::Event>();
+    latestSyncEvent->vault_id = vault->id;
+    latestSyncEvent->status = sync::Event::Status::PENDING;
+    latestSyncEvent->trigger = static_cast<sync::Event::Trigger>(trigger);
+    latestSyncEvent->timestamp_begin = system_clock::to_time_t(system_clock::now());
+    latestSyncEvent->config_hash = sync->config_hash;
+    SyncEventQueries::create(latestSyncEvent);
+}
+
+void StorageEngine::saveSyncEvent() const {
+    SyncEventQueries::upsert(latestSyncEvent);
 }
 
 bool StorageEngine::isDirectory(const fs::path& rel_path) const {
@@ -83,10 +108,9 @@ uintmax_t StorageEngine::getVaultAndCacheTotalSize() const { return getVaultSize
 uintmax_t StorageEngine::freeSpace() const { return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE; }
 
 void StorageEngine::purgeThumbnails(const fs::path& rel_path) const {
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
-        const auto thumbnailPath = paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
-        if (fs::exists(thumbnailPath)) fs::remove(thumbnailPath);
-    }
+    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes)
+        if (const auto thumbnailPath = paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+            fs::exists(thumbnailPath)) fs::remove(thumbnailPath);
 }
 
 void StorageEngine::moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {

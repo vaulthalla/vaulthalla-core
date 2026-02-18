@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS sync_event
 (
     id               SERIAL PRIMARY KEY,
     vault_id          INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
-    sync_id           INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
+
+    -- stable identity for a "run"
+    run_uuid          UUID NOT NULL DEFAULT gen_random_uuid(),
 
     -- core timing
     timestamp_begin   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS sync_event
 
     -- run state
     status            VARCHAR(12) NOT NULL DEFAULT 'running'
-    CHECK (status IN ('running', 'success', 'stalled', 'error', 'cancelled')),
+    CHECK (status IN ('pending', 'running', 'success', 'stalled', 'error', 'cancelled')),
     trigger           VARCHAR(12) NOT NULL DEFAULT 'schedule'
     CHECK (trigger IN ('schedule', 'manual', 'startup', 'webhook', 'retry')),
     retry_attempt     INTEGER NOT NULL DEFAULT 0,
@@ -99,7 +101,9 @@ CREATE TABLE IF NOT EXISTS sync_event
     remote_state_hash        TEXT DEFAULT NULL,
 
     -- attribution (multi-worker + debugging)
-    config_hash       TEXT DEFAULT NULL
+    config_hash       TEXT DEFAULT NULL,
+
+    UNIQUE (vault_id, run_uuid)
     );
 
 -- -----------------------------------
@@ -108,7 +112,14 @@ CREATE TABLE IF NOT EXISTS sync_event
 CREATE TABLE IF NOT EXISTS sync_throughput
 (
     id               SERIAL PRIMARY KEY,
-    sync_event_id    INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
+
+    vault_id          INTEGER NOT NULL,
+    run_uuid          UUID NOT NULL,
+
+    -- enforce association to a real sync_event run
+    FOREIGN KEY (vault_id, run_uuid)
+    REFERENCES sync_event (vault_id, run_uuid)
+    ON DELETE CASCADE,
 
     metric_type      VARCHAR(12) NOT NULL
     CHECK (metric_type IN ('upload', 'download', 'rename', 'copy', 'delete')),
@@ -117,7 +128,7 @@ CREATE TABLE IF NOT EXISTS sync_throughput
     size_bytes       BIGINT NOT NULL DEFAULT 0,
     duration_ms      BIGINT NOT NULL DEFAULT 0,
 
-    UNIQUE (sync_event_id, metric_type)
+    UNIQUE (vault_id, run_uuid, metric_type)
     );
 
 -- ##################################
@@ -133,8 +144,13 @@ CREATE INDEX IF NOT EXISTS idx_sync_event_vault_status_begin
 CREATE INDEX IF NOT EXISTS idx_sync_event_status_heartbeat
     ON sync_event (status, heartbeat_at);
 
-CREATE INDEX IF NOT EXISTS idx_sync_throughput_event
-    ON sync_throughput (sync_event_id);
+-- common lookup for a specific run
+CREATE INDEX IF NOT EXISTS idx_sync_event_vault_uuid
+    ON sync_event (vault_id, run_uuid);
+
+-- throughput lookups by run
+CREATE INDEX IF NOT EXISTS idx_sync_throughput_run
+    ON sync_throughput (vault_id, run_uuid);
 
 -- ##################################
 -- Triggers

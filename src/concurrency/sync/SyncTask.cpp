@@ -25,15 +25,18 @@ using namespace vh::storage;
 
 void SyncTask::operator()() {
     LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);
+
+    if (!engine_) {
+        LogRegistry::sync()->error("[SyncTask] Engine is null, cannot proceed with sync.");
+        return;
+    }
+
+    newEvent();
+    event_ = engine_->latestSyncEvent;
     event_->start();
 
     try {
         handleInterrupt();
-
-        if (!engine_) {
-            LogRegistry::sync()->error("[SyncTask] Engine is null, cannot proceed with sync.");
-            return;
-        }
 
         isRunning_ = true;
         SyncQueries::reportSyncStarted(engine_->sync->id);

@@ -11,7 +11,7 @@ using namespace vh::util;
 
 Throughput::Throughput(const pqxx::row& row) :
     id(row["id"].as<uint32_t>()),
-    sync_event_id(row["sync_event_id"].as<uint32_t>()),
+    run_uuid(row["run_uuid"].as<std::string>()),
     num_ops(row["num_ops"].as<uint64_t>()),
     failed_ops(row["failed_ops"].as<uint64_t>()),
     size_bytes(row["size_bytes"].as<uint64_t>()),
@@ -58,7 +58,7 @@ std::string Throughput::metricToString() const {
 void vh::types::sync::to_json(nlohmann::json& j, const Throughput& t) {
     j = {
         {"id", t.id},
-        {"sync_event_id", t.sync_event_id},
+        {"run_uuid", t.run_uuid},
         {"num_ops", t.num_ops},
         {"size_bytes", t.size_bytes},
         {"duration_ms", t.duration_ms},

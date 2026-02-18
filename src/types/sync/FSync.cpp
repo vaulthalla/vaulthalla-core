@@ -10,7 +10,16 @@ using namespace vh::util;
 
 FSync::FSync(const pqxx::row& row)
     : Sync(row),
-      conflict_policy(fsConflictPolicyFromString(row.at("conflict_policy").as<std::string>())) {}
+      conflict_policy(fsConflictPolicyFromString(row.at("conflict_policy").as<std::string>())) {
+    rehash_config();
+}
+
+void FSync::rehash_config() {
+    config_hash = "vault_id=" + std::to_string(vault_id) +
+                  ";interval=" + std::to_string(interval.count()) +
+                  ";enabled=" + (enabled ? "true" : "false") +
+                  ";conflict_policy=" + to_string(conflict_policy);
+}
 
 void vh::types::to_json(nlohmann::json& j, const FSync& s) {
     to_json(j, static_cast<const Sync&>(s));

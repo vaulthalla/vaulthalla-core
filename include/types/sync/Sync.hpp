@@ -16,9 +16,12 @@ struct Sync {
     std::chrono::seconds interval{};
     bool enabled{};
     std::time_t last_sync_at{}, last_success_at{}, created_at{}, updated_at{};
+    std::string config_hash{};
 
     Sync() = default;
     explicit Sync(const pqxx::row& row);
+
+    virtual void rehash_config() = 0;
 };
 
 void to_json(nlohmann::json& j, const Sync& s);

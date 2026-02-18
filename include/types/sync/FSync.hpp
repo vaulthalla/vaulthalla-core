@@ -18,6 +18,8 @@ struct FSync : public Sync {
 
     FSync() = default;
     explicit FSync(const pqxx::row& row);
+
+    void rehash_config() override;
 };
 
 void to_json(nlohmann::json& j, const FSync& s);

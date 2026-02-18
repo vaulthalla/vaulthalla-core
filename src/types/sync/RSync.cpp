@@ -12,6 +12,15 @@ RSync::RSync(const pqxx::row& row)
     : Sync(row),
       strategy(strategyFromString(row.at("strategy").as<std::string>())),
       conflict_policy(rsConflictPolicyFromString(row.at("conflict_policy").as<std::string>())) {
+    rehash_config();
+}
+
+void RSync::rehash_config() {
+    config_hash = "vault_id=" + std::to_string(vault_id) +
+                  ";interval=" + std::to_string(interval.count()) +
+                  ";enabled=" + (enabled ? "true" : "false") +
+                  ";strategy=" + to_string(strategy) +
+                  ";conflict_policy=" + to_string(conflict_policy);
 }
 
 void vh::types::to_json(nlohmann::json& j, const RSync& s) {

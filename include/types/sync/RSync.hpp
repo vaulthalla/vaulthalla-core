@@ -25,6 +25,8 @@ struct RSync : public Sync {
 
     RSync() = default;
     explicit RSync(const pqxx::row& row);
+
+    void rehash_config() override;
 };
 
 void to_json(nlohmann::json& j, const RSync& s);

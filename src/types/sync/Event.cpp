@@ -187,11 +187,12 @@ pqxx::params Event::getParams() const noexcept {
 
         timestampToString(timestamp_begin),
         timestampToString(timestamp_end),
-        heartbeat_at,
 
         std::string(toString(status)),
         std::string(toString(trigger)),
         retry_attempt,
+
+        timestampToString(heartbeat_at),
 
         stall_reason,
         error_code,

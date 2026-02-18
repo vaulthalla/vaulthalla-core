@@ -88,3 +88,11 @@ std::shared_ptr<Event> SyncEventQueries::getLatest(unsigned int vaultId) {
         return event;
     });
 }
+
+void SyncEventQueries::heartbeat(const std::shared_ptr<types::sync::Event>& event) {
+    Transactions::exec("SyncQueries::heartbeat", [&](pqxx::work& txn) {
+        const pqxx::params p { event->vault_id, event->run_uuid, timestampToString(event->heartbeat_at) };
+        if (const auto res = txn.exec(pqxx::prepped{"sync_event.touch_heartbeat"}, p);
+            res.empty()) throw std::runtime_error("Failed to heartbeat sync event");
+    });
+}

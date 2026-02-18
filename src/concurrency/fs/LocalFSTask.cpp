@@ -36,11 +36,11 @@ void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >&
 void LocalFSTask::removeTrashedFiles() {
     const auto engine = localEngine();
     const auto files = FileQueries::listTrashedFiles(engine_->vault->id);
+
     futures_.reserve(files.size());
-    for (const auto& file : files) {
-        auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::DELETE).newOp();
-        push(std::make_shared<LocalDeleteTask>(engine, file, op));
-    }
+    for (const auto& file : files)
+        push(std::make_shared<LocalDeleteTask>(engine, file, op(sync::Throughput::Metric::DELETE)));
+
     processFutures();
 }
 

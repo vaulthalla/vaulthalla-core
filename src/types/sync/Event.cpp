@@ -1,5 +1,6 @@
 #include "types/sync/Event.hpp"
 #include "util/timestamp.hpp"
+#include "database/Queries/SyncEventQueries.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -32,6 +33,7 @@ namespace {
 
 using namespace vh::types::sync;
 using namespace vh::util;
+using namespace vh::database;
 using namespace std::chrono;
 
 Event::Event(const pqxx::row& row)
@@ -73,6 +75,19 @@ void Event::start() {
 
 void Event::stop() {
     timestamp_end = system_clock::to_time_t(system_clock::now());
+}
+
+void Event::heartbeat(std::time_t min_interval_seconds) {
+    const std::time_t now = std::time(nullptr);
+    heartbeat_at = now;
+
+    // only persist if enough time passed
+    if (last_heartbeat_persisted_at != 0 &&
+        now - last_heartbeat_persisted_at < min_interval_seconds)
+        return;
+
+    SyncEventQueries::heartbeat(shared_from_this());
+    last_heartbeat_persisted_at = now;
 }
 
 void Event::parseCurrentStatus() {

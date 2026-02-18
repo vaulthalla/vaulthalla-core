@@ -20,6 +20,7 @@
 #include "types/sync/Throughput.hpp"
 #include "types/sync/ScopedOp.hpp"
 #include "database/Queries/SyncQueries.hpp"
+#include "types/sync/Throughput.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -47,6 +48,23 @@ std::shared_ptr<StorageEngine> FSTask::engine() const {
     return engine_;
 }
 
+void FSTask::runStages(const std::span<const Stage> stages) const {
+    for (const auto& [name, fn] : stages) {
+        if (!isRunning()) break;
+        try {
+            fn();
+            handleInterrupt();
+            if (event_) event_->heartbeat();
+        } catch (const std::exception& e) {
+            handleError(std::format("[FSTask:{}] {}", std::string(name), e.what()));
+            break;
+        } catch (...) {
+            handleError(std::format("[FSTask:{}] Unknown exception", std::string(name)));
+            break;
+        }
+    }
+}
+
 void FSTask::startTask() {
     if (!engine_) {
         LogRegistry::sync()->error("[FSTask] Engine is null, cannot proceed with sync.");
@@ -66,12 +84,26 @@ void FSTask::startTask() {
 }
 
 void FSTask::processSharedOps() {
-    processOperations();
-    handleInterrupt();
-    removeTrashedFiles();
-    handleInterrupt();
-    handleVaultKeyRotation();
-    handleInterrupt();
+    struct NamedOp { const char* name; std::function<void()> fn; };
+
+    const std::vector<NamedOp> ops = {
+        {"processOperations", [this]{ processOperations(); }},
+        {"removeTrashedFiles", [this]{ removeTrashedFiles(); }},
+        {"handleVaultKeyRotation", [this]{ handleVaultKeyRotation(); }},
+      };
+
+    for (const auto& [name, op] : ops) {
+        if (!isRunning()) break;
+
+        try {
+            op();
+            handleInterrupt();
+            event_->heartbeat();
+        } catch (const std::exception& e) {
+            handleError(std::format("[FSTask] Exception during {}: {}", name, e.what()));
+            break;
+        }
+    }
 }
 
 void FSTask::handleError(const std::string& message) const {
@@ -129,6 +161,10 @@ void FSTask::runNow(const uint8_t trigger) {
 void FSTask::push(const std::shared_ptr<Task>& task) {
     futures_.push_back(task->getFuture().value());
     ThreadPoolManager::instance().syncPool()->submit(task);
+}
+
+sync::ScopedOp& FSTask::op(const sync::Throughput::Metric& metric) const {
+    return event_->getOrCreateThroughput(metric).newOp();
 }
 
 void FSTask::processOperations() const {

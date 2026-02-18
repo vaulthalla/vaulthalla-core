@@ -24,17 +24,14 @@ using namespace vh::storage;
 void SyncTask::operator()() {
     startTask();
 
-    try {
-        processSharedOps();
-        initBins();
-        sync();
-        clearBins();
-    } catch (const std::exception& e) {
-        handleError(std::format("[SyncTask] Exception during sync for vault '{}': {}", engine_->vault->id, e.what()));
-    } catch (...) {
-        handleError(std::format("[SyncTask] Unknown exception during sync for vault '{}'", engine_->vault->id));
-    }
+    const Stage stages[] = {
+        {"shared",   [this]{ processSharedOps(); }},
+        {"initBins", [this]{ initBins(); }},
+        {"sync",     [this]{ sync(); }},
+        {"clearBins",[this]{ clearBins(); }},
+    };
 
+    runStages(stages);
     shutdown();
 }
 
@@ -43,6 +40,8 @@ void SyncTask::initBins() {
     s3Files_ = uMap2Vector(s3Map_);
     localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
     localMap_ = groupEntriesByPath(localFiles_);
+
+    event_->heartbeat();
 
     for (const auto& [path, entry] : intersect(s3Map_, localMap_))
         remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
@@ -54,28 +53,24 @@ void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& fi
 
 void SyncTask::removeTrashedFiles() {
     const auto files = FileQueries::listTrashedFiles(vaultId());
+
     futures_.reserve(files.size());
-
-    auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::DELETE).newOp();
-
     for (const auto& file : files)
-        push(std::make_shared<CloudTrashedDeleteTask>(cloudEngine(), file, op));
+        push(std::make_shared<CloudTrashedDeleteTask>(cloudEngine(), file, op(sync::Throughput::Metric::DELETE)));
+
     processFutures();
 }
 
 void SyncTask::upload(const std::shared_ptr<File>& file) {
-    auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::UPLOAD).newOp();
-    push(std::make_shared<UploadTask>(cloudEngine(), file, op));
+    push(std::make_shared<UploadTask>(cloudEngine(), file, op(sync::Throughput::Metric::UPLOAD)));
 }
 
 void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterDownload) {
-    auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::DOWNLOAD).newOp();
-    push(std::make_shared<DownloadTask>(cloudEngine(), file, op, freeAfterDownload));
+    push(std::make_shared<DownloadTask>(cloudEngine(), file, event_->getOrCreateThroughput(sync::Throughput::Metric::DOWNLOAD).newOp(), freeAfterDownload));
 }
 
 void SyncTask::remove(const std::shared_ptr<File>& file, const CloudDeleteTask::Type& type) {
-    auto& op = event_->getOrCreateThroughput(sync::Throughput::Metric::DELETE).newOp();
-    push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, op, type));
+    push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, op(sync::Throughput::Metric::DELETE), type));
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
+#include "types/sync/Throughput.hpp"
 
 #include <memory>
 #include <chrono>
@@ -25,6 +26,11 @@ namespace sync { struct Event; }
 }
 
 namespace vh::concurrency {
+
+struct Stage {
+    const char* name;
+    std::function<void()> fn;
+};
 
 class FSTask : public Task, public std::enable_shared_from_this<FSTask> {
 public:
@@ -63,8 +69,10 @@ protected:
     void processSharedOps();
     void handleError(const std::string& message) const;
     void shutdown();
-
     void newEvent();
+    void runStages(std::span<const Stage> stages) const;
+
+    types::sync::ScopedOp& op(const types::sync::Throughput::Metric& metric) const;
 
     virtual void removeTrashedFiles() = 0;
     virtual void processFutures();

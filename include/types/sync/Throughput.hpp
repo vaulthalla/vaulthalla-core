@@ -40,7 +40,7 @@ struct Throughput {
     ScopedOp& newOp();
 
     void parseMetric(const std::string& str);
-    std::string metricToString() const;
+    [[nodiscard]] std::string metricToString() const;
 };
 
 void to_json(nlohmann::json& j, const Throughput& t);

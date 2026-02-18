@@ -16,7 +16,7 @@ namespace pqxx { class row; class result; }
 
 namespace vh::types::sync {
 
-struct Event {
+struct Event : public std::enable_shared_from_this<Event> {
     // Mirrors DB values:
     // status: running/success/stalled/error/cancelled
     // trigger: schedule/manual/startup/webhook/retry
@@ -76,6 +76,9 @@ struct Event {
     // Attribution (multi-worker debugging)
     std::string config_hash;
 
+    // not DB field; runtime only
+    std::time_t last_heartbeat_persisted_at{0};
+
     Event() = default;
     explicit Event(const pqxx::row& row);
 
@@ -84,6 +87,7 @@ struct Event {
     // -------------------------
     void start();
     void stop();
+    void heartbeat(std::time_t min_interval_seconds = 10);
 
     [[nodiscard]] bool hasEnded() const noexcept { return timestamp_end != 0; }
     [[nodiscard]] bool hasHeartbeat() const noexcept { return heartbeat_at != 0; }

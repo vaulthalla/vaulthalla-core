@@ -10,7 +10,10 @@
 
 namespace vh::types {
 struct File;
-}
+
+namespace sync {
+struct ScopedOp;
+}}
 
 namespace vh::storage {
 class CloudStorageEngine;
@@ -22,45 +25,50 @@ class SyncTask : public FSTask {
 public:
     ~SyncTask() override = default;
 
-    explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
+    explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {
+    }
 
     void operator()() override;
 
     virtual void sync() = 0;
 
 protected:
-    std::vector<std::shared_ptr<types::File>> localFiles_, s3Files_;
-    std::unordered_map<std::u8string, std::shared_ptr<types::File>> localMap_, s3Map_;
-    std::unordered_map<std::u8string, std::optional<std::string>> remoteHashMap_;
+    std::vector<std::shared_ptr<types::File> > localFiles_, s3Files_;
+    std::unordered_map<std::u8string, std::shared_ptr<types::File> > localMap_, s3Map_;
+    std::unordered_map<std::u8string, std::optional<std::string> > remoteHashMap_;
 
     void upload(const std::shared_ptr<types::File>& file);
+
     void download(const std::shared_ptr<types::File>& file, bool freeAfterDownload = false);
-    void remove(const std::shared_ptr<types::File>& file, const CloudDeleteTask::Type& type = CloudDeleteTask::Type::PURGE);
+
+    void remove(const std::shared_ptr<types::File>& file,
+                const CloudDeleteTask::Type& type = CloudDeleteTask::Type::PURGE);
 
     std::shared_ptr<storage::CloudStorageEngine> cloudEngine() const;
 
     void removeTrashedFiles() override;
 
-    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
-                                     unsigned int begin, unsigned int end) override;
+    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File> >& files,
+                             unsigned int begin, unsigned int end) override;
 
     virtual void ensureFreeSpace(uintmax_t size) const;
 
-    static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File>>& files);
+    static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File> >& files);
 
-    static std::vector<std::shared_ptr<types::File>> uMap2Vector(
-        std::unordered_map<std::u8string, std::shared_ptr<types::File>>& map);
+    static std::vector<std::shared_ptr<types::File> > uMap2Vector(
+        std::unordered_map<std::u8string, std::shared_ptr<types::File> >& map);
 
-    static std::unordered_map<std::u8string, std::shared_ptr<types::File>> intersect(
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& a,
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& b);
+    static std::unordered_map<std::u8string, std::shared_ptr<types::File> > intersect(
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& a,
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& b);
 
     static std::unordered_map<std::u8string, std::shared_ptr<types::File> > symmetric_diff(
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& a,
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File>>& b);
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& a,
+        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& b);
 
 private:
     void initBins();
+
     void clearBins();
 };
 

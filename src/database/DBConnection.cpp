@@ -113,6 +113,8 @@ void DBConnection::initPrepared() const {
     initPreparedSync();
     initPreparedSyncEvents();
     initPreparedSyncThroughput();
+    initPreparedSyncConflicts();
+    initPreparedSyncConflictArtifacts();
 
     // Filesystem
     initPreparedFsEntries();

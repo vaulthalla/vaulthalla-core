@@ -16,6 +16,8 @@ namespace pqxx { class row; class result; }
 
 namespace vh::types::sync {
 
+struct Conflict;
+
 struct Event : public std::enable_shared_from_this<Event> {
     // Mirrors DB values:
     // status: running/success/stalled/error/cancelled
@@ -60,6 +62,7 @@ struct Event : public std::enable_shared_from_this<Event> {
 
     // Detailed metrics
     std::vector<std::unique_ptr<Throughput>> throughputs;
+    std::vector<std::shared_ptr<Conflict>> conflicts;
 
     // Summary counters (dashboard-friendly; derived from throughputs via computeDashboardStats())
     std::uint64_t num_ops_total{0};

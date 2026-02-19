@@ -1,6 +1,7 @@
 #include "types/sync/Event.hpp"
 #include "util/timestamp.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
+#include "logging/LogRegistry.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -34,6 +35,7 @@ namespace {
 using namespace vh::types::sync;
 using namespace vh::util;
 using namespace vh::database;
+using namespace vh::logging;
 using namespace std::chrono;
 
 Event::Event(const pqxx::row& row)

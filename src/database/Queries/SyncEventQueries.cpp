@@ -2,11 +2,37 @@
 #include "database/Transactions.hpp"
 #include "types/sync/Event.hpp"
 #include "types/sync/Throughput.hpp"
+#include "types/sync/Conflict.hpp"
+#include "types/sync/ConflictArtifact.hpp"
+#include "types/sync/Artifact.hpp"
+#include "types/fs/File.hpp"
 #include "util/timestamp.hpp"
+#include "util/u8.hpp"
 
 using namespace vh::database;
 using namespace vh::types::sync;
 using namespace vh::util;
+
+static void build_event(pqxx::work& txn, const std::shared_ptr<Event>& event) {
+    if (!event) return;
+
+    {
+        const auto res = txn.exec(pqxx::prepped{"sync_throughput.read_all_for_run"},
+            pqxx::params{event->vault_id, event->run_uuid});
+        if (res.empty()) return;
+        for (const auto& row : res) event->throughputs.push_back(std::make_unique<Throughput>(row));
+    }
+
+    {
+        const auto& res = txn.exec(pqxx::prepped{"sync_conflict.select_by_event"}, event->id);
+        if (res.empty()) return;
+        for (const auto& row : res) {
+            const auto conflictId = row["id"].as<unsigned int>();
+            const auto artifactRes = txn.exec(pqxx::prepped{"sync_conflict_artifact.select_by_conflict"}, conflictId);
+            event->conflicts.push_back(std::make_shared<Conflict>(row, artifactRes));
+        }
+    }
+}
 
 void SyncEventQueries::create(const std::shared_ptr<Event>& event) {
     const pqxx::params p {
@@ -44,6 +70,38 @@ void SyncEventQueries::upsert(const std::shared_ptr<Event>& event) {
             if (const auto res = txn.exec(pqxx::prepped{"sync_throughput.upsert"}, p);
                 res.empty()) throw std::runtime_error("Failed to upsert sync throughput");
         }
+
+        for (const auto& conflict : event->conflicts) {
+            {
+                const pqxx::params p {
+                    conflict->event_id,
+                    conflict->file->id,
+                    conflict->typeToString(),
+                    conflict->resolutionToString()
+                };
+                if (const auto res = txn.exec(pqxx::prepped{"sync_conflict.upsert"}, p);
+                    res.empty()) throw std::runtime_error("Failed to upsert sync conflict");
+            }
+
+            const auto upsertArtifact = [&txn](const Artifact& artifact) {
+                const pqxx::params p {
+                    artifact.conflict_id,
+                    artifact.sideToString(),
+                    artifact.size_bytes,
+                    artifact.mime_type,
+                    artifact.content_hash,
+                    timestampToString(artifact.last_modified),
+                    artifact.encryption_iv,
+                    artifact.key_version,
+                    to_utf8_string(artifact.local_backing_path.u8string())
+                };
+                if (const auto res = txn.exec(pqxx::prepped{"sync_conflict_artifact.upsert"}, p);
+                    res.empty()) throw std::runtime_error("Failed to upsert sync conflict artifact");
+            };
+
+            upsertArtifact(conflict->artifacts.local);
+            upsertArtifact(conflict->artifacts.upstream);
+        }
     });
 }
 
@@ -51,15 +109,8 @@ std::vector<std::shared_ptr<Event> > SyncEventQueries::getEvents(unsigned int va
     return Transactions::exec("SyncQueries::getSyncEvents", [&](pqxx::work& txn) {
         const pqxx::params p { vaultId, limit, offset };
         const auto res = txn.exec(pqxx::prepped{"sync_event.list_for_vault"}, p);
-        auto events = sync_events_from_pqxx_res(res);
-
-        for (const auto& event : events) {
-            const auto throughput_res = txn.exec(pqxx::prepped{"sync_throughput.read_all_for_run"},
-                pqxx::params{event->vault_id, event->run_uuid});
-            if (throughput_res.empty()) continue;
-            for (const auto& row : throughput_res) event->throughputs.push_back(std::make_unique<Throughput>(row));
-        }
-
+        const auto events = sync_events_from_pqxx_res(res);
+        for (const auto& event : events) build_event(txn, event);
         return events;
     });
 }
@@ -78,13 +129,9 @@ std::shared_ptr<Event> SyncEventQueries::getLatest(unsigned int vaultId) {
         const pqxx::params p { vaultId, limit, offset };
         const auto res = txn.exec(pqxx::prepped{"sync_event.list_for_vault"}, p);
         if (res.empty()) return nullptr;
-        auto event = std::make_shared<Event>(res.one_row());
 
-        const auto throughput_res = txn.exec(pqxx::prepped{"sync_throughput.read_all_for_run"},
-                pqxx::params{event->vault_id, event->run_uuid});
-        if (throughput_res.empty()) return event;
-        for (const auto& row : throughput_res) event->throughputs.push_back(std::make_unique<Throughput>(row));
-
+        const auto event = std::make_shared<Event>(res.one_row());
+        build_event(txn, event);
         return event;
     });
 }

@@ -6,8 +6,8 @@ void DBConnection::initPreparedSyncConflicts() const {
 
     // Upsert conflict (insert or update)
     conn_->prepare(
-    "sync_conflict.upsert",
-    R"SQL(
+        "sync_conflict.upsert",
+        R"SQL(
         INSERT INTO sync_conflicts
             (event_id, file_id, conflict_type, resolution, resolved_at)
         VALUES
@@ -27,7 +27,7 @@ void DBConnection::initPreparedSyncConflicts() const {
                             END
         RETURNING id
     )SQL"
-);
+        );
 
     // Explicit manual resolution
     conn_->prepare(
@@ -38,7 +38,7 @@ void DBConnection::initPreparedSyncConflicts() const {
                    resolved_at = NOW()
              WHERE id = $2
         )SQL"
-    );
+        );
 
     // Select all conflicts for event
     conn_->prepare(
@@ -54,7 +54,7 @@ void DBConnection::initPreparedSyncConflicts() const {
               FROM sync_conflicts
              WHERE event_id = $1
         )SQL"
-    );
+        );
 
     // Select unresolved conflicts for event (scheduler gate)
     conn_->prepare(
@@ -68,7 +68,7 @@ void DBConnection::initPreparedSyncConflicts() const {
              WHERE event_id = $1
                AND resolution = 'unresolved'
         )SQL"
-    );
+        );
 
     // Count unresolved conflicts (fast gate check)
     conn_->prepare(
@@ -79,5 +79,5 @@ void DBConnection::initPreparedSyncConflicts() const {
              WHERE event_id = $1
                AND resolution = 'unresolved'
         )SQL"
-    );
+        );
 }

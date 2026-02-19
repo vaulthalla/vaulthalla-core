@@ -8,7 +8,7 @@ void DBConnection::initPreparedSyncEvents() const {
     // CREATE (DB generates run_uuid)
     // ---------------------------------------
     conn_->prepare("sync_event.create",
-        R"SQL(
+                   R"SQL(
             INSERT INTO sync_event
             (
                 vault_id,
@@ -29,13 +29,13 @@ void DBConnection::initPreparedSyncEvents() const {
             )
             RETURNING id, run_uuid;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // UPSERT (deterministic by UUID)
     // ---------------------------------------
     conn_->prepare("sync_event.upsert",
-        R"SQL(
+                   R"SQL(
             INSERT INTO sync_event
             (
                 vault_id,
@@ -104,51 +104,51 @@ void DBConnection::initPreparedSyncEvents() const {
                 config_hash          = EXCLUDED.config_hash
             RETURNING id, run_uuid;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // READ by UUID
     // ---------------------------------------
     conn_->prepare("sync_event.read_by_uuid",
-        R"SQL(
+                   R"SQL(
             SELECT *
             FROM sync_event
             WHERE vault_id = $1
               AND run_uuid = $2;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // LIST runs for vault
     // ---------------------------------------
     conn_->prepare("sync_event.list_for_vault",
-        R"SQL(
+                   R"SQL(
             SELECT *
             FROM sync_event
             WHERE vault_id = $1
             ORDER BY timestamp_begin DESC
             LIMIT $2 OFFSET $3;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // TOUCH HEARTBEAT
     // ---------------------------------------
     conn_->prepare("sync_event.touch_heartbeat",
-        R"SQL(
+                   R"SQL(
             UPDATE sync_event
             SET heartbeat_at = COALESCE($3, CURRENT_TIMESTAMP)
             WHERE vault_id = $1
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // FINISH RUN
     // ---------------------------------------
     conn_->prepare("sync_event.finish",
-        R"SQL(
+                   R"SQL(
             UPDATE sync_event
             SET
                 timestamp_end = COALESCE($3, CURRENT_TIMESTAMP),
@@ -160,13 +160,13 @@ void DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // UPDATE COUNTERS
     // ---------------------------------------
     conn_->prepare("sync_event.update_counters",
-        R"SQL(
+                   R"SQL(
             UPDATE sync_event
             SET
                 num_ops_total  = $3,
@@ -178,17 +178,17 @@ void DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // DELETE RUN
     // ---------------------------------------
     conn_->prepare("sync_event.delete",
-        R"SQL(
+                   R"SQL(
             DELETE FROM sync_event
             WHERE vault_id = $1
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-    );
+        );
 }

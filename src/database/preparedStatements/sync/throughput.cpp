@@ -8,7 +8,7 @@ void DBConnection::initPreparedSyncThroughput() const {
     // UPSERT (overwrite values)
     // ---------------------------------------
     conn_->prepare("sync_throughput.upsert",
-        R"SQL(
+                   R"SQL(
             INSERT INTO sync_throughput
             (
                 vault_id,
@@ -34,13 +34,13 @@ void DBConnection::initPreparedSyncThroughput() const {
                 duration_ms = EXCLUDED.duration_ms
             RETURNING id;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // ACCUMULATE (additive worker updates)
     // ---------------------------------------
     conn_->prepare("sync_throughput.accumulate",
-        R"SQL(
+                   R"SQL(
             INSERT INTO sync_throughput
             (
                 vault_id,
@@ -66,29 +66,29 @@ void DBConnection::initPreparedSyncThroughput() const {
                 duration_ms = sync_throughput.duration_ms + EXCLUDED.duration_ms
             RETURNING id;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // READ ALL throughput for run
     // ---------------------------------------
     conn_->prepare("sync_throughput.read_all_for_run",
-        R"SQL(
+                   R"SQL(
             SELECT *
             FROM sync_throughput
             WHERE vault_id = $1
               AND run_uuid = $2
             ORDER BY metric_type;
         )SQL"
-    );
+        );
 
     // ---------------------------------------
     // DELETE ALL throughput for run
     // ---------------------------------------
     conn_->prepare("sync_throughput.delete_for_run",
-        R"SQL(
+                   R"SQL(
             DELETE FROM sync_throughput
             WHERE vault_id = $1
               AND run_uuid = $2;
         )SQL"
-    );
+        );
 }

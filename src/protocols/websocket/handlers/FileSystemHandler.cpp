@@ -17,7 +17,6 @@
 using namespace vh::types;
 using namespace vh::services;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::logging;
 
 namespace vh::websocket {

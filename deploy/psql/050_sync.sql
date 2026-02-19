@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS fsync
 (
     sync_id         INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
     conflict_policy VARCHAR(12) DEFAULT 'keep_both'
-    CHECK (conflict_policy IN ('overwrite', 'keep_both', 'ask'))
+    CHECK (conflict_policy IN ('overwrite', 'keep_both', 'keep_newer', 'keep_older', 'ask'))
     );
 
 CREATE TABLE IF NOT EXISTS rsync
@@ -43,21 +43,7 @@ CREATE TABLE IF NOT EXISTS rsync
     strategy        VARCHAR(8) DEFAULT 'cache'
     CHECK (strategy IN ('cache', 'sync', 'mirror')),
     conflict_policy VARCHAR(12) DEFAULT 'keep_local'
-    CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'ask'))
-    );
-
-CREATE TABLE IF NOT EXISTS sync_conflicts
-(
-    id            SERIAL PRIMARY KEY,
-    sync_id       INTEGER NOT NULL REFERENCES sync (id) ON DELETE CASCADE,
-    file_id       INTEGER NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
-    conflict_type VARCHAR(12) DEFAULT 'content'
-    CHECK (conflict_type IN ('content', 'metadata', 'both')),
-    resolved_at   TIMESTAMP DEFAULT NULL,
-    resolution    VARCHAR(12) DEFAULT 'unresolved'
-    CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote')),
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (sync_id, file_id)
+    CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'keep_newer', 'keep_older', 'ask'))
     );
 
 -- -----------------------------------
@@ -104,6 +90,46 @@ CREATE TABLE IF NOT EXISTS sync_event
     config_hash       TEXT DEFAULT NULL,
 
     UNIQUE (vault_id, run_uuid)
+    );
+
+CREATE TABLE IF NOT EXISTS sync_conflicts
+(
+    id            SERIAL PRIMARY KEY,
+    event_id      INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
+    file_id       INTEGER NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
+
+    conflict_type VARCHAR(12) DEFAULT 'content'
+    CHECK (conflict_type IN ('content', 'metadata', 'encryption')),
+    resolved_at   TIMESTAMP DEFAULT NULL,
+
+    resolution    VARCHAR(24) DEFAULT 'unresolved'
+    CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote', 'fixed_remote_encryption')),
+
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (event_id, file_id)
+    );
+
+CREATE TABLE IF NOT EXISTS sync_conflict_artifacts (
+                                                       id              SERIAL PRIMARY KEY,
+                                                       conflict_id     INTEGER NOT NULL REFERENCES sync_conflicts(id) ON DELETE CASCADE,
+    side            VARCHAR(12) NOT NULL
+    CHECK (side IN ('local','upstream')),
+
+    -- snapshot metadata for diff UI
+    size_bytes      BIGINT,
+    mime_type       VARCHAR(255),
+    content_hash    VARCHAR(128),
+    last_modified   TIMESTAMP,
+    encryption_iv   TEXT,
+    key_version     INTEGER,
+
+    -- where to fetch bytes
+    local_backing_path TEXT,     -- optional (for cached copy)
+
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (conflict_id, side)
     );
 
 -- -----------------------------------

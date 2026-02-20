@@ -24,6 +24,7 @@ class Vaulthalla;
 class CtlServerService;
 class ConnectionLifecycleManager;
 class LogRotationService;
+class DBSweeper;
 
 class ServiceManager : public std::enable_shared_from_this<ServiceManager> {
 public:
@@ -59,6 +60,7 @@ private:
     std::shared_ptr<CtlServerService> ctlServerService;
     std::shared_ptr<ConnectionLifecycleManager> connectionLifecycleManager;
     std::shared_ptr<LogRotationService> logRotationService;
+    std::shared_ptr<DBSweeper> dbSweeperService;
 
     mutable std::mutex mutex_;
     std::map<std::string, std::shared_ptr<AsyncService>> services_;

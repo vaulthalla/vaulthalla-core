@@ -8,10 +8,12 @@
 #include "types/fs/File.hpp"
 #include "util/timestamp.hpp"
 #include "util/u8.hpp"
+#include "config/ConfigRegistry.hpp"
 
 using namespace vh::database;
 using namespace vh::types::sync;
 using namespace vh::util;
+using namespace vh::config;
 
 static void build_event(pqxx::work& txn, const std::shared_ptr<Event>& event) {
     if (!event) return;
@@ -159,5 +161,27 @@ void SyncEventQueries::heartbeat(const std::shared_ptr<types::sync::Event>& even
         const pqxx::params p { event->vault_id, event->run_uuid, timestampToString(event->heartbeat_at) };
         if (const auto res = txn.exec(pqxx::prepped{"sync_event.touch_heartbeat"}, p);
             res.empty()) throw std::runtime_error("Failed to heartbeat sync event");
+    });
+}
+
+void SyncEventQueries::purgeOldEvents() {
+    const auto& syncConfig = ConfigRegistry::get().sync;
+
+    const auto retention_days = syncConfig.event_audit_retention_days;
+    const auto max_entries    = syncConfig.event_audit_max_entries;
+
+    // TODO: expose these in config later, but hardcode for now.
+    constexpr int batch_size  = 5000;
+    constexpr int max_batches = 200;
+
+    Transactions::exec("SyncEventQueries::purgeOldEvents", [&](pqxx::work& txn) {
+        const pqxx::params p{
+            retention_days,
+            max_entries,
+            batch_size,
+            max_batches
+        };
+
+        txn.exec(pqxx::prepped{"sync_event.cleanup"}, p);
     });
 }

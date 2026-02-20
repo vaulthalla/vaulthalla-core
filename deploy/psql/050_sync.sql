@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS sync_conflict_artifacts (
     UNIQUE (conflict_id, side)
     );
 
+
 -- -----------------------------------
 -- Throughput metrics (per-run buckets)
 -- -----------------------------------
@@ -171,6 +172,7 @@ CREATE TABLE IF NOT EXISTS sync_throughput
     UNIQUE (vault_id, run_uuid, metric_type)
     );
 
+
 -- ##################################
 -- Indexes (dashboards + health queries)
 -- ##################################
@@ -194,7 +196,14 @@ CREATE INDEX IF NOT EXISTS idx_sync_throughput_run
 
 -- conflicts by event
 CREATE INDEX IF NOT EXISTS idx_sync_conflict_reason_conflict
-    ON sync_conflict_reason(conflict_id);
+    ON sync_conflict_reasons(conflict_id);
+
+-- Helps retention delete and global cap selection
+CREATE INDEX IF NOT EXISTS idx_sync_event_timestamp_begin ON sync_event (timestamp_begin);
+
+-- Helps "keep newest N" by ordering; add DESC if your Postgres uses it for order-by optimization
+CREATE INDEX IF NOT EXISTS idx_sync_event_timestamp_begin_desc ON sync_event (timestamp_begin DESC);
+
 
 -- ##################################
 -- Triggers
@@ -216,3 +225,112 @@ CREATE TRIGGER update_sync_timestamp
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
+
+
+-- ###################################
+-- Maintenance Function: Cleanup old sync events (batched, scalable)
+-- ###################################
+
+CREATE OR REPLACE FUNCTION vh.cleanup_sync_events(
+    p_retention_days integer,
+    p_max_entries integer,
+    p_batch_size integer DEFAULT 5000,
+    p_max_batches integer DEFAULT 200
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+v_cutoff_ts     timestamptz;
+    v_deleted       integer;
+    v_batches       integer := 0;
+    v_keep_cutoff_ts timestamptz;
+BEGIN
+    -- Guardrails (keep your stated minimums)
+    IF p_retention_days IS NULL OR p_retention_days < 7 THEN
+        p_retention_days := 7;
+END IF;
+
+    IF p_max_entries IS NULL OR p_max_entries < 1000 THEN
+        p_max_entries := 1000;
+END IF;
+
+    IF p_batch_size IS NULL OR p_batch_size < 1000 THEN
+        p_batch_size := 1000;
+END IF;
+
+    IF p_max_batches IS NULL OR p_max_batches < 1 THEN
+        p_max_batches := 1;
+END IF;
+
+    v_cutoff_ts := now() - make_interval(days => p_retention_days);
+
+    -- ------------------------------------------------------------
+    -- 1) Time-based retention (batched)
+    -- Use ctid batching to avoid long locks and huge transactions.
+    -- ------------------------------------------------------------
+    LOOP
+EXIT WHEN v_batches >= p_max_batches;
+
+WITH doomed AS (
+    SELECT ctid
+    FROM sync_event
+    WHERE timestamp_begin < v_cutoff_ts
+    ORDER BY timestamp_begin ASC
+    LIMIT p_batch_size
+    )
+DELETE FROM sync_event se
+    USING doomed
+WHERE se.ctid = doomed.ctid;
+
+GET DIAGNOSTICS v_deleted = ROW_COUNT;
+v_batches := v_batches + 1;
+
+        EXIT WHEN v_deleted = 0;
+END LOOP;
+
+    -- ------------------------------------------------------------
+    -- 2) Cardinality cap (keep newest N globally) - batched
+    -- Strategy:
+    --   Find the timestamp_begin at the Nth newest row (the "keep cutoff").
+    --   Delete anything strictly older than that cutoff in batches.
+    --
+    -- This avoids OFFSET-on-huge-table deletes each run, and avoids NOT IN.
+    -- ------------------------------------------------------------
+
+    -- If table has <= p_max_entries, nothing to do.
+SELECT timestamp_begin
+INTO v_keep_cutoff_ts
+FROM sync_event
+ORDER BY timestamp_begin DESC
+OFFSET (p_max_entries - 1)
+    LIMIT 1;
+
+IF v_keep_cutoff_ts IS NULL THEN
+        RETURN;
+END IF;
+
+    v_batches := 0;
+
+    LOOP
+EXIT WHEN v_batches >= p_max_batches;
+
+WITH doomed AS (
+    SELECT ctid
+    FROM sync_event
+    WHERE timestamp_begin < v_keep_cutoff_ts
+    ORDER BY timestamp_begin ASC
+    LIMIT p_batch_size
+    )
+DELETE FROM sync_event se
+    USING doomed
+WHERE se.ctid = doomed.ctid;
+
+GET DIAGNOSTICS v_deleted = ROW_COUNT;
+v_batches := v_batches + 1;
+
+        EXIT WHEN v_deleted = 0;
+END LOOP;
+
+END;
+$$;

@@ -211,6 +211,75 @@ struct convert<AuthConfig> {
     }
 };
 
+// SyncConfig
+template<>
+struct convert<SyncConfig> {
+    static Node encode(const SyncConfig& rhs) {
+        Node node;
+        node["event_audit_retention_days"] = rhs.event_audit_retention_days;
+        node["event_audit_max_entries"] = rhs.event_audit_max_entries;
+        return node;
+    }
+
+    static bool decode(const Node& node, SyncConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.event_audit_retention_days = std::max(static_cast<uint32_t>(7), node["event_audit_retention_days"].as<uint32_t>(30));
+        rhs.event_audit_max_entries = std::max(static_cast<uint32_t>(1000), node["event_audit_max_entries"].as<uint32_t>(10000));
+        return true;
+    }
+};
+
+template<>
+struct convert<DBSweeperConfig> {
+    static Node encode(const DBSweeperConfig& rhs) {
+        Node node;
+        node["sweep_interval_minutes"] = rhs.sweep_interval_minutes;
+        return node;
+    }
+
+    static bool decode(const Node& node, DBSweeperConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.sweep_interval_minutes = std::max(10, node["sweep_interval_minutes"].as<int>(60));
+        return true;
+    }
+};
+
+template<>
+struct convert<ConnectionLifecycleManagerConfig> {
+    static Node encode(const ConnectionLifecycleManagerConfig& rhs) {
+        Node node;
+        node["idle_timeout_minutes"] = rhs.idle_timeout_minutes;
+        node["unauthenticated_timeout_seconds"] = rhs.unauthenticated_timeout_seconds;
+        node["sweep_interval_seconds"] = rhs.sweep_interval_seconds;
+        return node;
+    }
+
+    static bool decode(const Node& node, ConnectionLifecycleManagerConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.idle_timeout_minutes = std::max(5, node["idle_timeout_minutes"].as<int>(30));
+        rhs.unauthenticated_timeout_seconds = std::max(30, node["unauthenticated_timeout_seconds"].as<int>(300));
+        rhs.sweep_interval_seconds = std::max(15, node["sweep_interval_seconds"].as<int>(60));
+        return true;
+    }
+};
+
+template<>
+struct convert<ServicesConfig> {
+    static Node encode(const ServicesConfig& rhs) {
+        Node node;
+        node["db_sweeper"] = rhs.db_sweeper;
+        node["connection_lifecycle_manager"] = rhs.connection_lifecycle_manager;
+        return node;
+    }
+
+    static bool decode(const Node& node, ServicesConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.db_sweeper = node["db_sweeper"].as<DBSweeperConfig>();
+        rhs.connection_lifecycle_manager = node["connection_lifecycle_manager"].as<ConnectionLifecycleManagerConfig>();
+        return true;
+    }
+};
+
 template<>
 struct convert<SharingConfig> {
     static Node encode(const SharingConfig& rhs) {

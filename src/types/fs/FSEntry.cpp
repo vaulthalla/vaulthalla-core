@@ -19,7 +19,6 @@
 using namespace vh::types;
 using namespace vh::util;
 using namespace vh::logging;
-using namespace vh::database;
 using namespace vh::config;
 
 FSEntry::FSEntry(const pqxx::row& row, const pqxx::result& parentRows)
@@ -171,7 +170,7 @@ std::vector<std::shared_ptr<FSEntry>> vh::types::fromS3XML(const std::u8string& 
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
         std::time_t ts = ss.fail() ? std::time(nullptr) : timegm(&tm);
 
-        std::filesystem::path full_path = std::filesystem::path(reinterpret_cast<const char*>(key.c_str()));
+        auto full_path = std::filesystem::path(reinterpret_cast<const char*>(key.c_str()));
         std::filesystem::path current;
 
         for (auto pit = full_path.begin(); pit != std::prev(full_path.end()); ++pit) {

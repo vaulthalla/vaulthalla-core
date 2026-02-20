@@ -191,4 +191,10 @@ void DBConnection::initPreparedSyncEvents() const {
             RETURNING id;
         )SQL"
         );
+
+
+    // ---------------------------------------
+    // CLEANUP EVENTS
+    // ---------------------------------------
+    conn_->prepare("sync_event.cleanup", "SELECT vh.cleanup_sync_events($1, $2, $3, $4);");
 }

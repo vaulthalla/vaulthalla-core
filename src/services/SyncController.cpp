@@ -57,7 +57,7 @@ void SyncController::runLoop() {
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
     unsigned int refreshTries = 0;
 
-    while (running_ && !interruptFlag_.load()) {
+    while (!shouldStop()) {
         if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
             LogRegistry::sync()->debug("[SyncController] Refreshing sync engines...");
             refreshEngines();
@@ -71,7 +71,7 @@ void SyncController::runLoop() {
         }
 
         if (pqIsEmpty) {
-            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(3));
+            if (++refreshTries > 3) lazySleep(std::chrono::seconds(3));
             refreshEngines();
             continue;
         }

@@ -16,6 +16,8 @@ struct SyncEventQueries {
     static std::vector<std::shared_ptr<types::sync::Event>> getEvents(unsigned int vaultId, unsigned int limit, unsigned int offset);
     static std::vector<std::shared_ptr<types::sync::Event>> getEvents(unsigned int vaultId);
     static void heartbeat(const std::shared_ptr<types::sync::Event>& event);
+
+    static void purgeOldEvents();
 };
 
 }

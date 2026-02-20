@@ -218,7 +218,7 @@ void FUSE::runLoop() {
 
     LogRegistry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
 
-    while (!fuse_session_exited(session_) && running_ && !interruptFlag_.load()) {
+    while (!fuse_session_exited(session_) && !shouldStop()) {
         fuse_buf buf{};
         const int res = fuse_session_receive_buf(session_, &buf);
         if (res == -EINTR) continue;

@@ -6,6 +6,7 @@
 // Database
 #include "database/Transactions.hpp"
 #include "database/Queries/UserQueries.hpp"
+#include "database/Queries/SyncEventQueries.hpp"
 
 // Storage
 #include "storage/StorageManager.hpp"

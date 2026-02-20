@@ -24,6 +24,8 @@ Config loadConfig(const std::string& path) {
     if (auto node = root["caching"]) YAML::convert<CachingConfig>::decode(node, cfg.caching);
     if (auto node = root["database"]) YAML::convert<DatabaseConfig>::decode(node, cfg.database);
     if (auto node = root["auth"]) YAML::convert<AuthConfig>::decode(node, cfg.auth);
+    if (auto node = root["sync"]) YAML::convert<SyncConfig>::decode(node, cfg.sync);
+    if (auto node = root["services"]) YAML::convert<ServicesConfig>::decode(node, cfg.services);
     if (auto node = root["sharing"]) YAML::convert<SharingConfig>::decode(node, cfg.sharing);
     if (auto node = root["auditing"]) YAML::convert<AuditConfig>::decode(node, cfg.auditing);
     if (auto node = root["dev"]) YAML::convert<DevConfig>::decode(node, cfg.dev);
@@ -61,6 +63,8 @@ void Config::save() const {
         {"caching", encode(caching)},
         {"database", encode(database)},
         {"auth", encode(auth)},
+        {"sync", encode(sync)},
+        {"services", encode(services)},
         {"sharing", encode(sharing)},
         {"auditing", encode(auditing)},
         {"dev", encode(dev)}
@@ -91,6 +95,8 @@ void to_json(nlohmann::json& j, const Config& c) {
         {"caching", c.caching},
         {"database", c.database},
         {"auth", c.auth},
+        {"sync", c.sync},
+        {"services", c.services},
         {"sharing", c.sharing},
         {"auditing", c.auditing},
         {"dev", c.dev}
@@ -103,6 +109,8 @@ void from_json(const nlohmann::json& j, Config& c) {
     j.at("caching").get_to(c.caching);
     j.at("database").get_to(c.database);
     j.at("auth").get_to(c.auth);
+    j.at("sync").get_to(c.sync);
+    j.at("services").get_to(c.services);
     j.at("sharing").get_to(c.sharing);
     j.at("auditing").get_to(c.auditing);
     j.at("dev").get_to(c.dev);
@@ -255,6 +263,54 @@ void to_json(nlohmann::json& j, const AuthConfig& c) {
 void from_json(const nlohmann::json& j, AuthConfig& c) {
     c.token_expiry_minutes = j.value("token_expiry_minutes", 60);
     c.refresh_token_expiry_days = j.value("refresh_token_expiry_days", 7);
+}
+
+void to_json(nlohmann::json& j, const SyncConfig& c) {
+    j = {
+        {"event_audit_retention_days", c.event_audit_retention_days},
+        {"event_audit_max_entries", c.event_audit_max_entries}
+    };
+}
+
+void from_json(const nlohmann::json& j, SyncConfig& c) {
+    c.event_audit_retention_days = std::max(7, j.value("event_audit_retention_days", 30));
+    c.event_audit_max_entries = std::max(1000, j.value("event_audit_max_entries", 10000));
+}
+
+void to_json(nlohmann::json& j, const DBSweeperConfig& c) {
+    j = {
+        {"sweep_interval_minutes", c.sweep_interval_minutes}
+    };
+}
+
+void from_json(const nlohmann::json& j, DBSweeperConfig& c) {
+    c.sweep_interval_minutes = std::max(5, j.value("sweep_interval_minutes", 60));
+}
+
+void to_json(nlohmann::json& j, const ConnectionLifecycleManagerConfig& c) {
+    j = {
+        {"idle_timeout_minutes", c.idle_timeout_minutes},
+        {"unauthenticated_timeout_seconds", c.unauthenticated_timeout_seconds},
+        {"sweep_interval_seconds", c.sweep_interval_seconds}
+    };
+}
+
+void from_json(const nlohmann::json& j, ConnectionLifecycleManagerConfig& c) {
+    c.idle_timeout_minutes = std::max(5, j.value("idle_timeout_minutes", 30));
+    c.unauthenticated_timeout_seconds = std::max(30, j.value("unauthenticated_timeout_seconds", 300));
+    c.sweep_interval_seconds = std::max(15, j.value("sweep_interval_seconds", 60));
+}
+
+void to_json(nlohmann::json& j, const ServicesConfig& c) {
+    j = {
+        {"db_sweeper", c.db_sweeper},
+        {"connection_lifecycle_manager", c.connection_lifecycle_manager}
+    };
+}
+
+void from_json(const nlohmann::json& j, ServicesConfig& c) {
+    j.at("db_sweeper").get_to(c.db_sweeper);
+    j.at("connection_lifecycle_manager").get_to(c.connection_lifecycle_manager);
 }
 
 void to_json(nlohmann::json& j, const SharingConfig& c) {

@@ -43,6 +43,7 @@ struct Throughput {
     [[nodiscard]] std::string metricToString() const;
 };
 
-void to_json(nlohmann::json& j, const Throughput& t);
+void to_json(nlohmann::json& j, const std::unique_ptr<Throughput>& t);
+void to_json(nlohmann::json& j, const std::vector<std::unique_ptr<Throughput>>& t);
 
 }

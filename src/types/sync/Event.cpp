@@ -2,6 +2,7 @@
 #include "util/timestamp.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/Conflict.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -114,9 +115,7 @@ void Event::parseCurrentStatus() {
         return;
     }
 
-    // Ensure counters are coherent if caller didn't do it.
-    // (If computeDashboardStats() is expensive, you can gate it behind a dirty flag.)
-    // computeDashboardStats();
+    computeDashboardStats();
 
     const std::time_t now = std::time(nullptr);
     const bool ended = (timestamp_end != 0);
@@ -332,22 +331,15 @@ void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
         {"bytes_up", e.bytes_up},
         {"bytes_down", e.bytes_down},
 
+        {"conflicts", e.conflicts},
+        {"throughputs", e.throughputs},
+
         {"divergence_detected", e.divergence_detected},
         {"local_state_hash", e.local_state_hash},
         {"remote_state_hash", e.remote_state_hash},
 
         {"config_hash", e.config_hash},
     };
-
-    // Include throughputs (as array of objects)
-    nlohmann::json arr = nlohmann::json::array();
-    for (const auto& p : e.throughputs) {
-        if (!p) continue;
-        nlohmann::json tj;
-        vh::types::sync::to_json(tj, *p);
-        arr.push_back(std::move(tj));
-    }
-    j["throughputs"] = std::move(arr);
 }
 
 std::vector<std::shared_ptr<Event>> vh::types::sync::sync_events_from_pqxx_res(const pqxx::result& res) {

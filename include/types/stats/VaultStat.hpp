@@ -5,10 +5,15 @@
 
 namespace vh::types {
 
+namespace sync {
+struct Event;
+}
+
 struct CapacityStats;
 
 struct VaultStat {
     std::shared_ptr<CapacityStats> capacity;
+    std::shared_ptr<sync::Event> latest_sync_event;
 
     explicit VaultStat(unsigned int vaultId);
 };

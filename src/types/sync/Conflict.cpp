@@ -121,3 +121,9 @@ void vh::types::sync::to_json(nlohmann::json& j, const std::vector<Conflict::Rea
     j = nlohmann::json::array();
     for (const auto& reason : reasons) j.push_back(reason);
 }
+
+void vh::types::sync::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Conflict>>& conflicts) {
+    j = nlohmann::json::array();
+    for (const auto& conflict : conflicts) j.push_back(conflict);
+}
+

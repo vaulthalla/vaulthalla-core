@@ -58,5 +58,6 @@ struct Conflict {
 void to_json(nlohmann::json& j, const std::shared_ptr<Conflict>& conflict);
 void to_json(nlohmann::json& j, const Conflict::Reason& reason);
 void to_json(nlohmann::json& j, const std::vector<Conflict::Reason>& reasons);
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Conflict>>& conflicts);
 
 }

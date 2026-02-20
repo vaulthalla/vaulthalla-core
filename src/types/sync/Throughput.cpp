@@ -55,13 +55,19 @@ std::string Throughput::metricToString() const {
     }
 }
 
-void vh::types::sync::to_json(nlohmann::json& j, const Throughput& t) {
+void vh::types::sync::to_json(nlohmann::json& j, const std::unique_ptr<Throughput>& t) {
+    t->computeDashboardStats();
     j = {
-        {"id", t.id},
-        {"run_uuid", t.run_uuid},
-        {"num_ops", t.num_ops},
-        {"size_bytes", t.size_bytes},
-        {"duration_ms", t.duration_ms},
-        {"metric_type", t.metricToString()}
+        {"id", t->id},
+        {"run_uuid", t->run_uuid},
+        {"num_ops", t->num_ops},
+        {"size_bytes", t->size_bytes},
+        {"duration_ms", t->duration_ms},
+        {"metric_type", t->metricToString()}
     };
+}
+
+void vh::types::sync::to_json(nlohmann::json& j, const std::vector<std::unique_ptr<Throughput>>& t) {
+    j = nlohmann::json::array();
+    for (const auto& item : t) j.push_back(item);
 }

@@ -10,6 +10,7 @@ namespace vh::types {
 struct File;
 struct Directory;
 struct S3Vault;
+struct TrashedFile;
 
 namespace api {
 struct APIKey;
@@ -32,10 +33,13 @@ public:
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
 
     void purge(const std::filesystem::path& rel_path) const;
+    void purge(const std::shared_ptr<types::TrashedFile>& f) const;
 
     void removeLocally(const std::filesystem::path& rel_path) const;
+    void removeLocally(const std::shared_ptr<types::TrashedFile>& f) const;
 
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
+    void removeRemotely(const std::shared_ptr<types::TrashedFile>& f, bool rmThumbnails = true) const;
 
     void upload(const std::shared_ptr<types::File>& f) const;
 

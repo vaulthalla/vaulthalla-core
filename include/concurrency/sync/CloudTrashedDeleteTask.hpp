@@ -34,9 +34,6 @@ struct CloudTrashedDeleteTask final : PromisedTask {
                  const Type& type = Type::PURGE);
 
     void operator()() override;
-
-    void purge(const std::filesystem::path& path) const;
-    void handleLocalDelete() const;
 };
 
 }

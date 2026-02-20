@@ -1,6 +1,8 @@
 #include "types/sync/RSync.hpp"
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
+#include "types/sync/Conflict.hpp"
+#include "types/fs/File.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
@@ -21,6 +23,22 @@ void RSync::rehash_config() {
                   ";enabled=" + (enabled ? "true" : "false") +
                   ";strategy=" + to_string(strategy) +
                   ";conflict_policy=" + to_string(conflict_policy);
+}
+
+bool RSync::resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const {
+    if (conflict_policy == ConflictPolicy::Ask) return false;
+
+    if (conflict_policy == ConflictPolicy::KeepLocal) conflict->resolution = sync::Conflict::Resolution::KEPT_LOCAL;
+    else if (conflict_policy == ConflictPolicy::KeepRemote) conflict->resolution = sync::Conflict::Resolution::KEPT_REMOTE;
+    else if (conflict_policy == ConflictPolicy::KeepNewest) {
+        if (conflict->artifacts.local.file->updated_at == std::time_t{0} || conflict->artifacts.upstream.file->updated_at == std::time_t{0})
+            return false; // If either timestamp is missing, we can't determine which is newer, so we ask the user.
+
+        if (conflict->artifacts.local.file->updated_at > conflict->artifacts.upstream.file->updated_at) conflict->resolution = sync::Conflict::Resolution::KEPT_LOCAL;
+        else conflict->resolution = sync::Conflict::Resolution::KEPT_REMOTE;
+    }
+
+    return true;
 }
 
 void vh::types::to_json(nlohmann::json& j, const RSync& s) {
@@ -48,6 +66,7 @@ std::string vh::types::to_string(const RSync::ConflictPolicy& cp) {
     switch (cp) {
     case RSync::ConflictPolicy::KeepLocal: return "keep_local";
     case RSync::ConflictPolicy::KeepRemote: return "keep_remote";
+    case RSync::ConflictPolicy::KeepNewest: return "keep_newest";
     case RSync::ConflictPolicy::Ask: return "ask";
     default: throw std::invalid_argument("Unknown conflict policy");
     }
@@ -63,6 +82,7 @@ RSync::Strategy vh::types::strategyFromString(const std::string& str) {
 RSync::ConflictPolicy vh::types::rsConflictPolicyFromString(const std::string& str) {
     if (str == "keep_local") return RSync::ConflictPolicy::KeepLocal;
     if (str == "keep_remote") return RSync::ConflictPolicy::KeepRemote;
+    if (str == "keep_newest") return RSync::ConflictPolicy::KeepNewest;
     if (str == "ask") return RSync::ConflictPolicy::Ask;
     throw std::invalid_argument("Unknown conflict policy: " + str);
 }

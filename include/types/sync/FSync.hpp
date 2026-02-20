@@ -21,6 +21,7 @@ struct FSync final : public Sync {
     explicit FSync(const pqxx::row& row);
 
     void rehash_config() override;
+    [[nodiscard]] bool resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const override;
 };
 
 void to_json(nlohmann::json& j, const FSync& s);

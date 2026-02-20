@@ -11,6 +11,11 @@
 #include "logging/LogRegistry.hpp"
 #include "types/sync/Event.hpp"
 #include "types/sync/Throughput.hpp"
+#include "types/sync/Artifact.hpp"
+#include "types/sync/ConflictArtifact.hpp"
+#include "types/sync/Conflict.hpp"
+#include "types/sync/FSync.hpp"
+#include "types/sync/RSync.hpp"
 
 #include <utility>
 
@@ -71,6 +76,43 @@ void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterD
 
 void SyncTask::remove(const std::shared_ptr<File>& file, const CloudDeleteTask::Type& type) {
     push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, op(sync::Throughput::Metric::DELETE), type));
+}
+
+bool SyncTask::hasPotentialConflict(const std::shared_ptr<File>& local, const std::shared_ptr<File>& upstream, bool upstream_decryption_failure) {
+    if (upstream_decryption_failure) return true;
+
+    if (local->size_bytes != upstream->size_bytes) return true;
+
+    if (local->content_hash && upstream->content_hash && *local->content_hash != *upstream->content_hash) return true;
+
+    return false;
+}
+
+
+bool SyncTask::conflict(const std::shared_ptr<File>& local, const std::shared_ptr<File>& upstream, const bool upstream_decryption_failure) const {
+    if (!hasPotentialConflict(local, upstream, upstream_decryption_failure)) return false;
+
+    const auto conflict = std::make_shared<sync::Conflict>();
+    conflict->failed_to_decrypt_upstream = upstream_decryption_failure;
+    conflict->artifacts.local = sync::Artifact(local, sync::Artifact::Side::LOCAL);
+    conflict->artifacts.upstream = sync::Artifact(upstream, sync::Artifact::Side::UPSTREAM);
+    conflict->analyze();
+
+    if (conflict->reasons.empty()) {
+        LogRegistry::sync()->debug("[SyncTask] hasPotentialConflict() returned true, but no reasons were identified for the conflict. This might indicate a logic error in the conflict detection algorithm.");
+        return false;
+    }
+
+    conflict->created_at = system_clock::to_time_t(system_clock::now());
+    conflict->file_id = local->id;
+    conflict->event_id = event_->id;
+
+    const bool ok = engine()->sync->resolve_conflict(conflict);
+
+    if (ok) conflict->resolved_at = system_clock::to_time_t(system_clock::now());
+    event_->conflicts.push_back(conflict);
+
+    return !ok;
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {

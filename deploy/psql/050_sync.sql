@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS fsync
 (
     sync_id         INTEGER PRIMARY KEY REFERENCES sync (id) ON DELETE CASCADE,
     conflict_policy VARCHAR(12) DEFAULT 'keep_both'
-    CHECK (conflict_policy IN ('overwrite', 'keep_both', 'keep_newer', 'keep_older', 'ask'))
+    CHECK (conflict_policy IN ('overwrite', 'keep_both', 'ask'))
     );
 
 CREATE TABLE IF NOT EXISTS rsync
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS rsync
     strategy        VARCHAR(8) DEFAULT 'cache'
     CHECK (strategy IN ('cache', 'sync', 'mirror')),
     conflict_policy VARCHAR(12) DEFAULT 'keep_local'
-    CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'keep_newer', 'keep_older', 'ask'))
+    CHECK (conflict_policy IN ('keep_local', 'keep_remote', 'keep_newest', 'ask'))
     );
 
 -- -----------------------------------
@@ -98,16 +98,30 @@ CREATE TABLE IF NOT EXISTS sync_conflicts
     event_id      INTEGER NOT NULL REFERENCES sync_event (id) ON DELETE CASCADE,
     file_id       INTEGER NOT NULL REFERENCES files (fs_entry_id) ON DELETE CASCADE,
 
-    conflict_type VARCHAR(12) DEFAULT 'content'
-    CHECK (conflict_type IN ('content', 'metadata', 'encryption')),
+    conflict_type VARCHAR(12) NOT NULL
+    CHECK (conflict_type IN ('mismatch', 'encryption', 'both')),
+
     resolved_at   TIMESTAMP DEFAULT NULL,
 
     resolution    VARCHAR(24) DEFAULT 'unresolved'
-    CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote', 'fixed_remote_encryption')),
+    CHECK (resolution IN ('unresolved', 'kept_local', 'kept_remote', 'kept_both', 'overwritten', 'fixed_remote_encryption')),
 
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (event_id, file_id)
+    );
+
+CREATE TABLE IF NOT EXISTS sync_conflict_reason
+(
+    id              SERIAL PRIMARY KEY,
+    conflict_id     INTEGER NOT NULL REFERENCES sync_conflicts(id) ON DELETE CASCADE,
+
+    reason_code     VARCHAR(32) NOT NULL,
+    reason_message  TEXT DEFAULT NULL,
+
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (conflict_id, reason_code)
     );
 
 CREATE TABLE IF NOT EXISTS sync_conflict_artifacts (
@@ -177,6 +191,10 @@ CREATE INDEX IF NOT EXISTS idx_sync_event_vault_uuid
 -- throughput lookups by run
 CREATE INDEX IF NOT EXISTS idx_sync_throughput_run
     ON sync_throughput (vault_id, run_uuid);
+
+-- conflicts by event
+CREATE INDEX IF NOT EXISTS idx_sync_conflict_reason_conflict
+    ON sync_conflict_reason(conflict_id);
 
 -- ##################################
 -- Triggers

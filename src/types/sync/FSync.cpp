@@ -1,6 +1,8 @@
 #include "types/sync/FSync.hpp"
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
+#include "types/sync/Conflict.hpp"
+#include "types/fs/File.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
@@ -19,6 +21,15 @@ void FSync::rehash_config() {
                   ";interval=" + std::to_string(interval.count()) +
                   ";enabled=" + (enabled ? "true" : "false") +
                   ";conflict_policy=" + to_string(conflict_policy);
+}
+
+bool FSync::resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const {
+    if (conflict_policy == ConflictPolicy::Ask) return false; // Let the user decide
+    
+    if (conflict_policy == ConflictPolicy::KeepBoth) conflict->resolution = sync::Conflict::Resolution::KEPT_BOTH;
+    else if (conflict_policy == ConflictPolicy::Overwrite) conflict->resolution = sync::Conflict::Resolution::OVERWRITTEN;
+
+    return true;
 }
 
 void vh::types::to_json(nlohmann::json& j, const FSync& s) {

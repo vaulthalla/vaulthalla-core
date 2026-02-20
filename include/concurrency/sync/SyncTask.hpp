@@ -53,6 +53,10 @@ protected:
 
     virtual void ensureFreeSpace(uintmax_t size) const;
 
+    [[nodiscard]] static bool hasPotentialConflict(const std::shared_ptr<types::File>& local, const std::shared_ptr<types::File>& upstream, bool upstream_decryption_failure) ;
+
+    [[nodiscard]] bool conflict(const std::shared_ptr<types::File>& local, const std::shared_ptr<types::File>& upstream, bool upstream_decryption_failure = false) const;
+
     static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File> >& files);
 
     static std::vector<std::shared_ptr<types::File> > uMap2Vector(

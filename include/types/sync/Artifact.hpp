@@ -2,12 +2,14 @@
 
 #include <memory>
 #include <string>
-#include <optional>
 #include <nlohmann/json_fwd.hpp>
-#include <filesystem>
 
 namespace pqxx {
     class row;
+}
+
+namespace vh::types {
+    struct File;
 }
 
 namespace vh::types::sync {
@@ -16,18 +18,14 @@ struct Artifact {
     enum class Side { LOCAL, UPSTREAM };
 
     uint32_t id{}, conflict_id{};
-    std::optional<std::string> encryption_iv{};
-    std::optional<uint32_t> key_version{};
-    uint64_t size_bytes{};
+    std::shared_ptr<types::File> file{};
     Side side{};
-    std::string mime_type{}, content_hash{};
-    std::time_t last_modified{}, created_at{};
-    std::filesystem::path local_backing_path{};
 
     Artifact() = default;
     explicit Artifact(const pqxx::row& row);
+    explicit Artifact(const std::shared_ptr<types::File>& f, const Side& s);
 
-    std::string sideToString() const;
+    [[nodiscard]] std::string sideToString() const;
     void parseSide(const std::string& sideStr);
 };
 

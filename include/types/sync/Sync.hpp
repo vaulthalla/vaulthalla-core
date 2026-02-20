@@ -11,6 +11,10 @@ class row;
 
 namespace vh::types {
 
+namespace sync {
+    struct Conflict;
+}
+
 struct Sync {
     unsigned int id{}, vault_id{};
     std::chrono::seconds interval{};
@@ -23,6 +27,7 @@ struct Sync {
     explicit Sync(const pqxx::row& row);
 
     virtual void rehash_config() = 0;
+    [[nodiscard]] virtual bool resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const = 0;
 };
 
 void to_json(nlohmann::json& j, const Sync& s);

@@ -75,25 +75,28 @@ void SyncEventQueries::upsert(const std::shared_ptr<Event>& event) {
             {
                 const pqxx::params p {
                     conflict->event_id,
-                    conflict->file->id,
+                    conflict->file_id,
                     conflict->typeToString(),
                     conflict->resolutionToString()
                 };
-                if (const auto res = txn.exec(pqxx::prepped{"sync_conflict.upsert"}, p);
-                    res.empty()) throw std::runtime_error("Failed to upsert sync conflict");
+
+                const auto res = txn.exec(pqxx::prepped{"sync_conflict.upsert"}, p);
+                if (res.empty()) throw std::runtime_error("Failed to upsert sync conflict");
+                conflict->id = res.one_row()["id"].as<unsigned int>();
             }
 
-            const auto upsertArtifact = [&txn](const Artifact& artifact) {
+            const auto upsertArtifact = [&txn, &conflict](const Artifact& artifact) {
+                const auto& f = artifact.file;
                 const pqxx::params p {
-                    artifact.conflict_id,
+                    conflict->id,
                     artifact.sideToString(),
-                    artifact.size_bytes,
-                    artifact.mime_type,
-                    artifact.content_hash,
-                    timestampToString(artifact.last_modified),
-                    artifact.encryption_iv,
-                    artifact.key_version,
-                    to_utf8_string(artifact.local_backing_path.u8string())
+                    f->size_bytes,
+                    f->mime_type,
+                    f->content_hash,
+                    timestampToString(f->updated_at),
+                    f->encryption_iv,
+                    f->encrypted_with_key_version,
+                    to_utf8_string(f->backing_path.u8string())
                 };
                 if (const auto res = txn.exec(pqxx::prepped{"sync_conflict_artifact.upsert"}, p);
                     res.empty()) throw std::runtime_error("Failed to upsert sync conflict artifact");

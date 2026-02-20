@@ -29,7 +29,8 @@ static void build_event(pqxx::work& txn, const std::shared_ptr<Event>& event) {
         for (const auto& row : res) {
             const auto conflictId = row["id"].as<unsigned int>();
             const auto artifactRes = txn.exec(pqxx::prepped{"sync_conflict_artifact.select_by_conflict"}, conflictId);
-            event->conflicts.push_back(std::make_shared<Conflict>(row, artifactRes));
+            const auto reasonRes = txn.exec(pqxx::prepped{"sync_conflict_reason.select_by_conflict"}, conflictId);
+            event->conflicts.push_back(std::make_shared<Conflict>(row, artifactRes, reasonRes));
         }
     }
 }
@@ -104,6 +105,20 @@ void SyncEventQueries::upsert(const std::shared_ptr<Event>& event) {
 
             upsertArtifact(conflict->artifacts.local);
             upsertArtifact(conflict->artifacts.upstream);
+
+            for (auto& reason : conflict->reasons) {
+                const pqxx::params p {
+                    conflict->id,
+                    reason.code,
+                    reason.message
+                };
+
+                const auto res = txn.exec(pqxx::prepped{"sync_conflict_reason.upsert"}, p);
+                if (res.empty()) throw std::runtime_error("Failed to upsert sync conflict reason");
+                const auto row = res.one_row();
+                reason.id = row["id"].as<unsigned int>();
+                reason.conflict_id = conflict->id;
+            }
         }
     });
 }

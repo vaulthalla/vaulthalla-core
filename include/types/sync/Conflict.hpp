@@ -21,10 +21,12 @@ namespace vh::types::sync {
 struct Conflict {
 
     struct Reason {
+        uint32_t id{}, conflict_id{};
         std::string code{}, message{};
 
         Reason() = default;
         Reason(std::string c, std::string m) : code{std::move(c)}, message{std::move(m)} {}
+        explicit Reason(const pqxx::row& row);
     };
 
     enum class Type { MISMATCH, ENCRYPTION, BOTH };
@@ -43,7 +45,7 @@ struct Conflict {
     bool failed_to_decrypt_upstream{};
 
     Conflict() = default;
-    explicit Conflict(const pqxx::row& row, const pqxx::result& artifactRows);
+    explicit Conflict(const pqxx::row& row, const pqxx::result& artifactRows, const pqxx::result& reasonRows);
 
     [[nodiscard]] std::string typeToString() const;
     [[nodiscard]] std::string resolutionToString() const;

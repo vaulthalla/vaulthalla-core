@@ -12,7 +12,7 @@ using namespace vh::types::sync;
 using namespace vh::services;
 using namespace vh::util;
 
-Conflict::Conflict(const pqxx::row& row, const pqxx::result& artifactRows)
+Conflict::Conflict(const pqxx::row& row, const pqxx::result& artifactRows, const pqxx::result& reasonRows)
     : id(row["id"].as<uint32_t>()),
       event_id(row["event_id"].as<uint32_t>()),
       file_id(row["file_id"].as<uint32_t>()),
@@ -21,7 +21,14 @@ Conflict::Conflict(const pqxx::row& row, const pqxx::result& artifactRows)
       artifacts(artifactRows) {
     parseType(row["type"].as<std::string>());
     parseResolution(row["resolution"].as<std::string>());
+    for (const auto& reasonRow : reasonRows) reasons.emplace_back(reasonRow);
 }
+
+Conflict::Reason::Reason(const pqxx::row& row)
+    : id(row["id"].as<uint32_t>()),
+      conflict_id(row["conflict_id"].as<uint32_t>()),
+      code(row["code"].as<std::string>()),
+      message(row["message"].as<std::string>()) {}
 
 void Conflict::analyze() {
     reasons.clear();

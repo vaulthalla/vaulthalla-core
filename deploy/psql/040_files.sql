@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS files_trashed
 (
     id           SERIAL PRIMARY KEY,
     vault_id     INTEGER NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    path         TEXT NOT NULL,
     backing_path TEXT NOT NULL,
     base32_alias CHAR(33) NOT NULL,
     size_bytes   BIGINT DEFAULT 0 NOT NULL,

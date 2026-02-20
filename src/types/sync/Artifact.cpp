@@ -1,12 +1,14 @@
 #include "types/sync/Artifact.hpp"
 #include "types/fs/File.hpp"
 #include "util/timestamp.hpp"
+#include "services/ServiceDepsRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 
 using namespace vh::types::sync;
 using namespace vh::util;
+using namespace vh::services;
 
 Artifact::Artifact(const pqxx::row& row)
     : id(row["id"].as<uint32_t>()),

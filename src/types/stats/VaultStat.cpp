@@ -11,10 +11,10 @@ using namespace vh::types;
 using namespace vh::services;
 
 VaultStat::VaultStat(unsigned int vaultId)
-    : capacity(std::make_shared<CapacityStats>(vaultId)),
-      latest_sync_event(ServiceDepsRegistry::instance().storageManager->getEngine(vaultId)->latestSyncEvent) {}
+    : vault_id(vaultId),
+      capacity(std::make_shared<CapacityStats>(vaultId)) {}
 
 void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<VaultStat>& s) {
     j["capacity"] = s->capacity;
-    j["latest_sync_event"] = *s->latest_sync_event;
+    j["latest_sync_event"] = ServiceDepsRegistry::instance().storageManager->getEngine(s->vault_id)->latestSyncEvent;
 }

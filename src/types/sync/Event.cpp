@@ -307,38 +307,43 @@ pqxx::params Event::getParams() const noexcept {
 // -------------------------
 // JSON
 // -------------------------
-void vh::types::sync::to_json(nlohmann::json& j, const Event& e) {
+void vh::types::sync::to_json(nlohmann::json& j, const std::shared_ptr<Event>& e) {
+    if (!e) {
+        j = nullptr;
+        return;
+    }
+
     j = {
-        {"id", e.id},
-        {"vault_id", e.vault_id},
-        {"run_uuid", e.run_uuid},
+        {"id", e->id},
+        {"vault_id", e->vault_id},
+        {"run_uuid", e->run_uuid},
 
-        {"timestamp_begin", e.timestamp_begin},
-        {"timestamp_end", e.timestamp_end},
-        {"heartbeat_at", e.heartbeat_at},
+        {"timestamp_begin", e->timestamp_begin},
+        {"timestamp_end", e->timestamp_end},
+        {"heartbeat_at", e->heartbeat_at},
 
-        {"status", std::string(Event::toString(e.status))},
-        {"trigger", std::string(Event::toString(e.trigger))},
-        {"retry_attempt", e.retry_attempt},
+        {"status", std::string(Event::toString(e->status))},
+        {"trigger", std::string(Event::toString(e->trigger))},
+        {"retry_attempt", e->retry_attempt},
 
-        {"stall_reason", e.stall_reason},
-        {"error_code", e.error_code},
-        {"error_message", e.error_message},
+        {"stall_reason", e->stall_reason},
+        {"error_code", e->error_code},
+        {"error_message", e->error_message},
 
-        {"num_ops_total", e.num_ops_total},
-        {"num_failed_ops", e.num_failed_ops},
-        {"num_conflicts", e.num_conflicts},
-        {"bytes_up", e.bytes_up},
-        {"bytes_down", e.bytes_down},
+        {"num_ops_total", e->num_ops_total},
+        {"num_failed_ops", e->num_failed_ops},
+        {"num_conflicts", e->num_conflicts},
+        {"bytes_up", e->bytes_up},
+        {"bytes_down", e->bytes_down},
 
-        {"conflicts", e.conflicts},
-        {"throughputs", e.throughputs},
+        {"conflicts", e->conflicts},
+        {"throughputs", e->throughputs},
 
-        {"divergence_detected", e.divergence_detected},
-        {"local_state_hash", e.local_state_hash},
-        {"remote_state_hash", e.remote_state_hash},
+        {"divergence_detected", e->divergence_detected},
+        {"local_state_hash", e->local_state_hash},
+        {"remote_state_hash", e->remote_state_hash},
 
-        {"config_hash", e.config_hash},
+        {"config_hash", e->config_hash},
     };
 }
 

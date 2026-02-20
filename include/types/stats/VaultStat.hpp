@@ -12,8 +12,8 @@ struct Event;
 struct CapacityStats;
 
 struct VaultStat {
+    uint32_t vault_id;
     std::shared_ptr<CapacityStats> capacity;
-    std::shared_ptr<sync::Event> latest_sync_event;
 
     explicit VaultStat(unsigned int vaultId);
 };

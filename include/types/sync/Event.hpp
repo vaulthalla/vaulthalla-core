@@ -140,7 +140,7 @@ struct Event : public std::enable_shared_from_this<Event> {
     [[nodiscard]] pqxx::params getParams() const noexcept;
 };
 
-void to_json(nlohmann::json& j, const Event& e);
+void to_json(nlohmann::json& j, const std::shared_ptr<Event>& e);
 
 std::vector<std::shared_ptr<Event>> sync_events_from_pqxx_res(const pqxx::result& res);
 

@@ -32,7 +32,7 @@ public:
 
     void interruptTask(unsigned int vaultId);
 
-    void runNow(unsigned int vaultId);
+    void runNow(unsigned int vaultId, uint8_t trigger = 3); // sync::Event::Trigger::WEBHOOK
 
 protected:
     void runLoop() override;

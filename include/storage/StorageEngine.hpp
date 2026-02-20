@@ -10,6 +10,11 @@ struct Vault;
 struct File;
 struct Sync;
 struct Path;
+
+namespace sync {
+struct Event;
+}
+
 }
 
 namespace vh::crypto {
@@ -25,6 +30,7 @@ enum class StorageType { Local, Cloud };
 struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     std::shared_ptr<types::Vault> vault;
     std::shared_ptr<types::Sync> sync;
+    std::shared_ptr<types::sync::Event> latestSyncEvent;
     std::shared_ptr<types::Path> paths;
     std::shared_ptr<crypto::VaultEncryptionManager> encryptionManager;
     std::shared_mutex mutex;
@@ -36,6 +42,9 @@ struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     explicit StorageEngine(const std::shared_ptr<types::Vault>& vault);
 
     virtual ~StorageEngine() = default;
+
+    void newSyncEvent(uint8_t trigger = 0);  // trigger 0: Scheduled
+    void saveSyncEvent() const;
 
     [[nodiscard]] bool isDirectory(const fs::path& rel_path) const;
 

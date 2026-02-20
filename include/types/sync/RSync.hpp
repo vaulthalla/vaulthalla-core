@@ -11,12 +11,13 @@ class row;
 
 namespace vh::types {
 
-struct RSync : public Sync {
+struct RSync final : public Sync {
     enum class Strategy { Cache, Sync, Mirror };
 
     enum class ConflictPolicy {
         KeepLocal,
         KeepRemote,
+        KeepNewest,
         Ask
     };
 
@@ -24,7 +25,11 @@ struct RSync : public Sync {
     ConflictPolicy conflict_policy{ConflictPolicy::KeepLocal};
 
     RSync() = default;
+    ~RSync() override = default;
     explicit RSync(const pqxx::row& row);
+
+    void rehash_config() override;
+    [[nodiscard]] bool resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const override;
 };
 
 void to_json(nlohmann::json& j, const RSync& s);

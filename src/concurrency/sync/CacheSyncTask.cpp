@@ -33,7 +33,9 @@ void CacheSyncTask::sync() {
         }
 
         const auto rFile = match->second;
-        const auto remoteHash = std::make_optional(cloudEngine()->getRemoteContentHash(rFile->path));
+        rFile->content_hash = std::make_optional(cloudEngine()->getRemoteContentHash(rFile->path));
+
+        if (conflict(file, rFile)) continue;
 
         if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);

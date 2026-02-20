@@ -49,6 +49,24 @@ auth:
   refresh_token_expiry_days: 7      # Refresh token TTL
 
 
+# === 🔃 SYNC SETTINGS ===
+# Sync settings manage how often the system checks for changes in the vault and updates file metadata.
+sync:
+  event_audit_retention_days: 30          # Retain database events/conflicts for this many days, minimum 7 days
+  event_audit_max_entries: 5000           # Max number of database events/conflicts to retain, minimum 1000
+
+
+# === ⚙️ SERVICE SETTINGS ===
+# Service settings manage background tasks like database sweeping.
+services:
+  db_sweeper:
+    sweep_interval_minutes: 60             # Interval for sweeping old database events/conflicts, minimum 5 minutes
+  connection_lifecycle_manager:
+    idle_timeout_minutes: 30              # Timeout for idle connections, minimum 5 minutes
+    unauthenticated_timeout_seconds: 60  # Timeout for unauthenticated connections, minimum 30 seconds
+    sweep_interval_seconds: 60           # Interval for sweeping idle connections, minimum 15 seconds
+
+
 # === 🤝 SHARING SETTINGS ===
 # Sharing features allow users to share files and folders internally
 # and via public links.

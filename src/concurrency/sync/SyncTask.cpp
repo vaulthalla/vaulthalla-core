@@ -7,10 +7,15 @@
 #include "concurrency/sync/CloudRotateKeyTask.hpp"
 #include "types/vault/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
 #include "types/fs/File.hpp"
-#include "types/sync/Sync.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/Event.hpp"
+#include "types/sync/Throughput.hpp"
+#include "types/sync/Artifact.hpp"
+#include "types/sync/ConflictArtifact.hpp"
+#include "types/sync/Conflict.hpp"
+#include "types/sync/FSync.hpp"
+#include "types/sync/RSync.hpp"
 
 #include <utility>
 
@@ -22,71 +27,29 @@ using namespace vh::logging;
 using namespace vh::storage;
 
 void SyncTask::operator()() {
-    LogRegistry::sync()->info("[SyncTask] Preparing to sync vault '{}'", engine_->vault->id);
-    const auto start = steady_clock::now();
+    startTask();
 
-    try {
-        handleInterrupt();
+    const Stage stages[] = {
+        {"shared",   [this]{ processSharedOps(); }},
+        {"initBins", [this]{ initBins(); }},
+        {"sync",     [this]{ sync(); }},
+        {"clearBins",[this]{ clearBins(); }},
+    };
 
-        if (!engine_) {
-            LogRegistry::sync()->error("[SyncTask] Engine is null, cannot proceed with sync.");
-            return;
-        }
+    runStages(stages);
+    shutdown();
+}
 
-        isRunning_ = true;
-        SyncQueries::reportSyncStarted(engine_->sync->id);
+void SyncTask::initBins() {
+    s3Map_ = cloudEngine()->getGroupedFilesFromS3();
+    s3Files_ = uMap2Vector(s3Map_);
+    localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
+    localMap_ = groupEntriesByPath(localFiles_);
 
-        processOperations();
-        handleInterrupt();
-        removeTrashedFiles();
-        handleInterrupt();
-        handleVaultKeyRotation();
-        handleInterrupt();
+    event_->heartbeat();
 
-        s3Map_ = cloudEngine()->getGroupedFilesFromS3();
-        s3Files_ = uMap2Vector(s3Map_);
-        localFiles_ = FileQueries::listFilesInDir(engine_->vault->id);
-        localMap_ = groupEntriesByPath(localFiles_);
-
-        for (const auto& [path, entry] : intersect(s3Map_, localMap_))
-            remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
-
-
-        futures_.clear();
-
-        sync();
-
-        SyncQueries::reportSyncSuccess(engine_->sync->id);
-        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
-
-        handleInterrupt();
-
-        localFiles_.clear();
-        s3Files_.clear();
-        s3Map_.clear();
-        localMap_.clear();
-        remoteHashMap_.clear();
-
-        requeue();
-        isRunning_ = false;
-
-        LogRegistry::sync()->debug("[SyncTask] Sync task requeued for vault '{}'", engine_->vault->id);
-    } catch (const std::exception& e) {
-        isRunning_ = false;
-        if (std::string(e.what()).contains("Sync task interrupted")) {
-            LogRegistry::sync()->info("[SyncTask] Sync task interrupted for vault '{}'", engine_->vault->id);
-            return;
-        }
-        LogRegistry::sync()->error("[SyncTask] Exception during sync for vault '{}': {}", engine_->vault->id, e.what());
-    } catch (...) {
-        LogRegistry::sync()->error("[SyncTask] Unknown exception during sync for vault '{}'", engine_->vault->id);
-        isRunning_ = false;
-    }
-
-    const auto end = steady_clock::now();
-    const auto duration = duration_cast<milliseconds>(end - start);
-    LogRegistry::sync()->info("[SyncTask] Sync completed for vault '{}' in {}ms",
-                              engine_->vault->id, duration.count());
+    for (const auto& [path, entry] : intersect(s3Map_, localMap_))
+        remoteHashMap_.insert({entry->path.u8string(), cloudEngine()->getRemoteContentHash(entry->path)});
 }
 
 void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
@@ -95,22 +58,61 @@ void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& fi
 
 void SyncTask::removeTrashedFiles() {
     const auto files = FileQueries::listTrashedFiles(vaultId());
+
     futures_.reserve(files.size());
     for (const auto& file : files)
-        push(std::make_shared<CloudTrashedDeleteTask>(cloudEngine(), file));
+        push(std::make_shared<CloudTrashedDeleteTask>(cloudEngine(), file, op(sync::Throughput::Metric::DELETE)));
+
     processFutures();
 }
 
 void SyncTask::upload(const std::shared_ptr<File>& file) {
-    push(std::make_shared<UploadTask>(cloudEngine(), file));
+    push(std::make_shared<UploadTask>(cloudEngine(), file, op(sync::Throughput::Metric::UPLOAD)));
 }
 
 void SyncTask::download(const std::shared_ptr<File>& file, const bool freeAfterDownload) {
-    push(std::make_shared<DownloadTask>(cloudEngine(), file, freeAfterDownload));
+    push(std::make_shared<DownloadTask>(cloudEngine(), file, event_->getOrCreateThroughput(sync::Throughput::Metric::DOWNLOAD).newOp(), freeAfterDownload));
 }
 
 void SyncTask::remove(const std::shared_ptr<File>& file, const CloudDeleteTask::Type& type) {
-    push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, type));
+    push(std::make_shared<CloudDeleteTask>(cloudEngine(), file, op(sync::Throughput::Metric::DELETE), type));
+}
+
+bool SyncTask::hasPotentialConflict(const std::shared_ptr<File>& local, const std::shared_ptr<File>& upstream, bool upstream_decryption_failure) {
+    if (upstream_decryption_failure) return true;
+
+    if (local->size_bytes != upstream->size_bytes) return true;
+
+    if (local->content_hash && upstream->content_hash && *local->content_hash != *upstream->content_hash) return true;
+
+    return false;
+}
+
+
+bool SyncTask::conflict(const std::shared_ptr<File>& local, const std::shared_ptr<File>& upstream, const bool upstream_decryption_failure) const {
+    if (!hasPotentialConflict(local, upstream, upstream_decryption_failure)) return false;
+
+    const auto conflict = std::make_shared<sync::Conflict>();
+    conflict->failed_to_decrypt_upstream = upstream_decryption_failure;
+    conflict->artifacts.local = sync::Artifact(local, sync::Artifact::Side::LOCAL);
+    conflict->artifacts.upstream = sync::Artifact(upstream, sync::Artifact::Side::UPSTREAM);
+    conflict->analyze();
+
+    if (conflict->reasons.empty()) {
+        LogRegistry::sync()->debug("[SyncTask] hasPotentialConflict() returned true, but no reasons were identified for the conflict. This might indicate a logic error in the conflict detection algorithm.");
+        return false;
+    }
+
+    conflict->created_at = system_clock::to_time_t(system_clock::now());
+    conflict->file_id = local->id;
+    conflict->event_id = event_->id;
+
+    const bool ok = engine()->sync->resolve_conflict(conflict);
+
+    if (ok) conflict->resolved_at = system_clock::to_time_t(system_clock::now());
+    event_->conflicts.push_back(conflict);
+
+    return !ok;
 }
 
 uintmax_t SyncTask::computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<File> >& files) {
@@ -155,4 +157,12 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> SyncTask::intersect(
     for (const auto& item : a) if (b.contains(item.first)) result.insert(item);
 
     return result;
+}
+
+void SyncTask::clearBins() {
+    localFiles_.clear();
+    s3Files_.clear();
+    s3Map_.clear();
+    localMap_.clear();
+    remoteHashMap_.clear();
 }

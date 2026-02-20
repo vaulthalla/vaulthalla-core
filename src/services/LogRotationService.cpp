@@ -40,8 +40,8 @@ LogRotationService::LogRotationService()
 LogRotationService::~LogRotationService() { stop(); }
 
 void LogRotationService::runLoop() {
-    while (isRunning() && !interruptFlag_.load()) {
-        std::this_thread::sleep_for(CHECK_INTERVAL);
+    while (!shouldStop()) {
+        lazySleep(CHECK_INTERVAL);
         LogRegistry::vaulthalla()->debug("[LogRotationService] Checking for log rotation...");
         appRot_->maybeRotate();
         auditRot_->maybeRotate();

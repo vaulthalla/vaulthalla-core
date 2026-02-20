@@ -4,6 +4,7 @@
 #include "types/vault/Vault.hpp"
 #include "types/vault/S3Vault.hpp"
 #include "types/sync/Sync.hpp"
+#include "types/sync/RSync.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
@@ -35,7 +36,7 @@ json VaultHandler::add(const json& payload, const WebSocketSession& session) {
         const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
         const std::string bucket = payload.at("bucket").get<std::string>();
         vault = std::make_shared<S3Vault>(name, apiKeyID, bucket);
-        sync = std::make_shared<Sync>(payload);
+        sync = std::make_shared<RSync>(payload);
     }
 
     vault->name = name;

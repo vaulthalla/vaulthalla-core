@@ -4,14 +4,21 @@
 #include "auth/AuthManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+#include "config/ConfigRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::auth;
 using namespace vh::logging;
+using namespace vh::config;
 
 ConnectionLifecycleManager::ConnectionLifecycleManager()
     : AsyncService("LifecycleManager"),
-      sessionManager_(ServiceDepsRegistry::instance().authManager->sessionManager()) {}
+      sessionManager_(ServiceDepsRegistry::instance().authManager->sessionManager()) {
+    const auto& config = ConfigRegistry::get().services.connection_lifecycle_manager;
+    sweep_interval_ = std::chrono::seconds(config.sweep_interval_seconds);
+    unauthenticated_session_timeout_ = std::chrono::seconds(config.unauthenticated_timeout_seconds);
+    idle_timeout_ = std::chrono::minutes(config.idle_timeout_minutes); // TODO: implement idle timeout logic
+}
 
 ConnectionLifecycleManager::~ConnectionLifecycleManager() {
     stop();
@@ -19,9 +26,9 @@ ConnectionLifecycleManager::~ConnectionLifecycleManager() {
 
 void ConnectionLifecycleManager::runLoop() {
     LogRegistry::ws()->info("[LifecycleManager] Started connection lifecycle manager.");
-    while (running_ && !interruptFlag_.load()) {
+    while (!shouldStop()) {
         sweepActiveSessions();
-        std::this_thread::sleep_for(SWEEP_INTERVAL);
+        lazySleep(sweep_interval_);
     }
 }
 
@@ -31,7 +38,7 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
 
         const auto token = client->getToken();
 
-        if (client->connOpenedAt() + UNAUTHENTICATED_SESSION_TIMEOUT < std::chrono::system_clock::now() && !token) {
+        if (client->connOpenedAt() + unauthenticated_session_timeout_ < std::chrono::system_clock::now() && !token) {
             LogRegistry::ws()->debug("[LifecycleManager] Closing unauthenticated session (no token) opened at {}",
                                     std::chrono::system_clock::to_time_t(client->connOpenedAt()));
             client->sendControlMessage("unauthenticated_session_timeout", {});

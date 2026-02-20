@@ -6,6 +6,7 @@
 #include "services/ConnectionLifecycleManager.hpp"
 #include "services/LogRotationService.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "services/DBSweeper.hpp"
 
 #include <paths.h>
 
@@ -22,13 +23,15 @@ ServiceManager::ServiceManager()
       fuseService(std::make_shared<FUSE>()),
       vaulthallaService(std::make_shared<Vaulthalla>()),
       connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>()),
-      logRotationService(std::make_shared<LogRotationService>())
+      logRotationService(std::make_shared<LogRotationService>()),
+      dbSweeperService(std::make_shared<DBSweeper>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;
     services_["Vaulthalla"] = vaulthallaService;
     services_["ConnectionLifecycleManager"] = connectionLifecycleManager;
     services_["LogRotationService"] = logRotationService;
+    services_["DBSweeper"] = dbSweeperService;
 
     if (!paths::testMode) {
         ctlServerService = std::make_shared<CtlServerService>();
@@ -46,6 +49,7 @@ void ServiceManager::startAll() {
     tryStart("CtlServer", ctlServerService);
     tryStart("ConnectionLifecycleManager", connectionLifecycleManager);
     tryStart("LogRotationService", logRotationService);
+    tryStart("DBSweeper", dbSweeperService);
     LogRegistry::vaulthalla()->debug("[ServiceManager] All services started.");
 
     startWatchdog();
@@ -68,6 +72,7 @@ void ServiceManager::stopAll(const int signal) {
         stopService("CtlServer", ctlServerService, signal);
         stopService("ConnectionLifecycleManager", connectionLifecycleManager, signal);
         stopService("LogRotationService", logRotationService, signal);
+        stopService("DBSweeper", dbSweeperService, signal);
     }
 
     stopWatchdog();
@@ -78,7 +83,7 @@ void ServiceManager::stopAll(const int signal) {
 void ServiceManager::restartService(const std::string& name) {
     std::lock_guard lock(mutex_);
 
-    auto svc = services_.at(name);
+    const auto svc = services_.at(name);
     if (!svc) return;
 
     LogRegistry::vaulthalla()->warn("[ServiceManager] Restarting service: {}", name);

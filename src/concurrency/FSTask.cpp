@@ -4,7 +4,7 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
 #include "types/sync/Sync.hpp"
-#include "types/fs/Operation.hpp"
+#include "types/sync/Operation.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/File.hpp"
 #include "types/fs/Path.hpp"
@@ -16,6 +16,11 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/task.hpp"
+#include "types/sync/Event.hpp"
+#include "types/sync/Throughput.hpp"
+#include "types/sync/ScopedOp.hpp"
+#include "database/Queries/SyncQueries.hpp"
+#include "types/sync/Throughput.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -23,10 +28,12 @@ using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace std::chrono;
+using namespace vh::types;
 
 FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
-  engine_(engine) {}
+  engine_(engine),
+  event_(std::make_shared<sync::Event>()) {}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 
@@ -39,6 +46,96 @@ bool FSTask::isInterrupted() const { return interruptFlag_.load(); }
 std::shared_ptr<StorageEngine> FSTask::engine() const {
     if (!engine_) throw std::runtime_error("Storage engine is not set");
     return engine_;
+}
+
+void FSTask::runStages(const std::span<const Stage> stages) const {
+    for (const auto& [name, fn] : stages) {
+        if (!isRunning()) break;
+        try {
+            fn();
+            handleInterrupt();
+            if (event_) event_->heartbeat();
+        } catch (const std::exception& e) {
+            handleError(std::format("[FSTask:{}] {}", std::string(name), e.what()));
+            break;
+        } catch (...) {
+            handleError(std::format("[FSTask:{}] Unknown exception", std::string(name)));
+            break;
+        }
+    }
+}
+
+void FSTask::startTask() {
+    if (!engine_) {
+        LogRegistry::sync()->error("[FSTask] Engine is null, cannot proceed with sync.");
+        return;
+    }
+
+    LogRegistry::sync()->debug("[FSTask] Starting sync for vault '{}'", engine_->vault->id);
+
+    isRunning_ = true;
+    SyncQueries::reportSyncStarted(engine_->sync->id);
+
+    newEvent();
+    event_ = engine_->latestSyncEvent;
+    event_->status = sync::Event::Status::RUNNING;
+    engine_->saveSyncEvent();
+    event_->start();
+}
+
+void FSTask::processSharedOps() {
+    struct NamedOp { const char* name; std::function<void()> fn; };
+
+    const std::vector<NamedOp> ops = {
+        {"processOperations", [this]{ processOperations(); }},
+        {"removeTrashedFiles", [this]{ removeTrashedFiles(); }},
+        {"handleVaultKeyRotation", [this]{ handleVaultKeyRotation(); }},
+      };
+
+    for (const auto& [name, op] : ops) {
+        if (!isRunning()) break;
+
+        try {
+            op();
+            handleInterrupt();
+            event_->heartbeat();
+        } catch (const std::exception& e) {
+            handleError(std::format("[FSTask] Exception during {}: {}", name, e.what()));
+            break;
+        }
+    }
+}
+
+void FSTask::handleError(const std::string& message) const {
+    LogRegistry::sync()->error("[FSTask] {}", message);
+    event_->error_message = message;
+    event_->status = sync::Event::Status::ERROR;
+}
+
+void FSTask::shutdown() {
+    isRunning_ = false;
+    futures_.clear();
+    event_->stop();
+    event_->parseCurrentStatus();
+    engine_->saveSyncEvent();
+    if (event_->status == sync::Event::Status::SUCCESS) {
+        SyncQueries::reportSyncSuccess(engine_->sync->id);
+        next_run = system_clock::now() + seconds(engine_->sync->interval.count());
+        requeue();
+        LogRegistry::sync()->debug("[FSTask] Sync task requeued for vault '{}'", engine_->vault->id);
+        LogRegistry::sync()->info("[FSTask] Sync completed for vault '{}' in {}s",
+                              engine_->vault->id, event_->durationSeconds());
+    } else {
+        LogRegistry::sync()->error("[FSTask] Sync failed for vault '{}': {}", engine_->vault->id, event_->error_message);
+    }
+}
+
+void FSTask::newEvent() {
+    if (!runNow_) engine_->newSyncEvent();
+    else {
+        engine_->newSyncEvent(trigger_);
+        runNow_ = false;
+    }
 }
 
 void FSTask::processFutures() {
@@ -55,13 +152,26 @@ void FSTask::requeue() {
     ServiceDepsRegistry::instance().syncController->requeue(shared_from_this());
 }
 
+void FSTask::runNow(const uint8_t trigger) {
+    runNow_ = true;
+    trigger_ = trigger;
+    next_run = system_clock::now();
+}
+
 void FSTask::push(const std::shared_ptr<Task>& task) {
     futures_.push_back(task->getFuture().value());
     ThreadPoolManager::instance().syncPool()->submit(task);
 }
 
+sync::ScopedOp& FSTask::op(const sync::Throughput::Metric& metric) const {
+    return event_->getOrCreateThroughput(metric).newOp();
+}
+
 void FSTask::processOperations() const {
     for (const auto& op : OperationQueries::listOperationsByVault(engine_->vault->id)) {
+        auto& scopedOp = event_->getOrCreateThroughput(op->opToThroughputMetric()).newOp();
+        scopedOp.start();
+
         const auto absSrc = engine_->paths->absPath(op->source_path, PathType::BACKING_VAULT_ROOT);
         const auto absDest = engine_->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
@@ -69,11 +179,15 @@ void FSTask::processOperations() const {
         const auto f = FileQueries::getFileByPath(engine_->vault->id, op->destination_path);
         if (!f) {
             LogRegistry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
+            scopedOp.stop();
             continue;
         }
 
+        scopedOp.size_bytes = f->size_bytes;
+
         if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
             LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
+            scopedOp.stop();
             continue;
         }
 
@@ -82,6 +196,7 @@ void FSTask::processOperations() const {
 
         if (buffer.empty()) {
             LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
+            scopedOp.stop();
             continue;
         }
 
@@ -97,6 +212,8 @@ void FSTask::processOperations() const {
         if (op->operation == Operation::Op::Copy) engine_->copyThumbnails(op->source_path, op->destination_path);
         else if (op->operation == Operation::Op::Move || op->operation == Operation::Op::Rename) move();
         else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
+
+        scopedOp.stop();
     }
 }
 

@@ -39,7 +39,14 @@ class DBConnection {
     void initPreparedVaults() const;
     void initPreparedVaultKeys() const;
     void initPreparedAPIKeys() const;
+
+    // Sync
     void initPreparedSync() const;
+    void initPreparedSyncEvents() const;
+    void initPreparedSyncThroughput() const;
+    void initPreparedSyncConflicts() const;
+    void initPreparedSyncConflictArtifacts() const;
+    void initPreparedSyncConflictReasons() const;
 
     // Filesystem
     void initPreparedFsEntries() const;

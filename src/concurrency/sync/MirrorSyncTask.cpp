@@ -31,6 +31,11 @@ void MirrorSyncTask::syncKeepLocal() {
             continue;
         }
 
+        const auto rFile = match->second;
+        rFile->content_hash = std::make_optional(cloudEngine()->getRemoteContentHash(rFile->path));
+
+        if (conflict(file, rFile)) continue;
+
         if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
             continue;

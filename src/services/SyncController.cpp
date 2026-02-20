@@ -14,6 +14,7 @@
 #include "types/vault/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/Event.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <thread>
@@ -56,7 +57,7 @@ void SyncController::runLoop() {
     std::chrono::system_clock::time_point lastRefresh = std::chrono::system_clock::now();
     unsigned int refreshTries = 0;
 
-    while (running_ && !interruptFlag_.load()) {
+    while (!shouldStop()) {
         if (std::chrono::system_clock::now() - lastRefresh > std::chrono::minutes(5)) {
             LogRegistry::sync()->debug("[SyncController] Refreshing sync engines...");
             refreshEngines();
@@ -70,7 +71,7 @@ void SyncController::runLoop() {
         }
 
         if (pqIsEmpty) {
-            if (++refreshTries > 3) std::this_thread::sleep_for(std::chrono::seconds(3));
+            if (++refreshTries > 3) lazySleep(std::chrono::seconds(3));
             refreshEngines();
             continue;
         }
@@ -94,7 +95,7 @@ void SyncController::runLoop() {
     }
 }
 
-void SyncController::runNow(const unsigned int vaultId) {
+void SyncController::runNow(const unsigned int vaultId, const uint8_t trigger) {
     LogRegistry::sync()->debug("[SyncController] Early sync request for vault ID: {}", vaultId);
 
     std::shared_ptr<FSTask> task;
@@ -114,7 +115,7 @@ void SyncController::runNow(const unsigned int vaultId) {
 
     const auto engine = task->engine();
     task = createTask(engine);
-    task->next_run = std::chrono::system_clock::now();
+    task->runNow(trigger);
 
     {
         std::scoped_lock lock(taskMapMutex_, pqMutex_);

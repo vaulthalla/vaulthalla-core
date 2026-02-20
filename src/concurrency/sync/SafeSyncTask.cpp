@@ -41,6 +41,11 @@ void SafeSyncTask::sync() {
             continue;
         }
 
+        const auto rFile = match->second;
+        rFile->content_hash = std::make_optional(cloudEngine()->getRemoteContentHash(rFile->path));
+
+        if (conflict(file, rFile)) continue;
+
         if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
             s3Map_.erase(match);
             continue;
@@ -61,6 +66,9 @@ void SafeSyncTask::sync() {
     const auto availableSpace = engine_->freeSpace();
 
     if (availableSpace < requiredSpace) {
+        event_->error_code = "Insufficient Disk Space";
+        event_->error_message = "Not enough free space for download. Required: " + std::to_string(requiredSpace) + ", Available: " + std::to_string(availableSpace);
+        event_->stall_reason = event_->error_code;
         throw std::runtime_error(
             "[SafeSyncTask] Not enough free space for download. Required: " +
             std::to_string(requiredSpace) + ", Available: " + std::to_string(availableSpace));

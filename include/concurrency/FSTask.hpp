@@ -1,6 +1,7 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
+#include "types/sync/Throughput.hpp"
 
 #include <memory>
 #include <chrono>
@@ -19,9 +20,17 @@ class SyncController;
 
 namespace vh::types {
 struct File;
+
+namespace sync { struct Event; }
+
 }
 
 namespace vh::concurrency {
+
+struct Stage {
+    const char* name;
+    std::function<void()> fn;
+};
 
 class FSTask : public Task, public std::enable_shared_from_this<FSTask> {
 public:
@@ -46,11 +55,24 @@ public:
 
     void requeue();
 
+    void runNow(uint8_t trigger = 3);  // sync::Event::Trigger::WEBHOOK
+
 protected:
     std::shared_ptr<storage::StorageEngine> engine_;
     std::vector<std::future<ExpectedFuture>> futures_;
-    bool isRunning_ = false;
+    bool isRunning_{false}, runNow_{false};
     std::atomic<bool> interruptFlag_{false};
+    std::shared_ptr<types::sync::Event> event_;
+    uint8_t trigger_{3};
+
+    void startTask();
+    void processSharedOps();
+    void handleError(const std::string& message) const;
+    void shutdown();
+    void newEvent();
+    void runStages(std::span<const Stage> stages) const;
+
+    types::sync::ScopedOp& op(const types::sync::Throughput::Metric& metric) const;
 
     virtual void removeTrashedFiles() = 0;
     virtual void processFutures();

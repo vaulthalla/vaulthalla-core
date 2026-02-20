@@ -45,34 +45,80 @@ void DBConnection::initPreparedFiles() const {
                    "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
                    "WHERE fs.vault_id = $1 AND fs.path = $2");
 
-    conn_->prepare("mark_file_trashed",
-                   "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.base32_alias, fs.vault_id "
-                   "  FROM fs_entry fs "
-                   "  WHERE fs.vault_id = $1 AND fs.path = $2"
-                   "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, base32_alias, trashed_at, trashed_by, backing_path) "
-                   "  SELECT vault_id, base32_alias, NOW(), $3, $4 "
-                   "  FROM target"
-                   "), removed AS ("
-                   "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
-                   ") "
-                   "DELETE FROM fs_entry WHERE id IN (SELECT fs_entry_id FROM target);"
+    conn_->prepare(
+        "mark_file_trashed",
+        "WITH target AS ("
+        "  SELECT fs.id AS fs_entry_id, "
+        "         fs.base32_alias, "
+        "         fs.vault_id, "
+        "         fs.path, "
+        "         f.size_bytes "
+        "  FROM fs_entry fs "
+        "  JOIN files f ON f.fs_entry_id = fs.id "
+        "  WHERE fs.vault_id = $1 AND fs.path = $2"
+        "), moved AS ("
+        "  INSERT INTO files_trashed ("
+        "      vault_id, "
+        "      path, "
+        "      backing_path, "
+        "      base32_alias, "
+        "      size_bytes, "
+        "      trashed_at, "
+        "      trashed_by"
+        "  ) "
+        "  SELECT "
+        "      vault_id, "
+        "      path, "
+        "      $4, "
+        "      base32_alias, "
+        "      size_bytes, "
+        "      NOW(), "
+        "      $3 "
+        "  FROM target"
+        "), removed AS ("
+        "  DELETE FROM files "
+        "  WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
+        ") "
+        "DELETE FROM fs_entry "
+        "WHERE id IN (SELECT fs_entry_id FROM target);"
         );
 
-    conn_->prepare("mark_file_trashed_by_id",
-                   "WITH target AS ("
-                   "  SELECT fs.id AS fs_entry_id, fs.base32_alias, fs.vault_id "
-                   "  FROM fs_entry fs "
-                   "  WHERE fs.id = $1"
-                   "), moved AS ("
-                   "  INSERT INTO files_trashed (vault_id, base32_alias, trashed_at, trashed_by, backing_path) "
-                   "  SELECT vault_id, base32_alias, NOW(), $2, $3 "
-                   "  FROM target"
-                   "), removed AS ("
-                   "  DELETE FROM files WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
-                   ") "
-                   "DELETE FROM fs_entry WHERE id IN (SELECT fs_entry_id FROM target);"
+    conn_->prepare(
+        "mark_file_trashed_by_id",
+        "WITH target AS ("
+        "  SELECT fs.id AS fs_entry_id, "
+        "         fs.base32_alias, "
+        "         fs.vault_id, "
+        "         fs.path, "
+        "         f.size_bytes "
+        "  FROM fs_entry fs "
+        "  JOIN files f ON f.fs_entry_id = fs.id "
+        "  WHERE fs.id = $1"
+        "), moved AS ("
+        "  INSERT INTO files_trashed ("
+        "      vault_id, "
+        "      path, "
+        "      backing_path, "
+        "      base32_alias, "
+        "      size_bytes, "
+        "      trashed_at, "
+        "      trashed_by"
+        "  ) "
+        "  SELECT "
+        "      vault_id, "
+        "      path, "
+        "      $3, "
+        "      base32_alias, "
+        "      size_bytes, "
+        "      NOW(), "
+        "      $2 "
+        "  FROM target"
+        "), removed AS ("
+        "  DELETE FROM files "
+        "  WHERE fs_entry_id IN (SELECT fs_entry_id FROM target)"
+        ") "
+        "DELETE FROM fs_entry "
+        "WHERE id IN (SELECT fs_entry_id FROM target);"
         );
 
     conn_->prepare("list_trashed_files",
@@ -205,21 +251,21 @@ void DBConnection::initPreparedFiles() const {
                    "WHERE fs.vault_id = $1 AND f.encrypted_with_key_version < $2");
 
     conn_->prepare("get_n_largest_files",
-        "SELECT fs.*, f.* "
-        "FROM files f "
-        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-        "WHERE fs.vault_id = $1 "
-        "ORDER BY f.size_bytes DESC "
-        "LIMIT $2");
+                   "SELECT fs.*, f.* "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1 "
+                   "ORDER BY f.size_bytes DESC "
+                   "LIMIT $2");
 
     conn_->prepare("get_all_files",
-        "SELECT fs.*, f.* "
-        "FROM files f "
-        "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
-        "WHERE fs.vault_id = $1");
+                   "SELECT fs.*, f.* "
+                   "FROM files f "
+                   "JOIN fs_entry fs ON f.fs_entry_id = fs.id "
+                   "WHERE fs.vault_id = $1");
 
     conn_->prepare("get_top_extensions_by_size",
-R"SQL(
+                   R"SQL(
     SELECT
         ext,
         SUM(f.size_bytes)::bigint AS total_bytes

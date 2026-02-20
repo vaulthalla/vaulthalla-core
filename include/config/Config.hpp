@@ -54,6 +54,26 @@ struct AuthConfig {
     unsigned int refresh_token_expiry_days = 7;
 };
 
+struct SyncConfig {
+    uint32_t event_audit_retention_days = 30;
+    uint32_t event_audit_max_entries = 10000;
+};
+
+struct DBSweeperConfig {
+    uint32_t sweep_interval_minutes = 60;
+};
+
+struct ConnectionLifecycleManagerConfig {
+    uint32_t idle_timeout_minutes = 30;
+    uint32_t unauthenticated_timeout_seconds = 60;
+    uint32_t sweep_interval_seconds = 60;
+};
+
+struct ServicesConfig {
+    DBSweeperConfig db_sweeper;
+    ConnectionLifecycleManagerConfig connection_lifecycle_manager;
+};
+
 struct SharingConfig {
     bool enabled = true;
     bool enable_public_links = true;
@@ -120,6 +140,8 @@ struct Config {
     CachingConfig caching;
     DatabaseConfig database;
     AuthConfig auth;
+    SyncConfig sync;
+    ServicesConfig services;
     SharingConfig sharing;
     AuditConfig auditing;
     DevConfig dev;
@@ -150,6 +172,14 @@ void to_json(nlohmann::json& j, const DatabaseConfig& c);
 void from_json(const nlohmann::json& j, DatabaseConfig& c);
 void to_json(nlohmann::json& j, const AuthConfig& c);
 void from_json(const nlohmann::json& j, AuthConfig& c);
+void to_json(nlohmann::json& j, const SyncConfig& c);
+void from_json(const nlohmann::json& j, SyncConfig& c);
+void to_json(nlohmann::json& j, const DBSweeperConfig& c);
+void from_json(const nlohmann::json& j, DBSweeperConfig& c);
+void to_json(nlohmann::json& j, const ConnectionLifecycleManagerConfig& c);
+void from_json(const nlohmann::json& j, ConnectionLifecycleManagerConfig& c);
+void to_json(nlohmann::json& j, const ServicesConfig& c);
+void from_json(const nlohmann::json& j, ServicesConfig& c);
 void to_json(nlohmann::json& j, const SharingConfig& c);
 void from_json(const nlohmann::json& j, SharingConfig& c);
 void to_json(nlohmann::json& j, const AuditLogConfig& c);

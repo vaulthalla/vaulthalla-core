@@ -5,6 +5,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "types/fs/Path.hpp"
 #include "logging/LogRegistry.hpp"
+#include "types/sync/ScopedOp.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::types;
@@ -13,37 +14,41 @@ using namespace vh::config;
 using namespace vh::storage;
 using namespace vh::logging;
 
-LocalDeleteTask::LocalDeleteTask(std::shared_ptr<StorageEngine> eng, std::shared_ptr<TrashedFile> f)
-    : engine(std::move(eng)), file(std::move(f)) {}
+LocalDeleteTask::LocalDeleteTask(std::shared_ptr<StorageEngine> eng, std::shared_ptr<TrashedFile> f, sync::ScopedOp& op)
+    : engine(std::move(eng)), file(std::move(f)), op(op) {}
 
 
 void LocalDeleteTask::operator()() {
     try {
+        op.start(file->size_bytes);
         auto absPath = engine->paths->absPath(file->backing_path, PathType::BACKING_ROOT);
         if (fs::exists(absPath)) fs::remove(absPath);
 
         while (absPath.has_parent_path()) {
-            const auto p = absPath.parent_path();
-            if (!fs::exists(p) || !fs::is_empty(p) || p == engine->paths->vaultRoot) break;
+            if (const auto p = absPath.parent_path();
+                !fs::exists(p) || !fs::is_empty(p) || p == engine->paths->vaultRoot) break;
             fs::remove(absPath.parent_path());
             absPath = absPath.parent_path();
         }
 
         const auto vaultPath = engine->paths->absRelToRoot(file->backing_path, PathType::VAULT_ROOT);
 
-        for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
-            const auto thumbPath = engine->paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);
-            if (fs::exists(thumbPath)) fs::remove(thumbPath);
-        }
+        for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes)
+            if (const auto thumbPath = engine->paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+                fs::exists(thumbPath)) fs::remove(thumbPath);
 
-        const auto cachePath = engine->paths->absPath(vaultPath, PathType::CACHE_ROOT);
-        if (fs::exists(cachePath)) fs::remove(cachePath);
+        if (const auto cachePath = engine->paths->absPath(vaultPath, PathType::CACHE_ROOT);
+            fs::exists(cachePath)) fs::remove(cachePath);
 
         FileQueries::markTrashedFileDeleted(file->id);
-        promise.set_value(true);
+
+        op.stop();
+        op.success = true;
     } catch (const std::exception& e) {
         LogRegistry::sync()->error("[LocalDeleteTask] Failed to delete trashed file: {} - {}", file->backing_path.string(), e.what());
-        promise.set_value(false);
+        op.stop();
     }
+
+    promise.set_value(op.success);
 }
 

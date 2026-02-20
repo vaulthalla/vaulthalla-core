@@ -108,7 +108,14 @@ void DBConnection::initPrepared() const {
     initPreparedVaults();
     initPreparedVaultKeys();
     initPreparedAPIKeys();
+
+    // Sync
     initPreparedSync();
+    initPreparedSyncEvents();
+    initPreparedSyncThroughput();
+    initPreparedSyncConflicts();
+    initPreparedSyncConflictArtifacts();
+    initPreparedSyncConflictReasons();
 
     // Filesystem
     initPreparedFsEntries();

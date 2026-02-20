@@ -6,9 +6,7 @@
 #include "protocols/websocket/WebSocketHandler.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/WebSocketServer.hpp"
-#include "services/ServiceManager.hpp"
 #include "protocols/http/HttpServer.hpp"
-#include "concurrency/ThreadPoolManager.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
@@ -29,7 +27,7 @@ void Vaulthalla::runLoop() {
         initProtocols();
         LogRegistry::vaulthalla()->debug("[Vaulthalla] Protocols initialized successfully");
 
-        while (!interruptFlag_.load()) std::this_thread::sleep_for(std::chrono::seconds(1));
+        while (!shouldStop()) std::this_thread::sleep_for(std::chrono::seconds(1));
 
         ioContext_->stop();
         if (ioThread_.joinable()) ioThread_.join();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types/sync/Throughput.hpp"
+
 #include <string>
 #include <optional>
 #include <ctime>
@@ -22,8 +24,8 @@ struct Operation {
     enum class Status { Pending, InProgress, Success, Failed, Cancelled };
 
     unsigned int id{}, fs_entry_id{}, executed_by{};
-    Op operation;
-    Target target;
+    Op operation{Op::Rename};
+    Target target{Target::File};
     Status status{Status::Pending};
     std::string source_path, destination_path;
     std::time_t created_at{}, completed_at{};
@@ -32,6 +34,8 @@ struct Operation {
     Operation() = default;
     explicit Operation(const pqxx::row& row);
     explicit Operation(const std::shared_ptr<FSEntry>& origEntry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
+
+    [[nodiscard]] sync::Throughput::Metric opToThroughputMetric() const;
 };
 
 std::string to_string(const Operation::Op& op);

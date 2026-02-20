@@ -1,35 +1,32 @@
 #include "services/AsyncService.hpp"
-#include "services/ServiceManager.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::services;
 using namespace vh::logging;
 
-AsyncService::AsyncService(const std::string& serviceName) : serviceName_(serviceName) {}
+AsyncService::AsyncService(const std::string& serviceName)
+    : serviceName_(serviceName) {}
 
 AsyncService::~AsyncService() {
-    stop(); // ensure cleanup
+    stop();
 }
 
 void AsyncService::start() {
     if (isRunning()) return;
 
-    interruptFlag_.store(false);
-    running_.store(true);
+    interruptFlag_.store(false, std::memory_order_release);
+    running_.store(true, std::memory_order_release);
 
     worker_ = std::thread([this] {
         try {
             runLoop();
         } catch (const std::exception& e) {
-            LogRegistry::vaulthalla()->error("[{}] Service encountered an error: {}", serviceName_, e.what());
-            running_.store(false);
-            return;
+            LogRegistry::vaulthalla()->error("[{}] Service error: {}", serviceName_, e.what());
         } catch (...) {
-            LogRegistry::vaulthalla()->error("[{}] Service encountered an unknown error.", serviceName_);
-            running_.store(false);
-            return;
+            LogRegistry::vaulthalla()->error("[{}] Service error: unknown exception.", serviceName_);
         }
-        running_.store(false);
+
+        running_.store(false, std::memory_order_release);
     });
 
     LogRegistry::vaulthalla()->info("[{}] Service started.", serviceName_);
@@ -39,14 +36,14 @@ void AsyncService::stop() {
     if (!isRunning()) return;
 
     LogRegistry::vaulthalla()->info("[{}] Stopping service...", serviceName_);
-    interruptFlag_.store(true);
+    interruptFlag_.store(true, std::memory_order_release);
 
-    // Only join if we’re not calling stop() from the same thread
-    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) worker_.join();
+    if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) {
+        worker_.join();
+    }
 
-    running_.store(false);
-    interruptFlag_.store(false);
-
+    running_.store(false, std::memory_order_release);
+    // Leave interruptFlag_ true until next start() resets it
     LogRegistry::vaulthalla()->info("[{}] Service stopped.", serviceName_);
 }
 
@@ -54,11 +51,4 @@ void AsyncService::restart() {
     LogRegistry::vaulthalla()->info("[{}] Restarting service...", serviceName_);
     stop();
     start();
-}
-
-void AsyncService::handleInterrupt() {
-    if (interruptFlag_.load()) {
-        LogRegistry::vaulthalla()->info("[{}] Service interrupted.", serviceName_);
-        stop();
-    }
 }

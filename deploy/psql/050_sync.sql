@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS sync_conflicts
     UNIQUE (event_id, file_id)
     );
 
-CREATE TABLE IF NOT EXISTS sync_conflict_reason
+CREATE TABLE IF NOT EXISTS sync_conflict_reasons
 (
     id              SERIAL PRIMARY KEY,
     conflict_id     INTEGER NOT NULL REFERENCES sync_conflicts(id) ON DELETE CASCADE,

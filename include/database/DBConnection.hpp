@@ -46,6 +46,7 @@ class DBConnection {
     void initPreparedSyncThroughput() const;
     void initPreparedSyncConflicts() const;
     void initPreparedSyncConflictArtifacts() const;
+    void initPreparedSyncConflictReasons() const;
 
     // Filesystem
     void initPreparedFsEntries() const;

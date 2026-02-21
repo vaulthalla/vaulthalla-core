@@ -37,7 +37,6 @@ using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::logging;
 using namespace vh::storage;
-using namespace vh::util;
 
 
 // ##########################################

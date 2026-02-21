@@ -15,18 +15,18 @@ MirrorSyncTask::MirrorSyncTask(const std::shared_ptr<StorageEngine>& engine)
     : SyncTask(engine) {}
 
 void MirrorSyncTask::sync() {
-    const auto sync = std::static_pointer_cast<sync::RemotePolicy>(engine_->sync);
+    const auto sync = std::static_pointer_cast<sync::RemotePolicy>(engine->sync);
     if (sync->conflict_policy == sync::RemotePolicy::ConflictPolicy::KeepLocal) syncKeepLocal();
     else if (sync->conflict_policy == sync::RemotePolicy::ConflictPolicy::KeepRemote) syncKeepRemote();
     else throw std::runtime_error("[MirrorSyncTask] Conflict policy not supported: " + to_string(sync->conflict_policy));
 }
 
 void MirrorSyncTask::syncKeepLocal() {
-    for (const auto& file : localFiles_) {
+    for (const auto& file : localFiles) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
-        const auto match = s3Map_.find(strippedPath);
+        const auto match = s3Map.find(strippedPath);
 
-        if (match == s3Map_.end()) {
+        if (match == s3Map.end()) {
             upload(file);
             continue;
         }
@@ -36,26 +36,26 @@ void MirrorSyncTask::syncKeepLocal() {
 
         if (conflict(file, rFile)) continue;
 
-        if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
-            s3Map_.erase(match);
+        if (file->content_hash && remoteHashMap[strippedPath] && *file->content_hash == remoteHashMap[strippedPath]) {
+            s3Map.erase(match);
             continue;
         }
 
         upload(file);
-        s3Map_.erase(match);
+        s3Map.erase(match);
     }
 
-    futures_.reserve(s3Map_.size());
-    for (const auto& file : uMap2Vector(s3Map_)) remove(file, CloudDeleteTask::Type::REMOTE);
+    futures.reserve(s3Map.size());
+    for (const auto& file : uMap2Vector(s3Map)) remove(file, CloudDeleteTask::Type::REMOTE);
     processFutures();
 }
 
 void MirrorSyncTask::syncKeepRemote() {
-    for (const auto& file : s3Files_) {
+    for (const auto& file : s3Files) {
         const auto localRelPath = std::filesystem::path("/" / file->path).u8string();
-        const auto match = localMap_.find(localRelPath);
+        const auto match = localMap.find(localRelPath);
 
-        if (match == localMap_.end()) {
+        if (match == localMap.end()) {
             download(file);
             continue;
         }
@@ -63,15 +63,15 @@ void MirrorSyncTask::syncKeepRemote() {
         const auto localFile = match->second;
 
         if (localFile->content_hash == cloudEngine()->getRemoteContentHash(file->path)) {
-            localMap_.erase(match);
+            localMap.erase(match);
             continue;
         }
 
         download(file);
-        localMap_.erase(match);
+        localMap.erase(match);
     }
 
-    futures_.reserve(localMap_.size());
-    for (const auto& file : uMap2Vector(localMap_)) remove(file, CloudDeleteTask::Type::LOCAL);
+    futures.reserve(localMap.size());
+    for (const auto& file : uMap2Vector(localMap)) remove(file, CloudDeleteTask::Type::LOCAL);
     processFutures();
 }

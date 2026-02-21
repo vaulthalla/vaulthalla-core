@@ -75,6 +75,11 @@ FSEntry::FSEntry(const std::string& s3_key) {
     created_at = updated_at = std::time(nullptr); // default timestamp (can override)
 }
 
+bool FSEntry::operator==(const FSEntry& other) const {
+    return size_bytes == other.size_bytes &&
+           path == other.path;
+}
+
 void vh::types::to_json(nlohmann::json& j, const FSEntry& entry) {
     j = {
         {"id", entry.id},

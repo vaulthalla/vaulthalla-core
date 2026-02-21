@@ -2,6 +2,7 @@
 
 #include "concurrency/FSTask.hpp"
 #include "CloudDeleteTask.hpp"
+#include "types/sync/helpers.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -13,6 +14,7 @@ struct File;
 
 namespace sync {
 struct ScopedOp;
+struct Conflict;
 }}
 
 namespace vh::storage {
@@ -21,8 +23,7 @@ class CloudStorageEngine;
 
 namespace vh::concurrency {
 
-class SyncTask : public FSTask {
-public:
+struct SyncTask : public FSTask {
     ~SyncTask() override = default;
 
     explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {
@@ -32,10 +33,9 @@ public:
 
     virtual void sync() = 0;
 
-protected:
-    std::vector<std::shared_ptr<types::File> > localFiles_, s3Files_;
-    std::unordered_map<std::u8string, std::shared_ptr<types::File> > localMap_, s3Map_;
-    std::unordered_map<std::u8string, std::optional<std::string> > remoteHashMap_;
+    std::vector<std::shared_ptr<types::File>> localFiles, s3Files;
+    std::unordered_map<std::u8string, std::shared_ptr<types::File>> localMap, s3Map;
+    std::unordered_map<std::u8string, std::optional<std::string>> remoteHashMap;
 
     void upload(const std::shared_ptr<types::File>& file);
 
@@ -70,10 +70,20 @@ protected:
         const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& a,
         const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& b);
 
-private:
     void initBins();
 
     void clearBins();
+
+    types::sync::CompareResult compareLocalRemote(const std::shared_ptr<types::File>& L, const std::shared_ptr<types::File>& R) const;
+
+    std::vector<types::sync::EntryKey> allKeysSorted() const;
+
+    void ensureDirectoriesFromRemote();
+
+    std::shared_ptr<types::sync::Conflict> maybeBuildConflict(const std::shared_ptr<types::File>& local,
+                             const std::shared_ptr<types::File>& upstream) const;
+
+    bool handleConflict(const std::shared_ptr<types::sync::Conflict>& c) const;
 };
 
 }

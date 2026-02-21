@@ -113,8 +113,7 @@ void SyncController::runNow(const unsigned int vaultId, const uint8_t trigger) {
 
     while (task->isRunning()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    const auto engine = task->engine();
-    task = createTask(engine);
+    task = createTask(task->engine);
     task->runNow(trigger);
 
     {

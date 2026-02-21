@@ -22,11 +22,11 @@ CacheSyncTask::CacheSyncTask(const std::shared_ptr<StorageEngine>& engine)
     : SyncTask(engine) {}
 
 void CacheSyncTask::sync() {
-    for (const auto& file : localFiles_) {
+    for (const auto& file : localFiles) {
         const auto strippedPath = stripLeadingSlash(file->path).u8string();
-        const auto match = s3Map_.find(strippedPath);
+        const auto match = s3Map.find(strippedPath);
 
-        if (match == s3Map_.end()) {
+        if (match == s3Map.end()) {
             LogRegistry::sync()->debug("[CacheSyncTask] File not found in S3 map, uploading: {}", file->path.string());
             upload(file);
             continue;
@@ -37,39 +37,39 @@ void CacheSyncTask::sync() {
 
         if (conflict(file, rFile)) continue;
 
-        if (file->content_hash && remoteHashMap_[strippedPath] && *file->content_hash == remoteHashMap_[strippedPath]) {
-            s3Map_.erase(match);
+        if (file->content_hash && remoteHashMap[strippedPath] && *file->content_hash == remoteHashMap[strippedPath]) {
+            s3Map.erase(match);
             continue;
         }
 
         if (file->updated_at <= rFile->updated_at) {
             ensureFreeSpace(rFile->size_bytes);
             download(file);
-            s3Map_.erase(match);
+            s3Map.erase(match);
             continue;
         }
 
         LogRegistry::sync()->debug("[CacheSyncTask] Local file is newer than remote copy: {}", file->path.string());
 
-        s3Map_.erase(match);
+        s3Map.erase(match);
     }
 
     processFutures();
 
     // Ensure all directories in the S3 map exist locally
-    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map_))) {
-        if (!DirectoryQueries::directoryExists(engine_->vault->id, dir->path)) {
-            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine_->vault->id, dir->path.parent_path());
-            if (dir->fuse_path.empty()) dir->fuse_path = engine_->paths->absPath(dir->path, PathType::VAULT_ROOT);
+    for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map))) {
+        if (!DirectoryQueries::directoryExists(engine->vault->id, dir->path)) {
+            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(engine->vault->id, dir->path.parent_path());
+            if (dir->fuse_path.empty()) dir->fuse_path = engine->paths->absPath(dir->path, PathType::VAULT_ROOT);
             dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
             DirectoryQueries::upsertDirectory(dir);
         }
     }
 
-    const auto files = uMap2Vector(s3Map_);
-    futures_.reserve(files.size());
+    const auto files = uMap2Vector(s3Map);
+    futures.reserve(files.size());
 
-    const auto freeSpace = engine_->freeSpace();
+    const auto freeSpace = engine->freeSpace();
     const auto reqFreeSpace = computeReqFreeSpaceForDownload(files);
     const auto [purgeableSpace, maxSize] =
         computeIndicesSizeAndMaxSize(CacheQueries::listCacheIndicesByType(vaultId(), CacheIndex::Type::File));
@@ -94,8 +94,8 @@ CacheSyncTask::computeIndicesSizeAndMaxSize(const std::vector<std::shared_ptr<Ca
 }
 
 void CacheSyncTask::ensureFreeSpace(const uintmax_t size) const {
-    auto free = engine_->freeSpace();
-    if (engine_->vault->quota != 0 && free < size) {
+    auto free = engine->freeSpace();
+    if (engine->vault->quota != 0 && free < size) {
         const auto numFileIndices = CacheQueries::countCacheIndices(
             vaultId(), std::make_optional(CacheIndex::Type::File));
 

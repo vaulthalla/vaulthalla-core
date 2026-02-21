@@ -14,6 +14,8 @@ struct File final : FSEntry {
     File(const std::string& s3_key, uint64_t size, const std::optional<std::time_t>& updated = {});
 
     [[nodiscard]] bool isDirectory() const override { return false; }
+
+    [[nodiscard]] bool operator==(const File& other) const;
 };
 
 void to_json(nlohmann::json& j, const File& f);

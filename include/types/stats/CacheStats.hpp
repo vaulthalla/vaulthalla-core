@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <chrono>
 
 #include <nlohmann/json_fwd.hpp>
 

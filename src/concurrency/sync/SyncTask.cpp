@@ -13,6 +13,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "types/fs/File.hpp"
 #include "types/fs/Directory.hpp"
+#include "types/fs/Path.hpp"
 
 #include "logging/LogRegistry.hpp"
 

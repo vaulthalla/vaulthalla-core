@@ -2,7 +2,7 @@
 #include "types/vault/APIKey.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/sync/Sync.hpp"
+#include "types/sync/Policy.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"

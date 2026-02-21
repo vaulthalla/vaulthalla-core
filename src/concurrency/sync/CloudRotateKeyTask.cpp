@@ -1,7 +1,7 @@
 #include "concurrency/sync/CloudRotateKeyTask.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/fs/File.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "util/files.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
@@ -23,7 +23,7 @@ CloudRotateKeyTask::CloudRotateKeyTask(std::shared_ptr<CloudStorageEngine> eng,
 
 void CloudRotateKeyTask::operator()() {
     try {
-        const auto rsync = std::static_pointer_cast<RSync>(engine->sync);
+        const auto rsync = std::static_pointer_cast<sync::RemotePolicy>(engine->sync);
         for (unsigned int i = begin; i < end; ++i) {
             const auto& file = files[i];
             if (!file || !file->vault_id) continue;
@@ -51,7 +51,7 @@ void CloudRotateKeyTask::operator()() {
                 engine->upload(file, ciphertext);
                 FileQueries::setEncryptionIVAndVersion(file);
 
-                if (rsync->strategy == RSync::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;
+                if (rsync->strategy == sync::RemotePolicy::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;
                 writeFile(file->backing_path, ciphertext);
                 continue;
             }
@@ -69,7 +69,7 @@ void CloudRotateKeyTask::operator()() {
             engine->upload(file, ciphertext);
             FileQueries::setEncryptionIVAndVersion(file);
 
-            if (rsync->strategy == RSync::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;
+            if (rsync->strategy == sync::RemotePolicy::Strategy::Cache && ciphertext.size() * 2 < engine->freeSpace()) continue;
             writeFile(file->backing_path, ciphertext);
         }
         promise.set_value(true);

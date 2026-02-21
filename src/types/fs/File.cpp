@@ -24,6 +24,14 @@ File::File(const std::string& s3_key, const uint64_t size, const std::optional<s
     if (updated) updated_at = *updated;
 }
 
+bool File::operator==(const File& other) const {
+    return static_cast<const FSEntry&>(*this) == static_cast<const FSEntry&>(other) &&
+           encryption_iv == other.encryption_iv &&
+           mime_type == other.mime_type &&
+           content_hash == other.content_hash &&
+           encrypted_with_key_version == other.encrypted_with_key_version;
+}
+
 void vh::types::to_json(nlohmann::json& j, const File& f) {
     to_json(j, static_cast<const FSEntry&>(f));
     j["type"] = "file"; // Helpful for client

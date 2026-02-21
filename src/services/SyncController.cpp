@@ -3,18 +3,13 @@
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FSTask.hpp"
 #include "concurrency/fs/LocalFSTask.hpp"
-#include "concurrency/sync/CacheSyncTask.hpp"
-#include "concurrency/sync/SafeSyncTask.hpp"
-#include "concurrency/sync/MirrorSyncTask.hpp"
+#include "concurrency/sync/SyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/sync/Sync.hpp"
-#include "types/sync/RSync.hpp"
 #include "types/vault/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/sync/Event.hpp"
 
 #include <boost/dynamic_bitset.hpp>
 #include <thread>
@@ -113,8 +108,7 @@ void SyncController::runNow(const unsigned int vaultId, const uint8_t trigger) {
 
     while (task->isRunning()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    const auto engine = task->engine();
-    task = createTask(engine);
+    task = createTask(task->engine);
     task->runNow(trigger);
 
     {
@@ -159,13 +153,7 @@ void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
 }
 
 std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
-    std::shared_ptr<FSTask> task;
-    if (engine->type() == StorageType::Local) task = createTask<LocalFSTask>(engine);
-    else if (engine->type() == StorageType::Cloud) {
-        const auto sync = std::static_pointer_cast<RSync>(engine->sync);
-        if (sync->strategy == RSync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
-        else if (sync->strategy == RSync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
-        else if (sync->strategy == RSync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
-    } else throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
-    return task;
+    if (engine->type() == StorageType::Local) return createTask<LocalFSTask>(engine);
+    if (engine->type() == StorageType::Cloud) return createTask<SyncTask>(engine);
+    throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
 }

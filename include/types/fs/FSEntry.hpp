@@ -36,6 +36,8 @@ struct FSEntry {
     explicit FSEntry(const std::string& s3_key);
     FSEntry(const pqxx::row& row, const pqxx::result& parentRows);
 
+    [[nodiscard]] bool operator==(const FSEntry& other) const;
+
     [[nodiscard]] virtual bool isDirectory() const = 0;
 
     void setPath(const std::filesystem::path& path) { this->path = path; }

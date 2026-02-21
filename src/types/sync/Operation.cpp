@@ -5,7 +5,7 @@
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
-using namespace vh::types;
+using namespace vh::types::sync;
 using namespace vh::util;
 
 Operation::Operation(const pqxx::row& row)
@@ -30,13 +30,13 @@ Operation::Operation(const std::shared_ptr<FSEntry>& origEntry, const std::files
       source_path(origEntry->path),
       destination_path(dest) {}
 
-sync::Throughput::Metric Operation::opToThroughputMetric() const {
+Throughput::Metric Operation::opToThroughputMetric() const {
     if (operation == Op::Copy) return sync::Throughput::Metric::COPY;
     if (operation == Op::Rename || operation == Op::Move) return sync::Throughput::Metric::RENAME;
     throw std::logic_error("Unsupported operation for throughput metric");
 }
 
-std::string vh::types::to_string(const Operation::Op& op) {
+std::string vh::types::sync::to_string(const Operation::Op& op) {
     switch (op) {
         case Operation::Op::Copy: return "copy";
         case Operation::Op::Move: return "move";
@@ -45,7 +45,7 @@ std::string vh::types::to_string(const Operation::Op& op) {
     }
 }
 
-std::string vh::types::to_string(const Operation::Target& target) {
+std::string vh::types::sync::to_string(const Operation::Target& target) {
     switch (target) {
         case Operation::Target::File: return "file";
         case Operation::Target::Directory: return "directory";
@@ -53,7 +53,7 @@ std::string vh::types::to_string(const Operation::Target& target) {
     }
 }
 
-std::string vh::types::to_string(const Operation::Status& status) {
+std::string vh::types::sync::to_string(const Operation::Status& status) {
     switch (status) {
         case Operation::Status::Pending: return "pending";
         case Operation::Status::InProgress: return "in_progress";
@@ -64,20 +64,20 @@ std::string vh::types::to_string(const Operation::Status& status) {
     }
 }
 
-Operation::Op vh::types::to_op(const std::string& str) {
+Operation::Op vh::types::sync::to_op(const std::string& str) {
     if (str == "copy") return Operation::Op::Copy;
     if (str == "move") return Operation::Op::Move;
     if (str == "rename") return Operation::Op::Rename;
     throw std::invalid_argument("Invalid operation string: " + str);
 }
 
-Operation::Target vh::types::to_target(const std::string& str) {
+Operation::Target vh::types::sync::to_target(const std::string& str) {
     if (str == "file") return Operation::Target::File;
     if (str == "directory") return Operation::Target::Directory;
     throw std::invalid_argument("Invalid target string: " + str);
 }
 
-Operation::Status vh::types::to_status(const std::string& str) {
+Operation::Status vh::types::sync::to_status(const std::string& str) {
     if (str == "pending") return Operation::Status::Pending;
     if (str == "in_progress") return Operation::Status::InProgress;
     if (str == "success") return Operation::Status::Success;
@@ -86,7 +86,7 @@ Operation::Status vh::types::to_status(const std::string& str) {
     throw std::invalid_argument("Invalid status string: " + str);
 }
 
-void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<Operation>& op) {
+void vh::types::sync::to_json(nlohmann::json& j, const std::shared_ptr<Operation>& op) {
     j = nlohmann::json{
         {"id", op->id},
         {"fs_entry_id", op->fs_entry_id},
@@ -102,7 +102,7 @@ void vh::types::to_json(nlohmann::json& j, const std::shared_ptr<Operation>& op)
     };
 }
 
-void vh::types::from_json(const nlohmann::json& j, std::shared_ptr<Operation>& op) {
+void vh::types::sync::from_json(const nlohmann::json& j, std::shared_ptr<Operation>& op) {
     op = std::make_shared<Operation>();
     op->id = j.at("id").get<unsigned int>();
     op->fs_entry_id = j.at("fs_entry_id").get<unsigned int>();
@@ -121,7 +121,7 @@ void vh::types::from_json(const nlohmann::json& j, std::shared_ptr<Operation>& o
     }
 }
 
-std::vector<std::shared_ptr<Operation>> vh::types::operations_from_pq_res(const pqxx::result& res) {
+std::vector<std::shared_ptr<Operation>> vh::types::sync::operations_from_pq_res(const pqxx::result& res) {
     std::vector<std::shared_ptr<Operation>> operations;
     operations.reserve(res.size());
     for (const auto& row : res) operations.emplace_back(std::make_shared<Operation>(row));

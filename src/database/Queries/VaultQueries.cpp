@@ -2,15 +2,15 @@
 #include "database/Transactions.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/vault/S3Vault.hpp"
-#include "types/sync/FSync.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "util/u8.hpp"
 
 using namespace vh::database;
 using namespace vh::types;
 
 unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
-                                       const std::shared_ptr<Sync>& sync) {
+                                       const std::shared_ptr<sync::Policy>& sync) {
     const auto exists = vault->id != 0;
     if (!exists && !sync) throw std::invalid_argument("Sync cannot be null on vault creation.");
 
@@ -32,20 +32,20 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
 
         if (!exists) {
             if (vault->type == VaultType::Local) {
-                const auto fSync = std::static_pointer_cast<FSync>(sync);
+                const auto fSync = std::static_pointer_cast<sync::LocalPolicy>(sync);
                 pqxx::params sync_params{vaultId, fSync->interval.count(), to_string(fSync->conflict_policy)};
                 txn.exec(pqxx::prepped{"insert_sync_and_fsync"}, sync_params);
             } else if (vault->type == VaultType::S3) {
                 const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
 
-                const auto rSync = std::static_pointer_cast<RSync>(sync);
+                const auto rSync = std::static_pointer_cast<sync::RemotePolicy>(sync);
                 pqxx::params sync_params{vaultId, rSync->interval.count(), to_string(rSync->conflict_policy),
                                          to_string(rSync->strategy)};
                 txn.exec(pqxx::prepped{"insert_sync_and_rsync"}, sync_params);
             }
         } else if (sync) {  // exists and sync is provided
             if (vault->type == VaultType::Local) {
-                const auto fsync = std::static_pointer_cast<FSync>(sync);
+                const auto fsync = std::static_pointer_cast<sync::LocalPolicy>(sync);
                 pqxx::params f{
                     fsync->id,
                     fsync->interval.count(),
@@ -54,7 +54,7 @@ unsigned int VaultQueries::upsertVault(const std::shared_ptr<Vault>& vault,
                 };
                 txn.exec(pqxx::prepped{"update_sync_and_fsync"}, f);
             } else if (vault->type == VaultType::S3) {
-                const auto rsync = std::static_pointer_cast<RSync>(sync);
+                const auto rsync = std::static_pointer_cast<sync::RemotePolicy>(sync);
 
                 pqxx::params r{
                     rsync->id,
@@ -233,16 +233,16 @@ bool VaultQueries::vaultRootExists(const unsigned int vaultId) {
     });
 }
 
-void VaultQueries::updateVaultSync(const std::shared_ptr<Sync>& sync, const VaultType& type) {
+void VaultQueries::updateVaultSync(const std::shared_ptr<sync::Policy>& sync, const VaultType& type) {
     if (!sync) throw std::invalid_argument("Sync cannot be null on vault sync update.");
 
     Transactions::exec("VaultQueries::updateVaultSync", [&](pqxx::work& txn) {
         if (type == VaultType::Local) {
-            const auto fsync = std::static_pointer_cast<FSync>(sync);
+            const auto fsync = std::static_pointer_cast<sync::LocalPolicy>(sync);
             pqxx::params p{fsync->id, fsync->interval.count(), fsync->enabled, to_string(fsync->conflict_policy)};
             txn.exec(pqxx::prepped{"update_fsync"}, p);
         } else if (type == VaultType::S3) {
-            const auto rsync = std::static_pointer_cast<RSync>(sync);
+            const auto rsync = std::static_pointer_cast<sync::RemotePolicy>(sync);
             pqxx::params p{rsync->id, rsync->interval.count(), rsync->enabled, to_string(rsync->strategy),
                            to_string(rsync->conflict_policy)};
             txn.exec(pqxx::prepped{"update_rsync"}, p);

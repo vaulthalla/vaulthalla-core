@@ -14,7 +14,11 @@ namespace vh::types {
 struct FSEntry;
 struct User;
 struct Vault;
-struct Sync;
+
+namespace sync {
+struct Policy;
+}
+
 }
 
 namespace fs = std::filesystem;
@@ -36,7 +40,7 @@ public:
     void initUserStorage(const std::shared_ptr<types::User>& user);
 
     std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
-                                           const std::shared_ptr<types::Sync>& sync = nullptr);
+                                           const std::shared_ptr<types::sync::Policy>& sync = nullptr);
 
     void updateVault(const std::shared_ptr<types::Vault>& vault);
 

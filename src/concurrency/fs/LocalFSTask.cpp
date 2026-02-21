@@ -35,9 +35,9 @@ void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >&
 
 void LocalFSTask::removeTrashedFiles() {
     const auto engine = localEngine();
-    const auto files = FileQueries::listTrashedFiles(engine_->vault->id);
+    const auto files = FileQueries::listTrashedFiles(engine->vault->id);
 
-    futures_.reserve(files.size());
+    futures.reserve(files.size());
     for (const auto& file : files)
         push(std::make_shared<LocalDeleteTask>(engine, file, op(sync::Throughput::Metric::DELETE)));
 
@@ -45,5 +45,5 @@ void LocalFSTask::removeTrashedFiles() {
 }
 
 std::shared_ptr<StorageEngine> LocalFSTask::localEngine() const {
-    return std::static_pointer_cast<StorageEngine>(engine_);
+    return std::static_pointer_cast<StorageEngine>(engine);
 }

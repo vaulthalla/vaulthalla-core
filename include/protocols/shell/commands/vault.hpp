@@ -17,13 +17,16 @@ class CommandUsage;
 namespace vh::types {
 struct Vault;
 struct S3Vault;
-struct Sync;
 struct User;
 struct Waiver;
 struct VaultRole;
 struct Role;
 enum class VaultType;
 enum class OverrideOpt;
+
+namespace sync {
+struct Policy;
+}
 
 namespace api {
 struct APIKey;
@@ -106,7 +109,7 @@ void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
 
 void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
 
-void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<types::Sync>& sync);
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<types::sync::Policy>& sync);
 
 void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, unsigned int ownerId, bool required = false);
 

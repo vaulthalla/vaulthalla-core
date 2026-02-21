@@ -3,8 +3,8 @@
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/vault/S3Vault.hpp"
-#include "types/sync/Sync.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/Policy.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "storage/StorageManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
@@ -30,13 +30,13 @@ json VaultHandler::add(const json& payload, const WebSocketSession& session) {
     const std::string mountPoint = payload.at("mount_point").get<std::string>();
 
     std::shared_ptr<Vault> vault;
-    std::shared_ptr<Sync> sync = nullptr;
+    std::shared_ptr<sync::Policy> sync = nullptr;
 
     if (typeLower == "s3") {
         const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
         const std::string bucket = payload.at("bucket").get<std::string>();
         vault = std::make_shared<S3Vault>(name, apiKeyID, bucket);
-        sync = std::make_shared<RSync>(payload);
+        sync = std::make_shared<sync::RemotePolicy>(payload);
     }
 
     vault->name = name;

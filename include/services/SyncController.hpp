@@ -13,8 +13,8 @@ class StorageEngine;
 }
 
 namespace vh::concurrency {
-class SyncTask;
-class FSTask;
+struct SyncTask;
+struct FSTask;
 }
 
 namespace vh::services {

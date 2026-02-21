@@ -111,7 +111,7 @@ void StorageManager::initUserStorage(const std::shared_ptr<User>& user) {
 }
 
 std::shared_ptr<Vault> StorageManager::addVault(std::shared_ptr<Vault> vault,
-                                                const std::shared_ptr<Sync>& sync) {
+                                                const std::shared_ptr<sync::Policy>& sync) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::scoped_lock lock(mutex_);
 

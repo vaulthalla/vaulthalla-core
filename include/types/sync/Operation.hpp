@@ -15,8 +15,10 @@ class result;
 }
 
 namespace vh::types {
-
 struct FSEntry;
+}
+
+namespace vh::types::sync {
 
 struct Operation {
     enum class Op { Copy, Move, Rename };

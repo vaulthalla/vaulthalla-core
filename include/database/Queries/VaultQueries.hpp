@@ -9,8 +9,12 @@
 
 namespace vh::types {
     struct Vault;
-    struct Sync;
     enum class VaultType;
+
+namespace sync {
+struct Policy;
+}
+
 }
 
 namespace vh::database {
@@ -19,14 +23,14 @@ struct VaultQueries {
     VaultQueries() = default;
 
     static unsigned int upsertVault(const std::shared_ptr<types::Vault>& vault,
-                                 const std::shared_ptr<types::Sync>& sync = nullptr);
+                                 const std::shared_ptr<types::sync::Policy>& sync = nullptr);
     static void removeVault(unsigned int vaultId);
     static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
     static std::shared_ptr<types::Vault> getVault(const std::string& name, unsigned int ownerId);
     static std::vector<std::shared_ptr<types::Vault>> listVaults(const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
     static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
 
-    static void updateVaultSync(const std::shared_ptr<types::Sync>& sync, const types::VaultType& type);
+    static void updateVaultSync(const std::shared_ptr<types::sync::Policy>& sync, const types::VaultType& type);
 
     [[nodiscard]] static bool vaultExists(const std::string& name, unsigned int ownerId);
 

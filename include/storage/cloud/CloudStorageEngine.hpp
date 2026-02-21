@@ -15,6 +15,11 @@ struct TrashedFile;
 namespace api {
 struct APIKey;
 }
+
+namespace sync {
+struct RemotePolicy;
+}
+
 }
 
 namespace vh::cloud {
@@ -60,6 +65,8 @@ public:
     [[nodiscard]] bool remoteFileIsEncrypted(const std::filesystem::path& rel_path) const;
 
     std::optional<std::pair<std::string, unsigned int>> getRemoteIVBase64AndVersion(const std::filesystem::path& rel_path) const;
+
+    std::shared_ptr<types::sync::RemotePolicy> remote_policy() const;
 
 private:
     std::shared_ptr<types::api::APIKey> key_;

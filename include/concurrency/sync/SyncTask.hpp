@@ -13,7 +13,6 @@ namespace vh::types {
 struct File;
 
 namespace sync {
-struct ScopedOp;
 struct Conflict;
 }}
 
@@ -23,39 +22,68 @@ class CloudStorageEngine;
 
 namespace vh::concurrency {
 
-struct SyncTask : public FSTask {
-    ~SyncTask() override = default;
-
-    explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {
-    }
-
-    void operator()() override;
-
-    virtual void sync() = 0;
-
+struct SyncTask final : FSTask {
     std::vector<std::shared_ptr<types::File>> localFiles, s3Files;
     std::unordered_map<std::u8string, std::shared_ptr<types::File>> localMap, s3Map;
     std::unordered_map<std::u8string, std::optional<std::string>> remoteHashMap;
 
-    void upload(const std::shared_ptr<types::File>& file);
+    ~SyncTask() override = default;
+    explicit SyncTask(const std::shared_ptr<storage::StorageEngine>& engine) : FSTask(engine) {}
 
-    void download(const std::shared_ptr<types::File>& file, bool freeAfterDownload = false);
 
-    void remove(const std::shared_ptr<types::File>& file,
-                const CloudDeleteTask::Type& type = CloudDeleteTask::Type::PURGE);
+    // ##########################################
+    // ########### FSTask Overrides #############
+    // ##########################################
 
-    std::shared_ptr<storage::CloudStorageEngine> cloudEngine() const;
-
+    void operator()() override;
     void removeTrashedFiles() override;
-
     void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File> >& files,
                              unsigned int begin, unsigned int end) override;
 
-    virtual void ensureFreeSpace(uintmax_t size) const;
+
+    // ##########################################
+    // ############# Sync Operations ############
+    // ##########################################
+
+    void sync();
+    void initBins();
+    void clearBins();
+
+
+    // ##########################################
+    // ########### File Operations #############
+    // ##########################################
+
+    void upload(const std::shared_ptr<types::File>& file);
+    void download(const std::shared_ptr<types::File>& file, bool freeAfterDownload = false);
+    void remove(const std::shared_ptr<types::File>& file,
+                const CloudDeleteTask::Type& type = CloudDeleteTask::Type::PURGE);
+
+
+    // ##########################################
+    // ############ Internal Helpers ############
+    // ##########################################
+
+    std::shared_ptr<storage::CloudStorageEngine> cloudEngine() const;
+    std::vector<types::sync::EntryKey> allKeysSorted() const;
+    void ensureDirectoriesFromRemote();
+
+
+    // ##########################################
+    // ########### Conflict Handling ############
+    // ##########################################
 
     [[nodiscard]] static bool hasPotentialConflict(const std::shared_ptr<types::File>& local, const std::shared_ptr<types::File>& upstream, bool upstream_decryption_failure);
 
-    [[nodiscard]] bool conflict(const std::shared_ptr<types::File>& local, const std::shared_ptr<types::File>& upstream, bool upstream_decryption_failure = false) const;
+    std::shared_ptr<types::sync::Conflict> maybeBuildConflict(const std::shared_ptr<types::File>& local,
+                             const std::shared_ptr<types::File>& upstream) const;
+
+    bool handleConflict(const std::shared_ptr<types::sync::Conflict>& c) const;
+
+
+    // ##########################################
+    // ########### Static Helpers ###############
+    // ##########################################
 
     static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<types::File> >& files);
 
@@ -65,25 +93,6 @@ struct SyncTask : public FSTask {
     static std::unordered_map<std::u8string, std::shared_ptr<types::File> > intersect(
         const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& a,
         const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& b);
-
-    static std::unordered_map<std::u8string, std::shared_ptr<types::File> > symmetric_diff(
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& a,
-        const std::unordered_map<std::u8string, std::shared_ptr<types::File> >& b);
-
-    void initBins();
-
-    void clearBins();
-
-    types::sync::CompareResult compareLocalRemote(const std::shared_ptr<types::File>& L, const std::shared_ptr<types::File>& R) const;
-
-    std::vector<types::sync::EntryKey> allKeysSorted() const;
-
-    void ensureDirectoriesFromRemote();
-
-    std::shared_ptr<types::sync::Conflict> maybeBuildConflict(const std::shared_ptr<types::File>& local,
-                             const std::shared_ptr<types::File>& upstream) const;
-
-    bool handleConflict(const std::shared_ptr<types::sync::Conflict>& c) const;
 };
 
 }

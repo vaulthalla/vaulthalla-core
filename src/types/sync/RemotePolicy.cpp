@@ -1,4 +1,4 @@
-#include "types/sync/RSync.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
 #include "types/sync/Conflict.hpp"
@@ -7,17 +7,17 @@
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
-using namespace vh::types;
+using namespace vh::types::sync;
 using namespace vh::util;
 
-RSync::RSync(const pqxx::row& row)
-    : Sync(row),
+RemotePolicy::RemotePolicy(const pqxx::row& row)
+    : Policy(row),
       strategy(strategyFromString(row.at("strategy").as<std::string>())),
       conflict_policy(rsConflictPolicyFromString(row.at("conflict_policy").as<std::string>())) {
     rehash_config();
 }
 
-void RSync::rehash_config() {
+void RemotePolicy::rehash_config() {
     config_hash = "vault_id=" + std::to_string(vault_id) +
                   ";interval=" + std::to_string(interval.count()) +
                   ";enabled=" + (enabled ? "true" : "false") +
@@ -25,69 +25,69 @@ void RSync::rehash_config() {
                   ";conflict_policy=" + to_string(conflict_policy);
 }
 
-bool RSync::resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const {
+bool RemotePolicy::resolve_conflict(const std::shared_ptr<Conflict>& conflict) const {
     if (conflict_policy == ConflictPolicy::Ask) return false;
 
-    if (conflict_policy == ConflictPolicy::KeepLocal) conflict->resolution = sync::Conflict::Resolution::KEPT_LOCAL;
-    else if (conflict_policy == ConflictPolicy::KeepRemote) conflict->resolution = sync::Conflict::Resolution::KEPT_REMOTE;
+    if (conflict_policy == ConflictPolicy::KeepLocal) conflict->resolution = Conflict::Resolution::KEPT_LOCAL;
+    else if (conflict_policy == ConflictPolicy::KeepRemote) conflict->resolution = Conflict::Resolution::KEPT_REMOTE;
     else if (conflict_policy == ConflictPolicy::KeepNewest) {
         if (conflict->artifacts.local.file->updated_at == std::time_t{0} || conflict->artifacts.upstream.file->updated_at == std::time_t{0})
             return false; // If either timestamp is missing, we can't determine which is newer, so we ask the user.
 
-        if (conflict->artifacts.local.file->updated_at > conflict->artifacts.upstream.file->updated_at) conflict->resolution = sync::Conflict::Resolution::KEPT_LOCAL;
-        else conflict->resolution = sync::Conflict::Resolution::KEPT_REMOTE;
+        if (conflict->artifacts.local.file->updated_at > conflict->artifacts.upstream.file->updated_at) conflict->resolution = Conflict::Resolution::KEPT_LOCAL;
+        else conflict->resolution = Conflict::Resolution::KEPT_REMOTE;
     }
 
     return true;
 }
 
-void vh::types::to_json(nlohmann::json& j, const RSync& s) {
-    to_json(j, static_cast<const Sync&>(s));
+void vh::types::sync::to_json(nlohmann::json& j, const RemotePolicy& s) {
+    to_json(j, static_cast<const Policy&>(s));
     j["strategy"] = to_string(s.strategy);
     j["conflict_policy"] = to_string(s.conflict_policy);
 }
 
-void vh::types::from_json(const nlohmann::json& j, RSync& s) {
-    from_json(j, static_cast<Sync&>(s));
+void vh::types::sync::from_json(const nlohmann::json& j, RemotePolicy& s) {
+    from_json(j, static_cast<Policy&>(s));
     s.strategy = strategyFromString(j.at("strategy").get<std::string>());
     s.conflict_policy = rsConflictPolicyFromString(j.at("conflict_policy").get<std::string>());
 }
 
-std::string vh::types::to_string(const RSync::Strategy& s) {
+std::string vh::types::sync::to_string(const RemotePolicy::Strategy& s) {
     switch (s) {
-    case RSync::Strategy::Cache: return "cache";
-    case RSync::Strategy::Sync: return "sync";
-    case RSync::Strategy::Mirror: return "mirror";
+    case RemotePolicy::Strategy::Cache: return "cache";
+    case RemotePolicy::Strategy::Sync: return "sync";
+    case RemotePolicy::Strategy::Mirror: return "mirror";
     default: throw std::invalid_argument("Unknown sync strategy");
     }
 }
 
-std::string vh::types::to_string(const RSync::ConflictPolicy& cp) {
+std::string vh::types::sync::to_string(const RemotePolicy::ConflictPolicy& cp) {
     switch (cp) {
-    case RSync::ConflictPolicy::KeepLocal: return "keep_local";
-    case RSync::ConflictPolicy::KeepRemote: return "keep_remote";
-    case RSync::ConflictPolicy::KeepNewest: return "keep_newest";
-    case RSync::ConflictPolicy::Ask: return "ask";
+    case RemotePolicy::ConflictPolicy::KeepLocal: return "keep_local";
+    case RemotePolicy::ConflictPolicy::KeepRemote: return "keep_remote";
+    case RemotePolicy::ConflictPolicy::KeepNewest: return "keep_newest";
+    case RemotePolicy::ConflictPolicy::Ask: return "ask";
     default: throw std::invalid_argument("Unknown conflict policy");
     }
 }
 
-RSync::Strategy vh::types::strategyFromString(const std::string& str) {
-    if (str == "cache") return RSync::Strategy::Cache;
-    if (str == "sync") return RSync::Strategy::Sync;
-    if (str == "mirror") return RSync::Strategy::Mirror;
+RemotePolicy::Strategy vh::types::sync::strategyFromString(const std::string& str) {
+    if (str == "cache") return RemotePolicy::Strategy::Cache;
+    if (str == "sync") return RemotePolicy::Strategy::Sync;
+    if (str == "mirror") return RemotePolicy::Strategy::Mirror;
     throw std::invalid_argument("Unknown sync strategy: " + str);
 }
 
-RSync::ConflictPolicy vh::types::rsConflictPolicyFromString(const std::string& str) {
-    if (str == "keep_local") return RSync::ConflictPolicy::KeepLocal;
-    if (str == "keep_remote") return RSync::ConflictPolicy::KeepRemote;
-    if (str == "keep_newest") return RSync::ConflictPolicy::KeepNewest;
-    if (str == "ask") return RSync::ConflictPolicy::Ask;
+RemotePolicy::ConflictPolicy vh::types::sync::rsConflictPolicyFromString(const std::string& str) {
+    if (str == "keep_local") return RemotePolicy::ConflictPolicy::KeepLocal;
+    if (str == "keep_remote") return RemotePolicy::ConflictPolicy::KeepRemote;
+    if (str == "keep_newest") return RemotePolicy::ConflictPolicy::KeepNewest;
+    if (str == "ask") return RemotePolicy::ConflictPolicy::Ask;
     throw std::invalid_argument("Unknown conflict policy: " + str);
 }
 
-std::string vh::types::to_string(const std::shared_ptr<RSync>& sync) {
+std::string vh::types::sync::to_string(const std::shared_ptr<RemotePolicy>& sync) {
     if (!sync) return "null";
     return "Remote Vault Sync Configuration:\n"
            "  Vault ID: " + std::to_string(sync->vault_id) + "\n"

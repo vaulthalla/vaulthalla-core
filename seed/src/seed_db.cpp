@@ -12,8 +12,8 @@
 // Types
 #include "types/rbac/Permission.hpp"
 #include "types/vault/S3Vault.hpp"
-#include "types/sync/RSync.hpp"
-#include "types/sync/FSync.hpp"
+#include "types/sync/RemotePolicy.hpp"
+#include "types/sync/LocalPolicy.hpp"
 #include "types/entities/User.hpp"
 #include "types/entities/Group.hpp"
 #include "types/rbac/Role.hpp"
@@ -318,9 +318,9 @@ void vh::seed::initAdminDefaultVault() {
     vault->quota = 0; // No quota for admin vault
     vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
 
-    const auto sync = std::make_shared<FSync>();
+    const auto sync = std::make_shared<sync::LocalPolicy>();
     sync->interval = std::chrono::minutes(10);
-    sync->conflict_policy = FSync::ConflictPolicy::Overwrite;
+    sync->conflict_policy = sync::LocalPolicy::ConflictPolicy::Overwrite;
 
     VaultQueries::upsertVault(vault, sync);
 }
@@ -387,10 +387,10 @@ void vh::seed::initDevCloudVault() {
         vault->bucket = "vaulthalla-test";
         vault->type = VaultType::S3;
 
-        const auto sync = std::make_shared<RSync>();
+        const auto sync = std::make_shared<sync::RemotePolicy>();
         sync->interval = std::chrono::minutes(10);
-        sync->conflict_policy = RSync::ConflictPolicy::KeepLocal;
-        sync->strategy = RSync::Strategy::Sync;
+        sync->conflict_policy = sync::RemotePolicy::ConflictPolicy::KeepLocal;
+        sync->strategy = sync::RemotePolicy::Strategy::Sync;
 
         vault->id = VaultQueries::upsertVault(vault, sync);
 

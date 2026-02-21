@@ -1,14 +1,14 @@
-#include "types/sync/Sync.hpp"
+#include "types/sync/Policy.hpp"
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
-using namespace vh::types;
+using namespace vh::types::sync;
 using namespace vh::util;
 
-Sync::Sync(const pqxx::row& row)
+Policy::Policy(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),
       vault_id(row.at("vault_id").as<unsigned int>()),
       interval(std::chrono::seconds(row.at("interval").as<uint64_t>())),
@@ -19,7 +19,7 @@ Sync::Sync(const pqxx::row& row)
     if (!row["last_success_at"].is_null()) last_success_at = parsePostgresTimestamp(row["last_success_at"].as<std::string>());
 }
 
-void vh::types::to_json(nlohmann::json& j, const Sync& s) {
+void vh::types::sync::to_json(nlohmann::json& j, const Policy& s) {
     j = nlohmann::json{
         {"id", s.id},
         {"vault_id", s.vault_id},
@@ -32,7 +32,7 @@ void vh::types::to_json(nlohmann::json& j, const Sync& s) {
     };
 }
 
-void vh::types::from_json(const nlohmann::json& j, Sync& s) {
+void vh::types::sync::from_json(const nlohmann::json& j, Policy& s) {
     if (j.contains("id")) s.id = j.at("id").get<unsigned int>();
     if (j.contains("vault_id")) s.vault_id = j.at("vault_id").get<unsigned int>();
     s.interval = std::chrono::seconds(j.at("interval").get<uint64_t>());
@@ -43,7 +43,7 @@ void vh::types::from_json(const nlohmann::json& j, Sync& s) {
     if (j.contains("updated_at")) s.updated_at = parseTimestampFromString(j.at("updated_at").get<std::string>());
 }
 
-std::string vh::types::to_string(const std::shared_ptr<Sync>& sync) {
+std::string vh::types::sync::to_string(const std::shared_ptr<Policy>& sync) {
     if (!sync) return "null";
     return "Vault Sync Configuration:\n"
            "  Vault ID: " + std::to_string(sync->vault_id) + "\n"

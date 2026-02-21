@@ -1,9 +1,9 @@
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Transactions.hpp"
-#include "../../../include/types/sync/Operation.hpp"
+#include "types/sync/Operation.hpp"
 
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::types::sync;
 
 void OperationQueries::addOperation(const std::shared_ptr<Operation>& op) {
     Transactions::exec("OperationQueries::addOperation", [&](pqxx::work& txn) {

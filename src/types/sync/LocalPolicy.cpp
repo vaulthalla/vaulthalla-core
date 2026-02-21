@@ -1,4 +1,4 @@
-#include "types/sync/FSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
 #include "types/sync/Conflict.hpp"
@@ -7,58 +7,58 @@
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
-using namespace vh::types;
+using namespace vh::types::sync;
 using namespace vh::util;
 
-FSync::FSync(const pqxx::row& row)
-    : Sync(row),
+LocalPolicy::LocalPolicy(const pqxx::row& row)
+    : Policy(row),
       conflict_policy(fsConflictPolicyFromString(row.at("conflict_policy").as<std::string>())) {
     rehash_config();
 }
 
-void FSync::rehash_config() {
+void LocalPolicy::rehash_config() {
     config_hash = "vault_id=" + std::to_string(vault_id) +
                   ";interval=" + std::to_string(interval.count()) +
                   ";enabled=" + (enabled ? "true" : "false") +
                   ";conflict_policy=" + to_string(conflict_policy);
 }
 
-bool FSync::resolve_conflict(const std::shared_ptr<sync::Conflict>& conflict) const {
+bool LocalPolicy::resolve_conflict(const std::shared_ptr<Conflict>& conflict) const {
     if (conflict_policy == ConflictPolicy::Ask) return false; // Let the user decide
     
-    if (conflict_policy == ConflictPolicy::KeepBoth) conflict->resolution = sync::Conflict::Resolution::KEPT_BOTH;
-    else if (conflict_policy == ConflictPolicy::Overwrite) conflict->resolution = sync::Conflict::Resolution::OVERWRITTEN;
+    if (conflict_policy == ConflictPolicy::KeepBoth) conflict->resolution = Conflict::Resolution::KEPT_BOTH;
+    else if (conflict_policy == ConflictPolicy::Overwrite) conflict->resolution = Conflict::Resolution::OVERWRITTEN;
 
     return true;
 }
 
-void vh::types::to_json(nlohmann::json& j, const FSync& s) {
-    to_json(j, static_cast<const Sync&>(s));
+void vh::types::sync::to_json(nlohmann::json& j, const LocalPolicy& s) {
+    to_json(j, static_cast<const Policy&>(s));
     j["conflict_policy"] = to_string(s.conflict_policy);
 }
 
-void vh::types::from_json(const nlohmann::json& j, FSync& s) {
-    from_json(j, static_cast<Sync&>(s));
+void vh::types::sync::from_json(const nlohmann::json& j, LocalPolicy& s) {
+    from_json(j, static_cast<Policy&>(s));
     s.conflict_policy = fsConflictPolicyFromString(j.at("conflict_policy").get<std::string>());
 }
 
-std::string vh::types::to_string(const FSync::ConflictPolicy& cp) {
+std::string vh::types::sync::to_string(const LocalPolicy::ConflictPolicy& cp) {
     switch (cp) {
-        case FSync::ConflictPolicy::Overwrite: return "overwrite";
-        case FSync::ConflictPolicy::KeepBoth: return "keep_both";
-        case FSync::ConflictPolicy::Ask: return "ask";
+        case LocalPolicy::ConflictPolicy::Overwrite: return "overwrite";
+        case LocalPolicy::ConflictPolicy::KeepBoth: return "keep_both";
+        case LocalPolicy::ConflictPolicy::Ask: return "ask";
         default: throw std::invalid_argument("Unknown conflict policy");
     }
 }
 
-FSync::ConflictPolicy vh::types::fsConflictPolicyFromString(const std::string& str) {
-    if (str == "overwrite") return FSync::ConflictPolicy::Overwrite;
-    if (str == "keep_both") return FSync::ConflictPolicy::KeepBoth;
-    if (str == "ask") return FSync::ConflictPolicy::Ask;
+LocalPolicy::ConflictPolicy vh::types::sync::fsConflictPolicyFromString(const std::string& str) {
+    if (str == "overwrite") return LocalPolicy::ConflictPolicy::Overwrite;
+    if (str == "keep_both") return LocalPolicy::ConflictPolicy::KeepBoth;
+    if (str == "ask") return LocalPolicy::ConflictPolicy::Ask;
     throw std::invalid_argument("Unknown conflict policy: " + str);
 }
 
-std::string vh::types::to_string(const std::shared_ptr<FSync>& sync) {
+std::string vh::types::sync::to_string(const std::shared_ptr<LocalPolicy>& sync) {
     if (!sync) return "null";
     return "Local Vault Sync Configuration:\n"
            "  Vault ID: " + std::to_string(sync->vault_id) + "\n"

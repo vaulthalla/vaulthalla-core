@@ -9,8 +9,8 @@
 #include "concurrency/ThreadPool.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/sync/Sync.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/Policy.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "types/vault/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -162,10 +162,10 @@ std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<Storage
     std::shared_ptr<FSTask> task;
     if (engine->type() == StorageType::Local) task = createTask<LocalFSTask>(engine);
     else if (engine->type() == StorageType::Cloud) {
-        const auto sync = std::static_pointer_cast<RSync>(engine->sync);
-        if (sync->strategy == RSync::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
-        else if (sync->strategy == RSync::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
-        else if (sync->strategy == RSync::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
+        const auto sync = std::static_pointer_cast<sync::RemotePolicy>(engine->sync);
+        if (sync->strategy == sync::RemotePolicy::Strategy::Cache) task = createTask<CacheSyncTask>(engine);
+        else if (sync->strategy == sync::RemotePolicy::Strategy::Sync) task = createTask<SafeSyncTask>(engine);
+        else if (sync->strategy == sync::RemotePolicy::Strategy::Mirror) task = createTask<MirrorSyncTask>(engine);
     } else throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
     return task;
 }

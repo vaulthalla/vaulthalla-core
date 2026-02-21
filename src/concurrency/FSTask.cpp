@@ -3,7 +3,7 @@
 #include "concurrency/ThreadPool.hpp"
 #include "services/SyncController.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/sync/Sync.hpp"
+#include "types/sync/Policy.hpp"
 #include "types/sync/Operation.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/File.hpp"
@@ -20,7 +20,6 @@
 #include "types/sync/Throughput.hpp"
 #include "types/sync/ScopedOp.hpp"
 #include "database/Queries/SyncQueries.hpp"
-#include "types/sync/Throughput.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -185,7 +184,7 @@ void FSTask::processOperations() const {
 
         scopedOp.size_bytes = f->size_bytes;
 
-        if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
+        if (f->size_bytes == 0 && op->operation != sync::Operation::Op::Copy) {
             LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
             scopedOp.stop();
             continue;
@@ -209,8 +208,8 @@ void FSTask::processOperations() const {
             engine_->moveThumbnails(op->source_path, op->destination_path);
         };
 
-        if (op->operation == Operation::Op::Copy) engine_->copyThumbnails(op->source_path, op->destination_path);
-        else if (op->operation == Operation::Op::Move || op->operation == Operation::Op::Rename) move();
+        if (op->operation == sync::Operation::Op::Copy) engine_->copyThumbnails(op->source_path, op->destination_path);
+        else if (op->operation == sync::Operation::Op::Move || op->operation == sync::Operation::Op::Rename) move();
         else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
 
         scopedOp.stop();

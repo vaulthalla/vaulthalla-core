@@ -14,8 +14,8 @@
 #include "types/sync/Artifact.hpp"
 #include "types/sync/ConflictArtifact.hpp"
 #include "types/sync/Conflict.hpp"
-#include "types/sync/FSync.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
+#include "types/sync/RemotePolicy.hpp"
 
 #include <utility>
 

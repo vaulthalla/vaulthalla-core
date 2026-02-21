@@ -2,7 +2,7 @@
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "types/fs/File.hpp"
 #include "types/fs/Directory.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "util/fsPath.hpp"
 
 #include <filesystem>
@@ -15,9 +15,9 @@ MirrorSyncTask::MirrorSyncTask(const std::shared_ptr<StorageEngine>& engine)
     : SyncTask(engine) {}
 
 void MirrorSyncTask::sync() {
-    const auto sync = std::static_pointer_cast<RSync>(engine_->sync);
-    if (sync->conflict_policy == RSync::ConflictPolicy::KeepLocal) syncKeepLocal();
-    else if (sync->conflict_policy == RSync::ConflictPolicy::KeepRemote) syncKeepRemote();
+    const auto sync = std::static_pointer_cast<sync::RemotePolicy>(engine_->sync);
+    if (sync->conflict_policy == sync::RemotePolicy::ConflictPolicy::KeepLocal) syncKeepLocal();
+    else if (sync->conflict_policy == sync::RemotePolicy::ConflictPolicy::KeepRemote) syncKeepRemote();
     else throw std::runtime_error("[MirrorSyncTask] Conflict policy not supported: " + to_string(sync->conflict_policy));
 }
 

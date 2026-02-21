@@ -8,7 +8,7 @@
 #include "types/rbac/Role.hpp"
 #include "types/rbac/UserRole.hpp"
 #include "types/rbac/VaultRole.hpp"
-#include "types/sync/FSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
 #include "CLITestContext.hpp"
 #include "permsUtil.hpp"
 

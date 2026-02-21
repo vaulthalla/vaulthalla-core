@@ -12,8 +12,8 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "CommandUsage.hpp"
-#include "types/sync/FSync.hpp"
-#include "types/sync/RSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
+#include "types/sync/RemotePolicy.hpp"
 #include "util/interval.hpp"
 
 using namespace vh::shell;
@@ -207,26 +207,26 @@ void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
     }
 }
 
-void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const std::shared_ptr<Sync>& sync) {
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const std::shared_ptr<sync::Policy>& sync) {
     if (const auto syncIntervalOpt = optVal(call, usage->resolveOptional("interval")->option_tokens))
         sync->interval = util::parseSyncInterval(*syncIntervalOpt);
 
     if (vault->type == VaultType::Local) {
         if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("Local Vault Options", "conflict")->option_tokens)) {
-            const auto fsync = std::static_pointer_cast<FSync>(sync);
-            fsync->conflict_policy = fsConflictPolicyFromString(*conflictOpt);
+            const auto fsync = std::static_pointer_cast<sync::LocalPolicy>(sync);
+            fsync->conflict_policy = sync::fsConflictPolicyFromString(*conflictOpt);
         }
     } else if (vault->type == VaultType::S3) {
         if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "conflict")->option_tokens)) {
-            const auto rsync = std::static_pointer_cast<RSync>(sync);
-            rsync->conflict_policy = rsConflictPolicyFromString(*conflictOpt);
+            const auto rsync = std::static_pointer_cast<sync::RemotePolicy>(sync);
+            rsync->conflict_policy = sync::rsConflictPolicyFromString(*conflictOpt);
         }
     }
 
     if (vault->type == VaultType::S3) {
-        const auto rsync = std::static_pointer_cast<RSync>(sync);
+        const auto rsync = std::static_pointer_cast<sync::RemotePolicy>(sync);
         if (const auto syncStrategyOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "strategy")->option_tokens))
-            rsync->strategy = strategyFromString(*syncStrategyOpt);
+            rsync->strategy = sync::strategyFromString(*syncStrategyOpt);
     }
 }
 

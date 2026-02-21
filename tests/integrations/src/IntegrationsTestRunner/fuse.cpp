@@ -8,7 +8,7 @@
 #include "types/rbac/UserRole.hpp"
 #include "types/rbac/PermissionOverride.hpp"
 #include "types/fs/FSEntry.hpp"
-#include "types/sync/FSync.hpp"
+#include "types/sync/LocalPolicy.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/Path.hpp"
@@ -99,9 +99,9 @@ static std::shared_ptr<StorageEngine> createVault() {
 
     if (vault->name.empty()) throw std::runtime_error("Vault name cannot be empty");
 
-    const auto sync = std::make_shared<FSync>();
+    const auto sync = std::make_shared<sync::LocalPolicy>();
     sync->interval = std::chrono::minutes(15);
-    sync->conflict_policy = FSync::ConflictPolicy::Overwrite;
+    sync->conflict_policy = sync::LocalPolicy::ConflictPolicy::Overwrite;
 
     vault = ServiceDepsRegistry::instance().storageManager->addVault(vault, sync);
     return ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);

@@ -26,9 +26,6 @@ protected:
     void removeTrashedFiles() override;
 
     std::shared_ptr<storage::StorageEngine> localEngine() const;
-
-    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
-                                     unsigned int begin, unsigned int end) override;
 };
 
 }

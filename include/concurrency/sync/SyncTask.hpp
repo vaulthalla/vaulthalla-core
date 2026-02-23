@@ -37,8 +37,6 @@ struct SyncTask final : FSTask {
 
     void operator()() override;
     void removeTrashedFiles() override;
-    void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File> >& files,
-                             unsigned int begin, unsigned int end) override;
 
 
     // ##########################################

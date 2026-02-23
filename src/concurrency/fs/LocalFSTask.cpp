@@ -4,8 +4,6 @@
 #include "storage/StorageEngine.hpp"
 #include "types/vault/Vault.hpp"
 #include "logging/LogRegistry.hpp"
-#include "concurrency/fs/LocalRotateKeyTask.hpp"
-#include "types/sync/Event.hpp"
 #include "types/sync/Throughput.hpp"
 
 using namespace vh::concurrency;
@@ -18,19 +16,12 @@ using namespace std::chrono;
 void LocalFSTask::operator()() {
     startTask();
 
-    try {
-        processSharedOps();
-    } catch (const std::exception& e) {
-        handleError(std::format("[LocalFSTask] Exception during sync: {}", e.what()));
-    } catch (...) {
-        handleError("[LocalFSTask] Unknown exception during sync.");
-    }
+    const Stage stages[] = {
+        {"shared",   [this]{ processSharedOps(); }}
+    };
 
+    runStages(stages);
     shutdown();
-}
-
-void LocalFSTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files, unsigned int begin, unsigned int end) {
-    push(std::make_shared<LocalRotateKeyTask>(localEngine(), files, begin, end));
 }
 
 void LocalFSTask::removeTrashedFiles() {

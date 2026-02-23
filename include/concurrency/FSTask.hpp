@@ -63,8 +63,6 @@ struct FSTask : Task, std::enable_shared_from_this<FSTask> {
 
     virtual void removeTrashedFiles() = 0;
     virtual void processFutures();
-    virtual void pushKeyRotationTask(const std::vector<std::shared_ptr<types::File>>& files,
-                                     unsigned int begin, unsigned int end) = 0;
 
     void push(const std::shared_ptr<Task>& task);
     void handleInterrupt() const;

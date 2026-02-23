@@ -5,7 +5,6 @@
 #include "concurrency/sync/UploadTask.hpp"
 #include "concurrency/sync/CloudDeleteTask.hpp"
 #include "concurrency/sync/CloudTrashedDeleteTask.hpp"
-#include "concurrency/sync/CloudRotateKeyTask.hpp"
 #include "concurrency/sync/SyncExecutor.hpp"
 
 #include "types/vault/Vault.hpp"
@@ -66,12 +65,6 @@ void SyncTask::removeTrashedFiles() {
             cloudEngine(), file, op(sync::Throughput::Metric::DELETE)));
 
     processFutures();
-}
-
-void SyncTask::pushKeyRotationTask(const std::vector<std::shared_ptr<File> >& files,
-                                  unsigned int begin,
-                                  unsigned int end) {
-    push(std::make_shared<CloudRotateKeyTask>(cloudEngine(), files, begin, end));
 }
 
 // ##########################################

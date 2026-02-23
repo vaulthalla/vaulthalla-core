@@ -20,6 +20,7 @@
 #include "types/sync/Throughput.hpp"
 #include "types/sync/ScopedOp.hpp"
 #include "database/Queries/SyncQueries.hpp"
+#include "concurrency/RotateKeyTask.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -223,7 +224,7 @@ void FSTask::handleVaultKeyRotation() {
         }
 
         for (const auto& [begin, end] : getTaskOperationRanges(filesToRotate.size()))
-            pushKeyRotationTask(filesToRotate, begin, end);
+            push(std::make_shared<RotateKeyTask>(engine, filesToRotate, begin, end));
 
         processFutures();
 

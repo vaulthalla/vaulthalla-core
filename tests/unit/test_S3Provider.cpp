@@ -15,6 +15,7 @@ using namespace vh::cloud;
 using namespace vh::types;
 using namespace vh::util;
 using namespace vh::types::api;
+using namespace vh::fs::model;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
   protected:

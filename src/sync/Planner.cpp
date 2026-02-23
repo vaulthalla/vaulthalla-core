@@ -7,7 +7,6 @@
 
 using namespace vh::sync;
 using namespace vh::sync::model;
-using namespace vh::types;
 using namespace vh::fs::model;
 
 std::vector<Action> Planner::build(

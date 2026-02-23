@@ -28,8 +28,9 @@ using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
-using namespace std::chrono;
 using namespace vh::types;
+using namespace vh::concurrency;
+using namespace std::chrono;
 
 Local::Local(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),

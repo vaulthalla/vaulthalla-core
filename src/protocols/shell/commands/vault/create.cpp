@@ -13,8 +13,8 @@
 #include "types/vault/Vault.hpp"
 #include "types/vault/S3Vault.hpp"
 #include "types/vault/APIKey.hpp"
-#include "types/sync/LocalPolicy.hpp"
-#include "types/sync/RemotePolicy.hpp"
+#include "sync/model/LocalPolicy.hpp"
+#include "sync/model/RemotePolicy.hpp"
 #include "types/entities/User.hpp"
 
 #include "logging/LogRegistry.hpp"
@@ -41,6 +41,7 @@ using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
+using namespace vh::sync::model;
 
 static constexpr const auto* SYNC_STRATEGY_HELP = R"(
 Sync Strategy Options:
@@ -94,7 +95,7 @@ Sync Interval:
 )";
 
 static CommandResult finish_vault_create(const CommandCall& call, std::shared_ptr<Vault>& v,
-                                         const std::shared_ptr<sync::Policy>& s) {
+                                         const std::shared_ptr<Policy>& s) {
     try {
         const auto [okToProceed, waiver] = handle_encryption_waiver({call, v, false});
         if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
@@ -121,7 +122,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
     const auto& io = call.io;
 
     std::shared_ptr<Vault> v;
-    std::shared_ptr<sync::Policy> sync;
+    std::shared_ptr<Policy> sync;
 
     const auto helpOptions = std::vector<std::string>{"help", "h", "?"};
 
@@ -154,7 +155,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
             " does not have permission to create vaults for other users");
 
     if (v->type == VaultType::Local) {
-        auto fSync = std::make_shared<sync::LocalPolicy>();
+        auto fSync = std::make_shared<LocalPolicy>();
 
         auto conflictStr = io->prompt(
             "Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite] --help for details:", "overwrite");
@@ -163,7 +164,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
             conflictStr = io->prompt("Enter on-sync-conflict policy (overwrite/keep_both/ask) [overwrite]:",
                                      "overwrite");
         }
-        fSync->conflict_policy = sync::fsConflictPolicyFromString(conflictStr);
+        fSync->conflict_policy = fsConflictPolicyFromString(conflictStr);
         sync = fSync;
     }
 
@@ -204,8 +205,8 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
             io->print(SYNC_STRATEGY_HELP);
             strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache]:", "cache");
         }
-        const auto rsync = std::make_shared<sync::RemotePolicy>();
-        rsync->strategy = sync::strategyFromString(strategyStr);
+        const auto rsync = std::make_shared<RemotePolicy>();
+        rsync->strategy = strategyFromString(strategyStr);
 
         auto conflictStr = io->prompt(
             "Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask] --help for details:", "ask");
@@ -214,7 +215,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
             io->print(REMOTE_CONFLICT_POLICY_HELP);
             conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask]:", "ask");
         }
-        rsync->conflict_policy = sync::rsConflictPolicyFromString(conflictStr);
+        rsync->conflict_policy = rsConflictPolicyFromString(conflictStr);
 
         sync = rsync;
 
@@ -257,9 +258,9 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
     if (VaultQueries::vaultExists(vault->name, owner->id)) return invalid(
         "vault create: vault with name '" + vault->name + "' already exists for user ID " + std::to_string(owner->id));
 
-    std::shared_ptr<sync::Policy> sync;
-    if (vault->type == VaultType::Local) sync = std::make_shared<sync::LocalPolicy>();
-    else if (vault->type == VaultType::S3) sync = std::make_shared<sync::RemotePolicy>();
+    std::shared_ptr<Policy> sync;
+    if (vault->type == VaultType::Local) sync = std::make_shared<LocalPolicy>();
+    else if (vault->type == VaultType::S3) sync = std::make_shared<RemotePolicy>();
     else return invalid("vault create: unknown vault type");
 
     parseSync(call, usage, vault, sync);

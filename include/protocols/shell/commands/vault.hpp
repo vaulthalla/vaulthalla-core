@@ -18,19 +18,19 @@ namespace vh::types {
 struct Vault;
 struct S3Vault;
 struct User;
-struct Waiver;
 struct VaultRole;
 struct Role;
 enum class VaultType;
 enum class OverrideOpt;
 
-namespace sync {
-struct Policy;
-}
-
 namespace api {
 struct APIKey;
 }
+}
+
+namespace vh::sync::model {
+struct Policy;
+struct Waiver;
 }
 
 namespace vh::storage {
@@ -47,7 +47,7 @@ struct WaiverContext {
 
 struct WaiverResult {
     bool okToProceed;
-    std::shared_ptr<types::Waiver> waiver;
+    std::shared_ptr<sync::model::Waiver> waiver;
 };
 
 // router.cpp
@@ -109,7 +109,7 @@ void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
 
 void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
 
-void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<types::sync::Policy>& sync);
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<sync::model::Policy>& sync);
 
 void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, unsigned int ownerId, bool required = false);
 

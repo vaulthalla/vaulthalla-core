@@ -15,11 +15,10 @@ struct TrashedFile;
 namespace api {
 struct APIKey;
 }
-
-namespace sync {
-struct RemotePolicy;
 }
 
+namespace vh::sync::model {
+struct RemotePolicy;
 }
 
 namespace vh::cloud {
@@ -40,18 +39,13 @@ public:
     void purge(const std::filesystem::path& rel_path) const;
     void purge(const std::shared_ptr<types::TrashedFile>& f) const;
 
-    void removeLocally(const std::filesystem::path& rel_path) const;
-    void removeLocally(const std::shared_ptr<types::TrashedFile>& f) const;
-
     void removeRemotely(const std::filesystem::path& rel_path, bool rmThumbnails = true) const;
     void removeRemotely(const std::shared_ptr<types::TrashedFile>& f, bool rmThumbnails = true) const;
 
     void upload(const std::shared_ptr<types::File>& f) const;
-
     void upload(const std::shared_ptr<types::File>& f, const std::vector<uint8_t>& buffer, bool isCiphertext = true) const;
 
     std::shared_ptr<types::File> downloadFile(const std::filesystem::path& rel_path);
-
     std::vector<uint8_t> downloadToBuffer(const std::filesystem::path& rel_path) const;
 
     void indexAndDeleteFile(const std::filesystem::path& rel_path);
@@ -66,7 +60,7 @@ public:
 
     std::optional<std::pair<std::string, unsigned int>> getRemoteIVBase64AndVersion(const std::filesystem::path& rel_path) const;
 
-    std::shared_ptr<types::sync::RemotePolicy> remote_policy() const;
+    std::shared_ptr<sync::model::RemotePolicy> remote_policy() const;
 
 private:
     std::shared_ptr<types::api::APIKey> key_;

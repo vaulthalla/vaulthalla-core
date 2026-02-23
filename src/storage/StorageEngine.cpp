@@ -1,7 +1,7 @@
 #include "storage/StorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/sync/Operation.hpp"
+#include "sync/model/Operation.hpp"
 #include "types/fs/Path.hpp"
 #include "util/Magic.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
@@ -10,13 +10,12 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
-#include "types/sync/Policy.hpp"
+#include "sync/model/Policy.hpp"
 #include "util/files.hpp"
-#include "services/ThumbnailWorker.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/fsPath.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
-#include "types/sync/Event.hpp"
+#include "sync/model/Event.hpp"
 
 using namespace vh::crypto;
 using namespace vh::types;
@@ -42,16 +41,16 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
 void StorageEngine::newSyncEvent(const uint8_t trigger) {
     if (latestSyncEvent) {
         SyncEventQueries::upsert(latestSyncEvent);
-        if (latestSyncEvent->status != sync::Event::Status::SUCCESS && latestSyncEvent->status != sync::Event::Status::CANCELLED) {
-            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::Event::toString(latestSyncEvent->status)));
+        if (latestSyncEvent->status != sync::model::Event::Status::SUCCESS && latestSyncEvent->status != sync::model::Event::Status::CANCELLED) {
+            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
             return;
         }
     }
 
-    latestSyncEvent = std::make_shared<sync::Event>();
+    latestSyncEvent = std::make_shared<sync::model::Event>();
     latestSyncEvent->vault_id = vault->id;
-    latestSyncEvent->status = sync::Event::Status::PENDING;
-    latestSyncEvent->trigger = static_cast<sync::Event::Trigger>(trigger);
+    latestSyncEvent->status = sync::model::Event::Status::PENDING;
+    latestSyncEvent->trigger = static_cast<sync::model::Event::Trigger>(trigger);
     latestSyncEvent->timestamp_begin = system_clock::to_time_t(system_clock::now());
     latestSyncEvent->config_hash = sync->config_hash;
     SyncEventQueries::create(latestSyncEvent);
@@ -174,6 +173,58 @@ void StorageEngine::copy(const fs::path& from, const fs::path& to, const unsigne
 
 void StorageEngine::remove(const fs::path& rel_path, const unsigned int userId) const {
     Filesystem::remove(paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId);
+}
+
+void StorageEngine::removeLocally(const fs::path& rel_path) const {
+    const auto path = rel_path.string().front() != '/' ? fs::path("/" / rel_path) : rel_path;
+    purgeThumbnails(path);
+    auto file = FileQueries::getFileByPath(vault->id, path);
+    FileQueries::deleteFile(vault->owner_id, file);
+
+    if (const auto absPath = paths->absPath(path, PathType::BACKING_VAULT_ROOT); fs::exists(absPath)) fs::remove(absPath);
+}
+
+void StorageEngine::removeLocally(const std::shared_ptr<TrashedFile>& f) const {
+    namespace fs = std::filesystem;
+
+    fs::path absPath = paths->absPath(f->backing_path, PathType::BACKING_ROOT);
+
+    // Remove the file if present
+    std::error_code ec;
+    fs::remove(absPath, ec); // ignore errors; file may not exist
+
+    // Normalize roots to avoid string mismatch
+    fs::path vaultRoot = paths->vaultRoot;
+    vaultRoot = fs::weakly_canonical(vaultRoot, ec);
+    absPath   = fs::weakly_canonical(absPath, ec);
+
+    // Walk up deleting now-empty dirs, but never above vaultRoot
+    while (absPath.has_parent_path()) {
+        fs::path parent = absPath.parent_path();
+
+        // Stop if parent is (or is above) vaultRoot boundary
+        // Use lexically_relative to detect containment robustly.
+
+        if (const auto rel = parent.lexically_relative(vaultRoot);
+            rel.empty() || rel.native().starts_with("..")) break; // outside or at boundary
+
+        // If parent doesn't exist or isn't empty, we're done
+        if (!fs::exists(parent) || !fs::is_empty(parent)) break;
+
+        fs::remove(parent, ec);
+        if (ec) break;
+
+        absPath = parent;
+    }
+
+    const auto vaultPath = paths->absRelToAbsRel(f->path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
+
+    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+        const auto thumbPath = paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);
+        fs::remove(thumbPath, ec);
+    }
+
+    fs::remove(paths->absPath(vaultPath, PathType::CACHE_ROOT), ec);
 }
 
 }

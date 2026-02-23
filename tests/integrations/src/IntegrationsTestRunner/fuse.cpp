@@ -8,7 +8,7 @@
 #include "types/rbac/UserRole.hpp"
 #include "types/rbac/PermissionOverride.hpp"
 #include "types/fs/FSEntry.hpp"
-#include "types/sync/LocalPolicy.hpp"
+#include "sync/model/LocalPolicy.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
 #include "types/fs/Path.hpp"
@@ -27,6 +27,7 @@ using namespace vh::database;
 using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::services;
+using namespace vh::sync::model;
 
 static unsigned int uid_index = 1001;
 
@@ -99,9 +100,9 @@ static std::shared_ptr<StorageEngine> createVault() {
 
     if (vault->name.empty()) throw std::runtime_error("Vault name cannot be empty");
 
-    const auto sync = std::make_shared<sync::LocalPolicy>();
+    const auto sync = std::make_shared<LocalPolicy>();
     sync->interval = std::chrono::minutes(15);
-    sync->conflict_policy = sync::LocalPolicy::ConflictPolicy::Overwrite;
+    sync->conflict_policy = LocalPolicy::ConflictPolicy::Overwrite;
 
     vault = ServiceDepsRegistry::instance().storageManager->addVault(vault, sync);
     return ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);

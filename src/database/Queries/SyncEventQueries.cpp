@@ -1,17 +1,18 @@
 #include "database/Queries/SyncEventQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/sync/Event.hpp"
-#include "types/sync/Throughput.hpp"
-#include "types/sync/Conflict.hpp"
-#include "types/sync/ConflictArtifact.hpp"
-#include "types/sync/Artifact.hpp"
+#include "sync/model/Event.hpp"
+#include "sync/model/Throughput.hpp"
+#include "sync/model/Conflict.hpp"
+#include "sync/model/ConflictArtifact.hpp"
+#include "sync/model/Artifact.hpp"
 #include "types/fs/File.hpp"
 #include "util/timestamp.hpp"
 #include "util/u8.hpp"
 #include "config/ConfigRegistry.hpp"
 
+using namespace vh::sync::model;
 using namespace vh::database;
-using namespace vh::types::sync;
+using namespace vh::types;
 using namespace vh::util;
 using namespace vh::config;
 
@@ -156,7 +157,7 @@ std::shared_ptr<Event> SyncEventQueries::getLatest(unsigned int vaultId) {
     });
 }
 
-void SyncEventQueries::heartbeat(const std::shared_ptr<types::sync::Event>& event) {
+void SyncEventQueries::heartbeat(const std::shared_ptr<Event>& event) {
     Transactions::exec("SyncQueries::heartbeat", [&](pqxx::work& txn) {
         const pqxx::params p { event->vault_id, event->run_uuid, timestampToString(event->heartbeat_at) };
         if (const auto res = txn.exec(pqxx::prepped{"sync_event.touch_heartbeat"}, p);

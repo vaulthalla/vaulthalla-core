@@ -1,14 +1,15 @@
 #include "database/Queries/WaiverQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/sync/Waiver.hpp"
+#include "sync/model/Waiver.hpp"
 #include "types/vault/S3Vault.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/APIKey.hpp"
 #include "types/rbac/Role.hpp"
 
 using namespace vh::database;
+using namespace vh::sync::model;
 
-void WaiverQueries::addWaiver(const std::shared_ptr<types::Waiver>& waiver) {
+void WaiverQueries::addWaiver(const std::shared_ptr<Waiver>& waiver) {
     if (!waiver) throw std::invalid_argument("Invalid waiver");
     if (!waiver->vault) throw std::invalid_argument("Invalid vault in waiver");
     if (!waiver->user) throw std::invalid_argument("Invalid user in waiver");

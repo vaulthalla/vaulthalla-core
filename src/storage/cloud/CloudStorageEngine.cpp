@@ -16,7 +16,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "types/sync/RemotePolicy.hpp"
+#include "sync/model/RemotePolicy.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -224,58 +224,6 @@ void CloudStorageEngine::purge(const std::shared_ptr<TrashedFile>& f) const {
     removeRemotely(f, true);
 }
 
-void CloudStorageEngine::removeLocally(const fs::path& rel_path) const {
-    const auto path = rel_path.string().front() != '/' ? fs::path("/" / rel_path) : rel_path;
-    purgeThumbnails(path);
-    auto file = FileQueries::getFileByPath(vault->id, path);
-    FileQueries::deleteFile(vault->owner_id, file);
-
-    if (const auto absPath = paths->absPath(path, PathType::BACKING_VAULT_ROOT); fs::exists(absPath)) fs::remove(absPath);
-}
-
-void CloudStorageEngine::removeLocally(const std::shared_ptr<TrashedFile>& f) const {
-    namespace fs = std::filesystem;
-
-    fs::path absPath = paths->absPath(f->backing_path, PathType::BACKING_ROOT);
-
-    // Remove the file if present
-    std::error_code ec;
-    fs::remove(absPath, ec); // ignore errors; file may not exist
-
-    // Normalize roots to avoid string mismatch
-    fs::path vaultRoot = paths->vaultRoot;
-    vaultRoot = fs::weakly_canonical(vaultRoot, ec);
-    absPath   = fs::weakly_canonical(absPath, ec);
-
-    // Walk up deleting now-empty dirs, but never above vaultRoot
-    while (absPath.has_parent_path()) {
-        fs::path parent = absPath.parent_path();
-
-        // Stop if parent is (or is above) vaultRoot boundary
-        // Use lexically_relative to detect containment robustly.
-
-        if (const auto rel = parent.lexically_relative(vaultRoot);
-            rel.empty() || rel.native().starts_with("..")) break; // outside or at boundary
-
-        // If parent doesn't exist or isn't empty, we're done
-        if (!fs::exists(parent) || !fs::is_empty(parent)) break;
-
-        fs::remove(parent, ec);
-        if (ec) break;
-
-        absPath = parent;
-    }
-
-    const auto vaultPath = paths->absRelToAbsRel(f->path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
-        const auto thumbPath = paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);
-        fs::remove(thumbPath, ec);
-    }
-
-    fs::remove(paths->absPath(vaultPath, PathType::CACHE_ROOT), ec);
-}
-
 void CloudStorageEngine::removeRemotely(const fs::path& rel_path, const bool rmThumbnails) const {
     s3Provider_->deleteObject(stripLeadingSlash(rel_path));
     if (rmThumbnails) purgeThumbnails(rel_path);
@@ -289,6 +237,6 @@ void CloudStorageEngine::removeRemotely(const std::shared_ptr<types::TrashedFile
 
 std::shared_ptr<S3Vault> CloudStorageEngine::s3Vault() const { return std::static_pointer_cast<S3Vault>(vault); }
 
-std::shared_ptr<sync::RemotePolicy> CloudStorageEngine::remote_policy() const {
-    return std::static_pointer_cast<sync::RemotePolicy>(sync);
+std::shared_ptr<vh::sync::model::RemotePolicy> CloudStorageEngine::remote_policy() const {
+    return std::static_pointer_cast<sync::model::RemotePolicy>(sync);
 }

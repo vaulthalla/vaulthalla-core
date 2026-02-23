@@ -6,9 +6,9 @@
 #include "storage/StorageEngine.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/sync/LocalPolicy.hpp"
-#include "types/sync/RemotePolicy.hpp"
-#include "types/sync/Policy.hpp"
+#include "sync/model/LocalPolicy.hpp"
+#include "sync/model/RemotePolicy.hpp"
+#include "sync/model/Policy.hpp"
 #include "util/interval.hpp"
 #include "CommandUsage.hpp"
 
@@ -20,12 +20,13 @@
 using namespace vh::shell;
 using namespace vh::shell::commands;
 using namespace vh::shell::commands::vault;
-using namespace vh::types::sync;
+using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::sync::model;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync";

@@ -1,8 +1,8 @@
 #include "services/SyncController.hpp"
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "concurrency/FSTask.hpp"
-#include "concurrency/sync/SyncTask.hpp"
+#include "sync/Local.hpp"
+#include "sync/Cloud.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -18,15 +18,16 @@ using namespace vh::storage;
 using namespace vh::concurrency;
 using namespace vh::logging;
 using namespace vh::types;
+using namespace vh::sync;
 
-bool FSTaskCompare::operator()(const std::shared_ptr<FSTask>& a, const std::shared_ptr<FSTask>& b) const {
+bool FSTaskCompare::operator()(const std::shared_ptr<Local>& a, const std::shared_ptr<Local>& b) const {
     return a->next_run > b->next_run; // Min-heap based on next_run time
 }
 
 SyncController::SyncController()
     : AsyncService("SyncController") {}
 
-void SyncController::requeue(const std::shared_ptr<FSTask>& task) {
+void SyncController::requeue(const std::shared_ptr<Local>& task) {
     std::scoped_lock lock(pqMutex_);
     pq.push(task);
     LogRegistry::sync()->debug("[SyncController] Requeued task for vault ID: {}", task->vaultId());
@@ -71,7 +72,7 @@ void SyncController::runLoop() {
         }
 
         refreshTries = 0;
-        std::shared_ptr<FSTask> task;
+        std::shared_ptr<Local> task;
 
         {
             std::scoped_lock lock(pqMutex_);
@@ -92,7 +93,7 @@ void SyncController::runLoop() {
 void SyncController::runNow(const unsigned int vaultId, const uint8_t trigger) {
     LogRegistry::sync()->debug("[SyncController] Early sync request for vault ID: {}", vaultId);
 
-    std::shared_ptr<FSTask> task;
+    std::shared_ptr<Local> task;
 
     {
         std::scoped_lock lock(taskMapMutex_);
@@ -151,8 +152,8 @@ void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
     }
 }
 
-std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
-    if (engine->type() == StorageType::Local) return createTask<FSTask>(engine);
-    if (engine->type() == StorageType::Cloud) return createTask<SyncTask>(engine);
+std::shared_ptr<Local> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
+    if (engine->type() == StorageType::Local) return createTask<Local>(engine);
+    if (engine->type() == StorageType::Cloud) return createTask<Cloud>(engine);
     throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
 }

@@ -3,7 +3,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/StorageManager.hpp"
 #include "storage/StorageEngine.hpp"
-#include "types/sync/Event.hpp"
+#include "sync/model/Event.hpp"
 
 #include <nlohmann/json.hpp>
 

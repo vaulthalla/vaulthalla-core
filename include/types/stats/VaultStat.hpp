@@ -5,10 +5,6 @@
 
 namespace vh::types {
 
-namespace sync {
-struct Event;
-}
-
 struct CapacityStats;
 
 struct VaultStat {

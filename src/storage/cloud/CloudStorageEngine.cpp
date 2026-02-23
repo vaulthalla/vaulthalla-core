@@ -16,7 +16,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/APIKeyManager.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "types/sync/RemotePolicy.hpp"
+#include "sync/model/RemotePolicy.hpp"
 
 using namespace vh::storage;
 using namespace vh::types;
@@ -237,6 +237,6 @@ void CloudStorageEngine::removeRemotely(const std::shared_ptr<types::TrashedFile
 
 std::shared_ptr<S3Vault> CloudStorageEngine::s3Vault() const { return std::static_pointer_cast<S3Vault>(vault); }
 
-std::shared_ptr<sync::RemotePolicy> CloudStorageEngine::remote_policy() const {
-    return std::static_pointer_cast<sync::RemotePolicy>(sync);
+std::shared_ptr<vh::sync::model::RemotePolicy> CloudStorageEngine::remote_policy() const {
+    return std::static_pointer_cast<sync::model::RemotePolicy>(sync);
 }

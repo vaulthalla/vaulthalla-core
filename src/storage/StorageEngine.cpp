@@ -1,7 +1,7 @@
 #include "storage/StorageEngine.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/sync/Operation.hpp"
+#include "sync/model/Operation.hpp"
 #include "types/fs/Path.hpp"
 #include "util/Magic.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
@@ -10,13 +10,12 @@
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
 #include "storage/Filesystem.hpp"
-#include "types/sync/Policy.hpp"
+#include "sync/model/Policy.hpp"
 #include "util/files.hpp"
-#include "services/ThumbnailWorker.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/fsPath.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
-#include "types/sync/Event.hpp"
+#include "sync/model/Event.hpp"
 
 using namespace vh::crypto;
 using namespace vh::types;
@@ -42,16 +41,16 @@ StorageEngine::StorageEngine(const std::shared_ptr<Vault>& vault)
 void StorageEngine::newSyncEvent(const uint8_t trigger) {
     if (latestSyncEvent) {
         SyncEventQueries::upsert(latestSyncEvent);
-        if (latestSyncEvent->status != sync::Event::Status::SUCCESS && latestSyncEvent->status != sync::Event::Status::CANCELLED) {
-            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::Event::toString(latestSyncEvent->status)));
+        if (latestSyncEvent->status != sync::model::Event::Status::SUCCESS && latestSyncEvent->status != sync::model::Event::Status::CANCELLED) {
+            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
             return;
         }
     }
 
-    latestSyncEvent = std::make_shared<sync::Event>();
+    latestSyncEvent = std::make_shared<sync::model::Event>();
     latestSyncEvent->vault_id = vault->id;
-    latestSyncEvent->status = sync::Event::Status::PENDING;
-    latestSyncEvent->trigger = static_cast<sync::Event::Trigger>(trigger);
+    latestSyncEvent->status = sync::model::Event::Status::PENDING;
+    latestSyncEvent->trigger = static_cast<sync::model::Event::Trigger>(trigger);
     latestSyncEvent->timestamp_begin = system_clock::to_time_t(system_clock::now());
     latestSyncEvent->config_hash = sync->config_hash;
     SyncEventQueries::create(latestSyncEvent);

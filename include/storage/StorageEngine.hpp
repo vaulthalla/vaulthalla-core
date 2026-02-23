@@ -10,12 +10,11 @@ struct Vault;
 struct File;
 struct Path;
 struct TrashedFile;
-
-namespace sync {
-struct Event;
-struct Policy;
 }
 
+namespace vh::sync::model {
+struct Event;
+struct Policy;
 }
 
 namespace vh::crypto {
@@ -30,8 +29,8 @@ enum class StorageType { Local, Cloud };
 
 struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     std::shared_ptr<types::Vault> vault;
-    std::shared_ptr<types::sync::Policy> sync;
-    std::shared_ptr<types::sync::Event> latestSyncEvent;
+    std::shared_ptr<sync::model::Policy> sync;
+    std::shared_ptr<sync::model::Event> latestSyncEvent;
     std::shared_ptr<types::Path> paths;
     std::shared_ptr<crypto::VaultEncryptionManager> encryptionManager;
     std::shared_mutex mutex;

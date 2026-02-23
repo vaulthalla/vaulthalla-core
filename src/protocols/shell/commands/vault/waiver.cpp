@@ -1,5 +1,4 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
@@ -15,7 +14,7 @@
 #include "types/vault/APIKey.hpp"
 #include "types/rbac/VaultRole.hpp"
 #include "types/entities/User.hpp"
-#include "types/sync/Waiver.hpp"
+#include "sync/model/Waiver.hpp"
 #include "types/rbac/UserRole.hpp"
 
 #include "config/ConfigRegistry.hpp"
@@ -37,7 +36,7 @@ using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
-
+using namespace vh::sync::model;
 
 static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault) {
     auto waiver = std::make_shared<Waiver>();

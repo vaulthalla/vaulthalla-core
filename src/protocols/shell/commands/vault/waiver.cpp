@@ -6,7 +6,7 @@
 #include "database/Queries/UserQueries.hpp"
 
 #include "logging/LogRegistry.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/s3/S3Controller.hpp"
 #include "crypto/APIKeyManager.hpp"
 
 #include "types/vault/Vault.hpp"

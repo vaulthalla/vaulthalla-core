@@ -3,12 +3,12 @@
 #include "concurrency/Task.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "util/imageUtil.hpp"
-#include "storage/StorageEngine.hpp"
-#include "types/fs/CacheIndex.hpp"
+#include "storage/Engine.hpp"
+#include "fs/cache/Record.hpp"
 #include "database/Queries/CacheQueries.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Path.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/fs/Path.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "types/stats/CacheStats.hpp"
@@ -24,14 +24,15 @@ using namespace vh::config;
 using namespace vh::database;
 using namespace vh::services;
 using namespace std::chrono;
+using namespace vh::fs;
 
 namespace vh::concurrency {
 
 class ThumbnailTask : public Task {
 public:
-    ThumbnailTask(const std::shared_ptr<const storage::StorageEngine>& engine,
+    ThumbnailTask(const std::shared_ptr<const storage::Engine>& engine,
                   const std::vector<uint8_t>& buffer,
-                  const std::shared_ptr<File>& file)
+                  const std::shared_ptr<model::File>& file)
         : engine_(engine), buffer_(buffer), file_(file) {}
 
     void operator()() override {
@@ -56,11 +57,11 @@ public:
                 const auto end = steady_clock::now();
                 ServiceDepsRegistry::instance().httpCacheStats->record_op_us(duration_cast<microseconds>(end - now).count());
 
-                auto index = std::make_shared<CacheIndex>();
+                auto index = std::make_shared<cache::Record>();
                 index->vault_id = engine_->vault->id;
                 index->file_id = file_->id;
-                index->path = engine_->paths->relPath(cachePath, PathType::CACHE_ROOT);
-                index->type = CacheIndex::Type::Thumbnail;
+                index->path = engine_->paths->relPath(cachePath, model::PathType::CACHE_ROOT);
+                index->type = cache::Record::Type::Thumbnail;
                 index->size = fs::file_size(cachePath);
 
                 CacheQueries::upsertCacheIndex(index);
@@ -75,9 +76,9 @@ public:
     }
 
 private:
-    std::shared_ptr<const storage::StorageEngine> engine_;
+    std::shared_ptr<const storage::Engine> engine_;
     std::vector<uint8_t> buffer_;
-    std::shared_ptr<File> file_;
+    std::shared_ptr<model::File> file_;
 };
 
 }

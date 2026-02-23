@@ -5,12 +5,10 @@
 #include <memory>
 
 namespace vh::storage {
-class CloudStorageEngine;
+class CloudEngine;
 }
 
-namespace vh::types {
-struct File;
-}
+namespace vh::fs::model { struct File; }
 
 namespace vh::sync::model {
 struct ScopedOp;
@@ -19,12 +17,12 @@ struct ScopedOp;
 namespace vh::sync::tasks {
 
 struct Upload final : concurrency::PromisedTask {
-    std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<types::File> file;
+    std::shared_ptr<storage::CloudEngine> engine;
+    std::shared_ptr<fs::model::File> file;
     model::ScopedOp& op;
 
-    Upload(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<types::File> f,
+    Upload(std::shared_ptr<storage::CloudEngine> eng,
+                 std::shared_ptr<fs::model::File> f,
                  model::ScopedOp& op);
 
     void operator()() override;

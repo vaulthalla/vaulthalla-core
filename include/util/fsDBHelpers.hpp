@@ -3,14 +3,14 @@
 #include <memory>
 #include <pqxx/pqxx>
 
-namespace vh::types {
+namespace vh::fs::model {
 struct File;
-struct FSEntry;
+struct Entry;
 }
 
 namespace vh::database {
 
-void updateFile(pqxx::work& txn, const std::shared_ptr<types::File>& file);
-void updateFSEntry(pqxx::work& txn, const std::shared_ptr<types::FSEntry>& entry);
+void updateFile(pqxx::work& txn, const std::shared_ptr<fs::model::File>& file);
+void updateFSEntry(pqxx::work& txn, const std::shared_ptr<fs::model::Entry>& entry);
 
 }

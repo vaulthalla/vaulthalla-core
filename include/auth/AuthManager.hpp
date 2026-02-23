@@ -18,7 +18,7 @@ class WebSocketSession;
 }
 
 namespace vh::storage {
-class StorageManager;
+class Manager;
 }
 
 namespace vh::auth {
@@ -27,7 +27,7 @@ class Client;
 
 class AuthManager {
 public:
-    explicit AuthManager(const std::shared_ptr<storage::StorageManager>& storageManager = nullptr);
+    explicit AuthManager(const std::shared_ptr<storage::Manager>& storageManager = nullptr);
 
     void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const;
 
@@ -68,7 +68,7 @@ public:
 private:
     std::unordered_map<std::string, std::shared_ptr<types::User>> users_;
     std::shared_ptr<SessionManager> sessionManager_;
-    std::shared_ptr<storage::StorageManager> storageManager_;
+    std::shared_ptr<storage::Manager> storageManager_;
     const std::string jwt_secret_ = crypto::InternalSecretManager().jwtSecret();
 };
 

@@ -10,7 +10,7 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "CommandUsage.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
@@ -83,8 +83,8 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
     return out;
 }
 
-Lookup<StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
-    Lookup<StorageEngine> out;
+Lookup<Engine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
+    Lookup<Engine> out;
 
     const auto vLkp = resolveVault(call, vaultArg, usage, errPrefix);
     if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }

@@ -5,14 +5,13 @@
 #include "sync/model/Conflict.hpp"
 #include "sync/model/ConflictArtifact.hpp"
 #include "sync/model/Artifact.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 #include "util/timestamp.hpp"
 #include "util/u8.hpp"
 #include "config/ConfigRegistry.hpp"
 
 using namespace vh::sync::model;
 using namespace vh::database;
-using namespace vh::types;
 using namespace vh::util;
 using namespace vh::config;
 

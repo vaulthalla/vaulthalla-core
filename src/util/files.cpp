@@ -1,10 +1,10 @@
 #include "util/files.hpp"
-#include "storage/StorageEngine.hpp"
-#include "types/fs/Path.hpp"
-#include "types/fs/FSEntry.hpp"
+#include "storage/Engine.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/Path.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
-#include "storage/FSCache.hpp"
+#include "fs/cache/Registry.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -19,6 +19,7 @@ using namespace vh::util;
 using namespace vh::types;
 using namespace vh::services;
 using namespace vh::logging;
+using namespace vh::fs::model;
 
 std::vector<uint8_t> vh::util::readFileToVector(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
@@ -73,7 +74,7 @@ std::string vh::util::generate_random_suffix(const size_t length) {
 
 std::filesystem::path vh::util::decrypt_file_to_temp(const unsigned int vault_id,
                                                   const std::filesystem::path& rel_path,
-                                                  const std::shared_ptr<storage::StorageEngine>& engine) {
+                                                  const std::shared_ptr<storage::Engine>& engine) {
     namespace fs = std::filesystem;
 
     const auto abs_path = engine->paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);

@@ -1,14 +1,15 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/Directory.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Directory.hpp"
 #include "util/u8.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
-using namespace vh::types;
 using namespace vh::logging;
+using namespace vh::fs::model;
+
 
 bool FSEntryQueries::rootExists() {
     return Transactions::exec("FSEntryQueries::rootExists", [&](pqxx::work& txn) {
@@ -16,8 +17,8 @@ bool FSEntryQueries::rootExists() {
     });
 }
 
-std::shared_ptr<FSEntry> FSEntryQueries::getRootEntry() {
-    return Transactions::exec("FSEntryQueries::getRootEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+std::shared_ptr<Entry> FSEntryQueries::getRootEntry() {
+    return Transactions::exec("FSEntryQueries::getRootEntry", [&](pqxx::work& txn) -> std::shared_ptr<Entry> {
         const auto res = txn.exec(pqxx::prepped{"get_root_entry"});
         if (res.empty()) {
             LogRegistry::db()->warn("[FSEntryQueries::getRootEntry] No root entry found in the database");
@@ -27,7 +28,7 @@ std::shared_ptr<FSEntry> FSEntryQueries::getRootEntry() {
     });
 }
 
-void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
+void FSEntryQueries::updateFSEntry(const std::shared_ptr<Entry>& entry) {
     Transactions::exec("FSEntryQueries::updateFSEntry", [&](pqxx::work& txn) {
         pqxx::params p;
         p.append(entry->inode);
@@ -47,12 +48,12 @@ void FSEntryQueries::updateFSEntry(const std::shared_ptr<FSEntry>& entry) {
     });
 }
 
-std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const std::string& base32) {
-    return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+std::shared_ptr<Entry> FSEntryQueries::getFSEntry(const std::string& base32) {
+    return Transactions::exec("FSEntryQueries::getFSEntry", [&](pqxx::work& txn) -> std::shared_ptr<Entry> {
         const auto fileRes = txn.exec(pqxx::prepped{"get_file_by_base32_alias"}, base32);
         if (!fileRes.empty()) {
             const auto parentRows = txn.exec(pqxx::prepped{"collect_parent_chain"}, fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
-            return std::make_shared<File>(fileRes.one_row(), parentRows);
+            return std::make_shared<fs::model::File>(fileRes.one_row(), parentRows);
         }
 
         const auto dirRes = txn.exec(pqxx::prepped{"get_dir_by_base32_alias"}, base32);
@@ -65,12 +66,12 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntry(const std::string& base32) {
     });
 }
 
-std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryByInode(const ino_t ino) {
-    return Transactions::exec("FSEntryQueries::getFSEntryByInode", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+std::shared_ptr<Entry> FSEntryQueries::getFSEntryByInode(const ino_t ino) {
+    return Transactions::exec("FSEntryQueries::getFSEntryByInode", [&](pqxx::work& txn) -> std::shared_ptr<Entry> {
         const auto fileRes = txn.exec(pqxx::prepped{"get_file_by_inode"}, ino);
         if (!fileRes.empty()) {
             const auto parentRows = txn.exec(pqxx::prepped{"collect_parent_chain"}, fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
-            return std::make_shared<File>(fileRes.one_row(), parentRows);
+            return std::make_shared<fs::model::File>(fileRes.one_row(), parentRows);
         }
 
         const auto dirRes = txn.exec(pqxx::prepped{"get_dir_by_inode"}, ino);
@@ -84,15 +85,15 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryByInode(const ino_t ino) {
 }
 
 
-std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
-    return Transactions::exec("FSEntryQueries::getFSEntryById", [&](pqxx::work& txn) -> std::shared_ptr<FSEntry> {
+std::shared_ptr<Entry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
+    return Transactions::exec("FSEntryQueries::getFSEntryById", [&](pqxx::work& txn) -> std::shared_ptr<Entry> {
         const auto res = txn.exec(pqxx::prepped{"get_fs_entry_by_id"}, entryId);
         if (res.empty()) return nullptr;
 
         const auto fileRes = txn.exec(pqxx::prepped{"get_file_by_id"}, entryId);
         if (!fileRes.empty()) {
             const auto parentRows = txn.exec(pqxx::prepped{"collect_parent_chain"}, fileRes.one_row()["parent_id"].as<std::optional<unsigned int>>());
-            return std::make_shared<File>(fileRes.one_row(), parentRows);
+            return std::make_shared<fs::model::File>(fileRes.one_row(), parentRows);
         }
 
         const auto dirRes = txn.exec(pqxx::prepped{"get_dir_by_id"}, entryId);
@@ -105,7 +106,7 @@ std::shared_ptr<FSEntry> FSEntryQueries::getFSEntryById(unsigned int entryId) {
     });
 }
 
-void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
+void FSEntryQueries::renameEntry(const std::shared_ptr<Entry>& entry) {
     if (entry->parent_id && *entry->parent_id == 0) entry->parent_id = std::nullopt;
     Transactions::exec("FSEntryQueries::renameEntry", [&](pqxx::work& txn) {
         pqxx::params p{entry->id, entry->name,
@@ -116,7 +117,7 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<FSEntry>& entry) {
     });
 }
 
-std::vector<std::shared_ptr<FSEntry> > FSEntryQueries::listDir(const std::optional<unsigned int>& entryId, const bool recursive) {
+std::vector<std::shared_ptr<Entry>> FSEntryQueries::listDir(const std::optional<unsigned int>& entryId, const bool recursive) {
     if (!entryId) {
         LogRegistry::db()->warn("[FSEntryQueries::listDir] entryId is null, returning empty list");
         return {};

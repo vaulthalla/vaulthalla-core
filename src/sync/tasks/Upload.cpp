@@ -1,15 +1,15 @@
 #include "sync/tasks/Upload.hpp"
-#include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/fs/File.hpp"
+#include "storage/CloudEngine.hpp"
+#include "fs/model/File.hpp"
 #include "logging/LogRegistry.hpp"
 #include "sync/model/ScopedOp.hpp"
 
 using namespace vh::sync::tasks;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::logging;
 
-Upload::Upload(std::shared_ptr<CloudStorageEngine> eng, std::shared_ptr<File> f, model::ScopedOp& op)
+Upload::Upload(std::shared_ptr<CloudEngine> eng, std::shared_ptr<File> f, model::ScopedOp& op)
     : engine(std::move(eng)), file(std::move(f)), op(op) {}
 
 void Upload::operator()() {

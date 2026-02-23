@@ -3,7 +3,7 @@
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Engine.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"

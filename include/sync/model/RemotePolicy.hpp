@@ -16,7 +16,7 @@ namespace vh::sync {
 struct Cloud;
 }
 
-namespace vh::types {
+namespace vh::fs::model {
 struct File;
 }
 
@@ -47,7 +47,7 @@ struct RemotePolicy final : public Policy {
     [[nodiscard]] bool uploadLocalOnly() const;
     [[nodiscard]] bool deleteRemoteLeftovers() const;
     [[nodiscard]] bool deleteLocalLeftovers() const;
-    [[nodiscard]] std::optional<ActionType> decideForBoth(const std::shared_ptr<types::File>& L, const std::shared_ptr<types::File>& R) const;
+    [[nodiscard]] std::optional<ActionType> decideForBoth(const std::shared_ptr<fs::model::File>& L, const std::shared_ptr<fs::model::File>& R) const;
     void preflightSpaceForPlan(const std::weak_ptr<sync::Cloud>& ctx, const std::vector<Action>& plan) const;
 };
 

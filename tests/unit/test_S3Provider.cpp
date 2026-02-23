@@ -1,7 +1,7 @@
 #include "types/vault/APIKey.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/s3/S3Controller.hpp"
 #include "util/imageUtil.hpp"
-#include "types/fs/FSEntry.hpp"
+#include "fs/model/Entry.hpp"
 
 #include <filesystem>
 #include <fstream>

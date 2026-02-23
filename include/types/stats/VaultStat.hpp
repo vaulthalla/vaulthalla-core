@@ -3,13 +3,13 @@
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
-namespace vh::types {
+namespace vh::storage::stats { struct Capacity; }
 
-struct CapacityStats;
+namespace vh::types {
 
 struct VaultStat {
     uint32_t vault_id;
-    std::shared_ptr<CapacityStats> capacity;
+    std::shared_ptr<storage::stats::Capacity> capacity;
 
     explicit VaultStat(unsigned int vaultId);
 };

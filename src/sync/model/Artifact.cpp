@@ -1,5 +1,5 @@
 #include "sync/model/Artifact.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 #include "util/timestamp.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
@@ -7,7 +7,7 @@
 #include <pqxx/row>
 
 using namespace vh::sync::model;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::util;
 using namespace vh::services;
 

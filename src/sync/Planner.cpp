@@ -3,10 +3,11 @@
 #include "sync/Cloud.hpp"
 #include "sync/model/helpers.hpp"
 #include "sync/model/Conflict.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 
 using namespace vh::sync;
 using namespace vh::types;
+using namespace vh::fs::model;
 
 std::vector<model::Action> Planner::build(
     const std::shared_ptr<Cloud>& ctx,

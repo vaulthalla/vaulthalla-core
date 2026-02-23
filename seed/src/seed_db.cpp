@@ -20,7 +20,7 @@
 #include "types/rbac/UserRole.hpp"
 #include "types/rbac/VaultRole.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/fs/Directory.hpp"
+#include "fs/model/Directory.hpp"
 
 // Misc
 #include "config/ConfigRegistry.hpp"
@@ -51,6 +51,7 @@ using namespace vh::logging;
 using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::sync::model;
+using namespace vh::fs::model;
 
 void vh::seed::seed_database() {
     LogRegistry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);

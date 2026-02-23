@@ -7,16 +7,16 @@
 #include "types/rbac/VaultRole.hpp"
 #include "types/rbac/UserRole.hpp"
 #include "types/rbac/PermissionOverride.hpp"
-#include "types/fs/FSEntry.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/Path.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "types/entities/User.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/fs/Path.hpp"
 #include "seed/include/seed_db.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
-#include "storage/Filesystem.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
+#include "fs/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "util/fsPath.hpp"
@@ -28,6 +28,7 @@ using namespace vh::types;
 using namespace vh::storage;
 using namespace vh::services;
 using namespace vh::sync::model;
+using namespace vh::fs::model;
 
 static unsigned int uid_index = 1001;
 
@@ -92,7 +93,7 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
     return user;
 }
 
-static std::shared_ptr<StorageEngine> createVault() {
+static std::shared_ptr<Engine> createVault() {
     auto vault = std::make_shared<Vault>();
     vault->name = generateVaultName("vault/create");
     vault->description = "Test Vault";

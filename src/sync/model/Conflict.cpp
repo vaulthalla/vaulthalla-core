@@ -1,5 +1,5 @@
 #include "sync/model/Conflict.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "util/timestamp.hpp"
 
@@ -8,7 +8,7 @@
 #include <pqxx/result>
 
 using namespace vh::sync::model;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::services;
 using namespace vh::util;
 

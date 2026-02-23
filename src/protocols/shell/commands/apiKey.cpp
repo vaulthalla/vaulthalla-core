@@ -6,7 +6,7 @@
 #include "types/entities/User.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "crypto/APIKeyManager.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/s3/S3Controller.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "config/ConfigRegistry.hpp"

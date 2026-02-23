@@ -5,7 +5,7 @@
 #include "crypto/PasswordHash.hpp"
 #include "crypto/PasswordUtils.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -24,7 +24,7 @@ using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::logging;
 
-AuthManager::AuthManager(const std::shared_ptr<StorageManager>& storageManager)
+AuthManager::AuthManager(const std::shared_ptr<Manager>& storageManager)
     : sessionManager_(std::make_shared<SessionManager>()), storageManager_(storageManager) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }

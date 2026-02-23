@@ -2,17 +2,17 @@
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "services/SyncController.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Engine.hpp"
 #include "sync/model/Policy.hpp"
 #include "sync/model/Operation.hpp"
 #include "types/vault/Vault.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/Path.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Path.hpp"
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "crypto/VaultEncryptionManager.hpp"
-#include "storage/Filesystem.hpp"
+#include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "util/task.hpp"
@@ -31,8 +31,10 @@ using namespace vh::logging;
 using namespace vh::types;
 using namespace vh::concurrency;
 using namespace std::chrono;
+using namespace vh::fs;
+using namespace vh::fs::model;
 
-Local::Local(const std::shared_ptr<StorageEngine>& engine)
+Local::Local(const std::shared_ptr<Engine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
   engine(engine),
   event(std::make_shared<model::Event>()) {}
@@ -171,7 +173,7 @@ void Local::push(const std::shared_ptr<Task>& task) {
     concurrency::ThreadPoolManager::instance().syncPool()->submit(task);
 }
 
-model::ScopedOp& Local::op(const model::Throughput::Metric& metric) const {
+ScopedOp& Local::op(const model::Throughput::Metric& metric) const {
     return event->getOrCreateThroughput(metric).newOp();
 }
 
@@ -213,7 +215,7 @@ void Local::processOperations() const {
         FileQueries::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {
-            if (fs::exists(absSrc)) fs::remove(absSrc);
+            if (std::filesystem::exists(absSrc)) std::filesystem::remove(absSrc);
             engine->moveThumbnails(op->source_path, op->destination_path);
         };
 

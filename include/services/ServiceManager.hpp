@@ -19,10 +19,11 @@ namespace vh::concurrency {
 class AsyncService;
 }
 
+namespace vh::fuse { class Service; }
+
 namespace vh::services {
 
 class SyncController;
-class FUSE;
 class Vaulthalla;
 class CtlServerService;
 class ConnectionLifecycleManager;
@@ -58,7 +59,7 @@ private:
     [[noreturn]] void hardFail();
 
     std::shared_ptr<SyncController> syncController;
-    std::shared_ptr<FUSE> fuseService;
+    std::shared_ptr<fuse::Service> fuseService;
     std::shared_ptr<Vaulthalla> vaulthallaService;
     std::shared_ptr<CtlServerService> ctlServerService;
     std::shared_ptr<ConnectionLifecycleManager> connectionLifecycleManager;

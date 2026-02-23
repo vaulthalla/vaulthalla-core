@@ -7,7 +7,7 @@
 #include <memory>
 #include <atomic>
 
-namespace vh::types {
+namespace vh::fs::model {
     struct File;
 }
 
@@ -24,11 +24,11 @@ public:
     void finish_key_rotation();
 
     [[nodiscard]] std::vector<uint8_t>
-    rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<types::File>& f) const;
+    rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<fs::model::File>& f) const;
 
     // Encrypt data with vault key, returns ciphertext.
     // Populates out_b64_iv with base64-encoded IV.
-    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<types::File>& f) const;
+    [[nodiscard]] std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<fs::model::File>& f) const;
 
     // Decrypt using base64-encoded IV and ciphertext
     [[nodiscard]] std::vector<uint8_t> decrypt(const std::vector<uint8_t>& ciphertext,

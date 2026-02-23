@@ -2,7 +2,7 @@
 
 #include "helpers.hpp"
 
-namespace vh::types {
+namespace vh::fs::model {
 struct File;
 }
 
@@ -19,8 +19,8 @@ enum class ActionType {
 struct Action {
     ActionType type;
     EntryKey key;
-    std::shared_ptr<types::File> local;
-    std::shared_ptr<types::File> remote;
+    std::shared_ptr<fs::model::File> local;
+    std::shared_ptr<fs::model::File> remote;
     bool freeAfterDownload = false; // cache mode hint
 };
 

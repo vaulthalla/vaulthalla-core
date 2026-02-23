@@ -6,29 +6,29 @@
 #include <memory>
 #include <vector>
 
-namespace vh::storage { class StorageEngine; class CloudStorageEngine; }
+namespace vh::storage { struct Engine; class CloudEngine; }
 
-namespace vh::types { struct File; }
+namespace vh::fs::model { struct File; }
 
 namespace vh::sync::model { struct RemotePolicy; }
 
 namespace vh::sync::tasks {
 
 struct RotateKey final : concurrency::PromisedTask {
-    std::shared_ptr<storage::StorageEngine> engine;
-    std::shared_ptr<storage::CloudStorageEngine> cloud{nullptr};
-    std::vector<std::shared_ptr<types::File>> files;
+    std::shared_ptr<storage::Engine> engine;
+    std::shared_ptr<storage::CloudEngine> cloud{nullptr};
+    std::vector<std::shared_ptr<fs::model::File>> files;
     std::size_t begin{};
     std::size_t end{};
 
-    RotateKey(std::shared_ptr<storage::StorageEngine> eng,
-                  const std::vector<std::shared_ptr<types::File>>& f,
+    RotateKey(std::shared_ptr<storage::Engine> eng,
+                  const std::vector<std::shared_ptr<fs::model::File>>& f,
                   std::size_t begin_, std::size_t end_);
 
     void operator()() override;
 
 private:
-    using FileSP = std::shared_ptr<types::File>;
+    using FileSP = std::shared_ptr<fs::model::File>;
     using RemotePolicySP = std::shared_ptr<model::RemotePolicy>;
 
     [[nodiscard]] bool shouldSkipLocalWriteInCacheMode(const RemotePolicySP& policy, std::size_t ciphertextSize) const;

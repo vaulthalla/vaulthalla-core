@@ -8,9 +8,9 @@
 #include "logging/LogRegistry.hpp"
 #include "services/SyncController.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
+#include "storage/s3/S3Controller.hpp"
 
 #include "crypto/VaultEncryptionManager.hpp"
 #include "crypto/GPGEncryptor.hpp"
@@ -180,7 +180,7 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     validatePositionals(call, usage);
 
     const auto syncNow = hasFlag(call, usage->resolveFlag("now")->aliases);
-    const auto rotateKey = [&syncNow](const std::shared_ptr<StorageEngine>& engine) {
+    const auto rotateKey = [&syncNow](const std::shared_ptr<Engine>& engine) {
         engine->encryptionManager->prepare_key_rotation();
         if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
     };

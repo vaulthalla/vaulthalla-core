@@ -6,7 +6,7 @@
 #include "sync/model/Policy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"

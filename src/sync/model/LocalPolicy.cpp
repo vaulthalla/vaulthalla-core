@@ -2,13 +2,13 @@
 #include "util/timestamp.hpp"
 #include "util/interval.hpp"
 #include "sync/model/Conflict.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::sync::model;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::util;
 
 LocalPolicy::LocalPolicy(const pqxx::row& row)

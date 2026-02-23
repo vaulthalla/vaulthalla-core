@@ -6,10 +6,10 @@
 #include <memory>
 
 namespace vh::storage {
-struct StorageEngine;
+struct Engine;
 }
 
-namespace vh::types {
+namespace vh::fs::model {
 struct File;
 }
 
@@ -20,8 +20,8 @@ struct PreviewRequest {
     std::filesystem::path rel_path;
     std::optional<unsigned int> size;
     std::optional<float> scale;
-    std::shared_ptr<storage::StorageEngine> engine{nullptr};
-    std::shared_ptr<types::File> file{nullptr};
+    std::shared_ptr<storage::Engine> engine{nullptr};
+    std::shared_ptr<fs::model::File> file{nullptr};
 
     explicit PreviewRequest(const std::unordered_map<std::string, std::string>& params) {
         if (!params.contains("vault_id") || !params.contains("path"))

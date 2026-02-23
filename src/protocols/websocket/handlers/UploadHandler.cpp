@@ -3,7 +3,7 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "types/entities/User.hpp"
 #include "logging/LogRegistry.hpp"
-#include "storage/Filesystem.hpp"
+#include "fs/Filesystem.hpp"
 
 #include <filesystem>
 
@@ -12,6 +12,7 @@ using namespace vh::storage;
 using namespace vh::types;
 using namespace vh::database;
 using namespace vh::logging;
+using namespace vh::fs;
 
 UploadHandler::UploadHandler(WebSocketSession& session) : session_(session) {}
 

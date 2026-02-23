@@ -34,7 +34,7 @@ struct Waiver;
 }
 
 namespace vh::storage {
-struct StorageEngine;
+struct Engine;
 }
 
 namespace vh::shell::commands::vault {
@@ -84,7 +84,7 @@ Lookup<types::User> resolveOwnerRequired(const CommandCall& call, const std::sha
 
 Lookup<types::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
-Lookup<storage::StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
+Lookup<storage::Engine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
 std::optional<std::string> checkOverridePermissions(const CommandCall& call,
                                                     const std::shared_ptr<types::Vault>& vault,

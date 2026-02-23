@@ -6,8 +6,8 @@
 #include "database/Queries/WaiverQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/Manager.hpp"
+#include "storage/s3/S3Controller.hpp"
 
 #include "types/vault/Vault.hpp"
 #include "types/vault/APIKey.hpp"

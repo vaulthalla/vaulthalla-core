@@ -6,8 +6,8 @@
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
 
 #include "types/vault/Vault.hpp"
 #include "types/rbac/VaultRole.hpp"

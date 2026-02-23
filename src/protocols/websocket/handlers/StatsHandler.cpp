@@ -8,9 +8,9 @@
 #include "stats/VaultStatTask.hpp"
 #include "types/stats/VaultStat.hpp"
 #include "types/entities/User.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "../../../../include/types/stats/CacheStats.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/FSCache.hpp"
+#include "../../../../include/fs/cache/Registry.hpp"
 
 #include <future>
 

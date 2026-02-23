@@ -1,7 +1,7 @@
 #include "protocols/http/HttpRouter.hpp"
 #include "util/parse.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
@@ -9,10 +9,10 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
 #include "util/files.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "types/fs/Path.hpp"
-#include "storage/FSCache.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Path.hpp"
+#include "fs/cache/Registry.hpp"
 #include "types/stats/CacheStats.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "logging/LogRegistry.hpp"
@@ -23,6 +23,7 @@ using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
 using namespace vh::types;
+using namespace vh::fs::model;
 
 namespace vh::http {
 

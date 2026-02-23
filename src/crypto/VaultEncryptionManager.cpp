@@ -3,7 +3,7 @@
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "types/vault/VaultKey.hpp"
-#include "types/fs/File.hpp"
+#include "fs/model/File.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -13,6 +13,7 @@ using namespace vh::crypto;
 using namespace vh::logging;
 using namespace vh::database;
 using namespace vh::types;
+using namespace vh::fs::model;
 
 VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
     : vault_id_(vault_id) {
@@ -165,7 +166,7 @@ std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vec
     }
 }
 
-std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<types::File>& f) const {
+std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<File>& f) const {
     std::vector<uint8_t> iv;
 
     auto ciphertext = encrypt_aes256_gcm(plaintext, key_, iv);

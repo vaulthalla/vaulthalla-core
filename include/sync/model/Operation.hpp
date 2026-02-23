@@ -14,8 +14,8 @@ class row;
 class result;
 }
 
-namespace vh::types {
-struct FSEntry;
+namespace vh::fs::model {
+struct Entry;
 }
 
 namespace vh::sync::model {
@@ -35,7 +35,7 @@ struct Operation {
 
     Operation() = default;
     explicit Operation(const pqxx::row& row);
-    explicit Operation(const std::shared_ptr<types::FSEntry>& origEntry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
+    explicit Operation(const std::shared_ptr<fs::model::Entry>& origEntry, const std::filesystem::path& dest, unsigned int userId, const Op& op);
 
     [[nodiscard]] Throughput::Metric opToThroughputMetric() const;
 };

@@ -5,10 +5,10 @@
 #include <memory>
 
 namespace vh::storage {
-class CloudStorageEngine;
+class CloudEngine;
 }
 
-namespace vh::types {
+namespace vh::fs::model {
 struct File;
 }
 
@@ -19,13 +19,13 @@ struct ScopedOp;
 namespace vh::sync::tasks {
 
 struct Download final : concurrency::PromisedTask {
-    std::shared_ptr<storage::CloudStorageEngine> engine;
-    std::shared_ptr<types::File> file;
+    std::shared_ptr<storage::CloudEngine> engine;
+    std::shared_ptr<fs::model::File> file;
     model::ScopedOp& op;
     bool freeAfterDownload;
 
-    Download(std::shared_ptr<storage::CloudStorageEngine> eng,
-                 std::shared_ptr<types::File> f,
+    Download(std::shared_ptr<storage::CloudEngine> eng,
+                 std::shared_ptr<fs::model::File> f,
                  model::ScopedOp& op,
                  bool freeAfter = false);
 

@@ -1,17 +1,13 @@
 #pragma once
 
-#include "storage/StorageEngine.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
-
 #include <filesystem>
 #include <vector>
 #include <string>
 #include <random>
 
-using namespace vh::types;
-using namespace vh::services;
-using namespace vh::logging;
+namespace vh::storage {
+struct Engine;
+}
 
 namespace vh::util {
 
@@ -25,7 +21,7 @@ std::string generate_random_suffix(size_t length = 8);
 
 std::filesystem::path decrypt_file_to_temp(unsigned int vault_id,
                                            const std::filesystem::path& rel_path,
-                                           const std::shared_ptr<storage::StorageEngine>& engine);
+                                           const std::shared_ptr<storage::Engine>& engine);
 
 bool isProbablyEncrypted(const std::filesystem::path& path);
 

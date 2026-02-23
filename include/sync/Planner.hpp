@@ -8,7 +8,7 @@
 namespace vh::sync {
 
 namespace model {
-class RemotePolicy;
+struct RemotePolicy;
 }
 
 struct Cloud;

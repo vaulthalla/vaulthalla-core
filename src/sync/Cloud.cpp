@@ -1,6 +1,6 @@
 #include "sync/Cloud.hpp"
 
-#include "storage/cloud/CloudStorageEngine.hpp"
+#include "storage/CloudEngine.hpp"
 #include "sync/tasks/Download.hpp"
 #include "sync/tasks/Upload.hpp"
 #include "sync/tasks/Delete.hpp"
@@ -9,9 +9,10 @@
 #include "types/vault/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/Directory.hpp"
-#include "types/fs/Path.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Directory.hpp"
+#include "fs/model/Path.hpp"
 
 #include "logging/LogRegistry.hpp"
 
@@ -35,6 +36,7 @@ using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::logging;
 using namespace vh::storage;
+using namespace vh::fs::model;
 
 
 // ##########################################
@@ -112,8 +114,8 @@ void Cloud::remove(const std::shared_ptr<File>& file, const tasks::Delete::Type&
 // ############ Internal Helpers ############
 // ##########################################
 
-std::shared_ptr<CloudStorageEngine> Cloud::cloudEngine() const {
-    return std::static_pointer_cast<CloudStorageEngine>(engine);
+std::shared_ptr<CloudEngine> Cloud::cloudEngine() const {
+    return std::static_pointer_cast<CloudEngine>(engine);
 }
 
 std::vector<model::EntryKey> Cloud::allKeysSorted() const {
@@ -203,10 +205,10 @@ uintmax_t Cloud::computeReqFreeSpaceForDownload(
     return totalSize;
 }
 
-std::vector<std::shared_ptr<File> > Cloud::uMap2Vector(
-    std::unordered_map<std::u8string, std::shared_ptr<File> >& map)
+std::vector<std::shared_ptr<File>> Cloud::uMap2Vector(
+    std::unordered_map<std::u8string, std::shared_ptr<File>>& map)
 {
-    std::vector<std::shared_ptr<File> > files;
+    std::vector<std::shared_ptr<File>> files;
     files.reserve(map.size());
 
     std::ranges::transform(

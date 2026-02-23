@@ -2,7 +2,6 @@
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/StorageManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "protocols/http/HttpRouter.hpp"

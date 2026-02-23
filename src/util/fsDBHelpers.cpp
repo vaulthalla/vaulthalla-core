@@ -1,11 +1,12 @@
 #include "util/fsDBHelpers.hpp"
 #include "util/u8.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/FSEntry.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/File.hpp"
 
 using namespace vh::database;
+using namespace vh::fs::model;
 
-void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<types::File>& file) {
+void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<File>& file) {
     const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, file->inode).one_field().as<bool>();
     const auto sizeRes = txn.exec(pqxx::prepped{"get_file_size_by_inode"}, file->inode);
     const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
@@ -29,7 +30,7 @@ void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<types::File
     }
 }
 
-void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<types::FSEntry>& entry) {
+void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<Entry>& entry) {
     pqxx::params p;
     p.append(entry->inode);
     p.append(entry->vault_id);

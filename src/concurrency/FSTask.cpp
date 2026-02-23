@@ -21,6 +21,7 @@
 #include "types/sync/ScopedOp.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "concurrency/RotateKeyTask.hpp"
+#include "concurrency/DeleteTask.hpp"
 
 using namespace vh::concurrency;
 using namespace vh::storage;
@@ -34,6 +35,17 @@ FSTask::FSTask(const std::shared_ptr<StorageEngine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
   engine(engine),
   event(std::make_shared<sync::Event>()) {}
+
+void FSTask::operator()() {
+    startTask();
+
+    const Stage stages[] = {
+        {"shared",   [this]{ processSharedOps(); }}
+    };
+
+    runStages(stages);
+    shutdown();
+}
 
 void FSTask::handleInterrupt() const { if (isInterrupted()) throw std::runtime_error("Sync task interrupted"); }
 
@@ -238,4 +250,15 @@ void FSTask::handleVaultKeyRotation() {
         LogRegistry::sync()->error("[FSTask] Unknown exception during vault key rotation for vault '{}'", engine->vault->id);
         runningFlag = false;
     }
+}
+
+void FSTask::removeTrashedFiles() {
+    const auto files = FileQueries::listTrashedFiles(engine->vault->id);
+    const auto type = engine->type() == StorageType::Local ? DeleteTask::Type::LOCAL : DeleteTask::Type::PURGE;
+
+    futures.reserve(files.size());
+    for (const auto& file : files)
+        push(std::make_shared<DeleteTask>(engine, file, op(sync::Throughput::Metric::DELETE), type));
+
+    processFutures();
 }

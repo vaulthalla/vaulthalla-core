@@ -36,7 +36,6 @@ struct SyncTask final : FSTask {
     // ##########################################
 
     void operator()() override;
-    void removeTrashedFiles() override;
 
 
     // ##########################################

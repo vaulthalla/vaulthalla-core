@@ -2,7 +2,6 @@
 #include "storage/StorageManager.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/FSTask.hpp"
-#include "concurrency/fs/LocalFSTask.hpp"
 #include "concurrency/sync/SyncTask.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/cloud/CloudStorageEngine.hpp"
@@ -153,7 +152,7 @@ void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
 }
 
 std::shared_ptr<FSTask> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
-    if (engine->type() == StorageType::Local) return createTask<LocalFSTask>(engine);
+    if (engine->type() == StorageType::Local) return createTask<FSTask>(engine);
     if (engine->type() == StorageType::Cloud) return createTask<SyncTask>(engine);
     throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));
 }

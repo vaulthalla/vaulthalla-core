@@ -4,7 +4,6 @@
 #include "concurrency/sync/DownloadTask.hpp"
 #include "concurrency/sync/UploadTask.hpp"
 #include "concurrency/sync/CloudDeleteTask.hpp"
-#include "concurrency/sync/CloudTrashedDeleteTask.hpp"
 #include "concurrency/sync/SyncExecutor.hpp"
 
 #include "types/vault/Vault.hpp"
@@ -54,17 +53,6 @@ void SyncTask::operator()() {
 
     runStages(stages);
     shutdown();
-}
-
-void SyncTask::removeTrashedFiles() {
-    const auto files = FileQueries::listTrashedFiles(vaultId());
-
-    futures.reserve(files.size());
-    for (const auto& file : files)
-        push(std::make_shared<CloudTrashedDeleteTask>(
-            cloudEngine(), file, op(sync::Throughput::Metric::DELETE)));
-
-    processFutures();
 }
 
 // ##########################################

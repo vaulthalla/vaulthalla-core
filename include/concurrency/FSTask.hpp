@@ -45,7 +45,7 @@ struct FSTask : Task, std::enable_shared_from_this<FSTask> {
 
     explicit FSTask(const std::shared_ptr<storage::StorageEngine>& engine);
 
-    void operator()() override = 0;
+    void operator()() override;
 
     [[nodiscard]] unsigned int vaultId() const;
 
@@ -61,13 +61,13 @@ struct FSTask : Task, std::enable_shared_from_this<FSTask> {
 
     types::sync::ScopedOp& op(const types::sync::Throughput::Metric& metric) const;
 
-    virtual void removeTrashedFiles() = 0;
     virtual void processFutures();
 
     void push(const std::shared_ptr<Task>& task);
     void handleInterrupt() const;
     void processOperations() const;
     void handleVaultKeyRotation();
+    void removeTrashedFiles();
 
     void startTask();
     void processSharedOps();

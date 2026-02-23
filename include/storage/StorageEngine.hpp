@@ -9,6 +9,7 @@ namespace vh::types {
 struct Vault;
 struct File;
 struct Path;
+struct TrashedFile;
 
 namespace sync {
 struct Event;
@@ -61,7 +62,8 @@ struct StorageEngine : std::enable_shared_from_this<StorageEngine> {
     void copy(const fs::path& from, const fs::path& to, unsigned int userId);
     void remove(const fs::path& rel_path, unsigned int userId) const;
 
-    void rotateEncryptionKey();
+    void removeLocally(const std::filesystem::path& rel_path) const;
+    void removeLocally(const std::shared_ptr<types::TrashedFile>& f) const;
 
     [[nodiscard]] static uintmax_t getDirectorySize(const fs::path& path);
     [[nodiscard]] uintmax_t getVaultSize() const;

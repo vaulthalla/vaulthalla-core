@@ -4,9 +4,8 @@
 #include "fs/model/File.hpp"
 
 using namespace vh::database;
-using namespace vh::fs::model;
 
-void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<File>& file) {
+void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<fs::model::File>& file) {
     const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, file->inode).one_field().as<bool>();
     const auto sizeRes = txn.exec(pqxx::prepped{"get_file_size_by_inode"}, file->inode);
     const auto existingSize = sizeRes.empty() ? 0 : sizeRes.one_field().as<unsigned int>();
@@ -30,7 +29,7 @@ void vh::database::updateFile(pqxx::work& txn, const std::shared_ptr<File>& file
     }
 }
 
-void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<Entry>& entry) {
+void vh::database::updateFSEntry(pqxx::work& txn, const std::shared_ptr<fs::model::Entry>& entry) {
     pqxx::params p;
     p.append(entry->inode);
     p.append(entry->vault_id);

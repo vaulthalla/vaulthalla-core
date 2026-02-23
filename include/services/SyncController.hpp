@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <memory>
 #include <queue>
@@ -23,7 +23,7 @@ struct FSTaskCompare {
     bool operator()(const std::shared_ptr<sync::Local>& a, const std::shared_ptr<sync::Local>& b) const;
 };
 
-class SyncController final : public AsyncService, std::enable_shared_from_this<SyncController> {
+class SyncController final : public concurrency::AsyncService, std::enable_shared_from_this<SyncController> {
 public:
     SyncController();
     ~SyncController() override = default;

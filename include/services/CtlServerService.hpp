@@ -1,6 +1,7 @@
 #pragma once
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
+
 #include <memory>
 #include <string>
 
@@ -8,7 +9,7 @@ namespace vh::shell { class Router; }
 
 namespace vh::services {
 
-class CtlServerService final : public AsyncService {
+class CtlServerService final : public concurrency::AsyncService {
 public:
     CtlServerService();
     ~CtlServerService() override;

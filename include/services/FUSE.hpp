@@ -2,7 +2,7 @@
 
 #define FUSE_USE_VERSION 35
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <fuse_lowlevel.h>
 
@@ -16,7 +16,7 @@ class FUSEBridge;
 
 namespace vh::services {
 
-class FUSE final : public AsyncService {
+class FUSE final : public concurrency::AsyncService {
     friend class ServiceManager;
 
 public:

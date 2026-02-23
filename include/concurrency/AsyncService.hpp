@@ -6,7 +6,7 @@
 #include <string>
 #include <thread>
 
-namespace vh::services {
+namespace vh::concurrency {
 
 class AsyncService {
 public:

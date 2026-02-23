@@ -15,9 +15,12 @@ namespace vh::shell {
 class Router;
 }
 
+namespace vh::concurrency {
+class AsyncService;
+}
+
 namespace vh::services {
 
-class AsyncService;
 class SyncController;
 class FUSE;
 class Vaulthalla;
@@ -47,8 +50,8 @@ public:
 private:
     ServiceManager();
 
-    void tryStart(const std::string& name, const std::shared_ptr<AsyncService>& svc);
-    static void stopService(const std::string& name, const std::shared_ptr<AsyncService>& svc, int signal);
+    void tryStart(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc);
+    static void stopService(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc, int signal);
 
     void startWatchdog();
     void stopWatchdog();
@@ -63,7 +66,7 @@ private:
     std::shared_ptr<DBSweeper> dbSweeperService;
 
     mutable std::mutex mutex_;
-    std::map<std::string, std::shared_ptr<AsyncService>> services_;
+    std::map<std::string, std::shared_ptr<concurrency::AsyncService>> services_;
 
     // Watchdog state
     std::thread watchdogThread;

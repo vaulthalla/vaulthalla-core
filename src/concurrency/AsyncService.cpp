@@ -1,7 +1,7 @@
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 #include "logging/LogRegistry.hpp"
 
-using namespace vh::services;
+using namespace vh::concurrency;
 using namespace vh::logging;
 
 AsyncService::AsyncService(const std::string& serviceName)

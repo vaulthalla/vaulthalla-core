@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <memory>
 
@@ -10,7 +10,7 @@ namespace vh::logging {
 
 namespace vh::services {
 
-class LogRotationService final : public AsyncService {
+class LogRotationService final : public concurrency::AsyncService {
 public:
     LogRotationService();
     ~LogRotationService() override;

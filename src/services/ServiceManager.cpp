@@ -1,4 +1,5 @@
 #include "services/ServiceManager.hpp"
+#include "concurrency/AsyncService.hpp"
 #include "services/SyncController.hpp"
 #include "services/FUSE.hpp"
 #include "services/Vaulthalla.hpp"
@@ -12,6 +13,7 @@
 
 using namespace vh::logging;
 using namespace vh::services;
+using namespace vh::concurrency;
 
 ServiceManager& ServiceManager::instance() {
     static ServiceManager instance;

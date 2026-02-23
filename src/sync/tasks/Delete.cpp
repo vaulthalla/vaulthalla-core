@@ -9,9 +9,11 @@
 #include <stdexcept>
 #include <utility>
 
-namespace vh::sync::tasks {
+using namespace vh::sync::tasks;
+using namespace vh::storage;
+using namespace vh::types;
 
-Delete::Delete(std::shared_ptr<storage::StorageEngine> eng,
+Delete::Delete(std::shared_ptr<StorageEngine> eng,
                        Target tgt,
                        model::ScopedOp& op,
                        Type type)
@@ -32,10 +34,10 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
 void Delete::operator()() {
     auto getSizeBytes = [&](const Target& t) -> uint64_t {
         return std::visit(Overloaded{
-            [](const std::shared_ptr<types::File>& f) -> uint64_t {
+            [](const std::shared_ptr<File>& f) -> uint64_t {
                 return f ? f->size_bytes : 0;
             },
-            [](const std::shared_ptr<types::TrashedFile>& f) -> uint64_t {
+            [](const std::shared_ptr<TrashedFile>& f) -> uint64_t {
                 return f ? f->size_bytes : 0;
             }
         }, t);
@@ -43,10 +45,10 @@ void Delete::operator()() {
 
     auto getPathString = [&](const Target& t) -> std::string {
         return std::visit(Overloaded{
-            [](const std::shared_ptr<types::File>& f) -> std::string {
+            [](const std::shared_ptr<File>& f) -> std::string {
                 return f ? f->path.string() : std::string{"<null file>"};
             },
-            [](const std::shared_ptr<types::TrashedFile>& f) -> std::string {
+            [](const std::shared_ptr<TrashedFile>& f) -> std::string {
                 return f ? f->path.string() : std::string{"<null trashed file>"};
             }
         }, t);
@@ -59,26 +61,26 @@ void Delete::operator()() {
             throw std::runtime_error("DeleteTask: null storage engine");
 
         // Local engine path: just remove locally regardless of File vs TrashedFile.
-        if (engine->type() == storage::StorageType::Local) {
+        if (engine->type() == StorageType::Local) {
             std::visit(Overloaded{
-                [&](const std::shared_ptr<types::File>& f) {
+                [&](const std::shared_ptr<File>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null File");
                     engine->removeLocally(f->path);
                 },
-                [&](const std::shared_ptr<types::TrashedFile>& f) {
+                [&](const std::shared_ptr<TrashedFile>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null TrashedFile");
                     engine->removeLocally(f);
                 }
             }, target);
         }
         // Cloud engine path: needs CloudStorageEngine, and the API differs slightly.
-        else if (engine->type() == storage::StorageType::Cloud) {
-            auto cloud = std::static_pointer_cast<storage::CloudStorageEngine>(engine);
+        else if (engine->type() == StorageType::Cloud) {
+            auto cloud = std::static_pointer_cast<CloudStorageEngine>(engine);
             if (!cloud)
                 throw std::runtime_error("DeleteTask: failed to cast to CloudStorageEngine");
 
             std::visit(Overloaded{
-                [&](const std::shared_ptr<types::File>& f) {
+                [&](const std::shared_ptr<File>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null File");
 
                     if (type == Type::PURGE)      cloud->purge(f->path);
@@ -86,7 +88,7 @@ void Delete::operator()() {
                     else if (type == Type::REMOTE) cloud->removeRemotely(f->path);
                     else throw std::runtime_error("DeleteTask: unknown delete type");
                 },
-                [&](const std::shared_ptr<types::TrashedFile>& f) {
+                [&](const std::shared_ptr<TrashedFile>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null TrashedFile");
 
                     // Mirrors your existing DeleteTask behavior for trashed files.
@@ -112,6 +114,4 @@ void Delete::operator()() {
 
     op.stop();
     promise.set_value(op.success);
-}
-
 }

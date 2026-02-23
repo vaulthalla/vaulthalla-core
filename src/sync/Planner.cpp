@@ -6,17 +6,18 @@
 #include "fs/model/File.hpp"
 
 using namespace vh::sync;
+using namespace vh::sync::model;
 using namespace vh::types;
 using namespace vh::fs::model;
 
-std::vector<model::Action> Planner::build(
+std::vector<Action> Planner::build(
     const std::shared_ptr<Cloud>& ctx,
-    const std::shared_ptr<model::RemotePolicy>& policy)
+    const std::shared_ptr<RemotePolicy>& policy)
 {
-    std::vector<model::Action> plan;
+    std::vector<Action> plan;
 
     if (policy->wantsEnsureDirectories()) {
-        plan.push_back({ model::ActionType::EnsureDirectories, {.rel = u8""}, nullptr, nullptr });
+        plan.push_back({ ActionType::EnsureDirectories, {.rel = u8""}, nullptr, nullptr });
     }
 
     const auto keys = ctx->allKeysSorted();
@@ -31,13 +32,13 @@ std::vector<model::Action> Planner::build(
 
         if (L && !R) {
             if (policy->uploadLocalOnly())
-                plan.push_back({ model::ActionType::Upload, k, L, nullptr });
+                plan.push_back({ ActionType::Upload, k, L, nullptr });
             continue;
         }
 
         if (!L && R) {
             if (policy->downloadRemoteOnly())
-                plan.push_back({ model::ActionType::Download, k, nullptr, R });
+                plan.push_back({ ActionType::Download, k, nullptr, R });
             continue;
         }
 
@@ -51,11 +52,11 @@ std::vector<model::Action> Planner::build(
 
                 // auto-resolved => planner needs to translate resolution into an action
                 switch (c->resolution) {
-                case model::Conflict::Resolution::KEPT_LOCAL:
-                    plan.push_back({ model::ActionType::Upload, k, L, R });
+                case Conflict::Resolution::KEPT_LOCAL:
+                    plan.push_back({ ActionType::Upload, k, L, R });
                     break;
-                case model::Conflict::Resolution::KEPT_REMOTE:
-                    plan.push_back({ model::ActionType::Download, k, L, R });
+                case Conflict::Resolution::KEPT_REMOTE:
+                    plan.push_back({ ActionType::Download, k, L, R });
                     break;
                     // if you have KeepBoth, it might expand to "rename + upload" etc.
                 default:
@@ -74,14 +75,14 @@ std::vector<model::Action> Planner::build(
     if (policy->deleteRemoteLeftovers()) {
         for (auto& [rel, r] : ctx->s3Map) {
             if (!ctx->localMap.contains(rel))
-                plan.push_back({ model::ActionType::DeleteRemote, {rel}, nullptr, r });
+                plan.push_back({ ActionType::DeleteRemote, {rel}, nullptr, r });
         }
     }
 
     if (policy->deleteLocalLeftovers()) {
         for (auto& [rel, l] : ctx->localMap) {
             if (!ctx->s3Map.contains(rel))
-                plan.push_back({ model::ActionType::DeleteLocal, {rel}, l, nullptr });
+                plan.push_back({ ActionType::DeleteLocal, {rel}, l, nullptr });
         }
     }
 

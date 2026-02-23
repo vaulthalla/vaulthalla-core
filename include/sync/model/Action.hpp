@@ -17,10 +17,10 @@ enum class ActionType {
 };
 
 struct Action {
-    ActionType type;
+    ActionType type{ActionType::EnsureDirectories};
     EntryKey key;
-    std::shared_ptr<fs::model::File> local;
-    std::shared_ptr<fs::model::File> remote;
+    std::shared_ptr<fs::model::File> local{};
+    std::shared_ptr<fs::model::File> remote{};
     bool freeAfterDownload = false; // cache mode hint
 };
 

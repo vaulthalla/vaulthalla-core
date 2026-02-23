@@ -57,7 +57,7 @@ std::vector<Action> Planner::build(
                 case Conflict::Resolution::KEPT_REMOTE:
                     plan.push_back({ ActionType::Download, k, L, R });
                     break;
-                    // if you have KeepBoth, it might expand to "rename + upload" etc.
+                // TODO: finishing handling Resolution cases (e.g. KEPT_BOTH, etc.)
                 default:
                     break;
                 }
@@ -65,25 +65,20 @@ std::vector<Action> Planner::build(
             }
 
             // Non-conflict decision: by strategy/policy
-            if (auto a = policy->decideForBoth(L, R)) {   // implement this
+            if (auto a = policy->decideForBoth(L, R))
                 plan.push_back({ *a, k, L, R });
-            }
         }
     }
 
-    if (policy->deleteRemoteLeftovers()) {
-        for (auto& [rel, r] : ctx->s3Map) {
+    if (policy->deleteRemoteLeftovers())
+        for (auto& [rel, r] : ctx->s3Map)
             if (!ctx->localMap.contains(rel))
                 plan.push_back({ ActionType::DeleteRemote, {rel}, nullptr, r });
-        }
-    }
 
-    if (policy->deleteLocalLeftovers()) {
-        for (auto& [rel, l] : ctx->localMap) {
+    if (policy->deleteLocalLeftovers())
+        for (auto& [rel, l] : ctx->localMap)
             if (!ctx->s3Map.contains(rel))
                 plan.push_back({ ActionType::DeleteLocal, {rel}, l, nullptr });
-        }
-    }
 
     policy->preflightSpaceForPlan(ctx, plan);
     return plan;

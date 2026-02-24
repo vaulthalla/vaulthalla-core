@@ -1,5 +1,5 @@
 #include "rbac/model/UserRole.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
 
@@ -9,19 +9,20 @@
 #include <string>
 
 using namespace vh::rbac::model;
+using namespace vh::database::encoding;
 
 UserRole::UserRole(const pqxx::row& row)
     : Role(row) {
     assignment_id = row["assignment_id"].as<unsigned int>();
     user_id = row["user_id"].as<unsigned int>();
-    assigned_at = util::parsePostgresTimestamp(row["assigned_at"].as<std::string>());
+    assigned_at = parsePostgresTimestamp(row["assigned_at"].as<std::string>());
 }
 
 UserRole::UserRole(const nlohmann::json& j)
     : Role(j) {
     assignment_id = j.at("assignment_id").get<unsigned int>();
     user_id = j.at("user_id").get<unsigned int>();
-    assigned_at = util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
+    assigned_at = parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
 }
 
 std::string UserRole::permissions_to_flags_string() const {
@@ -39,14 +40,14 @@ void vh::rbac::model::to_json(nlohmann::json& j, const UserRole& r) {
     to_json(j, static_cast<const Role&>(r));
     j["assignment_id"] = r.assignment_id;
     j["user_id"] = r.user_id;
-    j["assigned_at"] = util::timestampToString(r.assigned_at);
+    j["assigned_at"] = timestampToString(r.assigned_at);
 }
 
 void vh::rbac::model::from_json(const nlohmann::json& j, UserRole& r) {
     from_json(j, static_cast<Role&>(r));
     r.assignment_id = j.at("assignment_id").get<unsigned int>();
     r.user_id = j.at("user_id").get<unsigned int>();
-    r.assigned_at = util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
+    r.assigned_at = parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
 }
 
 std::vector<std::shared_ptr<UserRole>> vh::rbac::model::user_roles_from_pq_res(const pqxx::result& res) {
@@ -67,8 +68,8 @@ std::string vh::rbac::model::to_string(const std::shared_ptr<UserRole>& role) {
     out += prefix + "- Role ID: " + std::to_string(role->id) + "\n";
     out += prefix + "- Description: " + role->description + "\n";
     out += prefix + "- Type: " + role->type + "\n";
-    out += prefix + "- Created at: " + util::timestampToString(role->created_at) + "\n";
-    out += prefix + "- Assigned at: " + util::timestampToString(role->assigned_at) + "\n";
+    out += prefix + "- Created at: " + timestampToString(role->created_at) + "\n";
+    out += prefix + "- Assigned at: " + timestampToString(role->assigned_at) + "\n";
     out += prefix + "- Permissions:\n" + admin_perms_to_string(role->permissions, 12);
     return out;
 }

@@ -4,9 +4,10 @@
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/u8.hpp"
 
 using namespace vh::database;
+using namespace vh::database::encoding;
 using namespace vh::database::model;
 using namespace vh::vault::model;
 using namespace vh::sync::model;

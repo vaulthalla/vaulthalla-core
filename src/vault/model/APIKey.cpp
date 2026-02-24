@@ -5,8 +5,8 @@
 #include "vault/model/Key.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
-#include "util/timestamp.hpp"
-#include "util/bytea.hpp"
+#include "database/encoding/timestamp.hpp"
+#include "database/encoding/bytea.hpp"
 #include "crypto/util/encrypt.hpp"
 
 #include <unordered_map>
@@ -20,8 +20,8 @@
 using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::shell;
-using namespace vh::util;
 using namespace vh::crypto::util;
+using namespace vh::database::encoding;
 
 // --- S3Provider helpers ---
 std::string vh::vault::model::to_string(S3Provider provider) {

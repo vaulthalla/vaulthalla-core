@@ -1,7 +1,7 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "database/Transactions.hpp"
 #include "fs/cache/Record.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/u8.hpp"
 
 using namespace vh::database;
 using namespace vh::fs::cache;
@@ -12,7 +12,7 @@ void CacheQueries::upsertCacheIndex(const std::shared_ptr<Record>& index) {
         pqxx::params p;
         p.append(index->vault_id);
         p.append(index->file_id);
-        p.append(to_utf8_string(index->path.u8string()));
+        p.append(encoding::to_utf8_string(index->path.u8string()));
         p.append(to_string(index->type));
         p.append(index->size);
 
@@ -41,7 +41,7 @@ std::shared_ptr<Record> CacheQueries::getCacheIndex(unsigned int indexId) {
 
 std::shared_ptr<Record> CacheQueries::getCacheIndexByPath(unsigned int vaultId, const std::filesystem::path& path) {
     return Transactions::exec("CacheQueries::getCacheIndexByPath", [&](pqxx::work& txn) -> std::shared_ptr<Record> {
-        const auto row = txn.exec(pqxx::prepped{"get_cache_index_by_path"}, pqxx::params{vaultId, to_utf8_string(path.u8string())}).one_row();
+        const auto row = txn.exec(pqxx::prepped{"get_cache_index_by_path"}, pqxx::params{vaultId, encoding::to_utf8_string(path.u8string())}).one_row();
         return std::make_shared<Record>(row);
     });
 }
@@ -99,7 +99,7 @@ std::vector<std::shared_ptr<Record>> CacheQueries::nLargestCacheIndices(const un
 
 bool CacheQueries::cacheIndexExists(unsigned int vaultId, const std::filesystem::path& relPath) {
     return Transactions::exec("CacheQueries::cacheIndexExists", [&](pqxx::work& txn) -> bool {
-        return txn.exec(pqxx::prepped{"cache_index_exists"}, pqxx::params{vaultId, to_utf8_string(relPath.u8string())}).one_row()["exists"].as<bool>();
+        return txn.exec(pqxx::prepped{"cache_index_exists"}, pqxx::params{vaultId, encoding::to_utf8_string(relPath.u8string())}).one_row()["exists"].as<bool>();
     });
 }
 

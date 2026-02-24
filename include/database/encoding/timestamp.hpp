@@ -6,7 +6,8 @@
 #include <sstream>
 #include <string>
 
-namespace vh::util {
+namespace vh::database::encoding {
+
 inline std::time_t parsePostgresTimestamp(const std::string& timestampStr) {
     std::tm tm = {};
     std::istringstream ss(timestampStr.substr(0, 19)); // truncate to "YYYY-MM-DD HH:MM:SS"
@@ -25,7 +26,7 @@ inline std::time_t parseTimestampFromString(const std::string& iso) {
     std::tm tm = {};
     std::istringstream ss(iso);
     ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-    return timegm(&tm); // or use vh::util::parsePostgresTimestamp if preferred
+    return timegm(&tm);
 }
 
 inline std::string getCurrentTimestamp() {
@@ -46,4 +47,4 @@ inline std::string getDate() {
     return {buffer};
 }
 
-} // namespace vh::util
+}

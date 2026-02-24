@@ -1,4 +1,4 @@
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "storage/Engine.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/Path.hpp"
@@ -15,12 +15,13 @@
 #include <cmath>
 #include <format>
 
-using namespace vh::util;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::fs::model;
 
-std::vector<uint8_t> vh::util::readFileToVector(const std::filesystem::path& path) {
+namespace vh::fs::ops {
+
+std::vector<uint8_t> readFileToVector(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) throw std::runtime_error("Failed to open file: " + path.string());
 
@@ -35,7 +36,7 @@ std::vector<uint8_t> vh::util::readFileToVector(const std::filesystem::path& pat
     return buffer;
 }
 
-std::string vh::util::readFileToString(const std::filesystem::path& path) {
+std::string readFileToString(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) throw std::runtime_error("Failed to open file: " + path.string());
 
@@ -50,14 +51,14 @@ std::string vh::util::readFileToString(const std::filesystem::path& path) {
     return buffer;
 }
 
-void vh::util::writeFile(const std::filesystem::path& absPath, const std::vector<uint8_t>& ciphertext) {
+void writeFile(const std::filesystem::path& absPath, const std::vector<uint8_t>& ciphertext) {
     std::ofstream out(absPath, std::ios::binary | std::ios::trunc);
     if (!out) throw std::runtime_error("Failed to write encrypted file: " + absPath.string());
     out.write(reinterpret_cast<const char*>(ciphertext.data()), static_cast<long>(ciphertext.size()));
     out.close();
 }
 
-std::string vh::util::generate_random_suffix(const size_t length) {
+std::string generate_random_suffix(const size_t length) {
     static constexpr char charset[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -71,7 +72,7 @@ std::string vh::util::generate_random_suffix(const size_t length) {
     return result;
 }
 
-std::filesystem::path vh::util::decrypt_file_to_temp(const unsigned int vault_id,
+std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
                                                   const std::filesystem::path& rel_path,
                                                   const std::shared_ptr<storage::Engine>& engine) {
     namespace fs = std::filesystem;
@@ -114,14 +115,14 @@ std::filesystem::path vh::util::decrypt_file_to_temp(const unsigned int vault_id
     return tmp_file;
 }
 
-bool vh::util::isProbablyEncrypted(const std::filesystem::path& path) {
+bool isProbablyEncrypted(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) return false;
     const auto size = in.tellg();
     return size >= 12 + 16;  // IV + tag = minimum
 }
 
-std::string vh::util::bytesToSize(uintmax_t bytes) {
+std::string bytesToSize(uintmax_t bytes) {
     // Units (binary / IEC-ish labels would be KiB/MiB/GiB/TiB; using KB/MB... to match your style)
     static constexpr std::array<const char*, 5> suffix = {"B", "KB", "MB", "GB", "TB"};
 
@@ -144,4 +145,6 @@ std::string vh::util::bytesToSize(uintmax_t bytes) {
     if (value >= 100.0 || std::fabs(value - std::round(value)) < 0.05)
         return std::format("{:.0f}{}", value, suffix[unit]);
     return std::format("{:.1f}{}", value, suffix[unit]);
+}
+
 }

@@ -4,7 +4,6 @@
 #include <fstream>
 
 using namespace vh::cloud;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::storage::s3::curl;
 

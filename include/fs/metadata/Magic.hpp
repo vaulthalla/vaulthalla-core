@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace vh::util {
+namespace vh::fs::metadata {
 
 class Magic {
 public:

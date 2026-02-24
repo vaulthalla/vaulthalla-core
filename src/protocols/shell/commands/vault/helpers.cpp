@@ -15,7 +15,7 @@
 #include "CommandUsage.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "util/interval.hpp"
+#include "database/encoding/interval.hpp"
 
 using namespace vh::shell;
 using namespace vh::identities::model;
@@ -25,6 +25,7 @@ using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::services;
 using namespace vh::sync::model;
+using namespace vh::database::encoding;
 
 namespace vh::shell::commands::vault {
 
@@ -213,7 +214,7 @@ void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
 
 void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const std::shared_ptr<Policy>& sync) {
     if (const auto syncIntervalOpt = optVal(call, usage->resolveOptional("interval")->option_tokens))
-        sync->interval = util::parseSyncInterval(*syncIntervalOpt);
+        sync->interval = parseSyncInterval(*syncIntervalOpt);
 
     if (vault->type == VaultType::Local) {
         if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("Local Vault Options", "conflict")->option_tokens)) {

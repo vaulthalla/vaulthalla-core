@@ -1,12 +1,12 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "vault/model/APIKey.hpp"
-#include "util/bytea.hpp"
+#include "database/encoding/bytea.hpp"
 
 using namespace vh::database;
 using namespace vh::database::model;
 using namespace vh::vault::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
 unsigned int APIKeyQueries::upsertAPIKey(const std::shared_ptr<APIKey>& key) {
     return Transactions::exec("APIKeyQueries::addAPIKey", [&](pqxx::work& txn) {

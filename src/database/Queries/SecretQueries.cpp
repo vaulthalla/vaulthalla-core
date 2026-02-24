@@ -1,11 +1,11 @@
 #include "database/Queries/InternalSecretQueries.hpp"
 #include "database/Transactions.hpp"
 #include "crypto/model/Secret.hpp"
-#include "util/bytea.hpp"
+#include "database/encoding/bytea.hpp"
 
 using namespace vh::database;
 using namespace vh::crypto::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
 void SecretQueries::upsertSecret(const std::shared_ptr<Secret>& secret) {
     Transactions::exec("SecretQueries::upsertSecret", [&](pqxx::work& txn) {

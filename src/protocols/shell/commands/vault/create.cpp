@@ -19,7 +19,7 @@
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/interval.hpp"
+#include "database/encoding/interval.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -37,10 +37,10 @@ using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
+using namespace vh::database::encoding;
 
 static constexpr const auto* SYNC_STRATEGY_HELP = R"(
 Sync Strategy Options:

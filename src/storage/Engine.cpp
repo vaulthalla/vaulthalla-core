@@ -3,7 +3,7 @@
 #include "vault/model/Vault.hpp"
 #include "sync/model/Operation.hpp"
 #include "fs/model/Path.hpp"
-#include "util/Magic.hpp"
+#include "fs/metadata/Magic.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
@@ -11,7 +11,7 @@
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "sync/model/Policy.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
 #include "sync/model/Event.hpp"
@@ -26,8 +26,9 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::storage;
 using namespace vh::logging;
-using namespace vh::util;
+using namespace vh::fs::ops;
 using namespace std::chrono;
+using namespace vh::fs::metadata;
 
 namespace vh::storage {
 

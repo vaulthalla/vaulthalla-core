@@ -15,8 +15,10 @@
 #include "TestCase.hpp"
 #include "protocols/shell/types.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "AssertionResult.hpp"
+
+using namespace vh::fs::ops;
 
 namespace vh::test::fuse {
 

@@ -1,10 +1,11 @@
 #include "fs/cache/Record.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::fs::cache;
+using namespace vh::database::encoding;
 
 Record::Record(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),
@@ -13,8 +14,8 @@ Record::Record(const pqxx::row& row)
       path(row.at("path").as<std::string>()),
       type(typeFromString(row.at("type").as<std::string>())),
       size(row.at("size").as<uintmax_t>()),
-      last_accessed(util::parsePostgresTimestamp(row.at("last_accessed").as<std::string>())),
-      created_at(util::parsePostgresTimestamp(row.at("created_at").as<std::string>())) {}
+      last_accessed(parsePostgresTimestamp(row.at("last_accessed").as<std::string>())),
+      created_at(parsePostgresTimestamp(row.at("created_at").as<std::string>())) {}
 
 void vh::fs::cache::to_json(nlohmann::json& j, const Record& index) {
     j = {
@@ -24,8 +25,8 @@ void vh::fs::cache::to_json(nlohmann::json& j, const Record& index) {
         {"path", index.path.string()},
         {"type", to_string(index.type)},
         {"size", index.size},
-        {"last_accessed", util::timestampToString(index.last_accessed)},
-        {"created_at", util::timestampToString(index.created_at)}
+        {"last_accessed", timestampToString(index.last_accessed)},
+        {"created_at", timestampToString(index.created_at)}
     };
 }
 
@@ -36,8 +37,8 @@ void vh::fs::cache::from_json(const nlohmann::json& j, Record& index) {
     index.path = j.value("path", std::filesystem::path{});
     index.type = typeFromString(j.value("type", "file"));
     index.size = j.value("size", 0u);
-    index.last_accessed = util::parseTimestampFromString(j.value("last_accessed", ""));
-    index.created_at = util::parseTimestampFromString(j.value("created_at", ""));
+    index.last_accessed = parseTimestampFromString(j.value("last_accessed", ""));
+    index.created_at = parseTimestampFromString(j.value("created_at", ""));
 }
 
 std::string vh::fs::cache::to_string(const Record::Type& type) {

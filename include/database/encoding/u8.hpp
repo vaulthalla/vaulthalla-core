@@ -8,6 +8,10 @@ inline std::ostream& operator<<(std::ostream& os, const std::u8string& u8str) {
     return os << sv;
 }
 
+namespace vh::database::encoding {
+
 inline std::string to_utf8_string(const std::u8string& u8) {
     return {reinterpret_cast<const char*>(u8.data()), u8.size()};
+}
+
 }

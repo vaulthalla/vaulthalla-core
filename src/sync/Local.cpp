@@ -8,14 +8,14 @@
 #include "vault/model/Vault.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/task.hpp"
+#include "concurrency/taskOpRanges.hpp"
 #include "sync/model/Event.hpp"
 #include "sync/model/Throughput.hpp"
 #include "sync/model/ScopedOp.hpp"
@@ -34,6 +34,7 @@ using namespace vh::concurrency;
 using namespace std::chrono;
 using namespace vh::fs;
 using namespace vh::fs::model;
+using namespace vh::fs::ops;
 
 Local::Local(const std::shared_ptr<Engine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
@@ -202,8 +203,8 @@ void Local::processOperations() const {
             continue;
         }
 
-        const auto tmpPath = util::decrypt_file_to_temp(vaultId(), op->source_path, engine);
-        const auto buffer = util::readFileToVector(tmpPath);
+        const auto tmpPath = decrypt_file_to_temp(vaultId(), op->source_path, engine);
+        const auto buffer = readFileToVector(tmpPath);
 
         if (buffer.empty()) {
             LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
@@ -212,7 +213,7 @@ void Local::processOperations() const {
         }
 
         const auto ciphertext = engine->encryptionManager->encrypt(buffer, f);
-        util::writeFile(absDest, ciphertext);
+        writeFile(absDest, ciphertext);
         FileQueries::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {

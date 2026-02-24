@@ -9,7 +9,7 @@ namespace vh::storage {
 struct Engine;
 }
 
-namespace vh::util {
+namespace vh::fs::ops {
 
 std::vector<uint8_t> readFileToVector(const std::filesystem::path& path);
 

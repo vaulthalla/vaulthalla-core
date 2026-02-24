@@ -1,6 +1,6 @@
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "permsUtil.hpp"
 
@@ -10,7 +10,7 @@
 #include <sstream>
 
 using namespace vh::rbac::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::shell;
 
 VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
@@ -65,7 +65,7 @@ void vh::rbac::model::to_json(nlohmann::json& j, const VaultRole& r) {
         {"vault_id", r.vault_id},
         {"subject_type", r.subject_type},
         {"subject_id", r.subject_id},
-        {"assigned_at", util::timestampToString(r.assigned_at)},
+        {"assigned_at", timestampToString(r.assigned_at)},
         {"permission_overrides", r.permission_overrides}
     });
 }
@@ -77,7 +77,7 @@ void vh::rbac::model::from_json(const nlohmann::json& j, VaultRole& r) {
     r.subject_type = j.at("subject_type").get<std::string>();
     r.subject_id = j.at("subject_id").get<unsigned int>();
     r.role_id = j.at("role_id").get<unsigned int>();
-    r.assigned_at = util::parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
+    r.assigned_at = parsePostgresTimestamp(j.at("assigned_at").get<std::string>());
     r.permission_overrides = permissionOverridesFromJson(j.at("permission_overrides"));
 }
 

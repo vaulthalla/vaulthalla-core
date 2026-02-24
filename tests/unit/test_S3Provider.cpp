@@ -1,6 +1,7 @@
 #include "vault/model/APIKey.hpp"
 #include "storage/s3/S3Controller.hpp"
-#include "util/imageUtil.hpp"
+#include "preview/image.hpp"
+#include "preview/pdf.hpp"
 #include "fs/model/Entry.hpp"
 
 #include <filesystem>
@@ -13,8 +14,8 @@ namespace fs = std::filesystem;
 
 using namespace vh::cloud;
 using namespace vh::vault::model;
-using namespace vh::util;
 using namespace vh::fs::model;
+using namespace vh::preview;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
   protected:
@@ -245,7 +246,7 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     std::vector<uint8_t> buffer;
     ASSERT_NO_THROW(s3Provider_->downloadToBuffer(key, buffer));
 
-    auto jpeg = resize_and_compress_image_buffer(
+    auto jpeg = image::resize_and_compress_buffer(
         buffer.data(),
         buffer.size(),
         std::nullopt,
@@ -267,7 +268,7 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     std::vector<uint8_t> buffer;
     ASSERT_NO_THROW(s3Provider_->downloadToBuffer(key, buffer));
 
-    auto jpeg = resize_and_compress_pdf_buffer(
+    auto jpeg = pdf::resize_and_compress_buffer(
         buffer.data(),
         buffer.size(),
         std::nullopt,

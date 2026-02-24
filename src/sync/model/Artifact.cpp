@@ -1,6 +1,6 @@
 #include "sync/model/Artifact.hpp"
 #include "fs/model/File.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "fs/cache/Registry.hpp"
 
@@ -9,7 +9,7 @@
 
 using namespace vh::sync::model;
 using namespace vh::fs::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::services;
 
 Artifact::Artifact(const pqxx::row& row)

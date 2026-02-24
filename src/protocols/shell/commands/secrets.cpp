@@ -5,7 +5,7 @@
 #include "identities/model/User.hpp"
 #include "crypto/secrets/TPMKeyProvider.hpp"
 #include "crypto/secrets/Manager.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include <nlohmann/json.hpp>
 #include "crypto/encryptors/GPG.hpp"
 #include "logging/LogRegistry.hpp"
@@ -18,9 +18,9 @@
 
 using namespace vh::shell;
 using namespace vh::identities::model;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::services;
+using namespace vh::fs::ops;
 
 static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
     auto start = secret.begin();

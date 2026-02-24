@@ -6,13 +6,13 @@
 #include "sync/model/ConflictArtifact.hpp"
 #include "sync/model/Artifact.hpp"
 #include "fs/model/File.hpp"
-#include "util/timestamp.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/timestamp.hpp"
+#include "database/encoding/u8.hpp"
 #include "config/ConfigRegistry.hpp"
 
 using namespace vh::sync::model;
 using namespace vh::database;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::config;
 
 static void build_event(pqxx::work& txn, const std::shared_ptr<Event>& event) {

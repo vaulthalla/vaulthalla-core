@@ -6,7 +6,7 @@
 #include <chrono>
 #include <sstream>
 
-namespace vh::util {
+namespace vh::database::encoding {
 
 inline std::chrono::seconds parsePostgresInterval(const std::string& s) {
     std::istringstream ss(s);

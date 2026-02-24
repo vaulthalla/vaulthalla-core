@@ -1,6 +1,6 @@
 #include "sync/model/RemotePolicy.hpp"
-#include "util/timestamp.hpp"
-#include "util/interval.hpp"
+#include "database/encoding/timestamp.hpp"
+#include "database/encoding/interval.hpp"
 #include "sync/model/Conflict.hpp"
 #include "fs/model/File.hpp"
 #include "sync/Cloud.hpp"
@@ -16,8 +16,8 @@
 using namespace vh::sync::model;
 using namespace vh::fs::model;
 using namespace vh::concurrency;
-using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::database::encoding;
 
 RemotePolicy::RemotePolicy(const pqxx::row& row)
     : Policy(row),

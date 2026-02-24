@@ -3,10 +3,11 @@
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/u8.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::database;
+using namespace vh::database::encoding;
 using namespace vh::logging;
 using namespace vh::fs::model;
 

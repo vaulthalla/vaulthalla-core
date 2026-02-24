@@ -1,8 +1,8 @@
-#include "util/Magic.hpp"
+#include "fs/metadata/Magic.hpp"
 #include <stdexcept>
 #include <magic.h>
 
-using namespace vh::util;
+using namespace vh::fs::metadata;
 
 Magic::Magic() {
     cookie = magic_open(MAGIC_MIME_TYPE);

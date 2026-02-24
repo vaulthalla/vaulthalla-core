@@ -1,5 +1,5 @@
 #include "identities/model/Group.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
@@ -9,20 +9,21 @@
 
 using namespace vh::identities::model;
 using namespace vh::shell;
+using namespace vh::database::encoding;
 
 GroupMember::GroupMember(const pqxx::row& row)
     : user(std::make_shared<User>(row)),
-      joined_at(util::parsePostgresTimestamp(row["joined_at"].as<std::string>())) {}
+      joined_at(parsePostgresTimestamp(row["joined_at"].as<std::string>())) {}
 
 Group::Group(const pqxx::row& gr, const pqxx::result& members)
     : id(gr["id"].as<unsigned int>()),
       linux_gid(gr["linux_gid"].as<std::optional<unsigned int>>()),
       name(gr["name"].as<std::string>()),
       description(gr["description"].is_null() ? std::nullopt : std::make_optional(gr["description"].as<std::string>())),
-      created_at(util::parsePostgresTimestamp(gr["created_at"].as<std::string>())),
+      created_at(parsePostgresTimestamp(gr["created_at"].as<std::string>())),
       updated_at(gr["updated_at"].is_null()
                      ? std::nullopt
-                     : std::make_optional(util::parsePostgresTimestamp(gr["updated_at"].as<std::string>()))) {
+                     : std::make_optional(parsePostgresTimestamp(gr["updated_at"].as<std::string>()))) {
     for (const auto& memberRow : members) this->members.push_back(std::make_shared<GroupMember>(memberRow));
 }
 
@@ -33,15 +34,15 @@ Group::Group(const nlohmann::json& j)
       description(j.contains("description")
                       ? std::make_optional(j.at("description").get<std::string>())
                       : std::nullopt),
-      created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())),
+      created_at(parsePostgresTimestamp(j.at("created_at").get<std::string>())),
       updated_at(j.contains("updated_at") && !j["updated_at"].is_null()
-                     ? std::make_optional(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>()))
+                     ? std::make_optional(parsePostgresTimestamp(j.at("updated_at").get<std::string>()))
                      : std::nullopt) {
     for (const auto& memberJson : j.at("members")) {
         auto member = std::make_shared<GroupMember>();
         member->user = std::make_shared<User>();
         member->user->id = memberJson.at("user_id").get<unsigned int>();
-        member->joined_at = util::parsePostgresTimestamp(memberJson.at("joined_at").get<std::string>());
+        member->joined_at = parsePostgresTimestamp(memberJson.at("joined_at").get<std::string>());
         members.push_back(member);
     }
 }
@@ -54,13 +55,13 @@ void vh::identities::model::to_json(nlohmann::json& j, const Group& g) {
         {"id", g.id},
         {"name", g.name},
         {"description", g.description},
-        {"created_at", util::timestampToString(g.created_at)},
+        {"created_at", timestampToString(g.created_at)},
         {"members", members}
     };
 
     if (g.linux_gid) j["gid"] = *g.linux_gid;
 
-    if (g.updated_at.has_value()) j["updated_at"] = util::timestampToString(*g.updated_at);
+    if (g.updated_at.has_value()) j["updated_at"] = timestampToString(*g.updated_at);
 }
 
 void vh::identities::model::from_json(const nlohmann::json& j, Group& g) {
@@ -70,16 +71,16 @@ void vh::identities::model::from_json(const nlohmann::json& j, Group& g) {
     g.description = j.contains("description")
                         ? std::make_optional(j.at("description").get<std::string>())
                         : std::nullopt;
-    g.created_at = util::parsePostgresTimestamp(j.at("created_at").get<std::string>());
+    g.created_at = parsePostgresTimestamp(j.at("created_at").get<std::string>());
     g.updated_at = j.contains("updated_at") && !j["updated_at"].is_null()
-                       ? std::make_optional(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>()))
+                       ? std::make_optional(parsePostgresTimestamp(j.at("updated_at").get<std::string>()))
                        : std::nullopt;
 
     for (const auto& memberJson : j.at("members")) {
         auto member = std::make_shared<GroupMember>();
         member->user = std::make_shared<User>();
         member->user->id = memberJson.at("user_id").get<unsigned int>();
-        member->joined_at = util::parsePostgresTimestamp(memberJson.at("joined_at").get<std::string>());
+        member->joined_at = parsePostgresTimestamp(memberJson.at("joined_at").get<std::string>());
         g.members.push_back(member);
     }
 }
@@ -98,7 +99,7 @@ std::vector<std::shared_ptr<Group> > vh::identities::model::groups_from_json(con
 void vh::identities::model::to_json(nlohmann::json& j, const GroupMember& gm) {
     j = {
         {"user", to_public_json(gm.user)},
-        {"joined_at", util::timestampToString(gm.joined_at)}
+        {"joined_at", timestampToString(gm.joined_at)}
     };
 }
 
@@ -107,12 +108,12 @@ std::string vh::identities::model::to_string(const std::shared_ptr<Group>& g) {
     out += "Group Name: " + g->name + "\n";
     out += "Group ID: " + std::to_string(g->id) + "\n";
     if (g->description) out += "\nDescription: " + *g->description;
-    out += "\nCreated at: " + util::timestampToString(g->created_at);
-    if (g->updated_at) out += "\nUpdated at: " + util::timestampToString(*g->updated_at);
+    out += "\nCreated at: " + timestampToString(g->created_at);
+    if (g->updated_at) out += "\nUpdated at: " + timestampToString(*g->updated_at);
 
     out += "\nMembers:\n";
     for (const auto& member : g->members)
-        out += "  - " + member->user->name + " (ID: " + std::to_string(member->user->id) + "), Joined at: " + util::timestampToString(member->joined_at) + "\n";
+        out += "  - " + member->user->name + " (ID: " + std::to_string(member->user->id) + "), Joined at: " + timestampToString(member->joined_at) + "\n";
 
     return out;
 }
@@ -133,7 +134,7 @@ std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<G
             std::to_string(g->id),
             g->name,
             g->description.value_or(""),
-            util::timestampToString(g->created_at),
+            timestampToString(g->created_at),
             std::to_string(g->members.size())
         });
     }
@@ -142,7 +143,7 @@ std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<G
 }
 
 std::string vh::identities::model::to_string(const std::shared_ptr<GroupMember>& gm) {
-    return "Member: " + gm->user->name + " (ID: " + std::to_string(gm->user->id) + "), Joined at: " + util::timestampToString(gm->joined_at);
+    return "Member: " + gm->user->name + " (ID: " + std::to_string(gm->user->id) + "), Joined at: " + timestampToString(gm->joined_at);
 }
 
 std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<GroupMember>>& members) {

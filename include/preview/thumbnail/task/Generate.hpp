@@ -2,7 +2,7 @@
 
 #include "concurrency/Task.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/imageUtil.hpp"
+#include "preview/thumbnail/ops.hpp"
 #include "storage/Engine.hpp"
 #include "fs/cache/Record.hpp"
 #include "database/Queries/CacheQueries.hpp"
@@ -27,13 +27,12 @@ using namespace vh::services;
 using namespace std::chrono;
 using namespace vh::fs;
 using namespace vh::fs::model;
-using namespace vh::util;
 
-namespace vh::concurrency {
+namespace vh::preview::thumbnail::task {
 
-class ThumbnailTask final : public Task {
+class Generate final : public concurrency::Task {
 public:
-    ThumbnailTask(const std::shared_ptr<const storage::Engine>& engine,
+    Generate(const std::shared_ptr<const storage::Engine>& engine,
                   const std::vector<uint8_t>& buffer,
                   const std::shared_ptr<File>& file)
         : engine_(engine), buffer_(buffer), file_(file) {}
@@ -56,7 +55,7 @@ public:
                 }
 
                 const auto now = steady_clock::now();
-                generateAndStoreThumbnail(buffer_, cachePath, *file_->mime_type, size);
+                generateAndStore(buffer_, cachePath, *file_->mime_type, size);
                 const auto end = steady_clock::now();
                 ServiceDepsRegistry::instance().httpCacheStats->record_op_us(duration_cast<microseconds>(end - now).count());
 

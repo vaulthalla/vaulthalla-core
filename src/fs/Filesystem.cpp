@@ -10,16 +10,17 @@
 #include "config/ConfigRegistry.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "vault/EncryptionManager.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "crypto/util/hash.hpp"
-#include "services/ThumbnailWorker.hpp"
-#include "util/Magic.hpp"
+#include "preview/thumbnail/Worker.hpp"
+#include "fs/metadata/Magic.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Transactions.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "crypto/id/Generator.hpp"
 #include "fs/cache/Registry.hpp"
+#include "database/encoding/u8.hpp"
 
 #include <ranges>
 #include <fstream>
@@ -30,12 +31,15 @@
 using namespace vh::storage;
 using namespace vh::vault::model;
 using namespace vh::database;
+using namespace vh::database::encoding;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::crypto;
 using namespace vh::fs;
+using namespace vh::fs::ops;
 using namespace vh::fs::model;
+using namespace vh::fs::metadata;
 
 static void updateFile(pqxx::work& txn, const std::shared_ptr<File>& file) {
     const auto exists = txn.exec(pqxx::prepped{"fs_entry_exists_by_inode"}, file->inode).one_field().as<bool>();
@@ -413,7 +417,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     cache->cacheEntry(f);
 
     if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
-        ThumbnailWorker::enqueue(engine, ctx.buffer, f);
+        preview::thumbnail::Worker::enqueue(engine, ctx.buffer, f);
 
     LogRegistry::fs()->debug("Successfully created file at path: {}", ctx.path.string());
     return f;
@@ -556,7 +560,7 @@ void Filesystem::handleRename(const RenameContext& ctx) {
             f->content_hash = hash::blake2b(entry->backing_path);
 
             if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
-                ThumbnailWorker::enqueue(ctx.engine, buffer, f);
+                preview::thumbnail::Worker::enqueue(ctx.engine, buffer, f);
 
             updateFile(ctx.txn, f);
         }

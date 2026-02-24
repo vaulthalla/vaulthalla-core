@@ -1,6 +1,6 @@
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -12,6 +12,7 @@
 using namespace vh::vault::model;
 using namespace vh::shell;
 using namespace vh::database;
+using namespace vh::database::encoding;
 
 std::string Vault::quotaStr() const {
     if (quota == 0) return "unlimited";
@@ -68,7 +69,7 @@ Vault::Vault(const pqxx::row& row)
       type(from_string(row["type"].as<std::string>())),
       mount_point(std::filesystem::path(row["mount_point"].as<std::string>())),
       is_active(row["is_active"].as<bool>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].c_str())) {}
+      created_at(parsePostgresTimestamp(row["created_at"].c_str())) {}
 
 void vh::vault::model::to_json(nlohmann::json& j, const Vault& v) {
     j = {
@@ -80,7 +81,7 @@ void vh::vault::model::to_json(nlohmann::json& j, const Vault& v) {
         {"owner_id", v.owner_id},
         {"mount_point", v.mount_point.string()},
         {"is_active", v.is_active},
-        {"created_at", util::timestampToString(v.created_at)}
+        {"created_at", timestampToString(v.created_at)}
     };
 }
 
@@ -93,7 +94,7 @@ void vh::vault::model::from_json(const nlohmann::json& j, Vault& v) {
     v.owner_id = j.at("owner_id").get<unsigned int>();
     v.mount_point = std::filesystem::path(j.at("mount_point").get<std::string>());
     v.is_active = j.at("is_active").get<bool>();
-    v.created_at = util::parseTimestampFromString(j.at("created_at").get<std::string>());
+    v.created_at = parseTimestampFromString(j.at("created_at").get<std::string>());
 }
 
 void vh::vault::model::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& vaults) {
@@ -114,7 +115,7 @@ std::string vh::vault::model::to_string(const Vault& v) {
     out += "Quota: ";
     if (v.quota == 0) out += "\u221E\n";  // ∞ symbol
     else out += fmt::format("{} ({} bytes)\n", human_bytes(v.quota), static_cast<unsigned long long>(v.quota));
-    out += "Created At: " + util::timestampToString(v.created_at) + "\n";
+    out += "Created At: " + timestampToString(v.created_at) + "\n";
     out += "Is Active: " + std::string(v.is_active ? "true" : "false") + "\n";
     return out;
 }

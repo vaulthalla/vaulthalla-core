@@ -1,11 +1,11 @@
 #include "crypto/model/Secret.hpp"
-#include "util/bytea.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/bytea.hpp"
+#include "database/encoding/timestamp.hpp"
 
 #include <pqxx/row>
 
 using namespace vh::crypto::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
 Secret::Secret(const pqxx::row& row)
     : key(row["key"].c_str()),

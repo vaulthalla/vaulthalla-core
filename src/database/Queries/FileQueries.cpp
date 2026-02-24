@@ -3,7 +3,7 @@
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/file/Trashed.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/u8.hpp"
 #include "fs/model/Path.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "fs/cache/Registry.hpp"
@@ -12,6 +12,7 @@
 #include <optional>
 
 using namespace vh::database;
+using namespace vh::database::encoding;
 using namespace vh::services;
 using namespace vh::fs::model;
 

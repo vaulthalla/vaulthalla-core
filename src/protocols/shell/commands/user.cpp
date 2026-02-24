@@ -20,7 +20,6 @@ using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::util;
 using namespace vh::crypto;
 
 static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;

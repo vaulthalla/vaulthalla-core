@@ -6,7 +6,7 @@
 #include "storage/CloudEngine.hpp"
 #include "fs/model/File.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 
 #include <filesystem>
 #include <stdexcept>
@@ -16,7 +16,7 @@ using namespace vh::sync::tasks;
 using namespace vh::storage;
 using namespace vh::fs::model;
 using namespace vh::database;
-using namespace vh::util;
+using namespace vh::fs::ops;
 
 RotateKey::RotateKey(std::shared_ptr<Engine> eng,
                              const std::vector<std::shared_ptr<File>>& f,

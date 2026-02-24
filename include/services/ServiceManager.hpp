@@ -11,14 +11,8 @@
 #include <chrono>
 #include <atomic>
 
-namespace vh::shell {
-class Router;
-}
-
-namespace vh::concurrency {
-class AsyncService;
-}
-
+namespace vh::shell { class Router; }
+namespace vh::concurrency { class AsyncService; }
 namespace vh::fuse { class Service; }
 
 namespace vh::services {

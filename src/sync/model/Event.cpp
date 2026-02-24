@@ -1,5 +1,5 @@
 #include "sync/model/Event.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
 #include "logging/LogRegistry.hpp"
 #include "sync/model/Conflict.hpp"
@@ -34,7 +34,7 @@ namespace {
 }
 
 using namespace vh::sync::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::database;
 using namespace vh::logging;
 using namespace std::chrono;

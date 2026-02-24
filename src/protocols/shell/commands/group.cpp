@@ -15,7 +15,6 @@ using namespace vh::shell;
 using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::auth;
-using namespace vh::util;
 using namespace vh::services;
 
 static std::shared_ptr<Group> resolveGroup(const std::string& groupNameOrId) {

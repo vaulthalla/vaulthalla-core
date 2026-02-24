@@ -1,10 +1,10 @@
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "vault/model/Key.hpp"
-#include "util/bytea.hpp"
+#include "database/encoding/bytea.hpp"
 
 using namespace vh::database;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
 unsigned int VaultKeyQueries::addVaultKey(const std::shared_ptr<vault::model::Key>& key) {
     return Transactions::exec("VaultKeyQueries::addVaultKey", [&](pqxx::work& txn) {

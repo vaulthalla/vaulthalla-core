@@ -9,8 +9,8 @@
 #include "fs/model/Path.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "util/files.hpp"
-#include "services/ThumbnailWorker.hpp"
+#include "fs/ops/file.hpp"
+#include "preview/thumbnail/Worker.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "vault/APIKeyManager.hpp"
@@ -25,9 +25,9 @@ using namespace vh::concurrency;
 using namespace vh::services;
 using namespace vh::cloud;
 using namespace vh::database;
-using namespace vh::util;
 using namespace vh::config;
 using namespace vh::sync::model;
+using namespace vh::fs::ops;
 
 static constexpr std::string_view META_VH_ENCRYPTED_FLAG = "vh-encrypted";
 static constexpr std::string_view META_VH_IV_FLAG = "vh-iv";
@@ -125,7 +125,7 @@ std::shared_ptr<File> CloudEngine::downloadFile(const fs::path& rel_path) {
 
     s3Provider_->uploadBufferWithMetadata(s3Key, buffer, getMetaMapFromFile(f));
 
-    ThumbnailWorker::enqueue(shared_from_this(), buffer, f);
+    preview::thumbnail::Worker::enqueue(shared_from_this(), buffer, f);
 
     return f;
 }

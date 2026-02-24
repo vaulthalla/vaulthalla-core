@@ -1,13 +1,10 @@
 #include "sync/model/Throughput.hpp"
-#include "util/timestamp.hpp"
 
-#include <chrono>
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::sync::model;
 using namespace std::chrono;
-using namespace vh::util;
 
 Throughput::Throughput(const pqxx::row& row) :
     id(row["id"].as<uint32_t>()),

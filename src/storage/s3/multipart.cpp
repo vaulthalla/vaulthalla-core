@@ -1,12 +1,9 @@
 #include "storage/s3/S3Controller.hpp"
-#include "util/u8.hpp"
 #include "logging/LogRegistry.hpp"
 
-#include <fstream>
 #include <regex>
 
 using namespace vh::cloud;
-using namespace vh::util;
 using namespace vh::logging;
 
 std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& key) const {

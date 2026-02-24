@@ -1,7 +1,7 @@
 #include "sync/model/Conflict.hpp"
 #include "fs/model/File.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
@@ -10,7 +10,7 @@
 using namespace vh::sync::model;
 using namespace vh::fs::model;
 using namespace vh::services;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
 Conflict::Conflict(const pqxx::row& row, const pqxx::result& artifactRows, const pqxx::result& reasonRows)
     : id(row["id"].as<uint32_t>()),

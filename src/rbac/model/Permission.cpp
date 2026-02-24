@@ -1,7 +1,9 @@
 #include "rbac/model/Permission.hpp"
 
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include <nlohmann/json.hpp>
+
+using namespace vh::database::encoding;
 
 namespace vh::rbac::model {
 
@@ -10,8 +12,8 @@ Permission::Permission(const pqxx::row& row)
       name(row["name"].as<std::string>()),
       description(row["description"].as<std::string>()),
       bit_position(row["bit_position"].as<uint16_t>()),
-      created_at(util::parsePostgresTimestamp(row["created_at"].as<std::string>())),
-      updated_at(util::parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
+      created_at(parsePostgresTimestamp(row["created_at"].as<std::string>())),
+      updated_at(parsePostgresTimestamp(row["updated_at"].as<std::string>())) {
 }
 
 Permission::Permission(const nlohmann::json& j)
@@ -19,8 +21,8 @@ Permission::Permission(const nlohmann::json& j)
       name(j.at("name").get<std::string>()),
       description(j.at("description").get<std::string>()),
       bit_position(j.at("bit_position").get<uint16_t>()),
-      created_at(util::parsePostgresTimestamp(j.at("created_at").get<std::string>())),
-      updated_at(util::parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {
+      created_at(parsePostgresTimestamp(j.at("created_at").get<std::string>())),
+      updated_at(parsePostgresTimestamp(j.at("updated_at").get<std::string>())) {
 }
 
 Permission::Permission(const unsigned int bitPos, std::string name, std::string description)
@@ -91,8 +93,8 @@ void to_json(nlohmann::json& j, const Permission& p) {
 
         {"description", p.description},
         {"bit_position", p.bit_position},
-        {"created_at", vh::util::timestampToString(p.created_at)},
-        {"updated_at", vh::util::timestampToString(p.updated_at)}
+        {"created_at", timestampToString(p.created_at)},
+        {"updated_at", timestampToString(p.updated_at)}
     };
 }
 

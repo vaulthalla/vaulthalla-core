@@ -2,7 +2,7 @@
 #include "rbac/model/UserRole.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/Permission.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -15,7 +15,7 @@
 
 using namespace vh::shell;
 using namespace vh::database;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::logging;
 using namespace vh::rbac::model;
 

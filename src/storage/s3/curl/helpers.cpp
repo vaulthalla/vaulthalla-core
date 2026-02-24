@@ -1,6 +1,6 @@
 #include "storage/s3/curl/helpers.hpp"
-#include "util/u8.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/u8.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "vault/model/APIKey.hpp"
 
 #include <openssl/hmac.h>
@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <mutex>
 #include <curl/curl.h>
+
+using namespace vh::database::encoding;
 
 namespace vh::storage::s3::curl {
 

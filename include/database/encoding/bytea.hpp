@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <stdexcept>
 
-namespace vh::util {
+namespace vh::database::encoding {
 
 inline std::string to_hex_bytea(const std::vector<uint8_t>& v) {
     static constexpr char hex[] = "0123456789abcdef";

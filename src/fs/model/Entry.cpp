@@ -1,11 +1,11 @@
 #include "fs/model/Entry.hpp"
-#include "util/timestamp.hpp"
+#include "database/encoding/timestamp.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/u8.hpp"
+#include "database/encoding/u8.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -17,7 +17,7 @@
 #include <paths.h>
 
 using namespace vh::fs::model;
-using namespace vh::util;
+using namespace vh::database::encoding;
 using namespace vh::logging;
 using namespace vh::config;
 

@@ -19,6 +19,7 @@ using namespace vh::logging;
 using namespace vh::stats;
 using namespace vh::services;
 using namespace vh::vault;
+using namespace vh::vault::model;
 
 json StatsHandler::vault(const json& payload, const WebSocketSession& session) {
     const auto& vaultId = payload.at("vault_id");

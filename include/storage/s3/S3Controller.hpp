@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/curlWrappers.hpp"
+#include "curl/wrappers.hpp"
 
 #include <filesystem>
 #include <map>

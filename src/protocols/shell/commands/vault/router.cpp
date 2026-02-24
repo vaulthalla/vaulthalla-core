@@ -1,6 +1,6 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/Router.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 

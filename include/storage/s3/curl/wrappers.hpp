@@ -1,6 +1,6 @@
 #pragma once
 
-#include "s3Helpers.hpp"
+#include "helpers.hpp"
 
 #include <curl/curl.h>
 #include <stdexcept>
@@ -56,7 +56,7 @@ static HttpResponse performCurl(SetupFn&& setup) {
         return s * n;
     });
     curl_easy_setopt(static_cast<CURL*>(h), CURLOPT_WRITEDATA,  &bodyBuf);
-    curl_easy_setopt(static_cast<CURL*>(h), CURLOPT_HEADERFUNCTION, vh::util::writeToString);
+    curl_easy_setopt(static_cast<CURL*>(h), CURLOPT_HEADERFUNCTION, vh::storage::s3::curl::writeToString);
     curl_easy_setopt(static_cast<CURL*>(h), CURLOPT_HEADERDATA, &hdrBuf);
 
     setup(static_cast<CURL*>(h));                      // caller-specific tweaks

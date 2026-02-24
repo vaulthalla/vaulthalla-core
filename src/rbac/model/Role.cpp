@@ -3,7 +3,7 @@
 #include "rbac/model/VaultRole.hpp"
 #include "util/timestamp.hpp"
 #include "protocols/shell/Table.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>

@@ -2,7 +2,7 @@
 #include "util/timestamp.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/shell/Table.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>

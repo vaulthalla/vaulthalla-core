@@ -1,6 +1,6 @@
 #include "rbac/model/UserRole.hpp"
 #include "util/timestamp.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
 
 #include <pqxx/result>

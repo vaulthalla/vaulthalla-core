@@ -1,4 +1,4 @@
-#include "util/s3Helpers.hpp"
+#include "storage/s3/curl/helpers.hpp"
 #include "util/u8.hpp"
 #include "util/timestamp.hpp"
 #include "vault/model/APIKey.hpp"
@@ -12,7 +12,7 @@
 #include <mutex>
 #include <curl/curl.h>
 
-namespace vh::util {
+namespace vh::storage::s3::curl {
 
 void ensureCurlGlobalInit() {
     static std::once_flag once;

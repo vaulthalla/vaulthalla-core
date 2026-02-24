@@ -8,7 +8,7 @@
 
 namespace vh::vault::model { struct APIKey; }
 
-namespace vh::util {
+namespace vh::storage::s3::curl {
 
 std::string sha256Hex(const std::string& data);
 std::string hmacSha256Hex(const std::string& key, const std::string& data);

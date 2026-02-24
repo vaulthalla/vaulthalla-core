@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/types.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "identities/model/Group.hpp"
 #include "identities/model/User.hpp"

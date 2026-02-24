@@ -1,7 +1,7 @@
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "util/timestamp.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
 #include "database/Queries/VaultQueries.hpp"
 

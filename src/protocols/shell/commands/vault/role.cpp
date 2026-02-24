@@ -1,5 +1,5 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/PermsQueries.hpp"
 

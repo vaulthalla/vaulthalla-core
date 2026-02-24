@@ -4,7 +4,7 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "storage/s3/S3Controller.hpp"
 #include "services/ServiceDepsRegistry.hpp"

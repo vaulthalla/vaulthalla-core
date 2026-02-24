@@ -5,7 +5,7 @@
 #include "identities/model/User.hpp"
 #include "CommandUsage.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 
 #include <fmt/core.h>
 #include <cctype>

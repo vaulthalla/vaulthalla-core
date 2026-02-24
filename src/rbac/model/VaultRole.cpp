@@ -1,7 +1,7 @@
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"
 #include "util/timestamp.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 #include "permsUtil.hpp"
 
 #include <pqxx/row>

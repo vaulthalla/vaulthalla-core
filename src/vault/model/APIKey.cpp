@@ -4,7 +4,7 @@
 #include "vault/model/Vault.hpp"
 #include "vault/model/Key.hpp"
 #include "protocols/shell/Table.hpp"
-#include "util/cmdLineHelpers.hpp"
+#include "protocols/shell/util/lineHelpers.hpp"
 #include "util/timestamp.hpp"
 #include "util/bytea.hpp"
 #include "crypto/util/encrypt.hpp"

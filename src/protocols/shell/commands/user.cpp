@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "auth/AuthManager.hpp"
 #include "crypto/util/hash.hpp"
 #include "logging/LogRegistry.hpp"

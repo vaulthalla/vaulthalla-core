@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "identities/model/User.hpp"
 #include "rbac/model/Role.hpp"

@@ -1,6 +1,6 @@
 #include "storage/s3/S3Controller.hpp"
 #include "vault/model/APIKey.hpp"
-#include "util/s3Helpers.hpp"
+#include "storage/s3/curl/helpers.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <ctime>
@@ -10,8 +10,8 @@
 
 using namespace vh::cloud;
 using namespace vh::vault::model;
-using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::storage::s3::curl;
 
 S3Controller::S3Controller(const std::shared_ptr<APIKey>& apiKey, std::string bucket)
 : apiKey_(apiKey), bucket_(std::move(bucket)) {

@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "identities/model/User.hpp"
 #include "crypto/secrets/TPMKeyProvider.hpp"
 #include "crypto/secrets/Manager.hpp"

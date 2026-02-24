@@ -9,7 +9,7 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/Manager.hpp"
 #include "CommandUsage.hpp"

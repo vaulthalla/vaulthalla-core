@@ -1,10 +1,10 @@
 #include "storage/s3/S3Controller.hpp"
-#include "util/s3Helpers.hpp"
+#include "storage/s3/curl/helpers.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::cloud;
-using namespace vh::util;
 using namespace vh::logging;
+using namespace vh::storage::s3::curl;
 
 void S3Controller::uploadLargeObject(const std::filesystem::path& key,
                                      const std::vector<uint8_t>& buffer,

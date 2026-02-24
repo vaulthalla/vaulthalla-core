@@ -1,5 +1,5 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"

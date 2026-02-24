@@ -10,7 +10,6 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "util/files.hpp"
-#include "util/fsPath.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"

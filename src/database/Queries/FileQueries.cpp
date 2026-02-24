@@ -4,7 +4,7 @@
 #include "fs/model/Directory.hpp"
 #include "fs/model/file/Trashed.hpp"
 #include "util/u8.hpp"
-#include "util/fsPath.hpp"
+#include "fs/model/Path.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "fs/cache/Registry.hpp"
 #include "fs/model/stats/Extension.hpp"

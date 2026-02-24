@@ -5,13 +5,11 @@
 #include "rbac/model/Permission.hpp"
 #include "rbac/model/PermissionOverride.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/bitmask.hpp"
 
 using namespace vh::database;
 using namespace vh::database::model;
 using namespace vh::rbac::model;
 using namespace vh::logging;
-using namespace vh::util::bitmask;
 
 // #################################################################################################
 // ############################################ Role  #############################################

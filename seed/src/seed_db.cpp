@@ -30,7 +30,6 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/id/Generator.hpp"
 #include "crypto/util/hash.hpp"
-#include "util/bitmask.hpp"
 #include "auth/SystemUid.hpp"
 
 // Libraries
@@ -135,7 +134,7 @@ void vh::seed::initRoles() {
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
 
             txn.exec(pqxx::prepped{"assign_permission_to_role"},
-                pqxx::params{r.id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
+                pqxx::params{r.id, bitmask_to_bitset(r.permissions).to_string()});
         }
     });
 }

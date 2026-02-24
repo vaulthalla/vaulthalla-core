@@ -19,7 +19,6 @@
 #include "fs/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
 #include "database/Queries/GroupQueries.hpp"
-#include "util/fsPath.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::test::fuse;

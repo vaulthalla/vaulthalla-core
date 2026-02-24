@@ -2,8 +2,8 @@
 #include "database/Transactions.hpp"
 #include "fs/model/Directory.hpp"
 #include "util/u8.hpp"
-#include "util/fsPath.hpp"
 #include "logging/LogRegistry.hpp"
+#include "fs/model/Path.hpp"
 
 #include <optional>
 

@@ -4,7 +4,6 @@
 #include "fs/model/Directory.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "crypto/id/Generator.hpp"

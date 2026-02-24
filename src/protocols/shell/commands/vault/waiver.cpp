@@ -18,7 +18,7 @@
 #include "rbac/model/UserRole.hpp"
 
 #include "config/ConfigRegistry.hpp"
-#include "util/waiver.hpp"
+#include "vault/terms/waiver.hpp"
 
 #include <string>
 #include <string_view>
@@ -38,6 +38,7 @@ using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
 using namespace vh::rbac::model;
+using namespace vh::vault::terms;
 
 static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault) {
     auto waiver = std::make_shared<Waiver>();

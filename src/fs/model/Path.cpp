@@ -1,5 +1,4 @@
 #include "fs/model/Path.hpp"
-#include "util/fsPath.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 

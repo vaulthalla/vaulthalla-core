@@ -8,7 +8,6 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/fsPath.hpp"
 #include "database/Queries/FSEntryQueries.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "util/files.hpp"
@@ -34,7 +33,6 @@ using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::util;
 using namespace vh::crypto;
 using namespace vh::fs;
 using namespace vh::fs::model;

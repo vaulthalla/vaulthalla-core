@@ -25,7 +25,6 @@
 #include "sync/model/helpers.hpp"
 #include "sync/Planner.hpp"
 
-#include "util/fsPath.hpp"
 #include "crypto/id/Generator.hpp"
 
 #include <utility>

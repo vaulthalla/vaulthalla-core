@@ -5,6 +5,7 @@
 #include <ctime>
 #include <vector>
 #include <memory>
+#include <bitset>
 #include <nlohmann/json_fwd.hpp>
 #include <pqxx/row>
 
@@ -97,5 +98,9 @@ uint16_t vaultMaskFromJson(const nlohmann::json& j);
 
 std::string admin_perms_to_string(uint16_t mask, unsigned short indent = 4);
 std::string vault_perms_to_string(uint16_t mask, unsigned short indent = 4);
+
+// Bitmask helpers
+std::string bitStringFromMask(uint16_t mask);
+std::bitset<16> bitmask_to_bitset(uint16_t mask);
 
 }

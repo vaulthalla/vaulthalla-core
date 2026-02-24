@@ -234,4 +234,15 @@ std::string vault_perms_to_string(const uint16_t mask, const unsigned short inde
     return out;
 }
 
+std::string bitStringFromMask(const uint16_t mask) {
+    std::string out = "B";
+    for (int i = 15; i >= 0; --i) out += (mask & (1 << i)) ? '1' : '0';
+    out += "";
+    return out;
+}
+
+std::bitset<16> bitmask_to_bitset(const uint16_t mask) {
+    return {mask};
+}
+
 }

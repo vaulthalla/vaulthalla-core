@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace vh::util {
+namespace vh::vault::terms {
 
 static constexpr std::string_view ENABLE_UPSTREAM_ENCRYPTION_WAIVER = R"(
 

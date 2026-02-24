@@ -13,7 +13,6 @@
 #include "sync/model/Policy.hpp"
 #include "util/files.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/fsPath.hpp"
 #include "database/Queries/SyncEventQueries.hpp"
 #include "sync/model/Event.hpp"
 #include "fs/model/file/Trashed.hpp"

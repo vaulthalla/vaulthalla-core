@@ -2,9 +2,9 @@
 #include "util/timestamp.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
+#include "fs/model/Path.hpp"
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/fsPath.hpp"
 #include "util/u8.hpp"
 
 #include <nlohmann/json.hpp>

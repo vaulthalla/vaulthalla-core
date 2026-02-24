@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace vh::crypto {
+namespace vh::crypto::secrets {
 
 class TPMKeyProvider {
 public:

@@ -11,13 +11,13 @@ namespace pqxx {
 
 namespace vh::crypto::model {
 
-struct InternalSecret {
+struct Secret {
     std::string key;
     std::vector<uint8_t> value, iv;
     std::time_t created_at{std::time(nullptr)}, updated_at{std::time(nullptr)};
 
-    InternalSecret() = default;
-    explicit InternalSecret(const pqxx::row& row);
+    Secret() = default;
+    explicit Secret(const pqxx::row& row);
 };
 
 }

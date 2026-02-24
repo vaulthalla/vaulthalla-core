@@ -4,7 +4,7 @@
 #include "Token.hpp"
 #include "RefreshToken.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "crypto/InternalSecretManager.hpp"
+#include "crypto/secrets/Manager.hpp"
 #include <memory>
 #include <string>
 
@@ -52,7 +52,7 @@ class Client {
     std::shared_ptr<Token> token_{nullptr};
     std::shared_ptr<websocket::WebSocketSession> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
-    const std::string jwt_secret_ = crypto::InternalSecretManager().jwtSecret();
+    const std::string jwt_secret_ = crypto::secrets::Manager().jwtSecret();
     std::chrono::system_clock::time_point openedAt_ = std::chrono::system_clock::now();
 
     [[nodiscard]] std::string generateToken(const std::string& name) const;

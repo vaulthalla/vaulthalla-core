@@ -1,4 +1,4 @@
-#include "crypto/TPMKeyProvider.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <tss2/tss2_esys.h>
@@ -12,7 +12,7 @@
 using namespace std::string_literals;
 using namespace vh::logging;
 
-namespace vh::crypto {
+namespace vh::crypto::secrets {
 
 static std::filesystem::path resolveSealedDir(const std::string& key) {
     return paths::getBackingPath() / (".sealed_" + key + ".blob");

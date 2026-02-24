@@ -1,5 +1,5 @@
 #include "services/Vaulthalla.hpp"
-#include "crypto/PasswordUtils.hpp"
+#include "crypto/password/Strength.hpp"
 #include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
@@ -15,6 +15,7 @@
 using namespace vh::services;
 using namespace vh::config;
 using namespace vh::logging;
+using namespace vh::crypto;
 
 Vaulthalla::Vaulthalla() : AsyncService("Vaulthalla") {}
 
@@ -86,12 +87,12 @@ void Vaulthalla::initHttpServer() {
 }
 
 void Vaulthalla::initThreatIntelligence() {
-    auth::PasswordUtils::loadCommonWeakPasswordsFromURLs(
+    password::Strength::loadCommonWeakPasswordsFromURLs(
             {"https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
              "100k-most-used-passwords-NCSC.txt",
              "https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/Common-Credentials/"
              "probable-v2_top-12000.txt"});
 
-    auth::PasswordUtils::loadDictionaryFromURL(
+    password::Strength::loadDictionaryFromURL(
         "https://raw.githubusercontent.com/dolph/dictionary/refs/heads/master/popular.txt");
 }

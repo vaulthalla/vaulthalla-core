@@ -4,9 +4,9 @@
 #include <unordered_set>
 #include <vector>
 
-namespace vh::auth {
+namespace vh::crypto::password {
 
-class PasswordUtils {
+class Strength {
   public:
     static unsigned short passwordStrengthCheck(const std::string& password);
     static bool containsDictionaryWord(const std::string& password);
@@ -25,4 +25,5 @@ class PasswordUtils {
     static size_t curlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* s);
     static std::string downloadURL(const std::string& url);
 };
-} // namespace vh::auth
+
+}

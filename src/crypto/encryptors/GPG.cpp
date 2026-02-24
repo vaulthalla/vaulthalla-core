@@ -1,14 +1,14 @@
-#include "crypto/GPGEncryptor.hpp"
+#include "crypto/encryptors/GPG.hpp"
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fmt/core.h>
 #include <nlohmann/json.hpp>
 
-using namespace vh::crypto;
+using namespace vh::crypto::encryptors;
 using json = nlohmann::json;
 
-void GPGEncryptor::encryptToFile(const json& payload,
+void GPG::encryptToFile(const json& payload,
                                  const std::string& recipient,
                                  const std::string& outputPath,
                                  const bool armor) {

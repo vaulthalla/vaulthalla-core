@@ -1,11 +1,11 @@
 #pragma once
 
-#include "util/uuid.hpp"
+#include "crypto/util/uuid.hpp"
 
 #include <sodium.h>
 #include <string>
 
-namespace vh::crypto {
+namespace vh::crypto::id {
 
 struct IdOptions {
     // Namespace to derive a *stable*, short, unique prefix per vault (or per anything).
@@ -27,9 +27,9 @@ struct IdOptions {
     util::Case out_case = util::Case::Upper;
 };
 
-class IdGenerator {
+class Generator {
 public:
-    explicit IdGenerator(const IdOptions& opt)
+    explicit Generator(const IdOptions& opt)
         : options_(opt),
           ns_prefix_(derive_namespace_prefix(opt.namespace_token, opt.prefix_chars, opt.out_case)) {
         util::ensure_sodium_init();

@@ -12,7 +12,7 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "util/files.hpp"
-#include "crypto/Hash.hpp"
+#include "crypto/util/hash.hpp"
 #include "services/ThumbnailWorker.hpp"
 #include "util/Magic.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -20,7 +20,7 @@
 #include "util/fsDBHelpers.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "crypto/IdGenerator.hpp"
+#include "crypto/id/Generator.hpp"
 #include "fs/cache/Registry.hpp"
 
 #include <ranges>
@@ -96,7 +96,7 @@ void Filesystem::mkdir(const std::filesystem::path& absPath, mode_t mode, const 
             dir->parent_id = parent->id;
             dir->fuse_path = path;
             dir->name = path.filename();
-            dir->base32_alias = IdGenerator({ .namespace_token = dir->name }).generate();
+            dir->base32_alias = id::Generator({ .namespace_token = dir->name }).generate();
             dir->backing_path = parent->backing_path / dir->base32_alias;
             dir->mode = mode;
             dir->owner_uid = getuid();
@@ -204,7 +204,7 @@ void Filesystem::copy(const std::filesystem::path& from, const std::filesystem::
     entry->path = toVaultPath;
     entry->fuse_path = to;
     entry->name = to.filename().string();
-    entry->base32_alias = IdGenerator({ .namespace_token = entry->name }).generate();
+    entry->base32_alias = id::Generator({ .namespace_token = entry->name }).generate();
     entry->backing_path = parent->backing_path / entry->base32_alias;
     entry->created_by = entry->last_modified_by = userId;
     entry->parent_id = parent->id;
@@ -258,7 +258,7 @@ std::shared_ptr<Entry> Filesystem::createFile(const std::filesystem::path& path,
     f->name = path.filename();
     f->path = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     f->fuse_path = path;
-    f->base32_alias = IdGenerator({ .namespace_token = f->name }).generate();
+    f->base32_alias = id::Generator({ .namespace_token = f->name }).generate();
     f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = mode;
     f->owner_uid = uid;
@@ -275,7 +275,7 @@ std::shared_ptr<Entry> Filesystem::createFile(const std::filesystem::path& path,
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
 
-    f->content_hash = Hash::blake2b(f->backing_path);
+    f->content_hash = hash::blake2b(f->backing_path);
     f->id = FileQueries::upsertFile(f);
     cache->cacheEntry(f);
 
@@ -315,7 +315,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
 
         const auto f = std::static_pointer_cast<File>(entry);
 
-        f->content_hash = Hash::blake2b(entry->backing_path);
+        f->content_hash = hash::blake2b(entry->backing_path);
 
         if (!ctx.buffer.empty()) {
             const auto ciphertext = engine->encryptionManager->encrypt(ctx.buffer, f);
@@ -347,7 +347,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     f->name = ctx.path.filename();
     f->path = ctx.path;
     f->fuse_path = ctx.fuse_path;
-    f->base32_alias = IdGenerator({ .namespace_token = f->name }).generate();
+    f->base32_alias = id::Generator({ .namespace_token = f->name }).generate();
     f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = ctx.mode;
     f->owner_uid = ctx.linux_uid;
@@ -365,7 +365,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
         writeFile(f->backing_path, ciphertext);
     }
 
-    f->content_hash = Hash::blake2b(f->backing_path);
+    f->content_hash = hash::blake2b(f->backing_path);
 
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
@@ -514,7 +514,7 @@ void Filesystem::handleRename(const RenameContext& ctx) {
 
             f->size_bytes = std::filesystem::file_size(entry->backing_path);
             f->mime_type = Magic::get_mime_type_from_buffer(buffer);
-            f->content_hash = Hash::blake2b(entry->backing_path);
+            f->content_hash = hash::blake2b(entry->backing_path);
 
             if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
                 ThumbnailWorker::enqueue(ctx.engine, buffer, f);

@@ -13,7 +13,7 @@
 #include "storage/s3/S3Controller.hpp"
 
 #include "vault/EncryptionManager.hpp"
-#include "crypto/GPGEncryptor.hpp"
+#include "crypto/encryptors/GPG.hpp"
 
 #include "vault/model/Vault.hpp"
 #include "vault/model/APIKey.hpp"
@@ -52,7 +52,7 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
         if (!outputOpt) return invalid("vault keys export: --recipient requires --output to specify the output file");
 
         try {
-            GPGEncryptor::encryptToFile(output, *recipientOpt, *outputOpt);
+            encryptors::GPG::encryptToFile(output, *recipientOpt, *outputOpt);
             return ok("Vault key successfully encrypted and saved to " + *outputOpt);
         } catch (const std::exception& e) {
             return invalid("vault keys export: failed to encrypt vault key: " + std::string(e.what()));

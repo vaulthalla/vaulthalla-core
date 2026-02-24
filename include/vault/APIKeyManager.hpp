@@ -1,6 +1,6 @@
 #pragma once
 
-#include "crypto/TPMKeyProvider.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -26,7 +26,7 @@ public:
 private:
     mutable std::mutex apiKeysMutex_;
     std::unordered_map<unsigned int, std::shared_ptr<model::APIKey>> apiKeys_;
-    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
+    std::unique_ptr<crypto::secrets::TPMKeyProvider> tpmKeyProvider_;
 };
 
 }

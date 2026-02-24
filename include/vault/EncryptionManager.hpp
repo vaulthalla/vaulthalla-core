@@ -1,6 +1,6 @@
 #pragma once
 
-#include "crypto/TPMKeyProvider.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
 
 #include <string>
 #include <vector>
@@ -39,7 +39,7 @@ public:
     [[nodiscard]] bool rotation_in_progress() const;
 
 private:
-    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
+    std::unique_ptr<crypto::secrets::TPMKeyProvider> tpmKeyProvider_;
     std::atomic<bool> rotation_in_progress_;
     unsigned int vault_id_, version_{};
     std::vector<uint8_t> key_, old_key_;

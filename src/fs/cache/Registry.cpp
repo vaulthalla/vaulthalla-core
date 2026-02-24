@@ -8,7 +8,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/Manager.hpp"
 #include "logging/LogRegistry.hpp"
-#include "crypto/IdGenerator.hpp"
+#include "../../../include/crypto/id/Generator.hpp"
 #include "stats/model/CacheStats.hpp"
 
 #include <unordered_set>

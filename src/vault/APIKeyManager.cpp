@@ -15,7 +15,7 @@ using namespace vh::database;
 
 APIKeyManager::APIKeyManager() {
     const std::string tpmKeyName = paths::testMode ? "test_ak_master" : "ak_master";
-    tpmKeyProvider_ = std::make_unique<TPMKeyProvider>(tpmKeyName);
+    tpmKeyProvider_ = std::make_unique<secrets::TPMKeyProvider>(tpmKeyName);
     tpmKeyProvider_->init();
 
     initAPIKeys();

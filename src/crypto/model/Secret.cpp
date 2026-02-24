@@ -1,4 +1,4 @@
-#include "crypto/model/InternalSecret.hpp"
+#include "crypto/model/Secret.hpp"
 #include "util/bytea.hpp"
 #include "util/timestamp.hpp"
 
@@ -7,7 +7,7 @@
 using namespace vh::crypto::model;
 using namespace vh::util;
 
-InternalSecret::InternalSecret(const pqxx::row& row)
+Secret::Secret(const pqxx::row& row)
     : key(row["key"].c_str()),
       value(from_hex_bytea(row["value"].as<std::string>())),
       iv(from_hex_bytea(row["iv"].as<std::string>())),

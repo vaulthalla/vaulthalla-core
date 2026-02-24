@@ -1,4 +1,4 @@
-#include "crypto/PasswordUtils.hpp"
+#include "crypto/password/Strength.hpp"
 #include "crypto/util/SHA1.hpp"
 #include <algorithm>
 #include <cctype>
@@ -6,11 +6,11 @@
 #include <sstream>
 #include <ranges>
 
-namespace vh::auth {
-std::unordered_set<std::string> PasswordUtils::dictionaryWords_;
-std::unordered_set<std::string> PasswordUtils::commonWeakPasswords_;
+namespace vh::crypto::password {
+std::unordered_set<std::string> Strength::dictionaryWords_;
+std::unordered_set<std::string> Strength::commonWeakPasswords_;
 
-unsigned short PasswordUtils::passwordStrengthCheck(const std::string& password) {
+unsigned short Strength::passwordStrengthCheck(const std::string& password) {
     if (password.empty()) return 1;
 
     unsigned short score = 0;
@@ -40,7 +40,7 @@ unsigned short PasswordUtils::passwordStrengthCheck(const std::string& password)
     return score;
 }
 
-bool PasswordUtils::containsDictionaryWord(const std::string& password) {
+bool Strength::containsDictionaryWord(const std::string& password) {
     if (dictionaryWords_.empty()) return false; // fallback if not loaded
 
     std::string lowerPw = password;
@@ -49,7 +49,7 @@ bool PasswordUtils::containsDictionaryWord(const std::string& password) {
     return std::ranges::any_of(dictionaryWords_, [&](const auto& word) { return lowerPw.contains(word); });
 }
 
-bool PasswordUtils::isCommonWeakPassword(const std::string& password) {
+bool Strength::isCommonWeakPassword(const std::string& password) {
     std::string lowerPw = password;
     std::ranges::transform(lowerPw.begin(), lowerPw.end(), lowerPw.begin(), ::tolower);
     return commonWeakPasswords_.count(lowerPw) > 0;
@@ -61,7 +61,7 @@ size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* s) 
     return newLength;
 }
 
-bool PasswordUtils::isPwnedPassword(const std::string& password) {
+bool Strength::isPwnedPassword(const std::string& password) {
     const std::string sha1Hex = SHA1Hex(password); // Needs to be uppercase hex
     const std::string prefix = sha1Hex.substr(0, 5);
     const std::string suffix = sha1Hex.substr(5);
@@ -86,7 +86,7 @@ bool PasswordUtils::isPwnedPassword(const std::string& password) {
     return false;
 }
 
-void PasswordUtils::loadCommonWeakPasswordsFromURLs(const std::vector<std::string>& urls) {
+void Strength::loadCommonWeakPasswordsFromURLs(const std::vector<std::string>& urls) {
     commonWeakPasswords_.clear();
 
     for (const auto& url : urls) {
@@ -105,7 +105,7 @@ void PasswordUtils::loadCommonWeakPasswordsFromURLs(const std::vector<std::strin
     }
 }
 
-void PasswordUtils::loadDictionaryFromURL(const std::string& url) {
+void Strength::loadDictionaryFromURL(const std::string& url) {
     dictionaryWords_.clear();
 
     std::string data = downloadURL(url);
@@ -122,7 +122,7 @@ void PasswordUtils::loadDictionaryFromURL(const std::string& url) {
     }
 }
 
-std::string PasswordUtils::SHA1Hex(const std::string& input) {
+std::string Strength::SHA1Hex(const std::string& input) {
     SHA1 sha1;
     sha1.update(input);
     std::string digest = sha1.final();
@@ -132,13 +132,13 @@ std::string PasswordUtils::SHA1Hex(const std::string& input) {
     return digest;
 }
 
-size_t PasswordUtils::curlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
+size_t Strength::curlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
     size_t newLength = size * nmemb;
     s->append((char*)contents, newLength);
     return newLength;
 }
 
-std::string PasswordUtils::downloadURL(const std::string& url) {
+std::string Strength::downloadURL(const std::string& url) {
     CURL* curl = curl_easy_init();
     if (!curl) throw std::runtime_error("Failed to init curl");
 
@@ -156,7 +156,7 @@ std::string PasswordUtils::downloadURL(const std::string& url) {
     return response;
 }
 
-std::string PasswordUtils::escape_uri_component(const std::string& input) {
+std::string Strength::escape_uri_component(const std::string& input) {
     std::ostringstream escaped;
     escaped.fill('0');
     escaped << std::hex;
@@ -169,4 +169,4 @@ std::string PasswordUtils::escape_uri_component(const std::string& input) {
     return escaped.str();
 }
 
-} // namespace vh::auth
+}

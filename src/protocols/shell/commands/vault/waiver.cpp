@@ -37,6 +37,7 @@ using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
+using namespace vh::rbac::model;
 
 static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault) {
     auto waiver = std::make_shared<Waiver>();

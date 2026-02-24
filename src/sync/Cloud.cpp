@@ -26,7 +26,7 @@
 #include "sync/Planner.hpp"
 
 #include "util/fsPath.hpp"
-#include "crypto/IdGenerator.hpp"
+#include "crypto/id/Generator.hpp"
 
 #include <utility>
 
@@ -140,7 +140,7 @@ void Cloud::ensureDirectoriesFromRemote() {
             if (dir->fuse_path.empty())
                 dir->fuse_path = engine->paths->absPath(dir->path, PathType::VAULT_ROOT);
 
-            dir->base32_alias = IdGenerator({ .namespace_token = dir->name }).generate();
+            dir->base32_alias = id::Generator({ .namespace_token = dir->name }).generate();
             DirectoryQueries::upsertDirectory(dir);
         }
     }

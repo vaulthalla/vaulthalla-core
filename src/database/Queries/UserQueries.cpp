@@ -5,7 +5,7 @@
 #include "rbac/model/UserRole.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "logging/LogRegistry.hpp"
-#include "crypto/PasswordHash.hpp"
+#include "crypto/util/hash.hpp"
 
 #include <pqxx/pqxx>
 
@@ -261,7 +261,7 @@ bool UserQueries::adminUserExists() {
 bool UserQueries::adminPasswordIsDefault() {
     return Transactions::exec("UserQueries::adminPasswordIsDefault", [](pqxx::work& txn) {
         const auto passwordHash = txn.exec(pqxx::prepped{"get_admin_password"}).one_field().as<std::string>();
-        return crypto::verifyPassword("vh!adm1n", passwordHash);
+        return crypto::hash::verifyPassword("vh!adm1n", passwordHash);
     });
 }
 

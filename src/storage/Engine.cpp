@@ -26,7 +26,6 @@ using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::storage;
-using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::util;
 using namespace std::chrono;

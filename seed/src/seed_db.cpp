@@ -28,8 +28,8 @@
 #include "vault/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "crypto/IdGenerator.hpp"
-#include "crypto/PasswordHash.hpp"
+#include "crypto/id/Generator.hpp"
+#include "crypto/util/hash.hpp"
 #include "util/bitmask.hpp"
 #include "auth/SystemUid.hpp"
 
@@ -218,8 +218,8 @@ void vh::seed::initSystemUser() {
     // System account shouldn't be used for interactive login.
     // Still set a password hash to satisfy NOT NULL / validation.
     // Generate a deterministic-ish strong password seed (or truly random if you prefer).
-    const auto pwSeed = IdGenerator({ .namespace_token = "vaulthalla-system-user" }).generate();
-    user->setPasswordHash(hashPassword(pwSeed));
+    const auto pwSeed = id::Generator({ .namespace_token = "vaulthalla-system-user" }).generate();
+    user->setPasswordHash(hash::password(pwSeed));
 
     user->linux_uid = sysUid;
 
@@ -279,7 +279,7 @@ void initAdmin() {
     const auto user = std::make_shared<User>();
     user->name = "admin";
     user->email = "";
-    user->setPasswordHash(hashPassword("vh!adm1n"));
+    user->setPasswordHash(hash::password("vh!adm1n"));
     user->linux_uid = loadPendingSuperAdminUid();
 
     const auto role = PermsQueries::getRoleByName("super_admin");
@@ -321,7 +321,7 @@ void vh::seed::initAdminDefaultVault() {
     vault->type = VaultType::Local;
     vault->owner_id = 1;
     vault->quota = 0; // No quota for admin vault
-    vault->mount_point = IdGenerator({ .namespace_token = vault->name }).generate();
+    vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
 
     const auto sync = std::make_shared<LocalPolicy>();
     sync->interval = std::chrono::minutes(10);
@@ -335,7 +335,7 @@ void vh::seed::initRoot() {
 
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
-    dir->base32_alias = IdGenerator( { .namespace_token = "absroot" }).generate();
+    dir->base32_alias = id::Generator( { .namespace_token = "absroot" }).generate();
     dir->created_by = dir->last_modified_by = 1;
     dir->path = "/";
     dir->fuse_path = "/";
@@ -386,7 +386,7 @@ void vh::seed::initDevCloudVault() {
         const auto vault = std::make_shared<S3Vault>();
         vault->name = "R2 Test Vault";
         vault->description = "Test vault for Cloudflare R2 in development mode";
-        vault->mount_point = IdGenerator({ .namespace_token = vault->name }).generate();
+        vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
         vault->api_key_id = key->id;
         vault->owner_id = 1;
         vault->bucket = "vaulthalla-test";

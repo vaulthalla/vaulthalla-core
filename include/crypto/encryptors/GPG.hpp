@@ -3,9 +3,9 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-namespace vh::crypto {
+namespace vh::crypto::encryptors {
 
-class GPGEncryptor {
+class GPG {
 public:
     static void encryptToFile(const nlohmann::json& payload,
                               const std::string& recipient,

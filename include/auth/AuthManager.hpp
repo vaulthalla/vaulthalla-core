@@ -1,7 +1,7 @@
 #pragma once
 
 #include "auth/SessionManager.hpp"
-#include "crypto/InternalSecretManager.hpp"
+#include "crypto/secrets/Manager.hpp"
 
 #include <memory>
 #include <string>
@@ -61,7 +61,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<identities::model::User>> users_;
     std::shared_ptr<SessionManager> sessionManager_;
     std::shared_ptr<storage::Manager> storageManager_;
-    const std::string jwt_secret_ = crypto::InternalSecretManager().jwtSecret();
+    const std::string jwt_secret_ = crypto::secrets::Manager().jwtSecret();
 };
 
 } // namespace vh::auth

@@ -1,16 +1,16 @@
 #pragma once
 
-#include "TPMKeyProvider.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
 
 #include <memory>
 #include <mutex>
 #include <string>
 
-namespace vh::crypto {
+namespace vh::crypto::secrets {
 
-class InternalSecretManager {
+class Manager {
 public:
-    InternalSecretManager();
+    Manager();
 
     std::string jwtSecret() const;
     void setJWTSecret(const std::string& secret) const;

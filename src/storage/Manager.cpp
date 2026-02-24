@@ -11,7 +11,7 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "seed/include/seed_db.hpp"
-#include "crypto/IdGenerator.hpp"
+#include "crypto/id/Generator.hpp"
 
 using namespace vh::storage;
 using namespace vh::vault::model;
@@ -93,7 +93,7 @@ void Manager::initUserStorage(const std::shared_ptr<User>& user) {
         auto vault = std::make_shared<Vault>();
         vault->name = user->name + "'s Local Disk Vault";
         vault->description = "Default local disk vault for " + user->name;
-        vault->mount_point = IdGenerator({ .namespace_token = vault->name }).generate();
+        vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
 
         {
             std::scoped_lock lock(mutex_);
@@ -118,7 +118,7 @@ std::shared_ptr<Vault> Manager::addVault(std::shared_ptr<Vault> vault,
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     std::scoped_lock lock(mutex_);
 
-    vault->mount_point = IdGenerator({ .namespace_token = vault->name }).generate();
+    vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
     vault->id = VaultQueries::upsertVault(vault, sync);
     vault = VaultQueries::getVault(vault->id);
     const auto engine = std::make_shared<Engine>(vault);

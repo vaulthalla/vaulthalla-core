@@ -3,11 +3,11 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "identities/model/User.hpp"
-#include "crypto/TPMKeyProvider.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
+#include "crypto/secrets/Manager.hpp"
 #include "util/files.hpp"
-#include "crypto/InternalSecretManager.hpp"
 #include <nlohmann/json.hpp>
-#include "crypto/GPGEncryptor.hpp"
+#include "crypto/encryptors/GPG.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
@@ -18,7 +18,6 @@
 
 using namespace vh::shell;
 using namespace vh::identities::model;
-using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::services;
@@ -43,14 +42,14 @@ static CommandResult handle_secrets_set(const CommandCall& call) {
     const auto secret = trimSecret(readFileToVector(fileArg));
 
     if (secretArg == "db-password") {
-        TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
+        vh::crypto::secrets::TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
         tpm.init();
         tpm.updateMasterKey(secret);
         return ok("Successfully updated database password secret (sealed with TPM)");
     }
 
     if (secretArg == "jwt-secret") {
-        const InternalSecretManager ism;
+        const vh::crypto::secrets::Manager ism;
         ism.setJWTSecret({secret.begin(), secret.end()});
         return ok("Successfully updated JWT secret");
     }
@@ -68,7 +67,7 @@ static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
         if (!outputOpt) return invalid("secrets export: --recipient requires --output to specify the output file");
 
         try {
-            GPGEncryptor::encryptToFile(output, *recipientOpt, *outputOpt);
+            vh::crypto::encryptors::GPG::encryptToFile(output, *recipientOpt, *outputOpt);
             return ok("Secret successfully encrypted and saved to " + *outputOpt);
         } catch (const std::exception& e) {
             return invalid("secrets export: failed to encrypt secret: " + std::string(e.what()));
@@ -113,13 +112,13 @@ static nlohmann::json generateSecretOutput(const std::string& name, const std::s
 }
 
 static nlohmann::json getDBPassword() {
-    TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
+    vh::crypto::secrets::TPMKeyProvider tpm(vh::paths::testMode ? "test_psql" : "psql");
     tpm.init();
     return generateSecretOutput("db-password", tpm.getMasterKey());
 }
 
 static nlohmann::json getJWTSecret() {
-    const InternalSecretManager ism;
+    const vh::crypto::secrets::Manager ism;
     return generateSecretOutput("jwt-secret", ism.jwtSecret());
 }
 

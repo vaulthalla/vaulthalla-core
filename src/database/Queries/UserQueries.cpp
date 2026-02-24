@@ -13,6 +13,7 @@ using namespace vh::logging;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::auth::model;
+using namespace vh::database::model;
 
 namespace vh::database {
 

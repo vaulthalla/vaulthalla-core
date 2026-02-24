@@ -14,34 +14,17 @@ class Router;
 class CommandUsage;
 }
 
-namespace vh::types {
-struct Vault;
-struct S3Vault;
-struct User;
-struct VaultRole;
-struct Role;
-enum class VaultType;
-enum class OverrideOpt;
-
-namespace api {
-struct APIKey;
-}
-}
-
-namespace vh::sync::model {
-struct Policy;
-struct Waiver;
-}
-
-namespace vh::storage {
-struct Engine;
-}
+namespace vh::identities::model { struct User; }
+namespace vh::rbac::model { struct VaultRole; enum class OverrideOpt; }
+namespace vh::vault::model { struct Vault; struct S3Vault; struct APIKey; enum class VaultType; }
+namespace vh::sync::model { struct Policy; struct Waiver; }
+namespace vh::storage { struct Engine; }
 
 namespace vh::shell::commands::vault {
 
 struct WaiverContext {
     const CommandCall& call;
-    std::shared_ptr<types::Vault> vault;
+    std::shared_ptr<vh::vault::model::Vault> vault;
     bool isUpdate = false;
 };
 
@@ -79,19 +62,19 @@ CommandResult handle_sync(const CommandCall& call);
 // helpers.cpp
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut);
 
-std::shared_ptr<types::User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage);
-Lookup<types::User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
+std::shared_ptr<identities::model::User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage);
+Lookup<identities::model::User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
-Lookup<types::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
+Lookup<vh::vault::model::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
 Lookup<storage::Engine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
 std::optional<std::string> checkOverridePermissions(const CommandCall& call,
-                                                    const std::shared_ptr<types::Vault>& vault,
+                                                    const std::shared_ptr<vh::vault::model::Vault>& vault,
                                                     const std::string& errPrefix);
 
-Lookup<types::VaultRole> resolveVRole(const std::string& roleArg,
-                                      const std::shared_ptr<types::Vault>& vault,
+Lookup<rbac::model::VaultRole> resolveVRole(const std::string& roleArg,
+                                      const std::shared_ptr<vh::vault::model::Vault>& vault,
                                       const Subject* subjectOrNull,
                                       const std::string& errPrefix);
 
@@ -101,16 +84,16 @@ EnableParse parseEnableDisableOpt(const CommandCall& call, const std::string& er
 
 EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& errPrefix);
 
-std::unique_ptr<types::VaultType> parseVaultType(const CommandCall& call);
+std::unique_ptr<vh::vault::model::VaultType> parseVaultType(const CommandCall& call);
 
-void assignDescIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+void assignDescIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<vh::vault::model::Vault>& vault);
 
-void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<vh::vault::model::Vault>& vault);
 
-void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault);
+void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<vh::vault::model::Vault>& vault);
 
-void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, const std::shared_ptr<sync::model::Policy>& sync);
+void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<vh::vault::model::Vault>& vault, const std::shared_ptr<sync::model::Policy>& sync);
 
-void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault, unsigned int ownerId, bool required = false);
+void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<vh::vault::model::Vault>& vault, unsigned int ownerId, bool required = false);
 
 }

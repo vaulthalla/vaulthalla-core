@@ -1,6 +1,6 @@
 #include "services/ConnectionLifecycleManager.hpp"
 #include "auth/SessionManager.hpp"
-#include "auth/Client.hpp"
+#include "auth/model/Client.hpp"
 #include "auth/AuthManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"

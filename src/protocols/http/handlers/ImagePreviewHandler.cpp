@@ -1,7 +1,6 @@
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "util/imageUtil.hpp"
 #include "util/files.hpp"
-#include "database/Queries/FileQueries.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "protocols/http/HttpRouter.hpp"
@@ -11,7 +10,6 @@
 using namespace vh::storage;
 using namespace vh::util;
 using namespace vh::logging;
-using namespace vh::database;
 
 namespace vh::http {
 

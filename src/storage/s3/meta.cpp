@@ -1,11 +1,11 @@
 #include "storage/s3/S3Controller.hpp"
-#include "types/vault/APIKey.hpp"
+#include "vault/model/APIKey.hpp"
 #include "util/timestamp.hpp"
 #include "util/s3Helpers.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::cloud;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::util;
 using namespace vh::logging;
 

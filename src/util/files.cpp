@@ -16,7 +16,6 @@
 #include <format>
 
 using namespace vh::util;
-using namespace vh::types;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::fs::model;

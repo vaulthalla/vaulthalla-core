@@ -5,7 +5,7 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "util/parse.hpp"
 
 #include <boost/beast/http.hpp>
@@ -25,7 +25,7 @@ using json          = nlohmann::json;
 
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::identities::model;
 
 namespace vh::websocket {
 

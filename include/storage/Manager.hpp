@@ -9,14 +9,9 @@
 #include <unordered_map>
 #include <fuse3/fuse_lowlevel.h>
 
-namespace vh::types {
-struct User;
-struct Vault;
-}
-
-namespace vh::sync::model {
-struct Policy;
-}
+namespace vh::identities::model { struct User; }
+namespace vh::vault::model { struct Vault; }
+namespace vh::sync::model { struct Policy; }
 
 namespace vh::storage {
 
@@ -32,16 +27,16 @@ public:
 
     std::shared_ptr<Engine> resolveStorageEngine(const std::filesystem::path& fusePath) const;
 
-    void initUserStorage(const std::shared_ptr<types::User>& user);
+    void initUserStorage(const std::shared_ptr<identities::model::User>& user);
 
-    std::shared_ptr<types::Vault> addVault(std::shared_ptr<types::Vault> vault,
+    std::shared_ptr<vault::model::Vault> addVault(std::shared_ptr<vault::model::Vault> vault,
                                            const std::shared_ptr<sync::model::Policy>& sync = nullptr);
 
-    void updateVault(const std::shared_ptr<types::Vault>& vault);
+    void updateVault(const std::shared_ptr<vault::model::Vault>& vault);
 
     void removeVault(unsigned int vaultId);
 
-    std::shared_ptr<types::Vault> getVault(unsigned int vaultId) const;
+    std::shared_ptr<vault::model::Vault> getVault(unsigned int vaultId) const;
 
     std::shared_ptr<Engine> getEngine(unsigned int id) const;
 

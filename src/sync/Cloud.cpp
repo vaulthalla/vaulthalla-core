@@ -6,7 +6,7 @@
 #include "sync/tasks/Delete.hpp"
 #include "sync/Executor.hpp"
 
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
 #include "fs/model/Entry.hpp"
@@ -31,7 +31,7 @@
 #include <utility>
 
 using namespace vh::sync;
-using namespace vh::types;
+using namespace vh::sync::model;
 using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::logging;
@@ -94,20 +94,20 @@ void Cloud::clearBins() {
 
 void Cloud::upload(const std::shared_ptr<File>& file) {
     push(std::make_shared<tasks::Upload>(
-        cloudEngine(), file, op(model::Throughput::Metric::UPLOAD)));
+        cloudEngine(), file, op(Throughput::Metric::UPLOAD)));
 }
 
 void Cloud::download(const std::shared_ptr<File>& file, const bool freeAfterDownload) {
     push(std::make_shared<tasks::Download>(
         cloudEngine(),
         file,
-        event->getOrCreateThroughput(model::Throughput::Metric::DOWNLOAD).newOp(),
+        event->getOrCreateThroughput(Throughput::Metric::DOWNLOAD).newOp(),
         freeAfterDownload));
 }
 
 void Cloud::remove(const std::shared_ptr<File>& file, const tasks::Delete::Type& type) {
     push(std::make_shared<tasks::Delete>(
-        cloudEngine(), file, op(model::Throughput::Metric::DELETE), type));
+        cloudEngine(), file, op(Throughput::Metric::DELETE), type));
 }
 
 // ##########################################
@@ -118,8 +118,8 @@ std::shared_ptr<CloudEngine> Cloud::cloudEngine() const {
     return std::static_pointer_cast<CloudEngine>(engine);
 }
 
-std::vector<model::EntryKey> Cloud::allKeysSorted() const {
-    std::vector<model::EntryKey> keys;
+std::vector<EntryKey> Cloud::allKeysSorted() const {
+    std::vector<EntryKey> keys;
     keys.reserve(localMap.size() + s3Map.size());
 
     for (const auto& [k, _] : localMap) keys.push_back({k});
@@ -162,16 +162,16 @@ bool Cloud::hasPotentialConflict(const std::shared_ptr<File>& local,
     return false;
 }
 
-std::shared_ptr<model::Conflict> Cloud::maybeBuildConflict(
+std::shared_ptr<Conflict> Cloud::maybeBuildConflict(
     const std::shared_ptr<File>& local,
     const std::shared_ptr<File>& upstream) const
 {
     if (!hasPotentialConflict(local, upstream, false)) return nullptr;
 
-    auto c = std::make_shared<model::Conflict>();
+    auto c = std::make_shared<Conflict>();
     c->failed_to_decrypt_upstream = false; // Planner-time default
-    c->artifacts.local = model::Artifact(local, model::Artifact::Side::LOCAL);
-    c->artifacts.upstream = model::Artifact(upstream, model::Artifact::Side::UPSTREAM);
+    c->artifacts.local = Artifact(local, Artifact::Side::LOCAL);
+    c->artifacts.upstream = Artifact(upstream, Artifact::Side::UPSTREAM);
     c->analyze();
 
     if (c->reasons.empty()) {
@@ -187,7 +187,7 @@ std::shared_ptr<model::Conflict> Cloud::maybeBuildConflict(
     return c;
 }
 
-bool Cloud::handleConflict(const std::shared_ptr<model::Conflict>& c) const {
+bool Cloud::handleConflict(const std::shared_ptr<Conflict>& c) const {
     const bool ok = engine->sync->resolve_conflict(c);
     if (ok) c->resolved_at = system_clock::to_time_t(system_clock::now());
     event->conflicts.push_back(c);

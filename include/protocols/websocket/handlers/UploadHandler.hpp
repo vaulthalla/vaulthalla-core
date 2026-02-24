@@ -6,13 +6,7 @@
 #include <optional>
 #include <boost/beast/core/flat_buffer.hpp>
 
-namespace vh::storage {
-struct Engine;
-}
-
-namespace vh::types {
-    struct User;
-}
+namespace vh::storage { struct Engine; }
 
 namespace vh::websocket {
 

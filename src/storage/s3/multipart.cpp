@@ -6,7 +6,6 @@
 #include <regex>
 
 using namespace vh::cloud;
-using namespace vh::types;
 using namespace vh::util;
 using namespace vh::logging;
 

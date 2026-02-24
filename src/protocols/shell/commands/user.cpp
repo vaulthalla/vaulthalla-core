@@ -6,7 +6,7 @@
 #include "auth/AuthManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/rbac/UserRole.hpp"
+#include "rbac/model/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
@@ -14,7 +14,8 @@
 #include <paths.h>
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::rbac::model;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;

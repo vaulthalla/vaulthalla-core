@@ -9,7 +9,7 @@
 #include "storage/Manager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "stats/model/CacheStats.hpp"
 
 #include <unordered_set>
 #include <mutex>
@@ -18,7 +18,7 @@
 
 using namespace vh::fs::cache;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::stats::model;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;

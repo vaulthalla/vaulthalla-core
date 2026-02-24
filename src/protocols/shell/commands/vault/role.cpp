@@ -1,14 +1,13 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "database/Queries/PermsQueries.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/Permission.hpp"
+#include "vault/model/Vault.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/Role.hpp"
+#include "rbac/model/Permission.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -23,7 +22,9 @@
 
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;

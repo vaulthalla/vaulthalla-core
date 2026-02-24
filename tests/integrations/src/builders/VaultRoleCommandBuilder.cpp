@@ -5,7 +5,9 @@
 #include <iomanip>
 
 using namespace vh::test::cli;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::shell;
 
 VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)

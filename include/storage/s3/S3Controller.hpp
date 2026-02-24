@@ -10,9 +10,7 @@
 #include <curl/curl.h>
 #include <unordered_map>
 
-namespace vh::types::api {
-struct APIKey;
-}
+namespace vh::vault::model { struct APIKey; }
 
 namespace vh::cloud {
 
@@ -24,7 +22,7 @@ class S3Controller {
 public:
     static constexpr uintmax_t MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MiB
 
-    S3Controller(const std::shared_ptr<types::api::APIKey>& apiKey, std::string bucket);
+    S3Controller(const std::shared_ptr<vault::model::APIKey>& apiKey, std::string bucket);
 
     ~S3Controller();
 
@@ -86,7 +84,7 @@ public:
     [[nodiscard]] std::u8string listObjects(const fs::path& prefix = {}) const;
 
 private:
-    std::shared_ptr<types::api::APIKey> apiKey_;
+    std::shared_ptr<vault::model::APIKey> apiKey_;
     std::string bucket_;
 
     [[nodiscard]] std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;

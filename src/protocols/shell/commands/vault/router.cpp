@@ -12,7 +12,6 @@
 using namespace vh::shell;
 using namespace vh::shell::commands;
 using namespace vh::shell::commands::vault;
-using namespace vh::types;
 using namespace vh::services;
 
 static bool isVaultMatch(const std::string& cmd, const std::string_view input) {

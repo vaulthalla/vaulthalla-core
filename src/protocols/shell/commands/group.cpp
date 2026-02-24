@@ -4,19 +4,18 @@
 #include "protocols/shell/types.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/GroupQueries.hpp"
-#include "types/entities/Group.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/Group.hpp"
+#include "identities/model/User.hpp"
 #include "auth/AuthManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::util;
-using namespace vh::types;
 using namespace vh::services;
 
 static std::shared_ptr<Group> resolveGroup(const std::string& groupNameOrId) {

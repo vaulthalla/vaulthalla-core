@@ -6,7 +6,7 @@
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -17,7 +17,7 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::concurrency;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::sync;
 
 bool FSTaskCompare::operator()(const std::shared_ptr<Local>& a, const std::shared_ptr<Local>& b) const {

@@ -1,6 +1,6 @@
 #include "auth/AuthManager.hpp"
-#include "types/entities/User.hpp"
-#include "auth/Client.hpp"
+#include "identities/model/User.hpp"
+#include "auth/model/Client.hpp"
 #include "auth/SessionManager.hpp"
 #include "crypto/PasswordHash.hpp"
 #include "crypto/PasswordUtils.hpp"
@@ -18,7 +18,8 @@
 #include <paths.h>
 
 using namespace vh::auth;
-using namespace vh::types;
+using namespace vh::auth::model;
+using namespace vh::identities::model;
 using namespace vh::crypto;
 using namespace vh::database;
 using namespace vh::storage;

@@ -5,7 +5,7 @@
 #include "fs/model/File.hpp"
 #include "fs/model/file/Trashed.hpp"
 #include "fs/model/Directory.hpp"
-#include "types/vault/S3Vault.hpp"
+#include "vault/model/S3Vault.hpp"
 #include "fs/model/Path.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
@@ -14,14 +14,14 @@
 #include "services/ThumbnailWorker.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "sync/model/RemotePolicy.hpp"
 
 using namespace vh::fs;
 using namespace vh::fs::model;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::vault;
 using namespace vh::crypto;
 using namespace vh::concurrency;
 using namespace vh::services;
@@ -29,6 +29,7 @@ using namespace vh::cloud;
 using namespace vh::database;
 using namespace vh::util;
 using namespace vh::config;
+using namespace vh::sync::model;
 
 static constexpr std::string_view META_VH_ENCRYPTED_FLAG = "vh-encrypted";
 static constexpr std::string_view META_VH_IV_FLAG = "vh-iv";
@@ -160,10 +161,10 @@ bool CloudEngine::remoteFileIsEncrypted(const fs::path& rel_path) const {
     return false; // assume unencrypted if metadata is missing or head request failed
 }
 
-std::vector<std::shared_ptr<model::Directory>> CloudEngine::extractDirectories(
+std::vector<std::shared_ptr<Directory>> CloudEngine::extractDirectories(
     const std::vector<std::shared_ptr<File>>& files) const {
 
-    std::unordered_map<std::u8string, std::shared_ptr<model::Directory>> directories;
+    std::unordered_map<std::u8string, std::shared_ptr<Directory>> directories;
 
     for (const auto& file : files) {
         fs::path current = "/";
@@ -172,7 +173,7 @@ std::vector<std::shared_ptr<model::Directory>> CloudEngine::extractDirectories(
             current /= part;
 
             if (!directories.contains(current.u8string())) {
-                const auto dir = std::make_shared<model::Directory>();
+                const auto dir = std::make_shared<Directory>();
                 dir->path = current;
                 dir->name = current.filename().string();
                 dir->created_by = dir->last_modified_by = vault->owner_id;
@@ -185,7 +186,7 @@ std::vector<std::shared_ptr<model::Directory>> CloudEngine::extractDirectories(
         }
     }
 
-    std::vector<std::shared_ptr<model::Directory>> result;
+    std::vector<std::shared_ptr<Directory>> result;
     for (const auto& [_, dir] : directories)
         result.push_back(dir);
 
@@ -239,6 +240,6 @@ void CloudEngine::removeRemotely(const std::shared_ptr<file::Trashed>& f, bool r
 
 std::shared_ptr<S3Vault> CloudEngine::s3Vault() const { return std::static_pointer_cast<S3Vault>(vault); }
 
-std::shared_ptr<vh::sync::model::RemotePolicy> CloudEngine::remote_policy() const {
-    return std::static_pointer_cast<sync::model::RemotePolicy>(sync);
+std::shared_ptr<RemotePolicy> CloudEngine::remote_policy() const {
+    return std::static_pointer_cast<RemotePolicy>(sync);
 }

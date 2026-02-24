@@ -3,15 +3,17 @@
 #include "EntityRegistrar.hpp"
 #include "CLITestContext.hpp"
 
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/entities/Group.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/VaultRole.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
+#include "vault/model/Vault.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 
 CommandRouter::CommandRouter(const std::shared_ptr<CLITestContext>& ctx)
     : registrar_(std::make_shared<EntityRegistrar>(ctx)) {

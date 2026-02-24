@@ -1,7 +1,7 @@
 #include "util/s3Helpers.hpp"
 #include "util/u8.hpp"
 #include "util/timestamp.hpp"
-#include "types/vault/APIKey.hpp"
+#include "vault/model/APIKey.hpp"
 
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
@@ -113,7 +113,7 @@ bool extractETag(const std::string& respHdr, std::string& etagOut) {
     return !etagOut.empty();
 }
 
-std::string buildAuthorizationHeader(const std::shared_ptr<types::api::APIKey>& api_key,
+std::string buildAuthorizationHeader(const std::shared_ptr<vault::model::APIKey>& api_key,
                                      const std::string& method,
                                      const std::string& fullPath,
                                      const std::map<std::string, std::string>& headers,

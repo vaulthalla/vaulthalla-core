@@ -5,9 +5,9 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/entities/Group.hpp"
-#include "types/rbac/Role.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
+#include "rbac/model/Role.hpp"
 
 #include <optional>
 #include <string>
@@ -17,8 +17,10 @@
 
 using namespace vh::shell;
 using namespace vh::services;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
 using namespace vh::database;
+using namespace vh::database::model;
 
 static constexpr uintmax_t KILOBYTE = 1024;
 static constexpr uintmax_t MEGABYTE = KILOBYTE * KILOBYTE;

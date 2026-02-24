@@ -1,7 +1,7 @@
 #include "fs/Filesystem.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
@@ -30,7 +30,7 @@
 #include <paths.h>
 
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;

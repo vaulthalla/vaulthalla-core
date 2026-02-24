@@ -3,24 +3,18 @@
 #include <memory>
 #include <string>
 
-namespace vh::types {
-struct S3Vault;
-struct User;
-struct Role;
-
-namespace api {
-struct APIKey;
-}
-}
+namespace vh::vault::model { struct APIKey; struct S3Vault; }
+namespace vh::identities::model { struct User; }
+namespace vh::rbac::model { struct Role; }
 
 namespace vh::sync::model {
 
 struct Waiver {
     unsigned int id{};
-    std::shared_ptr<types::S3Vault> vault;
-    std::shared_ptr<types::User> user, owner;
-    std::shared_ptr<types::api::APIKey> apiKey;
-    std::shared_ptr<types::Role> overridingRole;
+    std::shared_ptr<vault::model::S3Vault> vault;
+    std::shared_ptr<identities::model::User> user, owner;
+    std::shared_ptr<vault::model::APIKey> apiKey;
+    std::shared_ptr<rbac::model::Role> overridingRole;
     bool encrypt_upstream{};
     std::string waiver_text;
 };

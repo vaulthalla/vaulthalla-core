@@ -9,9 +9,8 @@
 #include "storage/Manager.hpp"
 #include "storage/s3/S3Controller.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "identities/model/User.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -24,7 +23,7 @@
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;

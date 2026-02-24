@@ -2,7 +2,7 @@
 #include "crypto/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
-#include "types/vault/VaultKey.hpp"
+#include "vault/model/Key.hpp"
 #include "fs/model/File.hpp"
 
 #include <sodium.h>
@@ -12,7 +12,6 @@
 using namespace vh::crypto;
 using namespace vh::logging;
 using namespace vh::database;
-using namespace vh::types;
 using namespace vh::fs::model;
 
 VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
@@ -38,7 +37,7 @@ void VaultEncryptionManager::load_key() {
         std::vector<uint8_t> iv;
         const auto enc_key = encrypt_aes256_gcm(vaultKey, masterKey, iv);
 
-        const auto key = std::make_shared<types::VaultKey>();
+        const auto key = std::make_shared<vault::model::Key>();
         key->vaultId = vault_id_;
         key->encrypted_key = enc_key;
         key->iv = iv;
@@ -93,7 +92,7 @@ void VaultEncryptionManager::prepare_key_rotation() {
     randombytes_buf(key_.data(), AES_KEY_SIZE);
 
     std::vector<uint8_t> iv;
-    const auto key = std::make_shared<types::VaultKey>();
+    const auto key = std::make_shared<vault::model::Key>();
     key->vaultId = vault_id_;
     key->encrypted_key = encrypt_aes256_gcm(key_, tpmKeyProvider_->getMasterKey(), iv);
     key->iv = std::move(iv);

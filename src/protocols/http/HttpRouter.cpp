@@ -13,7 +13,7 @@
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/cache/Registry.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "stats/model/CacheStats.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -22,7 +22,7 @@
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
-using namespace vh::types;
+using namespace vh::stats::model;
 using namespace vh::fs::model;
 
 namespace vh::http {

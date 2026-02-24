@@ -17,7 +17,6 @@
 #include <paths.h>
 
 using namespace vh::shell;
-using namespace vh::types;
 using namespace vh::config;
 using namespace vh::logging;
 using namespace vh::concurrency;

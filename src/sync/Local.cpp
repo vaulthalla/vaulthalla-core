@@ -5,7 +5,7 @@
 #include "storage/Engine.hpp"
 #include "sync/model/Policy.hpp"
 #include "sync/model/Operation.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "util/files.hpp"
@@ -28,7 +28,7 @@ using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::concurrency;
 using namespace std::chrono;
 using namespace vh::fs;

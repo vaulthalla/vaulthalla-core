@@ -3,15 +3,15 @@
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/Role.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/Role.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::rbac::model;
 using namespace vh::database;
 using namespace vh::services;
 

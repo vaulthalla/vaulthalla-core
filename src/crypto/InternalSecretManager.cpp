@@ -1,12 +1,13 @@
 #include "crypto/InternalSecretManager.hpp"
 #include "database/Queries/InternalSecretQueries.hpp"
-#include "types/admin/InternalSecret.hpp"
+#include "crypto/model/InternalSecret.hpp"
 #include "crypto/encrypt.hpp"
 #include "crypto/PasswordHash.hpp"
 
 #include <paths.h>
 
 using namespace vh::crypto;
+using namespace vh::crypto::model;
 
 InternalSecretManager::InternalSecretManager()
 : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_master" : "master")) {
@@ -45,7 +46,7 @@ void InternalSecretManager::setEncryptedValue(const std::string& key, const std:
     const auto plaintext = std::vector<uint8_t>(value.begin(), value.end());
     const auto ciphertext = encrypt_aes256_gcm(plaintext, masterKey, iv);
 
-    const auto secret = std::make_shared<types::InternalSecret>();
+    const auto secret = std::make_shared<InternalSecret>();
     secret->key = key;
     secret->value = ciphertext;
     secret->iv = iv;

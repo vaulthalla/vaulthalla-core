@@ -2,9 +2,8 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "CommandUsage.hpp"
-#include "UsageManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "util/shellArgsHelpers.hpp"
 
@@ -15,7 +14,7 @@
 
 using namespace vh::shell;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::services;
 
 void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler) {

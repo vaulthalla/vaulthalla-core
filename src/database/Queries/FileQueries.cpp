@@ -344,13 +344,13 @@ std::vector<stats::Extension> FileQueries::getTopExtensionsBySize(const unsigned
         p.append(limit);
 
         const auto res = txn.exec(pqxx::prepped{"get_top_extensions_by_size"}, p);
-        if (res.empty()) return std::vector<stats::Extension>{};
+        if (res.empty()) return std::vector<fs::model::stats::Extension>{};
 
-        std::vector<stats::Extension> out;
+        std::vector<fs::model::stats::Extension> out;
         out.reserve(res.size());
 
         for (const auto& row : res) {
-            stats::Extension s{};
+            fs::model::stats::Extension s{};
             s.extension   = row["ext"].as<std::string>();
             s.total_bytes = row["total_bytes"].as<std::uint64_t>(0);
             out.emplace_back(std::move(s));

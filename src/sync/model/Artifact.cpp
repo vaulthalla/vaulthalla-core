@@ -2,6 +2,7 @@
 #include "fs/model/File.hpp"
 #include "util/timestamp.hpp"
 #include "services/ServiceDepsRegistry.hpp"
+#include "fs/cache/Registry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>

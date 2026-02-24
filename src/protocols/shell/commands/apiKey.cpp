@@ -2,10 +2,10 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/APIKey.hpp"
+#include "identities/model/User.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "storage/s3/S3Controller.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
@@ -15,11 +15,10 @@
 #include <paths.h>
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::types::api;
 using namespace vh::cloud;
 using namespace vh::config;
 

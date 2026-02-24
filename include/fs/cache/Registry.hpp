@@ -9,23 +9,10 @@
 #include <vector>
 #include <fuse3/fuse_lowlevel.h>
 
-namespace vh::types {
-struct CacheStatsSnapshot;
-struct CacheStats;
-}
-
-namespace vh::fs::model {
-struct Entry;
-}
+namespace vh::stats::model { struct CacheStatsSnapshot; struct CacheStats; }
+namespace vh::fs::model { struct Entry; }
 
 namespace vh::fs::cache {
-
-struct CacheEntry {
-    std::shared_ptr<fs::model::Entry> entry;
-    std::filesystem::path vaultPath;
-    std::filesystem::path absPath;
-    fuse_ino_t inode;
-};
 
 class Registry {
 public:
@@ -52,11 +39,11 @@ public:
 
     std::vector<std::shared_ptr<fs::model::Entry>> listDir(unsigned int parentId, bool recursive = false) const;
 
-    std::shared_ptr<types::CacheStatsSnapshot> stats() const;
+    std::shared_ptr<stats::model::CacheStatsSnapshot> stats() const;
 
 private:
     mutable std::shared_mutex mutex_;
-    std::shared_ptr<types::CacheStats> stats_;
+    std::shared_ptr<stats::model::CacheStats> stats_;
     fuse_ino_t nextInode_ = 2;
     std::unordered_map<fuse_ino_t, std::filesystem::path> inodeToPath_;
     std::unordered_map<std::filesystem::path, fuse_ino_t> pathToInode_;

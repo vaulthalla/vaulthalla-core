@@ -4,7 +4,7 @@
 #include "generators.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::shell;
 
 UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)

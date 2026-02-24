@@ -1,9 +1,9 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/rbac/PermissionOverride.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "rbac/model/PermissionOverride.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
@@ -17,7 +17,9 @@
 #include "util/interval.hpp"
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::services;
@@ -196,7 +198,7 @@ void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
     }
 }
 
-void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault) {
+void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault) {
     if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
         Lookup<User> ownerLkp;
         if (const auto idOpt = parseUInt(*ownerOpt)) {

@@ -10,21 +10,22 @@
 #include "database/Transactions.hpp"
 
 // Types
-#include "types/rbac/Permission.hpp"
-#include "types/vault/S3Vault.hpp"
+#include "rbac/model/Permission.hpp"
+#include "vault/model/S3Vault.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"
-#include "types/entities/User.hpp"
-#include "types/entities/Group.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/vault/Vault.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
+#include "rbac/model/Role.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "vault/model/Vault.hpp"
 #include "fs/model/Directory.hpp"
+#include "vault/model/APIKey.hpp"
 
 // Misc
 #include "config/ConfigRegistry.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "crypto/IdGenerator.hpp"
@@ -46,7 +47,9 @@ using namespace vh::seed;
 using namespace vh::config;
 using namespace vh::database;
 using namespace vh::crypto;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::logging;
 using namespace vh::services;
 using namespace vh::crypto;
@@ -358,10 +361,10 @@ void vh::seed::initDevCloudVault() {
         const auto secretKey = prefix + "SECRET_ACCESS_KEY";
         const auto endpoint = prefix + "ENDPOINT";
 
-        auto key = std::make_shared<api::APIKey>();
+        auto key = std::make_shared<APIKey>();
         key->user_id = 1; // Default user ID for dev mode
         key->name = "R2 Test Key";
-        key->provider = api::S3Provider::CloudflareR2;
+        key->provider = S3Provider::CloudflareR2;
         key->region = "wnam";
 
         if (std::getenv(accessKey.c_str())) key->access_key = std::getenv(accessKey.c_str());

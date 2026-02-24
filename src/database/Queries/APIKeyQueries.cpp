@@ -1,10 +1,11 @@
 #include "database/Queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/vault/APIKey.hpp"
+#include "vault/model/APIKey.hpp"
 #include "util/bytea.hpp"
 
 using namespace vh::database;
-using namespace vh::types::api;
+using namespace vh::database::model;
+using namespace vh::vault::model;
 using namespace vh::util;
 
 unsigned int APIKeyQueries::upsertAPIKey(const std::shared_ptr<APIKey>& key) {
@@ -29,7 +30,7 @@ void APIKeyQueries::removeAPIKey(const unsigned int keyId) {
     });
 }
 
-std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned int userId, const types::ListQueryParams& params) {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned int userId, const ListQueryParams& params) {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
         const auto sql = appendPaginationAndFilter(
             "SELECT * FROM api_keys WHERE user_id = " + txn.quote(userId),
@@ -39,7 +40,7 @@ std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const unsigned 
     });
 }
 
-std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const types::ListQueryParams& params) {
+std::vector<std::shared_ptr<APIKey> > APIKeyQueries::listAPIKeys(const ListQueryParams& params) {
     return Transactions::exec("APIKeyQueries::listAPIKeys", [&](pqxx::work& txn) {
         const auto sql = appendPaginationAndFilter(
             "SELECT * FROM api_keys",

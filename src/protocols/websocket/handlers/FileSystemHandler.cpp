@@ -3,9 +3,9 @@
 #include "storage/Manager.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/entities/User.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "vault/model/Vault.hpp"
+#include "identities/model/User.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "storage/Engine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -14,7 +14,8 @@
 #include "services/SyncController.hpp"
 #include "fs/cache/Registry.hpp"
 
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::rbac::model;
 using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::logging;

@@ -1,5 +1,5 @@
 #include "storage/s3/S3Controller.hpp"
-#include "types/vault/APIKey.hpp"
+#include "vault/model/APIKey.hpp"
 #include "util/s3Helpers.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -9,11 +9,11 @@
 #include <utility>
 
 using namespace vh::cloud;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::util;
 using namespace vh::logging;
 
-S3Controller::S3Controller(const std::shared_ptr<api::APIKey>& apiKey, std::string bucket)
+S3Controller::S3Controller(const std::shared_ptr<APIKey>& apiKey, std::string bucket)
 : apiKey_(apiKey), bucket_(std::move(bucket)) {
     if (!apiKey_) throw std::runtime_error("S3Provider requires a valid S3APIKey");
     ensureCurlGlobalInit();

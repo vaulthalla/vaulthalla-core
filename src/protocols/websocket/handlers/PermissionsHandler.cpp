@@ -1,8 +1,8 @@
 #include "protocols/websocket/handlers/PermissionsHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/Permission.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/Permission.hpp"
 
 #include <nlohmann/json.hpp>
 

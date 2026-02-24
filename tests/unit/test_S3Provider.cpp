@@ -1,4 +1,4 @@
-#include "types/vault/APIKey.hpp"
+#include "vault/model/APIKey.hpp"
 #include "storage/s3/S3Controller.hpp"
 #include "util/imageUtil.hpp"
 #include "fs/model/Entry.hpp"
@@ -12,9 +12,8 @@
 namespace fs = std::filesystem;
 
 using namespace vh::cloud;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::util;
-using namespace vh::types::api;
 using namespace vh::fs::model;
 
 class S3ProviderIntegrationTest : public ::testing::Test {

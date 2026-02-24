@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "util/shellArgsHelpers.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "crypto/TPMKeyProvider.hpp"
 #include "util/files.hpp"
 #include "crypto/InternalSecretManager.hpp"
@@ -17,7 +17,7 @@
 #include <paths.h>
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::crypto;
 using namespace vh::util;
 using namespace vh::logging;

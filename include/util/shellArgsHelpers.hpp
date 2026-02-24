@@ -1,8 +1,8 @@
 #pragma once
 
 #include "protocols/shell/types.hpp"
-#include "types/rbac/PermissionOverride.hpp"
-#include "types/admin/ListQueryParams.hpp"
+#include "rbac/model/PermissionOverride.hpp"
+#include "database/model/ListQueryParams.hpp"
 
 #include <optional>
 #include <string>
@@ -12,9 +12,8 @@
 #include <memory>
 #include <regex>
 
-namespace vh::types {
-struct Role;
-}
+namespace vh::rbac::model { struct Role; }
+namespace vh::identities::model { struct User; }
 
 namespace vh::shell {
 
@@ -39,7 +38,7 @@ struct EnableParse {
 
 struct EffectParse {
     bool ok = false;
-    std::optional<types::OverrideOpt> value;
+    std::optional<rbac::model::OverrideOpt> value;
     std::string error;
 };
 
@@ -68,11 +67,11 @@ uintmax_t parseSize(const std::string& s);
 bool isCommandMatch(const std::vector<std::string>& path, std::string_view subcmd);
 
 Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPrefix);
-Lookup<types::Role> resolveRole(const std::string& roleArg, const std::string& errPrefix);
-Lookup<types::User> resolveUser(const std::string& userArg, const std::string& errPrefix);
+Lookup<rbac::model::Role> resolveRole(const std::string& roleArg, const std::string& errPrefix);
+Lookup<identities::model::User> resolveUser(const std::string& userArg, const std::string& errPrefix);
 
 std::pair<std::string_view, CommandCall> descend(const CommandCall& call);
 
-types::ListQueryParams parseListQuery(const CommandCall& call);
+database::model::ListQueryParams parseListQuery(const CommandCall& call);
 
 }

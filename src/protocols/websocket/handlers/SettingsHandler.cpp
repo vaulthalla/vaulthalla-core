@@ -1,5 +1,5 @@
 #include "protocols/websocket/handlers/SettingsHandler.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"

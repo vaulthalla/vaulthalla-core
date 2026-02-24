@@ -2,9 +2,7 @@
 
 #include <memory>
 
-namespace vh::sync::model {
-struct Policy;
-}
+namespace vh::sync::model { struct Policy; }
 
 namespace vh::database {
 

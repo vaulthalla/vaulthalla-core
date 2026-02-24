@@ -6,18 +6,9 @@
 #include <memory>
 #include <vector>
 
-namespace vh::types {
-struct S3Vault;
-namespace api { struct APIKey; }
-}
-
-namespace vh::sync::model {
-struct RemotePolicy;
-}
-
-namespace vh::cloud {
-class S3Controller;
-}
+namespace vh::vault::model { struct S3Vault; struct APIKey; }
+namespace vh::sync::model { struct RemotePolicy; }
+namespace vh::cloud { class S3Controller; }
 
 namespace vh::fs::model {
 struct File;
@@ -32,7 +23,7 @@ public:
     CloudEngine() = default;
     ~CloudEngine() override = default;
 
-    explicit CloudEngine(const std::shared_ptr<types::S3Vault>& vault);
+    explicit CloudEngine(const std::shared_ptr<vault::model::S3Vault>& vault);
 
     [[nodiscard]] StorageType type() const override { return StorageType::Cloud; }
 
@@ -63,10 +54,10 @@ public:
     std::shared_ptr<sync::model::RemotePolicy> remote_policy() const;
 
 private:
-    std::shared_ptr<types::api::APIKey> key_;
+    std::shared_ptr<vault::model::APIKey> key_;
     std::shared_ptr<cloud::S3Controller> s3Provider_;
 
-    std::shared_ptr<types::S3Vault> s3Vault() const;
+    std::shared_ptr<vault::model::S3Vault> s3Vault() const;
 
     std::unordered_map<std::string, std::string> getMetaMapFromFile(const std::shared_ptr<vh::fs::model::File>& f) const;
 };

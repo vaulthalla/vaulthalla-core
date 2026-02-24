@@ -4,8 +4,8 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"
 #include "storage/Engine.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
@@ -20,7 +20,7 @@
 using namespace vh::shell;
 using namespace vh::shell::commands;
 using namespace vh::shell::commands::vault;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;

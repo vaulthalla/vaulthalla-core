@@ -8,17 +8,18 @@
 #include "database/Queries/CacheQueries.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "stats/model/CacheStats.hpp"
 
 #include <memory>
 #include <string>
 #include <filesystem>
 #include <chrono>
 
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::stats::model;
 using namespace vh::logging;
 using namespace vh::config;
 using namespace vh::database;

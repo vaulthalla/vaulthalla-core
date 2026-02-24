@@ -1,8 +1,8 @@
 #include "protocols/websocket/handlers/VaultHandler.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
+#include "vault/model/APIKey.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
 #include "sync/model/Policy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "database/Queries/VaultQueries.hpp"
@@ -16,7 +16,7 @@
 #include <boost/algorithm/string.hpp>
 
 using namespace vh::websocket;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::logging;

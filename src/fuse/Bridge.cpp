@@ -1,10 +1,10 @@
 #include "fuse/Bridge.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/model/Entry.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::services;

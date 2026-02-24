@@ -7,15 +7,15 @@
 
 #include "logging/LogRegistry.hpp"
 #include "storage/s3/S3Controller.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/APIKeyManager.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
+#include "vault/model/APIKey.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "identities/model/User.hpp"
 #include "sync/model/Waiver.hpp"
-#include "types/rbac/UserRole.hpp"
+#include "rbac/model/UserRole.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "util/waiver.hpp"
@@ -27,7 +27,7 @@
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;

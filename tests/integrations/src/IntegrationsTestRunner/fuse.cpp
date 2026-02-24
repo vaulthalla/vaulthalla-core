@@ -4,14 +4,14 @@
 #include "database/Queries/FSEntryQueries.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "generators.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/PermissionOverride.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/PermissionOverride.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/Path.hpp"
 #include "sync/model/LocalPolicy.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
 #include "seed/include/seed_db.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "storage/Manager.hpp"
@@ -24,7 +24,9 @@
 using namespace vh::test::cli;
 using namespace vh::test::fuse;
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::rbac::model;
+using namespace vh::identities::model;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::services;
 using namespace vh::sync::model;

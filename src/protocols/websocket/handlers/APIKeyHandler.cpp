@@ -1,8 +1,7 @@
 #include "protocols/websocket/handlers/APIKeyHandler.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/model/APIKey.hpp"
+#include "identities/model/User.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -10,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::websocket;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::logging;
 using namespace vh::services;
@@ -24,13 +23,13 @@ json APIKeyHandler::add(const json& payload, const WebSocketSession& session) {
     if (user->id != userID) throw std::invalid_argument("Invalid user ID");
 
     const auto name = payload.at("name").get<std::string>();
-    const auto provider = api::s3_provider_from_string(payload.at("provider").get<std::string>());
+    const auto provider = s3_provider_from_string(payload.at("provider").get<std::string>());
     const auto accessKey = payload.at("access_key").get<std::string>();
     const auto secretKey = payload.at("secret_access_key").get<std::string>();
     const auto region = payload.at("region").get<std::string>();
     const auto endpoint = payload.at("endpoint").get<std::string>();
 
-    auto key = std::make_shared<api::APIKey>(userID, name, provider, accessKey, secretKey, region, endpoint);
+    auto key = std::make_shared<APIKey>(userID, name, provider, accessKey, secretKey, region, endpoint);
     ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
 
     return {};

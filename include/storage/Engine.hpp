@@ -12,9 +12,7 @@ struct Path;
 namespace file { struct Trashed; }
 }
 
-namespace vh::types {
-struct Vault;
-}
+namespace vh::vault::model { struct Vault; }
 
 namespace vh::sync::model {
 struct Event;
@@ -32,7 +30,7 @@ namespace fs = std::filesystem;
 enum class StorageType { Local, Cloud };
 
 struct Engine : std::enable_shared_from_this<Engine> {
-    std::shared_ptr<types::Vault> vault;
+    std::shared_ptr<vault::model::Vault> vault;
     std::shared_ptr<sync::model::Policy> sync;
     std::shared_ptr<sync::model::Event> latestSyncEvent;
     std::shared_ptr<vh::fs::model::Path> paths;
@@ -43,7 +41,7 @@ struct Engine : std::enable_shared_from_this<Engine> {
 
     Engine() = default;
 
-    explicit Engine(const std::shared_ptr<types::Vault>& vault);
+    explicit Engine(const std::shared_ptr<vault::model::Vault>& vault);
 
     virtual ~Engine() = default;
 

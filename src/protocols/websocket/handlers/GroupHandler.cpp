@@ -1,8 +1,8 @@
 #include "protocols/websocket/handlers/GroupHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/GroupQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/entities/Group.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +11,7 @@
 
 using namespace vh::websocket;
 using namespace vh::database;
+using namespace vh::identities::model;
 
 json GroupHandler::add(const json& payload, const WebSocketSession& session) {
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
@@ -19,7 +20,7 @@ json GroupHandler::add(const json& payload, const WebSocketSession& session) {
     const std::string groupName = payload.at("name").get<std::string>();
     const std::string groupDescription = payload.value("description", "");
 
-    const auto group = std::make_shared<types::Group>();
+    const auto group = std::make_shared<Group>();
     group->name = groupName;
     group->description = groupDescription;
     if (payload.contains("linux_gid")) {

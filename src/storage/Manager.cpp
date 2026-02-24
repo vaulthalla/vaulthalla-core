@@ -2,9 +2,9 @@
 #include "storage/Engine.hpp"
 #include "storage/CloudEngine.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
+#include "identities/model/User.hpp"
 #include "fs/model/Path.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
@@ -14,7 +14,8 @@
 #include "crypto/IdGenerator.hpp"
 
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;

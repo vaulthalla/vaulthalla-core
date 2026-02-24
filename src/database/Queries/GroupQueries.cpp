@@ -1,9 +1,10 @@
 #include "database/Queries/GroupQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/entities/Group.hpp"
+#include "identities/model/Group.hpp"
 
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::database::model;
+using namespace vh::identities::model;
 
 unsigned int GroupQueries::createGroup(const std::shared_ptr<Group>& group) {
     return Transactions::exec("GroupQueries::createGroup", [&](pqxx::work& txn) {

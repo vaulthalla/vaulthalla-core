@@ -1,7 +1,7 @@
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/DirectoryQueries.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "logging/LogRegistry.hpp"
 #include "fs/Filesystem.hpp"
 
@@ -9,7 +9,7 @@
 
 using namespace vh::websocket;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::logging;
 using namespace vh::fs;

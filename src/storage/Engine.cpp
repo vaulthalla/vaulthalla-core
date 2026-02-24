@@ -1,6 +1,6 @@
 #include "storage/Engine.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "sync/model/Operation.hpp"
 #include "fs/model/Path.hpp"
 #include "util/Magic.hpp"
@@ -22,7 +22,7 @@
 using namespace vh::fs::model;
 using namespace vh::fs;
 using namespace vh::crypto;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::storage;

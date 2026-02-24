@@ -6,9 +6,8 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "util/fsPath.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/Manager.hpp"
 #include "logging/LogRegistry.hpp"
-#include "../../../include/crypto/id/Generator.hpp"
+#include "crypto/id/Generator.hpp"
 #include "stats/model/CacheStats.hpp"
 
 #include <unordered_set>
@@ -17,6 +16,7 @@
 #include <chrono>
 
 using namespace vh::fs::cache;
+using namespace vh::fs::model;
 using namespace vh::storage;
 using namespace vh::stats::model;
 using namespace vh::database;

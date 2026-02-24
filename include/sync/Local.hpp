@@ -10,15 +10,11 @@
 #include <vector>
 
 namespace vh::storage {
-class StorageEngine;
+struct Engine;
 }
 
 namespace vh::services {
 class SyncController;
-}
-
-namespace vh::types {
-struct File;
 }
 
 namespace vh::sync {
@@ -35,7 +31,7 @@ struct Stage {
 
 struct Local : concurrency::Task, std::enable_shared_from_this<Local> {
     std::chrono::system_clock::time_point next_run;
-    std::shared_ptr<storage::StorageEngine> engine;
+    std::shared_ptr<storage::Engine> engine;
     std::vector<std::future<ExpectedFuture>> futures;
     bool runningFlag{false}, runNowFlag{false};
     std::atomic<bool> interruptFlag{false};
@@ -45,7 +41,7 @@ struct Local : concurrency::Task, std::enable_shared_from_this<Local> {
     Local() = default;
     ~Local() override = default;
 
-    explicit Local(const std::shared_ptr<storage::StorageEngine>& engine);
+    explicit Local(const std::shared_ptr<storage::Engine>& engine);
 
     void operator()() override;
 

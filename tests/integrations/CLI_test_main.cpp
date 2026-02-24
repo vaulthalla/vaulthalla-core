@@ -8,18 +8,15 @@
 #include "concurrency/ThreadPoolManager.hpp"
 #include "services/ServiceManager.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/Filesystem.hpp"
-#include "storage/StorageManager.hpp"
+#include "fs/Filesystem.hpp"
+#include "storage/Manager.hpp"
 
-#include <filesystem>
 #include <iostream>
 #include <string>
 #include <chrono>
 #include <paths.h>
 
-namespace fs = std::filesystem;
 using namespace vh::shell;
-using namespace vh::types;
 using namespace vh::config;
 using namespace vh::logging;
 using namespace vh::concurrency;
@@ -27,6 +24,7 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::test::cli;
 using namespace vh::database;
+using namespace vh::fs;
 
 static void initBase() {
     vh::paths::enableTestMode();

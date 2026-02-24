@@ -1,5 +1,5 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "CommandUsage.hpp"
 
@@ -8,16 +8,16 @@
 #include "logging/LogRegistry.hpp"
 #include "services/SyncController.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
+#include "storage/s3/S3Controller.hpp"
 
-#include "crypto/VaultEncryptionManager.hpp"
-#include "crypto/GPGEncryptor.hpp"
+#include "vault/EncryptionManager.hpp"
+#include "crypto/encryptors/GPG.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/APIKey.hpp"
+#include "identities/model/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
@@ -31,13 +31,13 @@
 
 using namespace vh::shell::commands::vault;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 
@@ -51,7 +51,7 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
         if (!outputOpt) return invalid("vault keys export: --recipient requires --output to specify the output file");
 
         try {
-            GPGEncryptor::encryptToFile(output, *recipientOpt, *outputOpt);
+            encryptors::GPG::encryptToFile(output, *recipientOpt, *outputOpt);
             return ok("Vault key successfully encrypted and saved to " + *outputOpt);
         } catch (const std::exception& e) {
             return invalid("vault keys export: failed to encrypt vault key: " + std::string(e.what()));
@@ -96,7 +96,7 @@ static CommandResult export_one_key(const CommandCall& call, const std::shared_p
     const auto& key = engine->encryptionManager->get_key(context);
     const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
 
-    const auto out = api::generate_json_key_object(engine->vault, key, vaultKey, call.user->name);
+    const auto out = generate_json_key_object(engine->vault, key, vaultKey, call.user->name);
     return handle_key_encrypt_and_response(call, out, usage);
 }
 
@@ -111,7 +111,7 @@ static CommandResult export_all_keys(const CommandCall& call, const std::shared_
     for (const auto& engine : engines) {
         const auto& key = engine->encryptionManager->get_key(context);
         const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
-        out.push_back(api::generate_json_key_object(engine->vault, key, vaultKey, call.user->name));
+        out.push_back(generate_json_key_object(engine->vault, key, vaultKey, call.user->name));
     }
 
     return handle_key_encrypt_and_response(call, out, usage);
@@ -159,7 +159,7 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
 
     const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
 
-    return ok(api::generate_json_key_info_object(engine->vault, vaultKey, call.user->name).dump(4));
+    return ok(generate_json_key_info_object(engine->vault, vaultKey, call.user->name).dump(4));
 }
 
 
@@ -180,7 +180,7 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     validatePositionals(call, usage);
 
     const auto syncNow = hasFlag(call, usage->resolveFlag("now")->aliases);
-    const auto rotateKey = [&syncNow](const std::shared_ptr<StorageEngine>& engine) {
+    const auto rotateKey = [&syncNow](const std::shared_ptr<Engine>& engine) {
         engine->encryptionManager->prepare_key_rotation();
         if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
     };

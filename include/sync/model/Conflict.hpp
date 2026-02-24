@@ -12,10 +12,6 @@ namespace pqxx {
     class result;
 }
 
-namespace vh::types {
-struct File;
-}
-
 namespace vh::sync::model {
 
 struct Conflict {

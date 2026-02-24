@@ -1,16 +1,16 @@
 #include "protocols/websocket/handlers/AuthHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
-#include "auth/Client.hpp"
+#include "auth/model/Client.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::websocket;
 using namespace vh::auth;
-using namespace vh::types;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::logging;
 using namespace vh::services;

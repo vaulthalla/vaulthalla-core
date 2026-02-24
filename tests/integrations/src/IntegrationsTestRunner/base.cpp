@@ -1,7 +1,6 @@
 #include "IntegrationsTestRunner.hpp"
 
 #include "UsageManager.hpp"
-#include "logging/LogRegistry.hpp"
 #include "CLITestContext.hpp"
 #include "Validator.hpp"
 #include "EntityRegistrar.hpp"
@@ -14,11 +13,11 @@
 #include "TestTask.hpp"
 #include "CLITestTask.hpp"
 
-#include "types/entities/User.hpp"
-#include "types/entities/Group.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/VaultRole.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
+#include "vault/model/Vault.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
 
 #include <cstdlib>
 #include <cstdio>
@@ -30,17 +29,15 @@
 
 using namespace vh::shell;
 using namespace vh::args;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::vault::model;
+using namespace vh::rbac::model;
 
 
 // forward decls so casts compile even if headers aren’t pulled here
-namespace vh::types {
-struct User;
-struct Group;
-struct Vault;
-struct UserRole;
-struct VaultRole;
-}
+namespace vh::identities::model { struct User; struct Group; }
+namespace vh::vault::model { struct Vault; }
+namespace vh::rbac::model { struct UserRole; struct VaultRole; }
 
 
 namespace vh::test::cli {
@@ -66,28 +63,28 @@ IntegrationsTestRunner::extractId(std::string_view output, std::string_view idPr
 template <EntityType E> struct EntityTraits;
 
 template <> struct EntityTraits<EntityType::USER> {
-    using Type = vh::types::User;
+    using Type = User;
     static constexpr std::string_view kStage = "Users";
     static constexpr std::string_view kIdPrefix = "User ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.users; }
 };
 
 template <> struct EntityTraits<EntityType::GROUP> {
-    using Type = vh::types::Group;
+    using Type = Group;
     static constexpr std::string_view kStage = "Groups";
     static constexpr std::string_view kIdPrefix = "Group ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.groups; }
 };
 
 template <> struct EntityTraits<EntityType::VAULT> {
-    using Type = vh::types::Vault;
+    using Type = Vault;
     static constexpr std::string_view kStage = "Vaults";
     static constexpr std::string_view kIdPrefix = "ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.vaults; }
 };
 
 template <> struct EntityTraits<EntityType::USER_ROLE> {
-    using Type = vh::types::UserRole;
+    using Type = UserRole;
     static constexpr std::string_view kStage = "User Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.userRoles; }
@@ -95,7 +92,7 @@ template <> struct EntityTraits<EntityType::USER_ROLE> {
 
 // VaultRole
 template <> struct EntityTraits<EntityType::VAULT_ROLE> {
-    using Type = vh::types::VaultRole;
+    using Type = VaultRole;
     static constexpr std::string_view kStage = "Vault Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.vaultRoles; }

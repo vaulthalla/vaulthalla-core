@@ -1,5 +1,5 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
 #include "database/Queries/VaultQueries.hpp"
@@ -7,20 +7,19 @@
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/WaiverQueries.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/Manager.hpp"
+#include "storage/s3/S3Controller.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
-#include "types/vault/APIKey.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
+#include "vault/model/APIKey.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "types/entities/User.hpp"
+#include "identities/model/User.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "util/interval.hpp"
-#include "CommandUsage.hpp"
+#include "database/encoding/interval.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -32,16 +31,16 @@
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
-using namespace vh::crypto;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
+using namespace vh::database::encoding;
 
 static constexpr const auto* SYNC_STRATEGY_HELP = R"(
 Sync Strategy Options:
@@ -173,7 +172,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
         const auto apiKeyStr = io->prompt("Enter API key name or ID (required):");
         if (apiKeyStr.empty()) return invalid("vault create: API key is required for S3 vaults");
 
-        std::shared_ptr<api::APIKey> apiKey;
+        std::shared_ptr<APIKey> apiKey;
         if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
         else apiKey = APIKeyQueries::getAPIKey(apiKeyStr);
 

@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
-#include "types/fs/Path.hpp"
-#include "util/fsPath.hpp"
+#include "fs/model/Path.hpp"
 
 #include <filesystem>
 
 namespace fs = std::filesystem;
-using namespace vh::types;
+using namespace vh::fs::model;
 
 class PathTest : public ::testing::Test {
 protected:

@@ -4,9 +4,7 @@
 #include <string>
 #include <pqxx/connection>
 
-namespace vh::crypto {
-    class TPMKeyProvider;
-}
+namespace vh::crypto::secrets { class TPMKeyProvider; }
 
 namespace vh::database {
 
@@ -20,7 +18,7 @@ class DBConnection {
     void initPrepared() const;
 
   private:
-    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
+    std::unique_ptr<crypto::secrets::TPMKeyProvider> tpmKeyProvider_;
     std::string DB_CONNECTION_STR;
     std::unique_ptr<pqxx::connection> conn_;
 

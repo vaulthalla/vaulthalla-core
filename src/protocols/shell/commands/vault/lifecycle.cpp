@@ -1,17 +1,16 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/WaiverQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/cloud/s3/S3Controller.hpp"
+#include "storage/Manager.hpp"
+#include "storage/s3/S3Controller.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/vault/APIKey.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "identities/model/User.hpp"
 
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -24,13 +23,12 @@
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::cloud;
 

@@ -1,11 +1,11 @@
 #include "services/ServiceDepsRegistry.hpp"
 #include "auth/AuthManager.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "services/SyncController.hpp"
-#include "storage/FSCache.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "fs/cache/Registry.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "stats/model/CacheStats.hpp"
 #include "usage/include/UsageManager.hpp"
 
 using namespace vh::services;
@@ -13,7 +13,9 @@ using namespace vh::storage;
 using namespace vh::crypto;
 using namespace vh::auth;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::stats::model;
+using namespace vh::vault;
+using namespace vh::fs::cache;
 
 ServiceDepsRegistry& ServiceDepsRegistry::instance() {
     static ServiceDepsRegistry instance_;
@@ -31,10 +33,10 @@ void ServiceDepsRegistry::init() {
     LogRegistry::vaulthalla()->info("[ServiceDepsRegistry] Initializing...");
 
     auto& ctx = instance();
-    ctx.storageManager = std::make_shared<StorageManager>();
+    ctx.storageManager = std::make_shared<Manager>();
     ctx.apiKeyManager = std::make_shared<APIKeyManager>();
     ctx.authManager = std::make_shared<AuthManager>();
-    ctx.fsCache = std::make_shared<FSCache>();
+    ctx.fsCache = std::make_shared<Registry>();
     ctx.shellUsageManager = std::make_shared<shell::UsageManager>();
     ctx.httpCacheStats = std::make_shared<CacheStats>();
 

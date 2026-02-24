@@ -5,13 +5,14 @@
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/entities/User.hpp"
-#include "util/parse.hpp"
+#include "identities/model/User.hpp"
+#include "protocols/cookie.hpp"
 
 #include <boost/beast/http.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/asio.hpp>
 
 #include "config/ConfigRegistry.hpp"
 
@@ -25,7 +26,8 @@ using json          = nlohmann::json;
 
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::protocols;
 
 namespace vh::websocket {
 
@@ -126,7 +128,7 @@ void WebSocketSession::hydrateFromRequest(const RequestType& req) {
     }
 
     userAgent_ = std::string(req[http::field::user_agent]);
-    refreshToken_ = util::extractCookie(req, "refresh");
+    refreshToken_ = extractCookie(req, "refresh");
 
     if (refreshToken_.empty())
         LogRegistry::ws()->debug("[Session] No refresh token found in Cookie header");

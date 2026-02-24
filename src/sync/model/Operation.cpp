@@ -1,13 +1,13 @@
 #include "sync/model/Operation.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "util/timestamp.hpp"
+#include "fs/model/Entry.hpp"
+#include "database/encoding/timestamp.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::sync::model;
-using namespace vh::types;
-using namespace vh::util;
+using namespace vh::fs::model;
+using namespace vh::database::encoding;
 
 Operation::Operation(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),
@@ -23,7 +23,7 @@ Operation::Operation(const pqxx::row& row)
     if (!row["completed_at"].is_null()) completed_at = parsePostgresTimestamp(row["completed_at"].as<std::string>());
 }
 
-Operation::Operation(const std::shared_ptr<FSEntry>& origEntry, const std::filesystem::path& dest, const unsigned int userId, const Op& op)
+Operation::Operation(const std::shared_ptr<Entry>& origEntry, const std::filesystem::path& dest, const unsigned int userId, const Op& op)
     : fs_entry_id(origEntry->id),
       executed_by(userId),
       operation(op),

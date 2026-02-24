@@ -1,27 +1,31 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/vault/S3Vault.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/rbac/PermissionOverride.hpp"
+#include "vault/model/Vault.hpp"
+#include "vault/model/S3Vault.hpp"
+#include "vault/model/APIKey.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "rbac/model/PermissionOverride.hpp"
 #include "database/Queries/VaultQueries.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "CommandUsage.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "util/interval.hpp"
+#include "database/encoding/interval.hpp"
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::services;
 using namespace vh::sync::model;
+using namespace vh::database::encoding;
 
 namespace vh::shell::commands::vault {
 
@@ -83,8 +87,8 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
     return out;
 }
 
-Lookup<StorageEngine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
-    Lookup<StorageEngine> out;
+Lookup<Engine> resolveEngine(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
+    Lookup<Engine> out;
 
     const auto vLkp = resolveVault(call, vaultArg, usage, errPrefix);
     if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }
@@ -196,7 +200,7 @@ void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
     }
 }
 
-void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<types::Vault>& vault) {
+void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault) {
     if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
         Lookup<User> ownerLkp;
         if (const auto idOpt = parseUInt(*ownerOpt)) {
@@ -210,7 +214,7 @@ void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
 
 void parseSync(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault, const std::shared_ptr<Policy>& sync) {
     if (const auto syncIntervalOpt = optVal(call, usage->resolveOptional("interval")->option_tokens))
-        sync->interval = util::parseSyncInterval(*syncIntervalOpt);
+        sync->interval = parseSyncInterval(*syncIntervalOpt);
 
     if (vault->type == VaultType::Local) {
         if (const auto conflictOpt = optVal(call, usage->resolveGroupOptional("Local Vault Options", "conflict")->option_tokens)) {

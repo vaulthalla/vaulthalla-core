@@ -3,8 +3,6 @@
 #include <memory>
 #include <variant>
 
-namespace vh::types {
-struct VaultStat;
-}
+namespace vh::vault::model { struct Stat; }
 
-typedef std::variant<bool, std::shared_ptr<vh::types::VaultStat>> ExpectedFuture;
+typedef std::variant<bool, std::shared_ptr<vh::vault::model::Stat>> ExpectedFuture;

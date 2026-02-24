@@ -1,16 +1,15 @@
 #include "database/Queries/PermsQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/rbac/Permission.hpp"
-#include "types/rbac/PermissionOverride.hpp"
+#include "rbac/model/Role.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "rbac/model/Permission.hpp"
+#include "rbac/model/PermissionOverride.hpp"
 #include "logging/LogRegistry.hpp"
-#include "util/bitmask.hpp"
 
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::database::model;
+using namespace vh::rbac::model;
 using namespace vh::logging;
-using namespace vh::util::bitmask;
 
 // #################################################################################################
 // ############################################ Role  #############################################

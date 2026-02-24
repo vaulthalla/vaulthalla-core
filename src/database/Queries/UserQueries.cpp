@@ -1,16 +1,19 @@
 #include "database/Queries/UserQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/RefreshToken.hpp"
+#include "identities/model/User.hpp"
+#include "auth/model/RefreshToken.hpp"
 #include "database/Transactions.hpp"
-#include "types/rbac/VaultRole.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
 #include "logging/LogRegistry.hpp"
-#include "crypto/PasswordHash.hpp"
+#include "crypto/util/hash.hpp"
 
 #include <pqxx/pqxx>
 
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::auth::model;
+using namespace vh::database::model;
 
 namespace vh::database {
 
@@ -195,7 +198,7 @@ void UserQueries::updateLastLoggedInUser(const unsigned int userId) {
     });
 }
 
-void UserQueries::addRefreshToken(const std::shared_ptr<auth::RefreshToken>& token) {
+void UserQueries::addRefreshToken(const std::shared_ptr<RefreshToken>& token) {
     Transactions::exec("UserQueries::addRefreshToken", [&](pqxx::work& txn) {
         pqxx::params p{token->getJti(), token->getUserId(), token->getHashedToken(), token->getIpAddress(),
                        token->getUserAgent()};
@@ -209,22 +212,22 @@ void UserQueries::removeRefreshToken(const std::string& jti) {
     });
 }
 
-std::shared_ptr<auth::RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
-    return Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<auth::RefreshToken> {
+std::shared_ptr<RefreshToken> UserQueries::getRefreshToken(const std::string& jti) {
+    return Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<RefreshToken> {
         const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
         if (res.empty()) {
             LogRegistry::db()->trace("[UserQueries] No refresh token found for JTI: {}", jti);
             return nullptr;
         }
-        return std::make_shared<auth::RefreshToken>(res.one_row());
+        return std::make_shared<RefreshToken>(res.one_row());
     });
 }
 
-std::vector<std::shared_ptr<auth::RefreshToken> > UserQueries::listRefreshTokens(const unsigned int userId) {
+std::vector<std::shared_ptr<RefreshToken> > UserQueries::listRefreshTokens(const unsigned int userId) {
     return Transactions::exec("UserQueries::listRefreshTokens", [&](pqxx::work& txn) {
         const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " + txn.quote(userId));
-        std::vector<std::shared_ptr<auth::RefreshToken> > tokens;
-        for (const auto& row : res) tokens.push_back(std::make_shared<vh::auth::RefreshToken>(row));
+        std::vector<std::shared_ptr<RefreshToken> > tokens;
+        for (const auto& row : res) tokens.push_back(std::make_shared<RefreshToken>(row));
         return tokens;
     });
 }
@@ -259,7 +262,7 @@ bool UserQueries::adminUserExists() {
 bool UserQueries::adminPasswordIsDefault() {
     return Transactions::exec("UserQueries::adminPasswordIsDefault", [](pqxx::work& txn) {
         const auto passwordHash = txn.exec(pqxx::prepped{"get_admin_password"}).one_field().as<std::string>();
-        return crypto::verifyPassword("vh!adm1n", passwordHash);
+        return crypto::hash::verifyPassword("vh!adm1n", passwordHash);
     });
 }
 

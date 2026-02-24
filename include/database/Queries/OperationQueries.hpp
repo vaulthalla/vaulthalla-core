@@ -3,9 +3,7 @@
 #include <memory>
 #include <vector>
 
-namespace vh::sync::model {
-struct Operation;
-}
+namespace vh::sync::model { struct Operation; }
 
 namespace vh::database {
 

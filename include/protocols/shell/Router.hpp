@@ -6,11 +6,8 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <nlohmann/json.hpp>
 
-namespace vh::types {
-    struct User;
-}
+namespace vh::identities::model { struct User; }
 
 namespace vh::shell {
 
@@ -21,7 +18,7 @@ public:
     void registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler);
 
     CommandResult executeLine(const std::string& line,
-        const std::shared_ptr<types::User>& user,
+        const std::shared_ptr<identities::model::User>& user,
         SocketIO* io = nullptr) const;
 
 private:

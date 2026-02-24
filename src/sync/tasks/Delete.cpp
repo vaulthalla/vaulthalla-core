@@ -1,9 +1,9 @@
 #include "sync/tasks/Delete.hpp"
 
 #include "logging/LogRegistry.hpp"
-#include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/TrashedFile.hpp"
+#include "storage/CloudEngine.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/file/Trashed.hpp"
 #include "sync/model/ScopedOp.hpp"
 
 #include <stdexcept>
@@ -11,9 +11,9 @@
 
 using namespace vh::sync::tasks;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::fs::model;
 
-Delete::Delete(std::shared_ptr<StorageEngine> eng,
+Delete::Delete(std::shared_ptr<Engine> eng,
                        Target tgt,
                        model::ScopedOp& op,
                        Type type)
@@ -37,7 +37,7 @@ void Delete::operator()() {
             [](const std::shared_ptr<File>& f) -> uint64_t {
                 return f ? f->size_bytes : 0;
             },
-            [](const std::shared_ptr<TrashedFile>& f) -> uint64_t {
+            [](const std::shared_ptr<file::Trashed>& f) -> uint64_t {
                 return f ? f->size_bytes : 0;
             }
         }, t);
@@ -48,7 +48,7 @@ void Delete::operator()() {
             [](const std::shared_ptr<File>& f) -> std::string {
                 return f ? f->path.string() : std::string{"<null file>"};
             },
-            [](const std::shared_ptr<TrashedFile>& f) -> std::string {
+            [](const std::shared_ptr<file::Trashed>& f) -> std::string {
                 return f ? f->path.string() : std::string{"<null trashed file>"};
             }
         }, t);
@@ -67,7 +67,7 @@ void Delete::operator()() {
                     if (!f) throw std::runtime_error("DeleteTask: null File");
                     engine->removeLocally(f->path);
                 },
-                [&](const std::shared_ptr<TrashedFile>& f) {
+                [&](const std::shared_ptr<file::Trashed>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null TrashedFile");
                     engine->removeLocally(f);
                 }
@@ -75,7 +75,7 @@ void Delete::operator()() {
         }
         // Cloud engine path: needs CloudStorageEngine, and the API differs slightly.
         else if (engine->type() == StorageType::Cloud) {
-            auto cloud = std::static_pointer_cast<CloudStorageEngine>(engine);
+            auto cloud = std::static_pointer_cast<CloudEngine>(engine);
             if (!cloud)
                 throw std::runtime_error("DeleteTask: failed to cast to CloudStorageEngine");
 
@@ -88,7 +88,7 @@ void Delete::operator()() {
                     else if (type == Type::REMOTE) cloud->removeRemotely(f->path);
                     else throw std::runtime_error("DeleteTask: unknown delete type");
                 },
-                [&](const std::shared_ptr<TrashedFile>& f) {
+                [&](const std::shared_ptr<file::Trashed>& f) {
                     if (!f) throw std::runtime_error("DeleteTask: null TrashedFile");
 
                     // Mirrors your existing DeleteTask behavior for trashed files.

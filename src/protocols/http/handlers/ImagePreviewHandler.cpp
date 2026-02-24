@@ -1,8 +1,6 @@
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
-#include "util/imageUtil.hpp"
-#include "util/files.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "preview/image.hpp"
+#include "fs/ops/file.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "protocols/http/HttpRouter.hpp"
@@ -10,9 +8,9 @@
 #include <boost/beast/http/file_body.hpp>
 
 using namespace vh::storage;
-using namespace vh::util;
 using namespace vh::logging;
-using namespace vh::database;
+using namespace vh::fs::ops;
+using namespace vh::preview;
 
 namespace vh::http {
 
@@ -21,7 +19,7 @@ PreviewResponse ImagePreviewHandler::handle(http::request<http::string_body>&& r
         const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
 
         if (pr->size || pr->scale) {
-            std::vector<uint8_t> resized = resize_and_compress_image(tmpPath, pr->scaleStr(), pr->sizeStr());
+            std::vector<uint8_t> resized = image::resize_and_compress(tmpPath, pr->scaleStr(), pr->sizeStr());
             return HttpRouter::makeResponse(req, std::move(resized), "image/jpeg");
         }
 

@@ -1,8 +1,8 @@
 #include "database/DBConnection.hpp"
 #include "config/Config.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "crypto/TPMKeyProvider.hpp"
-#include "crypto/PasswordUtils.hpp"
+#include "crypto/secrets/TPMKeyProvider.hpp"
+#include "crypto/password/Strength.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <fstream>
@@ -44,7 +44,7 @@ static std::optional<std::string> getFirstInitDBPass() {
 }
 
 DBConnection::DBConnection() : tpmKeyProvider_(
-    std::make_unique<TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
+    std::make_unique<secrets::TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
     if (paths::testMode) {
         const auto user = std::getenv("VH_TEST_DB_USER");
         const auto pass = std::getenv("VH_TEST_DB_PASS");
@@ -77,7 +77,7 @@ DBConnection::DBConnection() : tpmKeyProvider_(
     }
 
     const auto& key = tpmKeyProvider_->getMasterKey();
-    const auto password = auth::PasswordUtils::escape_uri_component({key.begin(), key.end()});
+    const auto password = password::Strength::escape_uri_component({key.begin(), key.end()});
 
     const auto& config = config::ConfigRegistry::get();
     const auto db = config.database;

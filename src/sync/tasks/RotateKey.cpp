@@ -1,12 +1,12 @@
 #include "sync/tasks/RotateKey.hpp"
 
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "storage/StorageEngine.hpp"
-#include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/fs/File.hpp"
+#include "storage/Engine.hpp"
+#include "storage/CloudEngine.hpp"
+#include "fs/model/File.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 
 #include <filesystem>
 #include <stdexcept>
@@ -14,11 +14,11 @@
 
 using namespace vh::sync::tasks;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::database;
-using namespace vh::util;
+using namespace vh::fs::ops;
 
-RotateKey::RotateKey(std::shared_ptr<StorageEngine> eng,
+RotateKey::RotateKey(std::shared_ptr<Engine> eng,
                              const std::vector<std::shared_ptr<File>>& f,
                              const std::size_t begin_,
                              const std::size_t end_)
@@ -109,7 +109,7 @@ void RotateKey::operator()() {
         const auto remotePolicy = std::dynamic_pointer_cast<model::RemotePolicy>(engine->sync);
 
         if (engine->type() == StorageType::Cloud) {
-            cloud = std::static_pointer_cast<CloudStorageEngine>(engine);
+            cloud = std::static_pointer_cast<CloudEngine>(engine);
             if (!cloud) throw std::runtime_error("RotateKeyTask: failed to cast to CloudStorageEngine");
         }
 

@@ -8,30 +8,30 @@
 
 namespace fs = std::filesystem;
 
-namespace vh::types {
-    struct FSEntry;
+namespace vh::fs::model {
+    struct Entry;
 }
 
 namespace vh::database {
 
 struct FSEntryQueries {
-    static void updateFSEntry(const std::shared_ptr<types::FSEntry>& entry);
+    static void updateFSEntry(const std::shared_ptr<fs::model::Entry>& entry);
 
-    static std::shared_ptr<types::FSEntry> getFSEntry(const std::string& base32);
+    static std::shared_ptr<fs::model::Entry> getFSEntry(const std::string& base32);
 
-    static std::shared_ptr<types::FSEntry> getFSEntryByInode(ino_t ino);
+    static std::shared_ptr<fs::model::Entry> getFSEntryByInode(ino_t ino);
 
-    static std::shared_ptr<types::FSEntry> getFSEntryById(unsigned int entryId);
+    static std::shared_ptr<fs::model::Entry> getFSEntryById(unsigned int entryId);
 
-    static std::vector<std::shared_ptr<types::FSEntry>> listDir(const std::optional<unsigned int>& entryId, bool recursive = false);
+    static std::vector<std::shared_ptr<fs::model::Entry>> listDir(const std::optional<unsigned int>& entryId, bool recursive = false);
 
-    static void renameEntry(const std::shared_ptr<types::FSEntry>& entry);
+    static void renameEntry(const std::shared_ptr<fs::model::Entry>& entry);
 
     [[nodiscard]] static ino_t getNextInode();
 
     [[nodiscard]] static bool rootExists();
 
-    [[nodiscard]] static std::shared_ptr<types::FSEntry> getRootEntry();
+    [[nodiscard]] static std::shared_ptr<fs::model::Entry> getRootEntry();
 
     [[nodiscard]] static pqxx::result collectParentChain(unsigned int parentId);
 };

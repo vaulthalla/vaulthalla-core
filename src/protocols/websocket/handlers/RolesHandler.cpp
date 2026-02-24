@@ -1,17 +1,18 @@
 #include "protocols/websocket/handlers/RolesHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "database/Queries/PermsQueries.hpp"
-#include "types/entities/User.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/VaultRole.hpp"
+#include "identities/model/User.hpp"
+#include "rbac/model/Role.hpp"
+#include "rbac/model/VaultRole.hpp"
 
 using namespace vh::websocket;
+using namespace vh::rbac::model;
 
 json RolesHandler::add(const json& payload, const WebSocketSession& session) {
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can add roles");
 
-    const auto role = std::make_shared<types::Role>(payload);
+    const auto role = std::make_shared<Role>(payload);
     role->id = database::PermsQueries::addRole(role);
     return {{"role", *role}};
 }
@@ -29,7 +30,7 @@ json RolesHandler::update(const json& payload, const WebSocketSession& session) 
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can update roles");
 
-    auto role = std::make_shared<types::Role>(payload);
+    auto role = std::make_shared<Role>(payload);
     database::PermsQueries::updateRole(role);
     return {{"role", *role}};
 }

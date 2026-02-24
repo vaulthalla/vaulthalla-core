@@ -9,14 +9,9 @@
 #include <atomic>
 #include <optional>
 
-namespace vh::shell {
-class UsageManager;
-}
-
-namespace vh::types {
-struct User;
-struct PermissionOverride;
-}
+namespace vh::shell { class UsageManager; }
+namespace vh::identities::model { struct User; }
+namespace vh::rbac::model { struct PermissionOverride; }
 
 namespace vh::test::cli {
 
@@ -77,7 +72,7 @@ private:
     void teardownStage();
 
     // FUSE steps
-    std::shared_ptr<types::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<types::PermissionOverride>>& overrides = {});
+    std::shared_ptr<identities::model::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<rbac::model::PermissionOverride>>& overrides = {});
     void runFUSETests();
     void testFUSECRUD();
     void testFUSEAllow();

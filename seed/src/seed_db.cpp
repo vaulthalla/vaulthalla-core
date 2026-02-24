@@ -10,26 +10,26 @@
 #include "database/Transactions.hpp"
 
 // Types
-#include "types/rbac/Permission.hpp"
-#include "types/vault/S3Vault.hpp"
+#include "rbac/model/Permission.hpp"
+#include "vault/model/S3Vault.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"
-#include "types/entities/User.hpp"
-#include "types/entities/Group.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/fs/Directory.hpp"
+#include "identities/model/User.hpp"
+#include "identities/model/Group.hpp"
+#include "rbac/model/Role.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "vault/model/Vault.hpp"
+#include "fs/model/Directory.hpp"
+#include "vault/model/APIKey.hpp"
 
 // Misc
 #include "config/ConfigRegistry.hpp"
-#include "crypto/APIKeyManager.hpp"
+#include "vault/APIKeyManager.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "crypto/IdGenerator.hpp"
-#include "crypto/PasswordHash.hpp"
-#include "util/bitmask.hpp"
+#include "crypto/id/Generator.hpp"
+#include "crypto/util/hash.hpp"
 #include "auth/SystemUid.hpp"
 
 // Libraries
@@ -46,11 +46,14 @@ using namespace vh::seed;
 using namespace vh::config;
 using namespace vh::database;
 using namespace vh::crypto;
-using namespace vh::types;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 using namespace vh::logging;
 using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::sync::model;
+using namespace vh::fs::model;
 
 void vh::seed::seed_database() {
     LogRegistry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);
@@ -131,7 +134,7 @@ void vh::seed::initRoles() {
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
 
             txn.exec(pqxx::prepped{"assign_permission_to_role"},
-                pqxx::params{r.id, util::bitmask::bitmask_to_bitset(r.permissions).to_string()});
+                pqxx::params{r.id, bitmask_to_bitset(r.permissions).to_string()});
         }
     });
 }
@@ -214,8 +217,8 @@ void vh::seed::initSystemUser() {
     // System account shouldn't be used for interactive login.
     // Still set a password hash to satisfy NOT NULL / validation.
     // Generate a deterministic-ish strong password seed (or truly random if you prefer).
-    const auto pwSeed = ids::IdGenerator({ .namespace_token = "vaulthalla-system-user" }).generate();
-    user->setPasswordHash(hashPassword(pwSeed));
+    const auto pwSeed = id::Generator({ .namespace_token = "vaulthalla-system-user" }).generate();
+    user->setPasswordHash(hash::password(pwSeed));
 
     user->linux_uid = sysUid;
 
@@ -275,7 +278,7 @@ void initAdmin() {
     const auto user = std::make_shared<User>();
     user->name = "admin";
     user->email = "";
-    user->setPasswordHash(hashPassword("vh!adm1n"));
+    user->setPasswordHash(hash::password("vh!adm1n"));
     user->linux_uid = loadPendingSuperAdminUid();
 
     const auto role = PermsQueries::getRoleByName("super_admin");
@@ -317,7 +320,7 @@ void vh::seed::initAdminDefaultVault() {
     vault->type = VaultType::Local;
     vault->owner_id = 1;
     vault->quota = 0; // No quota for admin vault
-    vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
+    vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
 
     const auto sync = std::make_shared<LocalPolicy>();
     sync->interval = std::chrono::minutes(10);
@@ -331,7 +334,7 @@ void vh::seed::initRoot() {
 
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
-    dir->base32_alias = ids::IdGenerator( { .namespace_token = "absroot" }).generate();
+    dir->base32_alias = id::Generator( { .namespace_token = "absroot" }).generate();
     dir->created_by = dir->last_modified_by = 1;
     dir->path = "/";
     dir->fuse_path = "/";
@@ -357,10 +360,10 @@ void vh::seed::initDevCloudVault() {
         const auto secretKey = prefix + "SECRET_ACCESS_KEY";
         const auto endpoint = prefix + "ENDPOINT";
 
-        auto key = std::make_shared<api::APIKey>();
+        auto key = std::make_shared<APIKey>();
         key->user_id = 1; // Default user ID for dev mode
         key->name = "R2 Test Key";
-        key->provider = api::S3Provider::CloudflareR2;
+        key->provider = S3Provider::CloudflareR2;
         key->region = "wnam";
 
         if (std::getenv(accessKey.c_str())) key->access_key = std::getenv(accessKey.c_str());
@@ -382,7 +385,7 @@ void vh::seed::initDevCloudVault() {
         const auto vault = std::make_shared<S3Vault>();
         vault->name = "R2 Test Vault";
         vault->description = "Test vault for Cloudflare R2 in development mode";
-        vault->mount_point = ids::IdGenerator({ .namespace_token = vault->name }).generate();
+        vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
         vault->api_key_id = key->id;
         vault->owner_id = 1;
         vault->bucket = "vaulthalla-test";

@@ -1,15 +1,15 @@
 #include "sync/tasks/Download.hpp"
-#include "storage/cloud/CloudStorageEngine.hpp"
-#include "types/fs/File.hpp"
+#include "storage/CloudEngine.hpp"
+#include "fs/model/File.hpp"
 #include "logging/LogRegistry.hpp"
 #include "sync/model/ScopedOp.hpp"
 
 using namespace vh::sync::tasks;
 using namespace vh::storage;
-using namespace vh::types;
+using namespace vh::fs::model;
 using namespace vh::logging;
 
-Download::Download(std::shared_ptr<CloudStorageEngine> eng,
+Download::Download(std::shared_ptr<CloudEngine> eng,
                            std::shared_ptr<File> f,
                            model::ScopedOp& op,
                            const bool freeAfter)

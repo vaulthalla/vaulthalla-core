@@ -1,19 +1,20 @@
 #include "CLITestContext.hpp"
 #include "UsageManager.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/entities/Group.hpp"
-#include "types/rbac/Role.hpp"
-#include "types/rbac/UserRole.hpp"
-#include "types/rbac/VaultRole.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "identities/model/Group.hpp"
+#include "rbac/model/UserRole.hpp"
+#include "rbac/model/VaultRole.hpp"
 #include "EntityType.hpp"
 #include "generators.hpp"
 
 #include <stdexcept>
 
 using namespace vh::test::cli;
-using namespace vh::types;
 using namespace vh::shell;
+using namespace vh::identities::model;
+using namespace vh::rbac::model;
+using namespace vh::vault::model;
 
 CLITestContext::CLITestContext()
     : usage(std::make_shared<UsageManager>()) {

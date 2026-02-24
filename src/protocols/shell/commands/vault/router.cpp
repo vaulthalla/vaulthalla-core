@@ -1,6 +1,6 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/Router.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 
@@ -12,7 +12,6 @@
 using namespace vh::shell;
 using namespace vh::shell::commands;
 using namespace vh::shell::commands::vault;
-using namespace vh::types;
 using namespace vh::services;
 
 static bool isVaultMatch(const std::string& cmd, const std::string_view input) {

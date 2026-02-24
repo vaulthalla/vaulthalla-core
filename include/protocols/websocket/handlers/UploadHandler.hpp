@@ -1,18 +1,12 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <fstream>
 #include <optional>
-#include <nlohmann/json.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 
-namespace vh::storage {
-class StorageEngine;
-}
-
-namespace vh::types {
-    struct User;
-}
+namespace vh::storage { struct Engine; }
 
 namespace vh::websocket {
 
@@ -21,7 +15,7 @@ class WebSocketSession; // Forward declare to avoid circular dependency
 struct UploadArgs {
     std::string uploadId;
     uint64_t expectedSize = 0;
-    std::shared_ptr<storage::StorageEngine> engine;
+    std::shared_ptr<storage::Engine> engine;
     std::filesystem::path tmpPath, finalPath, fuseFrom, fuseTo;
 };
 

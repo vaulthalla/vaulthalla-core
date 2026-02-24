@@ -1,11 +1,11 @@
 #include "auth/AuthManager.hpp"
-#include "types/entities/User.hpp"
-#include "auth/Client.hpp"
+#include "identities/model/User.hpp"
+#include "auth/model/Client.hpp"
 #include "auth/SessionManager.hpp"
-#include "crypto/PasswordHash.hpp"
-#include "crypto/PasswordUtils.hpp"
+#include "crypto/util/hash.hpp"
+#include "crypto/password/Strength.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -18,13 +18,14 @@
 #include <paths.h>
 
 using namespace vh::auth;
-using namespace vh::types;
+using namespace vh::auth::model;
+using namespace vh::identities::model;
 using namespace vh::crypto;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::logging;
 
-AuthManager::AuthManager(const std::shared_ptr<StorageManager>& storageManager)
+AuthManager::AuthManager(const std::shared_ptr<Manager>& storageManager)
     : sessionManager_(std::make_shared<SessionManager>()), storageManager_(storageManager) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
@@ -60,7 +61,7 @@ std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<User> user,
                                                   const std::shared_ptr<websocket::WebSocketSession>& session) {
     isValidRegistration(user, password);
 
-    user->setPasswordHash(hashPassword(password));
+    user->setPasswordHash(hash::password(password));
     UserQueries::createUser(user);
 
     user = findUser(user->name);
@@ -82,7 +83,7 @@ std::shared_ptr<Client> AuthManager::loginUser(const std::string& name, const st
         auto user = findUser(name);
         if (!user) throw std::runtime_error("User not found: " + name);
 
-        if (!verifyPassword(password, user->password_hash))
+        if (!hash::verifyPassword(password, user->password_hash))
             throw std::runtime_error("Invalid password for user: " + name);
 
         UserQueries::revokeAllRefreshTokens(user->id);
@@ -172,7 +173,7 @@ std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& ref
             throw std::runtime_error("Refresh token has expired");
 
         // 4. Secure compare stored hash to hashed input token
-        if (!verifyPassword(refreshToken, storedToken->getHashedToken()))
+        if (!hash::verifyPassword(refreshToken, storedToken->getHashedToken()))
             throw std::runtime_error("Refresh token hash mismatch");
 
         auto user = UserQueries::getUserByRefreshToken(tokenJti);
@@ -197,10 +198,10 @@ void AuthManager::changePassword(const std::string& name, const std::string& old
     const auto user = findUser(name);
     if (!user) throw std::runtime_error("User not found: " + name);
 
-    if (!verifyPassword(oldPassword, user->password_hash))
+    if (!hash::verifyPassword(oldPassword, user->password_hash))
         throw std::runtime_error("Invalid old password for user: " + name);
 
-    user->setPasswordHash(hashPassword(newPassword));
+    user->setPasswordHash(hash::password(newPassword));
 
     LogRegistry::audit()->info("[AuthManager] User {} is changing password", user->name);
     LogRegistry::auth()->info("[AuthManager] Changing password for user: {}", user->name);
@@ -214,17 +215,17 @@ bool AuthManager::isValidRegistration(const std::shared_ptr<User>& user, const s
     if (user->email && !isValidEmail(*user->email)) errors.emplace_back("Email must be valid and contain '@' and '.'.");
 
     if (!paths::testMode) {
-        if (const auto strength = PasswordUtils::passwordStrengthCheck(password) < 50)
+        if (const auto strength = password::Strength::passwordStrengthCheck(password) < 50)
             errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
                                 "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
 
-        if (PasswordUtils::containsDictionaryWord(password))
+        if (password::Strength::containsDictionaryWord(password))
             errors.emplace_back("Password contains dictionary word — this is forbidden.");
 
-        if (PasswordUtils::isCommonWeakPassword(password))
+        if (password::Strength::isCommonWeakPassword(password))
             errors.emplace_back("Password matches known weak pattern — this is forbidden.");
 
-        if (PasswordUtils::isPwnedPassword(password))
+        if (password::Strength::isPwnedPassword(password))
             errors.emplace_back("Password has been found in public breaches — choose a different one.");
     }
 
@@ -250,10 +251,10 @@ bool AuthManager::isValidEmail(const std::string& email) {
 bool AuthManager::isValidPassword(const std::string& password) {
     if (paths::testMode) return true;
     std::vector<std::string> errors;
-    if (PasswordUtils::passwordStrengthCheck(password) < 50) return false;
-    if (PasswordUtils::containsDictionaryWord(password)) return false;
-    if (PasswordUtils::isCommonWeakPassword(password)) return false;
-    if (PasswordUtils::isPwnedPassword(password)) return false;
+    if (password::Strength::passwordStrengthCheck(password) < 50) return false;
+    if (password::Strength::containsDictionaryWord(password)) return false;
+    if (password::Strength::isCommonWeakPassword(password)) return false;
+    if (password::Strength::isPwnedPassword(password)) return false;
     return !password.empty() && password.size() >= 8 && password.size() <= 128 &&
            std::ranges::any_of(password.begin(), password.end(), ::isdigit) && // At least one digit
            std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
@@ -299,7 +300,7 @@ AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSessio
 
     return {token,
             std::make_shared<RefreshToken>(jti,
-                                           hashPassword(token),     // Store hashed token
+                                           hash::password(token),     // Store hashed token
                                            0,                       // User ID will be set later
                                            session->getUserAgent(),
                                            session->getClientIp())};

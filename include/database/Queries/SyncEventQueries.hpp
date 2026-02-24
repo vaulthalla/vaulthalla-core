@@ -3,9 +3,7 @@
 #include <memory>
 #include <vector>
 
-namespace vh::sync::model {
-struct Event;
-}
+namespace vh::sync::model { struct Event; }
 
 namespace vh::database {
 

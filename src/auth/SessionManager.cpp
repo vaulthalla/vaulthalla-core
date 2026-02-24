@@ -1,9 +1,10 @@
 #include "auth/SessionManager.hpp"
-#include "types/rbac/RefreshToken.hpp"
+#include "auth/model/RefreshToken.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "logging/LogRegistry.hpp"
 
 using namespace vh::auth;
+using namespace vh::auth::model;
 using namespace vh::database;
 using namespace vh::logging;
 

@@ -1,17 +1,17 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/Router.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultQueries.hpp"
 
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
 
-#include "types/vault/Vault.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/entities/User.hpp"
+#include "vault/model/Vault.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "identities/model/User.hpp"
 
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
@@ -24,7 +24,9 @@
 using namespace vh::shell::commands::vault;
 using namespace vh::shell::commands;
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::rbac::model;
+using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <chrono>
 
@@ -10,7 +10,7 @@ class SessionManager;
 
 namespace vh::services {
 
-class ConnectionLifecycleManager : public AsyncService {
+class ConnectionLifecycleManager final : public concurrency::AsyncService {
   public:
     ConnectionLifecycleManager();
     ~ConnectionLifecycleManager() override;

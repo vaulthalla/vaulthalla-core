@@ -6,8 +6,8 @@
 #include <vector>
 #include <optional>
 
-namespace vh::types {
-struct FSEntry;
+namespace vh::fs::model {
+struct Entry;
 struct File;
 struct Directory;
 }
@@ -22,21 +22,21 @@ class DirectoryQueries {
 public:
     DirectoryQueries() = default;
 
-    static unsigned int upsertDirectory(const std::shared_ptr<types::Directory>& directory);
+    static unsigned int upsertDirectory(const std::shared_ptr<fs::model::Directory>& directory);
 
     [[nodiscard]] static bool isDirectory(unsigned int vaultId, const std::filesystem::path& relPath);
 
     [[nodiscard]] static bool directoryExists(unsigned int vaultId, const std::filesystem::path& relPath);
 
-    static void moveDirectory(const std::shared_ptr<types::Directory>& directory, const std::filesystem::path& newPath, unsigned int userId);
+    static void moveDirectory(const std::shared_ptr<fs::model::Directory>& directory, const std::filesystem::path& newPath, unsigned int userId);
 
-    static std::shared_ptr<types::Directory> getDirectoryByPath(unsigned int vaultId, const std::filesystem::path& relPath);
+    static std::shared_ptr<fs::model::Directory> getDirectoryByPath(unsigned int vaultId, const std::filesystem::path& relPath);
 
     [[nodiscard]] static std::optional<unsigned int> getDirectoryIdByPath(unsigned int vaultId, const std::filesystem::path& path);
 
     [[nodiscard]] static unsigned int getRootDirectoryId(unsigned int vaultId);
 
-    static std::vector<std::shared_ptr<types::Directory>> listDirectoriesInDir(unsigned int parentId, bool recursive = false);
+    static std::vector<std::shared_ptr<fs::model::Directory>> listDirectoriesInDir(unsigned int parentId, bool recursive = false);
 
     [[nodiscard]] static pqxx::result collectParentStats(unsigned int parentId);
 

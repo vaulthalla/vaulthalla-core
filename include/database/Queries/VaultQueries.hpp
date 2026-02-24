@@ -1,13 +1,13 @@
 #pragma once
 
-#include "types/admin/ListQueryParams.hpp"
+#include "database/model/ListQueryParams.hpp"
 
 #include <memory>
 #include <vector>
 #include <string>
 #include <optional>
 
-namespace vh::types {
+namespace vh::vault::model {
     struct Vault;
     enum class VaultType;
 }
@@ -21,15 +21,15 @@ namespace vh::database {
 struct VaultQueries {
     VaultQueries() = default;
 
-    static unsigned int upsertVault(const std::shared_ptr<types::Vault>& vault,
+    static unsigned int upsertVault(const std::shared_ptr<vault::model::Vault>& vault,
                                  const std::shared_ptr<sync::model::Policy>& sync = nullptr);
     static void removeVault(unsigned int vaultId);
-    static std::shared_ptr<types::Vault> getVault(unsigned int vaultID);
-    static std::shared_ptr<types::Vault> getVault(const std::string& name, unsigned int ownerId);
-    static std::vector<std::shared_ptr<types::Vault>> listVaults(const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
-    static std::vector<std::shared_ptr<types::Vault>> listUserVaults(unsigned int userId, const std::optional<types::VaultType>& type = std::nullopt, types::ListQueryParams&& params = {});
+    static std::shared_ptr<vault::model::Vault> getVault(unsigned int vaultID);
+    static std::shared_ptr<vault::model::Vault> getVault(const std::string& name, unsigned int ownerId);
+    static std::vector<std::shared_ptr<vault::model::Vault>> listVaults(const std::optional<vault::model::VaultType>& type = std::nullopt, model::ListQueryParams&& params = {});
+    static std::vector<std::shared_ptr<vault::model::Vault>> listUserVaults(unsigned int userId, const std::optional<vault::model::VaultType>& type = std::nullopt, model::ListQueryParams&& params = {});
 
-    static void updateVaultSync(const std::shared_ptr<sync::model::Policy>& sync, const types::VaultType& type);
+    static void updateVaultSync(const std::shared_ptr<sync::model::Policy>& sync, const vault::model::VaultType& type);
 
     [[nodiscard]] static bool vaultExists(const std::string& name, unsigned int ownerId);
 

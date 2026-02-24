@@ -1,28 +1,68 @@
 #include "protocols/http/HttpRouter.hpp"
-#include "util/parse.hpp"
-#include "storage/StorageManager.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Manager.hpp"
+#include "storage/Engine.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
 #include "protocols/http/handlers/ImagePreviewHandler.hpp"
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
-#include "util/files.hpp"
+#include "fs/ops/file.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "types/fs/Path.hpp"
-#include "storage/FSCache.hpp"
-#include "types/stats/CacheStats.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Path.hpp"
+#include "fs/cache/Registry.hpp"
+#include "stats/model/CacheStats.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "logging/LogRegistry.hpp"
+#include "protocols/cookie.hpp"
 
 #include <nlohmann/json.hpp>
 
+using namespace vh::protocols;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
-using namespace vh::types;
+using namespace vh::stats::model;
+using namespace vh::fs::model;
+using namespace vh::fs::ops;
+
+static std::string url_decode(const std::string& value) {
+    std::ostringstream result;
+    for (size_t i = 0; i < value.length(); ++i) {
+        if (value[i] == '%' && i + 2 < value.length()) {
+            if (int hex = 0; std::istringstream(value.substr(i + 1, 2)) >> std::hex >> hex) {
+                result << static_cast<char>(hex);
+                i += 2;
+            } else throw std::runtime_error("Invalid percent-encoding in URL");
+        }
+        else if (value[i] == '+') result << ' ';
+        else result << value[i];
+    }
+    return result.str();
+}
+
+static std::unordered_map<std::string, std::string> parse_query_params(const std::string& target) {
+    std::unordered_map<std::string, std::string> params;
+
+    const auto pos = target.find('?');
+    if (pos == std::string::npos) return params;
+
+    const std::string query = target.substr(pos + 1);
+    std::istringstream stream(query);
+    std::string pair;
+
+    while (std::getline(stream, pair, '&')) {
+        const auto eq = pair.find('=');
+        if (eq != std::string::npos) {
+            const auto key = url_decode(pair.substr(0, eq));
+            const auto value = url_decode(pair.substr(eq + 1));
+            params[key] = value;
+        }
+    }
+
+    return params;
+}
 
 namespace vh::http {
 
@@ -34,7 +74,7 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
         if (const auto pathToJpegCache = thumbnailRoot / f->base32_alias / std::string(std::to_string(size) + ".jpg");
             f->mime_type && (f->mime_type->starts_with("image/") || f->mime_type->starts_with("application/"))
             && std::filesystem::exists(pathToJpegCache))
-            return util::readFileToVector(pathToJpegCache);
+            return readFileToVector(pathToJpegCache);
 
         ServiceDepsRegistry::instance().httpCacheStats->record_miss();
     }
@@ -58,7 +98,7 @@ PreviewResponse HttpRouter::handleAuthSession(http::request<http::string_body>&&
     if (ConfigRegistry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
 
     try {
-        const auto refresh = util::extractCookie(req, "refresh");
+        const auto refresh = extractCookie(req, "refresh");
         if (refresh.empty()) {
             LogRegistry::http()->warn("[HttpRouter] Refresh token not set");
             return makeErrorResponse(req, "Refresh token not set", http::status::bad_request);
@@ -91,7 +131,7 @@ PreviewResponse HttpRouter::handleAuthSession(http::request<http::string_body>&&
 std::string HttpRouter::authenticateRequest(const http::request<http::string_body>& req) {
     if (ConfigRegistry::get().dev.enabled) return "";
     try {
-        const auto refresh_token = util::extractCookie(req, "refresh");
+        const auto refresh_token = extractCookie(req, "refresh");
         ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh_token);
         return "";
     } catch (const std::exception& e) {
@@ -109,7 +149,7 @@ PreviewResponse HttpRouter::handlePreview(http::request<http::string_body>&& req
             req, "Unauthorized: " + error, http::status::unauthorized);
 
     std::unique_ptr<PreviewRequest> pr;
-    try { pr = std::make_unique<PreviewRequest>(util::parse_query_params(req.target())); } catch (const std::exception&
+    try { pr = std::make_unique<PreviewRequest>(parse_query_params(req.target())); } catch (const std::exception&
         e) { return makeErrorResponse(req, e.what(), http::status::bad_request); }
 
     pr->engine = ServiceDepsRegistry::instance().storageManager->getEngine(pr->vault_id);

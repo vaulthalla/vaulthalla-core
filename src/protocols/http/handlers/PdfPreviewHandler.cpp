@@ -1,7 +1,7 @@
 #include "protocols/http/handlers/PdfPreviewHandler.hpp"
-#include "util/imageUtil.hpp"
-#include "util/files.hpp"
-#include "types/fs/File.hpp"
+#include "preview/image.hpp"
+#include "fs/ops/file.hpp"
+#include "fs/model/File.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/http/PreviewRequest.hpp"
 #include "protocols/http/HttpRouter.hpp"
@@ -10,7 +10,9 @@
 #include <pdfium/fpdfview.h>
 
 using namespace vh::logging;
-using namespace vh::util;
+using namespace vh::fs::model;
+using namespace vh::fs::ops;
+using namespace vh::preview;
 
 namespace vh::http {
 
@@ -63,7 +65,7 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         }
 
         std::vector<uint8_t> jpeg_buf;
-        compress_to_jpeg(rgb_data.data(), new_w, new_h, jpeg_buf);
+        image::compress_to_jpeg(rgb_data.data(), new_w, new_h, jpeg_buf);
 
         FPDFBitmap_Destroy(bitmap);
         FPDF_ClosePage(page);

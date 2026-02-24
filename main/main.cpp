@@ -9,8 +9,8 @@
 #include "database/Queries/SyncEventQueries.hpp"
 
 // Storage
-#include "storage/StorageManager.hpp"
-#include "storage/Filesystem.hpp"
+#include "storage/Manager.hpp"
+#include "fs/Filesystem.hpp"
 
 // Seed
 #include "seed/include/seed_db.hpp"
@@ -31,6 +31,7 @@ using namespace vh::concurrency;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::logging;
+using namespace vh::fs;
 
 namespace {
 std::atomic shouldExit = false;

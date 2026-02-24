@@ -8,10 +8,6 @@
 #include <memory>
 #include <string>
 
-namespace vh::types {
-struct File;
-}
-
 namespace vh::http {
 
 class HttpSession;

@@ -1,13 +1,12 @@
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/vault/VaultKey.hpp"
-#include "util/bytea.hpp"
+#include "vault/model/Key.hpp"
+#include "database/encoding/bytea.hpp"
 
 using namespace vh::database;
-using namespace vh::types;
-using namespace vh::util;
+using namespace vh::database::encoding;
 
-unsigned int VaultKeyQueries::addVaultKey(const std::shared_ptr<VaultKey>& key) {
+unsigned int VaultKeyQueries::addVaultKey(const std::shared_ptr<vault::model::Key>& key) {
     return Transactions::exec("VaultKeyQueries::addVaultKey", [&](pqxx::work& txn) {
         pqxx::params p{key->vaultId, to_hex_bytea(key->encrypted_key), to_hex_bytea(key->iv)};
         const auto res = txn.exec(pqxx::prepped{"insert_vault_key"}, p);
@@ -22,22 +21,22 @@ void VaultKeyQueries::deleteVaultKey(unsigned int vaultId) {
     });
 }
 
-void VaultKeyQueries::updateVaultKey(const std::shared_ptr<VaultKey>& key) {
+void VaultKeyQueries::updateVaultKey(const std::shared_ptr<vault::model::Key>& key) {
     Transactions::exec("VaultKeyQueries::updateVaultKey", [&](pqxx::work& txn) {
         pqxx::params p{key->vaultId, to_hex_bytea(key->encrypted_key), to_hex_bytea(key->iv)};
         txn.exec(pqxx::prepped{"update_vault_key"}, p);
     });
 }
 
-std::shared_ptr<VaultKey> VaultKeyQueries::getVaultKey(unsigned int vaultId) {
-    return Transactions::exec("VaultKeyQueries::getVaultKey", [&](pqxx::work& txn) -> std::shared_ptr<VaultKey> {
+std::shared_ptr<vh::vault::model::Key> VaultKeyQueries::getVaultKey(unsigned int vaultId) {
+    return Transactions::exec("VaultKeyQueries::getVaultKey", [&](pqxx::work& txn) -> std::shared_ptr<vault::model::Key> {
         const auto res = txn.exec(pqxx::prepped{"get_vault_key"}, vaultId);
         if (res.empty()) return nullptr;
-        return std::make_shared<VaultKey>(res[0]);
+        return std::make_shared<vault::model::Key>(res[0]);
     });
 }
 
-unsigned int VaultKeyQueries::rotateVaultKey(const std::shared_ptr<VaultKey>& newKey) {
+unsigned int VaultKeyQueries::rotateVaultKey(const std::shared_ptr<vault::model::Key>& newKey) {
     return Transactions::exec("VaultKeyQueries::rotateVaultKey", [&](pqxx::work& txn) {
         pqxx::params p{newKey->vaultId, to_hex_bytea(newKey->encrypted_key), to_hex_bytea(newKey->iv)};
         const auto res = txn.exec(pqxx::prepped{"rotate_vault_key"}, p);
@@ -58,10 +57,10 @@ bool VaultKeyQueries::keyRotationInProgress(unsigned int vaultId) {
     });
 }
 
-std::shared_ptr<VaultKey> VaultKeyQueries::getRotationInProgressOldKey(unsigned int vaultId) {
-    return Transactions::exec("VaultKeyQueries::getRotationInProgressOldKey", [&](pqxx::work& txn) -> std::shared_ptr<VaultKey> {
+std::shared_ptr<vh::vault::model::Key> VaultKeyQueries::getRotationInProgressOldKey(unsigned int vaultId) {
+    return Transactions::exec("VaultKeyQueries::getRotationInProgressOldKey", [&](pqxx::work& txn) -> std::shared_ptr<vault::model::Key> {
         const auto res = txn.exec(pqxx::prepped{"get_rotation_old_vault_key"}, vaultId);
         if (res.empty()) throw std::runtime_error("No old vault key found for rotation in progress");
-        return std::make_shared<VaultKey>(res[0]);
+        return std::make_shared<vault::model::Key>(res[0]);
     });
 }

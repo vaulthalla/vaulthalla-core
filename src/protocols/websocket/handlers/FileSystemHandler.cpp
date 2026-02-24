@@ -1,23 +1,26 @@
 #include "protocols/websocket/handlers/FileSystemHandler.hpp"
 #include "protocols/websocket/WebSocketSession.hpp"
-#include "storage/StorageManager.hpp"
-#include "types/fs/File.hpp"
-#include "types/rbac/VaultRole.hpp"
-#include "types/vault/Vault.hpp"
-#include "types/fs/Path.hpp"
-#include "types/entities/User.hpp"
+#include "storage/Manager.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Path.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "vault/model/Vault.hpp"
+#include "identities/model/User.hpp"
 #include "protocols/websocket/handlers/UploadHandler.hpp"
-#include "storage/StorageEngine.hpp"
+#include "storage/Engine.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
-#include "storage/Filesystem.hpp"
+#include "fs/Filesystem.hpp"
 #include "services/SyncController.hpp"
-#include "storage/FSCache.hpp"
+#include "fs/cache/Registry.hpp"
 
-using namespace vh::types;
+using namespace vh::vault::model;
+using namespace vh::rbac::model;
 using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::logging;
+using namespace vh::fs;
+using namespace vh::fs::model;
 
 namespace vh::websocket {
 
@@ -87,8 +90,8 @@ json FileSystemHandler::move(const json& payload, WebSocketSession& session) {
 
 json FileSystemHandler::rename(const json& payload, WebSocketSession& session) {
     const auto vaultId = payload.at("vault_id").get<unsigned int>();
-    const auto from = fs::path(payload.at("from").get<std::string>());
-    const auto to = fs::path(payload.at("to").get<std::string>());
+    const auto from = std::filesystem::path(payload.at("from").get<std::string>());
+    const auto to = std::filesystem::path(payload.at("to").get<std::string>());
 
     enforcePermissions(session, vaultId, from, &VaultRole::canRename);
     enforcePermissions(session, vaultId, to, &VaultRole::canCreate);
@@ -103,8 +106,8 @@ json FileSystemHandler::rename(const json& payload, WebSocketSession& session) {
 
 json FileSystemHandler::copy(const json& payload, WebSocketSession& session) {
     const auto vaultId = payload.at("vault_id").get<unsigned int>();
-    const auto from = fs::path(payload.at("from").get<std::string>());
-    const auto to = fs::path(payload.at("to").get<std::string>());
+    const auto from = std::filesystem::path(payload.at("from").get<std::string>());
+    const auto to = std::filesystem::path(payload.at("to").get<std::string>());
 
     enforcePermissions(session, vaultId, from, &VaultRole::canMove);
     enforcePermissions(session, vaultId, to, &VaultRole::canCreate);
@@ -119,8 +122,8 @@ json FileSystemHandler::copy(const json& payload, WebSocketSession& session) {
 
 json FileSystemHandler::listDir(const json& payload, WebSocketSession& session) {
     const auto vaultId = payload.at("vault_id").get<unsigned int>();
-    auto path = fs::path(payload.value("path", "/"));
-    if (path.empty()) path = fs::path("/");
+    auto path = std::filesystem::path(payload.value("path", "/"));
+    if (path.empty()) path = std::filesystem::path("/");
 
     enforcePermissions(session, vaultId, path, &VaultRole::canList);
 

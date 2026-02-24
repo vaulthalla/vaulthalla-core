@@ -21,9 +21,7 @@ struct UploadContext {
 
 using RequestType = boost::beast::http::request<boost::beast::http::string_body>;
 
-namespace vh::types {
-struct User;
-}
+namespace vh::identities::model { struct User; }
 
 namespace vh::websocket {
 class WebSocketRouter;
@@ -46,11 +44,11 @@ public:
 
     const std::string& getUUID() const { return uuid_; }
 
-    void setAuthenticatedUser(std::shared_ptr<types::User> user);
+    void setAuthenticatedUser(std::shared_ptr<identities::model::User> user);
     void setRefreshTokenCookie(const std::string& token);
     void setHandshakeRequest(const RequestType& req);
 
-    std::shared_ptr<types::User> getAuthenticatedUser() const;
+    std::shared_ptr<identities::model::User> getAuthenticatedUser() const;
     std::string getClientIp() const;
     std::string getUserAgent() const;
     std::string getRefreshToken() const;
@@ -92,7 +90,7 @@ private:
 
     std::shared_ptr<UploadHandler> uploadHandler_;
     std::shared_ptr<WebSocketRouter> router_;
-    std::shared_ptr<types::User> authenticatedUser_;
+    std::shared_ptr<identities::model::User> authenticatedUser_;
 
     std::string refreshToken_;
     std::string userAgent_;

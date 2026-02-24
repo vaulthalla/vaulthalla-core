@@ -1,19 +1,20 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "types/fs/File.hpp"
-#include "types/fs/TrashedFile.hpp"
-#include "util/u8.hpp"
-#include "util/fsPath.hpp"
+#include "fs/model/File.hpp"
+#include "fs/model/Directory.hpp"
+#include "fs/model/file/Trashed.hpp"
+#include "database/encoding/u8.hpp"
+#include "fs/model/Path.hpp"
 #include "services/ServiceDepsRegistry.hpp"
-#include "storage/FSCache.hpp"
-#include "types/stats/CapacityStats.hpp"
+#include "fs/cache/Registry.hpp"
+#include "fs/model/stats/Extension.hpp"
 
 #include <optional>
 
 using namespace vh::database;
+using namespace vh::database::encoding;
 using namespace vh::services;
-using namespace vh::types;
+using namespace vh::fs::model;
 
 unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
     if (!file) throw std::invalid_argument("File cannot be null");
@@ -208,10 +209,10 @@ std::vector<std::shared_ptr<File>> FileQueries::listFilesInDir(
     });
 }
 
-std::vector<std::shared_ptr<TrashedFile>> FileQueries::listTrashedFiles(unsigned int vaultId) {
+std::vector<std::shared_ptr<file::Trashed>> FileQueries::listTrashedFiles(unsigned int vaultId) {
     return Transactions::exec("FileQueries::listTrashedFiles", [&](pqxx::work& txn) {
         const auto res = txn.exec(pqxx::prepped{"list_trashed_files"}, vaultId);
-        return trashed_files_from_pq_res(res);
+        return file::trashed_files_from_pq_res(res);
     });
 }
 
@@ -335,7 +336,7 @@ std::vector<std::shared_ptr<File> > FileQueries::getAllFiles(unsigned int vaultI
     });
 }
 
-std::vector<ExtensionStat> FileQueries::getTopExtensionsBySize(unsigned int vaultId, unsigned int limit) {
+std::vector<stats::Extension> FileQueries::getTopExtensionsBySize(const unsigned int vaultId, const unsigned int limit) {
     if (limit == 0) return {};
 
     return Transactions::exec("FileQueries::getTopExtensionsBySize", [&](pqxx::work& txn) {
@@ -344,13 +345,13 @@ std::vector<ExtensionStat> FileQueries::getTopExtensionsBySize(unsigned int vaul
         p.append(limit);
 
         const auto res = txn.exec(pqxx::prepped{"get_top_extensions_by_size"}, p);
-        if (res.empty()) return std::vector<ExtensionStat>{};
+        if (res.empty()) return std::vector<fs::model::stats::Extension>{};
 
-        std::vector<ExtensionStat> out;
+        std::vector<fs::model::stats::Extension> out;
         out.reserve(res.size());
 
         for (const auto& row : res) {
-            ExtensionStat s{};
+            fs::model::stats::Extension s{};
             s.extension   = row["ext"].as<std::string>();
             s.total_bytes = row["total_bytes"].as<std::uint64_t>(0);
             out.emplace_back(std::move(s));

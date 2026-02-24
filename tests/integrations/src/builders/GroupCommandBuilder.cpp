@@ -3,8 +3,8 @@
 #include "generators.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::types;
 using namespace vh::shell;
+using namespace vh::identities::model;
 
 GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}
@@ -119,7 +119,7 @@ std::string GroupCommandBuilder::list() {
     return oss.str();
 }
 
-std::string GroupCommandBuilder::addUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const {
+std::string GroupCommandBuilder::addUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<User>& user) const {
     const auto baseCmd = root_->findSubcommand("user");
     if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
     const auto addCmd = baseCmd->findSubcommand("add");
@@ -137,7 +137,7 @@ std::string GroupCommandBuilder::addUser(const std::shared_ptr<types::Group>& en
     return oss.str();
 }
 
-std::string GroupCommandBuilder::removeUser(const std::shared_ptr<types::Group>& entity, const std::shared_ptr<types::User>& user) const {
+std::string GroupCommandBuilder::removeUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<User>& user) const {
     const auto baseCmd = root_->findSubcommand("user");
     if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
     const auto rmCmd = baseCmd->findSubcommand("remove");

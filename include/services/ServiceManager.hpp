@@ -11,15 +11,13 @@
 #include <chrono>
 #include <atomic>
 
-namespace vh::shell {
-class Router;
-}
+namespace vh::shell { class Router; }
+namespace vh::concurrency { class AsyncService; }
+namespace vh::fuse { class Service; }
 
 namespace vh::services {
 
-class AsyncService;
 class SyncController;
-class FUSE;
 class Vaulthalla;
 class CtlServerService;
 class ConnectionLifecycleManager;
@@ -47,15 +45,15 @@ public:
 private:
     ServiceManager();
 
-    void tryStart(const std::string& name, const std::shared_ptr<AsyncService>& svc);
-    static void stopService(const std::string& name, const std::shared_ptr<AsyncService>& svc, int signal);
+    void tryStart(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc);
+    static void stopService(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc, int signal);
 
     void startWatchdog();
     void stopWatchdog();
     [[noreturn]] void hardFail();
 
     std::shared_ptr<SyncController> syncController;
-    std::shared_ptr<FUSE> fuseService;
+    std::shared_ptr<fuse::Service> fuseService;
     std::shared_ptr<Vaulthalla> vaulthallaService;
     std::shared_ptr<CtlServerService> ctlServerService;
     std::shared_ptr<ConnectionLifecycleManager> connectionLifecycleManager;
@@ -63,7 +61,7 @@ private:
     std::shared_ptr<DBSweeper> dbSweeperService;
 
     mutable std::mutex mutex_;
-    std::map<std::string, std::shared_ptr<AsyncService>> services_;
+    std::map<std::string, std::shared_ptr<concurrency::AsyncService>> services_;
 
     // Watchdog state
     std::thread watchdogThread;

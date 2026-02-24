@@ -7,9 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <unordered_set>
 
-namespace vh::types {
-    struct User;
-}
+namespace vh::identities::model { struct User; }
 
 namespace vh::shell {
 
@@ -23,7 +21,7 @@ struct CommandCall {
     std::vector<FlagKV> options;
     std::vector<std::string> positionals;
     bool rewrote = false;
-    std::shared_ptr<types::User> user;
+    std::shared_ptr<identities::model::User> user;
     SocketIO* io = nullptr; // if set, command was run interactively
 
     // owns any strings you create at runtime (JSON, rewrites, etc.)

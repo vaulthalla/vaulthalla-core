@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <memory>
 #include <boost/asio/ip/tcp.hpp>
@@ -23,7 +23,7 @@ namespace vh::services {
 
 class ConnectionLifecycleManager;
 
-class Vaulthalla final : public AsyncService {
+class Vaulthalla final : public concurrency::AsyncService {
 public:
     Vaulthalla();
 

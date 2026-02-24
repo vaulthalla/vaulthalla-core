@@ -2,9 +2,9 @@
 
 #include "helpers.hpp"
 
-namespace vh::types {
-struct File;
-}
+#include <memory>
+
+namespace vh::fs::model { struct File; }
 
 namespace vh::sync::model {
 
@@ -17,10 +17,10 @@ enum class ActionType {
 };
 
 struct Action {
-    ActionType type;
+    ActionType type{ActionType::EnsureDirectories};
     EntryKey key;
-    std::shared_ptr<types::File> local;
-    std::shared_ptr<types::File> remote;
+    std::shared_ptr<fs::model::File> local{};
+    std::shared_ptr<fs::model::File> remote{};
     bool freeAfterDownload = false; // cache mode hint
 };
 

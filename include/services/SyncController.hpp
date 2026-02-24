@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/AsyncService.hpp"
+#include "concurrency/AsyncService.hpp"
 
 #include <memory>
 #include <queue>
@@ -9,7 +9,7 @@
 #include <shared_mutex>
 
 namespace vh::storage {
-struct StorageEngine;
+struct Engine;
 }
 
 namespace vh::sync {
@@ -23,7 +23,7 @@ struct FSTaskCompare {
     bool operator()(const std::shared_ptr<sync::Local>& a, const std::shared_ptr<sync::Local>& b) const;
 };
 
-class SyncController final : public AsyncService, std::enable_shared_from_this<SyncController> {
+class SyncController final : public concurrency::AsyncService, std::enable_shared_from_this<SyncController> {
 public:
     SyncController();
     ~SyncController() override = default;
@@ -52,14 +52,14 @@ private:
 
     void refreshEngines();
 
-    void pruneStaleTasks(const std::vector<std::shared_ptr<storage::StorageEngine>>& engines);
+    void pruneStaleTasks(const std::vector<std::shared_ptr<storage::Engine>>& engines);
 
-    void processTask(const std::shared_ptr<storage::StorageEngine>& engine);
+    void processTask(const std::shared_ptr<storage::Engine>& engine);
 
-    std::shared_ptr<sync::Local> createTask(const std::shared_ptr<storage::StorageEngine>& engine);
+    std::shared_ptr<sync::Local> createTask(const std::shared_ptr<storage::Engine>& engine);
 
     template <typename T>
-    std::shared_ptr<T> createTask(const std::shared_ptr<storage::StorageEngine>& engine) {
+    std::shared_ptr<T> createTask(const std::shared_ptr<storage::Engine>& engine) {
         auto task = std::make_shared<T>(engine);
         return task;
     }

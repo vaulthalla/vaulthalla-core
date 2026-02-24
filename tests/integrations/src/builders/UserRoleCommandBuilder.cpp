@@ -3,7 +3,9 @@
 #include "generators.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::types;
+using namespace vh::rbac::model;
+using namespace vh::identities::model;
+using namespace vh::vault::model;
 using namespace vh::shell;
 
 UserRoleCommandBuilder::UserRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
@@ -82,7 +84,7 @@ std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& enti
     return oss.str();
 }
 
-std::string UserRoleCommandBuilder::update(const std::shared_ptr<types::UserRole>& entity) {
+std::string UserRoleCommandBuilder::update(const std::shared_ptr<UserRole>& entity) {
     const auto cmd = root_->findSubcommand("update");
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'update' command usage not found");
 

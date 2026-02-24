@@ -1,6 +1,7 @@
 #include "services/ServiceManager.hpp"
+#include "concurrency/AsyncService.hpp"
 #include "services/SyncController.hpp"
-#include "services/FUSE.hpp"
+#include "fuse/Service.hpp"
 #include "services/Vaulthalla.hpp"
 #include "services/CtlServerService.hpp"
 #include "services/ConnectionLifecycleManager.hpp"
@@ -12,6 +13,7 @@
 
 using namespace vh::logging;
 using namespace vh::services;
+using namespace vh::concurrency;
 
 ServiceManager& ServiceManager::instance() {
     static ServiceManager instance;
@@ -20,7 +22,7 @@ ServiceManager& ServiceManager::instance() {
 
 ServiceManager::ServiceManager()
     : syncController(std::make_shared<SyncController>()),
-      fuseService(std::make_shared<FUSE>()),
+      fuseService(std::make_shared<fuse::Service>()),
       vaulthallaService(std::make_shared<Vaulthalla>()),
       connectionLifecycleManager(std::make_shared<ConnectionLifecycleManager>()),
       logRotationService(std::make_shared<LogRotationService>()),

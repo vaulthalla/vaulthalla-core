@@ -1,22 +1,21 @@
 #pragma once
 
-#include "types/rbac/VaultRole.hpp"
-#include "types/entities/Group.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
+#include "rbac/model/VaultRole.hpp"
+#include "identities/model/Group.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
 #include "protocols/shell/Router.hpp"
 #include "CLITestContext.hpp"
 #include "CommandBuilderRegistry.hpp"
 #include "protocols/shell/commands/all.hpp"
+#include "EntityFactory.hpp"
+#include "database/Queries/UserQueries.hpp"
 
 #include <string>
 #include <vector>
 #include <memory>
 #include <stdexcept>
 #include <iostream>
-
-#include "EntityFactory.hpp"
-#include "database/Queries/UserQueries.hpp"
 
 namespace vh::test::cli {
 
@@ -136,7 +135,7 @@ public:
         return { router_->executeLine(command, admin, io.get()), entity };
     }
 
-    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<types::Group>& group, const std::shared_ptr<types::User>& user) const {
+    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<Group>& group, const std::shared_ptr<User>& user) const {
         if (type != EntityType::USER && type != EntityType::VAULT)
             throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
 
@@ -151,8 +150,8 @@ public:
     }
 
     [[nodiscard]] EntityResult manageVaultRoleAssignments(const EntityType& type, const CommandType& cmdType,
-                                                          const std::shared_ptr<types::Vault>& vault,
-                                                          const std::shared_ptr<types::VaultRole>& role,
+                                                          const std::shared_ptr<Vault>& vault,
+                                                          const std::shared_ptr<VaultRole>& role,
                                                           const std::shared_ptr<void>& entity) const {
         if (type != EntityType::USER && type != EntityType::GROUP)
             throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports USER and GROUP entity types");

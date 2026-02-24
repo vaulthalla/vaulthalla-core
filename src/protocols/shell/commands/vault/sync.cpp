@@ -1,15 +1,15 @@
 #include "protocols/shell/commands/vault.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "logging/LogRegistry.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "services/SyncController.hpp"
-#include "storage/StorageEngine.hpp"
-#include "types/entities/User.hpp"
-#include "types/vault/Vault.hpp"
+#include "storage/Engine.hpp"
+#include "identities/model/User.hpp"
+#include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
-#include "util/interval.hpp"
+#include "database/encoding/interval.hpp"
 #include "CommandUsage.hpp"
 
 #include <optional>
@@ -20,13 +20,13 @@
 using namespace vh::shell;
 using namespace vh::shell::commands;
 using namespace vh::shell::commands::vault;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
-using namespace vh::util;
 using namespace vh::logging;
 using namespace vh::sync::model;
+using namespace vh::database::encoding;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync";

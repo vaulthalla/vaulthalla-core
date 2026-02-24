@@ -1,15 +1,15 @@
 #include "database/Queries/DirectoryQueries.hpp"
 #include "database/Transactions.hpp"
-#include "types/fs/FSEntry.hpp"
-#include "types/fs/Directory.hpp"
-#include "util/u8.hpp"
-#include "util/fsPath.hpp"
+#include "fs/model/Directory.hpp"
+#include "database/encoding/u8.hpp"
 #include "logging/LogRegistry.hpp"
+#include "fs/model/Path.hpp"
 
 #include <optional>
 
 using namespace vh::database;
-using namespace vh::types;
+using namespace vh::database::encoding;
+using namespace vh::fs::model;
 using namespace vh::logging;
 
 

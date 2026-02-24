@@ -2,11 +2,11 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "database/Queries/UserQueries.hpp"
-#include "util/shellArgsHelpers.hpp"
+#include "protocols/shell/util/argsHelpers.hpp"
 #include "auth/AuthManager.hpp"
-#include "crypto/PasswordHash.hpp"
+#include "crypto/util/hash.hpp"
 #include "logging/LogRegistry.hpp"
-#include "types/rbac/UserRole.hpp"
+#include "rbac/model/UserRole.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
@@ -14,12 +14,12 @@
 #include <paths.h>
 
 using namespace vh::shell;
-using namespace vh::types;
+using namespace vh::rbac::model;
+using namespace vh::identities::model;
 using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::services;
 using namespace vh::logging;
-using namespace vh::util;
 using namespace vh::crypto;
 
 static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
@@ -27,8 +27,8 @@ static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
 static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
     constexpr unsigned short maxRetries = 1024 * 4; // 4096 attempts max
     for (unsigned short i = 1; i < maxRetries; ++i) {
-        if (const auto password = generate_secure_password(PASSWORD_LENGTH); AuthManager::isValidPassword(password)) {
-            user->setPasswordHash(hashPassword(password));
+        if (const auto password = hash::generate_secure_password(PASSWORD_LENGTH); AuthManager::isValidPassword(password)) {
+            user->setPasswordHash(hash::password(password));
             return password;
         }
         if (i == maxRetries)

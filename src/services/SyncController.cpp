@@ -1,12 +1,12 @@
 #include "services/SyncController.hpp"
-#include "storage/StorageManager.hpp"
+#include "storage/Manager.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "sync/Local.hpp"
 #include "sync/Cloud.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "storage/cloud/CloudStorageEngine.hpp"
+#include "storage/CloudEngine.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "types/vault/Vault.hpp"
+#include "vault/model/Vault.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -17,7 +17,7 @@ using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::concurrency;
 using namespace vh::logging;
-using namespace vh::types;
+using namespace vh::vault::model;
 using namespace vh::sync;
 
 bool FSTaskCompare::operator()(const std::shared_ptr<Local>& a, const std::shared_ptr<Local>& b) const {
@@ -124,7 +124,7 @@ void SyncController::refreshEngines() {
     for (const auto& engine : latestEngines) processTask(engine);
 }
 
-void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<StorageEngine> >& engines) {
+void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<Engine> >& engines) {
     boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
     for (const auto& engine : engines) latestBitset.set(engine->vault->id);
 
@@ -142,7 +142,7 @@ void SyncController::pruneStaleTasks(const std::vector<std::shared_ptr<StorageEn
 }
 
 
-void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
+void SyncController::processTask(const std::shared_ptr<Engine>& engine) {
     std::scoped_lock lock(taskMapMutex_, pqMutex_);
 
     if (!taskMap_.contains(engine->vault->id)) {
@@ -152,7 +152,7 @@ void SyncController::processTask(const std::shared_ptr<StorageEngine>& engine) {
     }
 }
 
-std::shared_ptr<Local> SyncController::createTask(const std::shared_ptr<StorageEngine>& engine) {
+std::shared_ptr<Local> SyncController::createTask(const std::shared_ptr<Engine>& engine) {
     if (engine->type() == StorageType::Local) return createTask<Local>(engine);
     if (engine->type() == StorageType::Cloud) return createTask<Cloud>(engine);
     throw std::runtime_error("Unsupported StorageType: " + std::to_string(static_cast<int>(engine->type())));

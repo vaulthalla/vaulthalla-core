@@ -1,6 +1,7 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
+#include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"

@@ -8,7 +8,7 @@
 #include "database/Queries/FileQueries.hpp"
 #include "database/Queries/SyncQueries.hpp"
 #include "database/Queries/VaultQueries.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "sync/model/Policy.hpp"
 #include "util/files.hpp"
@@ -37,7 +37,7 @@ Engine::Engine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
       sync(SyncQueries::getSync(vault->id)),
       paths(std::make_shared<Path>(makeAbsolute(to_snake_case(vault->name)), vault->mount_point)),
-      encryptionManager(std::make_shared<VaultEncryptionManager>(vault->id)) {
+      encryptionManager(std::make_shared<vault::EncryptionManager>(vault->id)) {
     if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }

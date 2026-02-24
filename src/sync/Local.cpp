@@ -11,7 +11,7 @@
 #include "util/files.hpp"
 #include "database/Queries/OperationQueries.hpp"
 #include "database/Queries/FileQueries.hpp"
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "logging/LogRegistry.hpp"
@@ -24,6 +24,7 @@
 #include "sync/tasks/Delete.hpp"
 
 using namespace vh::sync;
+using namespace vh::sync::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::services;
@@ -37,7 +38,7 @@ using namespace vh::fs::model;
 Local::Local(const std::shared_ptr<Engine>& engine)
 : next_run(system_clock::from_time_t(engine->sync->last_sync_at) + seconds(engine->sync->interval.count())),
   engine(engine),
-  event(std::make_shared<model::Event>()) {}
+  event(std::make_shared<Event>()) {}
 
 void Local::operator()() {
     startTask();
@@ -88,7 +89,7 @@ void Local::startTask() {
 
     newEvent();
     event = engine->latestSyncEvent;
-    event->status = model::Event::Status::RUNNING;
+    event->status = Event::Status::RUNNING;
     engine->saveSyncEvent();
     event->start();
 }
@@ -119,7 +120,7 @@ void Local::processSharedOps() {
 void Local::handleError(const std::string& message) const {
     LogRegistry::sync()->error("[FSTask] {}", message);
     event->error_message = message;
-    event->status = model::Event::Status::ERROR;
+    event->status = Event::Status::ERROR;
 }
 
 void Local::shutdown() {
@@ -128,7 +129,7 @@ void Local::shutdown() {
     event->stop();
     event->parseCurrentStatus();
     engine->saveSyncEvent();
-    if (event->status == model::Event::Status::SUCCESS) {
+    if (event->status == Event::Status::SUCCESS) {
         SyncQueries::reportSyncSuccess(engine->sync->id);
         next_run = system_clock::now() + seconds(engine->sync->interval.count());
         requeue();
@@ -173,7 +174,7 @@ void Local::push(const std::shared_ptr<Task>& task) {
     concurrency::ThreadPoolManager::instance().syncPool()->submit(task);
 }
 
-ScopedOp& Local::op(const model::Throughput::Metric& metric) const {
+ScopedOp& Local::op(const Throughput::Metric& metric) const {
     return event->getOrCreateThroughput(metric).newOp();
 }
 
@@ -195,7 +196,7 @@ void Local::processOperations() const {
 
         scopedOp.size_bytes = f->size_bytes;
 
-        if (f->size_bytes == 0 && op->operation != model::Operation::Op::Copy) {
+        if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
             LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
             scopedOp.stop();
             continue;
@@ -219,8 +220,8 @@ void Local::processOperations() const {
             engine->moveThumbnails(op->source_path, op->destination_path);
         };
 
-        if (op->operation == model::Operation::Op::Copy) engine->copyThumbnails(op->source_path, op->destination_path);
-        else if (op->operation == model::Operation::Op::Move || op->operation == model::Operation::Op::Rename) move();
+        if (op->operation == Operation::Op::Copy) engine->copyThumbnails(op->source_path, op->destination_path);
+        else if (op->operation == Operation::Op::Move || op->operation == Operation::Op::Rename) move();
         else throw std::runtime_error("Unknown operation type: " + std::to_string(static_cast<int>(op->operation)));
 
         scopedOp.stop();
@@ -261,7 +262,7 @@ void Local::removeTrashedFiles() {
 
     futures.reserve(files.size());
     for (const auto& file : files)
-        push(std::make_shared<tasks::Delete>(engine, file, op(model::Throughput::Metric::DELETE), type));
+        push(std::make_shared<tasks::Delete>(engine, file, op(Throughput::Metric::DELETE), type));
 
     processFutures();
 }

@@ -2,9 +2,9 @@
 
 #include "helpers.hpp"
 
-namespace vh::fs::model {
-struct File;
-}
+#include <memory>
+
+namespace vh::fs::model { struct File; }
 
 namespace vh::sync::model {
 

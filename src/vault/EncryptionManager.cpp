@@ -1,4 +1,4 @@
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "crypto/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
@@ -8,23 +8,25 @@
 #include <sodium.h>
 #include <stdexcept>
 #include <fmt/format.h>
+#include <paths.h>
 
+using namespace vh::vault;
 using namespace vh::crypto;
 using namespace vh::logging;
 using namespace vh::database;
 using namespace vh::fs::model;
 
-VaultEncryptionManager::VaultEncryptionManager(const unsigned int vault_id)
+EncryptionManager::EncryptionManager(const unsigned int vault_id)
     : vault_id_(vault_id) {
     tpmKeyProvider_ = std::make_unique<TPMKeyProvider>(paths::testMode ? "test_vault_master" : "vault_master");
     tpmKeyProvider_->init();
     load_key();
 }
 
-unsigned int VaultEncryptionManager::get_key_version() const { return version_; }
-bool VaultEncryptionManager::rotation_in_progress() const { return rotation_in_progress_.load(); }
+unsigned int EncryptionManager::get_key_version() const { return version_; }
+bool EncryptionManager::rotation_in_progress() const { return rotation_in_progress_.load(); }
 
-void VaultEncryptionManager::load_key() {
+void EncryptionManager::load_key() {
     rotation_in_progress_.store(VaultKeyQueries::keyRotationInProgress(vault_id_));
     const auto rec = VaultKeyQueries::getVaultKey(vault_id_);
     const auto masterKey = tpmKeyProvider_->getMasterKey();
@@ -78,7 +80,7 @@ void VaultEncryptionManager::load_key() {
     }
 }
 
-void VaultEncryptionManager::prepare_key_rotation() {
+void EncryptionManager::prepare_key_rotation() {
     if (VaultKeyQueries::keyRotationInProgress(vault_id_)) {
         LogRegistry::crypto()->warn("[VaultEncryptionManager] Key rotation already in progress for vault {}", vault_id_);
         return;
@@ -107,7 +109,7 @@ void VaultEncryptionManager::prepare_key_rotation() {
     LogRegistry::crypto()->info(msg);
 }
 
-void VaultEncryptionManager::finish_key_rotation() {
+void EncryptionManager::finish_key_rotation() {
     if (!VaultKeyQueries::keyRotationInProgress(vault_id_)) {
         LogRegistry::crypto()->warn("[VaultEncryptionManager] No key rotation in progress for vault {}", vault_id_);
         return;
@@ -124,7 +126,7 @@ void VaultEncryptionManager::finish_key_rotation() {
     LogRegistry::crypto()->info(msg);
 }
 
-std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<File>& f) const {
+std::vector<uint8_t> EncryptionManager::rotateDecryptEncrypt(const std::vector<uint8_t>& ciphertext, const std::shared_ptr<File>& f) const {
     try {
         if (f->encrypted_with_key_version == version_) {
             LogRegistry::crypto()->debug("[VaultEncryptionManager] Key version {} is current for vault {}, no rotation needed",
@@ -165,7 +167,7 @@ std::vector<uint8_t> VaultEncryptionManager::rotateDecryptEncrypt(const std::vec
     }
 }
 
-std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<File>& f) const {
+std::vector<uint8_t> EncryptionManager::encrypt(const std::vector<uint8_t>& plaintext, const std::shared_ptr<File>& f) const {
     std::vector<uint8_t> iv;
 
     auto ciphertext = encrypt_aes256_gcm(plaintext, key_, iv);
@@ -174,7 +176,7 @@ std::vector<uint8_t> VaultEncryptionManager::encrypt(const std::vector<uint8_t>&
     return ciphertext;
 }
 
-std::vector<uint8_t> VaultEncryptionManager::decrypt(const std::vector<uint8_t>& ciphertext, const std::string& b64_iv, const unsigned int keyVersion) const {
+std::vector<uint8_t> EncryptionManager::decrypt(const std::vector<uint8_t>& ciphertext, const std::string& b64_iv, const unsigned int keyVersion) const {
     if (rotation_in_progress_.load()) {
         if (key_.empty() || old_key_.empty()) throw std::runtime_error("Key rotation in progress but keys are not set");
 
@@ -200,7 +202,7 @@ std::vector<uint8_t> VaultEncryptionManager::decrypt(const std::vector<uint8_t>&
     return decrypt_aes256_gcm(ciphertext, key_, b64_decode(b64_iv));
 }
 
-std::vector<uint8_t> VaultEncryptionManager::get_key(const std::string& callingFunctionName) const {
+std::vector<uint8_t> EncryptionManager::get_key(const std::string& callingFunctionName) const {
     if (key_.empty()) {
         LogRegistry::crypto()->error("[VaultEncryptionManager] Key is empty in function: {}", callingFunctionName);
         throw std::runtime_error("Vault key is not initialized");

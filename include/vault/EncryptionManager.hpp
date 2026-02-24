@@ -1,21 +1,19 @@
 #pragma once
 
-#include "TPMKeyProvider.hpp"
+#include "crypto/TPMKeyProvider.hpp"
 
 #include <string>
 #include <vector>
 #include <memory>
 #include <atomic>
 
-namespace vh::fs::model {
-    struct File;
-}
+namespace vh::fs::model { struct File; }
 
-namespace vh::crypto {
+namespace vh::vault {
 
-class VaultEncryptionManager {
+class EncryptionManager {
 public:
-    explicit VaultEncryptionManager(unsigned int vault_id);
+    explicit EncryptionManager(unsigned int vault_id);
 
     // Must be called before encrypt/decrypt
     void load_key();
@@ -41,7 +39,7 @@ public:
     [[nodiscard]] bool rotation_in_progress() const;
 
 private:
-    std::unique_ptr<TPMKeyProvider> tpmKeyProvider_;
+    std::unique_ptr<crypto::TPMKeyProvider> tpmKeyProvider_;
     std::atomic<bool> rotation_in_progress_;
     unsigned int vault_id_, version_{};
     std::vector<uint8_t> key_, old_key_;

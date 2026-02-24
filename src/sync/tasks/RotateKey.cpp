@@ -1,6 +1,6 @@
 #include "sync/tasks/RotateKey.hpp"
 
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "storage/Engine.hpp"
 #include "storage/CloudEngine.hpp"

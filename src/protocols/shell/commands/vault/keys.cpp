@@ -12,7 +12,7 @@
 #include "storage/Engine.hpp"
 #include "storage/s3/S3Controller.hpp"
 
-#include "crypto/VaultEncryptionManager.hpp"
+#include "vault/EncryptionManager.hpp"
 #include "crypto/GPGEncryptor.hpp"
 
 #include "vault/model/Vault.hpp"

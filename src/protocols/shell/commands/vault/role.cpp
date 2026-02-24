@@ -29,7 +29,6 @@ using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::services;
-using namespace vh::crypto;
 using namespace vh::logging;
 
 namespace vh::shell::commands::vault {

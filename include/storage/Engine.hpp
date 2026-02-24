@@ -12,7 +12,10 @@ struct Path;
 namespace file { struct Trashed; }
 }
 
-namespace vh::vault::model { struct Vault; }
+namespace vh::vault {
+class EncryptionManager;
+namespace model { struct Vault; }
+}
 
 namespace vh::sync::model {
 struct Event;
@@ -20,7 +23,7 @@ struct Policy;
 }
 
 namespace vh::crypto {
-class VaultEncryptionManager;
+
 }
 
 namespace vh::storage {
@@ -34,7 +37,7 @@ struct Engine : std::enable_shared_from_this<Engine> {
     std::shared_ptr<sync::model::Policy> sync;
     std::shared_ptr<sync::model::Event> latestSyncEvent;
     std::shared_ptr<vh::fs::model::Path> paths;
-    std::shared_ptr<crypto::VaultEncryptionManager> encryptionManager;
+    std::shared_ptr<vault::EncryptionManager> encryptionManager;
     std::shared_mutex mutex;
 
     static constexpr uintmax_t MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB

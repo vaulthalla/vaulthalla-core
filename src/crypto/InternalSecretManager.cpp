@@ -1,13 +1,15 @@
 #include "crypto/InternalSecretManager.hpp"
 #include "database/Queries/InternalSecretQueries.hpp"
 #include "crypto/model/InternalSecret.hpp"
-#include "crypto/encrypt.hpp"
+#include "crypto/util/encrypt.hpp"
 #include "crypto/PasswordHash.hpp"
 
 #include <paths.h>
 
 using namespace vh::crypto;
+using namespace vh::crypto::util;
 using namespace vh::crypto::model;
+using namespace vh::database;
 
 InternalSecretManager::InternalSecretManager()
 : tpmKeyProvider_(std::make_unique<TPMKeyProvider>(paths::testMode ? "test_master" : "master")) {
@@ -23,7 +25,7 @@ void InternalSecretManager::setJWTSecret(const std::string& secret) const {
 }
 
 std::string InternalSecretManager::getOrInitSecret(const std::string& key) const {
-    const auto secret = database::InternalSecretQueries::getSecret(key);
+    const auto secret = InternalSecretQueries::getSecret(key);
     if (!secret) {
         const auto newSecret = generate_secure_password(64);
         setEncryptedValue(key, newSecret);
@@ -51,5 +53,5 @@ void InternalSecretManager::setEncryptedValue(const std::string& key, const std:
     secret->value = ciphertext;
     secret->iv = iv;
 
-    database::InternalSecretQueries::upsertSecret(secret);
+    InternalSecretQueries::upsertSecret(secret);
 }

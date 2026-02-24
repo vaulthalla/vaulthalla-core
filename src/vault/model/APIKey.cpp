@@ -7,7 +7,7 @@
 #include "util/cmdLineHelpers.hpp"
 #include "util/timestamp.hpp"
 #include "util/bytea.hpp"
-#include "crypto/encrypt.hpp"
+#include "crypto/util/encrypt.hpp"
 
 #include <unordered_map>
 #include <stdexcept>
@@ -21,6 +21,7 @@ using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::shell;
 using namespace vh::util;
+using namespace vh::crypto::util;
 
 // --- S3Provider helpers ---
 std::string vh::vault::model::to_string(S3Provider provider) {
@@ -161,7 +162,7 @@ nlohmann::json vh::vault::model::generate_json_key_object(const std::shared_ptr<
     return {
             {"vault_id", v->id},
             {"vault_name", v->name},
-            {"key", crypto::b64_encode(key)},
+            {"key", b64_encode(key)},
             {"key_info",
                 {
                     {"type", "AES-256-GCM"},
@@ -192,7 +193,7 @@ nlohmann::json vh::vault::model::generate_json_key_info_object(const std::shared
                 {"key_info",
                     {
                         {"type", "AES-256-GCM"},
-                        {"key_size", crypto::AES_KEY_SIZE},
+                        {"key_size", AES_KEY_SIZE},
                         {"key_version", vk->version},
                         {"iv_size", 12},
                         {"tag_size", 16},

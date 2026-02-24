@@ -37,6 +37,7 @@ using namespace std::chrono;
 using namespace vh::logging;
 using namespace vh::storage;
 using namespace vh::fs::model;
+using namespace vh::crypto;
 
 
 // ##########################################
@@ -139,7 +140,7 @@ void Cloud::ensureDirectoriesFromRemote() {
             if (dir->fuse_path.empty())
                 dir->fuse_path = engine->paths->absPath(dir->path, PathType::VAULT_ROOT);
 
-            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+            dir->base32_alias = IdGenerator({ .namespace_token = dir->name }).generate();
             DirectoryQueries::upsertDirectory(dir);
         }
     }

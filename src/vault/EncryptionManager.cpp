@@ -1,5 +1,5 @@
 #include "vault/EncryptionManager.hpp"
-#include "crypto/encrypt.hpp"
+#include "crypto/util/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
 #include "database/Queries/VaultKeyQueries.hpp"
 #include "vault/model/Key.hpp"
@@ -12,6 +12,7 @@
 
 using namespace vh::vault;
 using namespace vh::crypto;
+using namespace vh::crypto::util;
 using namespace vh::logging;
 using namespace vh::database;
 using namespace vh::fs::model;

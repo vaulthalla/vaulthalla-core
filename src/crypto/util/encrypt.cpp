@@ -1,4 +1,4 @@
-#include "crypto/encrypt.hpp"
+#include "crypto/util/encrypt.hpp"
 #include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 
@@ -10,7 +10,7 @@
 using namespace vh::logging;
 using namespace vh::config;
 
-namespace vh::crypto {
+namespace vh::crypto::util {
 
 static bool is_aes_gcm_supported() {
     if (ConfigRegistry::get().dev.enabled || std::getenv("VH_ALLOW_FAKE_AES")) return true;

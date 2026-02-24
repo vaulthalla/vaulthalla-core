@@ -1,5 +1,5 @@
 #include "crypto/PasswordUtils.hpp"
-#include "crypto/SHA1.hpp"
+#include "crypto/util/SHA1.hpp"
 #include <algorithm>
 #include <cctype>
 #include <curl/curl.h>

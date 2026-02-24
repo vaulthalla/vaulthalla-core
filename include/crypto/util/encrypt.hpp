@@ -5,7 +5,7 @@
 #include <string>
 #include <filesystem>
 
-namespace vh::crypto {
+namespace vh::crypto::util {
 
 constexpr size_t AES_KEY_SIZE = 32;      // 256-bit
 constexpr size_t AES_IV_SIZE  = 12;      // GCM standard nonce

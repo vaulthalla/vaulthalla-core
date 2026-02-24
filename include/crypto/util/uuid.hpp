@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace vh::ids {
+namespace vh::crypto::util {
 
 // ---------- Alphabet: Crockford Base32 (no I, L, O, U) – filesystem/email safe
 // 32 symbols => each char encodes 5 bits; 128-bit payload => 26 chars

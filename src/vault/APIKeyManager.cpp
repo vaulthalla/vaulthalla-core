@@ -1,6 +1,6 @@
 #include "vault/APIKeyManager.hpp"
 #include "database/Queries/APIKeyQueries.hpp"
-#include "crypto/encrypt.hpp"
+#include "crypto/util/encrypt.hpp"
 #include "vault/model/APIKey.hpp"
 
 #include <sodium.h>
@@ -8,6 +8,7 @@
 #include <paths.h>
 
 using namespace vh::crypto;
+using namespace vh::crypto::util;
 using namespace vh::vault;
 using namespace vh::vault::model;
 using namespace vh::database;

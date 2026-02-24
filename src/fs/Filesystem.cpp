@@ -96,7 +96,7 @@ void Filesystem::mkdir(const std::filesystem::path& absPath, mode_t mode, const 
             dir->parent_id = parent->id;
             dir->fuse_path = path;
             dir->name = path.filename();
-            dir->base32_alias = ids::IdGenerator({ .namespace_token = dir->name }).generate();
+            dir->base32_alias = IdGenerator({ .namespace_token = dir->name }).generate();
             dir->backing_path = parent->backing_path / dir->base32_alias;
             dir->mode = mode;
             dir->owner_uid = getuid();
@@ -204,7 +204,7 @@ void Filesystem::copy(const std::filesystem::path& from, const std::filesystem::
     entry->path = toVaultPath;
     entry->fuse_path = to;
     entry->name = to.filename().string();
-    entry->base32_alias = ids::IdGenerator({ .namespace_token = entry->name }).generate();
+    entry->base32_alias = IdGenerator({ .namespace_token = entry->name }).generate();
     entry->backing_path = parent->backing_path / entry->base32_alias;
     entry->created_by = entry->last_modified_by = userId;
     entry->parent_id = parent->id;
@@ -258,7 +258,7 @@ std::shared_ptr<Entry> Filesystem::createFile(const std::filesystem::path& path,
     f->name = path.filename();
     f->path = engine->paths->absRelToAbsRel(path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
     f->fuse_path = path;
-    f->base32_alias = ids::IdGenerator({ .namespace_token = f->name }).generate();
+    f->base32_alias = IdGenerator({ .namespace_token = f->name }).generate();
     f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = mode;
     f->owner_uid = uid;
@@ -347,7 +347,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     f->name = ctx.path.filename();
     f->path = ctx.path;
     f->fuse_path = ctx.fuse_path;
-    f->base32_alias = ids::IdGenerator({ .namespace_token = f->name }).generate();
+    f->base32_alias = IdGenerator({ .namespace_token = f->name }).generate();
     f->backing_path = parent->backing_path / f->base32_alias;
     f->mode = ctx.mode;
     f->owner_uid = ctx.linux_uid;

@@ -3,9 +3,7 @@
 #include "protocols/shell/Router.hpp"
 #include "CommandUsage.hpp"
 
-using namespace vh::shell;
-
-void commands::registerAllCommands(const std::shared_ptr<Router>& r) {
+void vh::protocols::shell::commands::registerAllCommands(const std::shared_ptr<Router>& r) {
     vault::registerCommands(r);
     registerAPIKeyCommands(r);
     registerSystemCommands(r);

@@ -1,12 +1,12 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "CommandUsage.hpp"
 
-#include "database/Queries/VaultKeyQueries.hpp"
+#include "database/queries/VaultKeyQueries.hpp"
 
-#include "logging/LogRegistry.hpp"
-#include "services/SyncController.hpp"
+#include "log/Registry.hpp"
+#include "sync/Controller.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
@@ -29,17 +29,17 @@
 #include <memory>
 #include <fstream>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::logging;
 using namespace vh::cloud;
+
 
 static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
                                                      const nlohmann::json& output,
@@ -59,7 +59,7 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
     }
 
     if (outputOpt) {
-        LogRegistry::audit()->warn(
+        log::Registry::audit()->warn(
             "[shell::handle_key_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *
             outputOpt);
         try {
@@ -75,7 +75,7 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
         }
     }
 
-    LogRegistry::audit()->warn(
+    log::Registry::audit()->warn(
         "[shell::handle_key_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
     return {0, output.dump(4),
             "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
@@ -102,7 +102,7 @@ static CommandResult export_one_key(const CommandCall& call, const std::shared_p
 
 
 static CommandResult export_all_keys(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage) {
-    const auto engines = ServiceDepsRegistry::instance().storageManager->getEngines();
+    const auto engines = runtime::Deps::get().storageManager->getEngines();
     if (engines.empty()) return invalid("vault keys export: no vaults found");
 
     nlohmann::json out = nlohmann::json::array();
@@ -123,7 +123,7 @@ static CommandResult handle_export_vault_keys(const CommandCall& call) {
         if (!call.user->canManageEncryptionKeys()) return invalid(
             "vault keys export: only super admins can export vault keys");
 
-        LogRegistry::audit()->warn(
+        log::Registry::audit()->warn(
             "\n[shell::handle_export_vault_keys] User {} called to export vault keys without super admin privileges\n"
             "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
             call.user->name);
@@ -144,7 +144,7 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
         if (!call.user->canManageEncryptionKeys()) return invalid(
             "vault keys inspect: only super admins can inspect vault keys");
 
-        LogRegistry::audit()->warn(
+        log::Registry::audit()->warn(
             "\n[shell::handle_inspect_vault_key] User {} called to inspect vault keys without super admin privileges\n"
             "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
             call.user->name);
@@ -170,7 +170,7 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
         if (!call.user->canManageEncryptionKeys()) return invalid(
             "vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
 
-        LogRegistry::audit()->warn(
+        log::Registry::audit()->warn(
             "\n[shell::handle_rotate_vault_keys] User {} called to rotate vault keys without super admin privileges\n"
             "WARNING: It is extremely dangerous to assign this permission to non super-admin users, proceed at your own risk.\n",
             call.user->name);
@@ -182,13 +182,13 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     const auto syncNow = hasFlag(call, usage->resolveFlag("now")->aliases);
     const auto rotateKey = [&syncNow](const std::shared_ptr<Engine>& engine) {
         engine->encryptionManager->prepare_key_rotation();
-        if (syncNow) ServiceDepsRegistry::instance().syncController->runNow(engine->vault->id);
+        if (syncNow) runtime::Deps::get().syncController->runNow(engine->vault->id);
     };
 
     const auto vaultArg = call.positionals[0];
 
     if (vaultArg == "all") {
-        for (const auto& engine : ServiceDepsRegistry::instance().storageManager->getEngines())
+        for (const auto& engine : runtime::Deps::get().storageManager->getEngines())
             rotateKey(engine);
 
         return ok("Vault keys for all vaults have been rotated successfully.\n"

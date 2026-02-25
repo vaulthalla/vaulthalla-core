@@ -1,5 +1,5 @@
 #include "protocols/TCPServer.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <utility>
 
@@ -22,12 +22,11 @@ void TCPServer::onAcceptError(const beast::error_code& ec) {
 }
 
 std::shared_ptr<spdlog::logger> TCPServer::logger() const {
-    using logging::LogRegistry;
     switch (opts_.channel) {
-    case LogChannel::Http:      return LogRegistry::http();
-    case LogChannel::WebSocket: return LogRegistry::ws();
+    case LogChannel::Http:      return log::Registry::http();
+    case LogChannel::WebSocket: return log::Registry::ws();
     case LogChannel::General:
-    default: return LogRegistry::vaulthalla();
+    default: return log::Registry::vaulthalla();
     }
 }
 

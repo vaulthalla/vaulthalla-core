@@ -4,16 +4,16 @@
 #include "sync/model/Operation.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/metadata/Magic.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
+#include "database/queries/FileQueries.hpp"
+#include "database/queries/SyncQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "sync/model/Policy.hpp"
 #include "fs/ops/file.hpp"
-#include "logging/LogRegistry.hpp"
-#include "database/Queries/SyncEventQueries.hpp"
+#include "log/Registry.hpp"
+#include "database/queries/SyncEventQueries.hpp"
 #include "sync/model/Event.hpp"
 #include "fs/model/file/Trashed.hpp"
 #include "fs/model/File.hpp"
@@ -25,7 +25,6 @@ using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::config;
 using namespace vh::storage;
-using namespace vh::logging;
 using namespace vh::fs::ops;
 using namespace std::chrono;
 using namespace vh::fs::metadata;
@@ -45,7 +44,7 @@ void Engine::newSyncEvent(const uint8_t trigger) {
     if (latestSyncEvent) {
         SyncEventQueries::upsert(latestSyncEvent);
         if (latestSyncEvent->status != sync::model::Event::Status::SUCCESS && latestSyncEvent->status != sync::model::Event::Status::CANCELLED) {
-            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
+            log::Registry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
             return;
         }
     }
@@ -126,7 +125,7 @@ void Engine::moveThumbnails(const std::filesystem::path& from, const std::filesy
         }
 
         if (!fs::exists(fromPath)) {
-            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
+            log::Registry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 
@@ -146,7 +145,7 @@ void Engine::copyThumbnails(const std::filesystem::path& from, const std::filesy
         }
 
         if (!fs::exists(fromPath)) {
-            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
+            log::Registry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 

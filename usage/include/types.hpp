@@ -9,7 +9,7 @@
 #include <variant>
 #include <memory>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 struct Entry {
     std::string label;

@@ -1,12 +1,11 @@
 #include "auth/SessionManager.hpp"
 #include "auth/model/RefreshToken.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "database/queries/UserQueries.hpp"
+#include "log/Registry.hpp"
 
 using namespace vh::auth;
 using namespace vh::auth::model;
 using namespace vh::database;
-using namespace vh::logging;
 
 void SessionManager::createSession(const std::shared_ptr<Client>& client) {
     std::lock_guard lock(sessionMutex_);
@@ -18,7 +17,7 @@ void SessionManager::createSession(const std::shared_ptr<Client>& client) {
         sessionsByRefreshJti_[rt->getJti()] = client;
     else throw std::invalid_argument("Refresh token not found");
 
-    LogRegistry::ws()->debug("[SessionManager] Created session for user: {}", client->getUserName());
+    log::Registry::ws()->debug("[SessionManager] Created session for user: {}", client->getUserName());
 }
 
 std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client) {
@@ -48,10 +47,10 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
         if (!oldJti.empty() && oldJti != newJti) sessionsByRefreshJti_.erase(oldJti);
         sessionsByRefreshJti_[newJti] = client;
 
-        LogRegistry::ws()->debug("[SessionManager] Promoted session for user: {}", client->getUserName());
+        log::Registry::ws()->debug("[SessionManager] Promoted session for user: {}", client->getUserName());
         return client->getRawToken();
     } catch (const std::exception& e) {
-        LogRegistry::ws()->error("[SessionManager] Failed to promote session: {}", e.what());
+        log::Registry::ws()->error("[SessionManager] Failed to promote session: {}", e.what());
         return "";
     }
 }
@@ -84,7 +83,7 @@ void SessionManager::invalidateSession(const std::string& token) {
     if (const auto user = client->getUser()) {
         client->invalidateToken();
         UserQueries::revokeAndPurgeRefreshTokens(user->id);
-        LogRegistry::ws()->debug("[SessionManager] Invalidated session: {}", token);
+        log::Registry::ws()->debug("[SessionManager] Invalidated session: {}", token);
     }
 }
 

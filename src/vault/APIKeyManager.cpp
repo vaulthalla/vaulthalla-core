@@ -1,5 +1,5 @@
 #include "vault/APIKeyManager.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
+#include "database/queries/APIKeyQueries.hpp"
 #include "crypto/util/encrypt.hpp"
 #include "vault/model/APIKey.hpp"
 

@@ -29,7 +29,7 @@ enum class ActionType {
 };
 
 struct EntityResult {
-    shell::CommandResult result{};
+    protocols::shell::CommandResult result{};
     std::shared_ptr<void> entity{};
 };
 

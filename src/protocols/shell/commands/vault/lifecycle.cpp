@@ -1,10 +1,10 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/WaiverQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
+#include "database/queries/WaiverQueries.hpp"
+#include "database/queries/SyncQueries.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/s3/S3Controller.hpp"
@@ -12,7 +12,6 @@
 #include "vault/model/Vault.hpp"
 #include "identities/model/User.hpp"
 
-#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
 
@@ -20,16 +19,13 @@
 #include <vector>
 #include <memory>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::crypto;
-using namespace vh::logging;
 using namespace vh::cloud;
 
 CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
@@ -81,7 +77,7 @@ CommandResult commands::vault::handle_vault_delete(const CommandCall& call) {
             "vault delete: you do not have permission to delete this vault's data");
     }
 
-    ServiceDepsRegistry::instance().storageManager->removeVault(vault->id);
+    runtime::Deps::get().storageManager->removeVault(vault->id);
 
     return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
 }

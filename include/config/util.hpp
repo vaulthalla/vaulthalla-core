@@ -1,6 +1,6 @@
 #pragma once
 
-#include "logging/LogRotator.hpp"
+#include "log/Rotator.hpp"
 
 #include <string>
 #include <chrono>
@@ -64,18 +64,18 @@ inline std::string hoursToDayOrHourStr(const std::chrono::hours& hours) {
     return std::to_string(hours.count()) + "h";
 }
 
-inline logging::LogRotator::Compression parseCompression(const std::string& str) {
-    if (str == "none") return logging::LogRotator::Compression::None;
-    if (str == "gzip") return logging::LogRotator::Compression::Gzip;
-    if (str == "zstd") return logging::LogRotator::Compression::Zstd;
+inline log::Rotator::Compression parseCompression(const std::string& str) {
+    if (str == "none") return log::Rotator::Compression::None;
+    if (str == "gzip") return log::Rotator::Compression::Gzip;
+    if (str == "zstd") return log::Rotator::Compression::Zstd;
     throw std::invalid_argument("Invalid compression type: " + str);
 }
 
-inline std::string compressionToString(const logging::LogRotator::Compression c) {
+inline std::string compressionToString(const log::Rotator::Compression c) {
     switch (c) {
-        case logging::LogRotator::Compression::None: return "none";
-        case logging::LogRotator::Compression::Gzip: return "gzip";
-        case logging::LogRotator::Compression::Zstd: return "zstd";
+        case log::Rotator::Compression::None: return "none";
+        case log::Rotator::Compression::Gzip: return "gzip";
+        case log::Rotator::Compression::Zstd: return "zstd";
     }
     return "unknown";
 }

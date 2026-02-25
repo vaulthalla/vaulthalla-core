@@ -2,18 +2,17 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "database/Queries/PermsQueries.hpp"
+#include "database/queries/PermsQueries.hpp"
 #include "identities/model/User.hpp"
 #include "rbac/model/Role.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::rbac::model;
 using namespace vh::database;
-using namespace vh::services;
 
 static void parseFlag(const CommandCall& call, const std::string& flag, uint16_t& permissions, const unsigned int bitPosition) {
     if (hasFlag(call, flag) || hasFlag(call, "allow-" + flag)) permissions |= (1 << bitPosition);
@@ -151,7 +150,7 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
     const auto usage = resolveUsage({"role", "update"});
     validatePositionals(call, usage);
 
-    const auto rLkp = resolveRole(call.positionals[0], ERR);
+    const auto rLkp = shell::resolveRole(call.positionals[0], ERR);
     if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
     const auto role = rLkp.ptr;
 
@@ -180,7 +179,7 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
     const auto usage = resolveUsage({"role", "delete"});
     validatePositionals(call, usage);
 
-    const auto rLkp = resolveRole(call.positionals[0], ERR);
+    const auto rLkp = shell::resolveRole(call.positionals[0], ERR);
     if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
     const auto role = rLkp.ptr;
 
@@ -193,7 +192,7 @@ static bool isRoleMatch(const std::string& cmd, const std::string_view input) {
 }
 
 static CommandResult handle_role(const CommandCall& call) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     if (call.positionals.empty()) return usage(call.constructFullArgs());
 
     const auto [sub, subcall] = descend(call);
@@ -208,6 +207,6 @@ static CommandResult handle_role(const CommandCall& call) {
 }
 
 void commands::registerRoleCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("role"), handle_role);
 }

@@ -12,7 +12,7 @@
 
 #include <fmt/format.h>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 // ======================================================
 // helpers (anonymous namespace)

@@ -4,7 +4,7 @@
 #include <iostream>
 #include <fstream>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 int main(const int argc, char** argv) {
     std::string out;

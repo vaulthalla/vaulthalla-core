@@ -1,9 +1,8 @@
 #include "storage/s3/S3Controller.hpp"
 #include "storage/s3/curl/helpers.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 using namespace vh::cloud;
-using namespace vh::logging;
 using namespace vh::storage::s3::curl;
 
 void S3Controller::uploadLargeObject(const std::filesystem::path& key,
@@ -29,7 +28,7 @@ void S3Controller::uploadLargeObject(const std::filesystem::path& key,
         try {
             uploadPart(key, uploadId, partNo++, part, etag);
         } catch (const std::exception& e) {
-            LogRegistry::cloud()->error("[S3Provider] uploadLargeObject (from buffer) failed to upload part {}: {}",
+            log::Registry::cloud()->error("[S3Provider] uploadLargeObject (from buffer) failed to upload part {}: {}",
                                         partNo - 1, e.what());
             success = false;
             break;
@@ -44,10 +43,10 @@ void S3Controller::uploadLargeObject(const std::filesystem::path& key,
             abortMultipartUpload(key, uploadId);
             return;
         } catch (const std::exception& e) {
-            LogRegistry::cloud()->error(
+            log::Registry::cloud()->error(
                 "[S3Provider] uploadLargeObject (from buffer) failed to abort multipart upload for {}: uploadId={}",
                 key.string(), uploadId);
-            LogRegistry::cloud()->error(e.what());
+            log::Registry::cloud()->error(e.what());
             throw std::runtime_error("Failed to abort multipart upload after part upload failure");
         }
     }
@@ -60,7 +59,7 @@ void S3Controller::uploadBufferWithMetadata(
     const std::vector<uint8_t>& buffer,
     const std::unordered_map<std::string, std::string>& metadata) const
 {
-    LogRegistry::cloud()->debug("[S3Provider] Uploading buffer to S3 key: {}, buffer_size: {}",
+    log::Registry::cloud()->debug("[S3Provider] Uploading buffer to S3 key: {}, buffer_size: {}",
                                key.string(), buffer.size());
 
     // Hash the raw bytes for SigV4
@@ -150,7 +149,7 @@ void S3Controller::downloadToBuffer(const std::filesystem::path& key, std::vecto
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK)
-        LogRegistry::cloud()->error("[S3Provider] downloadToBuffer failed for {}: CURL={} Response:\n{}",
+        log::Registry::cloud()->error("[S3Provider] downloadToBuffer failed for {}: CURL={} Response:\n{}",
                                         key.string(), res, curl_easy_strerror(res));
 
     if (res != CURLE_OK) throw std::runtime_error(

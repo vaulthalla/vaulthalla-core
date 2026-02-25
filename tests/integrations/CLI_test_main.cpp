@@ -1,13 +1,13 @@
 #include "IntegrationsTestRunner.hpp"
 #include "database/Transactions.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "database/queries/UserQueries.hpp"
 #include "seed/include/init_db_tables.hpp"
 #include "seed/include/seed_db.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "services/ServiceManager.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Manager.hpp"
+#include "runtime/Deps.hpp"
 #include "fs/Filesystem.hpp"
 #include "storage/Manager.hpp"
 
@@ -16,11 +16,9 @@
 #include <chrono>
 #include <paths.h>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::config;
-using namespace vh::logging;
 using namespace vh::concurrency;
-using namespace vh::services;
 using namespace vh::storage;
 using namespace vh::test::cli;
 using namespace vh::database;
@@ -29,7 +27,7 @@ using namespace vh::fs;
 static void initBase() {
     vh::paths::enableTestMode();
     ConfigRegistry::init();
-    LogRegistry::init();
+    vh::log::Registry::init();
     ThreadPoolManager::instance().init();
 }
 
@@ -43,16 +41,16 @@ static void initDB() {
 }
 
 static void initServices() {
-    ServiceDepsRegistry::init();
-    ServiceDepsRegistry::setSyncController(ServiceManager::instance().getSyncController());
-    Filesystem::init(ServiceDepsRegistry::instance().storageManager);
-    ServiceDepsRegistry::instance().storageManager->initStorageEngines();
-    ServiceManager::instance().startTestServices();
+    vh::runtime::Deps::init();
+    vh::runtime::Deps::setSyncController(vh::runtime::Manager::instance().getSyncController());
+    Filesystem::init(vh::runtime::Deps::get().storageManager);
+    vh::runtime::Deps::get().storageManager->initStorageEngines();
+    vh::runtime::Manager::instance().startTestServices();
 }
 
 static void ensureAdminExists() {
     if (!UserQueries::adminUserExists()) {
-        LogRegistry::vaulthalla()->error("No admin user found; cannot run CLI tests");
+        vh::log::Registry::vaulthalla()->error("No admin user found; cannot run CLI tests");
         exit(1);
     }
 }

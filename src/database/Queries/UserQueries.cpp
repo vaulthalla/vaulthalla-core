@@ -1,15 +1,14 @@
-#include "database/Queries/UserQueries.hpp"
+#include "database/queries/UserQueries.hpp"
 #include "identities/model/User.hpp"
 #include "auth/model/RefreshToken.hpp"
 #include "database/Transactions.hpp"
 #include "rbac/model/UserRole.hpp"
 #include "rbac/model/VaultRole.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "crypto/util/hash.hpp"
 
 #include <pqxx/pqxx>
 
-using namespace vh::logging;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::auth::model;
@@ -21,7 +20,7 @@ std::shared_ptr<User> UserQueries::getUserByName(const std::string& name) {
     return Transactions::exec("UserQueries::getUserByName", [&](pqxx::work& txn) -> std::shared_ptr<User> {
         const auto res = txn.exec(pqxx::prepped{"get_user_by_name"}, pqxx::params{name});
         if (res.empty()) {
-            LogRegistry::db()->trace("[UserQueries] No user found with name: {}", name);
+            log::Registry::db()->trace("[UserQueries] No user found with name: {}", name);
             return nullptr;
         }
         const auto userRow = res.one_row();
@@ -51,7 +50,7 @@ std::shared_ptr<User> UserQueries::getUserByRefreshToken(const std::string& jti)
     return Transactions::exec("UserQueries::getUserByRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<User> {
         const auto res = txn.exec(pqxx::prepped{"get_user_by_refresh_token"}, pqxx::params{jti});
         if (res.empty()) {
-            LogRegistry::db()->trace("[UserQueries] No user found for refresh token JTI: {}", jti);
+            log::Registry::db()->trace("[UserQueries] No user found for refresh token JTI: {}", jti);
             return nullptr;
         }
 
@@ -70,7 +69,7 @@ std::shared_ptr<User> UserQueries::getUserByLinuxUID(unsigned int linuxUid) {
     return Transactions::exec("UserQueries::getUserByLinuxUID", [&](pqxx::work& txn) -> std::shared_ptr<User> {
         const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
         if (res.empty()) {
-            LogRegistry::db()->debug("[UserQueries] No user found with Linux UID: {}", linuxUid);
+            log::Registry::db()->debug("[UserQueries] No user found with Linux UID: {}", linuxUid);
             return nullptr;
         }
         const auto userRow = res.one_row();
@@ -93,7 +92,7 @@ unsigned int UserQueries::getUserIdByLinuxUID(const unsigned int linuxUid) {
 }
 
 unsigned int UserQueries::createUser(const std::shared_ptr<User>& user) {
-    LogRegistry::db()->debug("[UserQueries] Creating user: {}", user->name);
+    log::Registry::db()->debug("[UserQueries] Creating user: {}", user->name);
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     return Transactions::exec("UserQueries::createUser", [&](pqxx::work& txn) {
         pqxx::params p{
@@ -216,7 +215,7 @@ std::shared_ptr<RefreshToken> UserQueries::getRefreshToken(const std::string& jt
     return Transactions::exec("UserQueries::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<RefreshToken> {
         const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
         if (res.empty()) {
-            LogRegistry::db()->trace("[UserQueries] No refresh token found for JTI: {}", jti);
+            log::Registry::db()->trace("[UserQueries] No refresh token found for JTI: {}", jti);
             return nullptr;
         }
         return std::make_shared<RefreshToken>(res.one_row());

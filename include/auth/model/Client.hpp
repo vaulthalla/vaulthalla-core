@@ -58,4 +58,4 @@ class Client {
     [[nodiscard]] std::string generateToken(const std::string& name) const;
 };
 
-} // namespace vh::auth
+}

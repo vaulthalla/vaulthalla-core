@@ -1,4 +1,4 @@
-#include "database/Queries/WaiverQueries.hpp"
+#include "database/queries/WaiverQueries.hpp"
 #include "database/Transactions.hpp"
 #include "sync/model/Waiver.hpp"
 #include "vault/model/S3Vault.hpp"

@@ -1,4 +1,4 @@
-#include "database/Queries/VaultKeyQueries.hpp"
+#include "database/queries/VaultKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "vault/model/Key.hpp"
 #include "database/encoding/bytea.hpp"

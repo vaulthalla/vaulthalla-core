@@ -2,8 +2,8 @@
 #include "storage/Engine.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/Path.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "runtime/Deps.hpp"
+#include "log/Registry.hpp"
 #include "fs/cache/Registry.hpp"
 
 #include <fstream>
@@ -15,8 +15,6 @@
 #include <cmath>
 #include <format>
 
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::fs::model;
 
 namespace vh::fs::ops {
@@ -78,9 +76,9 @@ std::filesystem::path decrypt_file_to_temp(const unsigned int vault_id,
     namespace fs = std::filesystem;
 
     const auto abs_path = engine->paths->absRelToAbsRel(rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(abs_path);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(abs_path);
     if (!entry) {
-        LogRegistry::storage()->error("[decrypt_file_to_temp] Entry not found for path: {}", abs_path.string());
+        log::Registry::storage()->error("[decrypt_file_to_temp] Entry not found for path: {}", abs_path.string());
         throw std::runtime_error("Entry not found for path: " + abs_path.string());
     }
 

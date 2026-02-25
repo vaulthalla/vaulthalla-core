@@ -1,5 +1,5 @@
 #include "crypto/util/encrypt.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "config/ConfigRegistry.hpp"
 
 #include <sodium.h>
@@ -7,7 +7,6 @@
 #include <fstream>
 #include <cstring>
 
-using namespace vh::logging;
 using namespace vh::config;
 
 namespace vh::crypto::util {
@@ -23,7 +22,7 @@ std::vector<uint8_t> encrypt_aes256_gcm(
     std::vector<uint8_t>& out_iv)
 {
     if (key.size() != AES_KEY_SIZE) {
-        LogRegistry::crypto()->error("[encrypt_aes256_gcm] Invalid AES-256 key size: {} bytes", key.size());
+        log::Registry::crypto()->error("[encrypt_aes256_gcm] Invalid AES-256 key size: {} bytes", key.size());
         throw std::invalid_argument("Invalid AES-256 key size");
     }
 
@@ -52,7 +51,7 @@ std::vector<uint8_t> decrypt_aes256_gcm(
     const std::vector<uint8_t>& iv)
 {
     if (key.size() != AES_KEY_SIZE || iv.size() != AES_IV_SIZE) {
-        LogRegistry::crypto()->error("[decrypt_aes256_gcm] Invalid key or IV size: "
+        log::Registry::crypto()->error("[decrypt_aes256_gcm] Invalid key or IV size: "
                                      "key size = {}, iv size = {}",
                                      key.size(), iv.size());
         throw std::invalid_argument("Invalid key or IV size");

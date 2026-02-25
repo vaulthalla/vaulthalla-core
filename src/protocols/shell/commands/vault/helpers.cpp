@@ -5,29 +5,27 @@
 #include "identities/model/User.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
+#include "database/queries/UserQueries.hpp"
+#include "database/queries/PermsQueries.hpp"
+#include "database/queries/APIKeyQueries.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "storage/Manager.hpp"
 #include "CommandUsage.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "database/encoding/interval.hpp"
 
-using namespace vh::shell;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
 using namespace vh::database;
 using namespace vh::storage;
-using namespace vh::services;
 using namespace vh::sync::model;
 using namespace vh::database::encoding;
 
-namespace vh::shell::commands::vault {
+namespace vh::protocols::shell::commands::vault {
 
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut) {
     if (const auto v = parseUInt(s)) {
@@ -94,7 +92,7 @@ Lookup<Engine> resolveEngine(const CommandCall& call, const std::string& vaultAr
     if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }
     const auto vault = vLkp.ptr;
 
-    out.ptr = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    out.ptr = runtime::Deps::get().storageManager->getEngine(vault->id);
     if (!out.ptr) out.error = errPrefix + ": no storage engine found for vault '" + vaultArg + "'";
     return out;
 }

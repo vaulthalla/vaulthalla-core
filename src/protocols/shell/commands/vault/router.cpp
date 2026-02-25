@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 
 #include <string>
@@ -9,10 +9,9 @@
 #include <vector>
 #include <memory>
 
-using namespace vh::shell;
-using namespace vh::shell::commands;
-using namespace vh::shell::commands::vault;
-using namespace vh::services;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 
 static bool isVaultMatch(const std::string& cmd, const std::string_view input) {
     return isCommandMatch({"vault", cmd}, input);
@@ -37,6 +36,6 @@ static CommandResult handle_vault(const CommandCall& call) {
 }
 
 void commands::vault::registerCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("vault"), handle_vault);
 }

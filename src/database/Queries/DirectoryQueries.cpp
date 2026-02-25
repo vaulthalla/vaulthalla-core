@@ -1,8 +1,7 @@
-#include "database/Queries/DirectoryQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
 #include "database/Transactions.hpp"
 #include "fs/model/Directory.hpp"
 #include "database/encoding/u8.hpp"
-#include "logging/LogRegistry.hpp"
 #include "fs/model/Path.hpp"
 
 #include <optional>
@@ -10,8 +9,6 @@
 using namespace vh::database;
 using namespace vh::database::encoding;
 using namespace vh::fs::model;
-using namespace vh::logging;
-
 
 unsigned int DirectoryQueries::upsertDirectory(const std::shared_ptr<Directory>& directory) {
     if (!directory->path.string().starts_with("/")) directory->setPath("/" + to_utf8_string(directory->path.u8string()));

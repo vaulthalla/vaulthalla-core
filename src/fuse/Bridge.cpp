@@ -7,11 +7,11 @@
 #include "vault/model/Vault.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "fs/Filesystem.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "runtime/Deps.hpp"
+#include "database/queries/UserQueries.hpp"
+#include "database/queries/FileQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
+#include "log/Registry.hpp"
 #include "fs/cache/Registry.hpp"
 
 #include <cerrno>
@@ -23,15 +23,13 @@ using namespace vh::database;
 using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::fs;
 using namespace vh::fs::model;
 
 namespace vh::fuse {
 
 void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[getattr] Called for inode: {}", ino);
+    log::Registry::fuse()->debug("[getattr] Called for inode: {}", ino);
     (void)fi;
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
@@ -40,17 +38,17 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[getattr] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[getattr] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
     try {
-        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+        const auto& cache = runtime::Deps::get().fsCache;
         if (ino == FUSE_ROOT_ID) {
             const auto entry = cache->getEntry(FUSE_ROOT_ID);
             if (!entry) {
-                LogRegistry::fuse()->error("[getattr] No entry found for inode {}, resolved path: /", ino);
+                log::Registry::fuse()->error("[getattr] No entry found for inode {}, resolved path: /", ino);
                 fuse_reply_err(req, ENOENT);
                 return;
             }
@@ -66,13 +64,13 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
         const auto entry = cache->getEntry(ino);
 
         if (!entry) {
-            LogRegistry::fuse()->error("[getattr] No entry found for inode {}", ino);
+            log::Registry::fuse()->error("[getattr] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id && !user->canListVaultData(*entry->vault_id, entry->path)) {
-            LogRegistry::fuse()->warn("[getattr] Access denied for user {} on root directory", user->name);
+            log::Registry::fuse()->warn("[getattr] Access denied for user {} on root directory", user->name);
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -93,36 +91,36 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[setattr] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[setattr] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
-    LogRegistry::fuse()->debug("[setattr] Called for inode: {}, to_set: {}, uid: {}, gid: {}",
+    log::Registry::fuse()->debug("[setattr] Called for inode: {}, to_set: {}, uid: {}, gid: {}",
         ino, to_set, ctx->uid, ctx->gid);
 
     if (to_set & FUSE_SET_ATTR_MODE) {
-        LogRegistry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!");
+        log::Registry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: chmod is forbidden beyond the gates!");
         fuse_reply_err(req, EPERM);
         return;
     }
 
     if (to_set & (FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
-        LogRegistry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: changing ownership is forbidden beyond the gates!");
+        log::Registry::fuse()->warn("⚔️ [Vaulthalla] Illegal access: changing ownership is forbidden beyond the gates!");
         fuse_reply_err(req, EPERM);
         return;
     }
 
     try {
-        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+        const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
         if (!entry) {
-            LogRegistry::fuse()->error("[setattr] No entry found for inode {}", ino);
+            log::Registry::fuse()->error("[setattr] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id && !user->canCreateVaultData(*entry->vault_id, entry->path)) {
-            LogRegistry::fuse()->warn("[setattr] Access denied for user {} on path {}", user->name, entry->path.string());
+            log::Registry::fuse()->warn("[setattr] Access denied for user {} on path {}", user->name, entry->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -152,33 +150,33 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
 }
 
 void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
+    log::Registry::fuse()->debug("[readdir] Called for inode: {}, size: {}, offset: {}", ino, size, off);
     (void)fi;
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     const uid_t uid = ctx->uid;
 
-    const auto listDirEntry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto listDirEntry = runtime::Deps::get().fsCache->getEntry(ino);
     if (!listDirEntry) {
-        LogRegistry::fuse()->error("[readdir] No entry found for inode {}", ino);
+        log::Registry::fuse()->error("[readdir] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[readdir] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[readdir] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
     if (!user->canManageVaults() && listDirEntry->vault_id && !user->canListVaultData(*listDirEntry->vault_id, listDirEntry->path)) {
-        LogRegistry::fuse()->warn("[readdir] Access denied for user {} on path {}", user->name, listDirEntry->path.string());
+        log::Registry::fuse()->warn("[readdir] Access denied for user {} on path {}", user->name, listDirEntry->path.string());
         fuse_reply_err(req, EACCES);
         return;
     }
 
-    const auto entries = ServiceDepsRegistry::instance().fsCache->listDir(listDirEntry->id, false);
+    const auto entries = runtime::Deps::get().fsCache->listDir(listDirEntry->id, false);
 
     std::vector<char> buf(size);
     size_t buf_used = 0;
@@ -220,7 +218,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
 }
 
 void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
-    LogRegistry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
+    log::Registry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
         return;
@@ -232,28 +230,28 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->debug("[lookup] No user found for UID: {}", uid);
+        log::Registry::fuse()->debug("[lookup] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
-    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+    const auto& cache = runtime::Deps::get().fsCache;
 
     const auto parentPath = cache->resolvePath(parent);
     const auto path = parentPath / name;
     const fuse_ino_t ino = cache->getOrAssignInode(path);
 
-    LogRegistry::fuse()->debug("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
+    log::Registry::fuse()->debug("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
 
     const auto entry = cache->getEntry(path);
     if (!entry) {
-        LogRegistry::fuse()->debug("[lookup] Entry not found for path: {}", path.string());
+        log::Registry::fuse()->debug("[lookup] Entry not found for path: {}", path.string());
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     if (!user->canManageVaults() && entry->vault_id && !user->canListVaultData(*entry->vault_id, entry->path)) {
-        LogRegistry::fuse()->warn("[lookup] Access denied for user {} on path {}", user->name, path.string());
+        log::Registry::fuse()->warn("[lookup] Access denied for user {} on path {}", user->name, path.string());
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -270,7 +268,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 }
 
 void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
+    log::Registry::fuse()->debug("[create] Called for parent: {}, name: {}, mode: {}",
         parent, name, mode);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
@@ -282,12 +280,12 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
     }
 
     try {
-        const auto parentPath = ServiceDepsRegistry::instance().fsCache->resolvePath(parent);
+        const auto parentPath = runtime::Deps::get().fsCache->resolvePath(parent);
         const auto fullPath = parentPath / name;
 
-        const auto engine = ServiceDepsRegistry::instance().storageManager->resolveStorageEngine(fullPath);
+        const auto engine = runtime::Deps::get().storageManager->resolveStorageEngine(fullPath);
         if (!engine) {
-            LogRegistry::fuse()->error("[create] No storage engine found for path: {}", fullPath.string());
+            log::Registry::fuse()->error("[create] No storage engine found for path: {}", fullPath.string());
             fuse_reply_err(req, EIO);
             return;
         }
@@ -295,18 +293,18 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         const auto vaultPath = engine->paths->absRelToAbsRel(fullPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[create] No user found for UID: {}", uid);
+            log::Registry::fuse()->error("[create] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (!user->canManageVaults() && !user->canCreateVaultData(engine->vault->id, vaultPath)) {
-            LogRegistry::fuse()->warn("[create] Access denied for user {} on path {}", user->name, fullPath.string());
+            log::Registry::fuse()->warn("[create] Access denied for user {} on path {}", user->name, fullPath.string());
             fuse_reply_err(req, EACCES);
             return;
         }
 
-        if (ServiceDepsRegistry::instance().fsCache->entryExists(fullPath)) {
+        if (runtime::Deps::get().fsCache->entryExists(fullPath)) {
             fuse_reply_err(req, EEXIST);
             return;
         }
@@ -335,15 +333,15 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
         fuse_reply_create(req, &e, fi);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[create] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[create] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[open] Called for inode: {}, flags: {}", ino, fi->flags);
+    log::Registry::fuse()->debug("[open] Called for inode: {}, flags: {}", ino, fi->flags);
 
-    ServiceDepsRegistry::instance().storageManager->registerOpenHandle(ino);
+    runtime::Deps::get().storageManager->registerOpenHandle(ino);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
@@ -351,21 +349,21 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[open] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[open] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
     try {
-        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+        const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
         if (!entry) {
-            LogRegistry::fuse()->error("[open] No entry found for inode {}", ino);
+            log::Registry::fuse()->error("[open] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id && !user->canDownloadVaultData(*entry->vault_id, entry->path)) {
-            LogRegistry::fuse()->warn("[open] Access denied for user {} on path {}", user->name, entry->path.string());
+            log::Registry::fuse()->warn("[open] Access denied for user {} on path {}", user->name, entry->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -384,14 +382,14 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
         fuse_reply_open(req, fi);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[open] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[open] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
                        const size_t size, const off_t off, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[write] Called for inode: {}, size: {}, offset: {}, file handle: {}",
+    log::Registry::fuse()->debug("[write] Called for inode: {}, size: {}, offset: {}, file handle: {}",
         ino, size, off, fi->fh);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
@@ -400,41 +398,41 @@ void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     (void)ino; // unused
 
-    LogRegistry::fuse()->debug("[write] Writing to fd={} offset={} size={}", fh->fd, off, size);
+    log::Registry::fuse()->debug("[write] Writing to fd={} offset={} size={}", fh->fd, off, size);
 
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
     if (res < 0) fuse_reply_err(req, errno);
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[write] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[write] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
     if (!entry) {
-        LogRegistry::fuse()->error("[write] No entry found for inode {}", ino);
+        log::Registry::fuse()->error("[write] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     if (!user->canManageVaults() && entry->vault_id && !user->canCreateVaultData(*entry->vault_id, entry->path)) {
-        LogRegistry::fuse()->warn("[write] Access denied for user {} on path {}", user->name, entry->path.string());
+        log::Registry::fuse()->warn("[write] Access denied for user {} on path {}", user->name, entry->path.string());
         fuse_reply_err(req, EACCES);
         return;
     }
 
     entry->size_bytes = std::filesystem::file_size(entry->backing_path);
-    ServiceDepsRegistry::instance().fsCache->updateEntry(entry);
+    runtime::Deps::get().fsCache->updateEntry(entry);
 
-    fuse_lowlevel_notify_inval_inode(ServiceDepsRegistry::instance().fuseSession, ino, 0, 0);
+    fuse_lowlevel_notify_inval_inode(runtime::Deps::get().fuseSession, ino, 0, 0);
 
     fuse_reply_write(req, res);
 }
 
 void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[read] Called for inode: {}, size: {}, offset: {}, file handle: {}",
+    log::Registry::fuse()->debug("[read] Called for inode: {}, size: {}, offset: {}, file handle: {}",
         ino, size, off, fi->fh);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
@@ -442,22 +440,22 @@ void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const o
 
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
 
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
     if (!entry) {
-        LogRegistry::fuse()->error("[read] No entry found for inode {}", ino);
+        log::Registry::fuse()->error("[read] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[read] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[read] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
     if (!user->canManageVaults() && entry->vault_id && !user->canDownloadVaultData(*entry->vault_id, entry->path)) {
-        LogRegistry::fuse()->warn("[read] Access denied for user {} on path {}", user->name, entry->path.string());
+        log::Registry::fuse()->warn("[read] Access denied for user {} on path {}", user->name, entry->path.string());
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -470,14 +468,14 @@ void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const o
 }
 
 void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, const mode_t mode) {
-    LogRegistry::fuse()->debug("[mkdir] Called for parent: {}, name: {}, mode: {}", parent, name, mode);
+    log::Registry::fuse()->debug("[mkdir] Called for parent: {}, name: {}, mode: {}", parent, name, mode);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[mkdir] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[mkdir] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -488,7 +486,7 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
             return;
         }
 
-        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+        const auto& cache = runtime::Deps::get().fsCache;
 
         const auto parentPath = cache->resolvePath(parent);
         if (parentPath.empty()) {
@@ -498,16 +496,16 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
 
         const std::filesystem::path fullPath = parentPath / name;
 
-        const auto engine = ServiceDepsRegistry::instance().storageManager->resolveStorageEngine(fullPath);
+        const auto engine = runtime::Deps::get().storageManager->resolveStorageEngine(fullPath);
         if (!engine) {
-            LogRegistry::fuse()->error("[mkdir] No storage engine found for path: {}", fullPath.string());
+            log::Registry::fuse()->error("[mkdir] No storage engine found for path: {}", fullPath.string());
             fuse_reply_err(req, EIO);
             return;
         }
 
         const auto vaultPath = engine->paths->absRelToAbsRel(fullPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
         if (!user->canManageVaults() && !user->canCreateVaultData(engine->vault->id, vaultPath)) {
-            LogRegistry::fuse()->warn("[mkdir] Access denied for user {} on path {}", user->name, fullPath.string());
+            log::Registry::fuse()->warn("[mkdir] Access denied for user {} on path {}", user->name, fullPath.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -515,7 +513,7 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
         try {
             Filesystem::mkdir(fullPath, mode);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            LogRegistry::fuse()->error("[mkdir] Failed to create directory: {} → {}: {}",
+            log::Registry::fuse()->error("[mkdir] Failed to create directory: {} → {}: {}",
                 parentPath.string(), name, fsErr.what());
             fuse_reply_err(req, EIO);
             return;
@@ -534,19 +532,19 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
         fuse_reply_entry(req, &e);
 
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[mkdir] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[mkdir] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, const fuse_ino_t newparent, const char* newname, const unsigned int flags) {
-    LogRegistry::fuse()->debug("[rename] Called for parent: {}, name: {}, newparent: {}, newname: {}, flags: {}",
+    log::Registry::fuse()->debug("[rename] Called for parent: {}, name: {}, newparent: {}, newname: {}, flags: {}",
                                parent, name, newparent, newname, flags);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
 
-    const auto& cache = ServiceDepsRegistry::instance().fsCache;
+    const auto& cache = runtime::Deps::get().fsCache;
 
     try {
         const auto fromPath = cache->resolvePath(parent) / name;
@@ -566,13 +564,13 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[rename] No user found for UID: {}", uid);
+            log::Registry::fuse()->error("[rename] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id && !user->canRenameVaultData(*entry->vault_id, entry->path)) {
-            LogRegistry::fuse()->warn("[rename] Access denied for user {} on path {}", user->name, entry->path.string());
+            log::Registry::fuse()->warn("[rename] Access denied for user {} on path {}", user->name, entry->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -580,7 +578,7 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         try {
             Filesystem::rename(fromPath, toPath);
         } catch (const std::filesystem::filesystem_error& fsErr) {
-            LogRegistry::fuse()->error("[rename] Failed to rename: {} → {}: {}",
+            log::Registry::fuse()->error("[rename] Failed to rename: {} → {}: {}",
                 fromPath.string(), toPath.string(), fsErr.what());
             fuse_reply_err(req, EIO);
             return;
@@ -588,40 +586,40 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
         fuse_reply_err(req, 0);  // Success
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[rename] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[rename] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) {
-    LogRegistry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
-    if (const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino)) {
-        LogRegistry::fuse()->debug("[forget] Evicting inode: {} (path: {})", ino, entry->path.string());
-        ServiceDepsRegistry::instance().fsCache->evictIno(ino);
+    log::Registry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
+    if (const auto entry = runtime::Deps::get().fsCache->getEntry(ino)) {
+        log::Registry::fuse()->debug("[forget] Evicting inode: {} (path: {})", ino, entry->path.string());
+        runtime::Deps::get().fsCache->evictIno(ino);
         fuse_reply_err(req, 0);
         return;
     }
 
-    LogRegistry::fuse()->error("[forget] No entry found for inode {}", ino);
+    log::Registry::fuse()->error("[forget] No entry found for inode {}", ino);
     fuse_reply_none(req); // no return value
 }
 
 void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
-    LogRegistry::fuse()->debug("[access] Called for inode: {}, mask: {}", ino, mask);
+    log::Registry::fuse()->debug("[access] Called for inode: {}, mask: {}", ino, mask);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
 
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
     if (!entry) {
-        LogRegistry::fuse()->error("[access] No entry found for inode {}", ino);
+        log::Registry::fuse()->error("[access] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[access] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[access] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
@@ -633,7 +631,7 @@ void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
         if ((mask & X_OK) && !user->canListVaultData(*entry->vault_id, entry->path)) allowed = false;
 
         if (!allowed) {
-            LogRegistry::fuse()->warn("[access] Access denied for user {} on path {}, mask: {}",
+            log::Registry::fuse()->warn("[access] Access denied for user {} on path {}, mask: {}",
                 user->name, entry->path.string(), mask);
             fuse_reply_err(req, EACCES);
             return;
@@ -648,7 +646,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const uid_t uid = ctx->uid;
     // const gid_t gid = ctx->gid;
 
-    LogRegistry::fuse()->debug("[unlink] Called for parent: {}, name: {}", parent, name);
+    log::Registry::fuse()->debug("[unlink] Called for parent: {}, name: {}", parent, name);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -656,13 +654,13 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     }
 
     try {
-        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+        const auto& cache = runtime::Deps::get().fsCache;
 
         const auto parentPath = cache->resolvePath(parent);
         const auto fullPath   = parentPath / name;
 
         if (!cache->entryExists(fullPath)) {
-            LogRegistry::fuse()->debug("[unlink] Entry does not exist for path: {}", fullPath.string());
+            log::Registry::fuse()->debug("[unlink] Entry does not exist for path: {}", fullPath.string());
             fuse_reply_err(req, ENOENT);
             return;
         }
@@ -675,13 +673,13 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[unlink] No user found for UID: {}", uid);
+            log::Registry::fuse()->error("[unlink] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (!user->canManageVaults() && file->vault_id && !user->canDeleteVaultData(*file->vault_id, file->path)) {
-            LogRegistry::fuse()->warn("[unlink] Access denied for user {} on path {}", user->name, file->path.string());
+            log::Registry::fuse()->warn("[unlink] Access denied for user {} on path {}", user->name, file->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -689,11 +687,11 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         FileQueries::markFileAsTrashed(user->id, *file->vault_id, file->path, true);
 
         if (::unlink(file->backing_path.c_str()) < 0)
-            LogRegistry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
+            log::Registry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[unlink] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[unlink] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
@@ -703,7 +701,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     const uid_t uid = ctx->uid;
     // const gid_t gid = ctx->gid;
 
-    LogRegistry::fuse()->debug("[rmdir] Called for parent: {}, name: {}", parent, name);
+    log::Registry::fuse()->debug("[rmdir] Called for parent: {}, name: {}", parent, name);
 
     if (!name || strlen(name) == 0) {
         fuse_reply_err(req, EINVAL);
@@ -711,7 +709,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     }
 
     try {
-        const auto& cache = ServiceDepsRegistry::instance().fsCache;
+        const auto& cache = runtime::Deps::get().fsCache;
 
         const auto parentPath = cache->resolvePath(parent);
         const auto fullPath   = parentPath / name;
@@ -734,13 +732,13 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[rmdir] No user found for UID: {}", uid);
+            log::Registry::fuse()->error("[rmdir] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id && !user->canDeleteVaultData(*entry->vault_id, entry->path)) {
-            LogRegistry::fuse()->warn("[rmdir] Access denied for user {} on path {}", user->name, entry->path.string());
+            log::Registry::fuse()->warn("[rmdir] Access denied for user {} on path {}", user->name, entry->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
@@ -748,17 +746,17 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         DirectoryQueries::deleteEmptyDirectory(entry->id);
 
         if (::rmdir(entry->backing_path.c_str()) < 0)
-            LogRegistry::fuse()->debug("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
+            log::Registry::fuse()->debug("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[rmdir] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[rmdir] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void flush(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[flush] Called for inode: {}, file handle: {}", ino, fi->fh);
+    log::Registry::fuse()->debug("[flush] Called for inode: {}, file handle: {}", ino, fi->fh);
 
     // This can be a no-op unless something like sync(2) or call fsync(fd) is desired
     // Likely no need finalize here since flush may be called multiple times per FD
@@ -767,28 +765,28 @@ void flush(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 }
 
 void release(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[release] Called for inode: {}, file handle: {}", ino, fi->fh);
+    log::Registry::fuse()->debug("[release] Called for inode: {}, file handle: {}", ino, fi->fh);
 
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     if (!fh) {
-        LogRegistry::fuse()->error("[release] Invalid file handle for inode: {}", ino);
+        log::Registry::fuse()->error("[release] Invalid file handle for inode: {}", ino);
         fuse_reply_err(req, EBADF);
         return;
     }
 
     if (::close(fh->fd) < 0)
-        LogRegistry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
+        log::Registry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
 
     delete fh;  // clean up heap allocation
     fi->fh = 0; // clear the kernel-side handle
 
-    ServiceDepsRegistry::instance().storageManager->closeOpenHandle(ino);
+    runtime::Deps::get().storageManager->closeOpenHandle(ino);
 
     fuse_reply_err(req, 0);
 }
 
 void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_file_info* fi) {
-    LogRegistry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, datasync);
+    log::Registry::fuse()->debug("[fsync] Called for inode: {}, file handle: {}, isdatasync: {}", ino, fi->fh, datasync);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
@@ -797,76 +795,76 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
 
     const auto user = UserQueries::getUserByLinuxUID(uid);
     if (!user) {
-        LogRegistry::fuse()->error("[fsync] No user found for UID: {}", uid);
+        log::Registry::fuse()->error("[fsync] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
         return;
     }
 
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
     if (!entry) {
-        LogRegistry::fuse()->error("[fsync] No entry found for inode {}", ino);
+        log::Registry::fuse()->error("[fsync] No entry found for inode {}", ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
     if (!user->canManageVaults() && entry->vault_id && !user->canCreateVaultData(*entry->vault_id, entry->path)) {
-        LogRegistry::fuse()->warn("[fsync] Access denied for user {} on path {}", user->name, entry->path.string());
+        log::Registry::fuse()->warn("[fsync] Access denied for user {} on path {}", user->name, entry->path.string());
         fuse_reply_err(req, EACCES);
         return;
     }
 
     try {
         if (const int fd = fi->fh; ::fsync(fd) < 0) {
-            LogRegistry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
+            log::Registry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
 
         fuse_reply_err(req, 0);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[fsync] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[fsync] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }
 
 void statfs(const fuse_req_t req, const fuse_ino_t ino) {
-    LogRegistry::fuse()->debug("[statfs] Called for inode: {}", ino);
+    log::Registry::fuse()->debug("[statfs] Called for inode: {}", ino);
 
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
 
     try {
         struct statvfs st{};
-        const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(ino);
+        const auto entry = runtime::Deps::get().fsCache->getEntry(ino);
         if (!entry) {
-            LogRegistry::fuse()->error("[statfs] No entry found for inode {}", ino);
+            log::Registry::fuse()->error("[statfs] No entry found for inode {}", ino);
             fuse_reply_err(req, ENOENT);
             return;
         }
 
         const auto user = UserQueries::getUserByLinuxUID(uid);
         if (!user) {
-            LogRegistry::fuse()->error("[statfs] No user found for UID: {}", uid);
+            log::Registry::fuse()->error("[statfs] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (!user->canManageVaults() && entry->vault_id &&
             (!user->canListVaultData(*entry->vault_id, entry->path) || !user->canDownloadVaultData(*entry->vault_id, entry->path))) {
-            LogRegistry::fuse()->warn("[statfs] Access denied for user {} on path {}", user->name, entry->path.string());
+            log::Registry::fuse()->warn("[statfs] Access denied for user {} on path {}", user->name, entry->path.string());
             fuse_reply_err(req, EACCES);
             return;
         }
 
         if (::statvfs(entry->backing_path.c_str(), &st) < 0) {
-            LogRegistry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", entry->backing_path.string(), strerror(errno));
+            log::Registry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", entry->backing_path.string(), strerror(errno));
             fuse_reply_err(req, errno);
             return;
         }
 
         fuse_reply_statfs(req, &st);
     } catch (const std::exception& ex) {
-        LogRegistry::fuse()->error("[statfs] Exception: {}", ex.what());
+        log::Registry::fuse()->error("[statfs] Exception: {}", ex.what());
         fuse_reply_err(req, EIO);
     }
 }

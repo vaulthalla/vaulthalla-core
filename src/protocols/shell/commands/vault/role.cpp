@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "database/Queries/PermsQueries.hpp"
+#include "runtime/Deps.hpp"
+#include "database/queries/PermsQueries.hpp"
 
 #include "vault/model/Vault.hpp"
 #include "rbac/model/VaultRole.hpp"
@@ -9,7 +9,6 @@
 #include "rbac/model/Role.hpp"
 #include "rbac/model/Permission.hpp"
 
-#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
 
@@ -20,18 +19,15 @@
 #include <regex>
 #include <utility>
 
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
 using namespace vh::storage;
 using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::logging;
-
-namespace vh::shell::commands::vault {
 
 static VaultPermission permFromString(const std::string& perm) {
     if (perm.empty()) throw std::invalid_argument("Vault permission string cannot be empty");
@@ -433,8 +429,8 @@ static CommandResult handle_vault_role_override(const CommandCall& call) {
     return invalid(call.constructFullArgs(), "Unknown vault override action: '" + std::string(sub) + "'");
 }
 
-CommandResult handle_vault_role(const CommandCall& call) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+CommandResult commands::vault::handle_vault_role(const CommandCall& call) {
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     const auto [sub, subcall] = descend(call);
 
     if (isVaultRoleMatch({"assign"}, sub)) return handle_vault_role_assign(subcall);
@@ -443,6 +439,4 @@ CommandResult handle_vault_role(const CommandCall& call) {
     if (isVaultRoleMatch({"override"}, sub)) return handle_vault_role_override(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown vault role subcommand: '" + std::string(sub) + "'");
-}
-
 }

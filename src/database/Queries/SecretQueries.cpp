@@ -1,4 +1,4 @@
-#include "database/Queries/InternalSecretQueries.hpp"
+#include "database/queries/InternalSecretQueries.hpp"
 #include "database/Transactions.hpp"
 #include "crypto/model/Secret.hpp"
 #include "database/encoding/bytea.hpp"

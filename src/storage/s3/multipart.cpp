@@ -1,10 +1,9 @@
 #include "storage/s3/S3Controller.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <regex>
 
 using namespace vh::cloud;
-using namespace vh::logging;
 
 std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& key) const {
     CURL* curl = curl_easy_init();
@@ -36,7 +35,7 @@ std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& k
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK || httpCode != 200) {
-        LogRegistry::cloud()->error("[S3Provider] initiateMultipartUpload failed: CURL={} HTTP={} Response:\n{}",
+        log::Registry::cloud()->error("[S3Provider] initiateMultipartUpload failed: CURL={} HTTP={} Response:\n{}",
                                     res, httpCode, response);
         return "";
     }
@@ -46,7 +45,7 @@ std::string S3Controller::initiateMultipartUpload(const std::filesystem::path& k
     if (std::regex_search(response, m, re) && m.size() > 1)
         return m[1].str();
 
-    LogRegistry::cloud()->error("[S3Provider] initiateMultipartUpload failed to parse UploadId from response: {}", response);
+    log::Registry::cloud()->error("[S3Provider] initiateMultipartUpload failed to parse UploadId from response: {}", response);
     return "";
 }
 
@@ -125,7 +124,7 @@ void S3Controller::completeMultipartUpload(const std::filesystem::path& key, con
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK || httpCode != 200) {
-        LogRegistry::cloud()->error("[S3Provider] completeMultipartUpload failed: CURL={} HTTP={} Response:\n{}",
+        log::Registry::cloud()->error("[S3Provider] completeMultipartUpload failed: CURL={} HTTP={} Response:\n{}",
                                     res, httpCode, response);
         throw std::runtime_error(
             fmt::format("Failed to complete multipart upload to S3 (HTTP {}): {}", httpCode, response));

@@ -1,5 +1,5 @@
 #include "crypto/secrets/TPMKeyProvider.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <tss2/tss2_esys.h>
 #include <fstream>
@@ -10,7 +10,6 @@
 #include <paths.h>
 
 using namespace std::string_literals;
-using namespace vh::logging;
 
 namespace vh::crypto::secrets {
 
@@ -153,7 +152,7 @@ void TPMKeyProvider::generate_and_seal() {
 
     Esys_Finalize(&ctx);
 
-    LogRegistry::crypto()->debug("[TPMKeyProvider] Sealed {} key to {}", name_, sealedDir_.string());
+    log::Registry::crypto()->debug("[TPMKeyProvider] Sealed {} key to {}", name_, sealedDir_.string());
 }
 
 void TPMKeyProvider::unseal() {
@@ -188,7 +187,7 @@ void TPMKeyProvider::unseal() {
     Esys_FlushContext(ctx, parent);
     Esys_Finalize(&ctx);
 
-    LogRegistry::crypto()->debug("[TPMKeyProvider] Unsealed master key from {}", sealedDir_.string());
+    log::Registry::crypto()->debug("[TPMKeyProvider] Unsealed master key from {}", sealedDir_.string());
 }
 
 void TPMKeyProvider::updateMasterKey(const std::vector<uint8_t>& newMasterKey) {

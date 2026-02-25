@@ -9,7 +9,7 @@
 #include <regex>
 #include <string>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 class Router;
 class CommandUsage;
 }
@@ -20,7 +20,7 @@ namespace vh::vault::model { struct Vault; struct S3Vault; struct APIKey; enum c
 namespace vh::sync::model { struct Policy; struct Waiver; }
 namespace vh::storage { struct Engine; }
 
-namespace vh::shell::commands::vault {
+namespace vh::protocols::shell::commands::vault {
 
 struct WaiverContext {
     const CommandCall& call;

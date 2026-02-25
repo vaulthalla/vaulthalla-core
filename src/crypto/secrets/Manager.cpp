@@ -1,5 +1,5 @@
 #include "crypto/secrets/Manager.hpp"
-#include "database/Queries/InternalSecretQueries.hpp"
+#include "database/queries/InternalSecretQueries.hpp"
 #include "crypto/model/Secret.hpp"
 #include "crypto/util/encrypt.hpp"
 #include "crypto/util/hash.hpp"

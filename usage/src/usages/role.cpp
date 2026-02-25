@@ -1,8 +1,8 @@
 #include "usages.hpp"
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
-namespace vh::shell::role {
+namespace vh::protocols::shell::role {
 
 static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = std::make_shared<CommandUsage>();

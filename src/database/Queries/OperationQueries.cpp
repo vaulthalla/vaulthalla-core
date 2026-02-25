@@ -1,4 +1,4 @@
-#include "database/Queries/OperationQueries.hpp"
+#include "database/queries/OperationQueries.hpp"
 #include "database/Transactions.hpp"
 #include "sync/model/Operation.hpp"
 

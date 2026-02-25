@@ -7,12 +7,12 @@
 #include "fs/model/Directory.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "fs/model/Path.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
+#include "database/queries/FileQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
 #include "fs/ops/file.hpp"
 #include "preview/thumbnail/Worker.hpp"
 #include "fs/Filesystem.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "sync/model/RemotePolicy.hpp"
@@ -22,7 +22,6 @@ using namespace vh::fs::model;
 using namespace vh::storage;
 using namespace vh::vault;
 using namespace vh::concurrency;
-using namespace vh::services;
 using namespace vh::cloud;
 using namespace vh::database;
 using namespace vh::config;
@@ -53,7 +52,7 @@ std::unordered_map<std::string, std::string> CloudEngine::getMetaMapFromFile(con
 
 CloudEngine::CloudEngine(const std::shared_ptr<S3Vault>& vault)
     : Engine(vault),
-      key_(ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
+      key_(runtime::Deps::get().apiKeyManager->getAPIKey(vault->api_key_id, vault->owner_id)),
       s3Provider_(std::make_shared<S3Controller>(key_, vault->bucket)) {}
 
 void CloudEngine::upload(const std::shared_ptr<File>& f) const {
@@ -208,7 +207,7 @@ std::optional<std::pair<std::string, unsigned int>> CloudEngine::getRemoteIVBase
     }
 
     if (iv_b64.empty() || key_version == 0) {
-        LogRegistry::cloud()->error("[CloudStorageEngine] No IV or key version found for encrypted file: {}", rel_path.string());
+        log::Registry::cloud()->error("[CloudStorageEngine] No IV or key version found for encrypted file: {}", rel_path.string());
         return std::nullopt;
     }
 

@@ -2,7 +2,7 @@
 #include "preview/image.hpp"
 #include "fs/ops/file.hpp"
 #include "fs/model/File.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "protocols/http/model/preview/Request.hpp"
 #include "protocols/http/Router.hpp"
 
@@ -11,7 +11,6 @@
 
 using namespace vh::protocols::http::handler::preview;
 using namespace vh::protocols::http::model::preview;
-using namespace vh::logging;
 using namespace vh::fs::model;
 using namespace vh::fs::ops;
 using namespace vh::preview;
@@ -74,7 +73,7 @@ Response Pdf::handle(request&& req, const std::unique_ptr<Request>&& pr) {
         return Router::makeResponse(req, std::move(jpeg_buf), *pr->file->mime_type);
 
     } catch (const std::exception& e) {
-        LogRegistry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", pr->rel_path.string(), e.what());
+        log::Registry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", pr->rel_path.string(), e.what());
         return Router::makeErrorResponse(req, std::string(e.what()), http::status::unsupported_media_type);
     }
 }

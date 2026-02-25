@@ -11,7 +11,7 @@
 #include <memory>
 #include <string>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 class CommandUsage;
 class UsageManager;
 }
@@ -22,7 +22,7 @@ template <typename T = void> class CommandBuilder {
 public:
     virtual ~CommandBuilder() = default;
 
-    explicit CommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit CommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                             const std::shared_ptr<CLITestContext>& ctx, const std::string& rootTopLevelAlias)
         : ctx_(ctx) {
         if (!usage) throw std::runtime_error("CommandBuilder: usage manager is null");
@@ -42,7 +42,7 @@ public:
     virtual std::string list() = 0;
 
 protected:
-    std::shared_ptr<shell::CommandUsage> root_;
+    std::shared_ptr<protocols::shell::CommandUsage> root_;
     std::shared_ptr<CLITestContext> ctx_;
 
     virtual std::string updateAndResolveVar(const std::shared_ptr<T>& entity, const std::string& field) = 0;
@@ -50,7 +50,7 @@ protected:
 
 class UserCommandBuilder final : CommandBuilder<identities::model::User> {
 public:
-    explicit UserCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit UserCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                                 const std::shared_ptr<CLITestContext>& ctx);
 
     ~UserCommandBuilder() override = default;
@@ -74,7 +74,7 @@ private:
 
 class VaultCommandBuilder final : CommandBuilder<vault::model::Vault> {
 public:
-    explicit VaultCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit VaultCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                                  const std::shared_ptr<CLITestContext>& ctx);
 
     ~VaultCommandBuilder() override = default;
@@ -125,7 +125,7 @@ private:
 
 class GroupCommandBuilder final : CommandBuilder<identities::model::Group> {
 public:
-    explicit GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit GroupCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                                  const std::shared_ptr<CLITestContext>& ctx);
 
     ~GroupCommandBuilder() override = default;
@@ -153,7 +153,7 @@ private:
 
 class UserRoleCommandBuilder final : CommandBuilder<rbac::model::UserRole> {
 public:
-    explicit UserRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit UserRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                                     const std::shared_ptr<CLITestContext>& ctx);
 
     ~UserRoleCommandBuilder() override = default;
@@ -177,7 +177,7 @@ private:
 
 class VaultRoleCommandBuilder final : CommandBuilder<rbac::model::VaultRole> {
 public:
-    explicit VaultRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage,
+    explicit VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
                                      const std::shared_ptr<CLITestContext>& ctx);
 
     ~VaultRoleCommandBuilder() override = default;

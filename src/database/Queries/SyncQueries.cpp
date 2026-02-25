@@ -1,4 +1,4 @@
-#include "database/Queries/SyncQueries.hpp"
+#include "database/queries/SyncQueries.hpp"
 #include "database/Transactions.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"

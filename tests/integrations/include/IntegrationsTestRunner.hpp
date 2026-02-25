@@ -9,7 +9,7 @@
 #include <atomic>
 #include <optional>
 
-namespace vh::shell { class UsageManager; }
+namespace vh::protocols::shell { class UsageManager; }
 namespace vh::identities::model { struct User; }
 namespace vh::rbac::model { struct PermissionOverride; }
 
@@ -47,7 +47,7 @@ public:
 private:
     CLITestConfig config_;
     std::shared_ptr<CLITestContext> ctx_;
-    std::shared_ptr<shell::UsageManager> usage_;
+    std::shared_ptr<protocols::shell::UsageManager> usage_;
     std::shared_ptr<CommandRouter> router_;
     std::shared_ptr<std::atomic<bool>> interruptFlag;
     std::shared_ptr<TestThreadPool> threadPool_;

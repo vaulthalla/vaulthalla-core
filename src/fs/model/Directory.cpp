@@ -1,6 +1,6 @@
 #include "fs/model/Directory.hpp"
 #include "database/encoding/timestamp.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
+#include "database/queries/FSEntryQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>

@@ -1,6 +1,6 @@
 #include "fs/model/File.hpp"
-#include "logging/LogRegistry.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
+#include "log/Registry.hpp"
+#include "database/queries/FSEntryQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -8,7 +8,6 @@
 #include <pugixml.hpp>
 
 using namespace vh::fs::model;
-using namespace vh::logging;
 using namespace vh::database;
 
 File::File(const pqxx::row& row, const pqxx::result& parentRows)
@@ -70,13 +69,13 @@ std::vector<std::shared_ptr<File>> vh::fs::model::filesFromS3XML(const std::u8st
     pugi::xml_parse_result result = doc.load_string(reinterpret_cast<const char*>(xml.c_str()));
 
     if (!result) {
-        LogRegistry::types()->error("[File] [filesFromS3XML] Failed to parse XML: {}", result.description());
+        log::Registry::types()->error("[File] [filesFromS3XML] Failed to parse XML: {}", result.description());
         return {};
     }
 
     pugi::xml_node root = doc.child("ListBucketResult");
     if (!root) {
-        LogRegistry::types()->error("[File] [filesFromS3XML] No ListBucketResult node found in XML");
+        log::Registry::types()->error("[File] [filesFromS3XML] No ListBucketResult node found in XML");
         return {};
     }
 
@@ -86,7 +85,7 @@ std::vector<std::shared_ptr<File>> vh::fs::model::filesFromS3XML(const std::u8st
         auto modifiedNode = content.child("LastModified");
 
         if (!keyNode || !sizeNode || !modifiedNode) {
-            LogRegistry::types()->warn("[File] [filesFromS3XML] Skipping entry due to missing child elements");
+            log::Registry::types()->warn("[File] [filesFromS3XML] Skipping entry due to missing child elements");
             continue;
         }
 
@@ -111,7 +110,7 @@ std::unordered_map<std::u8string, std::shared_ptr<File>> vh::fs::model::groupEnt
 
     for (const auto& file : entries) {
         if (grouped.contains(file->path.u8string())) {
-            LogRegistry::types()->warn("[File] [groupEntriesByPath] Duplicate entry found for path: {}", file->path.string());
+            log::Registry::types()->warn("[File] [groupEntriesByPath] Duplicate entry found for path: {}", file->path.string());
             continue;
         }
         grouped[file->path.u8string()] = file;

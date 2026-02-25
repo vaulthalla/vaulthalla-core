@@ -1,19 +1,18 @@
 #include "vault/model/Capacity.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "vault/model/Vault.hpp"
 #include "storage/Engine.hpp"
 #include "storage/Manager.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "database/queries/FileQueries.hpp"
+#include "runtime/Deps.hpp"
 #include "fs/model/stats/Extension.hpp"
 
 #include <nlohmann/json.hpp>
 
 using namespace vh::vault::model;
 using namespace vh::database;
-using namespace vh::services;
 
 struct CompareFiles {
     bool operator()(const std::pair<std::string, unsigned int>& a, const std::pair<std::string, unsigned int>& b) const {
@@ -37,7 +36,7 @@ static nlohmann::json top10ToDict(const std::array<std::pair<std::string, uintma
 }
 
 Capacity::Capacity(const unsigned int vaultId) {
-    const auto engine = ServiceDepsRegistry::instance().storageManager->getEngine(vaultId);
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
     if (!engine) throw std::runtime_error("vaultId not available");
 
     const auto dir = DirectoryQueries::getDirectoryByPath(vaultId, "/");

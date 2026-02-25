@@ -1,10 +1,10 @@
 #include "fuse/Service.hpp"
 #include "fuse/Bridge.hpp"
-#include "services/ServiceManager.hpp"
+#include "runtime/Manager.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "../../include/fuse/task/Request.hpp"
-#include "logging/LogRegistry.hpp"
+#include "fuse/task/Request.hpp"
+#include "log/Registry.hpp"
 
 #include <cstring>
 #include <thread>
@@ -17,12 +17,8 @@
 #include <thread>
 
 namespace fs = std::filesystem;
-using namespace vh::services;
 using namespace vh::concurrency;
 using namespace vh::fuse;
-using namespace vh::logging;
-
-namespace fs = std::filesystem;
 
 // Best-effort guard: only allow nuking test mountpoints under /tmp
 static bool isSafeTestMountpoint(const fs::path& p) {
@@ -81,7 +77,7 @@ static void ensureFreshMountpoint() {
             ec.clear();
             fs::remove_all(mountPath, ec);
             if (ec && ec.value() != ENOENT) {
-                LogRegistry::fuse()->warn(
+                vh::log::Registry::fuse()->warn(
                     "[FUSE] Failed to remove old mount dir {}: {}", mountPath.string(), ec.message());
                 ec.clear();
             }
@@ -122,7 +118,7 @@ Service::Service() : AsyncService("FUSE") {}
 
 void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     (void)userdata;
-    LogRegistry::fuse()->debug("[FUSE] Initializing FUSE connection...");
+    vh::log::Registry::fuse()->debug("[FUSE] Initializing FUSE connection...");
 
     constexpr uintmax_t MB = 1024 * 1024;
 
@@ -131,13 +127,13 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
     conn->max_readahead = MB;
     conn->max_write = MB;
 
-    LogRegistry::fuse()->debug("[FUSE] Connection initialized with max_readahead={} bytes, max_write={} bytes",
+    vh::log::Registry::fuse()->debug("[FUSE] Connection initialized with max_readahead={} bytes, max_write={} bytes",
                               conn->max_readahead, conn->max_write);
 }
 
 void Service::stop() {
     if (!isRunning()) return;
-    LogRegistry::fuse()->info("[FUSE] Stopping FUSE connection...");
+    log::Registry::fuse()->info("[FUSE] Stopping FUSE connection...");
     interruptFlag_.store(true);
 
     if (paths::testMode) lazyUmount(paths::mountPath);
@@ -150,11 +146,11 @@ void Service::stop() {
 
     running_.store(false);
     interruptFlag_.store(false);
-    LogRegistry::fuse()->info("[FUSE] FUSE service stopped");
+    log::Registry::fuse()->info("[FUSE] FUSE service stopped");
 }
 
 void Service::runLoop() {
-    LogRegistry::fuse()->debug("[FUSE] Running FUSE service");
+    log::Registry::fuse()->debug("[FUSE] Running FUSE service");
 
     ensureFreshMountpoint();
 
@@ -178,13 +174,13 @@ void Service::runLoop() {
     fuse_args args = FUSE_ARGS_INIT(static_cast<int>(argsCStr.size()), argsCStr.data());
 
     if (fuse_opt_parse(&args, nullptr, nullptr, nullptr) == -1) {
-        LogRegistry::fuse()->error("[FUSE] Failed to parse FUSE options");
+        log::Registry::fuse()->error("[FUSE] Failed to parse FUSE options");
         return;
     }
 
     fuse_cmdline_opts opts{};
     if (fuse_parse_cmdline(&args, &opts) != 0) {
-        LogRegistry::fuse()->error("[FUSE] Failed to parse FUSE options");
+        log::Registry::fuse()->error("[FUSE] Failed to parse FUSE options");
         return;
     }
 
@@ -193,14 +189,14 @@ void Service::runLoop() {
 
     session_ = fuse_session_new(&args, &ops, sizeof(ops), nullptr);
     if (!session_) {
-        LogRegistry::fuse()->error("[FUSE] Failed to create FUSE session");
+        log::Registry::fuse()->error("[FUSE] Failed to create FUSE session");
         free(opts.mountpoint);
         fuse_opt_free_args(&args);
         return;
     }
 
     if (fuse_set_signal_handlers(session_) != 0) {
-        LogRegistry::fuse()->error("[FUSE] Failed to set signal handlers");
+        log::Registry::fuse()->error("[FUSE] Failed to set signal handlers");
         fuse_session_destroy(session_);
         free(opts.mountpoint);
         fuse_opt_free_args(&args);
@@ -208,7 +204,7 @@ void Service::runLoop() {
     }
 
     if (fuse_session_mount(session_, opts.mountpoint) != 0) {
-        LogRegistry::fuse()->error("[FUSE] Failed to mount FUSE filesystem at {}", opts.mountpoint);
+        log::Registry::fuse()->error("[FUSE] Failed to mount FUSE filesystem at {}", opts.mountpoint);
         fuse_remove_signal_handlers(session_);
         fuse_session_destroy(session_);
         free(opts.mountpoint);
@@ -216,7 +212,7 @@ void Service::runLoop() {
         return;
     }
 
-    LogRegistry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
+    log::Registry::fuse()->info("[FUSE] Mounted FUSE filesystem at {}", opts.mountpoint);
 
     while (!fuse_session_exited(session_) && !shouldStop()) {
         fuse_buf buf{};
@@ -227,7 +223,7 @@ void Service::runLoop() {
         ThreadPoolManager::instance().fusePool()->submit(std::make_shared<task::Request>(session_, buf));
     }
 
-    LogRegistry::fuse()->info("[FUSE] FUSE service loop exiting");
+    log::Registry::fuse()->info("[FUSE] FUSE service loop exiting");
 
     fuse_remove_signal_handlers(session_);
     fuse_session_unmount(session_);
@@ -237,5 +233,5 @@ void Service::runLoop() {
     free(opts.mountpoint);
     fuse_opt_free_args(&args);
 
-    LogRegistry::fuse()->info("[FUSE] FUSE service stopped successfully");
+    log::Registry::fuse()->info("[FUSE] FUSE service stopped successfully");
 }

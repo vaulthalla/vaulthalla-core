@@ -3,14 +3,14 @@
 #include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <fmt/core.h>
 
 using namespace vh::vault::model;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::database;
 using namespace vh::database::encoding;
 

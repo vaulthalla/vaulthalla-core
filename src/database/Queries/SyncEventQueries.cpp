@@ -1,4 +1,4 @@
-#include "database/Queries/SyncEventQueries.hpp"
+#include "database/queries/SyncEventQueries.hpp"
 #include "database/Transactions.hpp"
 #include "sync/model/Event.hpp"
 #include "sync/model/Throughput.hpp"

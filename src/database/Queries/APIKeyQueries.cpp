@@ -1,4 +1,4 @@
-#include "database/Queries/APIKeyQueries.hpp"
+#include "database/queries/APIKeyQueries.hpp"
 #include "database/Transactions.hpp"
 #include "vault/model/APIKey.hpp"
 #include "database/encoding/bytea.hpp"

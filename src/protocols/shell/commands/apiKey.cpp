@@ -1,23 +1,23 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
+#include "database/queries/APIKeyQueries.hpp"
 #include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "storage/s3/S3Controller.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
 
 #include <paths.h>
 
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::vault::model;
 using namespace vh::database;
-using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::cloud;
 using namespace vh::config;
@@ -93,7 +93,7 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
         if (!valid) return invalid("API key validation failed:\n" + validationErrors);
     }
 
-    key->id = ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
+    key->id = runtime::Deps::get().apiKeyManager->addAPIKey(key);
 
     return ok("Successfully created API key!\n" + to_string(key));
 }
@@ -115,7 +115,7 @@ static CommandResult handleDeleteAPIKey(const CommandCall& call) {
     if (!call.user->canManageAPIKeys() && key->user_id != call.user->id)
         return invalid("You do not have permission to delete this API key.");
 
-    ServiceDepsRegistry::instance().apiKeyManager->removeAPIKey(key->id, key->user_id);
+    runtime::Deps::get().apiKeyManager->removeAPIKey(key->id, key->user_id);
 
     return ok("API key deleted successfully: " + std::to_string(key->id) + "\n");
 }
@@ -151,6 +151,6 @@ static CommandResult handle_key(const CommandCall& call) {
 }
 
 void commands::registerAPIKeyCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("api-key"), handle_key);
 }

@@ -1,4 +1,4 @@
-#include "database/Queries/VaultQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
 #include "database/Transactions.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"

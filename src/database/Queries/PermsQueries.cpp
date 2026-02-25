@@ -1,15 +1,14 @@
-#include "database/Queries/PermsQueries.hpp"
+#include "database/queries/PermsQueries.hpp"
 #include "database/Transactions.hpp"
 #include "rbac/model/Role.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/Permission.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 using namespace vh::database;
 using namespace vh::database::model;
 using namespace vh::rbac::model;
-using namespace vh::logging;
 
 // #################################################################################################
 // ############################################ Role  #############################################
@@ -35,7 +34,7 @@ void PermsQueries::updateRole(const std::shared_ptr<Role>& role) {
         pqxx::params p{role->id, role->name, role->description, role->type};
         txn.exec(pqxx::prepped{"update_role"}, p);
 
-        LogRegistry::db()->trace("[PermsQueries] Updating permissions for role ID {} to mask {}",
+        log::Registry::db()->trace("[PermsQueries] Updating permissions for role ID {} to mask {}",
             role->id, bitStringFromMask(role->permissions));
 
         const pqxx::params perms_params{role->id, bitStringFromMask(role->permissions)};

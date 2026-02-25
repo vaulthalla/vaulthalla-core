@@ -3,19 +3,18 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/types.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "database/Queries/GroupQueries.hpp"
+#include "database/queries/GroupQueries.hpp"
 #include "identities/model/Group.hpp"
 #include "identities/model/User.hpp"
-#include "auth/AuthManager.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "auth/Manager.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::identities::model;
 using namespace vh::database;
-using namespace vh::auth;
-using namespace vh::services;
 
 static std::shared_ptr<Group> resolveGroup(const std::string& groupNameOrId) {
     if (const auto gidOpt = parseUInt(groupNameOrId)) {
@@ -40,7 +39,7 @@ static CommandResult handle_group_create(const CommandCall& call) {
     validatePositionals(call, usage);
 
     const std::string name = call.positionals[0];
-    if (!AuthManager::isValidGroup(name)) return invalid("group create: invalid group name '" + name + "'");
+    if (!auth::Manager::isValidGroup(name)) return invalid("group create: invalid group name '" + name + "'");
 
     const auto group = std::make_shared<Group>();
     group->name = name;
@@ -61,7 +60,7 @@ static CommandResult handle_group_update(const CommandCall& call) {
     const auto group = resolveGroup(call.positionals[0]);
 
     if (const auto newName = optVal(call, usage->resolveOptional("name")->option_tokens)) {
-        if (!AuthManager::isValidGroup(*newName)) return invalid("group update: invalid group name '" + *newName + "'");
+        if (!auth::Manager::isValidGroup(*newName)) return invalid("group update: invalid group name '" + *newName + "'");
         group->name = *newName;
     }
 
@@ -182,6 +181,6 @@ static CommandResult handle_group(const CommandCall& call) {
 }
 
 void commands::registerGroupCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("group"), handle_group);
 }

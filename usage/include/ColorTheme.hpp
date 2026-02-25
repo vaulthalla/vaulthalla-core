@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 struct ColorTheme {
     bool enabled = true;

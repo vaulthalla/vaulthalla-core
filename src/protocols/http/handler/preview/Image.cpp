@@ -1,7 +1,7 @@
 #include "protocols/http/handler/preview/Image.hpp"
 #include "preview/image.hpp"
 #include "fs/ops/file.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "protocols/http/model/preview/Request.hpp"
 #include "protocols/http/Router.hpp"
 
@@ -10,7 +10,6 @@
 using namespace vh::protocols::http::handler::preview;
 using namespace vh::protocols::http::model::preview;
 using namespace vh::storage;
-using namespace vh::logging;
 using namespace vh::fs::ops;
 using namespace vh::preview;
 
@@ -30,7 +29,7 @@ Response Image::handle(request&& req, const std::unique_ptr<Request>&& pr) {
 
         return Router::makeResponse(req, std::move(body), "image/jpeg");
     } catch (const std::exception& e) {
-        LogRegistry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", pr->rel_path.string(), e.what());
+        log::Registry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", pr->rel_path.string(), e.what());
         return Router::makeErrorResponse(req, "Failed to load image: " + std::string(e.what()), http::status::unsupported_media_type);
     }
 }

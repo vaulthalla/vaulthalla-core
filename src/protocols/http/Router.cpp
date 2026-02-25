@@ -1,26 +1,24 @@
 #include "protocols/http/Router.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "database/queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "auth/AuthManager.hpp"
+#include "auth/Manager.hpp"
 #include "protocols/http/handler/preview/Image.hpp"
 #include "protocols/http/handler/preview/Pdf.hpp"
 #include "fs/ops/file.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/cache/Registry.hpp"
 #include "stats/model/CacheStats.hpp"
 #include "protocols/http/model/preview/Request.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "protocols/cookie.hpp"
 
 #include <nlohmann/json.hpp>
 
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::config;
 using namespace vh::stats::model;
 using namespace vh::fs::model;
@@ -73,7 +71,7 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
             && std::filesystem::exists(pathToJpegCache))
             return readFileToVector(pathToJpegCache);
 
-        ServiceDepsRegistry::instance().httpCacheStats->record_miss();
+        vh::runtime::Deps::get().httpCacheStats->record_miss();
         }
     return {};
 }
@@ -100,13 +98,13 @@ Response Router::handleAuthSession(request&& req) {
     try {
         const auto refresh = protocols::extractCookie(req, "refresh");
         if (refresh.empty()) {
-            LogRegistry::http()->warn("[Router] Refresh token not set");
+            log::Registry::http()->warn("[Router] Refresh token not set");
             return makeErrorResponse(req, "Refresh token not set", status::bad_request);
         }
-        ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh);
-        const auto session = ServiceDepsRegistry::instance().authManager->sessionManager()->getClientSession(refresh);
+        runtime::Deps::get().authManager->validateRefreshToken(refresh);
+        const auto session = runtime::Deps::get().authManager->sessionManager()->getClientSession(refresh);
         if (!session || !session->getUser()) {
-            LogRegistry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
+            log::Registry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
             return makeErrorResponse(req, "Not found", status::not_found);
         }
 
@@ -120,7 +118,7 @@ Response Router::handleAuthSession(request&& req) {
 
         return makeJsonResponse(req, j);
     } catch (const std::exception& e) {
-        LogRegistry::http()->warn("[Router]: Invalid refresh token: %s", e.what());
+        log::Registry::http()->warn("[Router]: Invalid refresh token: %s", e.what());
         return makeErrorResponse(req, std::string("Unauthorized: ") + e.what(), status::unauthorized);
     }
 }
@@ -129,7 +127,7 @@ std::string Router::authenticateRequest(const request& req) {
     if (ConfigRegistry::get().dev.enabled) return "";
     try {
         const auto refresh_token = protocols::extractCookie(req, "refresh");
-        ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh_token);
+        runtime::Deps::get().authManager->validateRefreshToken(refresh_token);
         return "";
     } catch (const std::exception& e) {
         return e.what();
@@ -149,14 +147,14 @@ Response Router::handlePreview(request&& req) {
     try { pr = std::make_unique<Request>(parse_query_params(req.target())); } catch (const std::exception&
         e) { return makeErrorResponse(req, e.what(), status::bad_request); }
 
-    pr->engine = ServiceDepsRegistry::instance().storageManager->getEngine(pr->vault_id);
+    pr->engine = runtime::Deps::get().storageManager->getEngine(pr->vault_id);
     if (!pr->engine)
         return makeErrorResponse(
             req, "No storage engine found for vault with id " + std::to_string(pr->vault_id),
             status::bad_request);
 
     const auto fusePath = pr->engine->paths->absRelToAbsRel(pr->rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
-    const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(fusePath);
+    const auto entry = runtime::Deps::get().fsCache->getEntry(fusePath);
     if (!entry) return makeErrorResponse(req, "File not found in cache");
     if (entry->isDirectory())
         return makeErrorResponse(req, "Requested preview file is a directory", status::bad_request);
@@ -170,7 +168,7 @@ Response Router::handlePreview(request&& req) {
             return makeResponse(req, std::move(data), "image/jpeg", true);
 
     if (pr->file->mime_type->starts_with("image/") || pr->file->mime_type->ends_with("/pdf")) {
-        ScopedOpTimer timer(ServiceDepsRegistry::instance().httpCacheStats.get());
+        ScopedOpTimer timer(runtime::Deps::get().httpCacheStats.get());
         return pr->file->mime_type->starts_with("image/")
                    ? handler::preview::Image::handle(std::move(req), std::move(pr))
                    : handler::preview::Pdf::handle(std::move(req), std::move(pr));
@@ -194,7 +192,7 @@ Response Router::makeResponse(const request& req, std::vector<uint8_t>&& data,
     res.content_length(size);
     res.keep_alive(req.keep_alive());
 
-    if (cacheHit) ServiceDepsRegistry::instance().httpCacheStats->record_hit(size);
+    if (cacheHit) runtime::Deps::get().httpCacheStats->record_hit(size);
 
     return res;
 }
@@ -213,7 +211,7 @@ Response Router::makeResponse(const request& req, file_body::value_type data,
     res.content_length(size);
     res.keep_alive(req.keep_alive());
 
-    if (cacheHit) ServiceDepsRegistry::instance().httpCacheStats->record_hit(size);
+    if (cacheHit) runtime::Deps::get().httpCacheStats->record_hit(size);
 
     return res;
 }

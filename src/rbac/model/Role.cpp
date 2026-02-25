@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::rbac::model;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::database::encoding;
 
 Role::Role(const pqxx::row& row)

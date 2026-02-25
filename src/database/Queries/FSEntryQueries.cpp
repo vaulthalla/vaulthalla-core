@@ -1,14 +1,13 @@
-#include "database/Queries/FSEntryQueries.hpp"
+#include "database/queries/FSEntryQueries.hpp"
 #include "database/Transactions.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "database/encoding/u8.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 using namespace vh::database;
 using namespace vh::database::encoding;
-using namespace vh::logging;
 using namespace vh::fs::model;
 
 
@@ -22,7 +21,7 @@ std::shared_ptr<Entry> FSEntryQueries::getRootEntry() {
     return Transactions::exec("FSEntryQueries::getRootEntry", [&](pqxx::work& txn) -> std::shared_ptr<Entry> {
         const auto res = txn.exec(pqxx::prepped{"get_root_entry"});
         if (res.empty()) {
-            LogRegistry::db()->warn("[FSEntryQueries::getRootEntry] No root entry found in the database");
+            log::Registry::db()->warn("[FSEntryQueries::getRootEntry] No root entry found in the database");
             return nullptr;
         }
         return std::make_shared<Directory>(res.one_row(), pqxx::result{});
@@ -120,11 +119,11 @@ void FSEntryQueries::renameEntry(const std::shared_ptr<Entry>& entry) {
 
 std::vector<std::shared_ptr<Entry>> FSEntryQueries::listDir(const std::optional<unsigned int>& entryId, const bool recursive) {
     if (!entryId) {
-        LogRegistry::db()->warn("[FSEntryQueries::listDir] entryId is null, returning empty list");
+        log::Registry::db()->warn("[FSEntryQueries::listDir] entryId is null, returning empty list");
         return {};
     }
 
-    LogRegistry::db()->debug("[FSEntryQueries::listDir] Listing directory with parent ID: {}, recursive: {}", *entryId, recursive);
+    log::Registry::db()->debug("[FSEntryQueries::listDir] Listing directory with parent ID: {}, recursive: {}", *entryId, recursive);
 
     return Transactions::exec("FSEntryQueries::listDirById", [&](pqxx::work& txn) {
         const auto files = files_from_pq_res(
@@ -133,7 +132,7 @@ std::vector<std::shared_ptr<Entry>> FSEntryQueries::listDir(const std::optional<
                 : txn.exec(pqxx::prepped{"list_files_in_dir_by_parent_id"}, entryId)
             );
 
-        LogRegistry::db()->info("[FSEntryQueries::listDir] Executing queries for directories...");
+        log::Registry::db()->info("[FSEntryQueries::listDir] Executing queries for directories...");
         const auto directories = directories_from_pq_res(
             recursive
                 ? txn.exec(pqxx::prepped{"list_dirs_in_dir_by_parent_id_recursive"}, entryId)

@@ -11,7 +11,7 @@
 
 using namespace vh::rbac::model;
 using namespace vh::database::encoding;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
     : Role(row),
@@ -124,7 +124,7 @@ VRolePair vh::rbac::model::vault_roles_from_json(const nlohmann::json& j) {
         const auto role = std::make_shared<VaultRole>(roleJson);
         if (role->subject_type == "user") rolesPair.roles[role->vault_id] = role;
         else if (role->subject_type == "group") rolesPair.group_roles[role->vault_id] = role;
-        else logging::LogRegistry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
+        else log::Registry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
     }
     return rolesPair;
 }
@@ -150,11 +150,11 @@ VRolePair vh::rbac::model::vault_roles_from_pq_result(
                 const auto existingRole = rolesPair.group_roles[role->vault_id];
                 const auto combinedPerms = existingRole->permissions | role->permissions;
                 rolesPair.group_roles[role->vault_id]->permissions = combinedPerms;
-                logging::LogRegistry::auth()->warn("Combining group role permissions for vault ID {}: existing perms {:04x} + new perms {:04x} = combined perms {:04x}",
+                log::Registry::auth()->warn("Combining group role permissions for vault ID {}: existing perms {:04x} + new perms {:04x} = combined perms {:04x}",
                     role->vault_id, existingRole->permissions, role->permissions, combinedPerms);
             } else rolesPair.group_roles[role->vault_id] = role;
         }
-        else logging::LogRegistry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
+        else log::Registry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
     }
 
     return rolesPair;
@@ -164,7 +164,7 @@ std::vector<std::shared_ptr<PermissionOverride> > VaultRole::getPermissionOverri
     std::vector<std::shared_ptr<PermissionOverride>> overrides;
     for (const auto& override : permission_overrides) {
         if (override->permission.bit_position == bit) overrides.push_back(override);
-        logging::LogRegistry::auth()->debug("Checking override: {} for bit {}", to_string(override), bit);
+        log::Registry::auth()->debug("Checking override: {} for bit {}", to_string(override), bit);
     }
     return overrides;
 }

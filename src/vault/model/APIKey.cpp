@@ -1,5 +1,5 @@
 #include "vault/model/APIKey.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "database/queries/UserQueries.hpp"
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/Key.hpp"
@@ -19,7 +19,7 @@
 
 using namespace vh::vault::model;
 using namespace vh::database;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::crypto::util;
 using namespace vh::database::encoding;
 

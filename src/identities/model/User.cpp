@@ -5,18 +5,17 @@
 #include "database/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "database/queries/VaultQueries.hpp"
+#include "log/Registry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
 #include <ranges>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::database;
 using namespace vh::database::encoding;
-using namespace vh::logging;
 using namespace vh::rbac::model;
 
 namespace vh::identities::model {
@@ -70,18 +69,18 @@ bool User::operator!=(const User& other) const {
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
     if (roles.contains(vaultId)) {
-        LogRegistry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
+        log::Registry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
         return roles.at(vaultId);
     }
     if (group_roles.contains(vaultId)) {
-        LogRegistry::auth()->debug("User {} has group role for vault {}", name, vaultId);
+        log::Registry::auth()->debug("User {} has group role for vault {}", name, vaultId);
         return group_roles.at(vaultId);
     }
-    LogRegistry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
+    log::Registry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
     for (const auto& [id, role] : roles)
-        LogRegistry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
+        log::Registry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
     for (const auto& [id, role] : group_roles)
-        LogRegistry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
+        log::Registry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
     return nullptr;
 }
 

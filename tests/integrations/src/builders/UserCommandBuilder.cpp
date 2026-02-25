@@ -5,9 +5,9 @@
 
 using namespace vh::test::cli;
 using namespace vh::identities::model;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
-UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "user"), userAliases_(ctx) {}
 
 std::string UserCommandBuilder::updateAndResolveVar(const std::shared_ptr<User>& entity, const std::string& field) {

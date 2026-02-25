@@ -2,10 +2,10 @@
 
 #include "EntityType.hpp"
 #include "AssertionResult.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/GroupQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
+#include "database/queries/UserQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
+#include "database/queries/GroupQueries.hpp"
+#include "database/queries/PermsQueries.hpp"
 
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"

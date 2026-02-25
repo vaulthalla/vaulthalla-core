@@ -8,7 +8,7 @@
 #include <ranges>
 #include <algorithm>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 UsageManager::UsageManager() {
     root_ = std::make_shared<CommandUsage>();

@@ -1,8 +1,6 @@
 #include "protocols/http/Session.hpp"
 #include "protocols/http/Router.hpp"
-#include "logging/LogRegistry.hpp"
-
-using namespace vh::logging;
+#include "log/Registry.hpp"
 
 namespace vh::protocols::http {
 
@@ -25,11 +23,11 @@ void Session::on_read(beast::error_code ec, std::size_t bytes) {
     if (ec == http::error::end_of_stream) return do_close();
 
     if (ec) {
-        LogRegistry::http()->error("[Session] Read error: {}", ec.message());
+        log::Registry::http()->error("[Session] Read error: {}", ec.message());
         return;
     }
 
-    LogRegistry::http()->debug("[Session] Read {} bytes: {}", bytes, req_.target());
+    log::Registry::http()->debug("[Session] Read {} bytes: {}", bytes, req_.target());
 
     auto self = shared_from_this();
 
@@ -45,7 +43,7 @@ void Session::on_read(beast::error_code ec, std::size_t bytes) {
                               });
         }, std::move(res));
     } catch (const std::exception& e) {
-        LogRegistry::http()->error("[Session] Exception during request handling: {}", e.what());
+        log::Registry::http()->error("[Session] Exception during request handling: {}", e.what());
 
         http::response<http::string_body> err{http::status::internal_server_error, req_.version()};
         err.set(http::field::content_type, "text/plain");
@@ -64,7 +62,7 @@ void Session::on_write(const bool close, beast::error_code ec, const std::size_t
     (void)bytes; // unused
 
     if (ec) {
-        LogRegistry::http()->error("[Session] Write error: {}", ec.message());
+        log::Registry::http()->error("[Session] Write error: {}", ec.message());
         return;
     }
 

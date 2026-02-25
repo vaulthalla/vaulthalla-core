@@ -7,14 +7,14 @@
 #include "sync/Executor.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
+#include "database/queries/FileQueries.hpp"
+#include "database/queries/DirectoryQueries.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
 
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include "sync/model/Event.hpp"
 #include "sync/model/Throughput.hpp"
@@ -33,7 +33,6 @@ using namespace vh::sync;
 using namespace vh::sync::model;
 using namespace vh::database;
 using namespace std::chrono;
-using namespace vh::logging;
 using namespace vh::storage;
 using namespace vh::fs::model;
 using namespace vh::crypto;
@@ -175,7 +174,7 @@ std::shared_ptr<Conflict> Cloud::maybeBuildConflict(
     c->analyze();
 
     if (c->reasons.empty()) {
-        LogRegistry::sync()->debug(
+        log::Registry::sync()->debug(
             "[SyncTask] hasPotentialConflict() returned true, but no reasons were identified. Possible detection bug.");
         return nullptr;
     }

@@ -4,17 +4,17 @@
 #include "vault/model/Vault.hpp"
 #include "identities/model/User.hpp"
 #include "identities/model/Group.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "database/queries/UserQueries.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::vault::model;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::database;
 using vh::vault::model::Vault;
 
-VaultCommandBuilder::VaultCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+VaultCommandBuilder::VaultCommandBuilder(const std::shared_ptr<UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "vault"), vaultAliases_(ctx) {}
 
 std::string VaultCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault>& entity, const std::string& field) {

@@ -15,7 +15,7 @@
 namespace vh::rbac::model { struct Role; }
 namespace vh::identities::model { struct User; }
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 template <typename T> struct Lookup {
     std::shared_ptr<T> ptr;

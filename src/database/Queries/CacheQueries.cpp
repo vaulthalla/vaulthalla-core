@@ -1,4 +1,4 @@
-#include "database/Queries/CacheQueries.hpp"
+#include "database/queries/CacheQueries.hpp"
 #include "database/Transactions.hpp"
 #include "fs/cache/Record.hpp"
 #include "database/encoding/u8.hpp"

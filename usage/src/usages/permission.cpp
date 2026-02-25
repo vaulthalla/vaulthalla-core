@@ -2,9 +2,9 @@
 
 #include <sstream>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
-namespace vh::shell::permissions {
+namespace vh::protocols::shell::permissions {
 
 std::string usage_user_permissions() {
     std::ostringstream os;

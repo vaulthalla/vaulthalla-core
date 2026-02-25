@@ -1,8 +1,8 @@
 #include "IntegrationsTestRunner.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "database/queries/UserQueries.hpp"
+#include "database/queries/PermsQueries.hpp"
+#include "database/queries/FSEntryQueries.hpp"
+#include "database/queries/VaultQueries.hpp"
 #include "generators.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/UserRole.hpp"
@@ -13,12 +13,12 @@
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "seed/include/seed_db.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
 #include "fs/Filesystem.hpp"
 #include "fuse_test_helpers.hpp"
-#include "database/Queries/GroupQueries.hpp"
+#include "database/queries/GroupQueries.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::test::fuse;
@@ -27,7 +27,6 @@ using namespace vh::rbac::model;
 using namespace vh::identities::model;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::services;
 using namespace vh::sync::model;
 using namespace vh::fs::model;
 
@@ -106,8 +105,8 @@ static std::shared_ptr<Engine> createVault() {
     sync->interval = std::chrono::minutes(15);
     sync->conflict_policy = LocalPolicy::ConflictPolicy::Overwrite;
 
-    vault = ServiceDepsRegistry::instance().storageManager->addVault(vault, sync);
-    return ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    vault = vh::runtime::Deps::get().storageManager->addVault(vault, sync);
+    return vh::runtime::Deps::get().storageManager->getEngine(vault->id);
 }
 
 void IntegrationsTestRunner::testFUSECRUD() {
@@ -118,7 +117,7 @@ void IntegrationsTestRunner::testFUSECRUD() {
     const auto vault = VaultQueries::getVault(std::string(seed::ADMIN_DEFAULT_VAULT_NAME), admin->id);
     if (!vault) throw std::runtime_error("Admin default vault not found");
 
-    const auto engine = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vault->id);
     if (!engine) throw std::runtime_error("Engine not found for admin vault");
 
     const auto root = std::filesystem::path(engine->paths->fuseRoot / to_snake_case(vault->name));

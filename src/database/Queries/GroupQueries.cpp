@@ -1,4 +1,4 @@
-#include "database/Queries/GroupQueries.hpp"
+#include "database/queries/GroupQueries.hpp"
 #include "database/Transactions.hpp"
 #include "identities/model/Group.hpp"
 

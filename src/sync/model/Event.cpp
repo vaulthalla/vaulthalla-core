@@ -1,7 +1,7 @@
 #include "sync/model/Event.hpp"
 #include "database/encoding/timestamp.hpp"
-#include "database/Queries/SyncEventQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "database/queries/SyncEventQueries.hpp"
+#include "log/Registry.hpp"
 #include "sync/model/Conflict.hpp"
 
 #include <algorithm>
@@ -36,7 +36,6 @@ namespace {
 using namespace vh::sync::model;
 using namespace vh::database::encoding;
 using namespace vh::database;
-using namespace vh::logging;
 using namespace std::chrono;
 
 Event::Event(const pqxx::row& row)
@@ -354,7 +353,7 @@ std::vector<std::shared_ptr<Event>> vh::sync::model::sync_events_from_pqxx_res(c
             auto event = std::make_shared<Event>(row);
             events.push_back(std::move(event));
         } catch (const std::exception& ex) {
-            LogRegistry::types()->error("Failed to parse Event from database row: {}", ex.what());
+            log::Registry::types()->error("Failed to parse Event from database row: {}", ex.what());
         }
     }
     return events;

@@ -4,7 +4,6 @@
 #include "sync/model/Conflict.hpp"
 #include "fs/model/File.hpp"
 #include "sync/Cloud.hpp"
-#include "logging/LogRegistry.hpp"
 #include "storage/Engine.hpp"
 #include "sync/model/Event.hpp"
 
@@ -16,7 +15,6 @@
 using namespace vh::sync::model;
 using namespace vh::fs::model;
 using namespace vh::concurrency;
-using namespace vh::logging;
 using namespace vh::database::encoding;
 
 RemotePolicy::RemotePolicy(const pqxx::row& row)

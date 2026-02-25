@@ -11,7 +11,7 @@
 #include <stdexcept>
 
 using namespace vh::test::cli;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
@@ -53,7 +53,7 @@ std::string CLITestContext::getCommandName(const EntityType& type, const std::st
     }
 }
 
-std::shared_ptr<vh::shell::CommandUsage> CLITestContext::getCommand(const EntityType& type, const std::string& action) const {
+std::shared_ptr<CommandUsage> CLITestContext::getCommand(const EntityType& type, const std::string& action) const {
     return commands.at(getCommandName(type, action));
 }
 

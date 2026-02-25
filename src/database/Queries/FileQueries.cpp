@@ -1,11 +1,11 @@
-#include "database/Queries/FileQueries.hpp"
+#include "database/queries/FileQueries.hpp"
 #include "database/Transactions.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/file/Trashed.hpp"
 #include "database/encoding/u8.hpp"
 #include "fs/model/Path.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
 #include "fs/model/stats/Extension.hpp"
 
@@ -13,7 +13,6 @@
 
 using namespace vh::database;
 using namespace vh::database::encoding;
-using namespace vh::services;
 using namespace vh::fs::model;
 
 unsigned int FileQueries::upsertFile(const std::shared_ptr<File>& file) {
@@ -271,7 +270,7 @@ void FileQueries::updateParentStatsAndCleanEmptyDirs(pqxx::work& txn,
         if (deleteDirs && fsCount == 0) {
             const auto inode = txn.exec(pqxx::prepped{"get_fs_entry_inode"}, *parentId).one_field().as<ino_t>();
             txn.exec(pqxx::prepped{"delete_fs_entry"}, *parentId);
-            ServiceDepsRegistry::instance().fsCache->evictIno(inode);
+            runtime::Deps::get().fsCache->evictIno(inode);
             --subDirsDeleted;
         }
         if (parentRes.empty()) break;

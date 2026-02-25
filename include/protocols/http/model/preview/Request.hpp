@@ -5,17 +5,12 @@
 #include <unordered_map>
 #include <memory>
 
-namespace vh::storage {
-struct Engine;
-}
+namespace vh::storage { struct Engine; }
+namespace vh::fs::model { struct File; }
 
-namespace vh::fs::model {
-struct File;
-}
+namespace vh::protocols::http::model::preview {
 
-namespace vh::http {
-
-struct PreviewRequest {
+struct Request {
     unsigned int vault_id;
     std::filesystem::path rel_path;
     std::optional<unsigned int> size;
@@ -23,7 +18,7 @@ struct PreviewRequest {
     std::shared_ptr<storage::Engine> engine{nullptr};
     std::shared_ptr<fs::model::File> file{nullptr};
 
-    explicit PreviewRequest(const std::unordered_map<std::string, std::string>& params) {
+    explicit Request(const std::unordered_map<std::string, std::string>& params) {
         if (!params.contains("vault_id") || !params.contains("path"))
             throw std::invalid_argument("Missing vault_id or path");
 

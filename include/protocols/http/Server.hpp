@@ -2,14 +2,14 @@
 
 #include "protocols/TcpServerBase.hpp"
 
-namespace vh::http {
+namespace vh::protocols::http {
 
 namespace net = boost::asio;
 using tcp = net::ip::tcp;
 
-class HttpServer final : public protocols::TcpServerBase {
+class Server final : public TcpServerBase {
 public:
-    HttpServer(net::io_context& ioc, const tcp::endpoint& endpoint);
+    Server(net::io_context& ioc, const tcp::endpoint& endpoint);
 
 private:
     std::string_view serverName() const noexcept override { return "HttpServer"; }

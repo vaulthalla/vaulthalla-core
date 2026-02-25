@@ -1,22 +1,22 @@
-#include "protocols/http/handlers/PdfPreviewHandler.hpp"
+#include "protocols/http/handlers/preview/Pdf.hpp"
 #include "preview/image.hpp"
 #include "fs/ops/file.hpp"
 #include "fs/model/File.hpp"
 #include "logging/LogRegistry.hpp"
-#include "protocols/http/PreviewRequest.hpp"
-#include "protocols/http/HttpRouter.hpp"
+#include "protocols/http/model/preview/Request.hpp"
+#include "protocols/http/Router.hpp"
 
 #include <format>
 #include <pdfium/fpdfview.h>
 
+using namespace vh::protocols::http::handlers::preview;
+using namespace vh::protocols::http::model::preview;
 using namespace vh::logging;
 using namespace vh::fs::model;
 using namespace vh::fs::ops;
 using namespace vh::preview;
 
-namespace vh::http {
-
-PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req, const std::unique_ptr<PreviewRequest>&& pr) {
+Response Pdf::handle(request&& req, const std::unique_ptr<Request>&& pr) {
     try {
         std::string mime_type = "image/jpeg";
 
@@ -71,12 +71,10 @@ PreviewResponse PdfPreviewHandler::handle(http::request<http::string_body>&& req
         FPDF_ClosePage(page);
         FPDF_CloseDocument(doc);
 
-        return HttpRouter::makeResponse(req, std::move(jpeg_buf), *pr->file->mime_type);
+        return Router::makeResponse(req, std::move(jpeg_buf), *pr->file->mime_type);
 
     } catch (const std::exception& e) {
         LogRegistry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}", pr->rel_path.string(), e.what());
-        return HttpRouter::makeErrorResponse(req, std::string(e.what()), http::status::unsupported_media_type);
+        return Router::makeErrorResponse(req, std::string(e.what()), http::status::unsupported_media_type);
     }
-}
-
 }

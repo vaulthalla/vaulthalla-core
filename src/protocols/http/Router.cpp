@@ -1,11 +1,11 @@
-#include "protocols/http/HttpRouter.hpp"
+#include "protocols/http/Router.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
-#include "protocols/http/handlers/ImagePreviewHandler.hpp"
-#include "protocols/http/handlers/PdfPreviewHandler.hpp"
+#include "protocols/http/handlers/preview/Image.hpp"
+#include "protocols/http/handlers/preview/Pdf.hpp"
 #include "fs/ops/file.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "fs/model/Entry.hpp"
@@ -13,13 +13,13 @@
 #include "fs/model/Path.hpp"
 #include "fs/cache/Registry.hpp"
 #include "stats/model/CacheStats.hpp"
-#include "protocols/http/PreviewRequest.hpp"
+#include "protocols/http/model/preview/Request.hpp"
 #include "logging/LogRegistry.hpp"
 #include "protocols/cookie.hpp"
 
 #include <nlohmann/json.hpp>
 
-using namespace vh::protocols;
+using namespace vh::protocols::http;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
@@ -64,8 +64,6 @@ static std::unordered_map<std::string, std::string> parse_query_params(const std
     return params;
 }
 
-namespace vh::http {
-
 static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const std::filesystem::path& thumbnailRoot,
                                          const unsigned int size) {
     if (const auto thumbnail_sizes = ConfigRegistry::get().caching.thumbnails.sizes;
@@ -81,9 +79,9 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
     return {};
 }
 
-PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
-    if (req.method() != http::verb::get)
-        return makeErrorResponse(req, "Invalid request", http::status::bad_request);
+Response Router::route(request&& req) {
+    if (req.method() != verb::get)
+        return makeErrorResponse(req, "Invalid request", status::bad_request);
 
     if (req.target().starts_with("/auth/session"))
         return handleAuthSession(std::move(req));
@@ -91,29 +89,26 @@ PreviewResponse HttpRouter::route(http::request<http::string_body>&& req) {
     if (req.target().starts_with("/preview"))
         return handlePreview(std::move(req));
 
-    return makeErrorResponse(req, "Not found", http::status::not_found);
+    return makeErrorResponse(req, "Not found", status::not_found);
 }
 
-PreviewResponse HttpRouter::handleAuthSession(http::request<http::string_body>&& req) {
+Response Router::handleAuthSession(request&& req) {
     if (ConfigRegistry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
 
     try {
-        const auto refresh = extractCookie(req, "refresh");
+        const auto refresh = protocols::extractCookie(req, "refresh");
         if (refresh.empty()) {
-            LogRegistry::http()->warn("[HttpRouter] Refresh token not set");
-            return makeErrorResponse(req, "Refresh token not set", http::status::bad_request);
+            LogRegistry::http()->warn("[Router] Refresh token not set");
+            return makeErrorResponse(req, "Refresh token not set", status::bad_request);
         }
         ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh);
         const auto session = ServiceDepsRegistry::instance().authManager->sessionManager()->getClientSession(refresh);
         if (!session || !session->getUser()) {
-            LogRegistry::http()->warn("[HttpRouter]: Invalid refresh token. Unable to locate session.");
-            return makeErrorResponse(req, "Not found", http::status::not_found);
+            LogRegistry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
+            return makeErrorResponse(req, "Not found", status::not_found);
         }
 
-        // If validateRefreshToken only throws/returns void, extend it to return user/session info.
-        // Optionally mint an access token here:
-        // auto access = authManager->mintAccessToken(session.user_id);
-
+        // Could mint an access token here if we wanted to
         nlohmann::json j{
                 {"ok", true},
                 {"user_id", session->getUser()->id},
@@ -123,15 +118,15 @@ PreviewResponse HttpRouter::handleAuthSession(http::request<http::string_body>&&
 
         return makeJsonResponse(req, j);
     } catch (const std::exception& e) {
-        LogRegistry::http()->warn("[HttpRouter]: Invalid refresh token: %s", e.what());
-        return makeErrorResponse(req, std::string("Unauthorized: ") + e.what(), http::status::unauthorized);
+        LogRegistry::http()->warn("[Router]: Invalid refresh token: %s", e.what());
+        return makeErrorResponse(req, std::string("Unauthorized: ") + e.what(), status::unauthorized);
     }
 }
 
-std::string HttpRouter::authenticateRequest(const http::request<http::string_body>& req) {
+std::string Router::authenticateRequest(const request& req) {
     if (ConfigRegistry::get().dev.enabled) return "";
     try {
-        const auto refresh_token = extractCookie(req, "refresh");
+        const auto refresh_token = protocols::extractCookie(req, "refresh");
         ServiceDepsRegistry::instance().authManager->validateRefreshToken(refresh_token);
         return "";
     } catch (const std::exception& e) {
@@ -139,34 +134,34 @@ std::string HttpRouter::authenticateRequest(const http::request<http::string_bod
     }
 }
 
-PreviewResponse HttpRouter::handlePreview(http::request<http::string_body>&& req) {
-    if (req.method() != http::verb::get || !req.target().starts_with("/preview"))
+Response Router::handlePreview(request&& req) {
+    if (req.method() != verb::get || !req.target().starts_with("/preview"))
         return makeErrorResponse(
-            req, "Invalid request", http::status::bad_request);
+            req, "Invalid request", status::bad_request);
 
     if (const auto error = authenticateRequest(req); !error.empty())
         return makeErrorResponse(
-            req, "Unauthorized: " + error, http::status::unauthorized);
+            req, "Unauthorized: " + error, status::unauthorized);
 
-    std::unique_ptr<PreviewRequest> pr;
-    try { pr = std::make_unique<PreviewRequest>(parse_query_params(req.target())); } catch (const std::exception&
-        e) { return makeErrorResponse(req, e.what(), http::status::bad_request); }
+    std::unique_ptr<Request> pr;
+    try { pr = std::make_unique<Request>(parse_query_params(req.target())); } catch (const std::exception&
+        e) { return makeErrorResponse(req, e.what(), status::bad_request); }
 
     pr->engine = ServiceDepsRegistry::instance().storageManager->getEngine(pr->vault_id);
     if (!pr->engine)
         return makeErrorResponse(
             req, "No storage engine found for vault with id " + std::to_string(pr->vault_id),
-            http::status::bad_request);
+            status::bad_request);
 
     const auto fusePath = pr->engine->paths->absRelToAbsRel(pr->rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
     const auto entry = ServiceDepsRegistry::instance().fsCache->getEntry(fusePath);
     if (!entry) return makeErrorResponse(req, "File not found in cache");
     if (entry->isDirectory())
-        return makeErrorResponse(req, "Requested preview file is a directory", http::status::bad_request);
+        return makeErrorResponse(req, "Requested preview file is a directory", status::bad_request);
     pr->file = std::static_pointer_cast<File>(entry);
 
     if (!pr->file->mime_type)
-        return makeErrorResponse(req, "File has no mime type.", http::status::unsupported_media_type);
+        return makeErrorResponse(req, "File has no mime type.", status::unsupported_media_type);
 
     if (pr->size)
         if (auto data = tryCacheRead(pr->file, pr->engine->paths->thumbnailRoot, *pr->size); !data.empty())
@@ -175,25 +170,25 @@ PreviewResponse HttpRouter::handlePreview(http::request<http::string_body>&& req
     if (pr->file->mime_type->starts_with("image/") || pr->file->mime_type->ends_with("/pdf")) {
         ScopedOpTimer timer(ServiceDepsRegistry::instance().httpCacheStats.get());
         return pr->file->mime_type->starts_with("image/")
-                   ? ImagePreviewHandler::handle(std::move(req), std::move(pr))
-                   : PdfPreviewHandler::handle(std::move(req), std::move(pr));
+                   ? handlers::preview::Image::handle(std::move(req), std::move(pr))
+                   : handlers::preview::Pdf::handle(std::move(req), std::move(pr));
     }
 
     return makeErrorResponse(
         req, "Unsupported preview type: " + (pr->file->mime_type ? *pr->file->mime_type : "unknown"));
 }
 
-PreviewResponse HttpRouter::makeResponse(const http::request<http::string_body>& req, std::vector<uint8_t>&& data,
+Response Router::makeResponse(const request& req, std::vector<uint8_t>&& data,
                                          const std::string& mime_type, const bool cacheHit) {
     const auto size = data.size();
 
-    http::response<http::vector_body<uint8_t> > res{
+    vector_response res{
         std::piecewise_construct,
         std::make_tuple(std::move(data)),
-        std::make_tuple(http::status::ok, req.version())
+        std::make_tuple(status::ok, req.version())
     };
 
-    res.set(http::field::content_type, mime_type);
+    res.set(field::content_type, mime_type);
     res.content_length(size);
     res.keep_alive(req.keep_alive());
 
@@ -202,17 +197,17 @@ PreviewResponse HttpRouter::makeResponse(const http::request<http::string_body>&
     return res;
 }
 
-PreviewResponse HttpRouter::makeResponse(const http::request<http::string_body>& req, http::file_body::value_type data,
+Response Router::makeResponse(const request& req, file_body::value_type data,
                                          const std::string& mime_type, const bool cacheHit) {
     const auto size = data.size();
 
-    http::response<http::file_body> res{
+    file_response res{
         std::piecewise_construct,
         std::make_tuple(std::move(data)),
-        std::make_tuple(http::status::ok, req.version())
+        std::make_tuple(status::ok, req.version())
     };
 
-    res.set(http::field::content_type, mime_type);
+    res.set(field::content_type, mime_type);
     res.content_length(size);
     res.keep_alive(req.keep_alive());
 
@@ -221,23 +216,21 @@ PreviewResponse HttpRouter::makeResponse(const http::request<http::string_body>&
     return res;
 }
 
-PreviewResponse HttpRouter::makeJsonResponse(const http::request<http::string_body>& req, const nlohmann::json& j) {
-    http::response<http::string_body> res{http::status::ok, req.version()};
-    res.set(http::field::content_type, "application/json");
+Response Router::makeJsonResponse(const request& req, const nlohmann::json& j) {
+    string_response res{status::ok, req.version()};
+    res.set(field::content_type, "application/json");
     res.body() = j.dump();
     res.prepare_payload();
     res.keep_alive(req.keep_alive());
     return res;
 }
 
-PreviewResponse HttpRouter::makeErrorResponse(const http::request<http::string_body>& req,
+Response Router::makeErrorResponse(const request& req,
                                               const std::string& msg,
-                                              const http::status& status) {
-    http::response<http::string_body> res{status, req.version()};
-    res.set(http::field::content_type, "text/plain");
+                                              const status& status) {
+    string_response res{status, req.version()};
+    res.set(field::content_type, "text/plain");
     res.body() = msg;
     res.prepare_payload();
     return res;
-}
-
 }

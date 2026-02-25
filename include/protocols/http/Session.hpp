@@ -5,15 +5,15 @@
 #include <boost/asio.hpp>
 #include <memory>
 
-namespace vh::http {
+namespace vh::protocols::http {
 
 namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = boost::asio::ip::tcp;
 
-class HttpSession : public std::enable_shared_from_this<HttpSession> {
+class Session : public std::enable_shared_from_this<Session> {
 public:
-    explicit HttpSession(tcp::socket socket);
+    explicit Session(tcp::socket socket);
 
     void run();
 

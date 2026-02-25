@@ -11,12 +11,10 @@ class WebSocketRouter;
 class WebSocketHandler;
 }
 
-namespace boost::asio {
-class io_context;
-}
+namespace boost::asio { class io_context; }
 
-namespace vh::http {
-class HttpServer;
+namespace vh::protocols {
+namespace http { class Server; }
 }
 
 namespace vh::services {
@@ -36,7 +34,7 @@ private:
     std::shared_ptr<websocket::WebSocketRouter> wsRouter_;
     std::shared_ptr<websocket::WebSocketHandler> wsHandler_;
     std::shared_ptr<websocket::WebSocketServer> wsServer_;
-    std::shared_ptr<http::HttpServer> httpServer_;
+    std::shared_ptr<protocols::http::Server> httpServer_;
 
     void initProtocols();
     void initWebsocketServer();

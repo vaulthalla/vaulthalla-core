@@ -6,7 +6,7 @@
 #include "protocols/websocket/WebSocketHandler.hpp"
 #include "protocols/websocket/WebSocketRouter.hpp"
 #include "protocols/websocket/WebSocketServer.hpp"
-#include "protocols/http/HttpServer.hpp"
+#include "protocols/http/Server.hpp"
 #include "logging/LogRegistry.hpp"
 
 #include <boost/asio/io_context.hpp>
@@ -16,6 +16,7 @@ using namespace vh::services;
 using namespace vh::config;
 using namespace vh::logging;
 using namespace vh::crypto;
+using namespace vh::protocols;
 
 Vaulthalla::Vaulthalla() : AsyncService("Vaulthalla") {}
 
@@ -50,7 +51,7 @@ void Vaulthalla::initProtocols() {
         return;
     }
 
-    ioContext_ = std::make_shared<boost::asio::io_context>();
+    ioContext_ = std::make_shared<asio::io_context>();
 
     initWebsocketServer();
     initHttpServer();
@@ -66,7 +67,7 @@ void Vaulthalla::initWebsocketServer() {
         return;
     }
 
-    const auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(cfg.host), cfg.port);
+    const auto endpoint = asio::ip::tcp::endpoint(asio::ip::make_address(cfg.host), cfg.port);
     wsRouter_ = std::make_shared<websocket::WebSocketRouter>();
     wsHandler_ = std::make_shared<websocket::WebSocketHandler>(wsRouter_);
     wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint, wsRouter_);
@@ -81,8 +82,8 @@ void Vaulthalla::initHttpServer() {
         return;
     }
 
-    const auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(cfg.host), cfg.port);
-    httpServer_ = std::make_shared<http::HttpServer>(*ioContext_, endpoint);
+    const auto endpoint = asio::ip::tcp::endpoint(asio::ip::make_address(cfg.host), cfg.port);
+    httpServer_ = std::make_shared<http::Server>(*ioContext_, endpoint);
     httpServer_->run();
 }
 

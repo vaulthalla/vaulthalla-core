@@ -8,14 +8,14 @@
 
 using namespace vh::auth;
 using namespace vh::auth::model;
-using namespace vh::websocket;
+using namespace vh::protocols;
 using namespace vh::logging;
 using namespace vh::config;
 using namespace vh::identities::model;
 
 Client::Client() = default;
 
-Client::Client(const std::shared_ptr<WebSocketSession>& session,
+Client::Client(const std::shared_ptr<ws::Session>& session,
                const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<User>& user)
     : user_(user), session_(session), refreshToken_(refreshToken) {
     if (user) {
@@ -26,9 +26,9 @@ Client::Client(const std::shared_ptr<WebSocketSession>& session,
 
 std::shared_ptr<User> Client::getUser() const { return user_; }
 std::shared_ptr<Token> Client::getToken() const { return token_; }
-std::shared_ptr<WebSocketSession> Client::getSession() const { return session_; }
+std::shared_ptr<ws::Session> Client::getSession() const { return session_; }
 
-void Client::setSession(const std::shared_ptr<WebSocketSession>& session) {
+void Client::setSession(const std::shared_ptr<ws::Session>& session) {
     if (!session) {
         LogRegistry::ws()->debug("[Client] Cannot set session: session is null.");
         return;

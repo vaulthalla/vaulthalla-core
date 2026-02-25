@@ -4,8 +4,8 @@
 #include "database/Queries/FileQueries.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "auth/AuthManager.hpp"
-#include "protocols/http/handlers/preview/Image.hpp"
-#include "protocols/http/handlers/preview/Pdf.hpp"
+#include "protocols/http/handler/preview/Image.hpp"
+#include "protocols/http/handler/preview/Pdf.hpp"
 #include "fs/ops/file.hpp"
 #include "services/ServiceDepsRegistry.hpp"
 #include "fs/model/Entry.hpp"
@@ -19,7 +19,6 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace vh::protocols::http;
 using namespace vh::services;
 using namespace vh::logging;
 using namespace vh::config;
@@ -75,9 +74,12 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
             return readFileToVector(pathToJpegCache);
 
         ServiceDepsRegistry::instance().httpCacheStats->record_miss();
-    }
+        }
     return {};
 }
+namespace vh::protocols::http {
+
+using namespace vh::protocols::http::model::preview;
 
 Response Router::route(request&& req) {
     if (req.method() != verb::get)
@@ -110,11 +112,11 @@ Response Router::handleAuthSession(request&& req) {
 
         // Could mint an access token here if we wanted to
         nlohmann::json j{
-                {"ok", true},
-                {"user_id", session->getUser()->id},
-                // {"access_token", access.token},
-                // {"expires_in", access.expires_in}
-            };
+                    {"ok", true},
+                    {"user_id", session->getUser()->id},
+                    // {"access_token", access.token},
+                    // {"expires_in", access.expires_in}
+                };
 
         return makeJsonResponse(req, j);
     } catch (const std::exception& e) {
@@ -170,8 +172,8 @@ Response Router::handlePreview(request&& req) {
     if (pr->file->mime_type->starts_with("image/") || pr->file->mime_type->ends_with("/pdf")) {
         ScopedOpTimer timer(ServiceDepsRegistry::instance().httpCacheStats.get());
         return pr->file->mime_type->starts_with("image/")
-                   ? handlers::preview::Image::handle(std::move(req), std::move(pr))
-                   : handlers::preview::Pdf::handle(std::move(req), std::move(pr));
+                   ? handler::preview::Image::handle(std::move(req), std::move(pr))
+                   : handler::preview::Pdf::handle(std::move(req), std::move(pr));
     }
 
     return makeErrorResponse(
@@ -233,4 +235,6 @@ Response Router::makeErrorResponse(const request& req,
     res.body() = msg;
     res.prepare_payload();
     return res;
+}
+
 }

@@ -2,8 +2,9 @@
 #include "protocols/http/Router.hpp"
 #include "logging/LogRegistry.hpp"
 
-using namespace vh::protocols::http;
 using namespace vh::logging;
+
+namespace vh::protocols::http {
 
 Session::Session(tcp::socket socket) : socket_(std::move(socket)) { buffer_.max_size(8192); }
 
@@ -81,4 +82,6 @@ void Session::do_close() {
     beast::error_code ec;
     socket_.shutdown(tcp::socket::shutdown_send, ec);
     // ignore errors on shutdown
+}
+
 }

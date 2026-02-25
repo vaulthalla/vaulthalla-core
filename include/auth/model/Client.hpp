@@ -3,7 +3,7 @@
 #include "identities/model/User.hpp"
 #include "Token.hpp"
 #include "RefreshToken.hpp"
-#include "protocols/websocket/WebSocketSession.hpp"
+#include "protocols/ws/Session.hpp"
 #include "crypto/secrets/Manager.hpp"
 #include <memory>
 #include <string>
@@ -14,12 +14,12 @@ class Client {
   public:
     Client();
 
-    Client(const std::shared_ptr<websocket::WebSocketSession>& session,
+    Client(const std::shared_ptr<protocols::ws::Session>& session,
            const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<identities::model::User>& user = nullptr);
 
     [[nodiscard]] std::shared_ptr<identities::model::User> getUser() const;
     [[nodiscard]] std::shared_ptr<Token> getToken() const;
-    [[nodiscard]] std::shared_ptr<websocket::WebSocketSession> getSession() const;
+    [[nodiscard]] std::shared_ptr<protocols::ws::Session> getSession() const;
 
     void setUser(const std::shared_ptr<identities::model::User>& user);
     void setToken(const std::shared_ptr<Token>& token);
@@ -35,7 +35,7 @@ class Client {
     void invalidateToken() const;
     void closeConnection() const;
 
-    void setSession(const std::shared_ptr<websocket::WebSocketSession>& session);
+    void setSession(const std::shared_ptr<protocols::ws::Session>& session);
 
     void setRefreshToken(const std::shared_ptr<RefreshToken>& token) { refreshToken_ = token; }
     [[nodiscard]] const std::shared_ptr<RefreshToken>& getRefreshToken() const { return refreshToken_; }
@@ -50,7 +50,7 @@ class Client {
   private:
     std::shared_ptr<identities::model::User> user_;
     std::shared_ptr<Token> token_{nullptr};
-    std::shared_ptr<websocket::WebSocketSession> session_;
+    std::shared_ptr<protocols::ws::Session> session_;
     std::shared_ptr<RefreshToken> refreshToken_;
     const std::string jwt_secret_ = crypto::secrets::Manager().jwtSecret();
     std::chrono::system_clock::time_point openedAt_ = std::chrono::system_clock::now();

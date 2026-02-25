@@ -3,9 +3,7 @@
 #include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
-#include "protocols/websocket/WebSocketHandler.hpp"
-#include "protocols/websocket/WebSocketRouter.hpp"
-#include "protocols/websocket/WebSocketServer.hpp"
+#include "protocols/ws/Server.hpp"
 #include "protocols/http/Server.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -68,10 +66,7 @@ void Vaulthalla::initWebsocketServer() {
     }
 
     const auto endpoint = asio::ip::tcp::endpoint(asio::ip::make_address(cfg.host), cfg.port);
-    wsRouter_ = std::make_shared<websocket::WebSocketRouter>();
-    wsHandler_ = std::make_shared<websocket::WebSocketHandler>(wsRouter_);
-    wsServer_ = std::make_shared<websocket::WebSocketServer>(*ioContext_, endpoint, wsRouter_);
-
+    wsServer_ = std::make_shared<ws::Server>(*ioContext_, endpoint);
     wsServer_->run();
 }
 

@@ -6,7 +6,7 @@
 #include "crypto/password/Strength.hpp"
 #include "database/Queries/UserQueries.hpp"
 #include "storage/Manager.hpp"
-#include "protocols/websocket/WebSocketSession.hpp"
+#include "protocols/ws/Session.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "logging/LogRegistry.hpp"
 
@@ -24,13 +24,14 @@ using namespace vh::crypto;
 using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::logging;
+using namespace vh::protocols;
 
 AuthManager::AuthManager(const std::shared_ptr<Manager>& storageManager)
     : sessionManager_(std::make_shared<SessionManager>()), storageManager_(storageManager) {
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
 
-void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const {
+void AuthManager::rehydrateOrCreateClient(const std::shared_ptr<ws::Session>& session) const {
     std::shared_ptr<Client> client;
 
     if (!session->getRefreshToken().empty()) {
@@ -58,7 +59,7 @@ std::shared_ptr<SessionManager> AuthManager::sessionManager() const {
 
 std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<User> user,
                                                   const std::string& password,
-                                                  const std::shared_ptr<websocket::WebSocketSession>& session) {
+                                                  const std::shared_ptr<ws::Session>& session) {
     isValidRegistration(user, password);
 
     user->setPasswordHash(hash::password(password));
@@ -78,7 +79,7 @@ std::shared_ptr<Client> AuthManager::registerUser(std::shared_ptr<User> user,
 }
 
 std::shared_ptr<Client> AuthManager::loginUser(const std::string& name, const std::string& password,
-                                               const std::shared_ptr<websocket::WebSocketSession>& session) {
+                                               const std::shared_ptr<ws::Session>& session) {
     try {
         auto user = findUser(name);
         if (!user) throw std::runtime_error("User not found: " + name);
@@ -132,7 +133,7 @@ void AuthManager::validateRefreshToken(const std::string& refreshToken) const {
 }
 
 std::shared_ptr<Client> AuthManager::validateRefreshToken(const std::string& refreshToken,
-                                  const std::shared_ptr<websocket::WebSocketSession>& session) const {
+                                  const std::shared_ptr<ws::Session>& session) const {
     try {
         // 1. Decode and verify JWT
         const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
@@ -284,7 +285,7 @@ std::string generateUUID() {
 }
 
 std::pair<std::string, std::shared_ptr<RefreshToken>>
-AuthManager::createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) const {
+AuthManager::createRefreshToken(const std::shared_ptr<ws::Session>& session) const {
     const auto now = std::chrono::system_clock::now();
     const auto exp = now + std::chrono::days(config::ConfigRegistry::get().auth.refresh_token_expiry_days);
     std::string jti = generateUUID();

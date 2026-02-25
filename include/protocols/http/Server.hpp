@@ -1,13 +1,13 @@
 #pragma once
 
-#include "protocols/TcpServerBase.hpp"
+#include "protocols/TCPServer.hpp"
 
 namespace vh::protocols::http {
 
 namespace net = boost::asio;
 using tcp = net::ip::tcp;
 
-class Server final : public TcpServerBase {
+class Server final : public TCPServer {
 public:
     Server(net::io_context& ioc, const tcp::endpoint& endpoint);
 
@@ -16,4 +16,4 @@ private:
     void onAccept(tcp::socket socket) override;
 };
 
-} // namespace vh::http
+}

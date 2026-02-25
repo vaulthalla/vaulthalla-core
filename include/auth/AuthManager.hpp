@@ -10,7 +10,7 @@
 #include <jwt-cpp/traits/nlohmann-json/traits.h>
 
 namespace vh::identities::model { struct User; }
-namespace vh::websocket { class WebSocketSession; }
+namespace vh::protocols::ws { class Session; }
 namespace vh::storage { class Manager; }
 
 namespace vh::auth {
@@ -21,14 +21,14 @@ class AuthManager {
 public:
     explicit AuthManager(const std::shared_ptr<storage::Manager>& storageManager = nullptr);
 
-    void rehydrateOrCreateClient(const std::shared_ptr<websocket::WebSocketSession>& session) const;
+    void rehydrateOrCreateClient(const std::shared_ptr<protocols::ws::Session>& session) const;
 
     std::shared_ptr<model::Client> registerUser(std::shared_ptr<identities::model::User> user,
                                          const std::string& password,
-                                         const std::shared_ptr<websocket::WebSocketSession>& session);
+                                         const std::shared_ptr<protocols::ws::Session>& session);
 
     std::shared_ptr<model::Client> loginUser(const std::string& name, const std::string& password,
-                                      const std::shared_ptr<websocket::WebSocketSession>& session);
+                                      const std::shared_ptr<protocols::ws::Session>& session);
 
     void updateUser(const std::shared_ptr<identities::model::User>& user);
 
@@ -41,10 +41,10 @@ public:
     void validateRefreshToken(const std::string& refreshToken) const;
 
     std::shared_ptr<model::Client> validateRefreshToken(const std::string& refreshToken,
-                                                 const std::shared_ptr<websocket::WebSocketSession>& session) const;
+                                                 const std::shared_ptr<protocols::ws::Session>& session) const;
 
     std::pair<std::string, std::shared_ptr<model::RefreshToken>>
-    createRefreshToken(const std::shared_ptr<websocket::WebSocketSession>& session) const;
+    createRefreshToken(const std::shared_ptr<protocols::ws::Session>& session) const;
 
     static bool isValidRegistration(const std::shared_ptr<identities::model::User>& user,
                                     const std::string& password);

@@ -9,12 +9,12 @@
 #include <format>
 #include <pdfium/fpdfview.h>
 
+using namespace vh::protocols::http;
 using namespace vh::fs::model;
 using namespace vh::fs::ops;
 using namespace vh::preview;
 
-vh::protocols::http::model::preview::Response
-vh::protocols::http::handler::preview::Pdf::handle(request&& req, const std::unique_ptr<Request>&& pr) {
+model::preview::Response handler::preview::Pdf::handle(request&& req, const std::unique_ptr<model::preview::Request>&& pr) {
     try {
         std::string mime_type = "image/jpeg";
 

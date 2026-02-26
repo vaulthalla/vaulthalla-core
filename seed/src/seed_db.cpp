@@ -1,13 +1,13 @@
 #include "seed_db.hpp"
 
 // Database
-#include "database/queries/VaultQueries.hpp"
-#include "database/queries/PermsQueries.hpp"
-#include "database/queries/UserQueries.hpp"
-#include "database/queries/GroupQueries.hpp"
-#include "database/queries/DirectoryQueries.hpp"
-#include "database/queries/FSEntryQueries.hpp"
-#include "database/Transactions.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/rbac/Permission.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/identities/Group.hpp"
+#include "db/query/fs/Directory.hpp"
+#include "db/query/fs/Entry.hpp"
+#include "db/Transactions.hpp"
 
 // Types
 #include "rbac/model/Permission.hpp"
@@ -44,7 +44,6 @@
 
 using namespace vh::seed;
 using namespace vh::config;
-using namespace vh::database;
 using namespace vh::crypto;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
@@ -102,7 +101,7 @@ void vh::seed::initPermissions() {
         {13, "list", "Can list directory contents"}
     };
 
-    Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
+    db::Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
         for (const auto& p : userPerms)
             txn.exec(pqxx::prepped{"insert_raw_permission"},
                 pqxx::params{p.bit_position, p.name, p.description, "user"});
@@ -126,7 +125,7 @@ void vh::seed::initRoles() {
         {"implicit_deny", "Role that denies all permissions", "vault", 0b0000000000000000}
     };
 
-    Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
+    db::Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
         for (auto& r : roles) {
             r.id = txn.exec(pqxx::prepped{"insert_role"},
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
@@ -150,13 +149,13 @@ void vh::seed::initSystemUser() {
 
     // 2) If a user already exists for this Linux UID, ensure it's marked as system + has super_admin
     try {
-        if (const auto existingByUid = UserQueries::getUserByLinuxUID(sysUid); existingByUid) {
+        if (const auto existingByUid = db::query::identities::User::getUserByLinuxUID(sysUid); existingByUid) {
             log::Registry::vaulthalla()->info(
                 "[initdb] System user already exists for linux_uid={} (name='{}')",
                 sysUid, existingByUid->name
             );
 
-            const auto role = PermsQueries::getRoleByName("super_admin");
+            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
 
             // If your schema supports updating users, do it.
             // If you don't have update queries yet, you can just return here.
@@ -172,7 +171,7 @@ void vh::seed::initSystemUser() {
             existingByUid->role->permissions = role->permissions;
 
             // If you have an update query, use it. If not, skip.
-            // UserQueries::updateUser(existingByUid);
+            // db::query::identities::User::updateUser(existingByUid);
             return;
         }
     } catch (...) {
@@ -181,13 +180,13 @@ void vh::seed::initSystemUser() {
 
     // 3) If a user exists by name "system" but no UID match, align it
     try {
-        if (const auto existingByName = UserQueries::getUserByName("system"); existingByName) {
+        if (const auto existingByName = db::query::identities::User::getUserByName("system"); existingByName) {
             log::Registry::vaulthalla()->info(
                 "[initdb] Found existing 'system' user (id={}), updating linux_uid to {}",
                 existingByName->id, sysUid
             );
 
-            const auto role = PermsQueries::getRoleByName("super_admin");
+            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
 
             existingByName->linux_uid = sysUid;
             existingByName->email = "";
@@ -200,7 +199,7 @@ void vh::seed::initSystemUser() {
             existingByName->role->permissions = role->permissions;
 
             // If you have an update query, use it. If not, you can delete+recreate, but updating is better.
-            // UserQueries::updateUser(existingByName);
+            // db::query::identities::User::updateUser(existingByName);
             return;
         }
     } catch (...) {
@@ -220,7 +219,7 @@ void vh::seed::initSystemUser() {
 
     user->linux_uid = sysUid;
 
-    const auto role = PermsQueries::getRoleByName("super_admin");
+    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;
     user->role->name = role->name;
@@ -228,7 +227,7 @@ void vh::seed::initSystemUser() {
     user->role->type = role->type;
     user->role->permissions = role->permissions;
 
-    UserQueries::createUser(user);
+    db::query::identities::User::createUser(user);
 
     log::Registry::vaulthalla()->info(
         "[initdb] Created system user mapped to OS account '{}' (linux_uid={})",
@@ -279,7 +278,7 @@ void initAdmin() {
     user->setPasswordHash(hash::password("vh!adm1n"));
     user->linux_uid = loadPendingSuperAdminUid();
 
-    const auto role = PermsQueries::getRoleByName("super_admin");
+    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;
     user->role->name = role->name;
@@ -287,7 +286,7 @@ void initAdmin() {
     user->role->type = role->type;
     user->role->permissions = role->permissions;
 
-    UserQueries::createUser(user);
+    db::query::identities::User::createUser(user);
 }
 
 } // namespace vh::seed
@@ -299,11 +298,11 @@ void vh::seed::initAdminGroup() {
     auto group = std::make_shared<Group>();
     group->name = "admin";
     group->description = "Core administrative group for system management";
-    group->id = GroupQueries::createGroup(group);
+    group->id = db::query::identities::Group::createGroup(group);
 
-    GroupQueries::addMemberToGroup(group->id, UserQueries::getUserByName("admin")->id);
+    db::query::identities::Group::addMemberToGroup(group->id, db::query::identities::User::getUserByName("admin")->id);
 
-    group = GroupQueries::getGroupByName("admin");
+    group = db::query::identities::Group::getGroupByName("admin");
     if (!group) throw std::runtime_error("Failed to create admin group");
 
     if (group->members.front()->user->name != "admin") throw std::runtime_error("Admin user not added to admin group");
@@ -324,7 +323,7 @@ void vh::seed::initAdminDefaultVault() {
     sync->interval = std::chrono::minutes(10);
     sync->conflict_policy = LocalPolicy::ConflictPolicy::Overwrite;
 
-    VaultQueries::upsertVault(vault, sync);
+    db::query::vault::Vault::upsertVault(vault, sync);
 }
 
 void vh::seed::initRoot() {
@@ -341,11 +340,11 @@ void vh::seed::initRoot() {
     dir->is_hidden = false;
     dir->is_system = true;
 
-    DirectoryQueries::upsertDirectory(dir);
+    db::query::fs::Directory::upsertDirectory(dir);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Failed to create root directory in database");
+    if (!db::query::fs::Entry::rootExists()) throw std::runtime_error("Failed to create root directory in database");
     log::Registry::vaulthalla()->info("[initdb] Root directory initialized successfully");
 }
 
@@ -394,7 +393,7 @@ void vh::seed::initDevCloudVault() {
         sync->conflict_policy = RemotePolicy::ConflictPolicy::KeepLocal;
         sync->strategy = RemotePolicy::Strategy::Sync;
 
-        vault->id = VaultQueries::upsertVault(vault, sync);
+        vault->id = db::query::vault::Vault::upsertVault(vault, sync);
 
         log::Registry::vaulthalla()->info("[initdb] Created R2 test vault");
     } catch (const std::exception& e) {

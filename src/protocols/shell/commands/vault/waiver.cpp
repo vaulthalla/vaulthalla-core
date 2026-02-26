@@ -2,8 +2,8 @@
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
 
-#include "database/queries/APIKeyQueries.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/query/vault/APIKey.hpp"
+#include "db/query/identities/User.hpp"
 
 #include "log/Registry.hpp"
 #include "storage/s3/S3Controller.hpp"
@@ -29,7 +29,6 @@ using namespace vh::protocols::shell;
 using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::crypto;
 using namespace vh::cloud;
@@ -41,13 +40,13 @@ static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, co
     auto waiver = std::make_shared<Waiver>();
     waiver->vault = s3Vault;
     waiver->user = call.user;
-    waiver->apiKey = APIKeyQueries::getAPIKey(s3Vault->api_key_id);
+    waiver->apiKey = db::query::vault::APIKey::getAPIKey(s3Vault->api_key_id);
     waiver->encrypt_upstream = s3Vault->encrypt_upstream;
     waiver->waiver_text = s3Vault->encrypt_upstream ?
         ENABLE_UPSTREAM_ENCRYPTION_WAIVER : DISABLE_UPSTREAM_ENCRYPTION_WAIVER;
 
     if (s3Vault->owner_id != call.user->id) {
-        waiver->owner = UserQueries::getUserById(s3Vault->owner_id);
+        waiver->owner = db::query::identities::User::getUserById(s3Vault->owner_id);
         if (!waiver->owner) throw std::runtime_error("Failed to load owner ID " + std::to_string(s3Vault->owner_id));
 
         if (waiver->owner->canManageVaults()) waiver->overridingRole = std::make_shared<Role>(*call.user->role);

@@ -1,5 +1,5 @@
 #include "rbac/model/UserRole.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
 
@@ -9,7 +9,7 @@
 #include <string>
 
 using namespace vh::rbac::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 UserRole::UserRole(const pqxx::row& row)
     : Role(row) {

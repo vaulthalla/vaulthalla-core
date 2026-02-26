@@ -2,10 +2,10 @@
 
 #include "EntityType.hpp"
 #include "AssertionResult.hpp"
-#include "database/queries/UserQueries.hpp"
-#include "database/queries/VaultQueries.hpp"
-#include "database/queries/GroupQueries.hpp"
-#include "database/queries/PermsQueries.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/identities/Group.hpp"
+#include "db/query/rbac/Permission.hpp"
 
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
@@ -18,7 +18,6 @@
 #include <memory>
 #include <vector>
 
-using namespace vh::database;
 using namespace vh::identities::model;
 using namespace vh::vault::model;
 using namespace vh::rbac::model;
@@ -46,20 +45,20 @@ struct Validator {
 
     static AssertionResult assert_exists(const std::shared_ptr<T>& entity) {
         if constexpr (type == EntityType::USER) {
-            if (!UserQueries::userExists(entity->name))
+            if (!db::query::identities::User::userExists(entity->name))
                 return AssertionResult::Fail("User '" + entity->name + "' not found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::VAULT) {
             // T is Vault here
-            if (!VaultQueries::vaultExists(entity->name, entity->owner_id))
+            if (!db::query::vault::Vault::vaultExists(entity->name, entity->owner_id))
                 return AssertionResult::Fail("Vault '" + entity->name + "' not found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::GROUP) {
-            if (!GroupQueries::groupExists(entity->name))
+            if (!db::query::identities::Group::groupExists(entity->name))
                 return AssertionResult::Fail("Group '" + entity->name + "' not found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::USER_ROLE || type == EntityType::VAULT_ROLE) {
-            if (!PermsQueries::roleExists(entity->name))
+            if (!db::query::rbac::Permission::roleExists(entity->name))
                 return AssertionResult::Fail("Role '" + entity->name + "' not found in DB");
             return AssertionResult::Pass();
         } else {
@@ -69,19 +68,19 @@ struct Validator {
 
     static AssertionResult assert_not_exists(const std::shared_ptr<T>& entity) {
         if constexpr (type == EntityType::USER) {
-            if (UserQueries::userExists(entity->name))
+            if (db::query::identities::User::userExists(entity->name))
                 return AssertionResult::Fail("User '" + entity->name + "' unexpectedly found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::VAULT) {
-            if (VaultQueries::vaultExists(entity->name, entity->owner_id))
+            if (db::query::vault::Vault::vaultExists(entity->name, entity->owner_id))
                 return AssertionResult::Fail("Vault '" + entity->name + "' unexpectedly found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::GROUP) {
-            if (GroupQueries::groupExists(entity->name))
+            if (db::query::identities::Group::groupExists(entity->name))
                 return AssertionResult::Fail("Group '" + entity->name + "' unexpectedly found in DB");
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::USER_ROLE || type == EntityType::VAULT_ROLE) {
-            if (PermsQueries::roleExists(entity->name))
+            if (db::query::rbac::Permission::roleExists(entity->name))
                 return AssertionResult::Fail("Role '" + entity->name + "' unexpectedly found in DB");
             return AssertionResult::Pass();
         } else {
@@ -91,22 +90,22 @@ struct Validator {
 
     static AssertionResult assert_count_at_least(unsigned int count) {
         if constexpr (type == EntityType::USER) {
-            const auto actual = UserQueries::listUsers().size();
+            const auto actual = db::query::identities::User::listUsers().size();
             if (actual < count)
                 return AssertionResult::Fail("Expected at least " + std::to_string(count) + " users, found " + std::to_string(actual));
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::VAULT) {
-            const auto actual = VaultQueries::listVaults().size();
+            const auto actual = db::query::vault::Vault::listVaults().size();
             if (actual < count)
                 return AssertionResult::Fail("Expected at least " + std::to_string(count) + " vaults, found " + std::to_string(actual));
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::GROUP) {
-            const auto actual = GroupQueries::listGroups().size();
+            const auto actual = db::query::identities::Group::listGroups().size();
             if (actual < count)
                 return AssertionResult::Fail("Expected at least " + std::to_string(count) + " groups, found " + std::to_string(actual));
             return AssertionResult::Pass();
         } else if constexpr (type == EntityType::USER_ROLE || type == EntityType::VAULT_ROLE) {
-            const auto actual = PermsQueries::listRoles().size();
+            const auto actual = db::query::rbac::Permission::listRoles().size();
             if (actual < count)
                 return AssertionResult::Fail("Expected at least " + std::to_string(count) + " roles, found " + std::to_string(actual));
             return AssertionResult::Pass();

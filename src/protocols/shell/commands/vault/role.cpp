@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
-#include "database/queries/PermsQueries.hpp"
+#include "db/query/rbac/Permission.hpp"
 
 #include "vault/model/Vault.hpp"
 #include "rbac/model/VaultRole.hpp"
@@ -26,7 +26,6 @@ using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
 
 static VaultPermission permFromString(const std::string& perm) {
@@ -114,12 +113,12 @@ static CommandResult handle_vault_role_override_add(const CommandCall& call) {
     const auto applyOne = [&](const VaultPermission& perm, OverrideOpt effect) {
         const auto ov = std::make_shared<PermissionOverride>();
         ov->assignment_id = role->id;
-        ov->permission = *PermsQueries::getPermissionByName(get_vault_perm_name(perm));
+        ov->permission = *db::query::rbac::Permission::getPermissionByName(get_vault_perm_name(perm));
         ov->pattern     = *patt.compiled;
         ov->patternStr  = patt.raw;
         ov->effect      = effect;
         ov->enabled     = enabled;
-        PermsQueries::addVPermOverride(ov);
+        db::query::rbac::Permission::addVPermOverride(ov);
     };
 
     for (const auto& p : parsedPerms.allow) applyOne(p, OverrideOpt::ALLOW);
@@ -157,14 +156,14 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
     if (!bitPosOpt) return invalid(std::string(ERR) + ": " + bitErr);
     const unsigned int bitPosition = *bitPosOpt;
 
-    VPermOverrideQuery q{
+    db::query::rbac::VPermOverrideQuery q{
         .vault_id     = vault->id,
         .subject_type = subj.type,
         .subject_id   = subj.id,
         .bit_position = bitPosition
     };
 
-    auto ov = PermsQueries::getVPermOverride(q);
+    auto ov = db::query::rbac::Permission::getVPermOverride(q);
     if (!ov) {
         return invalid(std::string(ERR) + ": no override found for (vault="
                        + std::to_string(vault->id) + ", " + subj.type + "="
@@ -204,7 +203,7 @@ static CommandResult handle_vault_role_override_update(const CommandCall& call) 
     if (!changed)
         return invalid(std::string(ERR) + ": no changes specified (set at least one of --allow/--deny, --path/--pattern, --enable/--disable)");
 
-    PermsQueries::updateVPermOverride(ov);
+    db::query::rbac::Permission::updateVPermOverride(ov);
 
     return ok("Updated override (vault=" + std::to_string(vault->id) +
               ", " + subj.type + "=" + std::to_string(subj.id) +
@@ -240,14 +239,14 @@ static CommandResult handle_vault_role_override_remove(const CommandCall& call) 
     if (!bitPosOpt) return invalid(std::string(ERR) + ": " + bitErr);
     const unsigned int bitPosition = *bitPosOpt;
 
-    VPermOverrideQuery q{
+    db::query::rbac::VPermOverrideQuery q{
         .vault_id     = vault->id,
         .subject_type = subj.type,
         .subject_id   = subj.id,
         .bit_position = bitPosition
     };
 
-    auto ov = PermsQueries::getVPermOverride(q);
+    auto ov = db::query::rbac::Permission::getVPermOverride(q);
     if (!ov) {
         return invalid(std::string(ERR) + ": no override found for (vault="
                        + std::to_string(vault->id) + ", " + subj.type + "="
@@ -258,7 +257,7 @@ static CommandResult handle_vault_role_override_remove(const CommandCall& call) 
                        + role->name + "' (assignment mismatch)");
     }
 
-    PermsQueries::removeVPermOverride(ov->id);
+    db::query::rbac::Permission::removeVPermOverride(ov->id);
 
     return ok("Removed override (vault=" + std::to_string(vault->id) +
               ", " + subj.type + "=" + std::to_string(subj.id) +
@@ -338,7 +337,7 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     vr->subject_type = subjectType;
     vr->subject_id = subjectId;
 
-    PermsQueries::assignVaultRole(vr);
+    db::query::rbac::Permission::assignVaultRole(vr);
 
     return ok("Successfully assigned role '" + role->name + "' to vault '" + vault->name + "'");
 }
@@ -371,7 +370,7 @@ static CommandResult handle_vault_role_remove(const CommandCall& call) {
     if (!roleLkp || !roleLkp.ptr) return invalid(roleLkp.error);
     const auto role = roleLkp.ptr;
 
-    PermsQueries::removeVaultRoleAssignment(role->id);
+    db::query::rbac::Permission::removeVaultRoleAssignment(role->id);
 
     return ok("Successfully removed role '" + role->name + "' from vault '" + vault->name + "'");
 }
@@ -397,10 +396,10 @@ static CommandResult handle_vault_role_list(const CommandCall& call) {
     }
 
     std::vector<std::shared_ptr<VaultRole>> roles;
-    if (vault) roles = PermsQueries::listVaultAssignedRoles(vault->id);
+    if (vault) roles = db::query::rbac::Permission::listVaultAssignedRoles(vault->id);
     else {
         if (!call.user->canManageRoles()) return invalid("vault list: you do not have permission to manage roles");
-        roles = PermsQueries::listVaultAssignedRoles(0); // List all roles
+        roles = db::query::rbac::Permission::listVaultAssignedRoles(0); // List all roles
     }
 
     nlohmann::json j;

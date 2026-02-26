@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "auth/Manager.hpp"
 #include "crypto/util/hash.hpp"
@@ -17,7 +17,6 @@ using namespace vh;
 using namespace vh::protocols::shell;
 using namespace vh::rbac::model;
 using namespace vh::identities::model;
-using namespace vh::database;
 using namespace vh::auth;
 using namespace vh::crypto;
 
@@ -82,7 +81,7 @@ static CommandResult createUser(const CommandCall& call) {
     user->role->permissions = role->permissions;
 
     const auto password = tryAssignNewPassword(user);
-    user->id = UserQueries::createUser(user);
+    user->id = db::query::identities::User::createUser(user);
 
     std::string out = "User created successfully: " + to_string(user) + "\n";
     out += "Password: " + password + "\n";
@@ -131,7 +130,7 @@ static CommandResult handleUpdateUser(const CommandCall& call) {
 
     user->last_modified_by = call.user->id;
 
-    UserQueries::updateUser(user);
+    db::query::identities::User::updateUser(user);
 
     return ok("User updated successfully: " + user->name + "\n" + to_string(user));
 }
@@ -161,7 +160,7 @@ static CommandResult deleteUser(const CommandCall& call) {
             return invalid("You do not have permission to delete admin users.");
     }
 
-    UserQueries::deleteUser(user->id);
+    db::query::identities::User::deleteUser(user->id);
     return ok("User deleted successfully: " + user->name);
 }
 
@@ -189,7 +188,7 @@ static CommandResult handleUserInfo(const CommandCall& call) {
 
 static CommandResult handle_list_users(const CommandCall& call) {
     if (!call.user->canManageUsers()) return invalid("You do not have permission to list users.");
-    return ok(to_string(UserQueries::listUsers(parseListQuery(call))));
+    return ok(to_string(db::query::identities::User::listUsers(parseListQuery(call))));
 }
 
 static bool isUserMatch(const std::string& cmd, const std::string_view input) {

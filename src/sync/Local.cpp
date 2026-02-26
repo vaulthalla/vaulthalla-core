@@ -9,8 +9,8 @@
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/ops/file.hpp"
-#include "database/queries/OperationQueries.hpp"
-#include "database/queries/FileQueries.hpp"
+#include "db/query/sync/Operation.hpp"
+#include "db/query/fs/File.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "runtime/Deps.hpp"
@@ -19,14 +19,13 @@
 #include "sync/model/Event.hpp"
 #include "sync/model/Throughput.hpp"
 #include "sync/model/ScopedOp.hpp"
-#include "database/queries/SyncQueries.hpp"
+#include "db/query/sync/Policy.hpp"
 #include "sync/tasks/RotateKey.hpp"
 #include "sync/tasks/Delete.hpp"
 
 using namespace vh::sync;
 using namespace vh::sync::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::services;
 using namespace vh::vault::model;
 using namespace vh::concurrency;
@@ -85,7 +84,7 @@ void Local::startTask() {
     log::Registry::sync()->debug("[FSTask] Starting sync for vault '{}'", engine->vault->id);
 
     runningFlag = true;
-    SyncQueries::reportSyncStarted(engine->sync->id);
+    db::query::sync::Policy::reportSyncStarted(engine->sync->id);
 
     newEvent();
     event = engine->latestSyncEvent;
@@ -130,7 +129,7 @@ void Local::shutdown() {
     event->parseCurrentStatus();
     engine->saveSyncEvent();
     if (event->status == Event::Status::SUCCESS) {
-        SyncQueries::reportSyncSuccess(engine->sync->id);
+        db::query::sync::Policy::reportSyncSuccess(engine->sync->id);
         next_run = system_clock::now() + seconds(engine->sync->interval.count());
         requeue();
         log::Registry::sync()->debug("[FSTask] Sync task requeued for vault '{}'", engine->vault->id);
@@ -179,7 +178,7 @@ ScopedOp& Local::op(const Throughput::Metric& metric) const {
 }
 
 void Local::processOperations() const {
-    for (const auto& op : OperationQueries::listOperationsByVault(engine->vault->id)) {
+    for (const auto& op : db::query::sync::Operation::listOperationsByVault(engine->vault->id)) {
         auto& scopedOp = event->getOrCreateThroughput(op->opToThroughputMetric()).newOp();
         scopedOp.start();
 
@@ -187,7 +186,7 @@ void Local::processOperations() const {
         const auto absDest = engine->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
-        const auto f = FileQueries::getFileByPath(engine->vault->id, op->destination_path);
+        const auto f = db::query::fs::File::getFileByPath(engine->vault->id, op->destination_path);
         if (!f) {
             log::Registry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
             scopedOp.stop();
@@ -213,7 +212,7 @@ void Local::processOperations() const {
 
         const auto ciphertext = engine->encryptionManager->encrypt(buffer, f);
         writeFile(absDest, ciphertext);
-        FileQueries::setEncryptionIVAndVersion(f);
+        db::query::fs::File::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {
             if (std::filesystem::exists(absSrc)) std::filesystem::remove(absSrc);
@@ -232,7 +231,7 @@ void Local::handleVaultKeyRotation() {
     try {
         if (!engine->encryptionManager->rotation_in_progress()) return;
 
-        const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine->vault->id, engine->encryptionManager->get_key_version());
+        const auto filesToRotate = db::query::fs::File::getFilesOlderThanKeyVersion(engine->vault->id, engine->encryptionManager->get_key_version());
         if (filesToRotate.empty()) {
             log::Registry::audit()->info("[FSTask] No files to rotate for vault '{}'", engine->vault->id);
             engine->encryptionManager->finish_key_rotation();
@@ -257,7 +256,7 @@ void Local::handleVaultKeyRotation() {
 }
 
 void Local::removeTrashedFiles() {
-    const auto files = FileQueries::listTrashedFiles(engine->vault->id);
+    const auto files = db::query::fs::File::listTrashedFiles(engine->vault->id);
     const auto type = engine->type() == StorageType::Local ? tasks::Delete::Type::LOCAL : tasks::Delete::Type::PURGE;
 
     futures.reserve(files.size());

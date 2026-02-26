@@ -1,7 +1,7 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "database/queries/APIKeyQueries.hpp"
+#include "db/query/vault/APIKey.hpp"
 #include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
@@ -17,7 +17,6 @@
 using namespace vh;
 using namespace vh::protocols::shell;
 using namespace vh::vault::model;
-using namespace vh::database;
 using namespace vh::crypto;
 using namespace vh::cloud;
 using namespace vh::config;
@@ -42,8 +41,8 @@ static CommandResult handleListAPIKeys(const CommandCall& call) {
     const auto params = parseListQuery(call);
 
     std::vector<std::shared_ptr<APIKey>> keys;
-    if (call.user->canManageAPIKeys()) keys = APIKeyQueries::listAPIKeys(params);
-    else keys = APIKeyQueries::listAPIKeys(call.user->id, params);
+    if (call.user->canManageAPIKeys()) keys = db::query::vault::APIKey::listAPIKeys(params);
+    else keys = db::query::vault::APIKey::listAPIKeys(call.user->id, params);
 
     const auto jsonFlag = usage->resolveFlag("json");
     if (hasFlag(call, jsonFlag->aliases)) {
@@ -101,8 +100,8 @@ static CommandResult handleCreateAPIKey(const CommandCall& call) {
 static std::shared_ptr<APIKey> resolveAPIKey(const std::string& nameOrId) {
     if (nameOrId.empty()) return nullptr;
     if (const auto& idOpt = parseUInt(nameOrId); idOpt && *idOpt > 0)
-        return APIKeyQueries::getAPIKey(*idOpt);
-    return APIKeyQueries::getAPIKey(nameOrId);
+        return db::query::vault::APIKey::getAPIKey(*idOpt);
+    return db::query::vault::APIKey::getAPIKey(nameOrId);
 }
 
 static CommandResult handleDeleteAPIKey(const CommandCall& call) {

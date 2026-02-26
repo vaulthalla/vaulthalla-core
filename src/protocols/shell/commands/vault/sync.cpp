@@ -8,7 +8,7 @@
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/interval.hpp"
 #include "CommandUsage.hpp"
 
 #include <optional>
@@ -21,9 +21,8 @@ using namespace vh::protocols::shell;
 using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync";

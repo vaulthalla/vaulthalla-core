@@ -1,6 +1,6 @@
 #include "sync/model/Artifact.hpp"
 #include "fs/model/File.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
 
@@ -9,7 +9,7 @@
 
 using namespace vh::sync::model;
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Artifact::Artifact(const pqxx::row& row)
     : id(row["id"].as<uint32_t>()),

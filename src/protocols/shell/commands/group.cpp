@@ -3,7 +3,7 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/types.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "database/queries/GroupQueries.hpp"
+#include "db/query/identities/Group.hpp"
 #include "identities/model/Group.hpp"
 #include "identities/model/User.hpp"
 #include "auth/Manager.hpp"
@@ -14,14 +14,13 @@
 using namespace vh;
 using namespace vh::protocols::shell;
 using namespace vh::identities::model;
-using namespace vh::database;
 
 static std::shared_ptr<Group> resolveGroup(const std::string& groupNameOrId) {
     if (const auto gidOpt = parseUInt(groupNameOrId)) {
         if (*gidOpt <= 0) throw std::runtime_error("Group ID must be a positive integer");
-        return GroupQueries::getGroup(*gidOpt);
+        return db::query::identities::Group::getGroup(*gidOpt);
     }
-    return GroupQueries::getGroupByName(groupNameOrId);
+    return db::query::identities::Group::getGroupByName(groupNameOrId);
 }
 
 static void assignGidIfAvailable(const CommandCall& call, const std::shared_ptr<Group>& group, const std::shared_ptr<CommandUsage>& usage) {
@@ -47,7 +46,7 @@ static CommandResult handle_group_create(const CommandCall& call) {
 
     assignGidIfAvailable(call, group, usage);
 
-    group->id = GroupQueries::createGroup(group);
+    group->id = db::query::identities::Group::createGroup(group);
     return ok("Successfully created new group:\n" + to_string(group));
 }
 
@@ -69,7 +68,7 @@ static CommandResult handle_group_update(const CommandCall& call) {
 
     assignGidIfAvailable(call, group, usage);
 
-    GroupQueries::updateGroup(group);
+    db::query::identities::Group::updateGroup(group);
     return ok("Successfully updated group:\n" + to_string(group));
 }
 
@@ -78,7 +77,7 @@ static CommandResult handle_group_delete(const CommandCall& call) {
     const auto usage = resolveUsage({"group", "delete"});
     validatePositionals(call, usage);
     const auto group = resolveGroup(call.positionals[0]);
-    GroupQueries::deleteGroup(group->id);
+    db::query::identities::Group::deleteGroup(group->id);
     return ok("Successfully deleted group '" + group->name + "' (ID: " + std::to_string(group->id) + ")");
 }
 
@@ -97,8 +96,8 @@ static CommandResult handle_group_list(const CommandCall& call) {
     auto params = parseListQuery(call);
 
     std::vector<std::shared_ptr<Group>> groups;
-    if (!call.user->canManageGroups()) groups = GroupQueries::listGroups(call.user->id, std::move(params));
-    else groups = GroupQueries::listGroups(std::nullopt, std::move(params));
+    if (!call.user->canManageGroups()) groups = db::query::identities::Group::listGroups(call.user->id, std::move(params));
+    else groups = db::query::identities::Group::listGroups(std::nullopt, std::move(params));
 
     return ok(to_string(groups));
 }
@@ -117,7 +116,7 @@ static CommandResult handle_group_add_user(const CommandCall& call) {
     if (!uLkp || !uLkp.ptr) return invalid(uLkp.error);
     const auto user = uLkp.ptr;
 
-    GroupQueries::addMemberToGroup(group->id, user->id);
+    db::query::identities::Group::addMemberToGroup(group->id, user->id);
 
     return ok("Successfully added user '" + user->name + "' to group '" + group->name + "'");
 }
@@ -136,7 +135,7 @@ static CommandResult handle_group_remove_user(const CommandCall& call) {
     if (!uLkp || !uLkp.ptr) return invalid(uLkp.error);
     const auto user = uLkp.ptr;
 
-    GroupQueries::removeMemberFromGroup(group->id, user->id);
+    db::query::identities::Group::removeMemberFromGroup(group->id, user->id);
 
     return ok("Successfully removed user '" + user->name + "' from group '" + group->name + "'");
 }

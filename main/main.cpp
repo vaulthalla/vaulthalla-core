@@ -4,9 +4,8 @@
 #include "runtime/Deps.hpp"
 
 // Database
-#include "database/Transactions.hpp"
-#include "database/queries/UserQueries.hpp"
-#include "database/queries/SyncEventQueries.hpp"
+#include "db/Transactions.hpp"
+#include "db/query/identities/User.hpp"
 
 // Storage
 #include "storage/Manager.hpp"
@@ -27,7 +26,6 @@
 
 using namespace vh::config;
 using namespace vh::concurrency;
-using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::fs;
 
@@ -57,10 +55,10 @@ int main() {
         ThreadPoolManager::instance().init();
 
         vh::log::Registry::vaulthalla()->info("[*] Initializing services...");
-        Transactions::init();
-        seed::init_tables_if_not_exists();
-        Transactions::dbPool_->initPreparedStatements();
-        if (!UserQueries::adminUserExists()) vh::seed::seed_database();
+        vh::db::Transactions::init();
+        vh::db::seed::init_tables_if_not_exists();
+        vh::db::Transactions::dbPool_->initPreparedStatements();
+        if (!vh::db::query::identities::User::adminUserExists()) vh::seed::seed_database();
 
         vh::log::Registry::vaulthalla()->info("[*] Initializing service dependencies...");
         vh::runtime::Deps::init();

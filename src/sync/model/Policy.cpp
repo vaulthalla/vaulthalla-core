@@ -1,12 +1,12 @@
 #include "sync/model/Policy.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/encoding/interval.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Policy::Policy(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),

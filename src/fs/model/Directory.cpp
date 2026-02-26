@@ -1,13 +1,12 @@
 #include "fs/model/Directory.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/queries/FSEntryQueries.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/query/fs/Entry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
 
 using namespace vh::fs::model;
-using namespace vh::database;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Directory::Directory(const pqxx::row& row, const pqxx::result& parentRows)
     : Entry(row, parentRows),
@@ -34,7 +33,7 @@ std::vector<std::shared_ptr<Directory>> vh::fs::model::directories_from_pq_res(c
     std::vector<std::shared_ptr<Directory>> directories;
     for (const auto& row : res) {
         if (const auto parentId = row["parent_id"].as<std::optional<unsigned int>>()) {
-            const auto parentChain = FSEntryQueries::collectParentChain(*parentId);
+            const auto parentChain = db::query::fs::Entry::collectParentChain(*parentId);
             directories.push_back(std::make_shared<Directory>(row, parentChain));
         } else directories.push_back(std::make_shared<Directory>(row, pqxx::result{}));
     }

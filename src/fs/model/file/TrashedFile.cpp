@@ -1,11 +1,11 @@
 #include "fs/model/file/Trashed.hpp"
 #include <boost/uuid/string_generator.hpp>
 
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include <pqxx/result>
 
 using namespace vh::fs::model::file;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Trashed::Trashed(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),

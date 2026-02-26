@@ -1,11 +1,11 @@
 #include "fs/model/Entry.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
 #include "log/Registry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "database/encoding/u8.hpp"
+#include "db/encoding/u8.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -17,7 +17,7 @@
 #include <paths.h>
 
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 using namespace vh::config;
 
 Entry::Entry(const pqxx::row& row, const pqxx::result& parentRows)

@@ -1,6 +1,6 @@
 #include "IntegrationsTestRunner.hpp"
-#include "database/Transactions.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/Transactions.hpp"
+#include "db/query/identities/User.hpp"
 #include "seed/include/init_db_tables.hpp"
 #include "seed/include/seed_db.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -21,7 +21,6 @@ using namespace vh::config;
 using namespace vh::concurrency;
 using namespace vh::storage;
 using namespace vh::test::cli;
-using namespace vh::database;
 using namespace vh::fs;
 
 static void initBase() {
@@ -32,11 +31,11 @@ static void initBase() {
 }
 
 static void initDB() {
-    Transactions::init();
+    vh::db::Transactions::init();
 
-    seed::wipe_all_data_restart_identity();
-    seed::init_tables_if_not_exists();
-    Transactions::dbPool_->initPreparedStatements();
+    vh::db::seed::wipe_all_data_restart_identity();
+    vh::db::seed::init_tables_if_not_exists();
+    vh::db::Transactions::dbPool_->initPreparedStatements();
     vh::seed::seed_database();
 }
 
@@ -49,7 +48,7 @@ static void initServices() {
 }
 
 static void ensureAdminExists() {
-    if (!UserQueries::adminUserExists()) {
+    if (!vh::db::query::identities::User::adminUserExists()) {
         vh::log::Registry::vaulthalla()->error("No admin user found; cannot run CLI tests");
         exit(1);
     }

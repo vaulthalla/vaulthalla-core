@@ -8,7 +8,7 @@
 #include "log/RotationService.hpp"
 #include "log/Registry.hpp"
 #include "runtime/Deps.hpp"
-#include "database/Janitor.hpp"
+#include "db/Janitor.hpp"
 
 #include <paths.h>
 
@@ -25,7 +25,7 @@ Manager::Manager()
       protocolService(std::make_shared<protocols::ProtocolService>()),
       connectionLifecycleManager(std::make_shared<protocols::ws::ConnectionLifecycleManager>()),
       logRotationService(std::make_shared<log::RotationService>()),
-      dbSweeperService(std::make_shared<database::Janitor>())
+      dbSweeperService(std::make_shared<db::Janitor>())
 {
     services_["SyncController"] = syncController;
     services_["FUSE"] = fuseService;

@@ -21,7 +21,7 @@ namespace vh::concurrency { class AsyncService; }
 namespace vh::fuse { class Service; }
 namespace vh::sync { class Controller; }
 namespace vh::log { class RotationService; }
-namespace vh::database { class Janitor; }
+namespace vh::db { class Janitor; }
 
 namespace vh::runtime {
 
@@ -59,7 +59,7 @@ private:
     std::shared_ptr<protocols::shell::Server> shellServer;
     std::shared_ptr<protocols::ws::ConnectionLifecycleManager> connectionLifecycleManager;
     std::shared_ptr<log::RotationService> logRotationService;
-    std::shared_ptr<database::Janitor> dbSweeperService;
+    std::shared_ptr<db::Janitor> dbSweeperService;
 
     mutable std::mutex mutex_;
     std::map<std::string, std::shared_ptr<concurrency::AsyncService>> services_;

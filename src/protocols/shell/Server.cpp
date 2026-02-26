@@ -2,7 +2,7 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "protocols/shell/commands/all.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "log/Registry.hpp"
 #include "protocols/shell/SocketIO.hpp"
 #include "identities/model/User.hpp"
@@ -24,7 +24,6 @@
 using nlohmann::json;
 
 using namespace vh::protocols::shell;
-using namespace vh::database;
 
 namespace {
 
@@ -96,7 +95,7 @@ Server::Server()
 
     commands::registerAllCommands(router_);
 
-    const auto admin = UserQueries::getUserByName("admin");
+    const auto admin = db::query::identities::User::getUserByName("admin");
     if (!admin) log::Registry::shell()->warn("[CtlServerService] No 'admin' user found in database");
     if (admin->linux_uid.has_value()) adminUIDSet_.store(true);
 }
@@ -129,10 +128,10 @@ void Server::initAdminUid(const int cfd, const uid_t uid) {
     log::Registry::shell()->info("[CtlServerService] Adding UID {} to vaulthalla group", uid);
 
     // Assign UID to admin
-    const auto admin = UserQueries::getUserByName("admin");
+    const auto admin = db::query::identities::User::getUserByName("admin");
     if (!admin) throw std::runtime_error("admin user disappeared");
     admin->linux_uid = uid;
-    UserQueries::updateUser(admin);
+    db::query::identities::User::updateUser(admin);
     adminUIDSet_.store(true);
 
     log::Registry::shell()->info("[CtlServerService] Assigned UID {} to 'admin' user", uid);
@@ -224,7 +223,7 @@ void Server::runLoop() {
                 continue;
             }
 
-            const auto user = UserQueries::getUserByLinuxUID(p.uid);
+            const auto user = db::query::identities::User::getUserByLinuxUID(p.uid);
             if (!user) {
                 log::Registry::shell()->warn("[CtlServerService] No user found for UID {} (PID {})", p.uid, p.pid);
                 send_json(cfd, {{"ok", false}, {"exit_code", 1}, {"stderr", "user not found"}});

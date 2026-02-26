@@ -1,6 +1,6 @@
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "permsUtil.hpp"
 
@@ -10,7 +10,7 @@
 #include <sstream>
 
 using namespace vh::rbac::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 using namespace vh::protocols::shell;
 
 VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)

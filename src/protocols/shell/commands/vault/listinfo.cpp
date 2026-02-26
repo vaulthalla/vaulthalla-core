@@ -4,7 +4,7 @@
 
 #include "runtime/Deps.hpp"
 #include "log/Registry.hpp"
-#include "database/queries/VaultQueries.hpp"
+#include "db/query/vault/Vault.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
@@ -28,7 +28,6 @@ using namespace vh::vault::model;
 using namespace vh::rbac::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::crypto;
 
@@ -66,8 +65,8 @@ CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
     const auto canListAll = call.user->isAdmin() || call.user->canManageVaults();
 
     auto vaults = canListAll
-                      ? VaultQueries::listVaults(typeFilter, parseListQuery(call))
-                      : VaultQueries::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
+                      ? db::query::vault::Vault::listVaults(typeFilter, parseListQuery(call))
+                      : db::query::vault::Vault::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
 
     if (!canListAll) {
         for (const auto& [_, r] : call.user->roles) {

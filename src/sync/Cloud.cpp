@@ -7,8 +7,8 @@
 #include "sync/Executor.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "database/queries/FileQueries.hpp"
-#include "database/queries/DirectoryQueries.hpp"
+#include "db/query/fs/File.hpp"
+#include "db/query/fs/Directory.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
@@ -31,7 +31,6 @@
 
 using namespace vh::sync;
 using namespace vh::sync::model;
-using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::storage;
 using namespace vh::fs::model;
@@ -69,7 +68,7 @@ void Cloud::initBins() {
     s3Map = cloudEngine()->getGroupedFilesFromS3();
     s3Files = uMap2Vector(s3Map);
 
-    localFiles = FileQueries::listFilesInDir(engine->vault->id);
+    localFiles = db::query::fs::File::listFilesInDir(engine->vault->id);
     localMap = groupEntriesByPath(localFiles);
 
     event->heartbeat();
@@ -131,15 +130,15 @@ std::vector<EntryKey> Cloud::allKeysSorted() const {
 
 void Cloud::ensureDirectoriesFromRemote() {
     for (const auto& dir : cloudEngine()->extractDirectories(uMap2Vector(s3Map))) {
-        if (!DirectoryQueries::directoryExists(engine->vault->id, dir->path)) {
-            dir->parent_id = DirectoryQueries::getDirectoryIdByPath(
+        if (!db::query::fs::Directory::directoryExists(engine->vault->id, dir->path)) {
+            dir->parent_id = db::query::fs::Directory::getDirectoryIdByPath(
                 engine->vault->id, dir->path.parent_path());
 
             if (dir->fuse_path.empty())
                 dir->fuse_path = engine->paths->absPath(dir->path, PathType::VAULT_ROOT);
 
             dir->base32_alias = id::Generator({ .namespace_token = dir->name }).generate();
-            DirectoryQueries::upsertDirectory(dir);
+            db::query::fs::Directory::upsertDirectory(dir);
         }
     }
 }

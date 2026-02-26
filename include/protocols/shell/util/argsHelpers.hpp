@@ -2,7 +2,7 @@
 
 #include "protocols/shell/types.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "database/model/ListQueryParams.hpp"
+#include "db/model/ListQueryParams.hpp"
 
 #include <optional>
 #include <string>
@@ -72,6 +72,6 @@ Lookup<identities::model::User> resolveUser(const std::string& userArg, const st
 
 std::pair<std::string_view, CommandCall> descend(const CommandCall& call);
 
-database::model::ListQueryParams parseListQuery(const CommandCall& call);
+db::model::ListQueryParams parseListQuery(const CommandCall& call);
 
 }

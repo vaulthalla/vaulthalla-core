@@ -5,7 +5,7 @@
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/Policy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "database/queries/VaultQueries.hpp"
+#include "db/query/vault/Vault.hpp"
 #include "storage/Manager.hpp"
 #include "protocols/ws/Session.hpp"
 #include "runtime/Deps.hpp"
@@ -16,7 +16,6 @@
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::vault::model;
-using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::sync::model;
 using json = nlohmann::json;
@@ -84,7 +83,7 @@ json Vaults::get(const json& payload, const Session& session) {
     } else data["vault"] = *vault;
 
     if (vault->owner_id == user->id) data["vault"]["owner"] = user->name;
-    else data["vault"]["owner"] = VaultQueries::getVaultOwnersName(vaultId);
+    else data["vault"]["owner"] = db::query::vault::Vault::getVaultOwnersName(vaultId);
 
     return data;
 }
@@ -92,8 +91,8 @@ json Vaults::get(const json& payload, const Session& session) {
 json Vaults::list(const Session& session) {
     const auto user = session.getAuthenticatedUser();
     return user->canManageVaults() ?
-        json{{"vaults", VaultQueries::listVaults()}} :
-        json{{"vaults", VaultQueries::listUserVaults(user->id)}};
+        json{{"vaults", db::query::vault::Vault::listVaults()}} :
+        json{{"vaults", db::query::vault::Vault::listUserVaults(user->id)}};
 }
 
 json Vaults::sync(const json& payload, const Session& session) {

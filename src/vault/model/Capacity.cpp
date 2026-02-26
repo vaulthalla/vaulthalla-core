@@ -1,18 +1,17 @@
 #include "vault/model/Capacity.hpp"
-#include "database/queries/DirectoryQueries.hpp"
+#include "db/query/fs/Directory.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "vault/model/Vault.hpp"
 #include "storage/Engine.hpp"
 #include "storage/Manager.hpp"
-#include "database/queries/FileQueries.hpp"
+#include "db/query/fs/File.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/model/stats/Extension.hpp"
 
 #include <nlohmann/json.hpp>
 
 using namespace vh::vault::model;
-using namespace vh::database;
 
 struct CompareFiles {
     bool operator()(const std::pair<std::string, unsigned int>& a, const std::pair<std::string, unsigned int>& b) const {
@@ -39,7 +38,7 @@ Capacity::Capacity(const unsigned int vaultId) {
     const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
     if (!engine) throw std::runtime_error("vaultId not available");
 
-    const auto dir = DirectoryQueries::getDirectoryByPath(vaultId, "/");
+    const auto dir = db::query::fs::Directory::getDirectoryByPath(vaultId, "/");
     if (!dir) throw std::runtime_error("vaultId not found");
 
     capacity = engine->vault->quota;
@@ -50,10 +49,10 @@ Capacity::Capacity(const unsigned int vaultId) {
     file_count = dir->file_count;
     directory_count = dir->subdirectory_count;
     average_file_size_bytes = file_count > 0 ? dir->size_bytes / file_count : 0;
-    if (const auto largest = FileQueries::getLargestFile(engine->vault->id))
+    if (const auto largest = db::query::fs::File::getLargestFile(engine->vault->id))
         largest_file_size_bytes = largest->size_bytes;
     top_file_extensions_by_size =
-        toTop10Array(FileQueries::getTopExtensionsBySize(engine->vault->id, 10));
+        toTop10Array(db::query::fs::File::getTopExtensionsBySize(engine->vault->id, 10));
 }
 
 void vh::vault::model::to_json(nlohmann::json& j, const std::shared_ptr<Capacity>& stats) {

@@ -1,9 +1,9 @@
 #include "rbac/model/Permission.hpp"
 
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include <nlohmann/json.hpp>
 
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 namespace vh::rbac::model {
 

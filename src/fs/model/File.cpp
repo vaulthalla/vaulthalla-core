@@ -1,6 +1,6 @@
 #include "fs/model/File.hpp"
 #include "log/Registry.hpp"
-#include "database/queries/FSEntryQueries.hpp"
+#include "db/query/fs/Entry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -8,7 +8,6 @@
 #include <pugixml.hpp>
 
 using namespace vh::fs::model;
-using namespace vh::database;
 
 File::File(const pqxx::row& row, const pqxx::result& parentRows)
     : Entry(row, parentRows),
@@ -55,7 +54,7 @@ std::vector<std::shared_ptr<File>> vh::fs::model::files_from_pq_res(const pqxx::
     std::vector<std::shared_ptr<File>> files;
     for (const auto& row : res) {
         if (const auto parentId = row["parent_id"].as<std::optional<unsigned int>>()) {
-            const auto parentChain = FSEntryQueries::collectParentChain(*parentId);
+            const auto parentChain = db::query::fs::Entry::collectParentChain(*parentId);
             files.push_back(std::make_shared<File>(row, parentChain));
         } else files.push_back(std::make_shared<File>(row, pqxx::result{}));
     }

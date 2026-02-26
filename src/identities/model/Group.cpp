@@ -1,5 +1,5 @@
 #include "identities/model/Group.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
@@ -9,7 +9,7 @@
 
 using namespace vh::identities::model;
 using namespace vh::protocols::shell;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 GroupMember::GroupMember(const pqxx::row& row)
     : user(std::make_shared<User>(row)),

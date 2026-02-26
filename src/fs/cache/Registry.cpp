@@ -2,8 +2,8 @@
 
 #include "fs/model/Entry.hpp"
 #include "fs/model/Directory.hpp"
-#include "database/queries/FSEntryQueries.hpp"
-#include "database/queries/DirectoryQueries.hpp"
+#include "db/query/fs/Entry.hpp"
+#include "db/query/fs/Directory.hpp"
 #include "log/Registry.hpp"
 #include "crypto/id/Generator.hpp"
 #include "stats/model/CacheStats.hpp"
@@ -17,7 +17,6 @@ using namespace vh::fs::cache;
 using namespace vh::fs::model;
 using namespace vh::storage;
 using namespace vh::stats::model;
-using namespace vh::database;
 using namespace std::chrono;
 
 namespace {
@@ -50,7 +49,7 @@ Registry::Registry() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
 
-    nextInode_ = FSEntryQueries::getNextInode();
+    nextInode_ = db::query::fs::Entry::getNextInode();
 
     initRoot();
     restoreCache();
@@ -59,7 +58,7 @@ Registry::Registry() {
 }
 
 void Registry::initRoot() {
-    const auto rootEntry = FSEntryQueries::getRootEntry();
+    const auto rootEntry = db::query::fs::Entry::getRootEntry();
     if (!rootEntry) {
         log::Registry::storage()->error("[FSCache] Root entry not found in the database");
         throw std::runtime_error("Root entry not found in the database");
@@ -67,11 +66,11 @@ void Registry::initRoot() {
 
     if (!rootEntry->inode) {
         rootEntry->inode = std::make_optional(getOrAssignInode("/"));
-        FSEntryQueries::updateFSEntry(rootEntry);
+        db::query::fs::Entry::updateFSEntry(rootEntry);
     } else if (rootEntry->inode != FUSE_ROOT_ID) {
         log::Registry::storage()->warn("[FSCache] Root entry inode is not FUSE_ROOT_ID, resetting to 1");
         rootEntry->inode = FUSE_ROOT_ID;
-        FSEntryQueries::updateFSEntry(rootEntry);
+        db::query::fs::Entry::updateFSEntry(rootEntry);
     }
 
     cacheEntry(rootEntry);
@@ -81,7 +80,7 @@ void Registry::restoreCache() {
     const auto rootEntry = getEntry(FUSE_ROOT_ID);
     if (!rootEntry) throw std::runtime_error("[FSCache] Root entry not found, cannot restore cache");
 
-    for (const auto& entry : FSEntryQueries::listDir(rootEntry->id, true)) {
+    for (const auto& entry : db::query::fs::Entry::listDir(rootEntry->id, true)) {
         if (!entry) {
             log::Registry::storage()->warn("[FSCache] Null entry found in directory listing for root");
             continue;
@@ -90,7 +89,7 @@ void Registry::restoreCache() {
         if (entry->inode) cacheEntry(entry, true /*isFirstSeeding*/);
         else {
             entry->inode = std::make_optional(getOrAssignInode(entry->fuse_path));
-            FSEntryQueries::updateFSEntry(entry);
+            db::query::fs::Entry::updateFSEntry(entry);
             cacheEntry(entry, true /*isFirstSeeding*/);
         }
     }
@@ -113,7 +112,7 @@ std::shared_ptr<Entry> Registry::getEntry(const std::filesystem::path& absPath) 
 
     try {
         const auto ino = getOrAssignInode(path);
-        const auto entry = FSEntryQueries::getFSEntryByInode(ino);
+        const auto entry = db::query::fs::Entry::getFSEntryByInode(ino);
 
         if (entry) {
             if (entry->inode) cacheEntry(entry);
@@ -144,7 +143,7 @@ std::shared_ptr<Entry> Registry::getEntry(const fuse_ino_t ino) {
     stats_->record_miss();
     ScopedOpTimer timer(stats_.get());
 
-    auto entry = FSEntryQueries::getFSEntryByInode(ino);
+    auto entry = db::query::fs::Entry::getFSEntryByInode(ino);
     if (entry) cacheEntry(entry);
     else log::Registry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
     return entry;
@@ -162,7 +161,7 @@ std::shared_ptr<Entry> Registry::getEntryById(unsigned int id) {
 
     std::shared_ptr<Entry> entry = nullptr;
     log::Registry::storage()->warn("[FSCache] No entry found for ID: {}", id);
-    entry = FSEntryQueries::getFSEntryById(id);
+    entry = db::query::fs::Entry::getFSEntryById(id);
     return entry;
 }
 
@@ -272,7 +271,7 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
 
     const pqxx::result parentStats =
         (!isFirstSeeding && entry->parent_id && !entry->isDirectory())
-            ? DirectoryQueries::collectParentStats(*entry->parent_id)
+            ? db::query::fs::Directory::collectParentStats(*entry->parent_id)
             : pqxx::result{};
 
     std::unique_lock lock(mutex_);
@@ -329,7 +328,7 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
                 dir->file_count = s["file_count"].as<unsigned int>();
                 dir->subdirectory_count = s["subdirectory_count"].as<unsigned int>();
             } else {
-                insert(FSEntryQueries::getFSEntryById(id));
+                insert(db::query::fs::Entry::getFSEntryById(id));
             }
         }
     }
@@ -355,7 +354,7 @@ void Registry::updateEntry(const std::shared_ptr<Entry>& entry) {
     log::Registry::fs()->debug("[FSCache] Updating entry: {} with inode {}",
                              entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
 
-    FSEntryQueries::updateFSEntry(entry);
+    db::query::fs::Entry::updateFSEntry(entry);
     cacheEntry(entry);
 
     log::Registry::fs()->debug("[FSCache] Updated entry: {} with inode {}",
@@ -412,14 +411,14 @@ void Registry::evictPath(const std::filesystem::path& path) {
 }
 
 std::vector<std::shared_ptr<Entry>> Registry::listDir(const unsigned int parentId, const bool recursive) const {
-    const auto parent = FSEntryQueries::getFSEntryById(parentId);
+    const auto parent = db::query::fs::Entry::getFSEntryById(parentId);
     if (!parent->isDirectory()) throw std::runtime_error("Parent ID is not a directory");
 
     const auto parentDir = std::static_pointer_cast<Directory>(parent);
 
     unsigned int numEntries = parentDir->file_count + parentDir->subdirectory_count;
     if (!recursive) {
-        for (const auto& subdir : DirectoryQueries::listDirectoriesInDir(parentId))
+        for (const auto& subdir : db::query::fs::Directory::listDirectoriesInDir(parentId))
             numEntries -= subdir->file_count + subdir->subdirectory_count;
     }
 
@@ -452,7 +451,7 @@ std::vector<std::shared_ptr<Entry>> Registry::listDir(const unsigned int parentI
 
     if (entries.size() != numEntries) {
         log::Registry::fs()->warn("[FSCache] Expected {} entries, but found {}", numEntries, entries.size());
-        const auto expected = FSEntryQueries::listDir(parentId, recursive);
+        const auto expected = db::query::fs::Entry::listDir(parentId, recursive);
         if (expected.size() != numEntries) {
             if (expected.size() == entries.size())
                 log::Registry::fs()->warn("Computed number of entries mismatch with actual");

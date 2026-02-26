@@ -7,8 +7,8 @@
 #include "fs/model/Directory.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "fs/model/Path.hpp"
-#include "database/queries/FileQueries.hpp"
-#include "database/queries/DirectoryQueries.hpp"
+#include "db/query/fs/File.hpp"
+#include "db/query/fs/Directory.hpp"
 #include "fs/ops/file.hpp"
 #include "preview/thumbnail/Worker.hpp"
 #include "fs/Filesystem.hpp"
@@ -23,7 +23,6 @@ using namespace vh::storage;
 using namespace vh::vault;
 using namespace vh::concurrency;
 using namespace vh::cloud;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::sync::model;
 using namespace vh::fs::ops;
@@ -73,7 +72,7 @@ void CloudEngine::upload(const std::shared_ptr<File>& f) const {
     std::vector<uint8_t> buffer;
     s3Provider_->downloadToBuffer(s3Key, buffer);
 
-    if (!f->content_hash) f->content_hash = FileQueries::getContentHash(vault->id, f->path);
+    if (!f->content_hash) f->content_hash = db::query::fs::File::getContentHash(vault->id, f->path);
     s3Provider_->setObjectContentHash(s3Key, *f->content_hash);
     s3Provider_->setObjectEncryptionMetadata(s3Key, f->encryption_iv, f->encrypted_with_key_version);
 }
@@ -107,7 +106,7 @@ std::shared_ptr<File> CloudEngine::downloadFile(const fs::path& rel_path) {
 
     if (remoteFileIsEncrypted(rel_path)) {
         auto payload = getRemoteIVBase64AndVersion(rel_path);
-        if (!payload) payload = FileQueries::getEncryptionIVAndVersion(vault->id, rel_path);
+        if (!payload) payload = db::query::fs::File::getEncryptionIVAndVersion(vault->id, rel_path);
         if (!payload) throw std::runtime_error("[CloudStorageEngine] No IV found for encrypted file: " + rel_path.string());
         const auto& [iv_b64, key_version] = *payload;
         buffer = encryptionManager->decrypt(buffer, iv_b64, key_version);
@@ -176,7 +175,7 @@ std::vector<std::shared_ptr<Directory>> CloudEngine::extractDirectories(
                 dir->created_by = dir->last_modified_by = vault->owner_id;
                 dir->vault_id = vault->id;
                 const auto parent_path = current.has_parent_path() ? current.parent_path() : "/";
-                dir->parent_id = DirectoryQueries::getDirectoryIdByPath(vault->id, parent_path);
+                dir->parent_id = db::query::fs::Directory::getDirectoryIdByPath(vault->id, parent_path);
 
                 directories[current.u8string()] = dir;
             }

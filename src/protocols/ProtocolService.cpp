@@ -1,6 +1,5 @@
 #include "protocols/ProtocolService.hpp"
 #include "crypto/password/Strength.hpp"
-#include "database/Transactions.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "config/Config.hpp"
 #include "protocols/ws/Server.hpp"

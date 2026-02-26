@@ -5,22 +5,22 @@
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
-#include "database/queries/DirectoryQueries.hpp"
-#include "database/queries/FileQueries.hpp"
+#include "db/query/fs/Directory.hpp"
+#include "db/query/fs/File.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "database/queries/FSEntryQueries.hpp"
+#include "db/query/fs/Entry.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/ops/file.hpp"
 #include "crypto/util/hash.hpp"
 #include "preview/thumbnail/Worker.hpp"
 #include "fs/metadata/Magic.hpp"
 #include "runtime/Deps.hpp"
-#include "database/Transactions.hpp"
+#include "db/Transactions.hpp"
 #include "log/Registry.hpp"
-#include "database/queries/VaultQueries.hpp"
+#include "db/query/vault/Vault.hpp"
 #include "crypto/id/Generator.hpp"
 #include "fs/cache/Registry.hpp"
-#include "database/encoding/u8.hpp"
+#include "db/encoding/u8.hpp"
 
 #include <ranges>
 #include <fstream>
@@ -30,8 +30,7 @@
 
 using namespace vh::storage;
 using namespace vh::vault::model;
-using namespace vh::database;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 using namespace vh::config;
 using namespace vh::crypto;
 using namespace vh::fs;
@@ -147,7 +146,7 @@ void Filesystem::mkdir(const std::filesystem::path& absPath, mode_t mode, const 
             dir->is_system = false;
             dir->created_by = dir->last_modified_by = userId;
 
-            dir->id = DirectoryQueries::upsertDirectory(dir);
+            dir->id = db::query::fs::Directory::upsertDirectory(dir);
             cache->cacheEntry(dir);
 
             try {
@@ -172,7 +171,7 @@ void Filesystem::mkVault(const std::filesystem::path& absPath, unsigned int vaul
     std::scoped_lock lock(mutex_);
     if (!storageManager_) throw std::runtime_error("StorageManager is not initialized");
 
-    const auto vault = VaultQueries::getVault(vaultId);
+    const auto vault = db::query::vault::Vault::getVault(vaultId);
     if (!vault) throw std::runtime_error("Vault with ID " + std::to_string(vaultId) + " does not exist");
 
     try {
@@ -180,7 +179,7 @@ void Filesystem::mkVault(const std::filesystem::path& absPath, unsigned int vaul
         dir->vault_id = vaultId;
         dir->path = "/";
         dir->name = to_snake_case(vault->name);
-        dir->parent_id = FSEntryQueries::getRootEntry()->id;
+        dir->parent_id = db::query::fs::Entry::getRootEntry()->id;
         dir->base32_alias = vault->mount_point;
         dir->backing_path = paths::getBackingPath() / dir->base32_alias;
         dir->fuse_path = absPath;
@@ -192,9 +191,9 @@ void Filesystem::mkVault(const std::filesystem::path& absPath, unsigned int vaul
         dir->is_hidden = false;
         dir->is_system = false;
 
-        const auto root = FSEntryQueries::getRootEntry();
+        const auto root = db::query::fs::Entry::getRootEntry();
 
-        dir->id = DirectoryQueries::upsertDirectory(dir);
+        dir->id = db::query::fs::Directory::upsertDirectory(dir);
 
         runtime::Deps::get().fsCache->cacheEntry(dir);
 
@@ -253,8 +252,8 @@ void Filesystem::copy(const std::filesystem::path& from, const std::filesystem::
     entry->is_hidden = entry->name.front() == '.' && !entry->name.starts_with("..");
     entry->is_system = false;
 
-    if (isFile) FileQueries::upsertFile(std::make_shared<File>(*std::static_pointer_cast<File>(entry)));
-    else DirectoryQueries::upsertDirectory(std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry)));
+    if (isFile) db::query::fs::File::upsertFile(std::make_shared<File>(*std::static_pointer_cast<File>(entry)));
+    else db::query::fs::Directory::upsertDirectory(std::make_shared<Directory>(*std::static_pointer_cast<Directory>(entry)));
 }
 
 void Filesystem::remove(const std::filesystem::path& path, const unsigned int userId) {
@@ -268,12 +267,12 @@ void Filesystem::remove(const std::filesystem::path& path, const unsigned int us
     // which is incompatible with how FUSE expects unlink/rmdir to behave.
 
     if (entry->isDirectory())
-        for (const auto& file : FileQueries::listFilesInDir(*entry->vault_id, entry->path, true)) {
-            FileQueries::markFileAsTrashed(userId, file->id);
+        for (const auto& file : db::query::fs::File::listFilesInDir(*entry->vault_id, entry->path, true)) {
+            db::query::fs::File::markFileAsTrashed(userId, file->id);
             cache->evictPath(file->fuse_path);
         }
     else {
-        FileQueries::markFileAsTrashed(userId, *entry->vault_id, entry->path);
+        db::query::fs::File::markFileAsTrashed(userId, *entry->vault_id, entry->path);
         cache->evictPath(path);
     }
 
@@ -317,7 +316,7 @@ std::shared_ptr<Entry> Filesystem::createFile(const std::filesystem::path& path,
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
 
     f->content_hash = hash::blake2b(f->backing_path);
-    f->id = FileQueries::upsertFile(f);
+    f->id = db::query::fs::File::upsertFile(f);
     cache->cacheEntry(f);
 
     log::Registry::fs()->debug("Successfully created file at path: {}", path.string());
@@ -368,7 +367,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
             f->mime_type = inferMimeTypeFromPath(ctx.path);
         }
 
-        FileQueries::updateFile(f);
+        db::query::fs::File::updateFile(f);
 
         return f;
     }
@@ -411,7 +410,7 @@ std::shared_ptr<File> Filesystem::createFile(const NewFileContext& ctx) {
     if (!std::filesystem::exists(f->backing_path))
         throw std::runtime_error("[Filesystem] Failed to create real file at: " + f->backing_path.string());
 
-    f->id = FileQueries::upsertFile(f);
+    f->id = db::query::fs::File::upsertFile(f);
     cache->cacheEntry(f);
 
     if (f->size_bytes > 0 && f->mime_type && isPreviewable(*f->mime_type))
@@ -441,7 +440,7 @@ void Filesystem::rename(const std::filesystem::path& oldPath, const std::filesys
 
     const auto oldBackingPath = entry->backing_path;
 
-    Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
+    db::Transactions::exec("Filesystem::rename", [&](pqxx::work& txn) {
         std::vector<uint8_t> buffer;
         if (entry->isDirectory()) {
             if (!entry->parent_id) {

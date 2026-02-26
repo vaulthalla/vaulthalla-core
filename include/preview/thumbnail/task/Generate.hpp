@@ -5,7 +5,7 @@
 #include "preview/thumbnail/ops.hpp"
 #include "storage/Engine.hpp"
 #include "fs/cache/Record.hpp"
-#include "database/queries/CacheQueries.hpp"
+#include "db/query/fs/Cache.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "vault/model/Vault.hpp"
@@ -21,7 +21,6 @@
 using namespace vh::vault::model;
 using namespace vh::stats::model;
 using namespace vh::config;
-using namespace vh::database;
 using namespace std::chrono;
 using namespace vh::fs;
 using namespace vh::fs::model;
@@ -64,7 +63,7 @@ public:
                 index->type = cache::Record::Type::Thumbnail;
                 index->size = fs::file_size(cachePath);
 
-                CacheQueries::upsertCacheIndex(index);
+                db::query::fs::Cache::upsertCacheIndex(index);
 
                 runtime::Deps::get().httpCacheStats->record_insert(index->size);
             }

@@ -1,5 +1,5 @@
 #include "crypto/secrets/Manager.hpp"
-#include "database/queries/InternalSecretQueries.hpp"
+#include "db/query/crypto/Secret.hpp"
 #include "crypto/model/Secret.hpp"
 #include "crypto/util/encrypt.hpp"
 #include "crypto/util/hash.hpp"
@@ -8,7 +8,6 @@
 
 using namespace vh::crypto::util;
 using namespace vh::crypto::model;
-using namespace vh::database;
 
 namespace vh::crypto::secrets {
 
@@ -26,7 +25,7 @@ void Manager::setJWTSecret(const std::string& secret) const {
 }
 
 std::string Manager::getOrInitSecret(const std::string& key) const {
-    const auto secret = SecretQueries::getSecret(key);
+    const auto secret = db::query::crypto::Secret::getSecret(key);
     if (!secret) {
         const auto newSecret = hash::generate_secure_password(64);
         setEncryptedValue(key, newSecret);
@@ -54,7 +53,7 @@ void Manager::setEncryptedValue(const std::string& key, const std::string& value
     secret->value = ciphertext;
     secret->iv = iv;
 
-    SecretQueries::upsertSecret(secret);
+    db::query::crypto::Secret::upsertSecret(secret);
 }
 
 }

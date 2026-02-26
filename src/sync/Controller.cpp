@@ -5,7 +5,7 @@
 #include "sync/Cloud.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "storage/CloudEngine.hpp"
-#include "database/queries/VaultQueries.hpp"
+#include "db/query/vault/Vault.hpp"
 #include "vault/model/Vault.hpp"
 #include "runtime/Deps.hpp"
 #include "log/Registry.hpp"
@@ -123,7 +123,7 @@ void Controller::refreshEngines() {
 }
 
 void Controller::pruneStaleTasks(const std::vector<std::shared_ptr<Engine> >& engines) {
-    boost::dynamic_bitset<> latestBitset(database::VaultQueries::maxVaultId() + 1);
+    boost::dynamic_bitset<> latestBitset(db::query::vault::Vault::maxVaultId() + 1);
     for (const auto& engine : engines) latestBitset.set(engine->vault->id);
 
     {

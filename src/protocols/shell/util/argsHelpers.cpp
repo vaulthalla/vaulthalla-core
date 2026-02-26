@@ -2,9 +2,9 @@
 #include "runtime/Deps.hpp"
 #include "usage/include/CommandUsage.hpp"
 #include "usage/include/UsageManager.hpp"
-#include "database/queries/UserQueries.hpp"
-#include "database/queries/GroupQueries.hpp"
-#include "database/queries/PermsQueries.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/identities/Group.hpp"
+#include "db/query/rbac/Permission.hpp"
 #include "identities/model/User.hpp"
 #include "identities/model/Group.hpp"
 #include "rbac/model/Role.hpp"
@@ -17,8 +17,7 @@
 
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
-using namespace vh::database;
-using namespace vh::database::model;
+using namespace vh::db::model;
 
 static constexpr uintmax_t KILOBYTE = 1024;
 static constexpr uintmax_t MEGABYTE = KILOBYTE * KILOBYTE;
@@ -113,7 +112,7 @@ Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPref
                 out.ptr = std::make_shared<Subject>(Subject{"user", static_cast<unsigned int>(*idOpt)});
                 return out;
             }
-            auto user = UserQueries::getUserByName(*v);
+            auto user = db::query::identities::User::getUserByName(*v);
             if (!user) { out.error = errPrefix + ": user not found: " + *v; return out; }
             out.ptr = std::make_shared<Subject>(Subject{"user", static_cast<unsigned int>(user->id)});
             return out;
@@ -128,7 +127,7 @@ Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPref
                 out.ptr = std::make_shared<Subject>(Subject{"group", static_cast<unsigned int>(*idOpt)});
                 return out;
             }
-            auto group = GroupQueries::getGroupByName(*v);
+            auto group = db::query::identities::Group::getGroupByName(*v);
             if (!group) { out.error = errPrefix + ": group not found: " + *v; return out; }
             out.ptr = std::make_shared<Subject>(Subject{"group", group->id});
             return out;
@@ -147,8 +146,8 @@ Lookup<Role> resolveRole(const std::string& roleArg, const std::string& errPrefi
             out.error = errPrefix + ": role ID must be a positive integer";
             return out;
         }
-        out.ptr = PermsQueries::getRole(*roleIdOpt);
-    } else out.ptr = PermsQueries::getRoleByName(roleArg);
+        out.ptr = db::query::rbac::Permission::getRole(*roleIdOpt);
+    } else out.ptr = db::query::rbac::Permission::getRoleByName(roleArg);
 
     if (!out.ptr) out.error = errPrefix + ": role not found '" + roleArg + "'";
     return out;
@@ -206,8 +205,8 @@ Lookup<User> resolveUser(const std::string& userArg, const std::string& errPrefi
             out.error = errPrefix + ": user ID must be a positive integer";
             return out;
         }
-        out.ptr = UserQueries::getUserById(*idOpt);
-    } else out.ptr = UserQueries::getUserByName(userArg);
+        out.ptr = db::query::identities::User::getUserById(*idOpt);
+    } else out.ptr = db::query::identities::User::getUserByName(userArg);
 
     if (!out.ptr) out.error = errPrefix + ": user not found";
     return out;

@@ -1,13 +1,13 @@
 #include "storage/s3/S3Controller.hpp"
 #include "vault/model/APIKey.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "storage/s3/curl/helpers.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::cloud;
 using namespace vh::vault::model;
 using namespace vh::storage::s3::curl;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 std::map<std::string, std::string> S3Controller::buildHeaderMap(const std::string& payloadHash) const {
     return {

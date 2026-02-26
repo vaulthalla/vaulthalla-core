@@ -1,11 +1,10 @@
 #include "auth/SessionManager.hpp"
 #include "auth/model/RefreshToken.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::auth;
 using namespace vh::auth::model;
-using namespace vh::database;
 
 void SessionManager::createSession(const std::shared_ptr<Client>& client) {
     std::lock_guard lock(sessionMutex_);
@@ -31,15 +30,15 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
         refreshToken->setUserAgent(client->getSession()->getUserAgent());
         refreshToken->setIpAddress(client->getSession()->getClientIp());
 
-        if (const auto dbToken = UserQueries::getRefreshToken(refreshToken->getJti())) {
+        if (const auto dbToken = db::query::identities::User::getRefreshToken(refreshToken->getJti())) {
             if (dbToken->getUserId() != client->getUser()->id
                 || dbToken->getUserAgent() != client->getSession()->getUserAgent())
                 throw std::invalid_argument("Invalid refresh token");
-        } else UserQueries::addRefreshToken(refreshToken);
+        } else db::query::identities::User::addRefreshToken(refreshToken);
 
         const std::string oldJti = client->getRefreshToken() ? client->getRefreshToken()->getJti() : "";
 
-        client->setRefreshToken(UserQueries::getRefreshToken(refreshToken->getJti()));
+        client->setRefreshToken(db::query::identities::User::getRefreshToken(refreshToken->getJti()));
         sessionsByUUID_[client->getSession()->getUUID()] = client;
 
         const std::string newJti = client->getRefreshToken()->getJti();
@@ -82,7 +81,7 @@ void SessionManager::invalidateSession(const std::string& token) {
 
     if (const auto user = client->getUser()) {
         client->invalidateToken();
-        UserQueries::revokeAndPurgeRefreshTokens(user->id);
+        db::query::identities::User::revokeAndPurgeRefreshTokens(user->id);
         log::Registry::ws()->debug("[SessionManager] Invalidated session: {}", token);
     }
 }

@@ -1,6 +1,6 @@
 #include "sync/model/LocalPolicy.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/encoding/interval.hpp"
 #include "sync/model/Conflict.hpp"
 #include "fs/model/File.hpp"
 
@@ -9,7 +9,7 @@
 
 using namespace vh::sync::model;
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 LocalPolicy::LocalPolicy(const pqxx::row& row)
     : Policy(row),

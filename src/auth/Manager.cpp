@@ -4,7 +4,7 @@
 #include "auth/SessionManager.hpp"
 #include "crypto/util/hash.hpp"
 #include "crypto/password/Strength.hpp"
-#include "database/queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "storage/Manager.hpp"
 #include "protocols/ws/Session.hpp"
 #include "config/ConfigRegistry.hpp"
@@ -20,7 +20,6 @@
 using namespace vh::auth::model;
 using namespace vh::identities::model;
 using namespace vh::crypto;
-using namespace vh::database;
 using namespace vh::storage;
 using namespace vh::protocols;
 
@@ -63,7 +62,7 @@ std::shared_ptr<Client> Manager::registerUser(std::shared_ptr<User> user,
     isValidRegistration(user, password);
 
     user->setPasswordHash(hash::password(password));
-    UserQueries::createUser(user);
+    db::query::identities::User::createUser(user);
 
     user = findUser(user->name);
     auto client = sessionManager_->getClientSession(session->getUUID());
@@ -87,9 +86,9 @@ std::shared_ptr<Client> Manager::loginUser(const std::string& name, const std::s
         if (!hash::verifyPassword(password, user->password_hash))
             throw std::runtime_error("Invalid password for user: " + name);
 
-        UserQueries::revokeAllRefreshTokens(user->id);
-        UserQueries::updateLastLoggedInUser(user->id);
-        user = UserQueries::getUserById(user->id);
+        db::query::identities::User::revokeAllRefreshTokens(user->id);
+        db::query::identities::User::updateLastLoggedInUser(user->id);
+        user = db::query::identities::User::getUserById(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
         client->getSession()->setAuthenticatedUser(user);
@@ -108,8 +107,8 @@ void Manager::updateUser(const std::shared_ptr<User>& user) {
     try {
         if (!user) throw std::runtime_error("Cannot update null user");
 
-        UserQueries::updateUser(user);
-        users_[user->name] = UserQueries::getUserById(user->id);
+        db::query::identities::User::updateUser(user);
+        users_[user->name] = db::query::identities::User::getUserById(user->id);
 
         log::Registry::auth()->debug("[AuthManager] User updated: {}", user->name);
     } catch (const std::exception& e) {
@@ -162,7 +161,7 @@ std::shared_ptr<Client> Manager::validateRefreshToken(const std::string& refresh
         if (tokenJti.empty()) throw std::runtime_error("Missing JTI in refresh token");
 
         // 3. Lookup refresh token by jti
-        auto storedToken = UserQueries::getRefreshToken(tokenJti);
+        auto storedToken = db::query::identities::User::getRefreshToken(tokenJti);
         if (!storedToken) {
             log::Registry::auth()->debug("[AuthManager] Refresh token not found: {}", tokenJti);
             return nullptr;
@@ -177,7 +176,7 @@ std::shared_ptr<Client> Manager::validateRefreshToken(const std::string& refresh
         if (!hash::verifyPassword(refreshToken, storedToken->getHashedToken()))
             throw std::runtime_error("Refresh token hash mismatch");
 
-        auto user = UserQueries::getUserByRefreshToken(tokenJti);
+        auto user = db::query::identities::User::getUserByRefreshToken(tokenJti);
         if (!user) {
             log::Registry::auth()->debug("[AuthManager] User not found for refresh token: {}", tokenJti);
             return nullptr;
@@ -269,7 +268,7 @@ std::shared_ptr<User> Manager::findUser(const std::string& name) {
     const auto it = users_.find(name);
     if (it != users_.end()) return it->second;
 
-    if (const auto user = UserQueries::getUserByName(name)) {
+    if (const auto user = db::query::identities::User::getUserByName(name)) {
         users_[name] = user;
         return user;
     }

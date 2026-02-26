@@ -1,6 +1,5 @@
 #include "protocols/ws/handler/Upload.hpp"
 #include "protocols/ws/Session.hpp"
-#include "database/queries/DirectoryQueries.hpp"
 #include "identities/model/User.hpp"
 #include "log/Registry.hpp"
 #include "fs/Filesystem.hpp"
@@ -10,7 +9,6 @@
 using namespace vh::protocols::ws::handler;
 using namespace vh::storage;
 using namespace vh::identities::model;
-using namespace vh::database;
 using namespace vh::fs;
 
 Upload::Upload(Session& session) : session_(session) {}

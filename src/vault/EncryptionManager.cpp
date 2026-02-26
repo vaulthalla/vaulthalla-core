@@ -1,7 +1,7 @@
 #include "vault/EncryptionManager.hpp"
 #include "crypto/util/encrypt.hpp"
 #include "log/Registry.hpp"
-#include "database/queries/VaultKeyQueries.hpp"
+#include "db/query/vault/Key.hpp"
 #include "vault/model/Key.hpp"
 #include "fs/model/File.hpp"
 
@@ -13,7 +13,6 @@
 using namespace vh::vault;
 using namespace vh::crypto;
 using namespace vh::crypto::util;
-using namespace vh::database;
 using namespace vh::fs::model;
 
 EncryptionManager::EncryptionManager(const unsigned int vault_id)
@@ -27,8 +26,8 @@ unsigned int EncryptionManager::get_key_version() const { return version_; }
 bool EncryptionManager::rotation_in_progress() const { return rotation_in_progress_.load(); }
 
 void EncryptionManager::load_key() {
-    rotation_in_progress_.store(VaultKeyQueries::keyRotationInProgress(vault_id_));
-    const auto rec = VaultKeyQueries::getVaultKey(vault_id_);
+    rotation_in_progress_.store(db::query::vault::Key::keyRotationInProgress(vault_id_));
+    const auto rec = db::query::vault::Key::getVaultKey(vault_id_);
     const auto masterKey = tpmKeyProvider_->getMasterKey();
 
     if (!rec) {
@@ -43,7 +42,7 @@ void EncryptionManager::load_key() {
         key->vaultId = vault_id_;
         key->encrypted_key = enc_key;
         key->iv = iv;
-        key->version = VaultKeyQueries::addVaultKey(key);
+        key->version = db::query::vault::Key::addVaultKey(key);
         version_ = key->version;
 
         key_ = std::move(vaultKey);
@@ -62,7 +61,7 @@ void EncryptionManager::load_key() {
         throw std::runtime_error("Vault key must be 32 bytes (AES-256)");
 
     if (rotation_in_progress_) {
-        const auto oldKey = VaultKeyQueries::getRotationInProgressOldKey(vault_id_);
+        const auto oldKey = db::query::vault::Key::getRotationInProgressOldKey(vault_id_);
         if (!oldKey) {
             log::Registry::crypto()->error("[VaultEncryptionManager] No old key found for rotation in progress for vault {}",
                                          vault_id_);
@@ -81,7 +80,7 @@ void EncryptionManager::load_key() {
 }
 
 void EncryptionManager::prepare_key_rotation() {
-    if (VaultKeyQueries::keyRotationInProgress(vault_id_)) {
+    if (db::query::vault::Key::keyRotationInProgress(vault_id_)) {
         log::Registry::crypto()->warn("[VaultEncryptionManager] Key rotation already in progress for vault {}", vault_id_);
         return;
     }
@@ -98,7 +97,7 @@ void EncryptionManager::prepare_key_rotation() {
     key->vaultId = vault_id_;
     key->encrypted_key = encrypt_aes256_gcm(key_, tpmKeyProvider_->getMasterKey(), iv);
     key->iv = std::move(iv);
-    key->version = VaultKeyQueries::rotateVaultKey(key);
+    key->version = db::query::vault::Key::rotateVaultKey(key);
 
     version_ = key->version;
     rotation_in_progress_.store(true);
@@ -110,14 +109,14 @@ void EncryptionManager::prepare_key_rotation() {
 }
 
 void EncryptionManager::finish_key_rotation() {
-    if (!VaultKeyQueries::keyRotationInProgress(vault_id_)) {
+    if (!db::query::vault::Key::keyRotationInProgress(vault_id_)) {
         log::Registry::crypto()->warn("[VaultEncryptionManager] No key rotation in progress for vault {}", vault_id_);
         return;
     }
 
     old_key_.clear();
 
-    VaultKeyQueries::markKeyRotationFinished(vault_id_);
+    db::query::vault::Key::markKeyRotationFinished(vault_id_);
     rotation_in_progress_.store(false);
 
     const auto msg = fmt::format("[VaultEncryptionManager] Finished key rotation for vault {} with version {}",

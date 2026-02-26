@@ -8,9 +8,9 @@
 #include "config/ConfigRegistry.hpp"
 #include "fs/Filesystem.hpp"
 #include "runtime/Deps.hpp"
-#include "database/queries/UserQueries.hpp"
-#include "database/queries/FileQueries.hpp"
-#include "database/queries/DirectoryQueries.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/fs/File.hpp"
+#include "db/query/fs/Directory.hpp"
 #include "log/Registry.hpp"
 #include "fs/cache/Registry.hpp"
 
@@ -19,7 +19,6 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
-using namespace vh::database;
 using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::config;
@@ -36,7 +35,7 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     uid_t uid = ctx->uid;
     // gid_t gid = ctx->gid;
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[getattr] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -89,7 +88,7 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
     const fuse_ctx* ctx = fuse_req_ctx(req);
     const uid_t uid = ctx->uid;
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[setattr] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -163,7 +162,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
         return;
     }
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[readdir] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -228,7 +227,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     uid_t uid = ctx->uid;
     // gid_t gid = ctx->gid;
     
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->debug("[lookup] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -291,7 +290,7 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         }
 
         const auto vaultPath = engine->paths->absRelToAbsRel(fullPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-        const auto user = UserQueries::getUserByLinuxUID(uid);
+        const auto user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!user) {
             log::Registry::fuse()->error("[create] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
@@ -347,7 +346,7 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
     uid_t uid = ctx->uid;
     // gid_t gid = ctx->gid;
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[open] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -403,7 +402,7 @@ void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
     const ssize_t res = ::pwrite(fh->fd, buf, size, off);
     if (res < 0) fuse_reply_err(req, errno);
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[write] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -447,7 +446,7 @@ void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const o
         return;
     }
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[read] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -473,7 +472,7 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
     const fuse_ctx* ctx = fuse_req_ctx(req);
     uid_t uid = ctx->uid;
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[mkdir] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -562,7 +561,7 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
             return;
         }
 
-        const auto user = UserQueries::getUserByLinuxUID(uid);
+        const auto user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!user) {
             log::Registry::fuse()->error("[rename] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
@@ -617,7 +616,7 @@ void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
         return;
     }
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[access] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -671,7 +670,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        const auto user = UserQueries::getUserByLinuxUID(uid);
+        const auto user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!user) {
             log::Registry::fuse()->error("[unlink] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
@@ -684,7 +683,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        FileQueries::markFileAsTrashed(user->id, *file->vault_id, file->path, true);
+        db::query::fs::File::markFileAsTrashed(user->id, *file->vault_id, file->path, true);
 
         if (::unlink(file->backing_path.c_str()) < 0)
             log::Registry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", file->backing_path.string(), strerror(errno));
@@ -725,12 +724,12 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        if (!DirectoryQueries::isDirectoryEmpty(entry->id)) {
+        if (!db::query::fs::Directory::isDirectoryEmpty(entry->id)) {
             fuse_reply_err(req, ENOTEMPTY);
             return;
         }
 
-        const auto user = UserQueries::getUserByLinuxUID(uid);
+        const auto user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!user) {
             log::Registry::fuse()->error("[rmdir] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);
@@ -743,7 +742,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        DirectoryQueries::deleteEmptyDirectory(entry->id);
+        db::query::fs::Directory::deleteEmptyDirectory(entry->id);
 
         if (::rmdir(entry->backing_path.c_str()) < 0)
             log::Registry::fuse()->debug("[rmdir] Failed to remove backing directory: {}: {}", entry->backing_path.string(), strerror(errno));
@@ -793,7 +792,7 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
 
     (void) datasync;
 
-    const auto user = UserQueries::getUserByLinuxUID(uid);
+    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
     if (!user) {
         log::Registry::fuse()->error("[fsync] No user found for UID: {}", uid);
         fuse_reply_err(req, EACCES);
@@ -842,7 +841,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
             return;
         }
 
-        const auto user = UserQueries::getUserByLinuxUID(uid);
+        const auto user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!user) {
             log::Registry::fuse()->error("[statfs] No user found for UID: {}", uid);
             fuse_reply_err(req, EACCES);

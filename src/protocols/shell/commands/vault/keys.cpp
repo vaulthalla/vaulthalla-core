@@ -3,7 +3,7 @@
 #include "runtime/Deps.hpp"
 #include "CommandUsage.hpp"
 
-#include "database/queries/VaultKeyQueries.hpp"
+#include "db/query/vault/Key.hpp"
 
 #include "log/Registry.hpp"
 #include "sync/Controller.hpp"
@@ -35,7 +35,6 @@ using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::crypto;
 using namespace vh::cloud;
@@ -94,7 +93,7 @@ static CommandResult export_one_key(const CommandCall& call, const std::shared_p
 
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     const auto& key = engine->encryptionManager->get_key(context);
-    const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
+    const auto vaultKey = db::query::vault::Key::getVaultKey(engine->vault->id);
 
     const auto out = generate_json_key_object(engine->vault, key, vaultKey, call.user->name);
     return handle_key_encrypt_and_response(call, out, usage);
@@ -110,7 +109,7 @@ static CommandResult export_all_keys(const CommandCall& call, const std::shared_
     const auto context = fmt::format("User: {} -> {}", call.user->name, __func__);
     for (const auto& engine : engines) {
         const auto& key = engine->encryptionManager->get_key(context);
-        const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
+        const auto vaultKey = db::query::vault::Key::getVaultKey(engine->vault->id);
         out.push_back(generate_json_key_object(engine->vault, key, vaultKey, call.user->name));
     }
 
@@ -157,7 +156,7 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
     if (!engLkp || !engLkp.ptr) return invalid(engLkp.error);
     const auto engine = engLkp.ptr;
 
-    const auto vaultKey = VaultKeyQueries::getVaultKey(engine->vault->id);
+    const auto vaultKey = db::query::vault::Key::getVaultKey(engine->vault->id);
 
     return ok(generate_json_key_info_object(engine->vault, vaultKey, call.user->name).dump(4));
 }

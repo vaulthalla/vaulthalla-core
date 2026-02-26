@@ -5,7 +5,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 class CommandBook;
 class CommandUsage;

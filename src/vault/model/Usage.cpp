@@ -1,8 +1,8 @@
 #include "vault/model/Usage.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 
 using namespace vh::vault::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Usage::Usage(const pqxx::row& row)
     : user_id(row["user_id"].as<unsigned int>()),

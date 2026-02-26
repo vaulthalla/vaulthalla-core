@@ -1,13 +1,14 @@
 #pragma once
 
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include <pqxx/row>
 #include <string>
 #include <utility>
 
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 namespace vh::auth::model {
+
 class RefreshToken {
   public:
     RefreshToken(std::string jti, std::string hashedToken, unsigned int userId, std::string userAgent,
@@ -50,4 +51,5 @@ class RefreshToken {
     std::time_t expiresAt_, createdAt_, lastUsed_;
     bool revoked_;
 };
-} // namespace vh::auth
+
+}

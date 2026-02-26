@@ -2,21 +2,19 @@
 #include "rbac/model/UserRole.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/Permission.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "log/Registry.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <pqxx/result>
 #include <ranges>
 
-using namespace vh::shell;
-using namespace vh::database;
-using namespace vh::database::encoding;
-using namespace vh::logging;
+using namespace vh::protocols::shell;
+using namespace vh::db::encoding;
 using namespace vh::rbac::model;
 
 namespace vh::identities::model {
@@ -70,18 +68,18 @@ bool User::operator!=(const User& other) const {
 std::shared_ptr<VaultRole> User::getRole(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
     if (roles.contains(vaultId)) {
-        LogRegistry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
+        log::Registry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
         return roles.at(vaultId);
     }
     if (group_roles.contains(vaultId)) {
-        LogRegistry::auth()->debug("User {} has group role for vault {}", name, vaultId);
+        log::Registry::auth()->debug("User {} has group role for vault {}", name, vaultId);
         return group_roles.at(vaultId);
     }
-    LogRegistry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
+    log::Registry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
     for (const auto& [id, role] : roles)
-        LogRegistry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
+        log::Registry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
     for (const auto& [id, role] : group_roles)
-        LogRegistry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
+        log::Registry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
     return nullptr;
 }
 
@@ -175,85 +173,85 @@ bool User::canCreateVaults() const { return hasPermission(role->permissions, Adm
 // --- Vault role->permissions ---
 
 bool User::canManageVault(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageVault(path);
 }
 
 bool User::canManageVaultAccess(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageAccess(path);
 }
 
 bool User::canManageVaultTags(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageTags(path);
 }
 
 bool User::canManageVaultMetadata(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageMetadata(path);
 }
 
 bool User::canManageVaultVersions(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageVersions(path);
 }
 
 bool User::canManageVaultFileLocks(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canManageFileLocks(path);
 }
 
 bool User::canShareVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canShare(path);
 }
 
 bool User::canSyncVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canSync(path);
 }
 
 bool User::canCreateVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canCreate(path);
 }
 
 bool User::canDownloadVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->canDownload(path);
 }
 
 bool User::canDeleteVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::Delete, path);
 }
 
 bool User::canRenameVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::Rename, path);
 }
 
 bool User::canMoveVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::Move, path);
 }
 
 bool User::canListVaultData(const unsigned int vaultId, const std::filesystem::path& path) const {
-    if (VaultQueries::getVaultOwnerId(vaultId) == id) return true;
+    if (db::query::vault::Vault::getVaultOwnerId(vaultId) == id) return true;
     const auto role = getRole(vaultId);
     return role && role->validatePermission(role->permissions, VaultPermission::List, path);
 }

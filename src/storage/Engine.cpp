@@ -4,16 +4,16 @@
 #include "sync/model/Operation.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/metadata/Magic.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "db/query/fs/Directory.hpp"
+#include "db/query/fs/File.hpp"
+#include "db/query/sync/Policy.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/sync/Event.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
 #include "sync/model/Policy.hpp"
 #include "fs/ops/file.hpp"
-#include "logging/LogRegistry.hpp"
-#include "database/Queries/SyncEventQueries.hpp"
+#include "log/Registry.hpp"
 #include "sync/model/Event.hpp"
 #include "fs/model/file/Trashed.hpp"
 #include "fs/model/File.hpp"
@@ -22,10 +22,8 @@ using namespace vh::fs::model;
 using namespace vh::fs;
 using namespace vh::crypto;
 using namespace vh::vault::model;
-using namespace vh::database;
 using namespace vh::config;
 using namespace vh::storage;
-using namespace vh::logging;
 using namespace vh::fs::ops;
 using namespace std::chrono;
 using namespace vh::fs::metadata;
@@ -34,18 +32,18 @@ namespace vh::storage {
 
 Engine::Engine(const std::shared_ptr<Vault>& vault)
     : vault(vault),
-      sync(SyncQueries::getSync(vault->id)),
+      sync(db::query::sync::Policy::getSync(vault->id)),
       paths(std::make_shared<Path>(makeAbsolute(to_snake_case(vault->name)), vault->mount_point)),
       encryptionManager(std::make_shared<vault::EncryptionManager>(vault->id)) {
-    if (!VaultQueries::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
+    if (!db::query::vault::Vault::vaultRootExists(vault->id)) Filesystem::mkVault(paths->absRelToRoot(paths->vaultRoot, PathType::FUSE_ROOT), vault->id);
     if (!fs::exists(paths->cacheRoot)) fs::create_directories(paths->cacheRoot);
 }
 
 void Engine::newSyncEvent(const uint8_t trigger) {
     if (latestSyncEvent) {
-        SyncEventQueries::upsert(latestSyncEvent);
+        db::query::sync::Event::upsert(latestSyncEvent);
         if (latestSyncEvent->status != sync::model::Event::Status::SUCCESS && latestSyncEvent->status != sync::model::Event::Status::CANCELLED) {
-            LogRegistry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
+            log::Registry::storage()->warn("[StorageEngine] Previous sync event failed with status: {}", std::string(sync::model::Event::toString(latestSyncEvent->status)));
             return;
         }
     }
@@ -56,23 +54,23 @@ void Engine::newSyncEvent(const uint8_t trigger) {
     latestSyncEvent->trigger = static_cast<sync::model::Event::Trigger>(trigger);
     latestSyncEvent->timestamp_begin = system_clock::to_time_t(system_clock::now());
     latestSyncEvent->config_hash = sync->config_hash;
-    SyncEventQueries::create(latestSyncEvent);
+    db::query::sync::Event::create(latestSyncEvent);
 }
 
 void Engine::saveSyncEvent() const {
-    SyncEventQueries::upsert(latestSyncEvent);
+    db::query::sync::Event::upsert(latestSyncEvent);
 }
 
 bool Engine::isDirectory(const fs::path& rel_path) const {
-    return DirectoryQueries::isDirectory(vault->id, rel_path);
+    return db::query::fs::Directory::isDirectory(vault->id, rel_path);
 }
 
 bool Engine::isFile(const fs::path& rel_path) const {
-    return FileQueries::isFile(vault->id, rel_path);
+    return db::query::fs::File::isFile(vault->id, rel_path);
 }
 
 std::vector<uint8_t> Engine::decrypt(const std::shared_ptr<File>& f) const {
-    const auto context = FileQueries::getEncryptionIVAndVersion(vault->id, f->path);
+    const auto context = db::query::fs::File::getEncryptionIVAndVersion(vault->id, f->path);
     if (!context) throw std::runtime_error("No encryption IV found for file: " + f->path.string());
     const auto& [iv_b64, key_version] = *context;
     const auto payload = readFileToVector(f->backing_path);
@@ -84,14 +82,14 @@ std::vector<uint8_t> Engine::decrypt(const std::shared_ptr<File>& f, const std::
     if (!f) throw std::invalid_argument("Invalid file for decryption");
     if (payload.empty()) throw std::invalid_argument("Payload for decryption cannot be empty");
     if (f->encryption_iv.empty()) throw std::invalid_argument("File is not encrypted: " + f->path.string());
-    const auto context = FileQueries::getEncryptionIVAndVersion(vault->id, f->path);
+    const auto context = db::query::fs::File::getEncryptionIVAndVersion(vault->id, f->path);
     if (!context) throw std::runtime_error("No encryption IV found for file: " + f->path.string());
     const auto& [iv_b64, key_version] = *context;
     return encryptionManager->decrypt(payload, iv_b64, key_version);
 }
 
 std::vector<uint8_t> Engine::decrypt(const unsigned int vaultId, const fs::path& relPath, const std::vector<uint8_t>& payload) const {
-    const auto context = FileQueries::getEncryptionIVAndVersion(vaultId, relPath);
+    const auto context = db::query::fs::File::getEncryptionIVAndVersion(vaultId, relPath);
     if (!context) throw std::runtime_error("No encryption IV found for file: " + relPath.string());
     const auto& [iv_b64, key_version] = *context;
     return encryptionManager->decrypt(payload, iv_b64, key_version);
@@ -126,7 +124,7 @@ void Engine::moveThumbnails(const std::filesystem::path& from, const std::filesy
         }
 
         if (!fs::exists(fromPath)) {
-            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
+            log::Registry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 
@@ -146,7 +144,7 @@ void Engine::copyThumbnails(const std::filesystem::path& from, const std::filesy
         }
 
         if (!fs::exists(fromPath)) {
-            LogRegistry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
+            log::Registry::storage()->warn("[StorageEngine] Thumbnail does not exist: {}", fromPath.string());
             continue;
         }
 
@@ -181,8 +179,8 @@ void Engine::remove(const fs::path& rel_path, const unsigned int userId) const {
 void Engine::removeLocally(const fs::path& rel_path) const {
     const auto path = rel_path.string().front() != '/' ? fs::path("/" / rel_path) : rel_path;
     purgeThumbnails(path);
-    auto file = FileQueries::getFileByPath(vault->id, path);
-    FileQueries::deleteFile(vault->owner_id, file);
+    auto file = db::query::fs::File::getFileByPath(vault->id, path);
+    db::query::fs::File::deleteFile(vault->owner_id, file);
 
     if (const auto absPath = paths->absPath(path, PathType::BACKING_VAULT_ROOT); fs::exists(absPath)) fs::remove(absPath);
 }

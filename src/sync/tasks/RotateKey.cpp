@@ -1,7 +1,7 @@
 #include "sync/tasks/RotateKey.hpp"
 
 #include "vault/EncryptionManager.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "db/query/fs/File.hpp"
 #include "storage/Engine.hpp"
 #include "storage/CloudEngine.hpp"
 #include "fs/model/File.hpp"
@@ -15,7 +15,6 @@
 using namespace vh::sync::tasks;
 using namespace vh::storage;
 using namespace vh::fs::model;
-using namespace vh::database;
 using namespace vh::fs::ops;
 
 RotateKey::RotateKey(std::shared_ptr<Engine> eng,
@@ -46,7 +45,7 @@ std::vector<uint8_t> RotateKey::produceCiphertext(const FileSP& file,
 
 void RotateKey::hydrateIvAndVersionForRemoteEncrypted(const FileSP& file) const {
     auto payload = cloud->getRemoteIVBase64AndVersion(file->path);
-    if (!payload) payload = FileQueries::getEncryptionIVAndVersion(*file->vault_id, file->path);
+    if (!payload) payload = db::query::fs::File::getEncryptionIVAndVersion(*file->vault_id, file->path);
     if (!payload)
         throw std::runtime_error("RotateKeyTask: no IV/version for encrypted remote file: " + file->backing_path.string());
 
@@ -71,7 +70,7 @@ void RotateKey::rotateLocalFile(const FileSP& file) const {
         throw std::runtime_error("RotateKeyTask: failed to rotate key for file: " + file->backing_path.string());
 
     writeFile(file->backing_path, ciphertext);
-    FileQueries::setEncryptionIVAndVersion(file);
+    db::query::fs::File::setEncryptionIVAndVersion(file);
 }
 
 void RotateKey::rotateCloudFile(const RemotePolicySP& remotePolicy,
@@ -89,7 +88,7 @@ void RotateKey::rotateCloudFile(const RemotePolicySP& remotePolicy,
     } else {
         source = readFileToVector(file->backing_path);
         if (source.empty()) {
-            LogRegistry::sync()->warn("[RotateKeyTask] Empty file buffer for: {}", file->backing_path.string());
+            log::Registry::sync()->warn("[RotateKeyTask] Empty file buffer for: {}", file->backing_path.string());
             return;
         }
         sourceIsEncrypted = true;
@@ -100,7 +99,7 @@ void RotateKey::rotateCloudFile(const RemotePolicySP& remotePolicy,
         throw std::runtime_error("RotateKeyTask: failed to produce ciphertext for: " + file->backing_path.string());
 
     cloud->upload(file, ciphertext);
-    FileQueries::setEncryptionIVAndVersion(file);
+    db::query::fs::File::setEncryptionIVAndVersion(file);
     maybeWriteLocal(remotePolicy, file, ciphertext);
 }
 
@@ -123,7 +122,7 @@ void RotateKey::operator()() {
 
         promise.set_value(true);
     } catch (const std::exception& e) {
-        LogRegistry::sync()->error("[RotateKeyTask] Exception during key rotation: {}", e.what());
+        log::Registry::sync()->error("[RotateKeyTask] Exception during key rotation: {}", e.what());
         promise.set_value(false);
     }
 }

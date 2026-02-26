@@ -1,8 +1,8 @@
 #include "fs/model/file/Share.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 
 using namespace vh::fs::model::file;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Share::Share(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),

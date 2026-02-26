@@ -4,7 +4,7 @@
 #include "CommandBook.hpp"
 #include "permsUtil.hpp"
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 struct CommandCall;
 

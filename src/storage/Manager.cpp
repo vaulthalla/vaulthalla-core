@@ -6,38 +6,34 @@
 #include "vault/model/S3Vault.hpp"
 #include "identities/model/User.hpp"
 #include "fs/model/Path.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/identities/User.hpp"
+#include "log/Registry.hpp"
 #include "seed/include/seed_db.hpp"
 #include "crypto/id/Generator.hpp"
 
 using namespace vh::storage;
 using namespace vh::vault::model;
 using namespace vh::identities::model;
-using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::fs::model;
 using namespace vh::crypto;
 
 Manager::Manager() = default;
 
 void Manager::initStorageEngines() {
-    LogRegistry::storage()->debug("[StorageManager] Initializing storage engines...");
+    log::Registry::storage()->debug("[StorageManager] Initializing storage engines...");
     std::scoped_lock lock(mutex_);
 
     if (const auto& config = ConfigRegistry::get().dev; config.enabled && config.init_r2_test_vault)
-        if (const auto admin = UserQueries::getUserByName("admin");
-            !VaultQueries::vaultExists("R2 Test Vault", admin->id)) seed::initDevCloudVault();
+        if (const auto admin = db::query::identities::User::getUserByName("admin");
+            !db::query::vault::Vault::vaultExists("R2 Test Vault", admin->id)) seed::initDevCloudVault();
 
     engines_.clear();
 
     try {
-        for (auto& vault : VaultQueries::listVaults()) {
-            LogRegistry::storage()->debug("[StorageManager] Initializing StorageEngine for Vault {} (ID: {}, Type: {})",
+        for (auto& vault : db::query::vault::Vault::listVaults()) {
+            log::Registry::storage()->debug("[StorageManager] Initializing StorageEngine for Vault {} (ID: {}, Type: {})",
                                           vault->name, vault->id, to_string(vault->type));
             std::shared_ptr<Engine> engine;
             if (vault->type == VaultType::Local) engine = std::make_shared<Engine>(vault);
@@ -49,7 +45,7 @@ void Manager::initStorageEngines() {
             vaultToEngine_[vault->id] = engine;
         }
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageManager] Error initializing storage engines: {}", e.what());
+        log::Registry::storage()->error("[StorageManager] Error initializing storage engines: {}", e.what());
         throw;
     }
 }
@@ -68,10 +64,10 @@ std::shared_ptr<Engine> Manager::resolveStorageEngine(const fs::path& fusePath) 
         if (engines_.contains(currentStr)) return engines_.at(currentStr);
     }
 
-    LogRegistry::storage()->warn("[StorageManager] No storage engine found for path: {}", fusePath.string());
-    LogRegistry::storage()->info("[StorageManager] Available storage engines:");
+    log::Registry::storage()->warn("[StorageManager] No storage engine found for path: {}", fusePath.string());
+    log::Registry::storage()->info("[StorageManager] Available storage engines:");
     for (const auto& [path, engine] : engines_)
-        LogRegistry::storage()->info(" - {} (Vault ID: {}, Type: {})", path, engine->vault->id, to_string(engine->vault->type));
+        log::Registry::storage()->info(" - {} (Vault ID: {}, Type: {})", path, engine->vault->id, to_string(engine->vault->type));
 
     return nullptr;
 }
@@ -86,7 +82,7 @@ std::vector<std::shared_ptr<Engine>> Manager::getEngines() const {
 
 void Manager::initUserStorage(const std::shared_ptr<User>& user) {
     try {
-        LogRegistry::storage()->debug("[StorageManager] Initializing storage user storage...");
+        log::Registry::storage()->debug("[StorageManager] Initializing storage user storage...");
 
         if (!user->id) throw std::runtime_error("User ID is not set. Cannot initialize storage.");
 
@@ -97,18 +93,18 @@ void Manager::initUserStorage(const std::shared_ptr<User>& user) {
 
         {
             std::scoped_lock lock(mutex_);
-            vault->id = VaultQueries::upsertVault(vault);
-            vault = VaultQueries::getVault(vault->id);
+            vault->id = db::query::vault::Vault::upsertVault(vault);
+            vault = db::query::vault::Vault::getVault(vault->id);
         }
 
         if (!vault) throw std::runtime_error("Failed to create or retrieve vault for user: " + user->name);
 
         vaultToEngine_[vault->id] = std::make_shared<Engine>(vault);
 
-        LogRegistry::storage()->info("[StorageManager] User storage initialized for user: {} (ID: {})",
+        log::Registry::storage()->info("[StorageManager] User storage initialized for user: {} (ID: {})",
                                               user->name, user->id);
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageManager] Error initializing user storage: {}", e.what());
+        log::Registry::storage()->error("[StorageManager] Error initializing user storage: {}", e.what());
         throw;
     }
 }
@@ -119,13 +115,13 @@ std::shared_ptr<Vault> Manager::addVault(std::shared_ptr<Vault> vault,
     std::scoped_lock lock(mutex_);
 
     vault->mount_point = id::Generator({ .namespace_token = vault->name }).generate();
-    vault->id = VaultQueries::upsertVault(vault, sync);
-    vault = VaultQueries::getVault(vault->id);
+    vault->id = db::query::vault::Vault::upsertVault(vault, sync);
+    vault = db::query::vault::Vault::getVault(vault->id);
     const auto engine = std::make_shared<Engine>(vault);
     engines_[engine->paths->absRelToRoot(engine->paths->vaultRoot, PathType::FUSE_ROOT)] = engine;
     vaultToEngine_[vault->id] = engine;
 
-    LogRegistry::storage()->info("[StorageManager] Added new vault with ID: {}, Name: {}, Type: {}",
+    log::Registry::storage()->info("[StorageManager] Added new vault with ID: {}, Name: {}, Type: {}",
                                               vault->id, vault->name, to_string(vault->type));
 
     return vault;
@@ -135,23 +131,23 @@ void Manager::updateVault(const std::shared_ptr<Vault>& vault) {
     if (!vault) throw std::invalid_argument("Vault cannot be null");
     if (vault->id == 0) throw std::invalid_argument("Vault ID cannot be zero");
     std::scoped_lock lock(mutex_);
-    VaultQueries::upsertVault(vault);
+    db::query::vault::Vault::upsertVault(vault);
     vaultToEngine_[vault->id]->vault = vault;
-    LogRegistry::storage()->info("[StorageManager] Updated vault with ID: {}", vault->id);
+    log::Registry::storage()->info("[StorageManager] Updated vault with ID: {}", vault->id);
 }
 
 void Manager::removeVault(const unsigned int vaultId) {
     std::scoped_lock lock(mutex_);
-    VaultQueries::removeVault(vaultId);
+    db::query::vault::Vault::removeVault(vaultId);
 
     vaultToEngine_.erase(vaultId);
-    LogRegistry::storage()->info("[StorageManager] Removed vault with ID: {}", vaultId);
+    log::Registry::storage()->info("[StorageManager] Removed vault with ID: {}", vaultId);
 }
 
 std::shared_ptr<Vault> Manager::getVault(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
     if (vaultToEngine_.contains(vaultId)) return vaultToEngine_.at(vaultId)->vault;
-    return VaultQueries::getVault(vaultId);
+    return db::query::vault::Vault::getVault(vaultId);
 }
 
 std::shared_ptr<Engine> Manager::getEngine(const unsigned int id) const {

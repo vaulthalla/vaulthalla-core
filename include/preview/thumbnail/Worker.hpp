@@ -5,13 +5,12 @@
 #include "task/Generate.hpp"
 #include "concurrency/ThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <memory>
 #include <string>
 
 using namespace vh::concurrency;
-using namespace vh::logging;
 using namespace vh::fs::model;
 
 namespace vh::preview::thumbnail {
@@ -26,7 +25,7 @@ struct Worker {
             auto task = std::make_unique<task::Generate>(engine, buffer, file);
             ThreadPoolManager::instance().thumbPool()->submit(std::move(task));
         } catch (const std::exception& e) {
-            LogRegistry::thumb()->error("[ThumbnailWorker] Failed to enqueue thumbnail task: {}", e.what());
+            log::Registry::thumb()->error("[ThumbnailWorker] Failed to enqueue thumbnail task: {}", e.what());
         }
     }
 };

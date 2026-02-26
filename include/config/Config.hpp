@@ -1,6 +1,6 @@
 #pragma once
 
-#include "logging/LogRotator.hpp"
+#include "log/Rotator.hpp"
 
 #include <filesystem>
 #include <string>
@@ -83,7 +83,7 @@ struct AuditLogConfig {
     std::chrono::days retention_days = std::chrono::days(30);
     uintmax_t rotate_max_size = 50 * 1024 * 1024; // 50MB
     std::chrono::hours rotate_interval = std::chrono::hours(24);
-    logging::LogRotator::Compression compression = logging::LogRotator::Compression::Zstd;
+    log::Rotator::Compression compression = log::Rotator::Compression::Zstd;
     uintmax_t max_retained_logs_size = 1024 * 1024 * 1024; // 1GB
     bool strict_retention = false; // If true, retain logs for full retention days minimum, even if over the size limit
 };

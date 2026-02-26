@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <ranges>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 std::string CommandBook::str() const {
     std::ostringstream out;

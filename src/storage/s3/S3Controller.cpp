@@ -1,7 +1,7 @@
 #include "storage/s3/S3Controller.hpp"
 #include "vault/model/APIKey.hpp"
 #include "storage/s3/curl/helpers.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <ctime>
 #include <curl/curl.h>
@@ -10,7 +10,6 @@
 
 using namespace vh::cloud;
 using namespace vh::vault::model;
-using namespace vh::logging;
 using namespace vh::storage::s3::curl;
 
 S3Controller::S3Controller(const std::shared_ptr<APIKey>& apiKey, std::string bucket)
@@ -34,7 +33,7 @@ void S3Controller::deleteObject(const fs::path& key) const {
         curl_easy_setopt(h, CURLOPT_HTTPHEADER, hdrs.get());
     });
 
-    if (!resp.ok()) LogRegistry::cloud()->error(
+    if (!resp.ok()) log::Registry::cloud()->error(
         "[S3Provider] deleteObject failed: CURL={} HTTP={} Response:\n{}",
         resp.curl, resp.http, resp.body
     );
@@ -89,7 +88,7 @@ std::u8string S3Controller::listObjects(const fs::path& prefix) const {
         curl_easy_cleanup(curl);
 
         if (res != CURLE_OK) {
-            LogRegistry::cloud()->error("[S3Provider] listObjects failed: CURL={} Response:\n{}",
+            log::Registry::cloud()->error("[S3Provider] listObjects failed: CURL={} Response:\n{}",
                                         res, response);
             break;
         }

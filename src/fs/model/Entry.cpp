@@ -1,11 +1,11 @@
 #include "fs/model/Entry.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "database/encoding/u8.hpp"
+#include "db/encoding/u8.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>
@@ -17,8 +17,7 @@
 #include <paths.h>
 
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
-using namespace vh::logging;
+using namespace vh::db::encoding;
 using namespace vh::config;
 
 Entry::Entry(const pqxx::row& row, const pqxx::result& parentRows)
@@ -146,13 +145,13 @@ std::vector<std::shared_ptr<Entry>> vh::fs::model::fromS3XML(const std::u8string
     pugi::xml_parse_result result = doc.load_string(reinterpret_cast<const char*>(xml.c_str()));
 
     if (!result) {
-        LogRegistry::types()->error("[Entry] [fromS3XML] Failed to parse XML: {}", result.description());
+        log::Registry::types()->error("[Entry] [fromS3XML] Failed to parse XML: {}", result.description());
         return {};
     }
 
     pugi::xml_node root = doc.child("ListBucketResult");
     if (!root) {
-        LogRegistry::types()->error("[Entry] [fromS3XML] Missing root element 'ListBucketResult'");
+        log::Registry::types()->error("[Entry] [fromS3XML] Missing root element 'ListBucketResult'");
         return {};
     }
 
@@ -162,7 +161,7 @@ std::vector<std::shared_ptr<Entry>> vh::fs::model::fromS3XML(const std::u8string
         auto modifiedNode = content.child("LastModified");
 
         if (!keyNode || !sizeNode || !modifiedNode) {
-            LogRegistry::types()->warn("[Entry] [fromS3XML] Missing required child nodes in <Contents>");
+            log::Registry::types()->warn("[Entry] [fromS3XML] Missing required child nodes in <Contents>");
             continue;
         }
 
@@ -217,7 +216,7 @@ std::unordered_map<std::u8string, std::shared_ptr<Entry>> vh::fs::model::groupEn
 
     for (const auto& entry : entries) {
         if (grouped.contains(entry->path.u8string())) {
-            LogRegistry::types()->warn("[Entry] [groupEntriesByPath] Duplicate entry found for path: {}", entry->path.string());
+            log::Registry::types()->warn("[Entry] [groupEntriesByPath] Duplicate entry found for path: {}", entry->path.string());
             continue;
         }
         grouped[entry->path.u8string()] = entry;
@@ -227,7 +226,7 @@ std::unordered_map<std::u8string, std::shared_ptr<Entry>> vh::fs::model::groupEn
 }
 
 void Entry::print() const {
-    LogRegistry::types()->debug("[Entry]\n"
+    log::Registry::types()->debug("[Entry]\n"
                                 "  ID: {}\n"
                                 "  Name: {}\n"
                                 "  Size: {} bytes\n"

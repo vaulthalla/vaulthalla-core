@@ -2,18 +2,16 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "database/Queries/PermsQueries.hpp"
+#include "db/query/rbac/Permission.hpp"
 #include "identities/model/User.hpp"
 #include "rbac/model/Role.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::rbac::model;
-using namespace vh::database;
-using namespace vh::services;
 
 static void parseFlag(const CommandCall& call, const std::string& flag, uint16_t& permissions, const unsigned int bitPosition) {
     if (hasFlag(call, flag) || hasFlag(call, "allow-" + flag)) permissions |= (1 << bitPosition);
@@ -56,12 +54,12 @@ static uint16_t parseVaultRolePermissions(const CommandCall& call, uint16_t perm
 
 static std::shared_ptr<Role> resolveRole(const std::string& arg) {
     if (const auto roleIdOpt = parseUInt(arg)) {
-        const auto role = PermsQueries::getRole(*roleIdOpt);
+        const auto role = db::query::rbac::Permission::getRole(*roleIdOpt);
         if (!role) throw std::runtime_error("role with ID " + std::to_string(*roleIdOpt) + " not found");
         return role;
     }
 
-    const auto role = PermsQueries::getRoleByName(std::string(arg));
+    const auto role = db::query::rbac::Permission::getRoleByName(std::string(arg));
     if (!role) throw std::runtime_error("role with name '" + std::string(arg) + "' not found");
     return role;
 }
@@ -75,9 +73,9 @@ static CommandResult handleRolesList(const CommandCall& call) {
     auto params = parseListQuery(call);
     std::vector<std::shared_ptr<Role>> roles;
 
-    if (hasFlag(call, "user")) roles = PermsQueries::listUserRoles(std::move(params));
-    else if (hasFlag(call, "vault")) roles = PermsQueries::listVaultRoles(std::move(params));
-    else roles = PermsQueries::listRoles(std::move(params));
+    if (hasFlag(call, "user")) roles = db::query::rbac::Permission::listUserRoles(std::move(params));
+    else if (hasFlag(call, "vault")) roles = db::query::rbac::Permission::listVaultRoles(std::move(params));
+    else roles = db::query::rbac::Permission::listRoles(std::move(params));
 
     return ok(to_string(roles));
 }
@@ -138,7 +136,7 @@ static CommandResult handleRoleCreate(const CommandCall& call) {
 
     assignPermissions(call, role);
 
-    role->id = PermsQueries::addRole(role);
+    role->id = db::query::rbac::Permission::addRole(role);
 
     return ok("Role created successfully: " + to_string(role));
 }
@@ -169,7 +167,7 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
     assignDescIfAvailable(call, usage, role);
     assignPermissions(call, role);
 
-    PermsQueries::updateRole(role);
+    db::query::rbac::Permission::updateRole(role);
 
     return ok("Role updated successfully:\n" + to_string(role));
 }
@@ -184,7 +182,7 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
     if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
     const auto role = rLkp.ptr;
 
-    PermsQueries::deleteRole(role->id);
+    db::query::rbac::Permission::deleteRole(role->id);
     return ok("Role deleted successfully: " + to_string(role));
 }
 
@@ -193,7 +191,7 @@ static bool isRoleMatch(const std::string& cmd, const std::string_view input) {
 }
 
 static CommandResult handle_role(const CommandCall& call) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     if (call.positionals.empty()) return usage(call.constructFullArgs());
 
     const auto [sub, subcall] = descend(call);
@@ -208,6 +206,6 @@ static CommandResult handle_role(const CommandCall& call) {
 }
 
 void commands::registerRoleCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("role"), handle_role);
 }

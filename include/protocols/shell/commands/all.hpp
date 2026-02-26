@@ -2,11 +2,9 @@
 
 #include <memory>
 
-namespace vh::shell {
-class Router;
-}
+namespace vh::protocols::shell { class Router; }
 
-namespace vh::shell::commands {
+namespace vh::protocols::shell::commands {
 
 void registerAllCommands(const std::shared_ptr<Router>& r);
 

@@ -1,25 +1,23 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "auth/AuthManager.hpp"
+#include "auth/Manager.hpp"
 #include "crypto/util/hash.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "rbac/model/UserRole.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
 #include <paths.h>
 
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::rbac::model;
 using namespace vh::identities::model;
-using namespace vh::database;
 using namespace vh::auth;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::crypto;
 
 static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
@@ -27,7 +25,7 @@ static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
 static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
     constexpr unsigned short maxRetries = 1024 * 4; // 4096 attempts max
     for (unsigned short i = 1; i < maxRetries; ++i) {
-        if (const auto password = hash::generate_secure_password(PASSWORD_LENGTH); AuthManager::isValidPassword(password)) {
+        if (const auto password = hash::generate_secure_password(PASSWORD_LENGTH); auth::Manager::isValidPassword(password)) {
             user->setPasswordHash(hash::password(password));
             return password;
         }
@@ -39,7 +37,7 @@ static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
 
 static void assignEmail(const CommandCall& call, const std::shared_ptr<User>& user, const std::shared_ptr<CommandUsage>& usage) {
     if (const auto emailOpt = optVal(call, usage->resolveOptional("email")->option_tokens)) {
-        if (!AuthManager::isValidEmail(*emailOpt))
+        if (!auth::Manager::isValidEmail(*emailOpt))
             throw std::runtime_error("Invalid email address: " + *emailOpt);
         user->email = *emailOpt;
     }
@@ -69,7 +67,7 @@ static CommandResult createUser(const CommandCall& call) {
     user->role = std::make_shared<UserRole>();
     user->last_modified_by = call.user->id;
 
-    if (!AuthManager::isValidName(user->name)) return invalid("Invalid user name: " + user->name);
+    if (!auth::Manager::isValidName(user->name)) return invalid("Invalid user name: " + user->name);
 
     const auto roleOpt = optVal(call, usage->resolveRequired("role")->option_tokens);
     if (!roleOpt) return invalid("user create: --role is required");
@@ -83,7 +81,7 @@ static CommandResult createUser(const CommandCall& call) {
     user->role->permissions = role->permissions;
 
     const auto password = tryAssignNewPassword(user);
-    user->id = UserQueries::createUser(user);
+    user->id = db::query::identities::User::createUser(user);
 
     std::string out = "User created successfully: " + to_string(user) + "\n";
     out += "Password: " + password + "\n";
@@ -113,7 +111,7 @@ static CommandResult handleUpdateUser(const CommandCall& call) {
 
     if (const auto newNameOpt = optVal(call, usage->resolveOptional("name")->option_tokens)) {
         if (user->isSuperAdmin()) return invalid("Cannot change name of super_admin user: " + user->name);
-        if (!AuthManager::isValidName(*newNameOpt)) return invalid("Invalid new user name: " + *newNameOpt);
+        if (!auth::Manager::isValidName(*newNameOpt)) return invalid("Invalid new user name: " + *newNameOpt);
         user->name = *newNameOpt;
     }
 
@@ -132,7 +130,7 @@ static CommandResult handleUpdateUser(const CommandCall& call) {
 
     user->last_modified_by = call.user->id;
 
-    UserQueries::updateUser(user);
+    db::query::identities::User::updateUser(user);
 
     return ok("User updated successfully: " + user->name + "\n" + to_string(user));
 }
@@ -146,11 +144,11 @@ static CommandResult deleteUser(const CommandCall& call) {
     const auto user = uLkp.ptr;
 
     if (user->isSuperAdmin()) {
-        LogRegistry::audit()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+        log::Registry::audit()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
             user->name, call.user->name);
-        LogRegistry::shell()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+        log::Registry::shell()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
             user->name, call.user->name);
-        LogRegistry::vaulthalla()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
+        log::Registry::vaulthalla()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
             user->name, call.user->name);
         return invalid("Cannot delete super admin user: " + user->name);
     }
@@ -162,7 +160,7 @@ static CommandResult deleteUser(const CommandCall& call) {
             return invalid("You do not have permission to delete admin users.");
     }
 
-    UserQueries::deleteUser(user->id);
+    db::query::identities::User::deleteUser(user->id);
     return ok("User deleted successfully: " + user->name);
 }
 
@@ -190,7 +188,7 @@ static CommandResult handleUserInfo(const CommandCall& call) {
 
 static CommandResult handle_list_users(const CommandCall& call) {
     if (!call.user->canManageUsers()) return invalid("You do not have permission to list users.");
-    return ok(to_string(UserQueries::listUsers(parseListQuery(call))));
+    return ok(to_string(db::query::identities::User::listUsers(parseListQuery(call))));
 }
 
 static bool isUserMatch(const std::string& cmd, const std::string_view input) {
@@ -213,6 +211,6 @@ static CommandResult handle_user(const CommandCall& call) {
 }
 
 void commands::registerUserCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("user"), handle_user);
 }

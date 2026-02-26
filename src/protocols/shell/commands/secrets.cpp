@@ -8,18 +8,17 @@
 #include "fs/ops/file.hpp"
 #include <nlohmann/json.hpp>
 #include "crypto/encryptors/GPG.hpp"
-#include "logging/LogRegistry.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "log/Registry.hpp"
+#include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 
 #include <fstream>
 #include <paths.h>
 
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
 using namespace vh::identities::model;
-using namespace vh::logging;
-using namespace vh::services;
 using namespace vh::fs::ops;
 
 static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
@@ -75,7 +74,7 @@ static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
     }
 
     if (outputOpt) {
-        LogRegistry::audit()->warn(
+        log::Registry::audit()->warn(
             "[shell::handle_secret_encrypt_and_response] No recipient specified, saving unencrypted key(s) to " + *outputOpt);
         try {
             std::ofstream outFile(*outputOpt);
@@ -90,7 +89,7 @@ static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
         }
     }
 
-    LogRegistry::audit()->warn(
+    log::Registry::audit()->warn(
         "[shell::handle_secret_encrypt_and_response] No recipient specified, returning unencrypted key(s)");
     return {0, output.dump(4),
             "\nWARNING: No recipient specified, key(s) are unencrypted.\n"
@@ -99,15 +98,15 @@ static CommandResult handle_secret_encrypt_and_response(const CommandCall& call,
 
 static nlohmann::json generateSecretOutput(const std::string& name, const std::vector<uint8_t>& secret) {
     return {
-        {"name", name},
-        {"secret", std::string(secret.begin(), secret.end())}
+            {"name", name},
+            {"secret", std::string(secret.begin(), secret.end())}
     };
 }
 
 static nlohmann::json generateSecretOutput(const std::string& name, const std::string& secret) {
     return {
-        {"name", name},
-        {"secret", secret}
+            {"name", name},
+            {"secret", secret}
     };
 }
 
@@ -157,6 +156,6 @@ static CommandResult handle_secrets(const CommandCall& call) {
 }
 
 void commands::registerSecretsCommands(const std::shared_ptr<Router>& r) {
-    const auto usageManager = ServiceDepsRegistry::instance().shellUsageManager;
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
     r->registerCommand(usageManager->resolve("secrets"), handle_secrets);
 }

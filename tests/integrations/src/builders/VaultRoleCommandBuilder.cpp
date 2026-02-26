@@ -8,9 +8,9 @@ using namespace vh::test::cli;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
-VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "role"), vaultRoleAliases_(ctx) {}
 
 std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<VaultRole>& entity, const std::string& field) {

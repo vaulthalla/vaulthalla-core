@@ -26,7 +26,7 @@ public:
         return instance;
     }
 
-    static void init(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx) {
+    static void init(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx) {
         auto& registry = instance();
         registry.userBuilder = std::make_shared<UserCommandBuilder>(usage, ctx);
         registry.vaultBuilder = std::make_shared<VaultCommandBuilder>(usage, ctx);

@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 struct IO {
     virtual ~IO() = default;

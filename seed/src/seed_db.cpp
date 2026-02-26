@@ -1,13 +1,13 @@
 #include "seed_db.hpp"
 
 // Database
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/GroupQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
-#include "database/Transactions.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/rbac/Permission.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/identities/Group.hpp"
+#include "db/query/fs/Directory.hpp"
+#include "db/query/fs/Entry.hpp"
+#include "db/Transactions.hpp"
 
 // Types
 #include "rbac/model/Permission.hpp"
@@ -26,8 +26,8 @@
 // Misc
 #include "config/ConfigRegistry.hpp"
 #include "vault/APIKeyManager.hpp"
-#include "logging/LogRegistry.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "log/Registry.hpp"
+#include "runtime/Deps.hpp"
 #include "crypto/id/Generator.hpp"
 #include "crypto/util/hash.hpp"
 #include "auth/SystemUid.hpp"
@@ -44,20 +44,17 @@
 
 using namespace vh::seed;
 using namespace vh::config;
-using namespace vh::database;
 using namespace vh::crypto;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
-using namespace vh::logging;
-using namespace vh::services;
 using namespace vh::crypto;
 using namespace vh::sync::model;
 using namespace vh::fs::model;
 
 void vh::seed::seed_database() {
-    LogRegistry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);
-    LogRegistry::vaulthalla()->debug("Initializing database for Vaulthalla v{}", VH_VERSION);
+    log::Registry::audit()->info("Initializing database for Vaulthalla v{}", VH_VERSION);
+    log::Registry::vaulthalla()->debug("Initializing database for Vaulthalla v{}", VH_VERSION);
 
     initPermissions();
     initRoles();
@@ -67,12 +64,12 @@ void vh::seed::seed_database() {
     initRoot();
     initAdminDefaultVault();
 
-    LogRegistry::vaulthalla()->debug("[initdb] Database initialization complete");
-    LogRegistry::audit()->info("Database initialization complete for Vaulthalla v{}", VH_VERSION);
+    log::Registry::vaulthalla()->debug("[initdb] Database initialization complete");
+    log::Registry::audit()->info("Database initialization complete for Vaulthalla v{}", VH_VERSION);
 }
 
 void vh::seed::initPermissions() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing permissions...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing permissions...");
 
     const std::vector<Permission> userPerms{
         {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
@@ -104,7 +101,7 @@ void vh::seed::initPermissions() {
         {13, "list", "Can list directory contents"}
     };
 
-    Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
+    db::Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
         for (const auto& p : userPerms)
             txn.exec(pqxx::prepped{"insert_raw_permission"},
                 pqxx::params{p.bit_position, p.name, p.description, "user"});
@@ -116,7 +113,7 @@ void vh::seed::initPermissions() {
 }
 
 void vh::seed::initRoles() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing roles...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing roles...");
 
     std::vector<Role> roles{
         {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
@@ -128,7 +125,7 @@ void vh::seed::initRoles() {
         {"implicit_deny", "Role that denies all permissions", "vault", 0b0000000000000000}
     };
 
-    Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
+    db::Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
         for (auto& r : roles) {
             r.id = txn.exec(pqxx::prepped{"insert_role"},
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
@@ -140,7 +137,7 @@ void vh::seed::initRoles() {
 }
 
 void vh::seed::initSystemUser() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing system user...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing system user...");
 
     // 1) Resolve OS UID of the service account (default: "vaulthalla")
     // If you want it configurable, pull from ConfigRegistry here.
@@ -152,13 +149,13 @@ void vh::seed::initSystemUser() {
 
     // 2) If a user already exists for this Linux UID, ensure it's marked as system + has super_admin
     try {
-        if (const auto existingByUid = UserQueries::getUserByLinuxUID(sysUid); existingByUid) {
-            LogRegistry::vaulthalla()->info(
+        if (const auto existingByUid = db::query::identities::User::getUserByLinuxUID(sysUid); existingByUid) {
+            log::Registry::vaulthalla()->info(
                 "[initdb] System user already exists for linux_uid={} (name='{}')",
                 sysUid, existingByUid->name
             );
 
-            const auto role = PermsQueries::getRoleByName("super_admin");
+            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
 
             // If your schema supports updating users, do it.
             // If you don't have update queries yet, you can just return here.
@@ -174,7 +171,7 @@ void vh::seed::initSystemUser() {
             existingByUid->role->permissions = role->permissions;
 
             // If you have an update query, use it. If not, skip.
-            // UserQueries::updateUser(existingByUid);
+            // db::query::identities::User::updateUser(existingByUid);
             return;
         }
     } catch (...) {
@@ -183,13 +180,13 @@ void vh::seed::initSystemUser() {
 
     // 3) If a user exists by name "system" but no UID match, align it
     try {
-        if (const auto existingByName = UserQueries::getUserByName("system"); existingByName) {
-            LogRegistry::vaulthalla()->info(
+        if (const auto existingByName = db::query::identities::User::getUserByName("system"); existingByName) {
+            log::Registry::vaulthalla()->info(
                 "[initdb] Found existing 'system' user (id={}), updating linux_uid to {}",
                 existingByName->id, sysUid
             );
 
-            const auto role = PermsQueries::getRoleByName("super_admin");
+            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
 
             existingByName->linux_uid = sysUid;
             existingByName->email = "";
@@ -202,7 +199,7 @@ void vh::seed::initSystemUser() {
             existingByName->role->permissions = role->permissions;
 
             // If you have an update query, use it. If not, you can delete+recreate, but updating is better.
-            // UserQueries::updateUser(existingByName);
+            // db::query::identities::User::updateUser(existingByName);
             return;
         }
     } catch (...) {
@@ -222,7 +219,7 @@ void vh::seed::initSystemUser() {
 
     user->linux_uid = sysUid;
 
-    const auto role = PermsQueries::getRoleByName("super_admin");
+    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;
     user->role->name = role->name;
@@ -230,9 +227,9 @@ void vh::seed::initSystemUser() {
     user->role->type = role->type;
     user->role->permissions = role->permissions;
 
-    UserQueries::createUser(user);
+    db::query::identities::User::createUser(user);
 
-    LogRegistry::vaulthalla()->info(
+    log::Registry::vaulthalla()->info(
         "[initdb] Created system user mapped to OS account '{}' (linux_uid={})",
         systemUsername, sysUid
     );
@@ -244,28 +241,28 @@ static std::optional<unsigned int> loadPendingSuperAdminUid() {
     const std::filesystem::path uidFile{paths::getRuntimePath() / "superadmin_uid"};
 
     if (!std::filesystem::exists(uidFile)) {
-        LogRegistry::vaulthalla()->debug("[seed] No pending super-admin UID file at {}", uidFile.string());
+        log::Registry::vaulthalla()->debug("[seed] No pending super-admin UID file at {}", uidFile.string());
         return std::nullopt;
     }
 
     std::ifstream in(uidFile);
     if (!in.is_open()) {
-        LogRegistry::vaulthalla()->warn("[seed] Failed to open super-admin UID file: {}", uidFile.string());
+        log::Registry::vaulthalla()->warn("[seed] Failed to open super-admin UID file: {}", uidFile.string());
         return std::nullopt;
     }
 
     unsigned int uid{};
     if (!(in >> uid)) {
-        LogRegistry::vaulthalla()->warn("[seed] Invalid contents in {}", uidFile.string());
+        log::Registry::vaulthalla()->warn("[seed] Invalid contents in {}", uidFile.string());
         return std::nullopt;
     }
 
     if (!paths::testMode) {
         try {
             std::filesystem::remove(uidFile);
-            LogRegistry::vaulthalla()->info("[seed] Consumed and removed pending super-admin UID file (uid={})", uid);
+            log::Registry::vaulthalla()->info("[seed] Consumed and removed pending super-admin UID file (uid={})", uid);
         } catch (const std::exception& e) {
-            LogRegistry::vaulthalla()->warn("[seed] Failed to remove {}: {}", uidFile.string(), e.what());
+            log::Registry::vaulthalla()->warn("[seed] Failed to remove {}: {}", uidFile.string(), e.what());
         }
     }
 
@@ -273,7 +270,7 @@ static std::optional<unsigned int> loadPendingSuperAdminUid() {
 }
 
 void initAdmin() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin user...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing admin user...");
 
     const auto user = std::make_shared<User>();
     user->name = "admin";
@@ -281,7 +278,7 @@ void initAdmin() {
     user->setPasswordHash(hash::password("vh!adm1n"));
     user->linux_uid = loadPendingSuperAdminUid();
 
-    const auto role = PermsQueries::getRoleByName("super_admin");
+    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
     user->role = std::make_shared<UserRole>();
     user->role->id = role->id;
     user->role->name = role->name;
@@ -289,30 +286,30 @@ void initAdmin() {
     user->role->type = role->type;
     user->role->permissions = role->permissions;
 
-    UserQueries::createUser(user);
+    db::query::identities::User::createUser(user);
 }
 
 } // namespace vh::seed
 
 
 void vh::seed::initAdminGroup() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin group...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing admin group...");
 
     auto group = std::make_shared<Group>();
     group->name = "admin";
     group->description = "Core administrative group for system management";
-    group->id = GroupQueries::createGroup(group);
+    group->id = db::query::identities::Group::createGroup(group);
 
-    GroupQueries::addMemberToGroup(group->id, UserQueries::getUserByName("admin")->id);
+    db::query::identities::Group::addMemberToGroup(group->id, db::query::identities::User::getUserByName("admin")->id);
 
-    group = GroupQueries::getGroupByName("admin");
+    group = db::query::identities::Group::getGroupByName("admin");
     if (!group) throw std::runtime_error("Failed to create admin group");
 
     if (group->members.front()->user->name != "admin") throw std::runtime_error("Admin user not added to admin group");
 }
 
 void vh::seed::initAdminDefaultVault() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing admin default vault...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing admin default vault...");
 
     const auto vault = std::make_shared<Vault>();
     vault->name = ADMIN_DEFAULT_VAULT_NAME;
@@ -326,11 +323,11 @@ void vh::seed::initAdminDefaultVault() {
     sync->interval = std::chrono::minutes(10);
     sync->conflict_policy = LocalPolicy::ConflictPolicy::Overwrite;
 
-    VaultQueries::upsertVault(vault, sync);
+    db::query::vault::Vault::upsertVault(vault, sync);
 }
 
 void vh::seed::initRoot() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing root directory...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing root directory...");
 
     const auto dir = std::make_shared<Directory>();
     dir->name = "/";
@@ -343,16 +340,16 @@ void vh::seed::initRoot() {
     dir->is_hidden = false;
     dir->is_system = true;
 
-    DirectoryQueries::upsertDirectory(dir);
+    db::query::fs::Directory::upsertDirectory(dir);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    if (!FSEntryQueries::rootExists()) throw std::runtime_error("Failed to create root directory in database");
-    LogRegistry::vaulthalla()->info("[initdb] Root directory initialized successfully");
+    if (!db::query::fs::Entry::rootExists()) throw std::runtime_error("Failed to create root directory in database");
+    log::Registry::vaulthalla()->info("[initdb] Root directory initialized successfully");
 }
 
 void vh::seed::initDevCloudVault() {
-    LogRegistry::vaulthalla()->debug("[initdb] Initializing development Cloudflare R2 vault...");
+    log::Registry::vaulthalla()->debug("[initdb] Initializing development Cloudflare R2 vault...");
 
     try {
         const std::string prefix = "VAULTHALLA_TEST_R2_";
@@ -375,10 +372,10 @@ void vh::seed::initDevCloudVault() {
         if (std::getenv(endpoint.c_str())) key->endpoint = std::getenv(endpoint.c_str());
         else return;
 
-        key->id = ServiceDepsRegistry::instance().apiKeyManager->addAPIKey(key);
+        key->id = runtime::Deps::get().apiKeyManager->addAPIKey(key);
 
         if (key->id == 0) {
-            LogRegistry::storage()->error("[StorageManager] Failed to create API key for Cloudflare R2");
+            log::Registry::storage()->error("[StorageManager] Failed to create API key for Cloudflare R2");
             return;
         }
 
@@ -396,10 +393,10 @@ void vh::seed::initDevCloudVault() {
         sync->conflict_policy = RemotePolicy::ConflictPolicy::KeepLocal;
         sync->strategy = RemotePolicy::Strategy::Sync;
 
-        vault->id = VaultQueries::upsertVault(vault, sync);
+        vault->id = db::query::vault::Vault::upsertVault(vault, sync);
 
-        LogRegistry::vaulthalla()->info("[initdb] Created R2 test vault");
+        log::Registry::vaulthalla()->info("[initdb] Created R2 test vault");
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[StorageManager] Error initializing dev Cloudflare R2 vault: {}", e.what());
+        log::Registry::storage()->error("[StorageManager] Error initializing dev Cloudflare R2 vault: {}", e.what());
     }
 }

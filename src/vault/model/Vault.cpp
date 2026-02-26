@@ -1,18 +1,17 @@
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "protocols/shell/Table.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "db/query/vault/Vault.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/row>
 #include <fmt/core.h>
 
 using namespace vh::vault::model;
-using namespace vh::shell;
-using namespace vh::database;
-using namespace vh::database::encoding;
+using namespace vh::protocols::shell;
+using namespace vh::db::encoding;
 
 std::string Vault::quotaStr() const {
     if (quota == 0) return "unlimited";
@@ -148,7 +147,7 @@ std::string vh::vault::model::to_string(const std::vector<std::shared_ptr<Vault>
                           static_cast<unsigned long long>(v.quota));
 
         std::string owner = v.owner_id != 0 ?
-            VaultQueries::getVaultOwnersName(v.id) + " (ID: " + std::to_string(v.owner_id) + ")" : "N/A";
+            db::query::vault::Vault::getVaultOwnersName(v.id) + " (ID: " + std::to_string(v.owner_id) + ")" : "N/A";
 
         tbl.add_row({
             std::to_string(v.id),

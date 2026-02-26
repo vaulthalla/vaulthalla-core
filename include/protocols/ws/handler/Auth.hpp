@@ -1,0 +1,29 @@
+#pragma once
+
+#include <nlohmann/json.hpp>
+#include <string>
+
+namespace vh::protocols::ws { class Session; }
+
+namespace vh::protocols::ws::handler {
+
+using json = nlohmann::json;
+
+struct Auth {
+    static json login(const json& payload, Session& session);
+    static json registerUser(const json& payload, Session& session);
+    static json updateUser(const json& payload, const Session& session);
+    static json changePassword(const json& payload, const Session& session);
+    static json getUser(const json& payload, const Session& session);
+    static json getUserByName(const json& payload, const Session& session);
+
+    static json isUserAuthenticated(const std::string& token, const Session& session);
+
+    static json listUsers(const Session& session);
+    static json refresh(Session& session);
+    static json logout(Session& session);
+
+    static json doesAdminHaveDefaultPassword();
+};
+
+}

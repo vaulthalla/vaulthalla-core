@@ -9,7 +9,7 @@
 #include <sstream>
 
 using namespace vh::rbac::model;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 PermissionOverride::PermissionOverride(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),

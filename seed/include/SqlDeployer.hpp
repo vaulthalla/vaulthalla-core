@@ -11,7 +11,7 @@
 #include <format>
 #include <openssl/sha.h>
 
-namespace vh::database::seed {
+namespace vh::db::seed {
 
 namespace fs = std::filesystem;
 

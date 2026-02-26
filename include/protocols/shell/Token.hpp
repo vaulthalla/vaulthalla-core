@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "UsageManager.hpp"
 #include "CommandUsage.hpp"
 
@@ -8,7 +8,7 @@
 #include <vector>
 #include <string_view>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 enum class TokenType { Word, Flag /*, Value (unused) */ };
 
@@ -88,7 +88,7 @@ inline std::vector<Token> tokenize(const std::string& line) {
 
     // Strip command prefix if present
     // e.g. "vh", "vaulthalla", or any alias
-    for (const auto& aliases : services::ServiceDepsRegistry::instance().shellUsageManager->root()->aliases) {
+    for (const auto& aliases : runtime::Deps::get().shellUsageManager->root()->aliases) {
         size_t len = aliases.size();
         if (line.size() >= len && line.compare(0, len, aliases) == 0) {
             p += len;

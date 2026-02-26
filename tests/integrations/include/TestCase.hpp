@@ -16,7 +16,7 @@ struct TestCase {
     std::vector<std::string> must_contain{};     // stdout contains
     std::vector<std::string> must_not_contain{}; // stdout must NOT contain
     std::shared_ptr<void> entity{nullptr}, target{nullptr}, subject{nullptr}; // optional entity to be used in the tes
-    shell::CommandResult result{}; // filled after execution
+    protocols::shell::CommandResult result{}; // filled after execution
     AssertionResult assertion{};
 
     static TestCase List(const EntityType& type, const int expect_exit = 0) {

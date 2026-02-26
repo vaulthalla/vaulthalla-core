@@ -10,7 +10,7 @@
 #include "rbac/model/VaultRole.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;

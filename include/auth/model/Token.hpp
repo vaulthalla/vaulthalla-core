@@ -26,4 +26,4 @@ struct Token {
     void revoke() { revoked = true; }
 };
 
-} // namespace vh::auth
+}

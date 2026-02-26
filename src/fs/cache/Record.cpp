@@ -1,11 +1,11 @@
 #include "fs/cache/Record.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::fs::cache;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Record::Record(const pqxx::row& row)
     : id(row.at("id").as<unsigned int>()),

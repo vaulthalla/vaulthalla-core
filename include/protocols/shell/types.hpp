@@ -9,7 +9,7 @@
 
 namespace vh::identities::model { struct User; }
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 struct FlagKV {
     std::string key;

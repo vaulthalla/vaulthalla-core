@@ -1,10 +1,9 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "identities/model/User.hpp"
 #include "CommandUsage.hpp"
-#include "services/ServiceDepsRegistry.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 
 #include <fmt/core.h>
@@ -12,10 +11,9 @@
 #include <string>
 #include <algorithm>
 
-using namespace vh::shell;
-using namespace vh::logging;
 using namespace vh::identities::model;
-using namespace vh::services;
+
+using namespace vh::protocols::shell;
 
 void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler) {
     std::string key = normalize(usage->primary());
@@ -25,13 +23,13 @@ void Router::registerCommand(const std::shared_ptr<CommandUsage>& usage, Command
     for (const std::string& alias : usage->aliases) {
         std::string a = alias;
         if (aliasMap_.contains(a) && aliasMap_.at(a) != key) {
-            LogRegistry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
+            log::Registry::shell()->warn("Alias '{}' already mapped to '{}'; skipping duplicate for '{}'",
                                        a, aliasMap_.at(a), key);
             continue;
         }
         info.aliases.insert(a);
         aliasMap_[a] = key;
-        LogRegistry::shell()->debug("Alias '{}' mapped to '{}'", a, key);
+        log::Registry::shell()->debug("Alias '{}' mapped to '{}'", a, key);
     }
 
     if (usage->pluralAliasImpliesList) pluralMap_[key + "s"] = key;
@@ -48,7 +46,7 @@ std::string Router::canonicalFor(const std::string& nameOrAlias) const {
 }
 
 CommandResult Router::executeLine(const std::string& line, const std::shared_ptr<User>& user, SocketIO* io) const {
-    LogRegistry::shell()->debug("[Router] Executing line: '{}'", line);
+    log::Registry::shell()->debug("[Router] Executing line: '{}'", line);
     auto call   = parseTokens(tokenize(line));
     call.user = user;
     call.io = io;
@@ -61,7 +59,7 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
         call.positionals.emplace_back("list");
     }
 
-    LogRegistry::shell()->debug("[Router] Executing command: '{}'", canonical);
+    log::Registry::shell()->debug("[Router] Executing command: '{}'", canonical);
 
     if (!commands_.contains(canonical))
         return invalid(call.constructFullArgs(), fmt::format("[Router] Unknown command or alias: {}", call.name));

@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <fmt/format.h>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 enum class Align { Left, Right };
 

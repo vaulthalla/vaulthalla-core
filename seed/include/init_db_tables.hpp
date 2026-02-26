@@ -1,10 +1,10 @@
 #pragma once
 
-#include "database/Transactions.hpp"
+#include "db/Transactions.hpp"
 #include "seed/include/SqlDeployer.hpp"
 #include <paths.h>
 
-namespace vh::database::seed {
+namespace vh::db::seed {
 
 inline void init_tables_if_not_exists() {
     Transactions::exec("init_db_tables::deploy_sql", [&](pqxx::work& txn) {

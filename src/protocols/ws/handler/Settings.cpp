@@ -1,0 +1,25 @@
+#include "protocols/ws/handler/Settings.hpp"
+#include "identities/model/User.hpp"
+#include "protocols/ws/Session.hpp"
+#include "config/ConfigRegistry.hpp"
+#include "config/Config.hpp"
+
+#include <nlohmann/json.hpp>
+
+using namespace vh::protocols::ws::handler;
+
+json Settings::get(const Session& session) {
+    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageSettings())
+        throw std::runtime_error("Permission denied: Only admins can view settings");
+
+    return {{"settings", config::ConfigRegistry::get()}};
+}
+
+json Settings::update(const json& payload, const Session& session) {
+    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageSettings())
+        throw std::runtime_error("Permission denied: Only admins can update settings");
+
+    const config::Config config(payload);
+    config.save();
+    return {{"settings", config}};
+}

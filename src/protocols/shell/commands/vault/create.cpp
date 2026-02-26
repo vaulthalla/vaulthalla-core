@@ -1,11 +1,11 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/WaiverQueries.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/vault/APIKey.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/vault/Waiver.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/s3/S3Controller.hpp"
@@ -17,9 +17,9 @@
 #include "sync/model/RemotePolicy.hpp"
 #include "identities/model/User.hpp"
 
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/interval.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -28,19 +28,16 @@
 #include <vector>
 #include <memory>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 static constexpr const auto* SYNC_STRATEGY_HELP = R"(
 Sync Strategy Options:
@@ -99,13 +96,13 @@ static CommandResult finish_vault_create(const CommandCall& call, std::shared_pt
         const auto [okToProceed, waiver] = handle_encryption_waiver({call, v, false});
         if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
 
-        v = ServiceDepsRegistry::instance().storageManager->addVault(v, s);
-        if (waiver) WaiverQueries::addWaiver(waiver);
+        v = vh::runtime::Deps::get().storageManager->addVault(v, s);
+        if (waiver) db::query::vault::Waiver::addWaiver(waiver);
 
         return ok("\nSuccessfully created new vault!\n" + to_string(v));
     } catch (const std::exception& e) {
-        if (VaultQueries::vaultExists(v->name, v->owner_id))
-            ServiceDepsRegistry::instance().storageManager->removeVault(v->id);
+        if (db::query::vault::Vault::vaultExists(v->name, v->owner_id))
+            vh::runtime::Deps::get().storageManager->removeVault(v->id);
 
         return invalid("\nvault create error: " + std::string(e.what()) + "\n");
     }
@@ -173,8 +170,8 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
         if (apiKeyStr.empty()) return invalid("vault create: API key is required for S3 vaults");
 
         std::shared_ptr<APIKey> apiKey;
-        if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = APIKeyQueries::getAPIKey(*apiKeyIdOpt);
-        else apiKey = APIKeyQueries::getAPIKey(apiKeyStr);
+        if (const auto apiKeyIdOpt = parseUInt(apiKeyStr)) apiKey = db::query::vault::APIKey::getAPIKey(*apiKeyIdOpt);
+        else apiKey = db::query::vault::APIKey::getAPIKey(apiKeyStr);
 
         if (!apiKey) return invalid("vault create: API key not found: " + apiKeyStr);
         if (apiKey->user_id != v->owner_id) {
@@ -184,7 +181,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
                     " does not have permission to assign API keys to other users vaults"
                     );
 
-            const auto ownerUser = UserQueries::getUserById(v->owner_id);
+            const auto ownerUser = db::query::identities::User::getUserById(v->owner_id);
             if (!ownerUser) return invalid("vault create: owner user ID not found: " + std::to_string(v->owner_id));
 
             if (apiKey->user_id != ownerUser->id && !ownerUser->canManageAPIKeys())
@@ -203,7 +200,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
                helpOptions.end()) {
             io->print(SYNC_STRATEGY_HELP);
             strategyStr = io->prompt("Enter sync strategy (cache/sync/mirror) [cache]:", "cache");
-        }
+               }
         const auto rsync = std::make_shared<RemotePolicy>();
         rsync->strategy = strategyFromString(strategyStr);
 
@@ -213,7 +210,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
                helpOptions.end()) {
             io->print(REMOTE_CONFLICT_POLICY_HELP);
             conflictStr = io->prompt("Enter on-sync-conflict policy (keep_local/keep_remote/ask) [ask]:", "ask");
-        }
+               }
         rsync->conflict_policy = rsConflictPolicyFromString(conflictStr);
 
         sync = rsync;
@@ -226,7 +223,7 @@ static CommandResult handle_vault_create_interactive(const CommandCall& call) {
            end()) {
         io->print(SYNC_INTERVAL_HELP);
         interval = io->prompt("Enter sync interval (e.g. 30s, 10m, 1h) [15m]:", "15m");
-    }
+           }
     sync->interval = parseSyncInterval(interval);
 
     return finish_vault_create(call, v, sync);
@@ -254,7 +251,7 @@ CommandResult commands::vault::handle_vault_create(const CommandCall& call) {
     assignDescIfAvailable(call, usage, vault);
     assignQuotaIfAvailable(call, usage, vault);
 
-    if (VaultQueries::vaultExists(vault->name, owner->id)) return invalid(
+    if (db::query::vault::Vault::vaultExists(vault->name, owner->id)) return invalid(
         "vault create: vault with name '" + vault->name + "' already exists for user ID " + std::to_string(owner->id));
 
     std::shared_ptr<Policy> sync;

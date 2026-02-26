@@ -8,7 +8,7 @@
 #include <optional>
 #include <cctype>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 // Upsert a flag (last wins)
 inline void setOpt(CommandCall& c,

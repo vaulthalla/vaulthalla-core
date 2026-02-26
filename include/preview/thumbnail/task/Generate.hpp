@@ -5,12 +5,12 @@
 #include "preview/thumbnail/ops.hpp"
 #include "storage/Engine.hpp"
 #include "fs/cache/Record.hpp"
-#include "database/Queries/CacheQueries.hpp"
+#include "db/query/fs/Cache.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "vault/model/Vault.hpp"
-#include "logging/LogRegistry.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "log/Registry.hpp"
+#include "runtime/Deps.hpp"
 #include "stats/model/CacheStats.hpp"
 
 #include <memory>
@@ -20,10 +20,7 @@
 
 using namespace vh::vault::model;
 using namespace vh::stats::model;
-using namespace vh::logging;
 using namespace vh::config;
-using namespace vh::database;
-using namespace vh::services;
 using namespace std::chrono;
 using namespace vh::fs;
 using namespace vh::fs::model;
@@ -50,14 +47,14 @@ public:
                 if (!fs::exists(cachePath.parent_path())) fs::create_directories(cachePath.parent_path());
 
                 if (!file_->mime_type || file_->mime_type->empty()) {
-                    LogRegistry::thumb()->warn("[ThumbnailTask] No MIME type for file ID {}. Skipping thumbnail generation.", file_->id);
+                    log::Registry::thumb()->warn("[ThumbnailTask] No MIME type for file ID {}. Skipping thumbnail generation.", file_->id);
                     return;
                 }
 
                 const auto now = steady_clock::now();
                 generateAndStore(buffer_, cachePath, *file_->mime_type, size);
                 const auto end = steady_clock::now();
-                ServiceDepsRegistry::instance().httpCacheStats->record_op_us(duration_cast<microseconds>(end - now).count());
+                runtime::Deps::get().httpCacheStats->record_op_us(duration_cast<microseconds>(end - now).count());
 
                 auto index = std::make_shared<cache::Record>();
                 index->vault_id = engine_->vault->id;
@@ -66,14 +63,14 @@ public:
                 index->type = cache::Record::Type::Thumbnail;
                 index->size = fs::file_size(cachePath);
 
-                CacheQueries::upsertCacheIndex(index);
+                db::query::fs::Cache::upsertCacheIndex(index);
 
-                ServiceDepsRegistry::instance().httpCacheStats->record_insert(index->size);
+                runtime::Deps::get().httpCacheStats->record_insert(index->size);
             }
         } catch (const std::exception& e) {
-            LogRegistry::thumb()->error("[ThumbnailTask] Error generating thumbnail for file ID {}: {}", file_->id, e.what());
+            log::Registry::thumb()->error("[ThumbnailTask] Error generating thumbnail for file ID {}: {}", file_->id, e.what());
         } catch (...) {
-            LogRegistry::thumb()->error("[ThumbnailTask] Unknown error generating thumbnail for file ID {}", file_->id);
+            log::Registry::thumb()->error("[ThumbnailTask] Unknown error generating thumbnail for file ID {}", file_->id);
         }
     }
 

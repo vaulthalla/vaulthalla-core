@@ -1,12 +1,12 @@
 #include "vault/model/APIKey.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/Key.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/encoding/bytea.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/encoding/bytea.hpp"
 #include "crypto/util/encrypt.hpp"
 
 #include <unordered_map>
@@ -18,10 +18,9 @@
 #include <ctime>
 
 using namespace vh::vault::model;
-using namespace vh::database;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::crypto::util;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 // --- S3Provider helpers ---
 std::string vh::vault::model::to_string(S3Provider provider) {
@@ -121,7 +120,7 @@ void vh::vault::model::to_json(nlohmann::json& j, const std::vector<std::shared_
 
 std::string vh::vault::model::to_string(const std::shared_ptr<APIKey>& key) {
     std::string out = key->name + " (ID: " + std::to_string(key->id) + ")\n";
-    out += "  User: " + UserQueries::getUserById(key->user_id)->name + "\n";
+    out += "  User: " + db::query::identities::User::getUserById(key->user_id)->name + "\n";
     out += "  Created: " + timestampToString(key->created_at) + "\n";
     out += "  Provider: " + to_string(key->provider) + "\n";
     out += "  Access Key: " + key->access_key + "\n";
@@ -146,7 +145,7 @@ std::string vh::vault::model::to_string(const std::vector<std::shared_ptr<APIKey
         tbl.add_row({
             std::to_string(key->id),
             key->name,
-            UserQueries::getUserById(key->user_id)->name,
+            db::query::identities::User::getUserById(key->user_id)->name,
             to_string(key->provider),
             timestampToString(key->created_at)
         });

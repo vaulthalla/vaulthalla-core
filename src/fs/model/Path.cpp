@@ -1,12 +1,11 @@
 #include "fs/model/Path.hpp"
 #include "config/ConfigRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <paths.h>
 
 using namespace vh::fs::model;
 using namespace vh::config;
-using namespace vh::logging;
 
 Path::Path(const std::filesystem::path& vaultFuseMount, const std::filesystem::path& vaultBackingMount)
     : fuseRoot(paths::getMountPath()),
@@ -20,7 +19,7 @@ Path::Path(const std::filesystem::path& vaultFuseMount, const std::filesystem::p
       backingVaultRoot(paths::getBackingPath() /
                        stripLeadingSlash(vaultBackingMount)) {
 
-    LogRegistry::storage()->debug("[Path] Initialized paths:\nfuseRoot: {}\nvaultRoot: {}\n"
+    log::Registry::storage()->debug("[Path] Initialized paths:\nfuseRoot: {}\nvaultRoot: {}\n"
                                   "cacheRoot: {}\nthumbnailRoot: {}\nfileCacheRoot: {}\n"
                                   "backingRoot: {}\nbackingVaultRoot: {}",
                                   fuseRoot.string(), vaultRoot.string(), cacheRoot.string(),

@@ -1,7 +1,7 @@
 #include "sync/Local.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
-#include "services/SyncController.hpp"
+#include "sync/Controller.hpp"
 #include "storage/Engine.hpp"
 #include "sync/model/Policy.hpp"
 #include "sync/model/Operation.hpp"
@@ -9,26 +9,24 @@
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/ops/file.hpp"
-#include "database/Queries/OperationQueries.hpp"
-#include "database/Queries/FileQueries.hpp"
+#include "db/query/sync/Operation.hpp"
+#include "db/query/fs/File.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/Filesystem.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "runtime/Deps.hpp"
+#include "log/Registry.hpp"
 #include "concurrency/taskOpRanges.hpp"
 #include "sync/model/Event.hpp"
 #include "sync/model/Throughput.hpp"
 #include "sync/model/ScopedOp.hpp"
-#include "database/Queries/SyncQueries.hpp"
+#include "db/query/sync/Policy.hpp"
 #include "sync/tasks/RotateKey.hpp"
 #include "sync/tasks/Delete.hpp"
 
 using namespace vh::sync;
 using namespace vh::sync::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::vault::model;
 using namespace vh::concurrency;
 using namespace std::chrono;
@@ -79,14 +77,14 @@ void Local::runStages(const std::span<const Stage> stages) const {
 
 void Local::startTask() {
     if (!engine) {
-        LogRegistry::sync()->error("[FSTask] Engine is null, cannot proceed with sync.");
+        log::Registry::sync()->error("[FSTask] Engine is null, cannot proceed with sync.");
         return;
     }
 
-    LogRegistry::sync()->debug("[FSTask] Starting sync for vault '{}'", engine->vault->id);
+    log::Registry::sync()->debug("[FSTask] Starting sync for vault '{}'", engine->vault->id);
 
     runningFlag = true;
-    SyncQueries::reportSyncStarted(engine->sync->id);
+    db::query::sync::Policy::reportSyncStarted(engine->sync->id);
 
     newEvent();
     event = engine->latestSyncEvent;
@@ -119,7 +117,7 @@ void Local::processSharedOps() {
 }
 
 void Local::handleError(const std::string& message) const {
-    LogRegistry::sync()->error("[FSTask] {}", message);
+    log::Registry::sync()->error("[FSTask] {}", message);
     event->error_message = message;
     event->status = Event::Status::ERROR;
 }
@@ -131,14 +129,14 @@ void Local::shutdown() {
     event->parseCurrentStatus();
     engine->saveSyncEvent();
     if (event->status == Event::Status::SUCCESS) {
-        SyncQueries::reportSyncSuccess(engine->sync->id);
+        db::query::sync::Policy::reportSyncSuccess(engine->sync->id);
         next_run = system_clock::now() + seconds(engine->sync->interval.count());
         requeue();
-        LogRegistry::sync()->debug("[FSTask] Sync task requeued for vault '{}'", engine->vault->id);
-        LogRegistry::sync()->info("[FSTask] Sync completed for vault '{}' in {}s",
+        log::Registry::sync()->debug("[FSTask] Sync task requeued for vault '{}'", engine->vault->id);
+        log::Registry::sync()->info("[FSTask] Sync completed for vault '{}' in {}s",
                               engine->vault->id, event->durationSeconds());
     } else {
-        LogRegistry::sync()->error("[FSTask] Sync failed for vault '{}': {}", engine->vault->id, event->error_message);
+        log::Registry::sync()->error("[FSTask] Sync failed for vault '{}': {}", engine->vault->id, event->error_message);
     }
 }
 
@@ -153,7 +151,7 @@ void Local::newEvent() {
 void Local::processFutures() {
     for (auto& f : futures)
         if (std::get<bool>(f.get()) == false)
-            LogRegistry::sync()->error("[FSTask] Future failed");
+            log::Registry::sync()->error("[FSTask] Future failed");
     futures.clear();
 }
 
@@ -161,7 +159,7 @@ unsigned int Local::vaultId() const { return engine->vault->id; }
 
 void Local::requeue() {
     next_run = system_clock::now() + seconds(engine->sync->interval.count());
-    ServiceDepsRegistry::instance().syncController->requeue(shared_from_this());
+    runtime::Deps::get().syncController->requeue(shared_from_this());
 }
 
 void Local::runNow(const uint8_t trigger) {
@@ -180,7 +178,7 @@ ScopedOp& Local::op(const Throughput::Metric& metric) const {
 }
 
 void Local::processOperations() const {
-    for (const auto& op : OperationQueries::listOperationsByVault(engine->vault->id)) {
+    for (const auto& op : db::query::sync::Operation::listOperationsByVault(engine->vault->id)) {
         auto& scopedOp = event->getOrCreateThroughput(op->opToThroughputMetric()).newOp();
         scopedOp.start();
 
@@ -188,9 +186,9 @@ void Local::processOperations() const {
         const auto absDest = engine->paths->absPath(op->destination_path, PathType::BACKING_VAULT_ROOT);
         if (absDest.has_parent_path()) Filesystem::mkdir(absDest.parent_path());
 
-        const auto f = FileQueries::getFileByPath(engine->vault->id, op->destination_path);
+        const auto f = db::query::fs::File::getFileByPath(engine->vault->id, op->destination_path);
         if (!f) {
-            LogRegistry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
+            log::Registry::sync()->error("[FSTask] File not found for operation: {}", op->destination_path);
             scopedOp.stop();
             continue;
         }
@@ -198,7 +196,7 @@ void Local::processOperations() const {
         scopedOp.size_bytes = f->size_bytes;
 
         if (f->size_bytes == 0 && op->operation != Operation::Op::Copy) {
-            LogRegistry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
+            log::Registry::sync()->error("[FSTask] File size is zero for operation: {}", op->destination_path);
             scopedOp.stop();
             continue;
         }
@@ -207,14 +205,14 @@ void Local::processOperations() const {
         const auto buffer = readFileToVector(tmpPath);
 
         if (buffer.empty()) {
-            LogRegistry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
+            log::Registry::sync()->error("[FSTask] Empty file buffer for operation: {}", op->source_path);
             scopedOp.stop();
             continue;
         }
 
         const auto ciphertext = engine->encryptionManager->encrypt(buffer, f);
         writeFile(absDest, ciphertext);
-        FileQueries::setEncryptionIVAndVersion(f);
+        db::query::fs::File::setEncryptionIVAndVersion(f);
 
         const auto& move = [&]() {
             if (std::filesystem::exists(absSrc)) std::filesystem::remove(absSrc);
@@ -233,9 +231,9 @@ void Local::handleVaultKeyRotation() {
     try {
         if (!engine->encryptionManager->rotation_in_progress()) return;
 
-        const auto filesToRotate = FileQueries::getFilesOlderThanKeyVersion(engine->vault->id, engine->encryptionManager->get_key_version());
+        const auto filesToRotate = db::query::fs::File::getFilesOlderThanKeyVersion(engine->vault->id, engine->encryptionManager->get_key_version());
         if (filesToRotate.empty()) {
-            LogRegistry::audit()->info("[FSTask] No files to rotate for vault '{}'", engine->vault->id);
+            log::Registry::audit()->info("[FSTask] No files to rotate for vault '{}'", engine->vault->id);
             engine->encryptionManager->finish_key_rotation();
             return;
         }
@@ -247,18 +245,18 @@ void Local::handleVaultKeyRotation() {
 
         engine->encryptionManager->finish_key_rotation();
 
-        LogRegistry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine->vault->id);
+        log::Registry::audit()->info("[FSTask] Vault key rotation finished for vault '{}'", engine->vault->id);
     } catch (const std::exception& e) {
-        LogRegistry::sync()->error("[FSTask] Exception during vault key rotation for vault '{}': {}", engine->vault->id, e.what());
+        log::Registry::sync()->error("[FSTask] Exception during vault key rotation for vault '{}': {}", engine->vault->id, e.what());
         runningFlag = false;
     } catch (...) {
-        LogRegistry::sync()->error("[FSTask] Unknown exception during vault key rotation for vault '{}'", engine->vault->id);
+        log::Registry::sync()->error("[FSTask] Unknown exception during vault key rotation for vault '{}'", engine->vault->id);
         runningFlag = false;
     }
 }
 
 void Local::removeTrashedFiles() {
-    const auto files = FileQueries::listTrashedFiles(engine->vault->id);
+    const auto files = db::query::fs::File::listTrashedFiles(engine->vault->id);
     const auto type = engine->type() == StorageType::Local ? tasks::Delete::Type::LOCAL : tasks::Delete::Type::PURGE;
 
     futures.reserve(files.size());

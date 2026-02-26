@@ -2,10 +2,9 @@
 
 #include "fs/model/Entry.hpp"
 #include "fs/model/Directory.hpp"
-#include "database/Queries/FSEntryQueries.hpp"
-#include "database/Queries/DirectoryQueries.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "db/query/fs/Entry.hpp"
+#include "db/query/fs/Directory.hpp"
+#include "log/Registry.hpp"
 #include "crypto/id/Generator.hpp"
 #include "stats/model/CacheStats.hpp"
 
@@ -18,9 +17,6 @@ using namespace vh::fs::cache;
 using namespace vh::fs::model;
 using namespace vh::storage;
 using namespace vh::stats::model;
-using namespace vh::database;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace std::chrono;
 
 namespace {
@@ -53,28 +49,28 @@ Registry::Registry() {
     inodeToPath_[FUSE_ROOT_ID] = "/";
     pathToInode_["/"] = FUSE_ROOT_ID;
 
-    nextInode_ = FSEntryQueries::getNextInode();
+    nextInode_ = db::query::fs::Entry::getNextInode();
 
     initRoot();
     restoreCache();
 
-    LogRegistry::storage()->info("[FSCache] Initialized with next inode: {}", nextInode_);
+    log::Registry::storage()->info("[FSCache] Initialized with next inode: {}", nextInode_);
 }
 
 void Registry::initRoot() {
-    const auto rootEntry = FSEntryQueries::getRootEntry();
+    const auto rootEntry = db::query::fs::Entry::getRootEntry();
     if (!rootEntry) {
-        LogRegistry::storage()->error("[FSCache] Root entry not found in the database");
+        log::Registry::storage()->error("[FSCache] Root entry not found in the database");
         throw std::runtime_error("Root entry not found in the database");
     }
 
     if (!rootEntry->inode) {
         rootEntry->inode = std::make_optional(getOrAssignInode("/"));
-        FSEntryQueries::updateFSEntry(rootEntry);
+        db::query::fs::Entry::updateFSEntry(rootEntry);
     } else if (rootEntry->inode != FUSE_ROOT_ID) {
-        LogRegistry::storage()->warn("[FSCache] Root entry inode is not FUSE_ROOT_ID, resetting to 1");
+        log::Registry::storage()->warn("[FSCache] Root entry inode is not FUSE_ROOT_ID, resetting to 1");
         rootEntry->inode = FUSE_ROOT_ID;
-        FSEntryQueries::updateFSEntry(rootEntry);
+        db::query::fs::Entry::updateFSEntry(rootEntry);
     }
 
     cacheEntry(rootEntry);
@@ -84,16 +80,16 @@ void Registry::restoreCache() {
     const auto rootEntry = getEntry(FUSE_ROOT_ID);
     if (!rootEntry) throw std::runtime_error("[FSCache] Root entry not found, cannot restore cache");
 
-    for (const auto& entry : FSEntryQueries::listDir(rootEntry->id, true)) {
+    for (const auto& entry : db::query::fs::Entry::listDir(rootEntry->id, true)) {
         if (!entry) {
-            LogRegistry::storage()->warn("[FSCache] Null entry found in directory listing for root");
+            log::Registry::storage()->warn("[FSCache] Null entry found in directory listing for root");
             continue;
         }
 
         if (entry->inode) cacheEntry(entry, true /*isFirstSeeding*/);
         else {
             entry->inode = std::make_optional(getOrAssignInode(entry->fuse_path));
-            FSEntryQueries::updateFSEntry(entry);
+            db::query::fs::Entry::updateFSEntry(entry);
             cacheEntry(entry, true /*isFirstSeeding*/);
         }
     }
@@ -101,7 +97,7 @@ void Registry::restoreCache() {
 
 std::shared_ptr<Entry> Registry::getEntry(const std::filesystem::path& absPath) {
     const auto path = makeAbsolute(absPath);
-    LogRegistry::storage()->debug("[FSCache] Retrieving entry for path: {}", path.string());
+    log::Registry::storage()->debug("[FSCache] Retrieving entry for path: {}", path.string());
     
     {
         std::shared_lock lock(mutex_);
@@ -116,7 +112,7 @@ std::shared_ptr<Entry> Registry::getEntry(const std::filesystem::path& absPath) 
 
     try {
         const auto ino = getOrAssignInode(path);
-        const auto entry = FSEntryQueries::getFSEntryByInode(ino);
+        const auto entry = db::query::fs::Entry::getFSEntryByInode(ino);
 
         if (entry) {
             if (entry->inode) cacheEntry(entry);
@@ -124,17 +120,17 @@ std::shared_ptr<Entry> Registry::getEntry(const std::filesystem::path& absPath) 
                 entry->inode = ino;
                 cacheEntry(entry);
             }
-        } else LogRegistry::storage()->debug("[FSCache] No entry found for path: {}", path.string());
+        } else log::Registry::storage()->debug("[FSCache] No entry found for path: {}", path.string());
 
         return entry;
     } catch (const std::exception& e) {
-        LogRegistry::storage()->error("[FSCache] Error retrieving entry for path {}: {}", path.string(), e.what());
+        log::Registry::storage()->error("[FSCache] Error retrieving entry for path {}: {}", path.string(), e.what());
         return nullptr;
     }
 }
 
 std::shared_ptr<Entry> Registry::getEntry(const fuse_ino_t ino) {
-    LogRegistry::storage()->debug("[FSCache] Retrieving entry for inode: {}", ino);
+    log::Registry::storage()->debug("[FSCache] Retrieving entry for inode: {}", ino);
 
     {
         std::shared_lock lock(mutex_);
@@ -147,9 +143,9 @@ std::shared_ptr<Entry> Registry::getEntry(const fuse_ino_t ino) {
     stats_->record_miss();
     ScopedOpTimer timer(stats_.get());
 
-    auto entry = FSEntryQueries::getFSEntryByInode(ino);
+    auto entry = db::query::fs::Entry::getFSEntryByInode(ino);
     if (entry) cacheEntry(entry);
-    else LogRegistry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
+    else log::Registry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
     return entry;
 }
 
@@ -164,8 +160,8 @@ std::shared_ptr<Entry> Registry::getEntryById(unsigned int id) {
     ScopedOpTimer timer(stats_.get());
 
     std::shared_ptr<Entry> entry = nullptr;
-    LogRegistry::storage()->warn("[FSCache] No entry found for ID: {}", id);
-    entry = FSEntryQueries::getFSEntryById(id);
+    log::Registry::storage()->warn("[FSCache] No entry found for ID: {}", id);
+    entry = db::query::fs::Entry::getFSEntryById(id);
     return entry;
 }
 
@@ -178,13 +174,13 @@ fuse_ino_t Registry::resolveInode(const std::filesystem::path& absPath) {
 
     const auto entry = getEntry(absPath);
     if (!entry) {
-        LogRegistry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
+        log::Registry::storage()->warn("[FSCache] No entry found for path: {}", absPath.string());
         return FUSE_ROOT_ID;
     }
 
     const fuse_ino_t ino = (entry->inode ? *entry->inode : getOrAssignInode(absPath));
     if (ino == FUSE_ROOT_ID) {
-        LogRegistry::storage()->error("[FSCache] Failed to resolve inode for path: {}", absPath.string());
+        log::Registry::storage()->error("[FSCache] Failed to resolve inode for path: {}", absPath.string());
         return FUSE_ROOT_ID;
     }
 
@@ -221,7 +217,7 @@ std::filesystem::path Registry::resolvePath(fuse_ino_t ino) {
 void Registry::linkPath(const std::filesystem::path& absPath, const fuse_ino_t ino) {
     std::unique_lock lock(mutex_);
     if (pathToInode_.contains(absPath)) {
-        LogRegistry::storage()->debug("[FSCache] Path {} already linked to inode {}", absPath.string(), ino);
+        log::Registry::storage()->debug("[FSCache] Path {} already linked to inode {}", absPath.string(), ino);
         return;
     }
     pathToInode_[absPath] = ino;
@@ -241,25 +237,25 @@ bool Registry::entryExists(const std::filesystem::path& absPath) const {
 std::shared_ptr<Entry> Registry::getEntryFromInode(const fuse_ino_t ino) const {
     std::shared_lock lock(mutex_);
     if (const auto it = inodeToEntry_.find(ino); it != inodeToEntry_.end()) return it->second;
-    LogRegistry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
+    log::Registry::storage()->warn("[FSCache] No entry found for inode: {}", ino);
     return nullptr;
 }
 
 void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirstSeeding) {
     if (!entry || !entry->inode) throw std::invalid_argument("Entry or inode is null");
 
-    LogRegistry::storage()->debug("[FSCache] Caching entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
+    log::Registry::storage()->debug("[FSCache] Caching entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 
     // Preflight: reconstruct fuse/backing paths when needed
     if (*entry->inode != FUSE_ROOT_ID) {
         if (!entry->vault_id) {
-            LogRegistry::storage()->error("[FSCache] Entry {} has no vault_id, cannot cache", entry->id);
+            log::Registry::storage()->error("[FSCache] Entry {} has no vault_id, cannot cache", entry->id);
             throw std::runtime_error("Entry has no vault_id");
         }
 
         if (entry->fuse_path.empty() || entry->backing_path.empty()) {
             if (!entry->parent_id) {
-                LogRegistry::storage()->error("[FSCache] Entry {} has no parent_id, cannot cache", entry->id);
+                log::Registry::storage()->error("[FSCache] Entry {} has no parent_id, cannot cache", entry->id);
                 throw std::runtime_error("Entry has no parent_id");
             }
 
@@ -267,7 +263,7 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
                 entry->fuse_path = parent->fuse_path / entry->name;
                 entry->backing_path = parent->backing_path / entry->base32_alias;
             } else {
-                LogRegistry::storage()->error("[FSCache] No parent entry found for entry {}", entry->id);
+                log::Registry::storage()->error("[FSCache] No parent entry found for entry {}", entry->id);
                 throw std::runtime_error("No parent entry found");
             }
         }
@@ -275,7 +271,7 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
 
     const pqxx::result parentStats =
         (!isFirstSeeding && entry->parent_id && !entry->isDirectory())
-            ? DirectoryQueries::collectParentStats(*entry->parent_id)
+            ? db::query::fs::Directory::collectParentStats(*entry->parent_id)
             : pqxx::result{};
 
     std::unique_lock lock(mutex_);
@@ -302,12 +298,12 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
 
     auto insert = [&](const std::shared_ptr<Entry>& e) {
         if (!e) {
-            LogRegistry::fs()->error("[FSCache] Attempted to cache a null entry");
+            log::Registry::fs()->error("[FSCache] Attempted to cache a null entry");
             return;
         }
 
         if (!e->inode) {
-            LogRegistry::fs()->error("[FSCache] Entry {} has no inode, cannot cache", e->id);
+            log::Registry::fs()->error("[FSCache] Entry {} has no inode, cannot cache", e->id);
             throw std::runtime_error("Entry has no inode");
         }
 
@@ -332,7 +328,7 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
                 dir->file_count = s["file_count"].as<unsigned int>();
                 dir->subdirectory_count = s["subdirectory_count"].as<unsigned int>();
             } else {
-                insert(FSEntryQueries::getFSEntryById(id));
+                insert(db::query::fs::Entry::getFSEntryById(id));
             }
         }
     }
@@ -351,17 +347,17 @@ void Registry::cacheEntry(const std::shared_ptr<Entry>& entry, const bool isFirs
 
     stats_->set_used(updatedUsed);
 
-    LogRegistry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
+    log::Registry::fs()->info("[FSCache] Cached entry: {} with inode {}", entry->fuse_path.string(), *entry->inode);
 }
 
 void Registry::updateEntry(const std::shared_ptr<Entry>& entry) {
-    LogRegistry::fs()->debug("[FSCache] Updating entry: {} with inode {}",
+    log::Registry::fs()->debug("[FSCache] Updating entry: {} with inode {}",
                              entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
 
-    FSEntryQueries::updateFSEntry(entry);
+    db::query::fs::Entry::updateFSEntry(entry);
     cacheEntry(entry);
 
-    LogRegistry::fs()->debug("[FSCache] Updated entry: {} with inode {}",
+    log::Registry::fs()->debug("[FSCache] Updated entry: {} with inode {}",
                              entry->fuse_path.string(), entry->inode ? *entry->inode : 0);
 }
 
@@ -369,7 +365,7 @@ void Registry::evictIno(fuse_ino_t ino) {
     std::unique_lock lock(mutex_);
 
     if (!inodeToPath_.contains(ino) || !inodeToId_.contains(ino)) {
-        LogRegistry::fs()->debug("[FSCache] Attempted to destroy references for non-existent inode: {}", ino);
+        log::Registry::fs()->debug("[FSCache] Attempted to destroy references for non-existent inode: {}", ino);
         return;
     }
 
@@ -404,7 +400,7 @@ void Registry::evictPath(const std::filesystem::path& path) {
     {
         std::unique_lock lock(mutex_);
         if (!pathToInode_.contains(path)) {
-            LogRegistry::fs()->debug("[FSCache] Attempted to evict non-existent path: {}", path.string());
+            log::Registry::fs()->debug("[FSCache] Attempted to evict non-existent path: {}", path.string());
             return;
         }
         ino = pathToInode_[path];
@@ -415,14 +411,14 @@ void Registry::evictPath(const std::filesystem::path& path) {
 }
 
 std::vector<std::shared_ptr<Entry>> Registry::listDir(const unsigned int parentId, const bool recursive) const {
-    const auto parent = FSEntryQueries::getFSEntryById(parentId);
+    const auto parent = db::query::fs::Entry::getFSEntryById(parentId);
     if (!parent->isDirectory()) throw std::runtime_error("Parent ID is not a directory");
 
     const auto parentDir = std::static_pointer_cast<Directory>(parent);
 
     unsigned int numEntries = parentDir->file_count + parentDir->subdirectory_count;
     if (!recursive) {
-        for (const auto& subdir : DirectoryQueries::listDirectoriesInDir(parentId))
+        for (const auto& subdir : db::query::fs::Directory::listDirectoriesInDir(parentId))
             numEntries -= subdir->file_count + subdir->subdirectory_count;
     }
 
@@ -454,11 +450,11 @@ std::vector<std::shared_ptr<Entry>> Registry::listDir(const unsigned int parentI
     }
 
     if (entries.size() != numEntries) {
-        LogRegistry::fs()->warn("[FSCache] Expected {} entries, but found {}", numEntries, entries.size());
-        const auto expected = FSEntryQueries::listDir(parentId, recursive);
+        log::Registry::fs()->warn("[FSCache] Expected {} entries, but found {}", numEntries, entries.size());
+        const auto expected = db::query::fs::Entry::listDir(parentId, recursive);
         if (expected.size() != numEntries) {
             if (expected.size() == entries.size())
-                LogRegistry::fs()->warn("Computed number of entries mismatch with actual");
+                log::Registry::fs()->warn("Computed number of entries mismatch with actual");
 
             throw std::runtime_error(fmt::format(
                 "[FSCache] Inconsistent entry count for parent ID {}: expected: {}, found {}, actual: {}",

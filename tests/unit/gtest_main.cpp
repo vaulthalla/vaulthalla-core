@@ -3,7 +3,7 @@
 #include <paths.h>
 
 #include "config/ConfigRegistry.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 namespace fs = std::filesystem;
 
@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     try {
         vh::paths::setLogPathForTesting();
         vh::config::ConfigRegistry::init();
-        vh::logging::LogRegistry::init();
+        vh::log::Registry::init();
 
     } catch (const std::exception& e) {
         std::cerr << "Failed to initialize Vaulthalla test environment: " << e.what() << std::endl;

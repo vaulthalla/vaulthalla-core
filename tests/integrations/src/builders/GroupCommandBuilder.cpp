@@ -3,10 +3,10 @@
 #include "generators.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::identities::model;
 
-GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
+GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}
 
 std::string GroupCommandBuilder::updateAndResolveVar(const std::shared_ptr<Group>& entity, const std::string& field) {

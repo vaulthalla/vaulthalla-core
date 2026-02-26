@@ -1,14 +1,13 @@
 #include "storage/s3/S3Controller.hpp"
 #include "vault/model/APIKey.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "storage/s3/curl/helpers.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 using namespace vh::cloud;
 using namespace vh::vault::model;
-using namespace vh::logging;
 using namespace vh::storage::s3::curl;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 std::map<std::string, std::string> S3Controller::buildHeaderMap(const std::string& payloadHash) const {
     return {
@@ -50,7 +49,7 @@ S3Controller::getHeadObject(const std::filesystem::path& key) const {
     });
 
     if (!resp.ok()) {
-        LogRegistry::cloud()->error("[S3Provider] getHeadObject failed for {}: CURL={} HTTP={}",
+        log::Registry::cloud()->error("[S3Provider] getHeadObject failed for {}: CURL={} HTTP={}",
                                         key.string(), resp.curl, resp.http);
         return std::nullopt;
     }
@@ -99,7 +98,7 @@ void S3Controller::setObjectContentHash(const std::filesystem::path& key, const 
     });
 
     if (!resp.ok())
-        LogRegistry::cloud()->error("[S3Provider] setObjectContentHash failed for {}: CURL={} HTTP={}",
+        log::Registry::cloud()->error("[S3Provider] setObjectContentHash failed for {}: CURL={} HTTP={}",
                                         key.string(), resp.curl, resp.http);
 
     if (!resp.ok()) throw std::runtime_error(
@@ -136,7 +135,7 @@ void S3Controller::setObjectEncryptionMetadata(const std::string& key, const std
     });
 
     if (!resp.ok())
-        LogRegistry::cloud()->error("[S3Provider] setObjectEncryptionMetadata failed for {}: CURL={} HTTP={}",
+        log::Registry::cloud()->error("[S3Provider] setObjectEncryptionMetadata failed for {}: CURL={} HTTP={}",
                                         key, resp.curl, resp.http);
 
     if (!resp.ok()) throw std::runtime_error(

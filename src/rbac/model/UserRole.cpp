@@ -1,5 +1,5 @@
 #include "rbac/model/UserRole.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
 
@@ -9,7 +9,8 @@
 #include <string>
 
 using namespace vh::rbac::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
+using namespace vh::protocols::shell;
 
 UserRole::UserRole(const pqxx::row& row)
     : Role(row) {
@@ -64,7 +65,7 @@ void vh::rbac::model::to_json(nlohmann::json& j, const std::vector<std::shared_p
 
 std::string vh::rbac::model::to_string(const std::shared_ptr<UserRole>& role) {
     const std::string prefix(4, ' ');
-    std::string out = shell::snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
+    std::string out = snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
     out += prefix + "- Role ID: " + std::to_string(role->id) + "\n";
     out += prefix + "- Description: " + role->description + "\n";
     out += prefix + "- Type: " + role->type + "\n";

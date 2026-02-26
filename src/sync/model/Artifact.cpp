@@ -1,7 +1,7 @@
 #include "sync/model/Artifact.hpp"
 #include "fs/model/File.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
 
 #include <nlohmann/json.hpp>
@@ -9,13 +9,12 @@
 
 using namespace vh::sync::model;
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
-using namespace vh::services;
+using namespace vh::db::encoding;
 
 Artifact::Artifact(const pqxx::row& row)
     : id(row["id"].as<uint32_t>()),
       conflict_id(row["conflict_id"].as<uint32_t>()),
-      file(std::static_pointer_cast<File>(ServiceDepsRegistry::instance().fsCache->getEntryById(row["file_id"].as<uint32_t>()))) {
+      file(std::static_pointer_cast<File>(runtime::Deps::get().fsCache->getEntryById(row["file_id"].as<uint32_t>()))) {
     parseSide(row["side"].as<std::string>());
 }
 

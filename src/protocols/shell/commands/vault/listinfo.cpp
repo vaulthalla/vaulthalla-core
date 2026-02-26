@@ -2,9 +2,9 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 
-#include "services/ServiceDepsRegistry.hpp"
-#include "logging/LogRegistry.hpp"
-#include "database/Queries/VaultQueries.hpp"
+#include "runtime/Deps.hpp"
+#include "log/Registry.hpp"
+#include "db/query/vault/Vault.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
@@ -21,18 +21,15 @@
 #include <vector>
 #include <memory>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::rbac::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::logging;
 
 CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
     constexpr const auto* ERR = "vault info";
@@ -68,13 +65,13 @@ CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
     const auto canListAll = call.user->isAdmin() || call.user->canManageVaults();
 
     auto vaults = canListAll
-                      ? VaultQueries::listVaults(typeFilter, parseListQuery(call))
-                      : VaultQueries::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
+                      ? db::query::vault::Vault::listVaults(typeFilter, parseListQuery(call))
+                      : db::query::vault::Vault::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
 
     if (!canListAll) {
         for (const auto& [_, r] : call.user->roles) {
             if (r->canList({})) {
-                const auto vault = ServiceDepsRegistry::instance().storageManager->getEngine(r->vault_id)->vault;
+                const auto vault = runtime::Deps::get().storageManager->getEngine(r->vault_id)->vault;
                 if (!vault) continue;
                 if (vault->owner_id == call.user->id) continue; // Already added
                 vaults.push_back(vault);

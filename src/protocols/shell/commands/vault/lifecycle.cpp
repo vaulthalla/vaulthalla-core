@@ -1,10 +1,10 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/WaiverQueries.hpp"
-#include "database/Queries/SyncQueries.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/vault/Waiver.hpp"
+#include "db/query/sync/Policy.hpp"
 
 #include "storage/Manager.hpp"
 #include "storage/s3/S3Controller.hpp"
@@ -12,24 +12,18 @@
 #include "vault/model/Vault.hpp"
 #include "identities/model/User.hpp"
 
-#include "logging/LogRegistry.hpp"
 #include "config/ConfigRegistry.hpp"
 #include "CommandUsage.hpp"
 
 #include <string>
-#include <vector>
 #include <memory>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
-using namespace vh::crypto;
-using namespace vh::logging;
 using namespace vh::cloud;
 
 CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
@@ -49,15 +43,15 @@ CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
     assignQuotaIfAvailable(call, usage, vault);
     assignOwnerIfAvailable(call, usage, vault);
 
-    const auto sync = SyncQueries::getSync(vault->id);
+    const auto sync = db::query::sync::Policy::getSync(vault->id);
     parseSync(call, usage, vault, sync);
     parseS3API(call, usage, vault, vault->owner_id, false);
 
     const auto [okToProceed, waiver] = handle_encryption_waiver({call, vault, true});
     if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
-    if (waiver) WaiverQueries::addWaiver(waiver);
+    if (waiver) db::query::vault::Waiver::addWaiver(waiver);
 
-    VaultQueries::upsertVault(vault, sync);
+    db::query::vault::Vault::upsertVault(vault, sync);
 
     return ok("Successfully updated vault!\n" + to_string(vault));
 }
@@ -81,7 +75,7 @@ CommandResult commands::vault::handle_vault_delete(const CommandCall& call) {
             "vault delete: you do not have permission to delete this vault's data");
     }
 
-    ServiceDepsRegistry::instance().storageManager->removeVault(vault->id);
+    runtime::Deps::get().storageManager->removeVault(vault->id);
 
     return ok("Successfully deleted vault '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")\n");
 }

@@ -1,15 +1,14 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "logging/LogRegistry.hpp"
-#include "services/ServiceDepsRegistry.hpp"
-#include "services/SyncController.hpp"
+#include "runtime/Deps.hpp"
+#include "sync/Controller.hpp"
 #include "storage/Engine.hpp"
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/interval.hpp"
 #include "CommandUsage.hpp"
 
 #include <optional>
@@ -17,16 +16,13 @@
 #include <vector>
 #include <memory>
 
-using namespace vh::shell;
-using namespace vh::shell::commands;
-using namespace vh::shell::commands::vault;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
-using namespace vh::services;
-using namespace vh::logging;
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 static CommandResult handle_vault_sync(const CommandCall& call) {
     constexpr const auto* ERR = "vault sync";
@@ -41,7 +37,7 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
     if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->
         canSyncVaultData(vault->id)) return invalid("vault sync: you do not have permission to manage this vault");
 
-    ServiceDepsRegistry::instance().syncController->runNow(vault->id);
+    runtime::Deps::get().syncController->runNow(vault->id);
 
     return ok("Vault sync initiated for '" + vault->name + "' (ID: " + std::to_string(vault->id) + ")");
 }

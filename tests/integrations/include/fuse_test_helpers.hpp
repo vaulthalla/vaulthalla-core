@@ -14,7 +14,7 @@
 
 #include "TestCase.hpp"
 #include "protocols/shell/types.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "fs/ops/file.hpp"
 #include "AssertionResult.hpp"
 
@@ -109,7 +109,7 @@ inline int write_file(const std::filesystem::path& p, const std::string_view dat
 }
 
 inline int read_file(const std::filesystem::path& p) {
-    logging::LogRegistry::vaulthalla()->warn("[read_file] reading {}", p.string());
+    log::Registry::vaulthalla()->warn("[read_file] reading {}", p.string());
     std::cout << "OK read " << p << ":\n" << std::flush;
     const int fd = ::open(p.c_str(), O_RDONLY);
     if (fd < 0) return errno;

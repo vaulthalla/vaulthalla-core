@@ -1,12 +1,12 @@
 #include "vault/model/Key.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/encoding/bytea.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/encoding/bytea.hpp"
 
 #include <pqxx/row>
 #include <nlohmann/json.hpp>
 
 using namespace vh::vault::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Key::Key(const pqxx::row &row)
     : vaultId(row["vault_id"].as<unsigned int>()),

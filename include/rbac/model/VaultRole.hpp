@@ -2,7 +2,7 @@
 
 #include "Role.hpp"
 #include "PermissionOverride.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <string>
 #include <ctime>
@@ -54,7 +54,7 @@ struct VaultRole final : Role {
         const auto bit = vaultPermToBit(perm);
         auto overrides = getPermissionOverrides(bit);
         if (overrides.empty()) {
-            logging::LogRegistry::auth()->debug("[VaultRole::validatePermission] No overrides for permission on path {}", pathStr);
+            log::Registry::auth()->debug("[VaultRole::validatePermission] No overrides for permission on path {}", pathStr);
             return isEnabled;
         }
 

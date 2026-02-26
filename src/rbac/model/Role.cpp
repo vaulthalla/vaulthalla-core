@@ -1,7 +1,7 @@
 #include "rbac/model/Role.hpp"
 #include "rbac/model/UserRole.hpp"
 #include "rbac/model/VaultRole.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 
@@ -9,8 +9,8 @@
 #include <nlohmann/json.hpp>
 
 using namespace vh::rbac::model;
-using namespace vh::shell;
-using namespace vh::database::encoding;
+using namespace vh::protocols::shell;
+using namespace vh::db::encoding;
 
 Role::Role(const pqxx::row& row)
     : name(row["name"].as<std::string>()),

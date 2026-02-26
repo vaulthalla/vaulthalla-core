@@ -1,6 +1,6 @@
 #include "sync/tasks/Delete.hpp"
 
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "storage/CloudEngine.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/file/Trashed.hpp"
@@ -99,13 +99,11 @@ void Delete::operator()() {
                 }
             }, target);
         }
-        else {
-            throw std::runtime_error("DeleteTask: unsupported storage engine type");
-        }
+        else throw std::runtime_error("DeleteTask: unsupported storage engine type");
 
         op.success = true;
     } catch (const std::exception& e) {
-        vh::logging::LogRegistry::sync()->error(
+        log::Registry::sync()->error(
             "[DeleteTask] Failed to delete file: {} - {}",
             getPathString(target),
             e.what()

@@ -9,7 +9,7 @@
 #include <cstddef>
 #include <memory>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 class CommandUsage : public std::enable_shared_from_this<CommandUsage> {
 public:

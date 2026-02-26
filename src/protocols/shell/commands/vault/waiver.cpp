@@ -1,11 +1,11 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 
-#include "database/Queries/APIKeyQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "db/query/vault/APIKey.hpp"
+#include "db/query/identities/User.hpp"
 
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 #include "storage/s3/S3Controller.hpp"
 #include "vault/APIKeyManager.hpp"
 
@@ -24,16 +24,13 @@
 #include <string_view>
 #include <memory>
 
-using namespace vh::shell::commands::vault;
-using namespace vh::shell::commands;
-using namespace vh::shell;
+using namespace vh;
+using namespace vh::protocols::shell;
+using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::storage;
-using namespace vh::database;
 using namespace vh::config;
-using namespace vh::services;
 using namespace vh::crypto;
-using namespace vh::logging;
 using namespace vh::cloud;
 using namespace vh::sync::model;
 using namespace vh::rbac::model;
@@ -43,13 +40,13 @@ static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, co
     auto waiver = std::make_shared<Waiver>();
     waiver->vault = s3Vault;
     waiver->user = call.user;
-    waiver->apiKey = APIKeyQueries::getAPIKey(s3Vault->api_key_id);
+    waiver->apiKey = db::query::vault::APIKey::getAPIKey(s3Vault->api_key_id);
     waiver->encrypt_upstream = s3Vault->encrypt_upstream;
     waiver->waiver_text = s3Vault->encrypt_upstream ?
         ENABLE_UPSTREAM_ENCRYPTION_WAIVER : DISABLE_UPSTREAM_ENCRYPTION_WAIVER;
 
     if (s3Vault->owner_id != call.user->id) {
-        waiver->owner = UserQueries::getUserById(s3Vault->owner_id);
+        waiver->owner = db::query::identities::User::getUserById(s3Vault->owner_id);
         if (!waiver->owner) throw std::runtime_error("Failed to load owner ID " + std::to_string(s3Vault->owner_id));
 
         if (waiver->owner->canManageVaults()) waiver->overridingRole = std::make_shared<Role>(*call.user->role);
@@ -70,7 +67,7 @@ static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, co
 }
 
 static bool upstream_bucket_is_empty(const std::shared_ptr<S3Vault>& s3Vault) {
-    const auto apiKey = ServiceDepsRegistry::instance().apiKeyManager->getAPIKey(s3Vault->api_key_id, s3Vault->owner_id);
+    const auto apiKey = runtime::Deps::get().apiKeyManager->getAPIKey(s3Vault->api_key_id, s3Vault->owner_id);
     if (!apiKey) throw std::runtime_error("Failed to load API key ID " + std::to_string(s3Vault->api_key_id));
     if (apiKey->secret_access_key.empty()) throw std::runtime_error("API key ID " + std::to_string(s3Vault->api_key_id) + " has no secret access key");
     const S3Controller ctrl(apiKey, s3Vault->bucket);

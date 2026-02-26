@@ -27,7 +27,7 @@
 #include <utility>
 #include <future>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 using namespace vh::args;
 using namespace vh::identities::model;
 using namespace vh::vault::model;
@@ -181,7 +181,7 @@ static void harvestIdsIntoContext(
 IntegrationsTestRunner::IntegrationsTestRunner(CLITestConfig&& cfg)
     : config_(cfg),
       ctx_(std::make_shared<CLITestContext>()),
-      usage_(std::make_shared<shell::UsageManager>()),
+      usage_(std::make_shared<UsageManager>()),
       router_(std::make_shared<CommandRouter>(ctx_)),
       interruptFlag(std::make_shared<std::atomic<bool>>(false)),
       threadPool_(std::make_shared<TestThreadPool>(interruptFlag, std::thread::hardware_concurrency())) {

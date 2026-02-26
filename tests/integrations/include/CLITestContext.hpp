@@ -10,7 +10,7 @@ namespace vh::identities::model { struct User; struct Group; }
 namespace vh::rbac::model { struct Role; struct UserRole; struct VaultRole; }
 namespace vh::vault::model { struct Vault; struct APIKey; }
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 class CommandUsage;
 class UsageManager;
 }
@@ -30,8 +30,8 @@ struct CLITestContext {
     std::vector<std::shared_ptr<rbac::model::UserRole>> userRoles;
     std::vector<std::shared_ptr<rbac::model::VaultRole>> vaultRoles;
     std::vector<std::shared_ptr<identities::model::Group>> groups;
-    std::shared_ptr<shell::UsageManager> usage;
-    std::unordered_map<std::string, std::shared_ptr<shell::CommandUsage>> commands;
+    std::shared_ptr<protocols::shell::UsageManager> usage;
+    std::unordered_map<std::string, std::shared_ptr<protocols::shell::CommandUsage>> commands;
 
     CLITestContext();
 
@@ -42,7 +42,7 @@ struct CLITestContext {
     [[nodiscard]] std::shared_ptr<rbac::model::UserRole> randomUserRole() const;
     [[nodiscard]] std::shared_ptr<rbac::model::VaultRole> randomVaultRole() const;
     [[nodiscard]] static std::string getCommandName(const EntityType& type, const std::string& action);
-    [[nodiscard]] std::shared_ptr<shell::CommandUsage> getCommand(const EntityType& type, const std::string& action) const;
+    [[nodiscard]] std::shared_ptr<protocols::shell::CommandUsage> getCommand(const EntityType& type, const std::string& action) const;
 };
 
 }

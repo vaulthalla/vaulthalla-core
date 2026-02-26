@@ -9,7 +9,7 @@
 #include "CommandBuilderRegistry.hpp"
 #include "protocols/shell/commands/all.hpp"
 #include "EntityFactory.hpp"
-#include "database/Queries/UserQueries.hpp"
+#include "db/query/identities/User.hpp"
 
 #include <string>
 #include <vector>
@@ -31,18 +31,18 @@ class EntityRegistrar {
 public:
     explicit EntityRegistrar(const std::shared_ptr<CLITestContext>& ctx)
         : factory_(std::make_shared<EntityFactory>(ctx)),
-          router_(std::make_shared<shell::Router>()), ctx_(ctx) {
+          router_(std::make_shared<protocols::shell::Router>()), ctx_(ctx) {
         if (!router_) throw std::runtime_error("EntityRegistrar: router is null");
-        shell::commands::registerAllCommands(router_);
+        protocols::shell::commands::registerAllCommands(router_);
     }
 
         [[nodiscard]] EntityResult create(const EntityType& type) const {
         const auto cmd = ctx_->getCommand(type, "create");
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for creation");
 
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
         const auto buildCommand = [&](const std::shared_ptr<void>& entity) {
             const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::CREATE, entity);
@@ -93,9 +93,9 @@ public:
     [[nodiscard]] EntityResult update(const EntityType& type, const std::shared_ptr<T>& entity) const {
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::UPDATE, entity);
         std::cout << command << std::endl;
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
         return {router_->executeLine(command, admin, io.get()), entity};
     }
 
@@ -104,9 +104,9 @@ public:
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for listing");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::LIST, nullptr);
         std::cout << command << std::endl;
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
         return {router_->executeLine(command, admin, io.get())};
     }
 
@@ -116,9 +116,9 @@ public:
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for info");
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::INFO, entity);
         std::cout << command << std::endl;
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
         return {router_->executeLine(command, admin, io.get())};
     }
 
@@ -126,9 +126,9 @@ public:
         const auto cmd = ctx_->getCommand(type, "delete");
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for deletion");
 
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
         const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::DELETE, entity);
         std::cout << command << std::endl;
@@ -139,9 +139,9 @@ public:
         if (type != EntityType::USER && type != EntityType::VAULT)
             throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
 
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
         const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::GROUP, type, action, group, user);
 
@@ -159,9 +159,9 @@ public:
         if (cmdType != CommandType::ASSIGN && cmdType != CommandType::UNASSIGN)
             throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports ASSIGN and UNASSIGN command types");
 
-        const auto admin = database::UserQueries::getUserByName("admin");
+        const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
-        const auto io = std::make_unique<shell::SocketIO>(fd);
+        const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
         const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::VAULT, EntityType::VAULT_ROLE, type, cmdType, vault, role, entity);
 
@@ -172,7 +172,7 @@ public:
 private:
     static constexpr std::string_view ID_REGEX = R"(ID:\s*(\d+))";
     std::shared_ptr<EntityFactory> factory_;
-    std::shared_ptr<shell::Router> router_;
+    std::shared_ptr<protocols::shell::Router> router_;
     std::shared_ptr<CLITestContext> ctx_;
 
     static std::regex toRegex(const std::string_view& pattern) {

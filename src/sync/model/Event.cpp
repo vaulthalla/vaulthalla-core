@@ -1,7 +1,7 @@
 #include "sync/model/Event.hpp"
-#include "database/encoding/timestamp.hpp"
-#include "database/Queries/SyncEventQueries.hpp"
-#include "logging/LogRegistry.hpp"
+#include "db/encoding/timestamp.hpp"
+#include "db/query/sync/Event.hpp"
+#include "log/Registry.hpp"
 #include "sync/model/Conflict.hpp"
 
 #include <algorithm>
@@ -34,9 +34,7 @@ namespace {
 }
 
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
-using namespace vh::database;
-using namespace vh::logging;
+using namespace vh::db::encoding;
 using namespace std::chrono;
 
 Event::Event(const pqxx::row& row)
@@ -89,7 +87,7 @@ void Event::heartbeat(std::time_t min_interval_seconds) {
         now - last_heartbeat_persisted_at < min_interval_seconds)
         return;
 
-    SyncEventQueries::heartbeat(shared_from_this());
+    db::query::sync::Event::heartbeat(shared_from_this());
     last_heartbeat_persisted_at = now;
 }
 
@@ -354,7 +352,7 @@ std::vector<std::shared_ptr<Event>> vh::sync::model::sync_events_from_pqxx_res(c
             auto event = std::make_shared<Event>(row);
             events.push_back(std::move(event));
         } catch (const std::exception& ex) {
-            LogRegistry::types()->error("Failed to parse Event from database row: {}", ex.what());
+            log::Registry::types()->error("Failed to parse Event from database row: {}", ex.what());
         }
     }
     return events;

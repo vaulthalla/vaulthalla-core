@@ -1,10 +1,9 @@
 #include "storage/s3/S3Controller.hpp"
-#include "logging/LogRegistry.hpp"
+#include "log/Registry.hpp"
 
 #include <fstream>
 
 using namespace vh::cloud;
-using namespace vh::logging;
 using namespace vh::storage::s3::curl;
 
 void S3Controller::uploadLargeObject(const std::filesystem::path& key,
@@ -31,7 +30,7 @@ const uintmax_t partSize) const {
         std::string etag;
         try { uploadPart(key, uploadId, partNo++, part, etag); }
         catch (const std::exception& e) {
-            LogRegistry::cloud()->error("[S3Provider] uploadLargeObject failed to upload part {}: {}", partNo - 1, e.what());
+            log::Registry::cloud()->error("[S3Provider] uploadLargeObject failed to upload part {}: {}", partNo - 1, e.what());
             success = false;
             break;
         }
@@ -44,10 +43,10 @@ const uintmax_t partSize) const {
             return;
         }
         catch (const std::exception& e) {
-            LogRegistry::cloud()->error(
+            log::Registry::cloud()->error(
                 "[S3Provider] uploadLargeObject failed to abort multipart upload for {}: uploadId={}",
                 key.string(), uploadId);
-            LogRegistry::cloud()->error(e.what());
+            log::Registry::cloud()->error(e.what());
             throw std::runtime_error("Failed to abort multipart upload after part upload failure");
         }
     }

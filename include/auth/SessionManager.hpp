@@ -6,10 +6,6 @@
 #include <string>
 #include <unordered_map>
 
-namespace vh::websocket {
-class WebSocketSession;
-}
-
 namespace vh::auth {
 
 class SessionManager {

@@ -5,29 +5,26 @@
 #include "identities/model/User.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "rbac/model/PermissionOverride.hpp"
-#include "database/Queries/VaultQueries.hpp"
-#include "database/Queries/UserQueries.hpp"
-#include "database/Queries/PermsQueries.hpp"
-#include "database/Queries/APIKeyQueries.hpp"
+#include "db/query/vault/Vault.hpp"
+#include "db/query/identities/User.hpp"
+#include "db/query/rbac/Permission.hpp"
+#include "db/query/vault/APIKey.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "services/ServiceDepsRegistry.hpp"
+#include "runtime/Deps.hpp"
 #include "storage/Manager.hpp"
 #include "CommandUsage.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "database/encoding/interval.hpp"
+#include "db/encoding/interval.hpp"
 
-using namespace vh::shell;
 using namespace vh::identities::model;
 using namespace vh::rbac::model;
 using namespace vh::vault::model;
-using namespace vh::database;
 using namespace vh::storage;
-using namespace vh::services;
 using namespace vh::sync::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
-namespace vh::shell::commands::vault {
+namespace vh::protocols::shell::commands::vault {
 
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut) {
     if (const auto v = parseUInt(s)) {
@@ -42,11 +39,11 @@ std::shared_ptr<User> resolveOwner(const CommandCall& call, const std::shared_pt
     if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
         if (const auto idOpt = parseUInt(*ownerOpt)) {
             if (*idOpt <= 0) throw std::runtime_error("owner must be a positive integer");
-            const auto user = UserQueries::getUserById(*idOpt);
+            const auto user = db::query::identities::User::getUserById(*idOpt);
             if (!user) throw std::runtime_error("owner id not found: " + *ownerOpt);
             return user;
         }
-        const auto user = UserQueries::getUserByName(*ownerOpt);
+        const auto user = db::query::identities::User::getUserByName(*ownerOpt);
         if (!user) throw std::runtime_error("owner not found: " + *ownerOpt);
         return user;
     }
@@ -62,11 +59,11 @@ Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr
     }
     if (const auto idOpt = parseUInt(*ownerOpt)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": --owner must be a positive integer"; return out; }
-        out.ptr = UserQueries::getUserById(*idOpt);
+        out.ptr = db::query::identities::User::getUserById(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": owner id not found: " + *ownerOpt;
         return out;
     }
-    out.ptr = UserQueries::getUserByName(*ownerOpt);
+    out.ptr = db::query::identities::User::getUserByName(*ownerOpt);
     if (!out.ptr) out.error = errPrefix + ": owner not found: " + *ownerOpt;
     return out;
 }
@@ -75,14 +72,14 @@ Lookup<Vault> resolveVault(const CommandCall& call, const std::string& vaultArg,
     Lookup<Vault> out;
     if (const auto idOpt = parseUInt(vaultArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": vault ID must be a positive integer"; return out; }
-        out.ptr = VaultQueries::getVault(*idOpt);
+        out.ptr = db::query::vault::Vault::getVault(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": vault with id " + std::to_string(*idOpt) + " not found";
         return out;
     }
 
     auto ownerLkp = resolveOwnerRequired(call, usage, errPrefix);
     if (!ownerLkp) { out.error = std::move(ownerLkp.error); return out; }
-    out.ptr = VaultQueries::getVault(vaultArg, ownerLkp.ptr->id);
+    out.ptr = db::query::vault::Vault::getVault(vaultArg, ownerLkp.ptr->id);
     if (!out.ptr) out.error = errPrefix + ": vault named '" + vaultArg + "' (owner id " + std::to_string(ownerLkp.ptr->id) + ") not found";
     return out;
 }
@@ -94,7 +91,7 @@ Lookup<Engine> resolveEngine(const CommandCall& call, const std::string& vaultAr
     if (!vLkp || !vLkp.ptr) { out.error = vLkp.error; return out; }
     const auto vault = vLkp.ptr;
 
-    out.ptr = ServiceDepsRegistry::instance().storageManager->getEngine(vault->id);
+    out.ptr = runtime::Deps::get().storageManager->getEngine(vault->id);
     if (!out.ptr) out.error = errPrefix + ": no storage engine found for vault '" + vaultArg + "'";
     return out;
 }
@@ -117,7 +114,7 @@ Lookup<VaultRole> resolveVRole(const std::string& roleArg,
     Lookup<VaultRole> out;
     if (const auto idOpt = parseUInt(roleArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": role ID must be a positive integer"; return out; }
-        out.ptr = PermsQueries::getVaultRole(*idOpt);
+        out.ptr = db::query::rbac::Permission::getVaultRole(*idOpt);
         if (!out.ptr) out.error = errPrefix + ": role with id " + std::to_string(*idOpt) + " not found";
         return out;
     }
@@ -125,7 +122,7 @@ Lookup<VaultRole> resolveVRole(const std::string& roleArg,
         out.error = errPrefix + ": non-integer role arg requires a subject (--user/--group) to infer the role";
         return out;
     }
-    out.ptr = PermsQueries::getVaultRoleBySubjectAndVaultId(subjectOrNull->id, subjectOrNull->type, vault->id);
+    out.ptr = db::query::rbac::Permission::getVaultRoleBySubjectAndVaultId(subjectOrNull->id, subjectOrNull->type, vault->id);
     if (!out.ptr) out.error = errPrefix + ": role not found for " + subjectOrNull->type + " id " + std::to_string(subjectOrNull->id);
     return out;
 }
@@ -205,8 +202,8 @@ void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
         Lookup<User> ownerLkp;
         if (const auto idOpt = parseUInt(*ownerOpt)) {
             if (*idOpt <= 0) throw std::runtime_error("vault create: --owner must be a positive integer");
-            ownerLkp.ptr = UserQueries::getUserById(*idOpt);
-        } else ownerLkp.ptr = UserQueries::getUserByName(*ownerOpt);
+            ownerLkp.ptr = db::query::identities::User::getUserById(*idOpt);
+        } else ownerLkp.ptr = db::query::identities::User::getUserByName(*ownerOpt);
         if (!ownerLkp.ptr) throw std::runtime_error("vault create: owner not found: " + *ownerOpt);
         vault->owner_id = ownerLkp.ptr->id;
     }
@@ -241,9 +238,9 @@ void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& us
     const auto s3Vault = std::static_pointer_cast<S3Vault>(vault);
 
     if (const auto apiKeyOpt = optVal(call, usage->resolveGroupOptional("S3 Vault Options", "api-key")->option_tokens)) {
-        if (const auto apiKeyId = parseUInt(*apiKeyOpt); APIKeyQueries::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
+        if (const auto apiKeyId = parseUInt(*apiKeyOpt); db::query::vault::APIKey::getAPIKey(*apiKeyId)) s3Vault->api_key_id = *apiKeyId;
         else {
-            const auto apiKey = APIKeyQueries::getAPIKey(*apiKeyOpt);
+            const auto apiKey = db::query::vault::APIKey::getAPIKey(*apiKeyOpt);
             if (!apiKey) throw std::runtime_error("API key not found: " + *apiKeyOpt);
 
             if ((ownerId != call.user->id || call.user->id != apiKey->user_id) && !call.user->canManageAPIKeys())

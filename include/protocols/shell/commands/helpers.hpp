@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 class CommandUsage;
 struct CommandCall;

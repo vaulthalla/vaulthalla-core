@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <cstring>
 
-using namespace vh::shell;
+using namespace vh::protocols::shell;
 
 SocketIO::SocketIO(const int fd) : fd_(fd) {}
 

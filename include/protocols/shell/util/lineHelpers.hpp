@@ -5,7 +5,7 @@
 #include <string>
 #include <fmt/core.h>
 
-namespace vh::shell {
+namespace vh::protocols::shell {
 
 inline int term_width() {
     if (!isatty(STDOUT_FILENO)) return 80;

@@ -1,13 +1,13 @@
 #include "sync/model/Operation.hpp"
 #include "fs/model/Entry.hpp"
-#include "database/encoding/timestamp.hpp"
+#include "db/encoding/timestamp.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
 using namespace vh::sync::model;
 using namespace vh::fs::model;
-using namespace vh::database::encoding;
+using namespace vh::db::encoding;
 
 Operation::Operation(const pqxx::row& row)
     : id(row["id"].as<unsigned int>()),

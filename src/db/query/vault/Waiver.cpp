@@ -6,9 +6,9 @@
 #include "vault/model/APIKey.hpp"
 #include "rbac/model/Role.hpp"
 
-using namespace vh::db::query::vault;
+using namespace vh;
 
-void Waiver::addWaiver(const std::shared_ptr<vh::sync::model::Waiver>& waiver) {
+void db::query::vault::Waiver::addWaiver(const std::shared_ptr<vh::sync::model::Waiver>& waiver) {
     if (!waiver) throw std::invalid_argument("Invalid waiver");
     if (!waiver->vault) throw std::invalid_argument("Invalid vault in waiver");
     if (!waiver->user) throw std::invalid_argument("Invalid user in waiver");

@@ -7,18 +7,14 @@ namespace vh::sync::model { struct Waiver; }
 
 namespace vh::db::query::vault {
 
-class Waiver {
-    using W = vh::sync::model::Waiver;
-    using WaiverPtr = std::shared_ptr<W>;
+struct Waiver {
+    static void addWaiver(const std::shared_ptr<vh::sync::model::Waiver>& waiver);
 
-public:
-    static void addWaiver(const WaiverPtr& waiver);
+    static std::vector<std::shared_ptr<vh::sync::model::Waiver>> getAllWaivers();
 
-    static std::vector<WaiverPtr> getAllWaivers();
+    static std::vector<std::shared_ptr<vh::sync::model::Waiver>> getWaiversByUser(unsigned int userId);
 
-    static std::vector<WaiverPtr> getWaiversByUser(unsigned int userId);
-
-    static std::vector<WaiverPtr> getWaiversByVault(unsigned int vaultId);
+    static std::vector<std::shared_ptr<vh::sync::model::Waiver>> getWaiversByVault(unsigned int vaultId);
 };
 
 }

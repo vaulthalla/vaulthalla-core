@@ -8,7 +8,7 @@
 
 using namespace vh::db::query::vault;
 
-void Waiver::addWaiver(const WaiverPtr& waiver) {
+void Waiver::addWaiver(const std::shared_ptr<vh::sync::model::Waiver>& waiver) {
     if (!waiver) throw std::invalid_argument("Invalid waiver");
     if (!waiver->vault) throw std::invalid_argument("Invalid vault in waiver");
     if (!waiver->user) throw std::invalid_argument("Invalid user in waiver");
@@ -40,8 +40,8 @@ void Waiver::addWaiver(const WaiverPtr& waiver) {
                 waiver->overridingRole->permissions
             };
 
-            const auto res2 = txn.exec(pqxx::prepped{"insert_waiver_owner_override"}, p2);
-            if (res2.empty() || res2.affected_rows() == 0)
+            if (const auto res2 = txn.exec(pqxx::prepped{"insert_waiver_owner_override"}, p2);
+                res2.empty() || res2.affected_rows() == 0)
                 throw std::runtime_error("Failed to insert waiver for owner " + std::to_string(waiver->owner->id));
 
             const pqxx::params p3{waiver->id, waiver->overridingRole->type};

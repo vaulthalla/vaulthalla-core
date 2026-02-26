@@ -149,7 +149,7 @@ static CommandResult handleRoleUpdate(const CommandCall& call) {
     const auto usage = resolveUsage({"role", "update"});
     validatePositionals(call, usage);
 
-    const auto rLkp = shell::resolveRole(call.positionals[0], ERR);
+    const auto rLkp = resolveRole(call.positionals[0], ERR);
     if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
     const auto role = rLkp.ptr;
 
@@ -178,7 +178,7 @@ static CommandResult handleRoleDelete(const CommandCall& call) {
     const auto usage = resolveUsage({"role", "delete"});
     validatePositionals(call, usage);
 
-    const auto rLkp = shell::resolveRole(call.positionals[0], ERR);
+    const auto rLkp = resolveRole(call.positionals[0], ERR);
     if (!rLkp || !rLkp.ptr) return invalid(rLkp.error);
     const auto role = rLkp.ptr;
 

@@ -7,13 +7,12 @@
 
 #include <boost/beast/http/file_body.hpp>
 
-using namespace vh::protocols::http::handler::preview;
-using namespace vh::protocols::http::model::preview;
+using namespace vh::protocols::http;
 using namespace vh::storage;
 using namespace vh::fs::ops;
 using namespace vh::preview;
 
-Response Image::handle(request&& req, const std::unique_ptr<Request>&& pr) {
+model::preview::Response handler::preview::Image::handle(request&& req, const std::unique_ptr<Request>&& pr) {
     try {
         const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
 

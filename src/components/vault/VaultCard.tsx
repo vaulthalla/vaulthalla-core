@@ -35,7 +35,7 @@ const VaultCard = (vault: Vault) => {
   const Icon = getVaultIcon({ type: vault.type, provider: provider })
 
   return (
-    <Link href={`/src/app/(app)/(admin)/vaults/${vault.id}`} key={vault.id}>
+    <Link href={`/vaults/${vault.id}`} key={vault.id}>
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

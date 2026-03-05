@@ -36,7 +36,7 @@ const UserFullCard = ({ name }: { name: string }) => {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="card-glass my-4 h-fit w-128 rounded-2xl border border-white/10 p-6 text-left shadow-xl backdrop-blur-md transition-transform duration-300 hover:shadow-2xl">
+      className="card-glass my-4 h-fit w-full rounded-2xl border border-white/10 p-6 text-left shadow-xl backdrop-blur-md transition-transform duration-300 hover:shadow-2xl">
       <div className="mb-4 flex items-center justify-between text-2xl">
         <h3 className="font-semibold tracking-tight text-white">{user.name}</h3>
         <Icon className="text-primary fill-current" />
@@ -60,10 +60,10 @@ const UserFullCard = ({ name }: { name: string }) => {
           </p>
         </div>
       </div>
-      <Link href="/src/app/(app)/(admin)/users/[name]/edit" as={`/dashboard/users/${name}/edit`}>
+      <Link href="/users/[name]/edit" as={`/users/${name}/edit`}>
         <Button variant="default">Edit</Button>
       </Link>
-      <Link href="/src/app/(app)/(admin)/users/[name]/change-password" as={`/dashboard/users/${name}/change-password`}>
+      <Link href="/users/[name]/change-password" as={`/users/${name}/change-password`}>
         <Button variant="glass" className="mt-2">
           Change Password
         </Button>

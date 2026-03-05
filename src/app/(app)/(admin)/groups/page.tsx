@@ -1,11 +1,15 @@
 import GroupsClientPage from '@/app/(app)/(admin)/groups/page.client'
+import { AdminPage } from '@/components/admin/AdminPage'
 
 const GroupsPage = () => {
+  const title = 'Manage Groups'
+  const description = 'Create and manage groups to organize users and permissions effectively.'
+  const props = { title, description }
+
   return (
-    <div className="flex h-full flex-col items-center justify-center">
-      <h1 className="mb-4 text-2xl font-bold">Manage Groups</h1>
+    <AdminPage {...props}>
       <GroupsClientPage />
-    </div>
+    </AdminPage>
   )
 }
 

@@ -1,18 +1,8 @@
-import { AdminPage } from '@/components/admin/AdminPage'
 import APIKeysClientPage from '@/app/(app)/(admin)/api-keys/page.client'
-import { AddButton } from '@/components/admin/AddButton'
+import { makeAdminPage } from '@/components/admin/makeAdminPage'
 
-const APIKeysPage = () => {
-  const title = 'API Keys'
-  const description = 'Manage your API keys for cloud mounts here. You can create, edit, and delete keys as needed.'
-  const props = { title, description }
-
-  return (
-    <AdminPage {...props}>
-      <AddButton title="Add API Key" href="/api-keys/add" />
-      <APIKeysClientPage />
-    </AdminPage>
-  )
-}
-
-export default APIKeysPage
+export default makeAdminPage(APIKeysClientPage, {
+  title: 'API Keys',
+  description: 'Manage your API keys for cloud mounts here. You can create, edit, and delete keys as needed.',
+  add: { title: 'Add API Key', href: '/api-keys/add' },
+})

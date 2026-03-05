@@ -1,19 +1,8 @@
 import UsersClientPage from '@/app/(app)/(admin)/users/page.client'
-import { AdminGrid } from '@/components/admin/AdminGrid'
-import { AdminPage } from '@/components/admin/AdminPage'
+import { makeAdminPage } from '@/components/admin/makeAdminPage'
 
-const UsersPage = () => {
-  const title = 'Users'
-  const description = 'Manage users and their permissions in your vault.'
-  const props = { title, description }
-
-  return (
-    <AdminPage {...props}>
-      <AdminGrid>
-        <UsersClientPage />
-      </AdminGrid>
-    </AdminPage>
-  )
-}
-
-export default UsersPage
+export default makeAdminPage(UsersClientPage, {
+  title: 'Users',
+  description: 'Manage users and their permissions in your vault.',
+  grid: true,
+})

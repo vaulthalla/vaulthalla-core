@@ -1,25 +1,9 @@
-import VaultsClientPage from './page.client'
-import { AdminPage } from '@/components/admin/AdminPage'
-import { AdminGrid } from '@/components/admin/AdminGrid'
-import { AddButton } from '@/components/admin/AddButton'
+import VaultsClientPage from '@/app/(app)/(admin)/vaults/page.client'
+import { makeAdminPage } from '@/components/admin/makeAdminPage'
 
-const VaultsPage = () => {
-  const title = 'Vaults'
-  const description = 'Choose a vault to manage.'
-  const props = { title, description }
-
-  const Grid = () => (
-    <AdminGrid>
-      <VaultsClientPage />
-    </AdminGrid>
-  )
-
-  return (
-    <AdminPage {...props}>
-      <AddButton title="Add Vault" href="/vaults/add" />
-      <Grid />
-    </AdminPage>
-  )
-}
-
-export default VaultsPage
+export default makeAdminPage(VaultsClientPage, {
+  title: 'Vaults',
+  description: 'Choose a vault to manage.',
+  add: { title: 'Add Vault', href: '/vaults/add' },
+  grid: true,
+})

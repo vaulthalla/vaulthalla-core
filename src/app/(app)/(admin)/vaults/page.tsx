@@ -1,15 +1,34 @@
 import VaultsClientPage from './page.client'
+import { AdminPage } from '@/components/admin/AdminPage'
+import Link from 'next/link'
+import { Button } from '@/components/Button'
+import Plus from '@/fa-regular/plus.svg'
+import { AdminGrid } from '@/components/admin/AdminGrid'
 
 const VaultsPage = () => {
-  return (
-    <div className="p-6 md:p-10">
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold text-cyan-100">Vaults</h1>
-        <p className="mt-2 text-cyan-300/80">Choose a vault to manage.</p>
-      </div>
+  const title = 'Vaults'
+  const description = 'Choose a vault to manage.'
+  const props = { title, description }
 
+  const Grid = () => (
+    <AdminGrid>
       <VaultsClientPage />
-    </div>
+    </AdminGrid>
+  )
+
+  const AddButton = () => (
+    <Link href="/src/app/(app)/(admin)/vaults)/vaults/add">
+      <Button type="button">
+        <Plus className="text-secondary mr-2 fill-current" /> Add Vault
+      </Button>
+    </Link>
+  )
+
+  return (
+    <AdminPage {...props}>
+      <AddButton />
+      <Grid />
+    </AdminPage>
   )
 }
 

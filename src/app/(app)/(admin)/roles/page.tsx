@@ -1,15 +1,32 @@
-import { RoleCategoryGrid } from '@/components/roles/RoleCategoryGrid'
+import { AdminPage } from '@/components/admin/AdminPage'
+import { AdminGrid } from '@/components/admin/AdminGrid'
+import { RoleCategoryCard } from '@/components/roles/RoleCategoryCard'
+import UserIcon from '@/fa-duotone/user.svg'
+import VaultIcon from '@/fa-duotone/vault.svg'
 
 const RolesPage = () => {
-  return (
-    <div className="p-6 md:p-10">
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold text-cyan-100">Roles</h1>
-        <p className="mt-2 text-cyan-300/80">Choose a category to manage.</p>
-      </div>
+  const title = 'Roles'
+  const description = 'Choose a category to manage.'
+  const props = { title, description }
 
-      <RoleCategoryGrid />
-    </div>
+  return (
+    <AdminPage {...props}>
+      <AdminGrid>
+        <RoleCategoryCard
+          title="User Roles"
+          description="Permissions and roles assigned to users."
+          href="/roles/user"
+          Icon={UserIcon}
+        />
+
+        <RoleCategoryCard
+          title="Vault Roles"
+          description="Roles that apply within a vault context."
+          href="/roles/vault"
+          Icon={VaultIcon}
+        />
+      </AdminGrid>
+    </AdminPage>
   )
 }
 

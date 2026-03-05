@@ -18,7 +18,7 @@ const APIKeysComponent = () => {
         <ul className="my-6">
           {apiKeys.map(apiKey => (
             <li key={apiKey.api_key_id} className="my-4">
-              <Link href="/src/app/api-keys/[slug]" as={`/dashboard/api-keys/${apiKey.api_key_id}`}>
+              <Link href="/src/app/(app)/(admin)/api-keys/[slug]" as={`/dashboard/api-keys/${apiKey.api_key_id}`}>
                 <APIKeyCard {...apiKey} />
               </Link>
             </li>
@@ -26,7 +26,7 @@ const APIKeysComponent = () => {
         </ul>
       : <p className="text-gray-500">No API keys found. Create one to get started.</p>}
 
-      <Link href="/src/app/api-keys/add">
+      <Link href="/src/app/(app)/(admin)/api-keys/add">
         <Button className="w-full cursor-pointer rounded-lg bg-blue-600 px-4 font-semibold text-white transition-colors duration-200 hover:bg-blue-700">
           + Create New API Key
         </Button>

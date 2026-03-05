@@ -16,7 +16,7 @@ const RolesComponent = ({ roles }: { roles: VaultRole[] | UserRole[] }) => {
   return (
     <div className="h-full w-full px-6 py-8">
       <h1 className="text-center text-3xl font-bold text-white">{title}</h1>
-      <Link href="/src/app/roles/add">
+      <Link href="/src/app/(app)/(admin)/roles/add">
         <Button type="button" className="my-6">
           + Add Role
         </Button>
@@ -25,7 +25,7 @@ const RolesComponent = ({ roles }: { roles: VaultRole[] | UserRole[] }) => {
       {roles.length > 0 ?
         <div className="3xl:grid-cols-3 grid gap-6 sm:grid-cols-1 md:grid-cols-2">
           {roles.map(role => (
-            <Link href="/src/app/roles/[role_id]" as={`/dashboard/roles/${role.name}`} key={role.name}>
+            <Link href="/src/app/(app)/(admin)/roles/[role_id]" as={`/dashboard/roles/${role.name}`} key={role.name}>
               <RoleCard {...role} key={role.name} />
             </Link>
           ))}

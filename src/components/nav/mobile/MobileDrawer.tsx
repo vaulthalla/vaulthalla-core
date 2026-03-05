@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { NavList } from '@/components/nav/NavList'
-import type { NavConfig } from '@/components/nav/types'
 import Bars from '@/fa-light/bars.svg'
 import { LogoutButton } from '@/components/nav/LogoutButton'
+import { NAV } from '@/config/nav/registry'
 
-export const MobileDrawer = ({ config, title = 'Menu' }: { config: NavConfig; title?: string }) => {
+export const MobileDrawer = ({ mode, title = 'Menu' }: { mode: 'admin' | 'fs'; title?: string }) => {
   const [open, setOpen] = useState(false)
+  const config = NAV[mode]
 
   // optional: lock scroll when open
   useEffect(() => {
@@ -62,7 +62,7 @@ export const MobileDrawer = ({ config, title = 'Menu' }: { config: NavConfig; ti
               <div className="grow" />
 
               <div onClick={() => setOpen(false)}>
-                <LogoutButton />
+                <LogoutButton isCompact={false} />
               </div>
 
               <div className="mt-3 text-xs text-cyan-400 opacity-70">v0.1.0 • Vaulthalla</div>

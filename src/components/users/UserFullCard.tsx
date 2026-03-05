@@ -60,10 +60,10 @@ const UserFullCard = ({ name }: { name: string }) => {
           </p>
         </div>
       </div>
-      <Link href="/src/app/users/[name]/edit" as={`/dashboard/users/${name}/edit`}>
+      <Link href="/src/app/(app)/(admin)/users/[name]/edit" as={`/dashboard/users/${name}/edit`}>
         <Button variant="default">Edit</Button>
       </Link>
-      <Link href="/src/app/users/[name]/change-password" as={`/dashboard/users/${name}/change-password`}>
+      <Link href="/src/app/(app)/(admin)/users/[name]/change-password" as={`/dashboard/users/${name}/change-password`}>
         <Button variant="glass" className="mt-2">
           Change Password
         </Button>

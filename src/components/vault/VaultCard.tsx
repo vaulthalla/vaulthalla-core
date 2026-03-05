@@ -40,7 +40,7 @@ const VaultCard = (vault: Vault) => {
       transition={{ duration: 0.35, ease: 'easeOut' }}
       whileHover={{ scale: 1.015 }}
       whileTap={{ scale: 0.985 }}
-      className="card-glass relative my-4 w-96 rounded-xl border p-6 shadow-md transition-transform">
+      className="card-glass relative my-4 w-96 max-w-full rounded-xl border p-6 shadow-md transition-transform">
       <div className="absolute top-2.5 right-2.5 text-2xl">
         {vault.is_active ?
           <ShieldCheck className="fill-current text-green-600" />

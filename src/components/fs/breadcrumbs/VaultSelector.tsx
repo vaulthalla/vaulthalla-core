@@ -1,10 +1,10 @@
 'use client'
 
-import { useFSStore } from '@/stores/fsStore'
+import React from 'react'
 import { useVaultStore } from '@/stores/vaultStore'
-import { cn } from '@/util/cn'
+import { useFSStore } from '@/stores/fsStore'
 
-const VaultBreadcrumbs = ({ className }: { className?: string }) => {
+export const VaultSelector = () => {
   const { currVault, setCurrVault, path, setPath } = useFSStore()
   const { vaults } = useVaultStore()
 
@@ -16,9 +16,7 @@ const VaultBreadcrumbs = ({ className }: { className?: string }) => {
     }
   }
 
-  const parts = path.split('/').filter(Boolean)
-
-  const VaultSelector = () =>
+  return (
     vaults.length > 1 ?
       <div className="inline-flex items-center gap-2.5">
         <div className="flex items-center gap-1">
@@ -42,30 +40,5 @@ const VaultBreadcrumbs = ({ className }: { className?: string }) => {
         {currVault?.name}
       </span>
     : <span className="text-gray-500 italic">No Vaults</span>
-
-  const Breadcrumbs = () =>
-    parts.length > 0
-    && parts.map((part, index) => {
-      const fullPath = '/' + parts.slice(0, index + 1).join('/')
-      return (
-        <div key={index} className="flex items-center gap-1">
-          {index === 0 && <span>/</span>}
-          <span key={fullPath} className="flex items-center">
-            <span className="cursor-pointer text-cyan-400 hover:underline" onClick={() => setPath(fullPath)}>
-              {part}
-            </span>
-            {index < parts.length - 1 && <span className="mx-1">/</span>}
-          </span>
-        </div>
-      )
-    })
-
-  return (
-    <nav className={cn('flex items-center gap-2 text-sm text-gray-300', className)}>
-      <VaultSelector />
-      <Breadcrumbs />
-    </nav>
   )
 }
-
-export default VaultBreadcrumbs

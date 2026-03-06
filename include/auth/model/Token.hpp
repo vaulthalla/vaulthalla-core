@@ -17,7 +17,7 @@ struct Token {
     bool revoked = false;
 
     [[nodiscard]] bool isExpired() const { return std::chrono::system_clock::now() >= expiryTs; }
-    [[nodiscard]] bool isValid() const { return !isExpired() && !revoked; }
+    [[nodiscard]] bool isValid() const { return !rawToken.empty() && !isExpired() && !revoked; }
 
     [[nodiscard]] long long getTimeLeft() const {
         return std::chrono::duration_cast<std::chrono::seconds>(expiryTs - std::chrono::system_clock::now()).count();

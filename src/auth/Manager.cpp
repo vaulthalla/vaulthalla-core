@@ -35,11 +35,11 @@ void Manager::rehydrateOrCreateClient(const std::shared_ptr<ws::Session>& sessio
 
     if (!session->getRefreshToken().empty()) {
         log::Registry::auth()->debug("[AuthManager] Attempting to rehydrate session from provided refresh token.");
-        const auto validatedClient = validateRefreshToken(session->getRefreshToken(), session);
-        if (!validatedClient) log::Registry::auth()->debug("[AuthManager] Failed to rehydrate session: invalid refresh token.");
+        if (const auto validatedClient = validateRefreshToken(session->getRefreshToken(), session); !validatedClient)
+            log::Registry::auth()->debug("[AuthManager] Failed to rehydrate session: invalid refresh token.");
         else {
             client = validatedClient;
-            log::Registry::auth()->debug("[AuthManager] Successfully rehydrated session for user: {}", client->getUserName());
+            log::Registry::auth()->debug("[AuthManager] Successfully rehydrated session with UUID: {}", client->session->getUUID());
         }
     }
 
@@ -91,7 +91,6 @@ std::shared_ptr<Client> Manager::loginUser(const std::string& name, const std::s
         user = db::query::identities::User::getUserById(user->id);
         auto client = sessionManager_->getClientSession(session->getUUID());
         client->setUser(user);
-        client->getSession()->setAuthenticatedUser(user);
 
         sessionManager_->promoteSession(client);
 

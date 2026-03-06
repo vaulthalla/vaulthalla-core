@@ -9,14 +9,15 @@
 using namespace vh::protocols::ws;
 using namespace vh::auth;
 using namespace vh::config;
+using namespace std::chrono;
 
 ConnectionLifecycleManager::ConnectionLifecycleManager()
     : AsyncService("LifecycleManager"),
       sessionManager_(runtime::Deps::get().authManager->sessionManager()) {
     const auto& config = ConfigRegistry::get().services.connection_lifecycle_manager;
-    sweep_interval_ = std::chrono::seconds(config.sweep_interval_seconds);
-    unauthenticated_session_timeout_ = std::chrono::seconds(config.unauthenticated_timeout_seconds);
-    idle_timeout_ = std::chrono::minutes(config.idle_timeout_minutes); // TODO: implement idle timeout logic
+    sweep_interval_ = seconds(config.sweep_interval_seconds);
+    unauthenticated_session_timeout_ = seconds(config.unauthenticated_timeout_seconds);
+    idle_timeout_ = minutes(config.idle_timeout_minutes); // TODO: implement idle timeout logic
 }
 
 ConnectionLifecycleManager::~ConnectionLifecycleManager() {
@@ -35,19 +36,17 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
     for (const auto& [tokenStr, client] : sessionManager_->getActiveSessions()) {
         if (!client) continue;
 
-        const auto token = client->getToken();
-
-        if (client->connOpenedAt() + unauthenticated_session_timeout_ < std::chrono::system_clock::now() && !token) {
+        if (client->connOpenedAt() + unauthenticated_session_timeout_ < system_clock::now() && !client->token) {
             log::Registry::ws()->debug("[LifecycleManager] Closing unauthenticated session (no token) opened at {}",
-                                    std::chrono::system_clock::to_time_t(client->connOpenedAt()));
+                                    system_clock::to_time_t(client->connOpenedAt()));
             client->sendControlMessage("unauthenticated_session_timeout", {});
             client->closeConnection();
             sessionManager_->invalidateSession(tokenStr);
             continue;
         }
 
-        if (!token || token->revoked) {
-            if (const auto user = client->getUser()) {
+        if (!client->validateSession()) {
+            if (const auto user = client->user) {
                 log::Registry::ws()->debug("[LifecycleManager] Token revoked. Closing session for user {}", user->id);
                 client->sendControlMessage("token_revoked", {});
             }
@@ -56,10 +55,10 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
             continue;
         }
 
-        const auto secondsLeft = token->getTimeLeft();
+        const auto secondsLeft = client->token->getTimeLeft();
 
         if (secondsLeft <= 0) {
-            if (const auto user = client->getUser()) {
+            if (const auto user = client->user) {
                 log::Registry::ws()->debug("[LifecycleManager] Token expired. Closing session for user {}", user->id);
                 client->sendControlMessage("token_expired", {});
             }
@@ -69,7 +68,7 @@ void ConnectionLifecycleManager::sweepActiveSessions() const {
         }
 
         // sendControlMessage requires a user to be set
-        if (client->getUser()) {
+        if (client->user) {
             if (secondsLeft <= 10)
                 client->sendControlMessage("token_refresh_urgent", {{"deadline_ms", 10000}});
             else if (secondsLeft <= 300)

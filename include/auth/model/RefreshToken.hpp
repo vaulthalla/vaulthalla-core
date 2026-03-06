@@ -29,6 +29,9 @@ class RefreshToken {
           lastUsed_(parsePostgresTimestamp(row["last_used"].as<std::string>())),
           revoked_(row["revoked"].as<bool>()) {}
 
+    [[nodiscard]] bool isExpired() const { return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) > expiresAt_; }
+    [[nodiscard]] bool isValid() const { return !hashedToken_.empty() && !revoked_ && !isExpired(); }
+
     [[nodiscard]] const std::string& getJti() const { return jti_; }
     [[nodiscard]] const std::string& getHashedToken() const { return hashedToken_; }
     [[nodiscard]] unsigned int getUserId() const { return userId_; }

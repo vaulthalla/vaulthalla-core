@@ -102,7 +102,7 @@ Response Router::handleAuthSession(request&& req) {
         }
         runtime::Deps::get().authManager->validateRefreshToken(refresh);
         const auto session = runtime::Deps::get().authManager->sessionManager()->getClientSession(refresh);
-        if (!session || !session->getUser()) {
+        if (!session || !session->user) {
             log::Registry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
             return makeErrorResponse(req, "Not found", status::not_found);
         }
@@ -110,7 +110,7 @@ Response Router::handleAuthSession(request&& req) {
         // Could mint an access token here if we wanted to
         nlohmann::json j{
                     {"ok", true},
-                    {"user_id", session->getUser()->id},
+                    {"user_id", session->user->id},
                     // {"access_token", access.token},
                     // {"expires_in", access.expires_in}
                 };

@@ -18,8 +18,8 @@ json Auth::login(const json& payload, Session& session) {
     const auto client = runtime::Deps::get().authManager->loginUser(username, password, session.shared_from_this());
     if (!client) throw std::runtime_error("Invalid email or password or user not found");
 
-    session.setAuthenticatedUser(client->getUser());
-    return {{"token", client->getRawToken()}, {"user", *client->getUser()}};
+    session.setAuthenticatedUser(client->user);
+    return {{"token", client->getRawToken()}, {"user", *client->user}};
 }
 
 json Auth::registerUser(const json& payload, Session& session) {
@@ -33,7 +33,7 @@ json Auth::registerUser(const json& payload, Session& session) {
 
     auto user = std::make_shared<User>(name, email, isActive);
     const auto client = runtime::Deps::get().authManager->registerUser(user, password, session.shared_from_this());
-    user = client->getUser();
+    user = client->user;
     std::string token = client->getRawToken();
 
     // Bind user to WebSocketSession
@@ -101,8 +101,9 @@ json Auth::getUser(const json& payload, const Session& session) {
 json Auth::refresh(Session& session) {
     const auto client = runtime::Deps::get().authManager->validateRefreshToken(session.getRefreshToken(), session.shared_from_this());
     if (!client) throw std::runtime_error("No client attached to current websocket session. Please reauthenticate.");
-    client->refreshToken();
-    return {{"token", client->getRawToken()}, {"user", *client->getUser()}};
+    if (!client->user) throw std::runtime_error("No user attached to current websocket session. Please reauthenticate.");
+    client->renewToken();
+    return {{"token", client->getRawToken()}, {"user", *client->user}};
 }
 
 json Auth::logout(Session& session) {
@@ -123,7 +124,7 @@ json Auth::isUserAuthenticated(const std::string& token, const Session& session)
     const auto client = runtime::Deps::get().authManager->sessionManager()->getClientSession(session.getUUID());
     if (!client) throw std::runtime_error("No access token attached to current websocket session. Please reauthenticate.");
 
-    const auto user = client->getUser();
+    const auto user = client->user;
     if (!user) throw std::runtime_error("User not found for token: " + token);
 
     const bool isAuthenticated = client->isAuthenticated() && client->validateToken(token);

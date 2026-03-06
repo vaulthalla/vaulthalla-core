@@ -16,27 +16,23 @@ Client::Client() = default;
 
 Client::Client(const std::shared_ptr<ws::Session>& session,
                const std::shared_ptr<RefreshToken>& refreshToken, const std::shared_ptr<User>& user)
-    : user_(user), session_(session), refreshToken_(refreshToken) {
+    : user(user), session(session), refreshToken(refreshToken) {
     if (user) {
-        token_ = std::make_shared<Token>(generateToken(user->name), user->id);
-        session_->setAuthenticatedUser(user_);
+        token = std::make_shared<Token>(generateToken(user->name), user->id);
+        session->setAuthenticatedUser(user);
     }
 }
-
-std::shared_ptr<User> Client::getUser() const { return user_; }
-std::shared_ptr<Token> Client::getToken() const { return token_; }
-std::shared_ptr<ws::Session> Client::getSession() const { return session_; }
 
 void Client::setSession(const std::shared_ptr<ws::Session>& session) {
     if (!session) {
         log::Registry::ws()->debug("[Client] Cannot set session: session is null.");
         return;
     }
-    session_ = session;
-    if (user_) session_->setAuthenticatedUser(user_);
+    this->session = session;
+    if (user) session->setAuthenticatedUser(user);
     else {
         log::Registry::ws()->debug("[Client] Session set without user. User must be set before session.");
-        session_->setAuthenticatedUser(nullptr);
+        session->setAuthenticatedUser(nullptr);
     }
 }
 
@@ -45,51 +41,43 @@ void Client::setUser(const std::shared_ptr<User>& user) {
         log::Registry::ws()->debug("[Client] Cannot set user: user is null.");
         return;
     }
-    user_ = user;
-    token_ = std::make_shared<Token>(generateToken(user->name), user->id);
-    session_->setAuthenticatedUser(user_);
+    this->user = user;
+    renewToken();
+    session->setAuthenticatedUser(user);
 }
 
-void Client::setToken(const std::shared_ptr<Token>& token) {
-    token_ = token;
-}
-
-std::string Client::getUserName() const {
-    return user_ ? user_->name : "";
-}
-
-std::string Client::getEmail() const {
-    return user_ && user_->email ? *user_->email : "";
-}
-
-std::string Client::getRawToken() const {
-    return token_ ? token_->rawToken : "";
-}
+void Client::setToken(const std::shared_ptr<Token>& token) { this->token = token; }
 
 bool Client::expiresSoon() const {
-    return token_ && token_->expiryTs < std::chrono::system_clock::now() + std::chrono::minutes(5);
+    return token && token->expiryTs < std::chrono::system_clock::now() + std::chrono::minutes(5);
 }
 
 bool Client::isAuthenticated() const {
-    return user_ != nullptr && token_ != nullptr && !token_->isExpired() && !token_->revoked;
+    return user && token && token->isValid();
 }
 
-void Client::refreshToken() {
-    if (user_) token_ = std::make_shared<Token>(generateToken(user_->name), user_->id);
+void Client::renewToken() {
+    if (user) token = std::make_shared<Token>(generateToken(user->name), user->id);
     else log::Registry::ws()->debug("[Client] Cannot refresh token: user is not set.");
 }
 
 void Client::invalidateToken() const {
-    if (token_) {
-        token_->revoke();
-        log::Registry::ws()->debug("[Client] Token invalidated for user: {}", user_ ? user_->name : "unknown");
+    if (token) {
+        token->revoke();
+        log::Registry::ws()->debug("[Client] Token invalidated for user: {}", user ? user->name : "unknown");
     } else log::Registry::ws()->debug("[Client] Cannot invalidate token: token is not set.");
 }
 
 void Client::closeConnection() const {
     invalidateToken();
-    if (session_) session_->close();
-    log::Registry::ws()->debug("[Client] Connection closed for user: {}", user_ ? user_->name : "unknown");
+    if (session) session->close();
+    log::Registry::ws()->debug("[Client] Connection closed for user: {}", user ? user->name : "unknown");
+}
+
+std::string Client::getRawToken() const { return token ? token->rawToken : std::string(); }
+
+bool Client::validateSession() const {
+    return user && token && token->isValid() && refreshToken && refreshToken->isValid();
 }
 
 bool Client::validateToken(const std::string& token) const {
@@ -115,9 +103,9 @@ void Client::sendControlMessage(const std::string& type, const nlohmann::json& p
         return;
     }
 
-    const nlohmann::json msg = {{"type", type}, {"user", user_->email}, {"payload", payload}};
+    const nlohmann::json msg = {{"type", type}, {"user", user->email}, {"payload", payload}};
 
-    if (session_) session_->send(msg);
+    if (session) session->send(msg);
     else log::Registry::ws()->debug("[Client] Cannot send control message: session is not set.");
 }
 

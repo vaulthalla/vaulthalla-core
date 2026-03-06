@@ -32,11 +32,10 @@ std::string SessionManager::promoteSession(const std::shared_ptr<Client>& client
     token->setUserAgent(userAgent);
     token->setIpAddress(ipAddress);
 
-    if (const auto dbToken = db::query::identities::User::getRefreshToken(oldJti);
-        dbToken->getUserId() != userId || dbToken->getUserAgent() != userAgent)
+    if (const auto dbToken = db::query::identities::User::getRefreshToken(oldJti)) {
+        if (dbToken->getUserId() != userId || dbToken->getUserAgent() != userAgent)
             throw std::invalid_argument("Invalid refresh token");
-
-    db::query::identities::User::addRefreshToken(token);
+    } else db::query::identities::User::addRefreshToken(token);
 
     client->setRefreshToken(db::query::identities::User::getRefreshToken(oldJti));
     if (!client->refreshToken) throw std::runtime_error("Failed to reload refresh token");

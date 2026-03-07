@@ -28,7 +28,7 @@ struct RefreshToken final : Token {
 
     [[nodiscard]] bool isValid() const override;
 
-    void invalidate();
+    void hardInvalidate();
 
     [[nodiscard]] bool dangerousDivergence(const std::shared_ptr<RefreshToken>& other) const;
 

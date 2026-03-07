@@ -1,5 +1,5 @@
 #include "auth/model/RefreshToken.hpp"
-#include "db/query/identities/User.hpp"
+#include "db/query/auth/RefreshToken.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "protocols/ws/Session.hpp"
 #include "auth/model/TokenPair.hpp"
@@ -54,12 +54,11 @@ bool RefreshToken::dangerousDivergence(const std::shared_ptr<RefreshToken>& othe
     );
 }
 
-void RefreshToken::invalidate() {
+void RefreshToken::hardInvalidate() {
     revoke();
+    db::query::auth::RefreshToken::revokeRefreshToken(jti);
     hashedToken.clear();
-    userAgent.clear();
-    ipAddress.clear();
-    db::query::identities::User::revokeAndPurgeRefreshTokens(userId);
+    rawToken.clear();
 }
 
 std::shared_ptr<RefreshToken> RefreshToken::fromIssuedToken(std::string jti, std::string rawToken,

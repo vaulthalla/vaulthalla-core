@@ -25,6 +25,7 @@ class DBConnection {
     // Auth
     void initPreparedUsers() const;
     void initPreparedGroups() const;
+    void initPreparedRefreshTokens() const;
 
     // RBAC
     void initPreparedRoles() const;

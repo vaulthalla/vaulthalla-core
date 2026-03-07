@@ -6,35 +6,44 @@
 #include <unordered_map>
 
 namespace vh::protocols::ws { struct Session; }
+namespace vh::identities::model { struct User; }
 
 namespace vh::auth::session {
 
 class Manager {
-  public:
-    void newSession(const std::shared_ptr<protocols::ws::Session>& session);
-    void ensureSession(const std::shared_ptr<protocols::ws::Session>& session);
-    void promoteSession(const std::shared_ptr<protocols::ws::Session>& session);
+public:
+    using SessionPtr = std::shared_ptr<protocols::ws::Session>;
+    using SessionMap = std::unordered_map<std::string, SessionPtr>;
+    using SessionUserMap = std::unordered_multimap<uint32_t, SessionPtr>;
 
-    void cacheSession(const std::shared_ptr<protocols::ws::Session>& session);
+    void tryRehydrateSession(const SessionPtr& session);
+    void ensureSession(const SessionPtr& session);
+    void promoteSession(const SessionPtr& session);
+
+    void cacheSession(const SessionPtr& session);
     void invalidateSession(const std::string& token);
-    void invalidateSession(const std::shared_ptr<protocols::ws::Session>& session);
+    void invalidateSession(const SessionPtr& session);
 
-    std::shared_ptr<protocols::ws::Session> getSession(const std::string& token);
+    SessionPtr getSession(const std::string& token);
+    std::vector<SessionPtr> getSessions(const std::shared_ptr<identities::model::User>& user);
+    std::vector<SessionPtr> getSessionsByUserId(uint32_t userId);
 
-    // For admin / debug: list active sessions
-    std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> getActiveSessions();
+    SessionMap getActiveSessions();
 
-  private:
-    std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> sessionsByUUID_;
-    std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> sessionsByRefreshJti_;
-    std::unordered_map<uint32_t, std::shared_ptr<protocols::ws::Session>> sessionsByUserId_;
+private:
+    SessionMap sessionsByUUID_;
+    SessionMap sessionsByRefreshJti_;
+    SessionUserMap sessionsByUserId_;
     std::mutex sessionMutex_;
 };
 
-inline std::string to_string(const std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>>& sessions) {
+inline std::string to_string(
+    const std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>>& sessions
+) {
     std::string result;
-    for (const auto& [token, session] : sessions) result += "Token: " + token + "\n";
+    for (const auto& [token, session] : sessions)
+        result += "Token: " + token + "\n";
     return result;
 }
 
-} // namespace vh::auth
+}

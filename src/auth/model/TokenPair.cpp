@@ -3,9 +3,18 @@
 
 using namespace vh::auth::model;
 
-void TokenPair::invalidate() {
-    accessToken->revoke();
-    refreshToken->invalidate();
+void TokenPair::revoke() const {
+    if (accessToken) accessToken->revoke();
+    if (refreshToken) refreshToken->revoke();
+}
+
+void TokenPair::invalidate() const {
+    if (accessToken) accessToken->revoke();
+    if (refreshToken) refreshToken->hardInvalidate();
+}
+
+void TokenPair::destroy() {
+    invalidate();
     accessToken = nullptr;
     refreshToken = nullptr;
 }

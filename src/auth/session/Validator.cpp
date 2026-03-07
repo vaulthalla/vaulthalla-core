@@ -4,6 +4,7 @@
 #include "protocols/ws/Session.hpp"
 #include "log/Registry.hpp"
 #include "crypto/secrets/Manager.hpp"
+#include "runtime/Deps.hpp"
 
 #include <jwt-cpp/jwt.h>
 #include <jwt-cpp/traits/nlohmann-json/traits.h>
@@ -20,7 +21,7 @@ bool Validator::validateAccessToken(const std::shared_ptr<protocols::ws::Session
         const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(accessToken);
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-            .allow_algorithm(jwt::algorithm::hs256{crypto::secrets::Manager().jwtSecret()})
+            .allow_algorithm(jwt::algorithm::hs256{runtime::Deps::get().secretsManager->jwtSecret()})
             .with_issuer("vaulthalla");
 
         verifier.verify(decoded);
@@ -49,7 +50,7 @@ std::optional<RefreshTokenClaims> Validator::decodeRefreshToken(const std::strin
         const auto decoded = jwt::decode<jwt::traits::nlohmann_json>(refreshToken);
 
         const auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-            .allow_algorithm(jwt::algorithm::hs256{crypto::secrets::Manager().jwtSecret()})
+            .allow_algorithm(jwt::algorithm::hs256{runtime::Deps::get().secretsManager->jwtSecret()})
             .with_issuer("Vaulthalla");
 
         verifier.verify(decoded);

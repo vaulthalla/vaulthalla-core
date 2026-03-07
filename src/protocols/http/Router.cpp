@@ -101,7 +101,7 @@ Response Router::handleAuthSession(request&& req) {
             return makeErrorResponse(req, "Refresh token not set", status::bad_request);
         }
         runtime::Deps::get().authManager->validateRefreshToken(refresh);
-        const auto session = runtime::Deps::get().authManager->sessionManager()->getClientSession(refresh);
+        const auto session = runtime::Deps::get().authManager->sessionManager_()->getClientSession(refresh);
         if (!session || !session->user) {
             log::Registry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
             return makeErrorResponse(req, "Not found", status::not_found);

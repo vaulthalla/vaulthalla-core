@@ -50,10 +50,8 @@ public:
     void send(const json& message);
     void close();
 
-    void setRefreshTokenCookie(const std::string& token);
+    void setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user);
     void setHandshakeRequest(const RequestType& req);
-
-    std::shared_ptr<identities::model::User> getAuthenticatedUser() const;
 
     std::shared_ptr<handler::Upload> getUploadHandler() const { return uploadHandler_; }
 

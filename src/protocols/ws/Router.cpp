@@ -49,7 +49,7 @@ void Router::routeMessage(json&& msg, const SessionPtr& session) {
         const std::string accessToken = msg.value("token", "");
 
         if (!command.starts_with("auth")) {
-            if (const auto activeSession = runtime::Deps::get().authManager->sessionManager->getSession(session->uuid);
+            if (const auto activeSession = runtime::Deps::get().authManager->sessionManager_->getSession(session->uuid);
                 !activeSession || !auth::session::Validator::validateAccessToken(session, accessToken)) {
                 log::Registry::ws()->warn("[Router] Unauthorized access attempt for command: {}", command);
                 Response::UNAUTHORIZED(std::move(command), std::move(msg))(session);

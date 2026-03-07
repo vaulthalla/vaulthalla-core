@@ -32,7 +32,7 @@ using namespace vh::protocols;
 namespace vh::protocols::ws {
 
 Session::Session(const std::shared_ptr<Router>& router)
-    : uploadHandler_(std::make_shared<handler::Upload>(this)), router_(router) {
+    : uploadHandler_(std::make_shared<handler::Upload>(shared_from_this())), router_(router) {
     buffer_.max_size(65536);
 }
 
@@ -54,6 +54,12 @@ std::string Session::getUserAgent() const {
     if (const auto it = handshakeRequest_.find(http::field::user_agent);
         it != handshakeRequest_.end()) return std::string(it->value());
     return  "unknown";
+}
+
+void Session::setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user) {
+    this->user = user;
+    if (!tokens->refreshToken) throw std::runtime_error("Cannot set authenticated user without a refresh token in session");
+    tokens->refreshToken->userId = user->id;
 }
 
 void Session::setHandshakeRequest(const RequestType& req) { handshakeRequest_ = req; }
@@ -86,11 +92,6 @@ void Session::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast
 
     hydrateFromRequest(*req);
 
-    // auth rehydrate/create *before* accept so we can set refresh cookie in decorator
-    runtime::Deps::get().authManager->rehydrateOrCreateClient(shared_from_this());
-
-    installHandshakeDecorator();
-
     auto self = shared_from_this();
     ws_->async_accept(
         *req,
@@ -103,20 +104,10 @@ void Session::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast
 
 void Session::hydrateFromRequest(const RequestType& req) {
     handshakeRequest_ = req;
-
-    try {
-        ipAddress = ws_->next_layer().remote_endpoint().address().to_string();
-    } catch (...) {
-        ipAddress = "unknown";
-    }
-
-    userAgent = std::string(req[http::field::user_agent]);
+    ipAddress = getIPAddress();
+    userAgent = getUserAgent();
     auth::model::RefreshToken::addToSession(shared_from_this(), extractCookie(req, "refresh"));
-
-    if (tokens->refreshToken->rawToken.empty())
-        log::Registry::ws()->debug("[Session] No refresh token found in Cookie header");
-    else
-        log::Registry::ws()->debug("[Session] Refresh token found in Cookie header: {}", tokens->refreshToken->rawToken);
+    runtime::Deps::get().sessionManager->tryRehydrateSession(shared_from_this());
 }
 
 void Session::installHandshakeDecorator() const {

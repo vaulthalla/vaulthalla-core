@@ -1,6 +1,7 @@
 #include "db/Janitor.hpp"
 #include "config/Registry.hpp"
 #include "db/query/sync/Event.hpp"
+#include "db/query/auth/RefreshToken.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::config;
@@ -13,6 +14,7 @@ void vh::db::Janitor::runLoop() {
     while (!shouldStop()) {
         try {
             query::sync::Event::purgeOldEvents();
+            query::auth::RefreshToken::purgeOldRevokedRefreshTokens();
         } catch (const std::exception& e) {
             log::Registry::vaulthalla()->warn("[DBSweeper] Failed to purge old sync events: {}", e.what());
         }

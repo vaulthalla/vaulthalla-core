@@ -1,0 +1,85 @@
+#include "db/DBConnection.hpp"
+
+void vh::db::DBConnection::initPreparedRefreshTokens() const {
+    conn_->prepare(
+        "insert_refresh_token",
+        "INSERT INTO refresh_tokens (jti, user_id, token_hash, ip_address, user_agent, created_at, expires_at, last_used, revoked) "
+        "VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), FALSE)"
+    );
+
+    conn_->prepare(
+        "get_refresh_token_by_jti",
+        "SELECT * FROM refresh_tokens "
+        "WHERE jti = $1"
+    );
+
+    conn_->prepare(
+        "get_user_by_refresh_token_jti",
+        "SELECT u.* "
+        "FROM users u "
+        "JOIN refresh_tokens rt ON u.id = rt.user_id "
+        "WHERE rt.jti = $1"
+    );
+
+    conn_->prepare(
+        "touch_refresh_token_last_used",
+        "UPDATE refresh_tokens "
+        "SET last_used = NOW() "
+        "WHERE jti = $1"
+    );
+
+    conn_->prepare(
+        "revoke_refresh_token_by_jti",
+        "UPDATE refresh_tokens "
+        "SET revoked = TRUE "
+        "WHERE jti = $1"
+    );
+
+    conn_->prepare(
+        "revoke_all_refresh_tokens_for_user",
+        "UPDATE refresh_tokens "
+        "SET revoked = TRUE "
+        "WHERE user_id = $1 AND revoked = FALSE"
+    );
+
+    conn_->prepare(
+        "delete_refresh_token_by_jti",
+        "DELETE FROM refresh_tokens "
+        "WHERE jti = $1"
+    );
+
+    conn_->prepare(
+        "delete_expired_refresh_tokens_for_user",
+        "DELETE FROM refresh_tokens "
+        "WHERE user_id = $1 AND expires_at < NOW()"
+    );
+
+    conn_->prepare(
+        "delete_old_revoked_refresh_tokens_for_user",
+        "DELETE FROM refresh_tokens "
+        "WHERE user_id = $1 "
+        "AND revoked = TRUE "
+        "AND created_at < NOW() - INTERVAL '7 days'"
+    );
+
+    conn_->prepare(
+        "delete_old_revoked_refresh_tokens_global",
+        "DELETE FROM refresh_tokens "
+        "WHERE revoked = TRUE "
+        "AND created_at < NOW() - INTERVAL '7 days'"
+    );
+
+    conn_->prepare(
+        "list_active_refresh_tokens_for_user",
+        "SELECT * FROM refresh_tokens "
+        "WHERE user_id = $1 AND revoked = FALSE AND expires_at >= NOW() "
+        "ORDER BY created_at DESC"
+    );
+
+    conn_->prepare(
+        "count_active_refresh_tokens_for_user",
+        "SELECT COUNT(*) "
+        "FROM refresh_tokens "
+        "WHERE user_id = $1 AND revoked = FALSE AND expires_at >= NOW()"
+    );
+}

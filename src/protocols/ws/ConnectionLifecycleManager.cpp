@@ -13,7 +13,7 @@ using namespace std::chrono;
 
 ConnectionLifecycleManager::ConnectionLifecycleManager()
     : AsyncService("LifecycleManager"),
-      sessionManager_(runtime::Deps::get().authManager->sessionManager) {
+      sessionManager_(runtime::Deps::get().authManager->sessionManager_) {
     const auto& config = Registry::get().services.connection_lifecycle_manager;
     sweep_interval_ = seconds(config.sweep_interval_seconds);
     unauthenticated_session_timeout_ = seconds(config.unauthenticated_timeout_seconds);

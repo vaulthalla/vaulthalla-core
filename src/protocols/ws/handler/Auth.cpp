@@ -51,7 +51,7 @@ json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& sessi
     if (db::query::identities::User::getUserById(targetUser->id))
         throw std::runtime_error("Failed to delete user with id: " + std::to_string(targetUser->id));
 
-    runtime::Deps::get().authManager->sessionManager->invalidateSession(std::to_string(targetUser->id));
+    runtime::Deps::get().authManager->sessionManager_->invalidateSession(std::to_string(targetUser->id));
 
     return {{ "user_id", targetUser->id }};
 }
@@ -102,7 +102,7 @@ json Auth::refresh(const std::shared_ptr<Session>& session) {
 
 json Auth::logout(const std::shared_ptr<Session>& session) {
     const auto refreshToken = session->getRefreshToken();
-    runtime::Deps::get().authManager->sessionManager()->invalidateSession(session->getUUID());
+    runtime::Deps::get().authManager->sessionManager_()->invalidateSession(session->getUUID());
     session->setAuthenticatedUser(nullptr);
     return {};
 }
@@ -115,7 +115,7 @@ json Auth::listUsers(const std::shared_ptr<Session>& session) {
 }
 
 json Auth::isUserAuthenticated(const std::string& token, const std::shared_ptr<Session>& session)  {
-    const auto client = runtime::Deps::get().authManager->sessionManager()->getClientSession(session->getUUID());
+    const auto client = runtime::Deps::get().authManager->sessionManager_()->getClientSession(session->getUUID());
     if (!client) throw std::runtime_error("No access token attached to current websocket session-> Please reauthenticate.");
 
     const auto user = client->user;

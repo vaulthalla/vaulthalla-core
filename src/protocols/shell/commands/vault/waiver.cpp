@@ -17,7 +17,7 @@
 #include "sync/model/Waiver.hpp"
 #include "rbac/model/UserRole.hpp"
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "vault/terms/waiver.hpp"
 
 #include <string>

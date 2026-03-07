@@ -13,7 +13,7 @@
 #include "rbac/model/VaultRole.hpp"
 #include "identities/model/User.hpp"
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "CommandUsage.hpp"
 
 #include <optional>

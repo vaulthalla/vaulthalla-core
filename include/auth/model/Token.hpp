@@ -25,4 +25,6 @@ struct Token {
     void revoke() { revoked = true; }
 };
 
+bool operator==(const std::shared_ptr<Token>& lhs, const std::shared_ptr<Token>& rhs);
+
 }

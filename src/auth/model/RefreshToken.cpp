@@ -1,6 +1,8 @@
 #include "auth/model/RefreshToken.hpp"
-
+#include "db/query/identities/User.hpp"
 #include "db/encoding/timestamp.hpp"
+#include "protocols/ws/Session.hpp"
+#include "auth/model/TokenPair.hpp"
 
 #include <chrono>
 #include <pqxx/row>
@@ -44,9 +46,37 @@ RefreshToken::RefreshToken(const pqxx::row& row)
 
 bool RefreshToken::isValid() const { return !hashedToken.empty() && !revoked && !isExpired(); }
 
+bool RefreshToken::dangerousDivergence(const std::shared_ptr<RefreshToken>& other) const {
+    return hashedToken == other->hashedToken && (
+        jti != other->jti || userAgent != other->userAgent ||
+        ipAddress != other->ipAddress || createdAt != other->createdAt || expiresAt != other->expiresAt ||
+        lastUsed != other->lastUsed || revoked != other->revoked
+    );
+}
+
+void RefreshToken::invalidate() {
+    revoke();
+    hashedToken.clear();
+    userAgent.clear();
+    ipAddress.clear();
+    db::query::identities::User::revokeAndPurgeRefreshTokens(userId);
+}
+
 std::shared_ptr<RefreshToken> RefreshToken::fromIssuedToken(std::string jti, std::string rawToken,
                                                             std::string hashedToken, std::uint32_t userId,
                                                             std::string userAgent, std::string ipAddress) {
     return std::make_shared<RefreshToken>(std::move(jti), std::move(rawToken), std::move(hashedToken), userId,
                                           std::move(userAgent), std::move(ipAddress));
+}
+
+void RefreshToken::addToSession(const std::shared_ptr<protocols::ws::Session>& session, std::string token) {
+    session->tokens->refreshToken = std::make_shared<RefreshToken>(std::move(token));
+}
+
+bool vh::auth::model::operator==(const std::shared_ptr<RefreshToken>& lhs, const std::shared_ptr<RefreshToken>& rhs) {
+    return lhs->userId == rhs->userId && lhs->expiresAt == rhs->expiresAt &&
+           lhs->revoked == rhs->revoked && lhs->jti == rhs->jti && lhs->hashedToken == rhs->hashedToken &&
+           lhs->userAgent == rhs->userAgent && lhs->ipAddress == rhs->ipAddress &&
+           lhs->createdAt == rhs->createdAt && lhs->expiresAt == rhs->expiresAt &&
+           lhs->lastUsed == rhs->lastUsed && lhs->revoked == rhs->revoked;
 }

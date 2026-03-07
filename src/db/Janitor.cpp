@@ -1,5 +1,5 @@
 #include "db/Janitor.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "db/query/sync/Event.hpp"
 #include "log/Registry.hpp"
 
@@ -7,7 +7,7 @@ using namespace vh::config;
 
 vh::db::Janitor::Janitor()
     : AsyncService("DBSweeper"),
-      sweep_interval_(ConfigRegistry::get().services.db_sweeper.sweep_interval_minutes) {}
+      sweep_interval_(Registry::get().services.db_sweeper.sweep_interval_minutes) {}
 
 void vh::db::Janitor::runLoop() {
     while (!shouldStop()) {

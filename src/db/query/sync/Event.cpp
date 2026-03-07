@@ -8,7 +8,7 @@
 #include "fs/model/File.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "db/encoding/u8.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 using namespace vh::db::query::sync;
 using namespace vh::db::encoding;
@@ -164,7 +164,7 @@ void Event::heartbeat(const EventPtr& event) {
 }
 
 void Event::purgeOldEvents() {
-    const auto& syncConfig = ConfigRegistry::get().sync;
+    const auto& syncConfig = Registry::get().sync;
 
     const auto retention_days = syncConfig.event_audit_retention_days;
     const auto max_entries    = syncConfig.event_audit_max_entries;

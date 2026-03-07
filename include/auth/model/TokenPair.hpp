@@ -9,6 +9,8 @@ struct RefreshToken;
 struct TokenPair {
     std::shared_ptr<Token> accessToken;
     std::shared_ptr<RefreshToken> refreshToken;
+
+    void invalidate();
 };
 
 }

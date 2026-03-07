@@ -1,7 +1,7 @@
 #pragma once
 
 #include "concurrency/Task.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "preview/thumbnail/ops.hpp"
 #include "storage/Engine.hpp"
 #include "fs/cache/Record.hpp"
@@ -38,7 +38,7 @@ public:
         namespace fs = std::filesystem;
 
         try {
-            const auto& sizes = ConfigRegistry::get().caching.thumbnails.sizes;
+            const auto& sizes = Registry::get().caching.thumbnails.sizes;
             const auto basePath = engine_->paths->thumbnailRoot / file_->base32_alias;
             for (const auto& size : sizes) {
                 const auto filename = std::to_string(size) + ".jpg";

@@ -6,7 +6,7 @@
 
 namespace vh::config {
 
-class ConfigRegistry {
+class Registry {
 public:
     static void init();
     static const Config& get();

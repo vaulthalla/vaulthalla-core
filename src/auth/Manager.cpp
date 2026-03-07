@@ -2,13 +2,17 @@
 #include "identities/model/User.hpp"
 #include "auth/model/Client.hpp"
 #include "auth/session/Manager.hpp"
+#include "auth/session/Validator.hpp"
+#include "auth/session/Resolver.hpp"
+#include "auth/registration/Validator.hpp"
 #include "crypto/util/hash.hpp"
 #include "crypto/password/Strength.hpp"
 #include "db/query/identities/User.hpp"
 #include "storage/Manager.hpp"
 #include "protocols/ws/Session.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "log/Registry.hpp"
+#include "crypto/secrets/Manager.hpp"
 
 #include <chrono>
 #include <sodium.h>
@@ -30,28 +34,10 @@ Manager::Manager(const std::shared_ptr<storage::Manager>& storageManager)
     if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed in AuthManager");
 }
 
-void Manager::rehydrateOrCreateClient(const std::shared_ptr<ws::Session>& session) const {
-    std::shared_ptr<Session> s;
-
-    if (!session->refreshToken->rawToken.empty()) {
-        log::Registry::auth()->debug("[AuthManager] Attempting to rehydrate session from provided refresh token.");
-        if (const auto validatedClient = validateRefreshToken(session->refreshToken->rawToken, session); !
-            validatedClient) log::Registry::auth()->debug(
-            "[AuthManager] Failed to rehydrate session: invalid refresh token.");
-        else {
-            s = validatedClient;
-            log::Registry::auth()->debug("[AuthManager] Successfully rehydrated session with UUID: {}", s->uuid);
-        }
-    }
-
-    if (!s) session->refreshToken = createRefreshToken(session);
-    sessionManager->ensureSession(s);
-}
-
 std::shared_ptr<Session> Manager::registerUser(std::shared_ptr<User> user,
                                               const std::string& password,
                                               const std::shared_ptr<ws::Session>& session) {
-    isValidRegistration(user, password);
+    registration::Validator::validateRegistration(user, password);
 
     user->setPasswordHash(hash::password(password));
     db::query::identities::User::createUser(user);
@@ -182,6 +168,15 @@ std::shared_ptr<Session> Manager::validateRefreshToken(const std::string& refres
     }
 }
 
+std::shared_ptr<Session> Manager::validateSession(const std::shared_ptr<ws::Session>& session) const {
+    if (!session::Validator::hasUsableRefreshToken(session)) return nullptr;
+    if (session::Validator::validateAccessToken(session, accessToken)) return session;
+    return session::Resolver::resolveFromRefreshToken(session->tokens->refreshToken->rawToken,
+                                                      session,
+                                                      sessionManager,
+                                                      jwt_secret_);
+}
+
 void Manager::changePassword(const std::string& name, const std::string& oldPassword,
                              const std::string& newPassword) {
     const auto user = findUser(name);
@@ -194,63 +189,6 @@ void Manager::changePassword(const std::string& name, const std::string& oldPass
 
     log::Registry::audit()->info("[AuthManager] User {} is changing password", user->name);
     log::Registry::auth()->info("[AuthManager] Changing password for user: {}", user->name);
-}
-
-bool Manager::isValidRegistration(const std::shared_ptr<User>& user, const std::string& password) {
-    std::vector<std::string> errors;
-
-    if (!isValidName(user->name)) errors.emplace_back("Name must be between 3 and 50 characters.");
-
-    if (user->email && !isValidEmail(*user->email)) errors.emplace_back("Email must be valid and contain '@' and '.'.");
-
-    if (!paths::testMode) {
-        if (const auto strength = password::Strength::passwordStrengthCheck(password) < 50)
-            errors.emplace_back("Password is too weak (strength " + std::to_string(strength) +
-                                "/100). Use at least 12 characters, mix upper/lowercase, digits, and symbols.");
-
-        if (password::Strength::containsDictionaryWord(password)) errors.emplace_back(
-            "Password contains dictionary word — this is forbidden.");
-
-        if (password::Strength::isCommonWeakPassword(password)) errors.emplace_back(
-            "Password matches known weak pattern — this is forbidden.");
-
-        if (password::Strength::isPwnedPassword(password)) errors.emplace_back(
-            "Password has been found in public breaches — choose a different one.");
-    }
-
-    if (!errors.empty()) {
-        std::ostringstream oss;
-        oss << "Registration failed due to the following issues:\n";
-        for (const auto& err : errors) oss << "- " << err << std::endl;
-        log::Registry::auth()->error("[AuthManager] Registration validation failed: {}", oss.str());
-        throw std::runtime_error(oss.str());
-    }
-
-    return true;
-}
-
-bool Manager::isValidName(const std::string& displayName) {
-    return !displayName.empty() && displayName.size() > 2 && displayName.size() <= 50;
-}
-
-bool Manager::isValidEmail(const std::string& email) {
-    return !email.empty() && email.find('@') != std::string::npos && email.find('.') != std::string::npos;
-}
-
-bool Manager::isValidPassword(const std::string& password) {
-    if (paths::testMode) return true;
-    std::vector<std::string> errors;
-    if (password::Strength::passwordStrengthCheck(password) < 50) return false;
-    if (password::Strength::containsDictionaryWord(password)) return false;
-    if (password::Strength::isCommonWeakPassword(password)) return false;
-    if (password::Strength::isPwnedPassword(password)) return false;
-    return !password.empty() && password.size() >= 8 && password.size() <= 128 &&
-           std::ranges::any_of(password.begin(), password.end(), ::isdigit) && // At least one digit
-           std::ranges::any_of(password.begin(), password.end(), ::isalpha);   // At least one letter
-}
-
-bool Manager::isValidGroup(const std::string& group) {
-    return !group.empty() && group.size() >= 3 && group.size() <= 50;
 }
 
 std::shared_ptr<User> Manager::findUser(const std::string& name) {
@@ -274,7 +212,7 @@ std::string generateUUID() {
 
 std::shared_ptr<RefreshToken> Manager::createRefreshToken(const std::shared_ptr<ws::Session>& session) const {
     const auto now = std::chrono::system_clock::now();
-    const auto exp = now + std::chrono::days(config::ConfigRegistry::get().auth.refresh_token_expiry_days);
+    const auto exp = now + std::chrono::days(config::Registry::get().auth.refresh_token_expiry_days);
     const std::string jti = generateUUID();
 
     const std::string token =
@@ -284,7 +222,7 @@ std::shared_ptr<RefreshToken> Manager::createRefreshToken(const std::shared_ptr<
         .set_issued_at(now)
         .set_expires_at(exp)
         .set_id(jti)
-        .sign(jwt::algorithm::hs256{jwt_secret_});
+        .sign(jwt::algorithm::hs256{secrets::Manager().jwtSecret()});
 
     return RefreshToken::fromIssuedToken(
         jti,

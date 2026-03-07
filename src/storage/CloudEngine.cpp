@@ -14,7 +14,7 @@
 #include "fs/Filesystem.hpp"
 #include "runtime/Deps.hpp"
 #include "vault/APIKeyManager.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "sync/model/RemotePolicy.hpp"
 
 using namespace vh::fs;

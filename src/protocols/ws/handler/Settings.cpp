@@ -1,7 +1,7 @@
 #include "protocols/ws/handler/Settings.hpp"
 #include "identities/model/User.hpp"
 #include "protocols/ws/Session.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "config/Config.hpp"
 
 #include <nlohmann/json.hpp>
@@ -12,7 +12,7 @@ json Settings::get(const std::shared_ptr<Session>& session) {
     if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageSettings())
         throw std::runtime_error("Permission denied: Only admins can view settings");
 
-    return {{"settings", config::ConfigRegistry::get()}};
+    return {{"settings", config::Registry::get()}};
 }
 
 json Settings::update(const json& payload, const std::shared_ptr<Session>& session) {

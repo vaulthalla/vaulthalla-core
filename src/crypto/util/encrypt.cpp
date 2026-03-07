@@ -1,6 +1,6 @@
 #include "crypto/util/encrypt.hpp"
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
@@ -12,7 +12,7 @@ using namespace vh::config;
 namespace vh::crypto::util {
 
 static bool is_aes_gcm_supported() {
-    if (ConfigRegistry::get().dev.enabled || std::getenv("VH_ALLOW_FAKE_AES")) return true;
+    if (Registry::get().dev.enabled || std::getenv("VH_ALLOW_FAKE_AES")) return true;
     return crypto_aead_aes256gcm_is_available() != 0;
 }
 

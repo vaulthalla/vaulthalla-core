@@ -3,7 +3,7 @@
 #include "db/query/identities/User.hpp"
 #include "seed/include/init_db_tables.hpp"
 #include "seed/include/seed_db.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "log/Registry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "runtime/Manager.hpp"
@@ -25,7 +25,7 @@ using namespace vh::fs;
 
 static void initBase() {
     vh::paths::enableTestMode();
-    ConfigRegistry::init();
+    Registry::init();
     vh::log::Registry::init();
     ThreadPoolManager::instance().init();
 }

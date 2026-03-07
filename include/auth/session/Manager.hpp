@@ -11,10 +11,15 @@ namespace vh::auth::session {
 
 class Manager {
   public:
+    void newSession(const std::shared_ptr<protocols::ws::Session>& session);
     void ensureSession(const std::shared_ptr<protocols::ws::Session>& session);
-    std::string promoteSession(const std::shared_ptr<protocols::ws::Session>& session);
-    std::shared_ptr<protocols::ws::Session> getSession(const std::string& token);
+    void promoteSession(const std::shared_ptr<protocols::ws::Session>& session);
+
+    void cacheSession(const std::shared_ptr<protocols::ws::Session>& session);
     void invalidateSession(const std::string& token);
+    void invalidateSession(const std::shared_ptr<protocols::ws::Session>& session);
+
+    std::shared_ptr<protocols::ws::Session> getSession(const std::string& token);
 
     // For admin / debug: list active sessions
     std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> getActiveSessions();

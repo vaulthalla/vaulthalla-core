@@ -28,3 +28,7 @@ seconds Token::timeRemaining() const {
     return duration_cast<seconds>(system_clock::from_time_t(expiresAt) - system_clock::now());
 }
 
+bool vh::auth::model::operator==(const std::shared_ptr<Token>& lhs, const std::shared_ptr<Token>& rhs) {
+    return lhs->rawToken == rhs->rawToken && lhs->userId == rhs->userId && lhs->expiresAt == rhs->expiresAt &&
+           lhs->revoked == rhs->revoked;
+}

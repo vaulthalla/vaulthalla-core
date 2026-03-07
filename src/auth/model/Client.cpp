@@ -1,6 +1,6 @@
 #include "auth/model/Client.hpp"
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 #include <chrono>
 #include <jwt-cpp/jwt.h>
@@ -110,7 +110,7 @@ void Client::sendControlMessage(const std::string& type, const nlohmann::json& p
 }
 
 std::string Client::generateToken(const std::string& name) const {
-    const auto validForMinutes = ConfigRegistry::get().auth.token_expiry_minutes;
+    const auto validForMinutes = Registry::get().auth.token_expiry_minutes;
 
     return jwt::create<jwt::traits::nlohmann_json>()
         .set_issuer("vaulthalla")

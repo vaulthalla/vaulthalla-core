@@ -1,6 +1,6 @@
 #include "protocols/ProtocolService.hpp"
 #include "crypto/password/Strength.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "config/Config.hpp"
 #include "protocols/ws/Server.hpp"
 #include "protocols/http/Server.hpp"
@@ -40,7 +40,7 @@ void ProtocolService::runLoop() {
 }
 
 void ProtocolService::initProtocols() {
-    if (const auto& cfg = ConfigRegistry::get(); !cfg.websocket.enabled && !cfg.http_preview.enabled) {
+    if (const auto& cfg = Registry::get(); !cfg.websocket.enabled && !cfg.http_preview.enabled) {
         log::Registry::vaulthalla()->warn(
             "[Vaulthalla] Both WebSocket and HTTP preview servers are disabled in configuration. Nothing to start.");
         return;
@@ -56,7 +56,7 @@ void ProtocolService::initProtocols() {
 
 
 void ProtocolService::initWebsocketServer() {
-    const auto& cfg = ConfigRegistry::get().websocket;
+    const auto& cfg = Registry::get().websocket;
     if (!cfg.enabled) {
         log::Registry::vaulthalla()->info("[Vaulthalla] WebSocket server is disabled in configuration.");
         return;
@@ -68,7 +68,7 @@ void ProtocolService::initWebsocketServer() {
 }
 
 void ProtocolService::initHttpServer() {
-    const auto& cfg = ConfigRegistry::get().http_preview;
+    const auto& cfg = Registry::get().http_preview;
     if (!cfg.enabled) {
         log::Registry::vaulthalla()->info("[Vaulthalla] HTTP preview server is disabled in configuration.");
         return;

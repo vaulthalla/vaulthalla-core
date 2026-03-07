@@ -7,7 +7,7 @@
 #include "fs/model/Path.hpp"
 #include "db/query/fs/Directory.hpp"
 #include "db/query/fs/File.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "db/query/fs/Entry.hpp"
 #include "vault/EncryptionManager.hpp"
 #include "fs/ops/file.hpp"

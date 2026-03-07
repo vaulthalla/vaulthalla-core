@@ -16,7 +16,7 @@
 #include "seed/include/init_db_tables.hpp"
 
 // Misc
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 #include "log/Registry.hpp"
 
@@ -40,7 +40,7 @@ void signalHandler(const int signum) {
 
 int main() {
     try {
-        ConfigRegistry::init();
+        Registry::init();
         vh::log::Registry::init();
 
         FPDF_LIBRARY_CONFIG config;

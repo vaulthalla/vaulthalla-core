@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <paths.h>
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "log/Registry.hpp"
 
 namespace fs = std::filesystem;
@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
 
     try {
         vh::paths::setLogPathForTesting();
-        vh::config::ConfigRegistry::init();
+        vh::config::Registry::init();
         vh::log::Registry::init();
 
     } catch (const std::exception& e) {

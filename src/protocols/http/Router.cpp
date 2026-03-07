@@ -1,7 +1,7 @@
 #include "protocols/http/Router.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "auth/Manager.hpp"
 #include "protocols/http/handler/preview/Image.hpp"
 #include "protocols/http/handler/preview/Pdf.hpp"
@@ -62,7 +62,7 @@ static std::unordered_map<std::string, std::string> parse_query_params(const std
 
 static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const std::filesystem::path& thumbnailRoot,
                                          const unsigned int size) {
-    if (const auto thumbnail_sizes = ConfigRegistry::get().caching.thumbnails.sizes;
+    if (const auto thumbnail_sizes = Registry::get().caching.thumbnails.sizes;
         std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
 
         if (const auto pathToJpegCache = thumbnailRoot / f->base32_alias / std::string(std::to_string(size) + ".jpg");
@@ -92,7 +92,7 @@ Response Router::route(request&& req) {
 }
 
 Response Router::handleAuthSession(request&& req) {
-    if (ConfigRegistry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
+    if (Registry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
 
     try {
         const auto refresh = protocols::extractCookie(req, "refresh");
@@ -123,7 +123,7 @@ Response Router::handleAuthSession(request&& req) {
 }
 
 std::string Router::authenticateRequest(const request& req) {
-    if (ConfigRegistry::get().dev.enabled) return "";
+    if (Registry::get().dev.enabled) return "";
     try {
         const auto refresh_token = protocols::extractCookie(req, "refresh");
         runtime::Deps::get().authManager->validateRefreshToken(refresh_token);

@@ -4,7 +4,7 @@
 #include "auth/Manager.hpp"
 #include "runtime/Deps.hpp"
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 using namespace vh::protocols::ws;
 using namespace vh::auth;
@@ -14,7 +14,7 @@ using namespace std::chrono;
 ConnectionLifecycleManager::ConnectionLifecycleManager()
     : AsyncService("LifecycleManager"),
       sessionManager_(runtime::Deps::get().authManager->sessionManager) {
-    const auto& config = ConfigRegistry::get().services.connection_lifecycle_manager;
+    const auto& config = Registry::get().services.connection_lifecycle_manager;
     sweep_interval_ = seconds(config.sweep_interval_seconds);
     unauthenticated_session_timeout_ = seconds(config.unauthenticated_timeout_seconds);
     idle_timeout_ = minutes(config.idle_timeout_minutes); // TODO: implement idle timeout logic

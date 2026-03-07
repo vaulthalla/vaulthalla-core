@@ -9,7 +9,7 @@
 #include "storage/s3/S3Controller.hpp"
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "CommandUsage.hpp"
 
 #include <paths.h>

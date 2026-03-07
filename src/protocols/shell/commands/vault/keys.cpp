@@ -19,7 +19,7 @@
 #include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "CommandUsage.hpp"
 #include "usages.hpp"
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "session/Manager.hpp"
-#include "crypto/secrets/Manager.hpp"
 
 #include <memory>
 #include <string>
@@ -39,24 +38,10 @@ public:
 
     std::shared_ptr<identities::model::User> findUser(const std::string& name);
 
-    void validateRefreshToken(const std::string& refreshToken) const;
-
-    std::shared_ptr<protocols::ws::Session> validateRefreshToken(const std::string& refreshToken,
-                                                 const std::shared_ptr<protocols::ws::Session>& session) const;
+    void validateSession(const std::shared_ptr<protocols::ws::Session>& session);
 
     std::shared_ptr<model::RefreshToken>
     createRefreshToken(const std::shared_ptr<protocols::ws::Session>& session) const;
-
-    static bool isValidRegistration(const std::shared_ptr<identities::model::User>& user,
-                                    const std::string& password);
-
-    static bool isValidName(const std::string& displayName);
-
-    static bool isValidEmail(const std::string& email);
-
-    static bool isValidPassword(const std::string& password);
-
-    static bool isValidGroup(const std::string& group);
 
 private:
     std::unordered_map<std::string, std::shared_ptr<identities::model::User>> users_;

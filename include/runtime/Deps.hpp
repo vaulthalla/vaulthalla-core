@@ -8,7 +8,7 @@
 namespace vh::storage { class Manager; }
 namespace vh::fs::cache { class Registry; }
 namespace vh::vault { class APIKeyManager; }
-namespace vh::auth { class Manager; }
+namespace vh::auth { class Manager; namespace session { class Manager; } }
 namespace vh::protocols::shell { class UsageManager; }
 namespace vh::stats::model { struct CacheStats; }
 namespace vh::sync { class Controller; }
@@ -19,6 +19,7 @@ struct Deps {
     std::shared_ptr<storage::Manager> storageManager;
     std::shared_ptr<vault::APIKeyManager> apiKeyManager;
     std::shared_ptr<auth::Manager> authManager;
+    std::shared_ptr<auth::session::Manager> sessionManager;
     std::shared_ptr<sync::Controller> syncController;
     std::shared_ptr<fs::cache::Registry> fsCache;
     std::shared_ptr<protocols::shell::UsageManager> shellUsageManager;

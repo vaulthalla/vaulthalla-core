@@ -16,7 +16,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/asio.hpp>
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 namespace {
 namespace beast     = boost::beast;
@@ -32,7 +32,7 @@ using namespace vh::protocols;
 namespace vh::protocols::ws {
 
 Session::Session(const std::shared_ptr<Router>& router)
-    : uploadHandler_(std::make_shared<handler::Upload>(*this)), router_(router) {
+    : uploadHandler_(std::make_shared<handler::Upload>(this)), router_(router) {
     buffer_.max_size(65536);
 }
 
@@ -111,7 +111,7 @@ void Session::hydrateFromRequest(const RequestType& req) {
     }
 
     userAgent = std::string(req[http::field::user_agent]);
-    tokens->refreshToken = std::make_shared<auth::model::RefreshToken>(extractCookie(req, "refresh"));
+    auth::model::RefreshToken::addToSession(shared_from_this(), extractCookie(req, "refresh"));
 
     if (tokens->refreshToken->rawToken.empty())
         log::Registry::ws()->debug("[Session] No refresh token found in Cookie header");
@@ -126,7 +126,7 @@ void Session::installHandshakeDecorator() const {
         [&t](websocket::response_type& res) {
             res.set(http::field::server, "Vaulthalla");
 
-            const bool isDev = config::ConfigRegistry::get().dev.enabled;
+            const bool isDev = config::Registry::get().dev.enabled;
             const std::string sameSite = isDev ? "Lax" : "Lax"; // keep Lax unless *need* Strict
 
             std::string cookie = "refresh=" + t +

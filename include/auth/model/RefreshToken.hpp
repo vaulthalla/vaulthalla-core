@@ -8,6 +8,8 @@
 
 namespace pqxx { class row; }
 
+namespace vh::protocols::ws { class Session; }
+
 namespace vh::auth::model {
 
 struct RefreshToken final : Token {
@@ -22,10 +24,13 @@ struct RefreshToken final : Token {
                  std::string ipAddress);
 
     explicit RefreshToken(std::string rawToken);
-
     explicit RefreshToken(const pqxx::row& row);
 
     [[nodiscard]] bool isValid() const override;
+
+    void invalidate();
+
+    [[nodiscard]] bool dangerousDivergence(const std::shared_ptr<RefreshToken>& other) const;
 
     static std::shared_ptr<RefreshToken> fromIssuedToken(
         std::string jti,
@@ -35,6 +40,10 @@ struct RefreshToken final : Token {
         std::string userAgent,
         std::string ipAddress
     );
+
+    static void addToSession(const std::shared_ptr<protocols::ws::Session>& session, std::string token);
 };
+
+bool operator==(const std::shared_ptr<RefreshToken>& lhs, const std::shared_ptr<RefreshToken>& rhs);
 
 }

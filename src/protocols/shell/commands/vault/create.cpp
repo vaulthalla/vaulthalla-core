@@ -18,7 +18,7 @@
 #include "identities/model/User.hpp"
 
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "db/encoding/interval.hpp"
 
 #include <algorithm>

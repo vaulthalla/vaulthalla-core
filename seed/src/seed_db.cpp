@@ -24,7 +24,7 @@
 #include "vault/model/APIKey.hpp"
 
 // Misc
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "log/Registry.hpp"
 #include "runtime/Deps.hpp"

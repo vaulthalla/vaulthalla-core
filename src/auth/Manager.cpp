@@ -10,11 +10,13 @@
 #include "log/Registry.hpp"
 #include "crypto/secrets/Manager.hpp"
 #include "runtime/Deps.hpp"
+#include "auth/session/Issuer.hpp"
 
 #include <sodium.h>
 #include <stdexcept>
 #include <uuid/uuid.h>
 
+using namespace vh::auth;
 using namespace vh::auth::model;
 using namespace vh::identities::model;
 using namespace vh::crypto;
@@ -32,6 +34,7 @@ void Manager::registerUser(std::shared_ptr<User> user, const std::string& passwo
     user = findUser(user->name);
 
     session->setAuthenticatedUser(user);
+    session::Issuer::accessToken(session);
     runtime::Deps::get().sessionManager->promote(session);
     runtime::Deps::get().storageManager->initUserStorage(user);
 
@@ -51,6 +54,7 @@ void Manager::loginUser(const std::string& name, const std::string& password, co
     user = db::query::identities::User::getUserById(user->id);
 
     session->setAuthenticatedUser(user);
+    session::Issuer::accessToken(session);
     runtime::Deps::get().sessionManager->promote(session);
 
     log::Registry::auth()->info("[AuthManager] User logged in: {}", user->name);

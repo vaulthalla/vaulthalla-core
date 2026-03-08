@@ -34,7 +34,7 @@ static void finalizeAndSignToken(const std::shared_ptr<Session>& session, const 
     t->issuedAt = std::chrono::system_clock::to_time_t(now);
     t->expiresAt = std::chrono::system_clock::to_time_t(exp);
     t->jti = generateUUID();
-    t->userId = session->user->id;
+    if (session->user) t->userId = session->user->id;
 
     t->rawToken =
         jwt::create<jwt::traits::nlohmann_json>()
@@ -61,7 +61,6 @@ void Issuer::refreshToken(const std::shared_ptr<Session>& session) {
     finalizeAndSignToken(session, t, std::chrono::days(vh::config::Registry::get().auth.refresh_token_expiry_days));
     t->hashedToken = crypto::hash::password(t->rawToken);
 
-    db::query::auth::RefreshToken::set(t);
     session->tokens->refreshToken = t;
 }
 

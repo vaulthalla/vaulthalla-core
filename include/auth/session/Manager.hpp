@@ -5,14 +5,16 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <boost/asio.hpp>
 
-namespace vh::protocols::ws { struct Session; }
+namespace vh::protocols::ws { class Session; class Router; }
 namespace vh::identities::model { struct User; }
 
 namespace vh::auth::session {
 
 class Manager {
 public:
+    void accept(boost::asio::ip::tcp::socket&& socket, const std::shared_ptr<protocols::ws::Router>& router);
     void tryRehydrate(const std::shared_ptr<protocols::ws::Session>& session);
 
     void promote(const std::shared_ptr<protocols::ws::Session>& session);

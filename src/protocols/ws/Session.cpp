@@ -32,8 +32,7 @@ using namespace vh::protocols;
 namespace vh::protocols::ws {
 
 Session::Session(const std::shared_ptr<Router>& router)
-    : tokens(std::make_shared<auth::model::TokenPair>()),
-      uploadHandler_(std::make_shared<handler::Upload>(shared_from_this())), router_(router) {
+    : tokens(std::make_shared<auth::model::TokenPair>()), router_(router) {
     buffer_.max_size(65536);
 }
 
@@ -71,6 +70,8 @@ void Session::logFail(std::string_view where, const beast::error_code& ec) {
 }
 
 void Session::accept(tcp::socket&& socket) {
+    uploadHandler_ = std::make_shared<handler::Upload>(shared_from_this());
+
     ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
     strand_ = asio::make_strand(ws_->get_executor());
 
@@ -104,11 +105,19 @@ void Session::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast
 }
 
 void Session::hydrateFromRequest(const RequestType& req) {
+    log::Registry::ws()->debug("[Session] Handshake request received from IP: {}", getIPAddress());
+
     handshakeRequest_ = req;
     ipAddress = getIPAddress();
     userAgent = getUserAgent();
+
+    log::Registry::ws()->debug("[Session] Attempting to hydrate session from request. IP: {}, User-Agent: {}", ipAddress, userAgent);
     auth::model::RefreshToken::addToSession(shared_from_this(), extractCookie(req, "refresh"));
+
+    log::Registry::ws()->debug("[Session] Extracted refresh token from cookies: {}", tokens->refreshToken ? tokens->refreshToken->rawToken : "none");
     runtime::Deps::get().sessionManager->tryRehydrate(shared_from_this());
+
+    log::Registry::ws()->debug("[Session] Session hydrated with user: {} (ID: {})", user ? user->name : "none", user ? user->id : 0);
 }
 
 void Session::installHandshakeDecorator() const {

@@ -39,7 +39,7 @@ using json          = nlohmann::json;
 class Session : public std::enable_shared_from_this<Session> {
 public:
     const std::string uuid{generateUUIDv4()};
-    std::shared_ptr<identities::model::User> user;
+    std::shared_ptr<identities::model::User> user{nullptr};
     std::shared_ptr<auth::model::TokenPair> tokens;
     std::string userAgent, ipAddress;
     const std::chrono::system_clock::time_point connectionOpenedAt = std::chrono::system_clock::now();
@@ -88,7 +88,7 @@ private:
     beast::flat_buffer tmpBuffer_{4096}; // used during HTTP header read/handshake
     RequestType handshakeRequest_;
 
-    std::shared_ptr<handler::Upload> uploadHandler_;
+    std::shared_ptr<handler::Upload> uploadHandler_{nullptr};
     std::shared_ptr<Router> router_;
 
     std::atomic_bool closing_{false};

@@ -18,7 +18,7 @@ json Auth::login(const json& payload, const std::shared_ptr<Session>& session) {
     const auto password = payload.at("password").get<std::string>();
 
     runtime::Deps::get().authManager->loginUser(username, password, session);
-    if (!session::Validator::softValidateSession(session)) throw std::runtime_error("Failed to validate session after login");
+    if (!session::Validator::softValidateActiveSession(session)) throw std::runtime_error("Failed to validate session after login");
     return {{"token", session->tokens->accessToken->rawToken}, {"user", *session->user}};
 }
 

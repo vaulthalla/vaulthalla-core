@@ -8,33 +8,61 @@
 #include "log/Registry.hpp"
 #include "protocols/ws/Session.hpp"
 #include "identities/model/User.hpp"
+#include "runtime/Deps.hpp"
+#include "protocols/ws/Router.hpp"
 
 using namespace vh::protocols::ws;
 using namespace vh::identities::model;
 
 namespace vh::auth::session {
 
-void Manager::tryRehydrate(const std::shared_ptr<Session>& session) {
-    if (!session) throw std::invalid_argument("Invalid session");
-    Validator::validateRefreshToken(session); // May throw if invalid
+void Manager::accept(boost::asio::ip::tcp::socket&& socket, const std::shared_ptr<Router>& router) {
+    const auto session = std::make_shared<Session>(router);
     cache(session);
+    session->accept(std::move(socket));
+}
+
+void Manager::tryRehydrate(const std::shared_ptr<Session>& session) {
+    try {
+        if (!session) throw std::invalid_argument("Invalid session");
+        Validator::validateRefreshToken(session); // May throw if invalid
+        cache(session);
+    } catch (const std::exception& ex) {
+        log::Registry::ws()->debug(
+            "[session::Manager] Rehydration failed for session UUID: {}. Reason: {}",
+            session ? session->uuid : "null",
+            ex.what()
+        );
+
+        Issuer::refreshToken(session);
+        cache(session);
+    }
 }
 
 void Manager::promote(const std::shared_ptr<Session>& session) {
-    if (!session || !Validator::softValidateSession(session))
-        throw std::invalid_argument("Invalid session state for promotion");
+    if (!session || !Validator::softValidateActiveSession(session)) {
+        log::Registry::ws()->debug("[session::Manager] Promotion failed due to invalid session data");
+        throw std::invalid_argument("Invalid session data for promotion");
+    }
+
+    session->tokens->refreshToken->userId = session->user->id;
 
     const auto oldJti = session->tokens->refreshToken->jti;
 
     if (const auto dbToken = db::query::auth::RefreshToken::get(oldJti);
         dbToken->dangerousDivergence(session->tokens->refreshToken))
-            invalidate(oldJti);
+        invalidate(oldJti);
 
     db::query::auth::RefreshToken::set(session->tokens->refreshToken);
 
     session->tokens->refreshToken = db::query::auth::RefreshToken::get(oldJti);
-    if (!session->tokens->refreshToken)
-        throw std::runtime_error("Failed to reload refresh token");
+    if (!session->tokens->refreshToken) {
+        log::Registry::ws()->debug(
+            "[session::Manager] Promotion failed: Unable to retrieve updated refresh token for session UUID: {}",
+            session->uuid
+        );
+        throw std::runtime_error("Failed to retrieve updated refresh token during promotion");
+    }
 
     if (!oldJti.empty() && oldJti != session->tokens->refreshToken->jti)
         invalidate(oldJti);
@@ -42,7 +70,7 @@ void Manager::promote(const std::shared_ptr<Session>& session) {
     cache(session);
 
     log::Registry::ws()->debug(
-        "[SessionManager] Promoted session for user: {}",
+        "[session::Manager] Promoted session for user: {}",
         session->user->name
     );
 }
@@ -77,7 +105,7 @@ bool Manager::validate(const std::shared_ptr<Session>& session, const std::strin
         return true;
     } catch (const std::exception& ex) {
         log::Registry::ws()->debug(
-            "[SessionManager] Validation failed for session UUID: {}. Reason: {}",
+            "[session::Manager] Validation failed for session UUID: {}. Reason: {}",
             session ? session->uuid : "null",
             ex.what()
         );
@@ -132,7 +160,7 @@ void Manager::invalidate(const std::shared_ptr<Session>& session) {
     }
 
     log::Registry::ws()->debug(
-        "[SessionManager] Invalidated session with UUID: {}",
+        "[session::Manager] Invalidated session with UUID: {}",
         uuid
     );
 }

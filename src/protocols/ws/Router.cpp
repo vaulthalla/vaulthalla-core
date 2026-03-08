@@ -1,7 +1,6 @@
 #include "protocols/ws/Router.hpp"
 
 #include "auth/session/Manager.hpp"
-#include "auth/session/Validator.hpp"
 #include "log/Registry.hpp"
 #include "protocols/ws/Session.hpp"
 #include "protocols/ws/core/handler_templates.hpp"

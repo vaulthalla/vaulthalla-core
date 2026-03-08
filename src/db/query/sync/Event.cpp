@@ -163,7 +163,7 @@ void Event::heartbeat(const EventPtr& event) {
     });
 }
 
-void Event::purgeOldEvents() {
+void Event::purgeOld() {
     const auto& syncConfig = Registry::get().sync;
 
     const auto retention_days = syncConfig.event_audit_retention_days;

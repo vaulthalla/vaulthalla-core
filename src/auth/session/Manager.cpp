@@ -7,6 +7,7 @@
 #include "db/query/auth/RefreshToken.hpp"
 #include "log/Registry.hpp"
 #include "protocols/ws/Session.hpp"
+#include "identities/model/User.hpp"
 
 using namespace vh::protocols::ws;
 using namespace vh::identities::model;
@@ -39,13 +40,13 @@ void Manager::promoteSession(const SessionPtr& session) {
 
     const auto oldJti = session->tokens->refreshToken->jti;
 
-    if (const auto dbToken = db::query::auth::RefreshToken::getRefreshToken(oldJti);
+    if (const auto dbToken = db::query::auth::RefreshToken::get(oldJti);
         dbToken->dangerousDivergence(session->tokens->refreshToken))
             invalidateSession(oldJti);
 
-    db::query::auth::RefreshToken::setRefreshToken(session->tokens->refreshToken);
+    db::query::auth::RefreshToken::set(session->tokens->refreshToken);
 
-    session->tokens->refreshToken = db::query::auth::RefreshToken::getRefreshToken(oldJti);
+    session->tokens->refreshToken = db::query::auth::RefreshToken::get(oldJti);
     if (!session->tokens->refreshToken)
         throw std::runtime_error("Failed to reload refresh token");
 
@@ -90,11 +91,8 @@ void Manager::invalidateSession(const SessionPtr& session) {
 
     {
         std::lock_guard lock(sessionMutex_);
-
         sessionsByUUID_.erase(uuid);
-
-        if (!jti.empty())
-            sessionsByRefreshJti_.erase(jti);
+        if (!jti.empty()) sessionsByRefreshJti_.erase(jti);
 
         if (userId) {
             auto [begin, end] = sessionsByUserId_.equal_range(*userId);
@@ -118,11 +116,8 @@ void Manager::invalidateSession(const std::string& token) {
 Manager::SessionPtr Manager::getSession(const std::string& token) {
     std::lock_guard lock(sessionMutex_);
 
-    if (const auto it = sessionsByUUID_.find(token); it != sessionsByUUID_.end())
-        return it->second;
-
-    if (const auto it = sessionsByRefreshJti_.find(token); it != sessionsByRefreshJti_.end())
-        return it->second;
+    if (sessionsByUUID_.contains(token)) return sessionsByUUID_[token];
+    if (sessionsByRefreshJti_.contains(token)) return sessionsByRefreshJti_[token];
 
     return nullptr;
 }

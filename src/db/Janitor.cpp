@@ -13,8 +13,8 @@ vh::db::Janitor::Janitor()
 void vh::db::Janitor::runLoop() {
     while (!shouldStop()) {
         try {
-            query::sync::Event::purgeOldEvents();
-            query::auth::RefreshToken::purgeOldRevokedRefreshTokens();
+            query::sync::Event::purgeOld();
+            query::auth::RefreshToken::purgeOldRevoked();
         } catch (const std::exception& e) {
             log::Registry::vaulthalla()->warn("[DBSweeper] Failed to purge old sync events: {}", e.what());
         }

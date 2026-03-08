@@ -56,7 +56,7 @@ bool RefreshToken::dangerousDivergence(const std::shared_ptr<RefreshToken>& othe
 
 void RefreshToken::hardInvalidate() {
     revoke();
-    db::query::auth::RefreshToken::revokeRefreshToken(jti);
+    db::query::auth::RefreshToken::refresh(jti);
     hashedToken.clear();
     rawToken.clear();
 }

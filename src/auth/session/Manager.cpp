@@ -50,7 +50,7 @@ void Manager::promote(const std::shared_ptr<Session>& session) {
     const auto oldJti = session->tokens->refreshToken->jti;
 
     if (const auto dbToken = db::query::auth::RefreshToken::get(oldJti);
-        dbToken->dangerousDivergence(session->tokens->refreshToken))
+        dbToken && dbToken->dangerousDivergence(session->tokens->refreshToken))
         invalidate(oldJti);
 
     db::query::auth::RefreshToken::set(session->tokens->refreshToken);

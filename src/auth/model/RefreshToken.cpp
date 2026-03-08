@@ -27,6 +27,7 @@ RefreshToken::RefreshToken(std::string rawToken) : Token(std::move(rawToken)) {}
 bool RefreshToken::isValid() const { return !hashedToken.empty() && !revoked && !isExpired(); }
 
 bool RefreshToken::dangerousDivergence(const std::shared_ptr<RefreshToken>& other) const {
+    if (!other) return false; // No divergence if the other token doesn't exist
     return hashedToken == other->hashedToken && (
         jti != other->jti || userAgent != other->userAgent ||
         ipAddress != other->ipAddress || issuedAt != other->issuedAt || expiresAt != other->expiresAt ||

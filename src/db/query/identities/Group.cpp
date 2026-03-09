@@ -2,8 +2,9 @@
 #include "db/Transactions.hpp"
 #include "identities/model/Group.hpp"
 
-using namespace vh::db::query::identities;
 using namespace vh::db::model;
+
+namespace vh::db::query::identities {
 
 unsigned int Group::createGroup(const GroupPtr& group) {
     return Transactions::exec("Group::createGroup", [&](pqxx::work& txn) {
@@ -110,4 +111,6 @@ bool Group::groupExists(const std::string& name) {
         if (res.empty()) return false;
         return res.one_field().as<bool>();
     });
+}
+
 }

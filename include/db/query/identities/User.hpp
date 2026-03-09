@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-namespace vh::auth::model { class RefreshToken; }
 namespace vh::identities::model { struct User; }
 
 namespace vh::db::query::identities {
@@ -29,14 +28,6 @@ public:
     static void updateLastLoggedInUser(unsigned int userId);
     [[nodiscard]] static unsigned int getUserIdByLinuxUID(unsigned int linuxUid);
     [[nodiscard]] static UserPtr getUserByLinuxUID(unsigned int linuxUid);
-
-    static void addRefreshToken(const std::shared_ptr<auth::model::RefreshToken>& token);
-    static void removeRefreshToken(const std::string& jti);
-    static std::shared_ptr<auth::model::RefreshToken> getRefreshToken(const std::string& jti);
-    static std::vector<std::shared_ptr<auth::model::RefreshToken>> listRefreshTokens(unsigned int userId);
-    static void revokeAllRefreshTokens(unsigned int userId);
-    static void revokeAndPurgeRefreshTokens(unsigned int userId);
-    static UserPtr getUserByRefreshToken(const std::string& jti);
 
     [[nodiscard]] static bool userExists(const std::string& name);
     [[nodiscard]] static bool adminUserExists();

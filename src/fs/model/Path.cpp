@@ -1,5 +1,5 @@
 #include "fs/model/Path.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "log/Registry.hpp"
 
 #include <paths.h>

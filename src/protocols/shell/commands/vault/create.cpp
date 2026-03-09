@@ -8,7 +8,6 @@
 #include "db/query/vault/Waiver.hpp"
 
 #include "storage/Manager.hpp"
-#include "storage/s3/S3Controller.hpp"
 
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
@@ -18,7 +17,7 @@
 #include "identities/model/User.hpp"
 
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "db/encoding/interval.hpp"
 
 #include <algorithm>
@@ -35,7 +34,6 @@ using namespace vh::vault::model;
 using namespace vh::identities::model;
 using namespace vh::storage;
 using namespace vh::config;
-using namespace vh::cloud;
 using namespace vh::sync::model;
 using namespace vh::db::encoding;
 

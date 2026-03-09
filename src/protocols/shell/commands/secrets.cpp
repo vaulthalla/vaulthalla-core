@@ -48,8 +48,7 @@ static CommandResult handle_secrets_set(const CommandCall& call) {
     }
 
     if (secretArg == "jwt-secret") {
-        const vh::crypto::secrets::Manager ism;
-        ism.setJWTSecret({secret.begin(), secret.end()});
+        runtime::Deps::get().secretsManager->setJWTSecret({secret.begin(), secret.end()});
         return ok("Successfully updated JWT secret");
     }
 
@@ -117,8 +116,7 @@ static nlohmann::json getDBPassword() {
 }
 
 static nlohmann::json getJWTSecret() {
-    const vh::crypto::secrets::Manager ism;
-    return generateSecretOutput("jwt-secret", ism.jwtSecret());
+    return generateSecretOutput("jwt-secret", runtime::Deps::get().secretsManager->jwtSecret());
 }
 
 static CommandResult handle_secrets_export(const CommandCall& call) {

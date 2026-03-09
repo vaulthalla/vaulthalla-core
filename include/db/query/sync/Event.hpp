@@ -20,7 +20,7 @@ public:
     static std::vector<EventPtr> getEvents(unsigned int vaultId);
     static void heartbeat(const EventPtr& event);
 
-    static void purgeOldEvents();
+    static void purgeOld();
 };
 
 }

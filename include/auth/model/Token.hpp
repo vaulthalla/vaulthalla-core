@@ -2,28 +2,44 @@
 
 #include <chrono>
 #include <string>
-#include <utility>
+#include <optional>
+#include <memory>
+
+namespace pqxx { class row; }
+namespace vh::protocols::ws { class Session; }
+namespace vh::auth::session { struct TokenClaims; }
 
 namespace vh::auth::model {
 
 struct Token {
-    Token(std::string token, const unsigned short userId)
-        : rawToken(std::move(token)), userId(userId),
-          expiryTs(std::chrono::system_clock::now() + std::chrono::hours(1)) {}
+    enum class Type {
+        Access,
+        Refresh
+    };
 
-    std::string rawToken;
-    unsigned short userId;
-    std::chrono::system_clock::time_point expiryTs;
-    bool revoked = false;
+    std::string rawToken{};
+    std::string jti{};
+    std::string subject{};
+    uint32_t userId{};
+    std::chrono::system_clock::time_point issuedAt = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point expiresAt = std::chrono::system_clock::now();
+    bool revoked{false};
 
-    [[nodiscard]] bool isExpired() const { return std::chrono::system_clock::now() >= expiryTs; }
-    [[nodiscard]] bool isValid() const { return !rawToken.empty() && !isExpired() && !revoked; }
+    virtual ~Token() = default;
+    Token() = default;
+    explicit Token(std::string rawToken);
+    explicit Token(const pqxx::row& row);
 
-    [[nodiscard]] long long getTimeLeft() const {
-        return std::chrono::duration_cast<std::chrono::seconds>(expiryTs - std::chrono::system_clock::now()).count();
-    }
+    [[nodiscard]] bool isExpired() const;
+    [[nodiscard]] virtual bool isValid() const;
+    [[nodiscard]] std::chrono::seconds timeRemaining() const;
 
     void revoke() { revoked = true; }
+
+    [[nodiscard]] virtual Type type() const { return Type::Access; }
+    virtual void dangerousDivergence(const std::optional<session::TokenClaims>& claims) const;
 };
+
+bool operator==(const std::shared_ptr<Token>& lhs, const std::shared_ptr<Token>& rhs);
 
 }

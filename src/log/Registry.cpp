@@ -1,5 +1,5 @@
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -22,7 +22,7 @@ void Registry::init() {
     namespace fs = std::filesystem;
     if (!fs::exists(log_dir_)) fs::create_directories(log_dir_);
 
-    const auto cnf = config::ConfigRegistry::get().logging;
+    const auto cnf = config::Registry::get().logging;
 
     // console
     console_sink_ = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();

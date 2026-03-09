@@ -22,6 +22,7 @@ struct UploadContext {
 using RequestType = boost::beast::http::request<boost::beast::http::string_body>;
 
 namespace vh::identities::model { struct User; }
+namespace vh::auth::model { struct TokenPair; }
 
 namespace vh::protocols::ws {
 
@@ -37,23 +38,23 @@ using json          = nlohmann::json;
 
 class Session : public std::enable_shared_from_this<Session> {
 public:
+    const std::string uuid{generateUUIDv4()};
+    std::shared_ptr<identities::model::User> user{nullptr};
+    std::shared_ptr<auth::model::TokenPair> tokens;
+    std::string userAgent, ipAddress;
+    const std::chrono::system_clock::time_point connectionOpenedAt = std::chrono::system_clock::now();
+
     explicit Session(const std::shared_ptr<Router>& router);
     ~Session();
 
     void accept(tcp::socket&& socket);
-    void send(const json& message);
+    void send(json message);
     void close();
 
-    const std::string& getUUID() const { return uuid_; }
-
     void setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user);
-    void setRefreshTokenCookie(const std::string& token);
     void setHandshakeRequest(const RequestType& req);
 
-    std::shared_ptr<identities::model::User> getAuthenticatedUser() const;
-    std::string getClientIp() const;
-    std::string getUserAgent() const;
-    std::string getRefreshToken() const;
+    void sendAccessTokenOnNextResponse() { sendAccessToken_ = true; }
 
     std::shared_ptr<handler::Upload> getUploadHandler() const { return uploadHandler_; }
 
@@ -79,8 +80,8 @@ private:
     static void logFail(std::string_view where, const beast::error_code& ec);
     void sendParseError(std::string_view msg);
     void sendInternalError();
-
-    const std::string uuid_{generateUUIDv4()};
+    [[nodiscard]] std::string getUserAgent() const;
+    [[nodiscard]] std::string getIPAddress() const;
 
     std::shared_ptr<websocket::stream<tcp::socket>> ws_;
     asio::any_io_executor strand_;
@@ -89,18 +90,15 @@ private:
     beast::flat_buffer tmpBuffer_{4096}; // used during HTTP header read/handshake
     RequestType handshakeRequest_;
 
-    std::shared_ptr<handler::Upload> uploadHandler_;
+    std::shared_ptr<handler::Upload> uploadHandler_{nullptr};
     std::shared_ptr<Router> router_;
-    std::shared_ptr<identities::model::User> authenticatedUser_;
-
-    std::string refreshToken_;
-    std::string userAgent_;
-    std::string ipAddress_;
 
     std::atomic_bool closing_{false};
 
     bool writing_ = false;                 // only touched on strand
     std::deque<std::string> writeQueue_;   // only touched on strand
+
+    bool sendAccessToken_{false};
 };
 
 }

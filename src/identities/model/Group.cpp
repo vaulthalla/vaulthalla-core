@@ -7,9 +7,10 @@
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 
-using namespace vh::identities::model;
 using namespace vh::protocols::shell;
 using namespace vh::db::encoding;
+
+namespace vh::identities::model {
 
 GroupMember::GroupMember(const pqxx::row& row)
     : user(std::make_shared<User>(row)),
@@ -47,7 +48,7 @@ Group::Group(const nlohmann::json& j)
     }
 }
 
-void vh::identities::model::to_json(nlohmann::json& j, const Group& g) {
+void to_json(nlohmann::json& j, const Group& g) {
     nlohmann::json members = nlohmann::json::array();
     for (const auto& member : g.members) members.push_back(*member);
 
@@ -64,7 +65,7 @@ void vh::identities::model::to_json(nlohmann::json& j, const Group& g) {
     if (g.updated_at.has_value()) j["updated_at"] = timestampToString(*g.updated_at);
 }
 
-void vh::identities::model::from_json(const nlohmann::json& j, Group& g) {
+void from_json(const nlohmann::json& j, Group& g) {
     g.id = j.at("id").get<unsigned int>();
     g.linux_gid = j.contains("gid") ? j.at("gid").get<unsigned int>() : 0;
     g.name = j.at("name").get<std::string>();
@@ -85,25 +86,25 @@ void vh::identities::model::from_json(const nlohmann::json& j, Group& g) {
     }
 }
 
-void vh::identities::model::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group>>& groups) {
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Group>>& groups) {
     j = nlohmann::json::array();
     for (const auto& group : groups) j.push_back(*group);
 }
 
-std::vector<std::shared_ptr<Group> > vh::identities::model::groups_from_json(const nlohmann::json& j) {
+std::vector<std::shared_ptr<Group> > groups_from_json(const nlohmann::json& j) {
     std::vector<std::shared_ptr<Group> > groups;
     for (const auto& groupJson : j) groups.push_back(std::make_shared<Group>(groupJson));
     return groups;
 }
 
-void vh::identities::model::to_json(nlohmann::json& j, const GroupMember& gm) {
+void to_json(nlohmann::json& j, const GroupMember& gm) {
     j = {
         {"user", to_public_json(gm.user)},
         {"joined_at", timestampToString(gm.joined_at)}
     };
 }
 
-std::string vh::identities::model::to_string(const std::shared_ptr<Group>& g) {
+std::string to_string(const std::shared_ptr<Group>& g) {
     std::string out;
     out += "Group Name: " + g->name + "\n";
     out += "Group ID: " + std::to_string(g->id) + "\n";
@@ -118,7 +119,7 @@ std::string vh::identities::model::to_string(const std::shared_ptr<Group>& g) {
     return out;
 }
 
-std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<Group>>& groups) {
+std::string to_string(const std::vector<std::shared_ptr<Group>>& groups) {
     if (groups.empty()) return "No groups found";
 
     Table tbl({
@@ -142,14 +143,16 @@ std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<G
     return tbl.render();
 }
 
-std::string vh::identities::model::to_string(const std::shared_ptr<GroupMember>& gm) {
+std::string to_string(const std::shared_ptr<GroupMember>& gm) {
     return "Member: " + gm->user->name + " (ID: " + std::to_string(gm->user->id) + "), Joined at: " + timestampToString(gm->joined_at);
 }
 
-std::string vh::identities::model::to_string(const std::vector<std::shared_ptr<GroupMember>>& members) {
+std::string to_string(const std::vector<std::shared_ptr<GroupMember>>& members) {
     if (members.empty()) return "No members found";
 
     std::string out = "Group Members:\n";
     for (const auto& member : members) out += "  - " + to_string(member) + "\n";
     return out;
+}
+
 }

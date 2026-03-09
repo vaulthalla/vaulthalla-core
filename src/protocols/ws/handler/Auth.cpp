@@ -1,96 +1,97 @@
 #include "protocols/ws/handler/Auth.hpp"
 #include "runtime/Deps.hpp"
 #include "auth/Manager.hpp"
-#include "auth/model/Client.hpp"
 #include "db/query/rbac/Permission.hpp"
-#include "protocols/ws/Session.hpp"
+#include "auth/session/Validator.hpp"
 #include "identities/model/User.hpp"
 #include "db/query/identities/User.hpp"
+#include "protocols/ws/Session.hpp"
+#include "rbac/model/UserRole.hpp"
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::auth;
 using namespace vh::identities::model;
 
-json Auth::login(const json& payload, Session& session) {
+json Auth::login(const json& payload, const std::shared_ptr<Session>& session) {
     const auto username = payload.at("name").get<std::string>();
     const auto password = payload.at("password").get<std::string>();
 
-    const auto client = runtime::Deps::get().authManager->loginUser(username, password, session.shared_from_this());
-    if (!client) throw std::runtime_error("Invalid email or password or user not found");
+    runtime::Deps::get().authManager->loginUser(username, password, session);
+    if (!session::Validator::softValidateActiveSession(session)) throw std::runtime_error("Failed to validate session after login");
 
-    session.setAuthenticatedUser(client->user);
-    return {{"token", client->getRawToken()}, {"user", *client->user}};
+    session->sendAccessTokenOnNextResponse();
+    return {{"user", *session->user}};
 }
 
-json Auth::registerUser(const json& payload, Session& session) {
+json Auth::registerUser(const json& payload, const std::shared_ptr<Session>& session) {
     const auto name = payload.at("name").get<std::string>();
     const auto email = payload.at("email").get<std::string>();
     const auto password = payload.at("password").get<std::string>();
     const auto isActive = payload.at("is_active").get<bool>();
     const auto role = payload.at("role").get<std::string>();
 
-    const auto userRole = db::query::rbac::Permission::getRoleByName(role);
+    const auto user = std::make_shared<User>(name, email, isActive);
 
-    auto user = std::make_shared<User>(name, email, isActive);
-    const auto client = runtime::Deps::get().authManager->registerUser(user, password, session.shared_from_this());
-    user = client->user;
-    std::string token = client->getRawToken();
+    if (const auto userRole = std::dynamic_pointer_cast<rbac::model::UserRole>(db::query::rbac::Permission::getRoleByName(role))) {
+        if (!session->user) throw std::runtime_error("User not authenticated");
+        if (userRole->name == "super_admin") throw std::runtime_error("Cannot assign super admin role to a user");
+        if (userRole->name == "admin" && !session->user->canManageAdmins()) throw std::runtime_error("Permission denied: Only super admins can assign admin role");
+        if (!session->user->canManageUsers()) throw std::runtime_error("Permission denied: Only admins can assign user roles");
+        user->role = userRole;
+    } else throw std::runtime_error("Invalid role specified: " + role);
 
-    // Bind user to WebSocketSession
-    session.setAuthenticatedUser(user);
+    runtime::Deps::get().authManager->registerUser(user, password);
 
-    return {{"token", token}, {"user", *user}};
+    return {{"user", *user}};
 }
 
-json Auth::deleteUser(const json& payload, const Session& session) {
+json Auth::refreshToken(const std::string& token, const std::shared_ptr<Session>& session) {
+    runtime::Deps::get().sessionManager->renewAccessToken(session, token);
+    session->sendAccessTokenOnNextResponse();
+    return {};
+}
+
+json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& session) {
     const auto id = payload.at("id").get<unsigned int>();
-    const auto user = session.getAuthenticatedUser();
 
     const auto targetUser = db::query::identities::User::getUserById(id);
     if (!targetUser) throw std::runtime_error("User not found");
 
     if (targetUser->isSuperAdmin()) throw std::runtime_error("Cannot delete super admin user");
-    if (targetUser->isAdmin() && !user->canManageAdmins()) throw std::runtime_error("Permission denied: Only super admins can delete admin users");
-    if (!targetUser->isAdmin() && targetUser->id != user->id && !user->canManageUsers()) throw std::runtime_error("Permission denied: Only admins can delete other users");
+    if (targetUser->isAdmin() && !session->user->canManageAdmins()) throw std::runtime_error("Permission denied: Only super admins can delete admin users");
+    if (!targetUser->isAdmin() && targetUser->id != session->user->id && !session->user->canManageUsers()) throw std::runtime_error("Permission denied: Only admins can delete other users");
 
     db::query::identities::User::deleteUser(targetUser->id);
     if (db::query::identities::User::getUserById(targetUser->id))
         throw std::runtime_error("Failed to delete user with id: " + std::to_string(targetUser->id));
 
-    runtime::Deps::get().authManager->sessionManager()->invalidateSession(std::to_string(targetUser->id));
+    runtime::Deps::get().sessionManager->invalidate(std::to_string(targetUser->id));
 
     return {{ "user_id", targetUser->id }};
 }
 
-json Auth::updateUser(const json& payload, const Session& session) {
-    const auto user = session.getAuthenticatedUser();
-    if (!user) throw std::runtime_error("User not authenticated");
+json Auth::updateUser(const json& payload, const std::shared_ptr<Session>& session) {
+    if (!session->user) throw std::runtime_error("User not authenticated");
 
-    user->updateUser(payload);
-    runtime::Deps::get().authManager->updateUser(user);
+    session->user->updateUser(payload);
+    runtime::Deps::get().authManager->updateUser(session->user);
 
-    return {{"user", *user}};
+    return {{"user", *session->user}};
 }
 
-json Auth::changePassword(const json& payload, const Session& session) {
-    const auto user = session.getAuthenticatedUser();
-    if (!user) throw std::runtime_error("User not authenticated");
-
+json Auth::changePassword(const json& payload, const std::shared_ptr<Session>& session) {
     const auto oldPassword = payload.at("old_password").get<std::string>();
     const auto newPassword = payload.at("new_password").get<std::string>();
 
-    runtime::Deps::get().authManager->changePassword(user->name, oldPassword, newPassword);
+    runtime::Deps::get().authManager->changePassword(session->user->name, oldPassword, newPassword);
 
     return {};
 }
 
-json Auth::getUser(const json& payload, const Session& session) {
-    const auto user = session.getAuthenticatedUser();
-    if (!user) throw std::runtime_error("User not authenticated");
-
+json Auth::getUser(const json& payload, const std::shared_ptr<Session>& session) {
     const auto userId = payload.at("id").get<unsigned int>();
 
-    if (user->id != userId && !user->canManageRoles()) throw std::runtime_error(
+    if (session->user->id != userId && !session->user->canManageRoles()) throw std::runtime_error(
         "Permission denied: Only admins can fetch user data");
 
     const auto requestedUser = db::query::identities::User::getUserById(userId);
@@ -98,47 +99,28 @@ json Auth::getUser(const json& payload, const Session& session) {
     return {{"user", *requestedUser}};
 }
 
-json Auth::refresh(Session& session) {
-    const auto client = runtime::Deps::get().authManager->validateRefreshToken(session.getRefreshToken(), session.shared_from_this());
-    if (!client) throw std::runtime_error("No client attached to current websocket session. Please reauthenticate.");
-    if (!client->user) throw std::runtime_error("No user attached to current websocket session. Please reauthenticate.");
-    client->renewToken();
-    return {{"token", client->getRawToken()}, {"user", *client->user}};
-}
-
-json Auth::logout(Session& session) {
-    const auto refreshToken = session.getRefreshToken();
-    runtime::Deps::get().authManager->sessionManager()->invalidateSession(session.getUUID());
-    session.setAuthenticatedUser(nullptr);
+json Auth::logout(const std::shared_ptr<Session>& session) {
+    runtime::Deps::get().sessionManager->invalidate(session);
     return {};
 }
 
-json Auth::listUsers(const Session& session) {
-    if (const auto user = session.getAuthenticatedUser();
-        !user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list users");
-    const auto users = db::query::identities::User::listUsers();
-    return {{"users", to_json(users)}};
+json Auth::listUsers(const std::shared_ptr<Session>& session) {
+    if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list users");
+    return {{"users", to_json(db::query::identities::User::listUsers())}};
 }
 
-json Auth::isUserAuthenticated(const std::string& token, const Session& session)  {
-    const auto client = runtime::Deps::get().authManager->sessionManager()->getClientSession(session.getUUID());
-    if (!client) throw std::runtime_error("No access token attached to current websocket session. Please reauthenticate.");
-
-    const auto user = client->user;
-    if (!user) throw std::runtime_error("User not found for token: " + token);
-
-    const bool isAuthenticated = client->isAuthenticated() && client->validateToken(token);
+json Auth::isUserAuthenticated(const std::string& token, const std::shared_ptr<Session>& session)  {
+    const bool isAuthenticated = runtime::Deps::get().sessionManager->validate(session, token);
     json data = {{"isAuthenticated", isAuthenticated}};
-    if (isAuthenticated) data["user"] = *user;
+    if (isAuthenticated) data["user"] = *session->user;
     return data;
 }
 
-json Auth::getUserByName(const json& payload, const Session& session) {
-    const auto user = session.getAuthenticatedUser();
-    if (!user) throw std::runtime_error("User not authenticated");
+json Auth::getUserByName(const json& payload, const std::shared_ptr<Session>& session) {
+    if (!session->user) throw std::runtime_error("User not authenticated");
 
     const auto name = payload.at("name").get<std::string>();
-    if (user->name != name && !user->canManageRoles()) throw std::runtime_error(
+    if (session->user->name != name && !session->user->canManageRoles()) throw std::runtime_error(
         "Permission denied: Only admins can fetch user by name");
 
     const auto retUser = db::query::identities::User::getUserByName(name);

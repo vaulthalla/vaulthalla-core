@@ -3,6 +3,8 @@
 #include "protocols/ws/Router.hpp"
 #include "protocols/ws/Handler.hpp"
 #include "protocols/TCPAcceptor.hpp"
+#include "runtime/Deps.hpp"
+#include "auth/session/Manager.hpp"
 
 namespace vh::protocols::ws {
 
@@ -23,7 +25,7 @@ void Server::onAccept(tcp::socket socket) {
     wrap_sys("[WebSocketServer] KEEPALIVE set failed",
         [&] { socket.set_option(asio::socket_base::keep_alive(true)); });
 
-    std::make_shared<Session>(router_)->accept(std::move(socket));
+    runtime::Deps::get().sessionManager->accept(std::move(socket), router_);
 }
 
 }

@@ -44,25 +44,6 @@ User::UserPtr User::getUserById(const unsigned int id) {
     });
 }
 
-User::UserPtr User::getUserByRefreshToken(const std::string& jti) {
-    return Transactions::exec("User::getUserByRefreshToken", [&](pqxx::work& txn) -> UserPtr {
-        const auto res = txn.exec(pqxx::prepped{"get_user_by_refresh_token"}, pqxx::params{jti});
-        if (res.empty()) {
-            log::Registry::db()->trace("[User] No user found for refresh token JTI: {}", jti);
-            return nullptr;
-        }
-
-        const auto userRow = res.one_row();
-        const auto userId = userRow["id"].as<unsigned int>();
-        const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
-
-        const auto rolesRes = txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, userId);
-        const auto overridesRes = txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, userId);
-
-        return std::make_shared<U>(userRow, userRoleRow, rolesRes, overridesRes);
-    });
-}
-
 User::UserPtr User::getUserByLinuxUID(unsigned int linuxUid) {
     return Transactions::exec("User::getUserByLinuxUID", [&](pqxx::work& txn) -> UserPtr {
         const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
@@ -192,55 +173,6 @@ std::vector<User::UserPtr > User::listUsers(ListQueryParams&& params) {
 void User::updateLastLoggedInUser(const unsigned int userId) {
     Transactions::exec("User::updateLastLoggedInUser", [&](pqxx::work& txn) {
         txn.exec(pqxx::prepped{"update_user_last_login"}, pqxx::params{userId});
-    });
-}
-
-void User::addRefreshToken(const std::shared_ptr<RefreshToken>& token) {
-    Transactions::exec("User::addRefreshToken", [&](pqxx::work& txn) {
-        pqxx::params p{token->getJti(), token->getUserId(), token->getHashedToken(), token->getIpAddress(),
-                       token->getUserAgent()};
-        txn.exec(pqxx::prepped{"insert_refresh_token"}, p);
-    });
-}
-
-void User::removeRefreshToken(const std::string& jti) {
-    Transactions::exec("User::removeRefreshToken", [&](pqxx::work& txn) {
-        txn.exec("DELETE FROM refresh_tokens WHERE jti = " + txn.quote(jti));
-    });
-}
-
-std::shared_ptr<RefreshToken> User::getRefreshToken(const std::string& jti) {
-    return Transactions::exec("User::getRefreshToken", [&](pqxx::work& txn) -> std::shared_ptr<RefreshToken> {
-        const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE jti = " + txn.quote(jti));
-        if (res.empty()) {
-            log::Registry::db()->trace("[User] No refresh token found for JTI: {}", jti);
-            return nullptr;
-        }
-        return std::make_shared<RefreshToken>(res.one_row());
-    });
-}
-
-std::vector<std::shared_ptr<RefreshToken> > User::listRefreshTokens(const unsigned int userId) {
-    return Transactions::exec("User::listRefreshTokens", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT * FROM refresh_tokens WHERE user_id = " + txn.quote(userId));
-        std::vector<std::shared_ptr<RefreshToken> > tokens;
-        for (const auto& row : res) tokens.push_back(std::make_shared<RefreshToken>(row));
-        return tokens;
-    });
-}
-
-void User::revokeAllRefreshTokens(const unsigned int userId) {
-    Transactions::exec("User::revokeAllRefreshTokens", [&](pqxx::work& txn) {
-        txn.exec("UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = " + txn.quote(userId));
-    });
-}
-
-void User::revokeAndPurgeRefreshTokens(const unsigned int userId) {
-    Transactions::exec("User::revokeAndPurgeRefreshTokens", [&](pqxx::work& txn) {
-        pqxx::params p{userId};
-        txn.exec(pqxx::prepped{"revoke_most_recent_refresh_token"}, p);
-        txn.exec(pqxx::prepped{"delete_refresh_tokens_older_than_7_days"}, p);
-        txn.exec(pqxx::prepped{"delete_refresh_tokens_keep_five"}, p);
     });
 }
 

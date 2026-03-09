@@ -1,5 +1,5 @@
 #include "storage/Engine.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "vault/model/Vault.hpp"
 #include "sync/model/Operation.hpp"
 #include "fs/model/Path.hpp"
@@ -108,13 +108,13 @@ uintmax_t Engine::getVaultAndCacheTotalSize() const { return getVaultSize() + ge
 uintmax_t Engine::freeSpace() const { return vault->quota - getVaultAndCacheTotalSize() - MIN_FREE_SPACE; }
 
 void Engine::purgeThumbnails(const fs::path& rel_path) const {
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes)
+    for (const auto& size : Registry::get().caching.thumbnails.sizes)
         if (const auto thumbnailPath = paths->absPath(rel_path, PathType::THUMBNAIL_ROOT) / std::to_string(size);
             fs::exists(thumbnailPath)) fs::remove(thumbnailPath);
 }
 
 void Engine::moveThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+    for (const auto& size : Registry::get().caching.thumbnails.sizes) {
         auto fromPath = paths->absPath(from, PathType::THUMBNAIL_ROOT) / std::to_string(size);
         auto toPath = paths->absPath(to, PathType::THUMBNAIL_ROOT) / std::to_string(size);
 
@@ -134,7 +134,7 @@ void Engine::moveThumbnails(const std::filesystem::path& from, const std::filesy
 }
 
 void Engine::copyThumbnails(const std::filesystem::path& from, const std::filesystem::path& to) const {
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+    for (const auto& size : Registry::get().caching.thumbnails.sizes) {
         auto fromPath = paths->absPath(from, PathType::THUMBNAIL_ROOT) / std::to_string(size);
         auto toPath = paths->absPath(to, PathType::THUMBNAIL_ROOT) / std::to_string(size);
 
@@ -220,7 +220,7 @@ void Engine::removeLocally(const std::shared_ptr<file::Trashed>& f) const {
 
     const auto vaultPath = paths->absRelToAbsRel(f->path, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
 
-    for (const auto& size : ConfigRegistry::get().caching.thumbnails.sizes) {
+    for (const auto& size : Registry::get().caching.thumbnails.sizes) {
         const auto thumbPath = paths->absPath(vaultPath, PathType::THUMBNAIL_ROOT) / std::to_string(size);
         fs::remove(thumbPath, ec);
     }

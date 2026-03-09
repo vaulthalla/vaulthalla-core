@@ -1,6 +1,7 @@
 #include "protocols/ws/handler/Groups.hpp"
 #include "protocols/ws/Session.hpp"
 #include "auth/Manager.hpp"
+#include "auth/registration/Validator.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "identities/model/User.hpp"
@@ -11,8 +12,8 @@
 using namespace vh::protocols::ws::handler;
 using namespace vh::identities::model;
 
-json Groups::add(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::add(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can create groups");
 
     const std::string groupName = payload.at("name").get<std::string>();
@@ -33,8 +34,8 @@ json Groups::add(const json& payload, const Session& session) {
     return {{"name", groupName}};
 }
 
-json Groups::remove(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::remove(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can delete groups");
 
     const auto groupId = payload.at("id").get<unsigned int>();
@@ -43,8 +44,8 @@ json Groups::remove(const json& payload, const Session& session) {
     return {{"id", groupId}};
 }
 
-json Groups::addMember(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::addMember(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can add members to groups");
 
     const unsigned int groupId = payload.at("groupId").get<unsigned int>();
@@ -58,8 +59,8 @@ json Groups::addMember(const json& payload, const Session& session) {
     return {{"groupId", groupId}, {"memberName", memberName}};
 }
 
-json Groups::removeMember(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::removeMember(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can remove members from groups");
 
     const unsigned int groupId = payload.at("groupId").get<unsigned int>();
@@ -70,15 +71,15 @@ json Groups::removeMember(const json& payload, const Session& session) {
     return {{"groupId", groupId}, {"userId", userId}};
 }
 
-json Groups::list(const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::list(const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can list groups");
 
     return {{"groups", db::query::identities::Group::listGroups()}};
 }
 
-json Groups::get(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::get(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can get group details");
 
     const auto groupId = payload.at("id").get<unsigned int>();
@@ -89,8 +90,8 @@ json Groups::get(const json& payload, const Session& session) {
     return {{"group", *group}};
 }
 
-json Groups::getByName(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::getByName(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can get group by name");
 
     if (const auto group = db::query::identities::Group::getGroupByName(payload.at("name").get<std::string>()))
@@ -100,14 +101,14 @@ json Groups::getByName(const json& payload, const Session& session) {
 }
 
 
-json Groups::update(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::update(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can update groups");
 
     const unsigned int groupId = payload.at("id").get<unsigned int>();
     const std::string newName = payload.at("name").get<std::string>();
 
-    if (!auth::Manager::isValidGroup(newName))
+    if (!auth::registration::Validator::isValidGroup(newName))
         throw std::runtime_error("Invalid group name: " + newName);
 
     const auto group = db::query::identities::Group::getGroup(groupId);
@@ -127,8 +128,8 @@ json Groups::update(const json& payload, const Session& session) {
     return {{"id", groupId}, {"name", newName}};
 }
 
-json Groups::listByUser(const json& payload, const Session& session) {
-    if (const auto user = session.getAuthenticatedUser(); !user || !user->canManageRoles())
+json Groups::listByUser(const json& payload, const std::shared_ptr<Session>& session) {
+    if (const auto user = session->user; !user || !user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can list groups by user");
 
     return {{"groups", db::query::identities::Group::listGroups(payload.at("user_id").get<unsigned int>())}};

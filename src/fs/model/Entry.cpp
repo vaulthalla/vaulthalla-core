@@ -4,7 +4,7 @@
 #include "fs/model/Directory.hpp"
 #include "fs/model/Path.hpp"
 #include "log/Registry.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "db/encoding/u8.hpp"
 
 #include <nlohmann/json.hpp>

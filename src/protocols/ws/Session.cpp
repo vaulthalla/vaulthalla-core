@@ -1,6 +1,8 @@
 #include "protocols/ws/Session.hpp"
 
 #include "auth/Manager.hpp"
+#include "auth/model/RefreshToken.hpp"
+#include "auth/model/TokenPair.hpp"
 #include "log/Registry.hpp"
 #include "protocols/ws/Router.hpp"
 #include "protocols/ws/handler/Upload.hpp"
@@ -14,7 +16,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/asio.hpp>
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 
 namespace {
 namespace beast     = boost::beast;
@@ -30,16 +32,16 @@ using namespace vh::protocols;
 namespace vh::protocols::ws {
 
 Session::Session(const std::shared_ptr<Router>& router)
-    : uploadHandler_(std::make_shared<handler::Upload>(*this)), router_(router) {
+    : tokens(std::make_shared<auth::model::TokenPair>()), router_(router) {
     buffer_.max_size(65536);
 }
 
 Session::~Session() {
     close();
-    log::Registry::ws()->debug("[WebSocketSession] Session destroyed for IP: {}", getClientIp());
+    log::Registry::ws()->debug("[ws::Session] Session destroyed for IP: {}", getIPAddress());
 }
 
-std::string Session::getClientIp() const {
+std::string Session::getIPAddress() const {
     try {
         if (!ws_ || !ws_->next_layer().is_open()) return "unknown";
         return ws_->next_layer().remote_endpoint().address().to_string();
@@ -49,22 +51,27 @@ std::string Session::getClientIp() const {
 }
 
 std::string Session::getUserAgent() const {
-    const auto it = handshakeRequest_.find(http::field::user_agent);
-    return it != handshakeRequest_.end() ? std::string(it->value()) : "unknown";
+    if (const auto it = handshakeRequest_.find(http::field::user_agent);
+        it != handshakeRequest_.end()) return std::string(it->value());
+    return  "unknown";
 }
 
-std::string Session::getRefreshToken() const { return refreshToken_; }
-std::shared_ptr<User> Session::getAuthenticatedUser() const { return authenticatedUser_; }
-void Session::setAuthenticatedUser(const std::shared_ptr<User>& user) { authenticatedUser_ = std::move(user); }
-void Session::setRefreshTokenCookie(const std::string& token) { refreshToken_ = token; }
+void Session::setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user) {
+    this->user = user;
+    if (!tokens->refreshToken) throw std::runtime_error("Cannot set authenticated user without a refresh token in session");
+    tokens->refreshToken->userId = user->id;
+}
+
 void Session::setHandshakeRequest(const RequestType& req) { handshakeRequest_ = req; }
 
 void Session::logFail(std::string_view where, const beast::error_code& ec) {
     if (!ec) return;
-    log::Registry::ws()->debug("[WebSocketSession] {}: {}", where, ec.message());
+    log::Registry::ws()->debug("[ws::Session] {}: {}", where, ec.message());
 }
 
 void Session::accept(tcp::socket&& socket) {
+    uploadHandler_ = std::make_shared<handler::Upload>(shared_from_this());
+
     ws_ = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
     strand_ = asio::make_strand(ws_->get_executor());
 
@@ -87,11 +94,6 @@ void Session::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast
 
     hydrateFromRequest(*req);
 
-    // auth rehydrate/create *before* accept so we can set refresh cookie in decorator
-    runtime::Deps::get().authManager->rehydrateOrCreateClient(shared_from_this());
-
-    installHandshakeDecorator();
-
     auto self = shared_from_this();
     ws_->async_accept(
         *req,
@@ -103,42 +105,48 @@ void Session::onHeadersRead(const std::shared_ptr<RequestType>& req, const beast
 }
 
 void Session::hydrateFromRequest(const RequestType& req) {
+    log::Registry::ws()->debug("[ws::Session] Handshake request received from IP: {}", getIPAddress());
+
     handshakeRequest_ = req;
+    ipAddress = getIPAddress();
+    userAgent = getUserAgent();
 
-    try {
-        ipAddress_ = ws_->next_layer().remote_endpoint().address().to_string();
-    } catch (...) {
-        ipAddress_ = "unknown";
+    log::Registry::ws()->debug("[ws::Session] Attempting to hydrate session from request. IP: {}, User-Agent: {}", ipAddress, userAgent);
+    auth::model::RefreshToken::addToSession(shared_from_this(), extractCookie(req, "refresh"));
+
+    log::Registry::ws()->debug("[ws::Session] Extracted refresh token from cookies: {}", tokens->refreshToken ? tokens->refreshToken->rawToken : "none");
+    runtime::Deps::get().sessionManager->tryRehydrate(shared_from_this());
+
+    if (user) log::Registry::ws()->debug("[ws::Session] Session hydrated with user: {} (ID: {})", user->name, user->id);
+    else {
+        log::Registry::ws()->debug("[ws::Session] No user associated with session after hydration");
+        if (!tokens->refreshToken->isValid()) exit(1); // this should never happen, but if it does, it's safest to just kill the session immediately
+        installHandshakeDecorator();
     }
-
-    userAgent_ = std::string(req[http::field::user_agent]);
-    refreshToken_ = extractCookie(req, "refresh");
-
-    if (refreshToken_.empty())
-        log::Registry::ws()->debug("[Session] No refresh token found in Cookie header");
-    else
-        log::Registry::ws()->debug("[Session] Refresh token found in Cookie header: {}", refreshToken_);
 }
 
 void Session::installHandshakeDecorator() const {
-    const auto token = refreshToken_;
+    if (!tokens || !tokens->refreshToken) {
+        log::Registry::ws()->debug("[ws::Session] No refresh token available, skipping handshake decorator installation");
+        return;
+    }
 
+    const auto t = tokens->refreshToken->rawToken;
     ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
     ws_->set_option(websocket::stream_base::decorator(
-        [token](websocket::response_type& res) {
+        [t](websocket::response_type& res) {
             res.set(http::field::server, "Vaulthalla");
 
-            const bool isDev = config::ConfigRegistry::get().dev.enabled;
+            const bool isDev = config::Registry::get().dev.enabled;
             const std::string sameSite = isDev ? "Lax" : "Lax"; // keep Lax unless *need* Strict
-            const bool secure = true; // or: !isDev ? true : config says https-enabled
 
-            std::string cookie = "refresh=" + token +
+            std::string cookie = "refresh=" + t +
                 "; Path=/" +
                 "; HttpOnly" +
                 "; SameSite=" + sameSite +
                 "; Max-Age=604800";
 
-            if (secure) cookie += "; Secure";
+            cookie += "; Secure";
 
             // IMPORTANT: use insert to avoid clobbering other Set-Cookie headers
             res.insert(http::field::set_cookie, cookie);
@@ -149,7 +157,7 @@ void Session::installHandshakeDecorator() const {
 void Session::onHandshakeAccepted(const beast::error_code& ec) {
     if (ec) return logFail("Handshake error", ec);
 
-    log::Registry::ws()->debug("[Session] Handshake accepted from IP: {}", getClientIp());
+    log::Registry::ws()->debug("[ws::Session] Handshake accepted from IP: {}", getIPAddress());
     startReadLoop();
 }
 
@@ -173,16 +181,26 @@ void Session::close() {
             ws->close(websocket::close_code::normal, ec);
 
         if (ec)
-            log::Registry::ws()->debug("[WebSocketSession] ws close error: {}", ec.message());
+            log::Registry::ws()->debug("[ws::Session] ws close error: {}", ec.message());
 
         self->ws_.reset();
         self->buffer_.consume(self->buffer_.size());
 
-        log::Registry::ws()->debug("[WebSocketSession] Closed session for IP: {}", self->getClientIp());
+        log::Registry::ws()->debug("[ws::Session] Closed session for IP: {}", self->ipAddress);
     });
 }
 
-void Session::send(const json& message) {
+void Session::send(json message) {
+    if (sendAccessToken_) {
+        if (!tokens || !tokens->accessToken) {
+            log::Registry::ws()->debug("[ws::Session] Attempted to send access token, but no access token is available in session");
+            throw std::runtime_error("No access token available in session");
+        }
+
+        message["token"] = tokens->accessToken->rawToken;
+        sendAccessToken_ = false;
+    }
+
     auto payload = message.dump();
     auto self = shared_from_this();
 
@@ -260,11 +278,11 @@ void Session::sendInternalError() {
 
 void Session::onRead(const beast::error_code& ec, std::size_t) {
     if (ec == websocket::error::closed) {
-        log::Registry::ws()->debug("[Session] WebSocket closed gracefully by peer");
+        log::Registry::ws()->debug("[ws::Session] WebSocket closed gracefully by peer");
         return close();
     }
     if (ec == asio::error::eof) {
-        log::Registry::ws()->debug("[Session] WebSocket peer vanished (EOF)");
+        log::Registry::ws()->debug("[ws::Session] WebSocket peer vanished (EOF)");
         return close();
     }
     if (ec) {
@@ -276,13 +294,13 @@ void Session::onRead(const beast::error_code& ec, std::size_t) {
     else {
         try {
             const auto text = beast::buffers_to_string(buffer_.data());
-            router_->routeMessage(json::parse(text), *this);
+            router_->routeMessage(json::parse(text), shared_from_this());
         } catch (const std::exception& ex) {
-            log::Registry::ws()->debug("[Session] Error parsing message: {}", ex.what());
+            log::Registry::ws()->debug("[ws::Session] Error parsing message: {}", ex.what());
             sendParseError(std::string("Failed to parse message: ") + ex.what());
             // NOTE: we still continue reading (keeps session alive after a bad frame)
         } catch (...) {
-            log::Registry::ws()->debug("[Session] Unknown error while processing message");
+            log::Registry::ws()->debug("[ws::Session] Unknown error while processing message");
             sendInternalError();
         }
     }

@@ -1,6 +1,6 @@
 #include "db/DBConnection.hpp"
 #include "config/Config.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "crypto/secrets/TPMKeyProvider.hpp"
 #include "crypto/password/Strength.hpp"
 #include "log/Registry.hpp"
@@ -78,7 +78,7 @@ DBConnection::DBConnection() : tpmKeyProvider_(
     const auto& key = tpmKeyProvider_->getMasterKey();
     const auto password = password::Strength::escape_uri_component({key.begin(), key.end()});
 
-    const auto& config = config::ConfigRegistry::get();
+    const auto& config = config::Registry::get();
     const auto db = config.database;
     DB_CONNECTION_STR = "postgresql://" + db.user + ":" + password + "@" + db.host + ":" + std::to_string(db.port) + "/"
                         + db.name;
@@ -95,6 +95,7 @@ void DBConnection::initPrepared() const {
     // Auth
     initPreparedUsers();
     initPreparedGroups();
+    initPreparedRefreshTokens();
 
     // RBAC
     initPreparedRoles();

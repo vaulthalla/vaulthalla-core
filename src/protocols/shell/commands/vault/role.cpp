@@ -9,7 +9,7 @@
 #include "rbac/model/Role.hpp"
 #include "rbac/model/Permission.hpp"
 
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "CommandUsage.hpp"
 
 #include <optional>

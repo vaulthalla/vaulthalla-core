@@ -5,7 +5,7 @@
 #include "fs/model/Path.hpp"
 #include "fs/model/Entry.hpp"
 #include "vault/model/Vault.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "fs/Filesystem.hpp"
 #include "runtime/Deps.hpp"
 #include "db/query/identities/User.hpp"

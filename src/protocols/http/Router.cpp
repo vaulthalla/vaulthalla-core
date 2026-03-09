@@ -1,7 +1,7 @@
 #include "protocols/http/Router.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "config/ConfigRegistry.hpp"
+#include "config/Registry.hpp"
 #include "auth/Manager.hpp"
 #include "protocols/http/handler/preview/Image.hpp"
 #include "protocols/http/handler/preview/Pdf.hpp"
@@ -15,6 +15,8 @@
 #include "protocols/http/model/preview/Request.hpp"
 #include "log/Registry.hpp"
 #include "protocols/cookie.hpp"
+#include "protocols/ws/Session.hpp"
+#include "identities/model/User.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -62,7 +64,7 @@ static std::unordered_map<std::string, std::string> parse_query_params(const std
 
 static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const std::filesystem::path& thumbnailRoot,
                                          const unsigned int size) {
-    if (const auto thumbnail_sizes = ConfigRegistry::get().caching.thumbnails.sizes;
+    if (const auto thumbnail_sizes = Registry::get().caching.thumbnails.sizes;
         std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
 
         if (const auto pathToJpegCache = thumbnailRoot / f->base32_alias / std::string(std::to_string(size) + ".jpg");
@@ -92,7 +94,7 @@ Response Router::route(request&& req) {
 }
 
 Response Router::handleAuthSession(request&& req) {
-    if (ConfigRegistry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
+    if (Registry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
 
     try {
         const auto refresh = protocols::extractCookie(req, "refresh");
@@ -100,12 +102,7 @@ Response Router::handleAuthSession(request&& req) {
             log::Registry::http()->warn("[Router] Refresh token not set");
             return makeErrorResponse(req, "Refresh token not set", status::bad_request);
         }
-        runtime::Deps::get().authManager->validateRefreshToken(refresh);
-        const auto session = runtime::Deps::get().authManager->sessionManager()->getClientSession(refresh);
-        if (!session || !session->user) {
-            log::Registry::http()->warn("[Router]: Invalid refresh token. Unable to locate session.");
-            return makeErrorResponse(req, "Not found", status::not_found);
-        }
+        const auto session = runtime::Deps::get().sessionManager->validateRawRefreshToken(refresh);
 
         // Could mint an access token here if we wanted to
         nlohmann::json j{
@@ -123,10 +120,10 @@ Response Router::handleAuthSession(request&& req) {
 }
 
 std::string Router::authenticateRequest(const request& req) {
-    if (ConfigRegistry::get().dev.enabled) return "";
+    if (Registry::get().dev.enabled) return "";
     try {
         const auto refresh_token = protocols::extractCookie(req, "refresh");
-        runtime::Deps::get().authManager->validateRefreshToken(refresh_token);
+        runtime::Deps::get().sessionManager->validateRawRefreshToken(refresh_token);
         return "";
     } catch (const std::exception& e) {
         return e.what();

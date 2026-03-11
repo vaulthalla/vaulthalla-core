@@ -1,9 +1,9 @@
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "db/Transactions.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/VaultRole.hpp"
-#include "rbac/model/Permission.hpp"
-#include "rbac/model/PermissionOverride.hpp"
+#include "rbac/role/Base.hpp"
+#include "rbac/role/Vault.hpp"
+#include "rbac/permission/Permission.hpp"
+#include "rbac/permission/Override.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::db::model;

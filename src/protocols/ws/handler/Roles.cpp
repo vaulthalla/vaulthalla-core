@@ -1,9 +1,9 @@
 #include "protocols/ws/handler/Roles.hpp"
 #include "protocols/ws/Session.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "identities/model/User.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../../include/rbac/role/Base.hpp"
+#include "../../../../include/rbac/role/Vault.hpp"
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::rbac::model;

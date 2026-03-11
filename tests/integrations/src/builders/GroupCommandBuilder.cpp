@@ -48,7 +48,7 @@ static std::string randomizePrimaryPositional(const std::shared_ptr<Group>& enti
     return entity->name;
 }
 
-static std::string randomizeSecondaryPositional(const std::shared_ptr<User>& entity) {
+static std::string randomizeSecondaryPositional(const std::shared_ptr<Admin>& entity) {
     if (coin()) return std::to_string(entity->id);
     return entity->name;
 }
@@ -119,7 +119,7 @@ std::string GroupCommandBuilder::list() {
     return oss.str();
 }
 
-std::string GroupCommandBuilder::addUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<User>& user) const {
+std::string GroupCommandBuilder::addUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<Admin>& user) const {
     const auto baseCmd = root_->findSubcommand("user");
     if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
     const auto addCmd = baseCmd->findSubcommand("add");
@@ -137,7 +137,7 @@ std::string GroupCommandBuilder::addUser(const std::shared_ptr<Group>& entity, c
     return oss.str();
 }
 
-std::string GroupCommandBuilder::removeUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<User>& user) const {
+std::string GroupCommandBuilder::removeUser(const std::shared_ptr<Group>& entity, const std::shared_ptr<Admin>& user) const {
     const auto baseCmd = root_->findSubcommand("user");
     if (!baseCmd) throw std::runtime_error("GroupCommandBuilder: 'group user' command usage not found");
     const auto rmCmd = baseCmd->findSubcommand("remove");

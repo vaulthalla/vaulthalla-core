@@ -1,7 +1,7 @@
 #pragma once
 
 #include "protocols/shell/types.hpp"
-#include "rbac/model/PermissionOverride.hpp"
+#include "../../../rbac/permission/Override.hpp"
 #include "db/model/ListQueryParams.hpp"
 
 #include <optional>
@@ -13,7 +13,7 @@
 #include <regex>
 
 namespace vh::rbac::model { struct Role; }
-namespace vh::identities::model { struct User; }
+namespace vh::identities::model { struct Admin; }
 
 namespace vh::protocols::shell {
 
@@ -68,7 +68,7 @@ bool isCommandMatch(const std::vector<std::string>& path, std::string_view subcm
 
 Lookup<Subject> parseSubject(const CommandCall& call, const std::string& errPrefix);
 Lookup<rbac::model::Role> resolveRole(const std::string& roleArg, const std::string& errPrefix);
-Lookup<identities::model::User> resolveUser(const std::string& userArg, const std::string& errPrefix);
+Lookup<identities::model::Admin> resolveUser(const std::string& userArg, const std::string& errPrefix);
 
 std::pair<std::string_view, CommandCall> descend(const CommandCall& call);
 

@@ -80,7 +80,7 @@ std::vector<std::shared_ptr<Engine>> Manager::getEngines() const {
     return engines;
 }
 
-void Manager::initUserStorage(const std::shared_ptr<User>& user) {
+void Manager::initUserStorage(const std::shared_ptr<Admin>& user) {
     try {
         log::Registry::storage()->debug("[StorageManager] Initializing storage user storage...");
 

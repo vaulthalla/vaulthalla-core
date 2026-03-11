@@ -14,7 +14,7 @@
 #include "rbac/model/VaultRole.hpp"
 #include "identities/model/User.hpp"
 #include "sync/model/Waiver.hpp"
-#include "rbac/model/UserRole.hpp"
+#include "../../../../../include/rbac/role/Admin.hpp"
 
 #include "config/Registry.hpp"
 #include "vault/terms/waiver.hpp"

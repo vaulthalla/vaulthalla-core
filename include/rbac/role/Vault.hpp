@@ -1,8 +1,10 @@
 #pragma once
 
-#include "Role.hpp"
-#include "PermissionOverride.hpp"
+#include "Base.hpp"
+#include "rbac/permission/Vault.hpp"
+#include "rbac/permission/Override.hpp"
 #include "log/Registry.hpp"
+#include "fs/model/Path.hpp"
 
 #include <string>
 #include <ctime>
@@ -13,40 +15,39 @@
 #include <regex>
 #include <unordered_map>
 
-namespace vh::rbac::model {
+namespace vh::rbac::role {
 
-struct PermissionOverride;
+struct Override;
 
-struct VaultRole final : Role {
-    unsigned int assignment_id{}, subject_id{}, role_id{}, vault_id{};
+struct Vault final : Base {
+    uint32_t subject_id{}, role_id{}, vault_id{};
     std::string subject_type; // 'user' or 'group'
-    std::time_t assigned_at{};
-    std::vector<std::shared_ptr<PermissionOverride> > permission_overrides;
+    permission::Vault permissions{};
 
-    VaultRole() = default;
-    ~VaultRole() override = default;
+    Vault() = default;
+    ~Vault() override = default;
 
-    VaultRole(const pqxx::row& row, const pqxx::result& overrides);
+    Vault(const pqxx::row& row, const pqxx::result& overrides);
 
-    VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrides);
+    Vault(const pqxx::row& row, const std::vector<pqxx::row>& overrides);
 
-    explicit VaultRole(const nlohmann::json& j);
-    explicit VaultRole(const Role& r) : Role(r) {
+    explicit Vault(const nlohmann::json& j);
+    explicit Vault(const Base& r) : Base(r) {
         if (type != "vault") throw std::runtime_error("VaultRole: invalid role type");
     }
 
-    static std::shared_ptr<VaultRole> fromJson(const nlohmann::json& j);
+    static std::shared_ptr<Vault> fromJson(const nlohmann::json& j);
 
     [[nodiscard]] std::string permissions_to_flags_string() const override;
 
-    [[nodiscard]] std::vector<std::shared_ptr<PermissionOverride> > getPermissionOverrides(unsigned short bit) const;
+    [[nodiscard]] std::vector<std::shared_ptr<Override> > getPermissionOverrides(unsigned short bit) const;
 
     template <typename T> bool validatePermission(const uint16_t mask, T perm,
                                                   const std::filesystem::path& path = {}) const {
         const bool isEnabled = (mask & static_cast<uint16_t>(perm)) != 0;
         if (path.empty()) return isEnabled;
 
-        const auto pathStr = path.string();
+        const auto pathStr = fs::model::makeAbsolute(path).string();
         const auto bit = vaultPermToBit(perm);
         auto overrides = getPermissionOverrides(bit);
         if (overrides.empty()) {
@@ -56,7 +57,7 @@ struct VaultRole final : Role {
 
         // Sort: best match first
         std::sort(overrides.begin(), overrides.end(),
-                  [&pathStr](const std::shared_ptr<PermissionOverride>& a, const std::shared_ptr<PermissionOverride>& b) {
+                  [&pathStr](const std::shared_ptr<Override>& a, const std::shared_ptr<Override>& b) {
                       std::smatch matchA, matchB;
                       const bool aMatches = std::regex_match(pathStr, matchA, a->pattern);
                       const bool bMatches = std::regex_match(pathStr, matchB, b->pattern);
@@ -69,7 +70,7 @@ struct VaultRole final : Role {
         for (const auto& ovr : overrides)
             if (std::regex_match(pathStr, ovr->pattern)) {
                 if (!ovr->enabled) continue;
-                return ovr->effect == OverrideOpt::ALLOW;
+                return ovr->effect == permission::OverrideOpt::ALLOW;
             }
 
         return isEnabled;
@@ -93,28 +94,28 @@ struct VaultRole final : Role {
 };
 
 struct VRolePair {
-    std::unordered_map<unsigned int, std::shared_ptr<VaultRole>> roles, group_roles;
+    std::unordered_map<unsigned int, std::shared_ptr<Vault>> roles, group_roles;
 };
 
 // JSON + DB helpers
-void to_json(nlohmann::json& j, const VaultRole& r);
+void to_json(nlohmann::json& j, const Vault& r);
 
-void from_json(const nlohmann::json& j, VaultRole& r);
+void from_json(const nlohmann::json& j, Vault& r);
 
-void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles);
+void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shared_ptr<Vault>>& roles);
 
 VRolePair vault_roles_from_json(const nlohmann::json& j);
 VRolePair vault_roles_from_pq_result(const pqxx::result& res, const pqxx::result& overrides);
 
-std::string to_string(const std::shared_ptr<VaultRole>& role);
-std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles);
-std::string to_string(const std::vector<std::shared_ptr<VaultRole>>& roles);
+std::string to_string(const std::shared_ptr<Vault>& role);
+std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<Vault>>& roles);
+std::string to_string(const std::vector<std::shared_ptr<Vault>>& roles);
 
-void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<VaultRole> >& roles);
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault> >& roles);
 
-std::vector<std::shared_ptr<VaultRole>> vault_roles_vector_from_json(const nlohmann::json& j);
+std::vector<std::shared_ptr<Vault>> vault_roles_vector_from_json(const nlohmann::json& j);
 
-std::vector<std::shared_ptr<VaultRole>> vault_roles_vector_from_pq_result(const pqxx::result& res,
+std::vector<std::shared_ptr<Vault>> vault_roles_vector_from_pq_result(const pqxx::result& res,
                                                                           const pqxx::result& overrides);
 
 }

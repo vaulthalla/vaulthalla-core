@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rbac/model/VaultRole.hpp"
+#include "../../../include/rbac/role/Vault.hpp"
 #include "identities/model/Group.hpp"
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
@@ -135,7 +135,7 @@ public:
         return { router_->executeLine(command, admin, io.get()), entity };
     }
 
-    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<Group>& group, const std::shared_ptr<User>& user) const {
+    [[nodiscard]] EntityResult manageGroup(const EntityType& type, const ActionType& action, const std::shared_ptr<Group>& group, const std::shared_ptr<Admin>& user) const {
         if (type != EntityType::USER && type != EntityType::VAULT)
             throw std::runtime_error("EntityRegistrar: manageGroup only supports USER and VAULT entity types");
 
@@ -151,7 +151,7 @@ public:
 
     [[nodiscard]] EntityResult manageVaultRoleAssignments(const EntityType& type, const CommandType& cmdType,
                                                           const std::shared_ptr<Vault>& vault,
-                                                          const std::shared_ptr<VaultRole>& role,
+                                                          const std::shared_ptr<Vault>& role,
                                                           const std::shared_ptr<void>& entity) const {
         if (type != EntityType::USER && type != EntityType::GROUP)
             throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports USER and GROUP entity types");

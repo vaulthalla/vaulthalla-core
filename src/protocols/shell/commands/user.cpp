@@ -5,7 +5,7 @@
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "crypto/util/hash.hpp"
 #include "log/Registry.hpp"
-#include "rbac/model/UserRole.hpp"
+#include "../../../../include/rbac/role/Admin.hpp"
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
@@ -23,7 +23,7 @@ using namespace vh::crypto;
 
 static const unsigned int PASSWORD_LENGTH = vh::paths::testMode ? 8 : 84;
 
-static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
+static std::string tryAssignNewPassword(const std::shared_ptr<Admin>& user) {
     constexpr unsigned short maxRetries = 1024 * 4; // 4096 attempts max
     for (unsigned short i = 1; i < maxRetries; ++i) {
         if (const auto password = hash::generate_secure_password(PASSWORD_LENGTH); registration::Validator::isValidPassword(password)) {
@@ -36,7 +36,7 @@ static std::string tryAssignNewPassword(const std::shared_ptr<User>& user) {
     throw std::runtime_error("Failed to generate a valid password");
 }
 
-static void assignEmail(const CommandCall& call, const std::shared_ptr<User>& user, const std::shared_ptr<CommandUsage>& usage) {
+static void assignEmail(const CommandCall& call, const std::shared_ptr<Admin>& user, const std::shared_ptr<CommandUsage>& usage) {
     if (const auto emailOpt = optVal(call, usage->resolveOptional("email")->option_tokens)) {
         if (!registration::Validator::isValidEmail(*emailOpt))
             throw std::runtime_error("Invalid email address: " + *emailOpt);
@@ -44,7 +44,7 @@ static void assignEmail(const CommandCall& call, const std::shared_ptr<User>& us
     }
 }
 
-static void assignLinuxUidIfAvailable(const CommandCall& call, const std::shared_ptr<User>& user, const std::shared_ptr<CommandUsage>& usage) {
+static void assignLinuxUidIfAvailable(const CommandCall& call, const std::shared_ptr<Admin>& user, const std::shared_ptr<CommandUsage>& usage) {
     if (const auto linuxUidOpt = optVal(call, usage->resolveOptional("linux-uid")->option_tokens)) {
         const auto parsed = parseUInt(*linuxUidOpt);
         if (!parsed || *parsed <= 0)
@@ -61,11 +61,11 @@ static CommandResult createUser(const CommandCall& call) {
     const auto usage = resolveUsage({"user", "create"});
     validatePositionals(call, usage);
 
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = call.positionals[0];
     assignEmail(call, user, usage);
     assignLinuxUidIfAvailable(call, user, usage);
-    user->role = std::make_shared<UserRole>();
+    user->role = std::make_shared<Admin>();
     user->last_modified_by = call.user->id;
 
     if (!registration::Validator::isValidName(user->name)) return invalid("Invalid user name: " + user->name);

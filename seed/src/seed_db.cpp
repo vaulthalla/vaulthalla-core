@@ -2,7 +2,7 @@
 
 // Database
 #include "db/query/vault/Vault.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../include/db/query/rbac/Permission.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "db/query/fs/Directory.hpp"
@@ -10,15 +10,16 @@
 #include "db/Transactions.hpp"
 
 // Types
-#include "rbac/model/Permission.hpp"
+#include "rbac/permission/Permission.hpp"
+#include "rbac/permission/bitmask.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "identities/model/User.hpp"
 #include "identities/model/Group.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "rbac/role/Base.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 #include "vault/model/Vault.hpp"
 #include "fs/model/Directory.hpp"
 #include "vault/model/APIKey.hpp"
@@ -46,7 +47,7 @@ using namespace vh::seed;
 using namespace vh::config;
 using namespace vh::crypto;
 using namespace vh::identities::model;
-using namespace vh::rbac::model;
+using namespace vh::rbac;
 using namespace vh::vault::model;
 using namespace vh::crypto;
 using namespace vh::sync::model;
@@ -71,7 +72,7 @@ void vh::seed::seed_database() {
 void vh::seed::initPermissions() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing permissions...");
 
-    const std::vector<Permission> userPerms{
+    const std::vector<permission::Permission> userPerms{
         {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
         {1, "manage_admins", "Can manage admin users (create, deactivate, modify)"},
         {2, "manage_users", "Can manage regular users"},
@@ -84,7 +85,7 @@ void vh::seed::initPermissions() {
         {9, "create_vaults", "Can create new vaults"}
     };
 
-    const std::vector<Permission> vaultPerms{
+    const std::vector<permission::Permission> vaultPerms{
         {0, "manage_vault", "Can manage vault settings, including sync and upstream encryption"},
         {1, "manage_access", "Can manage vault roles and access rules"},
         {2, "manage_tags", "Can manage tags for files and directories"},
@@ -115,7 +116,7 @@ void vh::seed::initPermissions() {
 void vh::seed::initRoles() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing roles...");
 
-    std::vector<Role> roles{
+    std::vector<role::Base> roles{
         {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
         {"admin", "System administrator with all non-root administrative powers", "user", 0b0000001111111100},
         {"unprivileged", "User with no admin privileges", "user", 0b0000000000000000},
@@ -131,7 +132,7 @@ void vh::seed::initRoles() {
                 pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
 
             txn.exec(pqxx::prepped{"assign_permission_to_role"},
-                pqxx::params{r.id, bitmask_to_bitset(r.permissions).to_string()});
+                pqxx::params{r.id, permission::toBitset(r.permissions).to_string()});
         }
     });
 }
@@ -163,7 +164,7 @@ void vh::seed::initSystemUser() {
             existingByUid->email = "no-reply@system";
             existingByUid->linux_uid = sysUid;
 
-            existingByUid->role = std::make_shared<UserRole>();
+            existingByUid->role = std::make_shared<Admin>();
             existingByUid->role->id = role->id;
             existingByUid->role->name = role->name;
             existingByUid->role->description = role->description;
@@ -191,7 +192,7 @@ void vh::seed::initSystemUser() {
             existingByName->linux_uid = sysUid;
             existingByName->email = "";
 
-            existingByName->role = std::make_shared<UserRole>();
+            existingByName->role = std::make_shared<Admin>();
             existingByName->role->id = role->id;
             existingByName->role->name = role->name;
             existingByName->role->description = role->description;
@@ -207,7 +208,7 @@ void vh::seed::initSystemUser() {
     }
 
     // 4) Create a fresh system user
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = "system";
     user->email = "no-reply@system";
 
@@ -220,7 +221,7 @@ void vh::seed::initSystemUser() {
     user->linux_uid = sysUid;
 
     const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-    user->role = std::make_shared<UserRole>();
+    user->role = std::make_shared<Admin>();
     user->role->id = role->id;
     user->role->name = role->name;
     user->role->description = role->description;
@@ -272,14 +273,14 @@ static std::optional<unsigned int> loadPendingSuperAdminUid() {
 void initAdmin() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing admin user...");
 
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = "admin";
     user->email = "";
     user->setPasswordHash(hash::password("vh!adm1n"));
     user->linux_uid = loadPendingSuperAdminUid();
 
     const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-    user->role = std::make_shared<UserRole>();
+    user->role = std::make_shared<Admin>();
     user->role->id = role->id;
     user->role->name = role->name;
     user->role->description = role->description;

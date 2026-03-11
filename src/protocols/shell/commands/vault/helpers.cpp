@@ -3,11 +3,11 @@
 #include "vault/model/S3Vault.hpp"
 #include "vault/model/APIKey.hpp"
 #include "identities/model/User.hpp"
-#include "rbac/model/VaultRole.hpp"
-#include "rbac/model/PermissionOverride.hpp"
+#include "../../../../../include/rbac/role/Vault.hpp"
+#include "../../../../../include/rbac/permission/Override.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/User.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../../include/db/query/rbac/Permission.hpp"
 #include "db/query/vault/APIKey.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
@@ -35,7 +35,7 @@ std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* 
     return std::nullopt;
 }
 
-std::shared_ptr<User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage) {
+std::shared_ptr<Admin> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage) {
     if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
         if (const auto idOpt = parseUInt(*ownerOpt)) {
             if (*idOpt <= 0) throw std::runtime_error("owner must be a positive integer");
@@ -50,8 +50,8 @@ std::shared_ptr<User> resolveOwner(const CommandCall& call, const std::shared_pt
     return call.user;
 }
 
-Lookup<User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
-    Lookup<User> out;
+Lookup<Admin> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
+    Lookup<Admin> out;
     const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens);
     if (!ownerOpt || ownerOpt->empty()) {
         out.error = errPrefix + ": when using a vault name, you must specify --owner <id|name>";
@@ -107,11 +107,11 @@ std::optional<std::string> checkOverridePermissions(const CommandCall& call, con
     return std::nullopt;
 }
 
-Lookup<VaultRole> resolveVRole(const std::string& roleArg,
+Lookup<Vault> resolveVRole(const std::string& roleArg,
                               const std::shared_ptr<Vault>& vault,
                               const Subject* subjectOrNull,
                               const std::string& errPrefix) {
-    Lookup<VaultRole> out;
+    Lookup<Vault> out;
     if (const auto idOpt = parseUInt(roleArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": role ID must be a positive integer"; return out; }
         out.ptr = db::query::rbac::Permission::getVaultRole(*idOpt);
@@ -199,7 +199,7 @@ void assignQuotaIfAvailable(const CommandCall& call, const std::shared_ptr<Comma
 
 void assignOwnerIfAvailable(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::shared_ptr<Vault>& vault) {
     if (const auto ownerOpt = optVal(call, usage->resolveOptional("owner")->option_tokens)) {
-        Lookup<User> ownerLkp;
+        Lookup<Admin> ownerLkp;
         if (const auto idOpt = parseUInt(*ownerOpt)) {
             if (*idOpt <= 0) throw std::runtime_error("vault create: --owner must be a positive integer");
             ownerLkp.ptr = db::query::identities::User::getUserById(*idOpt);

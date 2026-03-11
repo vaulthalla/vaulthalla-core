@@ -5,9 +5,9 @@
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "identities/model/Group.hpp"
-#include "rbac/model/Role.hpp"
+#include "../../../include/rbac/role/Base.hpp"
 #include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../include/rbac/role/Vault.hpp"
 #include "CLITestContext.hpp"
 #include "permsUtil.hpp"
 
@@ -28,7 +28,7 @@ public:
     [[nodiscard]] std::shared_ptr<void> create(const EntityType& type) const {
         if (type == EntityType::USER) {
             const std::string usage = "user/create";
-            const auto user = std::make_shared<User>();
+            const auto user = std::make_shared<Admin>();
             user->name = generateName(usage);
             if (coin()) user->email = generateEmail(usage);
             user->role = ctx_->randomUserRole();
@@ -51,7 +51,7 @@ public:
         }
 
         if (type == EntityType::USER_ROLE) {
-            const auto role = std::make_shared<UserRole>();
+            const auto role = std::make_shared<Admin>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated user role";
             role->type = "user";
@@ -60,7 +60,7 @@ public:
         }
 
         if (type == EntityType::VAULT_ROLE) {
-            const auto role = std::make_shared<VaultRole>();
+            const auto role = std::make_shared<Vault>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated vault role";
             role->type = "vault";

@@ -56,7 +56,7 @@ std::string Session::getUserAgent() const {
     return  "unknown";
 }
 
-void Session::setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user) {
+void Session::setAuthenticatedUser(const std::shared_ptr<identities::model::Admin>& user) {
     this->user = user;
     if (!tokens->refreshToken) throw std::runtime_error("Cannot set authenticated user without a refresh token in session");
     tokens->refreshToken->userId = user->id;

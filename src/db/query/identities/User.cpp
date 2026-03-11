@@ -2,7 +2,7 @@
 #include "identities/model/User.hpp"
 #include "auth/model/RefreshToken.hpp"
 #include "db/Transactions.hpp"
-#include "rbac/model/UserRole.hpp"
+#include "../../../../include/rbac/role/Admin.hpp"
 #include "rbac/model/VaultRole.hpp"
 #include "log/Registry.hpp"
 #include "crypto/util/hash.hpp"
@@ -14,7 +14,7 @@ using namespace vh::db::query::identities;
 using namespace vh::rbac::model;
 using namespace vh::auth::model;
 
-User::UserPtr User::getUserByName(const std::string& name) {
+Admin::UserPtr Admin::getUserByName(const std::string& name) {
     return Transactions::exec("User::getUserByName", [&](pqxx::work& txn) -> UserPtr {
         const auto res = txn.exec(pqxx::prepped{"get_user_by_name"}, pqxx::params{name});
         if (res.empty()) {
@@ -32,7 +32,7 @@ User::UserPtr User::getUserByName(const std::string& name) {
     });
 }
 
-User::UserPtr User::getUserById(const unsigned int id) {
+Admin::UserPtr Admin::getUserById(const unsigned int id) {
     return Transactions::exec("User::getUserById", [&](pqxx::work& txn) {
         const auto userRow = txn.exec(pqxx::prepped{"get_user"}, pqxx::params{id}).one_row();
         const auto userRoleRow = txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{id}).one_row();
@@ -44,7 +44,7 @@ User::UserPtr User::getUserById(const unsigned int id) {
     });
 }
 
-User::UserPtr User::getUserByLinuxUID(unsigned int linuxUid) {
+Admin::UserPtr Admin::getUserByLinuxUID(unsigned int linuxUid) {
     return Transactions::exec("User::getUserByLinuxUID", [&](pqxx::work& txn) -> UserPtr {
         const pqxx::result res = txn.exec(pqxx::prepped{"get_user_by_linux_uid"}, pqxx::params{linuxUid});
         if (res.empty()) {
@@ -62,7 +62,7 @@ User::UserPtr User::getUserByLinuxUID(unsigned int linuxUid) {
     });
 }
 
-unsigned int User::getUserIdByLinuxUID(const unsigned int linuxUid) {
+unsigned int Admin::getUserIdByLinuxUID(const unsigned int linuxUid) {
     return Transactions::exec("User::getUserIdByLinuxUID", [&](pqxx::work& txn) {
         const pqxx::result res = txn.exec(pqxx::prepped{"get_user_id_by_linux_uid"}, pqxx::params{linuxUid});
         if (res.empty()) throw std::runtime_error("No user found with Linux UID: " + std::to_string(linuxUid));
@@ -70,7 +70,7 @@ unsigned int User::getUserIdByLinuxUID(const unsigned int linuxUid) {
     });
 }
 
-unsigned int User::createUser(const UserPtr& user) {
+unsigned int Admin::createUser(const UserPtr& user) {
     log::Registry::db()->debug("[User] Creating user: {}", user->name);
     if (!user->role) throw std::runtime_error("User role must be set before creating a user");
     return Transactions::exec("User::createUser", [&](pqxx::work& txn) {
@@ -109,7 +109,7 @@ unsigned int User::createUser(const UserPtr& user) {
     });
 }
 
-void User::updateUser(const UserPtr& user) {
+void Admin::updateUser(const UserPtr& user) {
     Transactions::exec("User::updateUser", [&](pqxx::work& txn) {
         pqxx::params u_params{
             user->id,
@@ -127,7 +127,7 @@ void User::updateUser(const UserPtr& user) {
     });
 }
 
-bool User::authenticateUser(const std::string& name, const std::string& password) {
+bool Admin::authenticateUser(const std::string& name, const std::string& password) {
     return Transactions::exec("User::authenticateUser", [&](pqxx::work& txn) -> bool {
         const pqxx::result res = txn.exec("SELECT password_hash FROM users WHERE name = " + txn.quote(name));
         if (res.empty()) return false; // User not found
@@ -136,19 +136,19 @@ bool User::authenticateUser(const std::string& name, const std::string& password
     });
 }
 
-void User::updateUserPassword(const unsigned int userId, const std::string& newPassword) {
+void Admin::updateUserPassword(const unsigned int userId, const std::string& newPassword) {
     Transactions::exec("User::updateUserPassword", [&](pqxx::work& txn) {
         txn.exec(pqxx::prepped{"update_user_password"}, pqxx::params{userId, newPassword});
     });
 }
 
-void User::deleteUser(const unsigned int userId) {
+void Admin::deleteUser(const unsigned int userId) {
     Transactions::exec("User::deleteUser", [&](pqxx::work& txn) {
         txn.exec("DELETE FROM users WHERE id = " + txn.quote(userId));
     });
 }
 
-std::vector<User::UserPtr > User::listUsers(ListQueryParams&& params) {
+std::vector<Admin::UserPtr > Admin::listUsers(ListQueryParams&& params) {
     return Transactions::exec("User::listUsersWithRoles", [&](pqxx::work& txn) {
         const auto sql = appendPaginationAndFilter(
             "SELECT * FROM users",
@@ -170,25 +170,25 @@ std::vector<User::UserPtr > User::listUsers(ListQueryParams&& params) {
     });
 }
 
-void User::updateLastLoggedInUser(const unsigned int userId) {
+void Admin::updateLastLoggedInUser(const unsigned int userId) {
     Transactions::exec("User::updateLastLoggedInUser", [&](pqxx::work& txn) {
         txn.exec(pqxx::prepped{"update_user_last_login"}, pqxx::params{userId});
     });
 }
 
-bool User::userExists(const std::string& name) {
+bool Admin::userExists(const std::string& name) {
     return Transactions::exec("User::userExists", [&](pqxx::work& txn) {
         return txn.exec(pqxx::prepped{"user_exists"}, pqxx::params{name}).one_field().as<bool>();
     });
 }
 
-bool User::adminUserExists() {
+bool Admin::adminUserExists() {
     return Transactions::exec("User::adminUserExists", [](pqxx::work& txn) {
         return txn.exec(pqxx::prepped{"admin_user_exists"}).one_field().as<bool>();
     });
 }
 
-bool User::adminPasswordIsDefault() {
+bool Admin::adminPasswordIsDefault() {
     return Transactions::exec("User::adminPasswordIsDefault", [](pqxx::work& txn) {
         const auto passwordHash = txn.exec(pqxx::prepped{"get_admin_password"}).one_field().as<std::string>();
         return crypto::hash::verifyPassword("vh!adm1n", passwordHash);

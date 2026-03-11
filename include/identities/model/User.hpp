@@ -17,11 +17,11 @@ class row;
 class result;
 }
 
-namespace vh::rbac::model { struct UserRole; struct VaultRole; }
+namespace vh::rbac::model { struct Admin; struct Vault; }
 
 namespace vh::identities::model {
 
-struct User : public std::enable_shared_from_this<User> {
+struct Admin : public std::enable_shared_from_this<Admin> {
     static constexpr uint16_t ADMIN_MASK = 0xFFFE;
 
     unsigned int id{};
@@ -31,19 +31,19 @@ struct User : public std::enable_shared_from_this<User> {
     std::time_t created_at{}, updated_at{};
     std::optional<std::time_t> last_login;
     bool is_active{true};
-    std::shared_ptr<rbac::model::UserRole> role{};
-    std::unordered_map<unsigned int, std::shared_ptr<rbac::model::VaultRole>> roles{}, group_roles{};
+    std::shared_ptr<rbac::model::Admin> role{};
+    std::unordered_map<unsigned int, std::shared_ptr<rbac::model::Vault>> roles{}, group_roles{};
     mutable std::mutex mutex_{};
 
-    User();
-    explicit User(std::string name, std::string email = "", bool isActive = true);
-    explicit User(const pqxx::row& row);
-    User(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides);
+    Admin();
+    explicit Admin(std::string name, std::string email = "", bool isActive = true);
+    explicit Admin(const pqxx::row& row);
+    Admin(const pqxx::row& user, const pqxx::row& role, const pqxx::result& vaultRoles, const pqxx::result& overrides);
 
-    bool operator==(const User& other) const;
-    bool operator!=(const User& other) const;
+    bool operator==(const Admin& other) const;
+    bool operator!=(const Admin& other) const;
 
-    [[nodiscard]] std::shared_ptr<rbac::model::VaultRole> getRole(unsigned int vaultId) const;
+    [[nodiscard]] std::shared_ptr<rbac::model::Vault> getRole(unsigned int vaultId) const;
 
     void updateUser(const nlohmann::json& j);
     void setPasswordHash(const std::string& hash);
@@ -81,16 +81,16 @@ struct User : public std::enable_shared_from_this<User> {
 };
 
 
-void to_json(nlohmann::json& j, const User& u);
-void from_json(const nlohmann::json& j, User& u);
+void to_json(nlohmann::json& j, const Admin& u);
+void from_json(const nlohmann::json& j, Admin& u);
 
-nlohmann::json to_public_json(const std::shared_ptr<User>& u);
-nlohmann::json to_public_json(const std::vector<std::shared_ptr<User>>& u);
+nlohmann::json to_public_json(const std::shared_ptr<Admin>& u);
+nlohmann::json to_public_json(const std::vector<std::shared_ptr<Admin>>& u);
 
-nlohmann::json to_json(const std::vector<std::shared_ptr<User>>& users);
-nlohmann::json to_json(const std::shared_ptr<User>& user);
+nlohmann::json to_json(const std::vector<std::shared_ptr<Admin>>& users);
+nlohmann::json to_json(const std::shared_ptr<Admin>& user);
 
-std::string to_string(const std::shared_ptr<User>& user);
-std::string to_string(const std::vector<std::shared_ptr<User>>& users);
+std::string to_string(const std::shared_ptr<Admin>& user);
+std::string to_string(const std::vector<std::shared_ptr<Admin>>& users);
 
 }

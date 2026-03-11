@@ -5,17 +5,31 @@
 -- ACL assignments (depends on: users, vault, role, permission)
 
 -- Permissions assigned to roles
-CREATE TABLE IF NOT EXISTS permissions
+CREATE TABLE IF NOT EXISTS vault_permissions
 (
-    id          SERIAL PRIMARY KEY,
-    role_id     INTEGER NOT NULL REFERENCES role (id) ON DELETE CASCADE,
-    permissions BIT(16) NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (role_id)
-    );
+    role_id      INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
+    global_name  VARCHAR(8) NOT NULL CHECK (global_name IN ('role', 'self', 'user', 'admin')),
+
+    files_permissions       BIT(64) NOT NULL,
+    directories_permissions BIT(64) NOT NULL,
+    sync_permissions        BIT(32) NOT NULL,
+    roles_permissions       BIT(16) NOT NULL,
+    keys_permissions        BIT(16) NOT NULL,
+
+    PRIMARY KEY (role_id, global_name)
+);
+
+CREATE TABLE IF NOT EXISTS admin_permissions
+(
+    role_id INTEGER PRIMARY KEY REFERENCES role(id) ON DELETE CASCADE,
+
+    identity_permissions BIT(32) NOT NULL,
+    audit_permissions    BIT(8) NOT NULL,
+    settings_permissions BIT(16) NOT NULL
+);
 
 -- Assignments: user-level
-CREATE TABLE IF NOT EXISTS user_role_assignments
+CREATE TABLE IF NOT EXISTS admin_role_assignments
 (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,

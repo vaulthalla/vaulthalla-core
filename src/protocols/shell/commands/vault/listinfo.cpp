@@ -10,7 +10,7 @@
 #include "storage/Engine.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../../../include/rbac/role/Vault.hpp"
 #include "identities/model/User.hpp"
 
 #include "config/Registry.hpp"

@@ -13,7 +13,7 @@ using namespace vh::protocols::shell;
 VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "role"), vaultRoleAliases_(ctx) {}
 
-std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<VaultRole>& entity, const std::string& field) {
+std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<Vault>& entity, const std::string& field) {
     const std::string usagePath = "vault/update";
 
     if (vaultRoleAliases_.isName(field)) {
@@ -34,7 +34,7 @@ std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<V
     throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for update: " + field);
 }
 
-static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<VaultRole>& role) {
+static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<Vault>& role) {
     if (name == "id" || name == "role_id") return std::to_string(role->id);
     if (name == "name" || name == "role_name") return role->name;
     if (name == "description" || name == "desc") return role->description;
@@ -43,12 +43,12 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
     throw std::runtime_error("VaultRoleCommandBuilder: unsupported vault role field for resolveVar: " + name);
 }
 
-static std::string randomizePrimaryPositional(const std::shared_ptr<VaultRole>& entity) {
+static std::string randomizePrimaryPositional(const std::shared_ptr<Vault>& entity) {
     if (generateRandomIndex(10000) < 5000) return std::to_string(entity->id);
     return entity->name;
 }
 
-std::string VaultRoleCommandBuilder::create(const std::shared_ptr<VaultRole>& entity) {
+std::string VaultRoleCommandBuilder::create(const std::shared_ptr<Vault>& entity) {
     const auto cmd = root_->findSubcommand("create");
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'create' command usage not found");
 
@@ -85,7 +85,7 @@ std::string VaultRoleCommandBuilder::create(const std::shared_ptr<VaultRole>& en
     return oss.str();
 }
 
-std::string VaultRoleCommandBuilder::update(const std::shared_ptr<VaultRole>& entity) {
+std::string VaultRoleCommandBuilder::update(const std::shared_ptr<Vault>& entity) {
     const auto cmd = root_->findSubcommand("update");
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'update' command usage not found");
 
@@ -120,7 +120,7 @@ std::string VaultRoleCommandBuilder::update(const std::shared_ptr<VaultRole>& en
     return oss.str();
 }
 
-std::string VaultRoleCommandBuilder::info(const std::shared_ptr<VaultRole>& entity) {
+std::string VaultRoleCommandBuilder::info(const std::shared_ptr<Vault>& entity) {
     const auto cmd = root_->findSubcommand("info");
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'info' command usage not found");
 
@@ -144,7 +144,7 @@ std::string VaultRoleCommandBuilder::list() {
     return oss.str();
 }
 
-std::string VaultRoleCommandBuilder::remove(const std::shared_ptr<VaultRole>& entity) {
+std::string VaultRoleCommandBuilder::remove(const std::shared_ptr<Vault>& entity) {
     const auto cmd = root_->findSubcommand("delete");
     if (!cmd) throw std::runtime_error("VaultRoleCommandBuilder: 'delete' command usage not found");
 

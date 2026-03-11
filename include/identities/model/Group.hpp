@@ -14,11 +14,11 @@ class result;
 
 namespace vh::identities::model {
 
-struct User;
+struct Admin;
 struct Volume;
 
 struct GroupMember {
-    std::shared_ptr<User> user;
+    std::shared_ptr<Admin> user;
     std::time_t joined_at{};
 
     GroupMember() = default;

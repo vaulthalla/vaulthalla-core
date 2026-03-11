@@ -11,7 +11,7 @@ using namespace vh::protocols::shell;
 UserRoleCommandBuilder::UserRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "role"), userRoleAliases_(ctx) {}
 
-std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<UserRole>& entity, const std::string& field) {
+std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<Admin>& entity, const std::string& field) {
     const std::string usagePath = "role/update";
 
     if (userRoleAliases_.isName(field)) {
@@ -32,7 +32,7 @@ std::string UserRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<Us
     throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for update: " + field);
 }
 
-static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<UserRole>& role) {
+static std::optional<std::string> resolveVar(const std::string& name, const std::shared_ptr<Admin>& role) {
     if (name == "id" || name == "role_id") return std::to_string(role->id);
     if (name == "name" || name == "role_name") return role->name;
     if (name == "description" || name == "desc") return role->description;
@@ -41,12 +41,12 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
     throw std::runtime_error("UserRoleCommandBuilder: unsupported user role field for resolveVar: " + name);
 }
 
-static std::string randomizePrimaryPositional(const std::shared_ptr<UserRole>& entity) {
+static std::string randomizePrimaryPositional(const std::shared_ptr<Admin>& entity) {
     if (generateRandomIndex(10000) < 5000) return std::to_string(entity->id);
     return entity->name;
 }
 
-std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& entity) {
+std::string UserRoleCommandBuilder::create(const std::shared_ptr<Admin>& entity) {
     const auto cmd = root_->findSubcommand("create");
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'create' command usage not found");
 
@@ -84,7 +84,7 @@ std::string UserRoleCommandBuilder::create(const std::shared_ptr<UserRole>& enti
     return oss.str();
 }
 
-std::string UserRoleCommandBuilder::update(const std::shared_ptr<UserRole>& entity) {
+std::string UserRoleCommandBuilder::update(const std::shared_ptr<Admin>& entity) {
     const auto cmd = root_->findSubcommand("update");
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'update' command usage not found");
 
@@ -119,7 +119,7 @@ std::string UserRoleCommandBuilder::update(const std::shared_ptr<UserRole>& enti
     return oss.str();
 }
 
-std::string UserRoleCommandBuilder::info(const std::shared_ptr<UserRole>& entity) {
+std::string UserRoleCommandBuilder::info(const std::shared_ptr<Admin>& entity) {
     const auto cmd = root_->findSubcommand("info");
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'info' command usage not found");
 
@@ -143,7 +143,7 @@ std::string UserRoleCommandBuilder::list() {
     return oss.str();
 }
 
-std::string UserRoleCommandBuilder::remove(const std::shared_ptr<UserRole>& entity) {
+std::string UserRoleCommandBuilder::remove(const std::shared_ptr<Admin>& entity) {
     const auto cmd = root_->findSubcommand("delete");
     if (!cmd) throw std::runtime_error("UserRoleCommandBuilder: 'delete' command usage not found");
 

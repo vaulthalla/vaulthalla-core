@@ -5,13 +5,13 @@
 #include "db/query/identities/User.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/Group.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../include/db/query/rbac/Permission.hpp"
 
 #include "identities/model/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "identities/model/Group.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../include/rbac/role/Admin.hpp"
+#include "../../../include/rbac/role/Vault.hpp"
 
 #include <type_traits>
 #include <string>
@@ -28,11 +28,11 @@ template <EntityType type, typename T>
 struct Validator {
     // Nice hard error if someone mismatches <type, T>
     static constexpr bool TypeOK =
-        (type == EntityType::USER      && std::is_same_v<T, User>)      ||
+        (type == EntityType::USER      && std::is_same_v<T, Admin>)      ||
         (type == EntityType::VAULT     && std::is_same_v<T, Vault>)     ||
         (type == EntityType::GROUP     && std::is_same_v<T, Group>)     ||
-        (type == EntityType::USER_ROLE && std::is_same_v<T, UserRole>)  ||
-        (type == EntityType::VAULT_ROLE&& std::is_same_v<T, VaultRole>);
+        (type == EntityType::USER_ROLE && std::is_same_v<T, Admin>)  ||
+        (type == EntityType::VAULT_ROLE&& std::is_same_v<T, Vault>);
     static_assert(TypeOK, "Validator<type,T> mismatch: T must match the entity class for 'type'.");
 
     static AssertionResult assert_all_exist(const std::vector<std::shared_ptr<T>>& entities) {

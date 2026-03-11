@@ -30,6 +30,8 @@ class DBConnection {
     // RBAC
     void initPreparedRoles() const;
     void initPreparedPermissions() const;
+    void initPreparedAdminPermissions() const;
+    void initPreparedVaultPermissions() const;
     void initPreparedUserRoles() const;
     void initPreparedVaultRoles() const;
     void initPreparedPermOverrides() const;

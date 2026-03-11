@@ -1,6 +1,6 @@
-#include "rbac/model/Role.hpp"
+#include "../../../include/rbac/role/Base.hpp"
 #include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../include/rbac/role/Vault.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
@@ -37,7 +37,7 @@ Role::Role(std::string name, std::string description, std::string type, const ui
       type(std::move(type)),
       permissions(permissions) {}
 
-void vh::rbac::model::to_json(nlohmann::json& j, const Role& r) {
+void vh::rbac::model::to_json(nlohmann::json& j, const Base& r) {
     j = {
         {"role_id", r.id},
         {"name", r.name},
@@ -48,7 +48,7 @@ void vh::rbac::model::to_json(nlohmann::json& j, const Role& r) {
     };
 }
 
-void vh::rbac::model::from_json(const nlohmann::json& j, Role& r) {
+void vh::rbac::model::from_json(const nlohmann::json& j, Base& r) {
     if (j.contains("role_id")) r.id = j.at("role_id").get<unsigned int>();
     r.name = j.at("name").get<std::string>();
     r.description = j.at("description").get<std::string>();
@@ -57,18 +57,18 @@ void vh::rbac::model::from_json(const nlohmann::json& j, Role& r) {
     r.created_at = parsePostgresTimestamp(j.at("created_at").get<std::string>());
 }
 
-void vh::rbac::model::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Role>>& roles) {
+void vh::rbac::model::to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Base>>& roles) {
     j = nlohmann::json::array();
     for (const auto& role : roles) j.push_back(*role);
 }
 
 std::vector<std::shared_ptr<Role>> vh::rbac::model::roles_from_pq_res(const pqxx::result& res) {
-    std::vector<std::shared_ptr<Role> > roles;
-    for (const auto& item : res) roles.push_back(std::make_shared<Role>(item));
+    std::vector<std::shared_ptr<Base> > roles;
+    for (const auto& item : res) roles.push_back(std::make_shared<Base>(item));
     return roles;
 }
 
-std::string vh::rbac::model::to_string(const std::shared_ptr<Role>& r) {
+std::string vh::rbac::model::to_string(const std::shared_ptr<Base>& r) {
     std::string out = "Role:\n";
     out += "Role ID: " + std::to_string(r->id) + "\n";
     out += "Name: " + r->name + "\n";
@@ -79,7 +79,7 @@ std::string vh::rbac::model::to_string(const std::shared_ptr<Role>& r) {
     return out;
 }
 
-std::string vh::rbac::model::to_string(const std::vector<std::shared_ptr<Role>>& roles) {
+std::string vh::rbac::model::to_string(const std::vector<std::shared_ptr<Base>>& roles) {
     if (roles.empty()) return "No roles assigned";
 
     Table tbl({
@@ -111,7 +111,7 @@ std::string Role::underscore_to_hyphens(const std::string& s) {
 }
 
 std::string Role::permissions_to_flags_string() const {
-    if (type == "user") return static_cast<UserRole>(*this).permissions_to_flags_string();
-    if (type == "vault") return static_cast<VaultRole>(*this).permissions_to_flags_string();
+    if (type == "user") return static_cast<Admin>(*this).permissions_to_flags_string();
+    if (type == "vault") return static_cast<Vault>(*this).permissions_to_flags_string();
     throw std::runtime_error("Role: unknown role type for permissions_to_flags_string");
 }

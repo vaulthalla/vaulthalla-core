@@ -102,10 +102,10 @@ void RefreshToken::revokeAndPurge(const unsigned int userId) {
     });
 }
 
-std::shared_ptr<vh::identities::model::User> RefreshToken::getUserByJti(const std::string& jti) {
+std::shared_ptr<vh::identities::model::Admin> RefreshToken::getUserByJti(const std::string& jti) {
     return Transactions::exec(
         "RefreshToken::getUserByRefreshToken",
-        [&](pqxx::work& txn) -> std::shared_ptr<identities::model::User> {
+        [&](pqxx::work& txn) -> std::shared_ptr<identities::model::Admin> {
             const auto res = txn.exec(pqxx::prepped{"get_user_by_refresh_token_jti"}, pqxx::params{jti});
 
             if (res.empty()) {
@@ -125,7 +125,7 @@ std::shared_ptr<vh::identities::model::User> RefreshToken::getUserByJti(const st
             const auto overridesRes =
                 txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, pqxx::params{userId});
 
-            return std::make_shared<identities::model::User>(
+            return std::make_shared<identities::model::Admin>(
                 userRow,
                 userRoleRow,
                 rolesRes,

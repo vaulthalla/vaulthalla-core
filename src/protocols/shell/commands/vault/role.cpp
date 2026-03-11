@@ -1,13 +1,13 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../../include/db/query/rbac/Permission.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "../../../../../include/rbac/role/Vault.hpp"
 #include "identities/model/User.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/Permission.hpp"
+#include "../../../../../include/rbac/role/Base.hpp"
+#include "../../../../../include/rbac/permission/Permission.hpp"
 
 #include "config/Registry.hpp"
 #include "CommandUsage.hpp"
@@ -111,7 +111,7 @@ static CommandResult handle_vault_role_override_add(const CommandCall& call) {
     const bool enabled = en.value.value_or(true);
 
     const auto applyOne = [&](const VaultPermission& perm, OverrideOpt effect) {
-        const auto ov = std::make_shared<PermissionOverride>();
+        const auto ov = std::make_shared<Override>();
         ov->assignment_id = role->id;
         ov->permission = *db::query::rbac::Permission::getPermissionByName(get_vault_perm_name(perm));
         ov->pattern     = *patt.compiled;
@@ -294,7 +294,7 @@ static CommandResult handle_vault_role_override_list(const CommandCall& call) {
                   "' for " + subj.type + " id " + std::to_string(subj.id));
     }
 
-    std::vector<std::shared_ptr<PermissionOverride>> overrides = ovs;
+    std::vector<std::shared_ptr<Override>> overrides = ovs;
     std::ranges::sort(overrides.begin(), overrides.end(),
               [](const auto& a, const auto& b) {
                   return a->permission.bit_position < b->permission.bit_position;
@@ -331,7 +331,7 @@ static CommandResult handle_vault_role_assign(const CommandCall& call) {
     if (!subjLkp) return invalid(subjLkp.error);
     const auto [subjectType, subjectId] = *subjLkp.ptr;
 
-    const auto vr = std::make_shared<VaultRole>();
+    const auto vr = std::make_shared<Vault>();
     vr->role_id = role->id;
     vr->vault_id = vault->id;
     vr->subject_type = subjectType;
@@ -395,7 +395,7 @@ static CommandResult handle_vault_role_list(const CommandCall& call) {
         }
     }
 
-    std::vector<std::shared_ptr<VaultRole>> roles;
+    std::vector<std::shared_ptr<Vault>> roles;
     if (vault) roles = db::query::rbac::Permission::listVaultAssignedRoles(vault->id);
     else {
         if (!call.user->canManageRoles()) return invalid("vault list: you do not have permission to manage roles");

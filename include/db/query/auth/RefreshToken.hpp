@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace vh::auth::model { struct RefreshToken; }
-namespace vh::identities::model { struct User; }
+namespace vh::identities::model { struct Admin; }
 
 namespace vh::db::query::auth {
 
@@ -24,7 +24,7 @@ struct RefreshToken {
     static void purgeOldRevoked();
     static void revokeAndPurge(unsigned int userId);
 
-    static std::shared_ptr<vh::identities::model::User> getUserByJti(const std::string& jti);
+    static std::shared_ptr<vh::identities::model::Admin> getUserByJti(const std::string& jti);
 };
 
 }

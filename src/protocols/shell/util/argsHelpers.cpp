@@ -4,10 +4,10 @@
 #include "usage/include/UsageManager.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "identities/model/User.hpp"
 #include "identities/model/Group.hpp"
-#include "rbac/model/Role.hpp"
+#include "../../../../include/rbac/role/Base.hpp"
 
 #include <optional>
 #include <string>
@@ -197,8 +197,8 @@ ListQueryParams parseListQuery(const CommandCall& call) {
     return p;
 }
 
-Lookup<User> resolveUser(const std::string& userArg, const std::string& errPrefix) {
-    Lookup<User> out;
+Lookup<Admin> resolveUser(const std::string& userArg, const std::string& errPrefix) {
+    Lookup<Admin> out;
 
     if (const auto idOpt = parseUInt(userArg)) {
         if (*idOpt <= 0) {

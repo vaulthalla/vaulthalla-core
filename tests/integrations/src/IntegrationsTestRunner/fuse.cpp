@@ -1,12 +1,12 @@
 #include "tests/integrations/include/IntegrationsTestRunner.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
-#include "db/query/rbac/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "tests/integrations/include/generators.hpp"
-#include "rbac/model/VaultRole.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/PermissionOverride.hpp"
+#include "../../../../include/rbac/role/Vault.hpp"
+#include "../../../../include/rbac/role/Admin.hpp"
+#include "../../../../include/rbac/permission/Override.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/Path.hpp"
 #include "sync/model/LocalPolicy.hpp"
@@ -46,14 +46,14 @@ void IntegrationsTestRunner::runFUSETests() {
     }
 }
 
-std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaultId, const std::optional<uint16_t>& vaultPerms, const std::vector<std::shared_ptr<PermissionOverride>>& overrides) {
-    const auto user = std::make_shared<User>();
+std::shared_ptr<Admin> IntegrationsTestRunner::createUser(const unsigned int vaultId, const std::optional<uint16_t>& vaultPerms, const std::vector<std::shared_ptr<Override>>& overrides) {
+    const auto user = std::make_shared<Admin>();
     user->name = generateName("user/create");
 
     const auto userRole = db::query::rbac::Permission::getRoleByName("unprivileged");
     if (!userRole) throw std::runtime_error("Admin role not found");
 
-    user->role = std::make_shared<UserRole>();
+    user->role = std::make_shared<Admin>();
     user->role->name = userRole->name;
     user->role->permissions = userRole->permissions;
     user->role->id = userRole->id;
@@ -63,7 +63,7 @@ std::shared_ptr<User> IntegrationsTestRunner::createUser(const unsigned int vaul
     linux_uids_.push_back(*user->linux_uid);
 
     if (vaultPerms) {
-        const auto vaultRole = std::make_shared<VaultRole>();
+        const auto vaultRole = std::make_shared<Vault>();
         vaultRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create");
         vaultRole->permissions = *vaultPerms;
         vaultRole->description = "Vault role for user " + user->name;
@@ -248,7 +248,7 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     if (!role) throw std::runtime_error("Implicit deny role not found");
     if (role->permissions > 0) throw std::runtime_error("Implicit deny role has permissions");
 
-    const auto override = std::make_shared<PermissionOverride>();
+    const auto override = std::make_shared<Override>();
     const auto perm = db::query::rbac::Permission::getPermissionByName("download");
     if (!perm) throw std::runtime_error("Download permission not found");
     override->permission = *perm;
@@ -256,7 +256,7 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     override->patternStr = R"(^/perm_override_allow_seed/docs/[^/]+\.txt$)";
     override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
 
-    const auto vRole = std::make_shared<VaultRole>();
+    const auto vRole = std::make_shared<Vault>();
     vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override");
     vRole->permissions = role->permissions; // 0
     vRole->description = "Vault role with override";
@@ -268,9 +268,9 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     const auto userRole = db::query::rbac::Permission::getRoleByName("unprivileged");
     if (!userRole) throw std::runtime_error("Admin role not found");
 
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = generateName("user/create/override");
-    user->role = std::make_shared<UserRole>(*userRole);
+    user->role = std::make_shared<Admin>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
     user->roles[engine->vault->id] = vRole;
@@ -318,7 +318,7 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     if (!role) throw std::runtime_error("Power user role not found");
     if (role->permissions == 0) throw std::runtime_error("Power user role has no permissions");
 
-    const auto override = std::make_shared<PermissionOverride>();
+    const auto override = std::make_shared<Override>();
     const auto perm = db::query::rbac::Permission::getPermissionByName("download");
     if (!perm) throw std::runtime_error("Download permission not found");
     override->permission = *perm;
@@ -326,7 +326,7 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     override->patternStr = R"(^/perm_override_deny_seed/docs/[^/]+\.txt$)";
     override->pattern    = std::regex(override->patternStr, std::regex::ECMAScript);
 
-    const auto vRole = std::make_shared<VaultRole>();
+    const auto vRole = std::make_shared<Vault>();
     vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
     vRole->permissions = role->permissions; // 0
     vRole->description = "Vault role with override";
@@ -338,9 +338,9 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     const auto userRole = db::query::rbac::Permission::getRoleByName("unprivileged");
     if (!userRole) throw std::runtime_error("Admin role not found");
 
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = generateName("user/create/override_deny");
-    user->role = std::make_shared<UserRole>(*userRole);
+    user->role = std::make_shared<Admin>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
     user->roles[engine->vault->id] = vRole;
@@ -399,7 +399,7 @@ void IntegrationsTestRunner::testFUSEGroupPermissions() {
 
     db::query::identities::Group::addMemberToGroup(group->id, user->id);
 
-    const auto vRole = std::make_shared<VaultRole>();
+    const auto vRole = std::make_shared<Vault>();
     vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create");
     vRole->role_id = powerUserRole->id;
     vRole->permissions = powerUserRole->permissions;
@@ -454,7 +454,7 @@ void IntegrationsTestRunner::testGroupPermOverrides() {
     if (!role) throw std::runtime_error("Power user role not found");
     if (role->permissions == 0) throw std::runtime_error("Power user role has no permissions");
 
-    const auto override = std::make_shared<PermissionOverride>();
+    const auto override = std::make_shared<Override>();
     const auto perm = db::query::rbac::Permission::getPermissionByName("download");
     if (!perm) throw std::runtime_error("Download permission not found");
     override->permission = *perm;
@@ -471,7 +471,7 @@ void IntegrationsTestRunner::testGroupPermOverrides() {
 
     db::query::identities::Group::addMemberToGroup(group->id, user->id);
 
-    const auto vRole = std::make_shared<VaultRole>();
+    const auto vRole = std::make_shared<Vault>();
     vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
     vRole->permissions = role->permissions;
     vRole->description = "Vault role with override";
@@ -530,7 +530,7 @@ void IntegrationsTestRunner::testFUSEUserOverridesGroupOverride() {
     role->type = "vault";
     role->id = db::query::rbac::Permission::addRole(role);
 
-    const auto override = std::make_shared<PermissionOverride>();
+    const auto override = std::make_shared<Override>();
     const auto perm = db::query::rbac::Permission::getPermissionByName("download");
     if (!perm) throw std::runtime_error("Download permission not found");
     override->permission = *perm;
@@ -543,7 +543,7 @@ void IntegrationsTestRunner::testFUSEUserOverridesGroupOverride() {
     group->description = "Test group for FUSE perms";
     group->id = db::query::identities::Group::createGroup(group);
 
-    const auto vRole = std::make_shared<VaultRole>();
+    const auto vRole = std::make_shared<Vault>();
     vRole->name = generateRoleName(EntityType::VAULT_ROLE, "vault_role/create/override_deny");
     vRole->permissions = role->permissions;
     vRole->description = "Vault role with override";
@@ -569,9 +569,9 @@ void IntegrationsTestRunner::testFUSEUserOverridesGroupOverride() {
     const auto userRole = db::query::rbac::Permission::getRoleByName("unprivileged");
     if (!userRole) throw std::runtime_error("Admin role not found");
 
-    const auto user = std::make_shared<User>();
+    const auto user = std::make_shared<Admin>();
     user->name = generateName("user/create/override_deny");
-    user->role = std::make_shared<UserRole>(*userRole);
+    user->role = std::make_shared<Admin>(*userRole);
     user->linux_uid = uid_index++;
     linux_uids_.push_back(*user->linux_uid);
     user->roles[engine->vault->id] = vRole;

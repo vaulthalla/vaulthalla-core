@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
-namespace vh::identities::model { struct User; }
+namespace vh::identities::model { struct Admin; }
 
 namespace vh::db::query::identities {
 
 class User {
-    using U = vh::identities::model::User;
+    using U = vh::identities::model::Admin;
     using UserPtr = std::shared_ptr<U>;
 
 public:

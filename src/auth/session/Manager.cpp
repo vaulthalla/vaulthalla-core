@@ -215,7 +215,7 @@ std::shared_ptr<Session> Manager::get(const std::string& token) {
     return nullptr;
 }
 
-std::vector<std::shared_ptr<Session>> Manager::getSessions(const std::shared_ptr<User>& user) {
+std::vector<std::shared_ptr<Session>> Manager::getSessions(const std::shared_ptr<Admin>& user) {
     if (!user) throw std::invalid_argument("Invalid user");
     return getSessionsByUserId(user->id);
 }

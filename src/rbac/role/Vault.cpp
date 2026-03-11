@@ -1,5 +1,5 @@
-#include "rbac/model/VaultRole.hpp"
-#include "rbac/model/PermissionOverride.hpp"
+#include "../../../include/rbac/role/Vault.hpp"
+#include "../../../include/rbac/permission/Override.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "permsUtil.hpp"
@@ -14,7 +14,7 @@ using namespace vh::protocols::shell;
 
 namespace vh::rbac::model {
 
-VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
+Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
     : Role(row),
       assignment_id(row["assignment_id"].as<unsigned int>()),
       subject_id(row["subject_id"].as<unsigned int>()),
@@ -25,7 +25,7 @@ VaultRole::VaultRole(const pqxx::row& row, const pqxx::result& overrides)
       permission_overrides(permissionOverridesFromPqRes(overrides)) {
 }
 
-VaultRole::VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrides)
+Vault::Vault(const pqxx::row& row, const std::vector<pqxx::row>& overrides)
     : Role(row),
       assignment_id(row["assignment_id"].as<unsigned int>()),
       subject_id(row["subject_id"].as<unsigned int>()),
@@ -34,10 +34,10 @@ VaultRole::VaultRole(const pqxx::row& row, const std::vector<pqxx::row>& overrid
       subject_type(row["subject_type"].as<std::string>()),
       assigned_at(parsePostgresTimestamp(row["assigned_at"].as<std::string>())) {
     for (const auto& override : overrides) permission_overrides.push_back(
-        std::make_shared<PermissionOverride>(override));
+        std::make_shared<Override>(override));
 }
 
-VaultRole::VaultRole(const nlohmann::json& j)
+Vault::Vault(const nlohmann::json& j)
     : Role(j),
       assignment_id(j.at("assignment_id").get<unsigned int>()),
       subject_id(j.at("subject_id").get<unsigned int>()),
@@ -47,11 +47,11 @@ VaultRole::VaultRole(const nlohmann::json& j)
       assigned_at(parsePostgresTimestamp(j.at("assigned_at").get<std::string>())),
       permission_overrides(j.at("permission_overrides")) {}
 
-std::shared_ptr<VaultRole> VaultRole::fromJson(const nlohmann::json& j) {
-    return std::make_shared<VaultRole>(j);
+std::shared_ptr<Vault> Vault::fromJson(const nlohmann::json& j) {
+    return std::make_shared<Vault>(j);
 }
 
-std::string VaultRole::permissions_to_flags_string() const {
+std::string Vault::permissions_to_flags_string() const {
     std::ostringstream oss;
     for (unsigned int i = 0; i < VAULT_SHELL_PERMS.size(); ++i) {
         const auto bit = 1 << i;
@@ -62,8 +62,8 @@ std::string VaultRole::permissions_to_flags_string() const {
     return oss.str();
 }
 
-void to_json(nlohmann::json& j, const VaultRole& r) {
-    to_json(j, static_cast<const Role&>(r));
+void to_json(nlohmann::json& j, const Vault& r) {
+    to_json(j, static_cast<const Base&>(r));
     j.update({
         {"assignment_id", r.assignment_id},
         {"vault_id", r.vault_id},
@@ -74,8 +74,8 @@ void to_json(nlohmann::json& j, const VaultRole& r) {
     });
 }
 
-void from_json(const nlohmann::json& j, VaultRole& r) {
-    from_json(j, static_cast<Role&>(r));
+void from_json(const nlohmann::json& j, Vault& r) {
+    from_json(j, static_cast<Base&>(r));
     r.assignment_id = j.at("assignment_id").get<unsigned int>();
     r.vault_id = j.at("vault_id").get<unsigned int>();
     r.subject_type = j.at("subject_type").get<std::string>();
@@ -85,22 +85,22 @@ void from_json(const nlohmann::json& j, VaultRole& r) {
     r.permission_overrides = permissionOverridesFromJson(j.at("permission_overrides"));
 }
 
-void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<VaultRole> >& roles) {
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault> >& roles) {
     j = nlohmann::json::array();
     for (const auto& role : roles) j.push_back(*role);
 }
 
-std::vector<std::shared_ptr<VaultRole> > vault_roles_vector_from_json(const nlohmann::json& j) {
-    std::vector<std::shared_ptr<VaultRole> > roles;
-    for (const auto& roleJson : j) roles.push_back(std::make_shared<VaultRole>(roleJson));
+std::vector<std::shared_ptr<Vault> > vault_roles_vector_from_json(const nlohmann::json& j) {
+    std::vector<std::shared_ptr<Vault> > roles;
+    for (const auto& roleJson : j) roles.push_back(std::make_shared<Vault>(roleJson));
     return roles;
 }
 
-std::vector<std::shared_ptr<VaultRole> > vault_roles_vector_from_pq_result(
+std::vector<std::shared_ptr<Vault> > vault_roles_vector_from_pq_result(
     const pqxx::result& res,
     const pqxx::result& overrides
     ) {
-    std::vector<std::shared_ptr<VaultRole> > roles;
+    std::vector<std::shared_ptr<Vault> > roles;
 
     std::unordered_map<unsigned int, std::vector<pqxx::row> > overrideMap;
     for (const auto& overrideRow : overrides) {
@@ -111,13 +111,13 @@ std::vector<std::shared_ptr<VaultRole> > vault_roles_vector_from_pq_result(
     for (const auto& item : res) {
         const auto roleId = item["role_id"].as<unsigned int>();
         const auto& roleOverrides = overrideMap[roleId];
-        roles.push_back(std::make_shared<VaultRole>(item, roleOverrides));
+        roles.push_back(std::make_shared<Vault>(item, roleOverrides));
     }
 
     return roles;
 }
 
-void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles) {
+void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shared_ptr<Vault>>& roles) {
     j = nlohmann::json::array();
     for (const auto& [k, v] : roles) j.push_back(*v);
 }
@@ -125,7 +125,7 @@ void to_json(nlohmann::json& j, const std::unordered_map<unsigned int, std::shar
 VRolePair vault_roles_from_json(const nlohmann::json& j) {
     VRolePair rolesPair;
     for (const auto& roleJson : j) {
-        const auto role = std::make_shared<VaultRole>(roleJson);
+        const auto role = std::make_shared<Vault>(roleJson);
         if (role->subject_type == "user") rolesPair.roles[role->vault_id] = role;
         else if (role->subject_type == "group") rolesPair.group_roles[role->vault_id] = role;
         else vh::log::Registry::auth()->warn("Unknown subject_type '{}' in vault role ID {}", role->subject_type, role->id);
@@ -147,7 +147,7 @@ VRolePair vault_roles_from_pq_result(
     VRolePair rolesPair;
 
     for (const auto& item : res) {
-        const auto role = std::make_shared<VaultRole>(item, overrideMap[item["role_id"].as<unsigned int>()]);
+        const auto role = std::make_shared<Vault>(item, overrideMap[item["role_id"].as<unsigned int>()]);
         if (role->subject_type == "user") rolesPair.roles[role->vault_id] = role;
         else if (role->subject_type == "group") {
             if (rolesPair.group_roles.contains(role->vault_id)) {
@@ -164,8 +164,8 @@ VRolePair vault_roles_from_pq_result(
     return rolesPair;
 }
 
-std::vector<std::shared_ptr<PermissionOverride> > VaultRole::getPermissionOverrides(const unsigned short bit) const {
-    std::vector<std::shared_ptr<PermissionOverride>> overrides;
+std::vector<std::shared_ptr<Override> > Vault::getPermissionOverrides(const unsigned short bit) const {
+    std::vector<std::shared_ptr<Override>> overrides;
     for (const auto& override : permission_overrides) {
         if (override->permission.bit_position == bit) overrides.push_back(override);
         vh::log::Registry::auth()->debug("Checking override: {} for bit {}", to_string(override), bit);
@@ -174,64 +174,64 @@ std::vector<std::shared_ptr<PermissionOverride> > VaultRole::getPermissionOverri
 }
 
 
-bool VaultRole::canManageVault(const std::filesystem::path& path) const {
+bool Vault::canManageVault(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageVault, path);
 }
 
-bool VaultRole::canManageAccess(const std::filesystem::path& path) const {
+bool Vault::canManageAccess(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageAccess, path);
 }
 
-bool VaultRole::canManageTags(const std::filesystem::path& path) const {
+bool Vault::canManageTags(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageTags, path);
 }
 
-bool VaultRole::canManageMetadata(const std::filesystem::path& path) const {
+bool Vault::canManageMetadata(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageMetadata, path);
 }
 
-bool VaultRole::canManageVersions(const std::filesystem::path& path) const {
+bool Vault::canManageVersions(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageVersions, path);
 }
 
-bool VaultRole::canManageFileLocks(const std::filesystem::path& path) const {
+bool Vault::canManageFileLocks(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::ManageFileLocks, path);
 }
 
-bool VaultRole::canShare(const std::filesystem::path& path) const {
+bool Vault::canShare(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Share, path);
 }
 
-bool VaultRole::canSync(const std::filesystem::path& path) const {
+bool Vault::canSync(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Sync, path);
 }
 
-bool VaultRole::canCreate(const std::filesystem::path& path) const {
+bool Vault::canCreate(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Create, path);
 }
 
-bool VaultRole::canDownload(const std::filesystem::path& path) const {
+bool Vault::canDownload(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Download, path);
 }
 
-bool VaultRole::canDelete(const std::filesystem::path& path) const {
+bool Vault::canDelete(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Delete, path);
 }
 
-bool VaultRole::canRename(const std::filesystem::path& path) const {
+bool Vault::canRename(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Rename, path);
 }
 
-bool VaultRole::canMove(const std::filesystem::path& path) const {
+bool Vault::canMove(const std::filesystem::path& path) const {
     return validatePermission(permissions, VaultPermission::Move, path);
 }
 
-bool VaultRole::canList(const std::filesystem::path& path) const {
+bool Vault::canList(const std::filesystem::path& path) const {
     if (path.empty()) return true; // If no path is specified, assume listing is allowed at the top level
     return validatePermission(permissions, VaultPermission::List, path);
 }
 
-std::string to_string(const std::shared_ptr<VaultRole>& role) {
+std::string to_string(const std::shared_ptr<Vault>& role) {
     std::string out = snake_case_to_title(role->name) + " (ID: " + std::to_string(role->id) + ")\n";
     out += " - Role ID: " + std::to_string(role->id) + "\n";
     out += " - Description: " + role->description + "\n";
@@ -246,7 +246,7 @@ std::string to_string(const std::shared_ptr<VaultRole>& role) {
     return out;
 }
 
-std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<VaultRole>>& roles) {
+std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<Vault>>& roles) {
     if (roles.empty()) return "No vault roles found\n";
 
     std::string out;
@@ -254,7 +254,7 @@ std::string to_string(const std::unordered_map<unsigned int, std::shared_ptr<Vau
     return out;
 }
 
-std::string to_string(const std::vector<std::shared_ptr<VaultRole>>& roles) {
+std::string to_string(const std::vector<std::shared_ptr<Vault>>& roles) {
     if (roles.empty()) return "No vault roles found\n";
 
     std::string out;

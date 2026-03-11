@@ -4,7 +4,7 @@
 #include "vault/model/S3Vault.hpp"
 #include "identities/model/User.hpp"
 #include "vault/model/APIKey.hpp"
-#include "rbac/model/Role.hpp"
+#include "../../../../include/rbac/role/Base.hpp"
 
 using namespace vh;
 

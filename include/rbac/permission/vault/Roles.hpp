@@ -20,6 +20,9 @@ enum class RolePermissions : uint8_t {
 struct Roles : Set<RolePermissions, uint8_t> {
     std::vector<std::shared_ptr<Override>> overrides;
 
+    Roles() = default;
+    explicit Roles(const Mask& mask) : Set(mask) {}
+
     [[nodiscard]] bool canAssign() const noexcept { return has(RolePermissions::Assign); }
     [[nodiscard]] bool canModify() const noexcept { return has(RolePermissions::Modify); }
     [[nodiscard]] bool canRevoke() const noexcept { return has(RolePermissions::Revoke); }

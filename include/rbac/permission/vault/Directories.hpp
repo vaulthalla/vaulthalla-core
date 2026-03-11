@@ -27,6 +27,9 @@ struct Directories final : Module<uint32_t> {
     Set<DirectoryPermissions, uint16_t> permissions;
     Share share;
 
+    Directories() = default;
+    explicit Directories(const Mask& mask) { fromMask(mask); }
+
     const char* name() const override { return ModuleName; }
 
     [[nodiscard]] uint32_t toMask() const override { return pack(permissions, share); }

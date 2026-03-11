@@ -11,6 +11,9 @@ struct Set {
 
     Mask permissions{0};
 
+    Set() = default;
+    explicit Set(const Mask mask) : permissions(mask) {}
+
     [[nodiscard]] static constexpr std::size_t bitWidth() {
         return sizeof(Mask) * 8u;
     }

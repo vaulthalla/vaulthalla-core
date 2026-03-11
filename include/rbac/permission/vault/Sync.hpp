@@ -34,12 +34,15 @@ struct SyncAction : Set<SyncActionPermissions, uint8_t> {
     [[nodiscard]] bool none() const noexcept { return has(SyncActionPermissions::None); }
 };
 
-struct Sync : Module<uint32_t> {
+struct Sync final : Module<uint32_t> {
     static constexpr const auto* ModuleName = "Sync";
 
     SyncConfig config;
     SyncAction action;
     std::vector<std::shared_ptr<Override>> overrides;
+
+    Sync() = default;
+    explicit Sync(const Mask& mask) { fromMask(mask); }
 
     const char* name() const override { return ModuleName; }
     [[nodiscard]] uint32_t toMask() const override { return pack(config, action); }

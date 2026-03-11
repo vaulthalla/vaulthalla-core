@@ -27,6 +27,9 @@ struct Files final : Module<uint32_t> {
     Set<FilePermissions, uint16_t> permissions;
     Share share;
 
+    Files() = default;
+    explicit Files(const Mask& mask) { fromMask(mask); }
+
     const char* name() const override { return ModuleName; }
     [[nodiscard]] uint32_t toMask() const override { return pack(permissions, share); }
     void fromMask(const Mask mask) override { unpack(mask, permissions, share); }

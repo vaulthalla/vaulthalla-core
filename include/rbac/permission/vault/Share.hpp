@@ -20,6 +20,9 @@ enum class SharePermissions : uint8_t {
 struct Share : Set<SharePermissions, uint8_t> {
     std::vector<std::shared_ptr<Override>> overrides;
 
+    Share() = default;
+    explicit Share(const Mask& mask) : Set(mask) {}
+
     [[nodiscard]] bool canShareInternally() const noexcept {
         return has(SharePermissions::Internal);
     }

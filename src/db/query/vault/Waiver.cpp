@@ -2,7 +2,7 @@
 #include "db/Transactions.hpp"
 #include "sync/model/Waiver.hpp"
 #include "vault/model/S3Vault.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "vault/model/APIKey.hpp"
 #include "../../../../include/rbac/role/Base.hpp"
 

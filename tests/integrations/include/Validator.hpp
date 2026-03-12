@@ -5,11 +5,11 @@
 #include "db/query/identities/User.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/Group.hpp"
-#include "../../../include/db/query/rbac/Permission.hpp"
+#include "../../../include/db/query/rbac/permission/Permission.hpp"
 
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "vault/model/Vault.hpp"
-#include "identities/model/Group.hpp"
+#include "../../../include/identities/Group.hpp"
 #include "../../../include/rbac/role/Admin.hpp"
 #include "../../../include/rbac/role/Vault.hpp"
 

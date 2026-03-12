@@ -1,5 +1,5 @@
 #include "db/query/identities/User.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "auth/model/RefreshToken.hpp"
 #include "db/Transactions.hpp"
 #include "../../../../include/rbac/role/Admin.hpp"

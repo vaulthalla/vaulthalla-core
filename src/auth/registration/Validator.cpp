@@ -1,6 +1,6 @@
 #include "auth/registration/Validator.hpp"
 #include "crypto/password/Strength.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "log/Registry.hpp"
 
 #include <paths.h>

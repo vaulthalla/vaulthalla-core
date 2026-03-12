@@ -12,7 +12,7 @@ class row;
 class result;
 }
 
-namespace vh::identities::model {
+namespace vh::identities {
 
 struct Admin;
 struct Volume;

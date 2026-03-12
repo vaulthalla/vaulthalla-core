@@ -16,7 +16,7 @@
 
 #include "vault/model/Vault.hpp"
 #include "vault/model/APIKey.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../../include/identities/User.hpp"
 
 #include "config/Registry.hpp"
 #include "CommandUsage.hpp"

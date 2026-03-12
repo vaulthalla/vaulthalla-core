@@ -1,4 +1,4 @@
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "../../../include/rbac/role/Admin.hpp"
 #include "../../../include/rbac/role/Vault.hpp"
 #include "../../../include/rbac/permission/Permission.hpp"

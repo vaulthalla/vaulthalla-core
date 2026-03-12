@@ -2,7 +2,7 @@
 
 // Database
 #include "db/query/vault/Vault.hpp"
-#include "../../include/db/query/rbac/Permission.hpp"
+#include "../../include/db/query/rbac/permission/Permission.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "db/query/fs/Directory.hpp"
@@ -15,8 +15,8 @@
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"
-#include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
+#include "../../include/identities/User.hpp"
+#include "../../include/identities/Group.hpp"
 #include "rbac/role/Base.hpp"
 #include "rbac/role/Admin.hpp"
 #include "rbac/role/Vault.hpp"

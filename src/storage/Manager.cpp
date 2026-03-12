@@ -4,7 +4,7 @@
 #include "config/Registry.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
-#include "identities/model/User.hpp"
+#include "../../include/identities/User.hpp"
 #include "fs/model/Path.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/User.hpp"

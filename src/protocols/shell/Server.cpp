@@ -5,7 +5,7 @@
 #include "db/query/identities/User.hpp"
 #include "log/Registry.hpp"
 #include "protocols/shell/SocketIO.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>

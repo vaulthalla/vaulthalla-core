@@ -3,7 +3,7 @@
 #include "runtime/Deps.hpp"
 #include "sync/Controller.hpp"
 #include "storage/Engine.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../../include/identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"

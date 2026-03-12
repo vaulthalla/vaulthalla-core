@@ -1,4 +1,4 @@
-#include "../../../../include/db/query/rbac/Permission.hpp"
+#include "../../../../include/db/query/rbac/permission/Permission.hpp"
 #include "db/Transactions.hpp"
 #include "rbac/role/Base.hpp"
 #include "rbac/role/Vault.hpp"

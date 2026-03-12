@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../../../include/rbac/role/Vault.hpp"
-#include "identities/model/Group.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/Group.hpp"
+#include "../../../include/identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "protocols/shell/Router.hpp"
 #include "CLITestContext.hpp"

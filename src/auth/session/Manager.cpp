@@ -7,7 +7,7 @@
 #include "db/query/auth/RefreshToken.hpp"
 #include "log/Registry.hpp"
 #include "protocols/ws/Session.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "runtime/Deps.hpp"
 #include "protocols/ws/Router.hpp"
 

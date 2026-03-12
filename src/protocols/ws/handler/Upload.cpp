@@ -1,6 +1,6 @@
 #include "protocols/ws/handler/Upload.hpp"
 #include "protocols/ws/Session.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "log/Registry.hpp"
 #include "fs/Filesystem.hpp"
 #include "protocols/ws/model/Response.hpp"

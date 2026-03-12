@@ -1,7 +1,7 @@
 #include "protocols/ws/handler/Permissions.hpp"
 #include "protocols/ws/Session.hpp"
-#include "../../../../include/db/query/rbac/Permission.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "../../../../include/rbac/permission/Permission.hpp"
 
 #include <nlohmann/json.hpp>

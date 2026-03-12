@@ -1,7 +1,7 @@
 #include "fuse/Bridge.hpp"
 #include "storage/Manager.hpp"
 #include "storage/Engine.hpp"
-#include "identities/model/User.hpp"
+#include "../../include/identities/User.hpp"
 #include "fs/model/Path.hpp"
 #include "fs/model/Entry.hpp"
 #include "vault/model/Vault.hpp"

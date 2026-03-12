@@ -10,7 +10,7 @@
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
 #include "auth/registration/Validator.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 
 #include <paths.h>
 

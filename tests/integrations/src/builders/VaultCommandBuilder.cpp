@@ -2,8 +2,8 @@
 #include "CommandUsage.hpp"
 #include "generators.hpp"
 #include "vault/model/Vault.hpp"
-#include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
+#include "../../../../include/identities/User.hpp"
+#include "../../../../include/identities/Group.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::protocols::shell;

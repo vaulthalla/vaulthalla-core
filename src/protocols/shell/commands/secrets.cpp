@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "crypto/secrets/TPMKeyProvider.hpp"
 #include "crypto/secrets/Manager.hpp"
 #include "fs/ops/file.hpp"

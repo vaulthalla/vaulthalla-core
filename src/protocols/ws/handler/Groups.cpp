@@ -5,7 +5,7 @@
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
+#include "../../../../include/identities/Group.hpp"
 
 #include <nlohmann/json.hpp>
 

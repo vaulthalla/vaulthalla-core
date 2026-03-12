@@ -1,6 +1,6 @@
-#include "identities/model/Group.hpp"
+#include "../../../include/identities/Group.hpp"
 #include "db/encoding/timestamp.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "protocols/shell/Table.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 

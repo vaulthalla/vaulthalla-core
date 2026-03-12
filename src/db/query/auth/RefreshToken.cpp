@@ -1,6 +1,6 @@
 #include "db/query/auth/RefreshToken.hpp"
 #include "auth/model/RefreshToken.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "db/Transactions.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "log/Registry.hpp"

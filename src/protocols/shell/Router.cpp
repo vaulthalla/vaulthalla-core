@@ -2,7 +2,7 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "log/Registry.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "CommandUsage.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 

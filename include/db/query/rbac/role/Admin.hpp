@@ -14,15 +14,15 @@ namespace permission { struct Admin; }
 namespace vh::db::query::rbac::role {
 
 class Admin {
-    using UserRole = vh::rbac::permission::Admin;
-    using UserRolePtr = std::shared_ptr<UserRole>;
+    using AdminRole = vh::rbac::permission::Admin;
+    using AdminRolePtr = std::shared_ptr<AdminRole>;
 
 public:
-    static unsigned int upsert(const UserRolePtr& role);
+    static unsigned int upsert(const AdminRolePtr& role);
     static void remove(unsigned int id);
-    static void remove(const UserRolePtr& userRole);
-    static UserRolePtr get(unsigned int id);
-    static std::vector<UserRolePtr> list(model::ListQueryParams&& params = {});
+    static void remove(const AdminRolePtr& userRole);
+    static AdminRolePtr get(unsigned int id);
+    static std::vector<AdminRolePtr> list(model::ListQueryParams&& params = {});
 };
 
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <memory>
@@ -10,15 +11,14 @@
 namespace vh::rbac::permission {
 
 struct Permission {
-    unsigned int id{};
+    uint32_t id{}, bit_position{};
     std::string name, description;
-    uint16_t bit_position{};
     std::time_t created_at{}, updated_at{};
 
     Permission() = default;
     explicit Permission(const pqxx::row& row);
     explicit Permission(const nlohmann::json& j);
-    Permission(unsigned int bitPos, std::string name, std::string description);
+    Permission(uint32_t bitPos, std::string name, std::string description);
 };
 
 void to_json(nlohmann::json& j, const Permission& p);

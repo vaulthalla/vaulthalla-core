@@ -7,7 +7,7 @@
 #include "protocols/ws/Router.hpp"
 #include "protocols/ws/handler/Upload.hpp"
 #include "runtime/Deps.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "protocols/cookie.hpp"
 
 #include <boost/beast/http.hpp>

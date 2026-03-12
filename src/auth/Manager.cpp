@@ -1,5 +1,5 @@
 #include "auth/Manager.hpp"
-#include "identities/model/User.hpp"
+#include "../../include/identities/User.hpp"
 #include "auth/session/Manager.hpp"
 #include "auth/registration/Validator.hpp"
 #include "crypto/util/hash.hpp"

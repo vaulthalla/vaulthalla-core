@@ -8,7 +8,6 @@ namespace vh::fs::model {
 struct Directory final : Entry {
     unsigned int file_count{0};
     unsigned int subdirectory_count{0};
-    std::time_t last_modified{0};
 
     Directory() = default;
     Directory(const pqxx::row& row, const pqxx::result& parentRows);

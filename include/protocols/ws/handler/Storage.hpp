@@ -1,7 +1,7 @@
 #pragma once
 
 #include "protocols/ws/Session.hpp"
-#include "identities/model/User.hpp"
+#include "../../../identities/User.hpp"
 
 #include <memory>
 #include <nlohmann/json.hpp>

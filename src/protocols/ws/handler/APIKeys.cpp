@@ -1,6 +1,6 @@
 #include "protocols/ws/handler/APIKeys.hpp"
 #include "vault/model/APIKey.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "protocols/ws/Session.hpp"
 #include "runtime/Deps.hpp"

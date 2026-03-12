@@ -5,7 +5,7 @@
 #include "fs/model/Path.hpp"
 #include "../../../../include/rbac/role/Vault.hpp"
 #include "vault/model/Vault.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../include/identities/User.hpp"
 #include "protocols/ws/handler/Upload.hpp"
 #include "storage/Engine.hpp"
 #include "runtime/Deps.hpp"

@@ -12,7 +12,7 @@
 #include "vault/model/S3Vault.hpp"
 #include "vault/model/APIKey.hpp"
 #include "rbac/model/VaultRole.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../../include/identities/User.hpp"
 #include "sync/model/Waiver.hpp"
 #include "../../../../../include/rbac/role/Admin.hpp"
 

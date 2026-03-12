@@ -11,22 +11,19 @@ using namespace vh::db::encoding;
 Directory::Directory(const pqxx::row& row, const pqxx::result& parentRows)
     : Entry(row, parentRows),
       file_count(row["file_count"].as<unsigned int>()),
-      subdirectory_count(row["subdirectory_count"].as<unsigned int>()),
-      last_modified(parsePostgresTimestamp(row["last_modified"].as<std::string>())) {}
+      subdirectory_count(row["subdirectory_count"].as<unsigned int>()) {}
 
 void vh::fs::model::to_json(nlohmann::json& j, const Directory& d) {
     to_json(j, static_cast<const Entry&>(d));
     j["type"] = "directory"; // Helpful for client
     j["file_count"] = d.file_count;
     j["subdirectory_count"] = d.subdirectory_count;
-    j["last_modified"] = timestampToString(d.last_modified);
 }
 
 void vh::fs::model::from_json(const nlohmann::json& j, Directory& d) {
     from_json(j, static_cast<Entry&>(d));
     d.file_count = j.at("file_count").get<unsigned int>();
     d.subdirectory_count = j.at("subdirectory_count").get<unsigned int>();
-    d.last_modified = parsePostgresTimestamp(j.at("last_modified").get<std::string>());
 }
 
 std::vector<std::shared_ptr<Directory>> vh::fs::model::directories_from_pq_res(const pqxx::result& res) {

@@ -1,11 +1,11 @@
 #include "protocols/shell/commands/vault.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
-#include "../../../../../include/db/query/rbac/Permission.hpp"
+#include "../../../../../include/db/query/rbac/permission/Permission.hpp"
 
 #include "vault/model/Vault.hpp"
 #include "../../../../../include/rbac/role/Vault.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../../include/identities/User.hpp"
 #include "../../../../../include/rbac/role/Base.hpp"
 #include "../../../../../include/rbac/permission/Permission.hpp"
 

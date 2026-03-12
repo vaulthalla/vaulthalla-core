@@ -30,13 +30,13 @@ void vh::db::DBConnection::initPreparedDirectories() const {
                    "    updated_at = NOW() "
                    "  RETURNING id "
                    ") "
-                   "INSERT INTO directories (fs_entry_id, size_bytes, file_count, subdirectory_count, last_modified) "
+                   "INSERT INTO directories (fs_entry_id, size_bytes, file_count, subdirectory_count) "
                    "SELECT id, $14, $15, $16, NOW() FROM inserted "
                    "ON CONFLICT (fs_entry_id) DO UPDATE SET "
                    "  size_bytes = EXCLUDED.size_bytes, "
                    "  file_count = EXCLUDED.file_count, "
-                   "  subdirectory_count = EXCLUDED.subdirectory_count, "
-                   "  last_modified = NOW() RETURNING fs_entry_id");
+                   "  subdirectory_count = EXCLUDED.subdirectory_count "
+                   "RETURNING fs_entry_id");
 
     conn_->prepare("list_dirs_in_dir_by_parent_id",
                    "SELECT fs.*, d.* "

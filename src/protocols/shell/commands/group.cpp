@@ -4,7 +4,7 @@
 #include "protocols/shell/types.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "db/query/identities/Group.hpp"
-#include "identities/model/Group.hpp"
+#include "../../../../include/identities/Group.hpp"
 #include "identities/model/User.hpp"
 #include "auth/Manager.hpp"
 #include "runtime/Deps.hpp"

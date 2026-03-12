@@ -14,7 +14,7 @@
 #include "vault/model/APIKey.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
-#include "identities/model/User.hpp"
+#include "../../../../../include/identities/User.hpp"
 
 #include "log/Registry.hpp"
 #include "config/Registry.hpp"

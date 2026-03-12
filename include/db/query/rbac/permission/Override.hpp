@@ -2,32 +2,42 @@
 
 #include "db/model/ListQueryParams.hpp"
 
-#include <vector>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
-namespace vh::rbac::model { struct Override; }
+namespace vh::rbac::permission { struct Override; }
 
 namespace vh::db::query::rbac::permission {
 
-struct VPermOverrideQuery {
-    unsigned int vault_id;
-    std::string subject_type;
-    unsigned int subject_id;
-    unsigned int bit_position = 0;
-};
-
 class Override {
-    using Override = vh::rbac::model::Override;
-    using OverridePtr = std::shared_ptr<Override>;
+    using OverrideT = vh::rbac::permission::Override;
+    using OverridePtr = std::shared_ptr<OverrideT>;
 
 public:
-    static unsigned int addVPermOverride(const OverridePtr& override);
-    static void updateVPermOverride(const OverridePtr& override);
-    static void removeVPermOverride(unsigned int permOverrideId);
-    static std::vector<OverridePtr> listVPermOverrides(unsigned int vaultId, model::ListQueryParams&& params = {});
-    static std::vector<OverridePtr> listAssignedVRoleOverrides(const VPermOverrideQuery& query, model::ListQueryParams&& params = {});
-    static OverridePtr getVPermOverride(const VPermOverrideQuery& query);
+    struct Query {
+        unsigned int vault_id{};
+        std::string subject_type;
+        unsigned int subject_id{};
+        unsigned int bit_position{};
+    };
+
+    static unsigned int upsert(const OverridePtr& permOverride);
+    static unsigned int add(const OverridePtr& permOverride);
+    static void update(const OverridePtr& permOverride);
+
+    static void remove(unsigned int permOverrideId);
+    static void removeByAssignment(unsigned int assignmentId);
+
+    static OverridePtr get(unsigned int permOverrideId);
+    static OverridePtr get(const Query& query);
+
+    static bool exists(unsigned int assignmentId, unsigned int permissionId, const std::string& globPath);
+
+    static std::vector<OverridePtr> list(unsigned int vaultId, model::ListQueryParams&& params = {});
+    static std::vector<OverridePtr> listAssigned(const Query& query, model::ListQueryParams&& params = {});
+    static std::vector<OverridePtr> listForSubject(const std::string& subjectType, unsigned int subjectId,
+                                                   model::ListQueryParams&& params = {});
 };
 
 }

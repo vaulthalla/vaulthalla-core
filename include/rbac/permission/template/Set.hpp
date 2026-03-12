@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <type_traits>
 
 namespace vh::rbac::permission {
 
@@ -8,6 +10,9 @@ template <typename EnumT, typename MaskT>
 struct Set {
     using Enum = EnumT;
     using Mask = MaskT;
+
+    static_assert(std::is_integral_v<Mask>, "Set<EnumT, MaskT>: MaskT must be an integral type");
+    static_assert(std::is_unsigned_v<Mask>, "Set<EnumT, MaskT>: MaskT must be an unsigned integral type");
 
     Mask permissions{0};
 
@@ -32,6 +37,18 @@ struct Set {
 
     [[nodiscard]] constexpr Mask operator()() const { return permissions; }
     [[nodiscard]] constexpr Mask raw() const { return permissions; }
+
+    [[nodiscard]] std::string toBitString() const {
+        std::string bits;
+        bits.reserve(bitWidth());
+
+        for (std::size_t i = 0; i < bitWidth(); ++i) {
+            const auto shift = static_cast<unsigned>(bitWidth() - 1u - i);
+            bits.push_back(((permissions >> shift) & static_cast<Mask>(1)) ? '1' : '0');
+        }
+
+        return bits;
+    }
 
     constexpr void setRaw(const Mask mask) { permissions = mask; }
     constexpr void clear() { permissions = 0; }

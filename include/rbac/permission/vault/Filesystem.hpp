@@ -11,12 +11,11 @@ namespace pqxx { class row; }
 
 namespace vh::rbac::permission::vault {
 
-class Filesystem {
-    Files files_;
-    Directories directories_;
+struct Filesystem {
+    Files files;
+    Directories directories;
     std::vector<std::shared_ptr<Override>> overrides;
 
-public:
     Filesystem() = default;
     explicit Filesystem(const pqxx::row& row);
 };

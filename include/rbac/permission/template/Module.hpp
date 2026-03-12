@@ -5,12 +5,16 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace vh::rbac::permission {
 
 template <typename MaskT>
 struct Module {
     using Mask = MaskT;
+
+    static_assert(std::is_integral_v<Mask>, "Module<MaskT>: MaskT must be an integral type");
+    static_assert(std::is_unsigned_v<Mask>, "Module<MaskT>: MaskT must be an unsigned integral type");
 
     virtual ~Module() = default;
     Module() = default;
@@ -22,6 +26,22 @@ struct Module {
     [[nodiscard]] virtual const char* name() const = 0;
     [[nodiscard]] virtual Mask toMask() const = 0;
     virtual void fromMask(Mask mask) = 0;
+
+    [[nodiscard]] std::string toBitString() const {
+        return maskToBitString(toMask());
+    }
+
+    [[nodiscard]] static std::string maskToBitString(const Mask mask) {
+        std::string bits;
+        bits.reserve(bitWidth());
+
+        for (std::size_t i = 0; i < bitWidth(); ++i) {
+            const auto shift = static_cast<unsigned>(bitWidth() - 1u - i);
+            bits.push_back(((mask >> shift) & static_cast<Mask>(1)) ? '1' : '0');
+        }
+
+        return bits;
+    }
 
 protected:
     template <typename EnumT, typename SetMaskT>

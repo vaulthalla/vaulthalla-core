@@ -58,4 +58,38 @@ void vh::db::DBConnection::initPreparedPermOverrides() const {
                    "WHERE id = $1");
 
     conn_->prepare("delete_vault_permission_override", "DELETE FROM vault_permission_overrides WHERE id = $1");
+
+    conn_->prepare(
+        "vault_permission_override_list_by_role_id",
+        R"SQL(
+        SELECT
+            vpo.id,
+            vpo.assignment_id,
+            vpo.permission_id,
+            vpo.glob_path,
+            vpo.enabled,
+            vpo.effect,
+            vpo.created_at,
+            vpo.updated_at,
+
+            vra.vault_id,
+            vra.subject_type,
+            vra.subject_id,
+            vra.role_id,
+            vra.assigned_at,
+
+            p.name,
+            p.description,
+            p.category,
+            p.bit_position
+        FROM vault_permission_overrides vpo
+        INNER JOIN permission p
+            ON p.id = vpo.permission_id
+        INNER JOIN vault_role_assignments vra
+            ON vra.id = vpo.assignment_id
+        WHERE vra.role_id = $1
+        ORDER BY vra.vault_id, vra.subject_type, vra.subject_id, p.bit_position, vpo.glob_path
+    )SQL"
+        );
+
 }

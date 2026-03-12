@@ -51,7 +51,7 @@ Admin::Admin(const pqxx::row& user, const pqxx::row& role, const pqxx::result& v
     this->role = std::make_shared<Admin>(role);
     const auto [roles, group_roles] = vault_roles_from_pq_result(vaultRoles, overrides);
     std::scoped_lock lock(mutex_);
-    this->roles = roles;
+    this->vault_roles = roles;
     this->group_roles = group_roles;
 }
 
@@ -67,16 +67,16 @@ bool Admin::operator!=(const Admin& other) const {
 
 std::shared_ptr<Vault> Admin::getRole(const unsigned int vaultId) const {
     std::scoped_lock lock(mutex_);
-    if (roles.contains(vaultId)) {
+    if (vault_roles.contains(vaultId)) {
         log::Registry::auth()->debug("User {} has direct role for vault {}", name, vaultId);
-        return roles.at(vaultId);
+        return vault_roles.at(vaultId);
     }
     if (group_roles.contains(vaultId)) {
         log::Registry::auth()->debug("User {} has group role for vault {}", name, vaultId);
         return group_roles.at(vaultId);
     }
     log::Registry::auth()->debug("User {} has no role for vault {}\nOptions:\n", name, vaultId);
-    for (const auto& [id, role] : roles)
+    for (const auto& [id, role] : vault_roles)
         log::Registry::auth()->debug(" - Direct role for vault {}: {}", id, to_string(role));
     for (const auto& [id, role] : group_roles)
         log::Registry::auth()->debug(" - Group role for vault {}: {}", id, to_string(role));
@@ -112,7 +112,7 @@ void to_json(nlohmann::json& j, const Admin& u) {
     if (u.linux_uid) j["uid"] = *u.linux_uid;
 
     std::scoped_lock lock(u.mutex_);
-    if (!u.roles.empty()) j["roles"] = u.roles;
+    if (!u.vault_roles.empty()) j["roles"] = u.vault_roles;
     if (!u.group_roles.empty()) j["group_roles"] = u.group_roles;
 }
 
@@ -274,7 +274,7 @@ std::string to_string(const std::shared_ptr<Admin>& user) {
         std::scoped_lock lock(user->mutex_);
         out += "Vault Roles:\n";
         out += "  - User Level:\n";
-        out += "    " + to_string(user->roles);
+        out += "    " + to_string(user->vault_roles);
         out += "  - Group Level:\n";
         out += "    " + to_string(user->group_roles);
     }

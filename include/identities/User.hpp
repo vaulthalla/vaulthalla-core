@@ -29,10 +29,10 @@ struct Admin : public std::enable_shared_from_this<Admin> {
     std::string name{}, password_hash{};
     std::optional<std::string> email{std::nullopt};
     std::time_t created_at{}, updated_at{};
-    std::optional<std::time_t> last_login;
+    std::optional<std::time_t> last_login{};
     bool is_active{true};
     std::shared_ptr<rbac::model::Admin> role{};
-    std::unordered_map<unsigned int, std::shared_ptr<rbac::model::Vault>> roles{}, group_roles{};
+    std::unordered_map<unsigned int, std::shared_ptr<rbac::model::Vault>> vault_roles{}, group_roles{};
     mutable std::mutex mutex_{};
 
     Admin();

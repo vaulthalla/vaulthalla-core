@@ -279,7 +279,7 @@ void IntegrationsTestRunner::testVaultPermOverridesAllow() {
     const auto verify = db::query::identities::User::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
-    if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
+    if (verify->vault_roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
 
     std::vector<FuseStep> steps;
 
@@ -349,7 +349,7 @@ void IntegrationsTestRunner::testVaultPermOverridesDeny() {
     const auto verify = db::query::identities::User::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
-    if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
+    if (verify->vault_roles.size() != 1) throw std::runtime_error("Created user roles size != 1");
 
     std::vector<FuseStep> steps;
 
@@ -414,7 +414,7 @@ void IntegrationsTestRunner::testFUSEGroupPermissions() {
     const auto verify = db::query::identities::User::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
-    if (!verify->roles.empty()) throw std::runtime_error("Created user roles size != 0");
+    if (!verify->vault_roles.empty()) throw std::runtime_error("Created user roles size != 0");
     if (verify->group_roles.size() != 1) throw std::runtime_error("Created user group_roles size != 1");
 
     std::vector<FuseStep> steps;
@@ -582,7 +582,7 @@ void IntegrationsTestRunner::testFUSEUserOverridesGroupOverride() {
     const auto verify = db::query::identities::User::getUserById(user->id);
     if (!verify) throw std::runtime_error("Failed to verify created user");
     if (!verify->linux_uid) throw std::runtime_error("Created user linux_uid not set");
-    if (verify->roles.size() != 1) throw std::runtime_error("Created user roles size != 1, actual: " + std::to_string(verify->roles.size()));
+    if (verify->vault_roles.size() != 1) throw std::runtime_error("Created user roles size != 1, actual: " + std::to_string(verify->vault_roles.size()));
     if (verify->group_roles.size() != 1) throw std::runtime_error("Created group roles size != 1, actual: " + std::to_string(verify->group_roles.size()));
     if (verify->getRole(engine->vault->id)->permission_overrides.empty()) throw std::runtime_error("Created user role overrides size != 1");
 

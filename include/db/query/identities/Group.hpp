@@ -7,12 +7,12 @@
 #include <vector>
 #include <optional>
 
-namespace vh::identities::model { struct Group; }
+namespace vh::identities { struct Group; }
 
 namespace vh::db::query::identities {
 
 class Group {
-    using G = vh::identities::model::Group;
+    using G = vh::identities::Group;
     using GroupPtr = std::shared_ptr<G>;
 
 public:

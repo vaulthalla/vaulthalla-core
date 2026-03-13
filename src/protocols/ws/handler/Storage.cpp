@@ -3,9 +3,9 @@
 #include "storage/Manager.hpp"
 #include "fs/model/File.hpp"
 #include "fs/model/Path.hpp"
-#include "../../../../include/rbac/role/Vault.hpp"
+#include "rbac/role/Vault.hpp"
 #include "vault/model/Vault.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "protocols/ws/handler/Upload.hpp"
 #include "storage/Engine.hpp"
 #include "runtime/Deps.hpp"
@@ -15,7 +15,7 @@
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::vault::model;
-using namespace vh::rbac::model;
+using namespace vh::rbac;
 using namespace vh::storage;
 using namespace vh::fs;
 using namespace vh::fs::model;

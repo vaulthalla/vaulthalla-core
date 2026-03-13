@@ -7,6 +7,7 @@
 #include <vector>
 #include <nlohmann/json_fwd.hpp>
 #include <regex>
+#include <memory>
 #include <optional>
 
 namespace vh::rbac::role {
@@ -39,6 +40,8 @@ void to_json(nlohmann::json& j, const std::vector<Vault>& roles);
 
 void to_json(nlohmann::json& j, const Vault::AssignmentInfo& r);
 void from_json(const nlohmann::json& j, Vault::AssignmentInfo& r);
+
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& roles);
 
 std::vector<Vault> vault_roles_from_json(const nlohmann::json& j);
 std::vector<Vault> vault_roles_from_pq_result(const pqxx::result& res, const pqxx::result& overrides);

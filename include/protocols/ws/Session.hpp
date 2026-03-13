@@ -21,7 +21,7 @@ struct UploadContext {
 
 using RequestType = boost::beast::http::request<boost::beast::http::string_body>;
 
-namespace vh::identities::model { struct Admin; }
+namespace vh::identities { struct User; }
 namespace vh::auth::model { struct TokenPair; }
 
 namespace vh::protocols::ws {
@@ -39,7 +39,7 @@ using json          = nlohmann::json;
 class Session : public std::enable_shared_from_this<Session> {
 public:
     const std::string uuid{generateUUIDv4()};
-    std::shared_ptr<identities::model::Admin> user{nullptr};
+    std::shared_ptr<identities::User> user{nullptr};
     std::shared_ptr<auth::model::TokenPair> tokens;
     std::string userAgent, ipAddress;
     const std::chrono::system_clock::time_point connectionOpenedAt = std::chrono::system_clock::now();
@@ -51,7 +51,7 @@ public:
     void send(json message);
     void close();
 
-    void setAuthenticatedUser(const std::shared_ptr<identities::model::Admin>& user);
+    void setAuthenticatedUser(const std::shared_ptr<identities::User>& user);
     void setHandshakeRequest(const RequestType& req);
 
     void sendAccessTokenOnNextResponse() { sendAccessToken_ = true; }

@@ -1,5 +1,5 @@
 #include "protocols/ws/handler/Settings.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "protocols/ws/Session.hpp"
 #include "config/Registry.hpp"
 #include "config/Config.hpp"

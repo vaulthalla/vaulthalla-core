@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "../../../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "../../../../include/identities/User.hpp"
 #include "../../../../include/rbac/role/Base.hpp"
 #include "runtime/Deps.hpp"

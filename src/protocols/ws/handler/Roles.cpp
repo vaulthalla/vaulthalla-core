@@ -1,68 +1,114 @@
 #include "protocols/ws/handler/Roles.hpp"
 #include "protocols/ws/Session.hpp"
-#include "../../../../include/db/query/rbac/permission/Permission.hpp"
-#include "../../../../include/identities/User.hpp"
-#include "../../../../include/rbac/role/Base.hpp"
-#include "../../../../include/rbac/role/Vault.hpp"
+#include "db/query/rbac/role/Admin.hpp"
+#include "db/query/rbac/role/Vault.hpp"
+#include "identities/User.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 
 using namespace vh::protocols::ws::handler;
-using namespace vh::rbac::model;
+using namespace vh::rbac;
 
 json Roles::add(const json& payload, const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can add roles");
+    const auto& type = payload.at("type").get<std::string>();
 
-    const auto role = std::make_shared<Role>(payload);
-    role->id = db::query::rbac::Permission::addRole(role);
-    return {{"role", *role}};
+    if (type == "admin") {
+        auto role = std::make_shared<role::Admin>(payload);
+        role->id = db::query::rbac::role::Admin::upsert(role);
+        return {{"role", *role}};
+    }
+
+    if (type == "vault") {
+        auto role = std::make_shared<role::Vault>(payload);
+        role->id = db::query::rbac::role::Vault::upsert(role);
+        return {{"role", *role}};
+    }
+
+    throw std::runtime_error("Invalid role type");
 }
 
 json Roles::remove(const json& payload, const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can delete roles");
 
     const auto roleId = payload.at("id").get<unsigned int>();
-    db::query::rbac::Permission::deleteRole(roleId);
+    const auto& type = payload.at("type").get<std::string>();
+
+    if (type == "admin") db::query::rbac::role::Admin::remove(roleId);
+    else if (type == "vault") db::query::rbac::role::Vault::remove(roleId);
+    else throw std::runtime_error("Invalid role type");
+
     return {{"role", roleId}};
 }
 
 json Roles::update(const json& payload, const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can update roles");
+    const auto& type = payload.at("type").get<std::string>();
 
-    auto role = std::make_shared<Role>(payload);
-    db::query::rbac::Permission::updateRole(role);
-    return {{"role", *role}};
+    if (type == "admin") {
+        auto role = std::make_shared<role::Admin>(payload);
+        db::query::rbac::role::Admin::upsert(role);
+        return {{"role", *role}};
+    }
+
+    if (type == "vault") {
+        auto role = std::make_shared<role::Vault>(payload);
+        db::query::rbac::role::Vault::upsert(role);
+        return {{"role", *role}};
+    }
+
+    throw std::runtime_error("Invalid role type");
 }
 
 json Roles::get(const json& payload, const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can get roles");
 
     const auto roleId = payload.at("id").get<unsigned int>();
-    auto role = db::query::rbac::Permission::getRole(roleId);
+    const auto type = payload.at("type").get<std::string>();
 
-    if (!role) throw std::runtime_error("Role not found");
+    if (type == "admin") {
+        auto role = db::query::rbac::role::Admin::get(roleId);
+        if (!role) throw std::runtime_error("Role not found");
+        return {{"role", *role}};
+    }
 
-    return {{"role", *role}};
+    if (type == "vault") {
+        auto role = db::query::rbac::role::Vault::get(roleId);
+        if (!role) throw std::runtime_error("Role not found");
+        return {{"role", *role}};
+    }
+
+    throw std::runtime_error("Invalid role type");
 }
 
 json Roles::getByName(const json& payload, const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can get roles by name");
 
-    const auto roleName = payload.at("name").get<std::string>();
-    auto role = db::query::rbac::Permission::getRoleByName(roleName);
-    if (!role) throw std::runtime_error("Role not found");
-    return {{"role", *role}};
+    const auto& type = payload.at("type").get<std::string>();
+
+    if (type == "admin") {
+        const auto roleName = payload.at("name").get<std::string>();
+        auto role = db::query::rbac::role::Admin::get(roleName);
+        if (!role) throw std::runtime_error("Role not found");
+        return {{"role", *role}};
+    }
+
+    if (type == "vault") {
+        const auto roleName = payload.at("name").get<std::string>();
+        auto role = db::query::rbac::role::Vault::get(roleName);
+        if (!role) throw std::runtime_error("Role not found");
+        return {{"role", *role}};
+    }
+
+    throw std::runtime_error("Invalid role type");
 }
 
-json Roles::list(const std::shared_ptr<Session>& session) {
-    if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list roles");
-    return {{"roles", db::query::rbac::Permission::listRoles()}};
-}
-
-json Roles::listUserRoles(const std::shared_ptr<Session>& session) {
+json Roles::listAdminRoles(const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list user roles");
-    return {{"roles", db::query::rbac::Permission::listUserRoles()}};
+    return {{"roles", db::query::rbac::role::Admin::list()}};
 }
 
 json Roles::listVaultRoles(const std::shared_ptr<Session>& session) {
     if (!session->user->canManageRoles()) throw std::runtime_error("Permission denied: Only admins can list filesystem roles");
-    return {{"roles", db::query::rbac::Permission::listVaultRoles()}};
+    return {{"roles", db::query::rbac::role::Vault::list()}};
 }

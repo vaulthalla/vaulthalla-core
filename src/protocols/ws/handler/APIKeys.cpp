@@ -1,10 +1,9 @@
 #include "protocols/ws/handler/APIKeys.hpp"
 #include "vault/model/APIKey.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "vault/APIKeyManager.hpp"
 #include "protocols/ws/Session.hpp"
 #include "runtime/Deps.hpp"
-#include "log/Registry.hpp"
 
 #include <nlohmann/json.hpp>
 

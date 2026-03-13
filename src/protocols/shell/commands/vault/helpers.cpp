@@ -7,7 +7,7 @@
 #include "../../../../../include/rbac/permission/Override.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/User.hpp"
-#include "../../../../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../../../../include/db/query/rbac/Permission.hpp"
 #include "db/query/vault/APIKey.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"

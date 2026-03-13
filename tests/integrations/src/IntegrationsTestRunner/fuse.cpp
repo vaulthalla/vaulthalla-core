@@ -1,7 +1,7 @@
 #include "tests/integrations/include/IntegrationsTestRunner.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
-#include "../../../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "tests/integrations/include/generators.hpp"
 #include "../../../../include/rbac/role/Vault.hpp"

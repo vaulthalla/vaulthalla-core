@@ -14,7 +14,7 @@ class Router;
 class CommandUsage;
 }
 
-namespace vh::identities::model { struct Admin; }
+namespace vh::identities { struct User; }
 namespace vh::rbac::model { struct Vault; enum class OverrideOpt; }
 namespace vh::vault::model { struct Vault; struct S3Vault; struct APIKey; enum class VaultType; }
 namespace vh::sync::model { struct Policy; struct Waiver; }
@@ -62,8 +62,8 @@ CommandResult handle_sync(const CommandCall& call);
 // helpers.cpp
 std::optional<unsigned int> parsePositiveUint(const std::string& s, const char* errLabel, std::string& errOut);
 
-std::shared_ptr<identities::model::Admin> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage);
-Lookup<identities::model::Admin> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
+std::shared_ptr<identities::User> resolveOwner(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage);
+Lookup<identities::User> resolveOwnerRequired(const CommandCall& call, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 
 Lookup<vh::vault::model::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix);
 

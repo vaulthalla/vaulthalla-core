@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace vh::identities::model { struct Admin; }
+namespace vh::identities { struct User; }
 
 namespace vh::protocols::shell {
 
@@ -18,7 +18,7 @@ public:
     void registerCommand(const std::shared_ptr<CommandUsage>& usage, CommandHandler handler);
 
     CommandResult executeLine(const std::string& line,
-        const std::shared_ptr<identities::model::Admin>& user,
+        const std::shared_ptr<identities::User>& user,
         SocketIO* io = nullptr) const;
 
 private:

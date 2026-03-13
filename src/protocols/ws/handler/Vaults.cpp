@@ -1,6 +1,6 @@
 #include "protocols/ws/handler/Vaults.hpp"
 #include "vault/model/APIKey.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/Policy.hpp"

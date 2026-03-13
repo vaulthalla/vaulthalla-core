@@ -4,7 +4,7 @@
 #include "usage/include/UsageManager.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
-#include "../../../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../../../include/db/query/rbac/Permission.hpp"
 #include "identities/model/User.hpp"
 #include "../../../../include/identities/Group.hpp"
 #include "../../../../include/rbac/role/Base.hpp"

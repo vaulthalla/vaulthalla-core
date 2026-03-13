@@ -1,15 +1,15 @@
 #include "protocols/ws/handler/Permissions.hpp"
 #include "protocols/ws/Session.hpp"
-#include "../../../../include/db/query/rbac/permission/Permission.hpp"
-#include "../../../../include/identities/User.hpp"
-#include "../../../../include/rbac/permission/Permission.hpp"
+#include "db/query/rbac/Permission.hpp"
+#include "identities/User.hpp"
+#include "rbac/permission/Permission.hpp"
 
 #include <nlohmann/json.hpp>
 
 using namespace vh::protocols::ws::handler;
 
 json Permissions::get(const json& payload, const std::shared_ptr<Session>& session) {
-    if (const auto user = session->user; !user || !user->canManageRoles())
+    if (!session->user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can get permissions");
 
     const auto permissionId = payload.at("id").get<unsigned int>();
@@ -20,7 +20,7 @@ json Permissions::get(const json& payload, const std::shared_ptr<Session>& sessi
 }
 
 json Permissions::getByName(const json& payload, const std::shared_ptr<Session>& session) {
-    if (const auto user = session->user; !user || !user->canManageRoles())
+    if (!session->user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can get permissions by name");
 
     const auto permissionName = payload.at("name").get<std::string>();
@@ -31,7 +31,7 @@ json Permissions::getByName(const json& payload, const std::shared_ptr<Session>&
 }
 
 json Permissions::list(const std::shared_ptr<Session>& session) {
-    if (const auto user = session->user; !user || !user->canManageRoles())
+    if (session->user->canManageRoles())
         throw std::runtime_error("Permission denied: Only admins can list permissions");
 
     auto permissions = db::query::rbac::Permission::listPermissions();

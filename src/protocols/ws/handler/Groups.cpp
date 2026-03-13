@@ -4,13 +4,13 @@
 #include "auth/registration/Validator.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
-#include "identities/model/User.hpp"
-#include "../../../../include/identities/Group.hpp"
+#include "identities/User.hpp"
+#include "identities/Group.hpp"
 
 #include <nlohmann/json.hpp>
 
 using namespace vh::protocols::ws::handler;
-using namespace vh::identities::model;
+using namespace vh::identities;
 
 json Groups::add(const json& payload, const std::shared_ptr<Session>& session) {
     if (const auto user = session->user; !user || !user->canManageRoles())

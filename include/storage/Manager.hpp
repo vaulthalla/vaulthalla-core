@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <fuse3/fuse_lowlevel.h>
 
-namespace vh::identities::model { struct Admin; }
+namespace vh::identities { struct User; }
 namespace vh::vault::model { struct Vault; }
 namespace vh::sync::model { struct Policy; }
 
@@ -27,7 +27,7 @@ public:
 
     std::shared_ptr<Engine> resolveStorageEngine(const std::filesystem::path& fusePath) const;
 
-    void initUserStorage(const std::shared_ptr<identities::model::Admin>& user);
+    void initUserStorage(const std::shared_ptr<identities::User>& user);
 
     std::shared_ptr<vault::model::Vault> addVault(std::shared_ptr<vault::model::Vault> vault,
                                            const std::shared_ptr<sync::model::Policy>& sync = nullptr);

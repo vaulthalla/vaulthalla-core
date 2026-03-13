@@ -78,6 +78,11 @@ void to_json(nlohmann::json& j, const std::vector<Vault>& roles) {
     for (const auto& role : roles) j.emplace_back(role);
 }
 
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& roles) {
+    j = nlohmann::json::array();
+    for (const auto& role : roles) j.emplace_back(*role);
+}
+
 void to_json(nlohmann::json& j, const Vault& r) {
     j = static_cast<const Meta&>(r);
     if (r.assignment) to_json(j["assignment"], *r.assignment);

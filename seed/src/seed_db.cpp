@@ -2,7 +2,7 @@
 
 // Database
 #include "db/query/vault/Vault.hpp"
-#include "../../include/db/query/rbac/permission/Permission.hpp"
+#include "../../include/db/query/rbac/Permission.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "db/query/fs/Directory.hpp"

@@ -1,15 +1,14 @@
 #include "protocols/ws/handler/Upload.hpp"
 #include "protocols/ws/Session.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "log/Registry.hpp"
 #include "fs/Filesystem.hpp"
-#include "protocols/ws/model/Response.hpp"
 
 #include <filesystem>
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::storage;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::fs;
 
 Upload::Upload(const std::shared_ptr<Session>& session) : session_(session) {}

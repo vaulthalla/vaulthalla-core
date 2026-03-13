@@ -77,7 +77,7 @@ void Handler::registerRoleHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("role.get", &Roles::get);
     r->registerPayload("role.get.byName", &Roles::getByName);
     r->registerSessionOnlyHandler("roles.list", &Roles::list);
-    r->registerSessionOnlyHandler("roles.list.user", &Roles::listUserRoles);
+    r->registerSessionOnlyHandler("roles.list.user", &Roles::listAdminRoles);
     r->registerSessionOnlyHandler("roles.list.vault", &Roles::listVaultRoles);
 }
 

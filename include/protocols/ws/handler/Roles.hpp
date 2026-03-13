@@ -16,8 +16,7 @@ struct Roles {
     static json get(const json& payload, const std::shared_ptr<Session>& session);
     static json getByName(const json& payload, const std::shared_ptr<Session>& session);
 
-    static json list(const std::shared_ptr<Session>& session);
-    static json listUserRoles(const std::shared_ptr<Session>& session);
+    static json listAdminRoles(const std::shared_ptr<Session>& session);
     static json listVaultRoles(const std::shared_ptr<Session>& session);
 };
 

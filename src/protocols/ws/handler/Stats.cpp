@@ -6,7 +6,7 @@
 #include "protocols/ws/Session.hpp"
 #include "vault/task/Stats.hpp"
 #include "vault/model/Stat.hpp"
-#include "../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"

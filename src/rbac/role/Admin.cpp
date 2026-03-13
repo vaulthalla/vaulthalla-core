@@ -49,6 +49,11 @@ void to_json(nlohmann::json& j, const std::vector<Admin>& roles) {
     for (const auto& role : roles) j.emplace_back(role);
 }
 
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Admin>>& roles) {
+    j = nlohmann::json::array();
+    for (const auto& role : roles) j.emplace_back(*role);
+}
+
 std::string Admin::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << snake_case_to_title(name) << " (ID: " << id << ")\n";

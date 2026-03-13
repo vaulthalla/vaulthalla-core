@@ -5,6 +5,7 @@
 
 #include <string>
 #include <optional>
+#include <memory>
 #include <nlohmann/json_fwd.hpp>
 
 namespace vh::rbac::role {
@@ -29,6 +30,7 @@ void from_json(const nlohmann::json& j, Admin& a);
 
 std::vector<Admin> admin_roles_from_pq_res(const pqxx::result& res);
 void to_json(nlohmann::json& j, const std::vector<Admin>& roles);
+void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Admin>>& roles);
 
 std::string to_string(const Admin& r);
 

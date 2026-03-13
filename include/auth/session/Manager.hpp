@@ -8,7 +8,7 @@
 #include <boost/asio.hpp>
 
 namespace vh::protocols::ws { class Session; class Router; }
-namespace vh::identities::model { struct Admin; }
+namespace vh::identities { struct User; }
 
 namespace vh::auth::session {
 
@@ -27,7 +27,7 @@ public:
     void invalidate(const std::shared_ptr<protocols::ws::Session>& session);
 
     std::shared_ptr<protocols::ws::Session> get(const std::string& token);
-    std::vector<std::shared_ptr<protocols::ws::Session>> getSessions(const std::shared_ptr<identities::model::Admin>& user);
+    std::vector<std::shared_ptr<protocols::ws::Session>> getSessions(const std::shared_ptr<identities::User>& user);
     std::vector<std::shared_ptr<protocols::ws::Session>> getSessionsByUserId(uint32_t userId);
 
     std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> getActive();

@@ -12,6 +12,11 @@
 #include "fs/Filesystem.hpp"
 #include "sync/Controller.hpp"
 #include "fs/cache/Registry.hpp"
+#include "rbac/role/Vault.hpp"
+#include "rbac/vault/Resolver.hpp"
+#include "rbac/role/vault/Global.hpp"
+
+#include <cstdint>
 
 using namespace vh::protocols::ws::handler;
 using namespace vh::vault::model;
@@ -21,10 +26,21 @@ using namespace vh::fs;
 using namespace vh::fs::model;
 
 json Storage::startUpload(const json& payload, const std::shared_ptr<Session>& session) {
-    const auto vaultId = payload.at("vault_id").get<unsigned int>();
+    const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = payload.at("path").get<std::string>();
 
-    enforcePermissions(session, vaultId, path, &Vault::canCreate);
+
+
+    using Permission = vh::rbac::permission::vault::fs::FilePermissions;
+
+    if (!rbac::vault::Resolver::has<Permission>({
+        .user = session->user,
+        .module = rbac::vault::Module::Files,
+        .permission = Permission::Upload,
+        .vault_id = vaultId,
+        .path = path
+    }))
+        throw std::runtime_error("Permission denied: User does not have upload permission for this path in the vault");
 
     const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
     if (!engine) throw std::runtime_error("Unknown storage engine");
@@ -104,6 +120,8 @@ json Storage::copy(const json& payload, const std::shared_ptr<Session>& session)
     const auto vaultId = payload.at("vault_id").get<unsigned int>();
     const auto from = std::filesystem::path(payload.at("from").get<std::string>());
     const auto to = std::filesystem::path(payload.at("to").get<std::string>());
+
+
 
     enforcePermissions(session, vaultId, from, &Vault::canMove);
     enforcePermissions(session, vaultId, to, &Vault::canCreate);

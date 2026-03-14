@@ -31,6 +31,21 @@ struct Global final : BasicMeta {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] std::string toString() const { return toString(0); }
 
+    [[nodiscard]] permission::vault::fs::Files& files() noexcept { return permissions.filesystem.files; }
+    [[nodiscard]] const permission::vault::fs::Files& files() const noexcept { return permissions.filesystem.files; }
+
+    [[nodiscard]] permission::vault::fs::Directories& directories() noexcept { return permissions.filesystem.directories; }
+    [[nodiscard]] const permission::vault::fs::Directories& directories() const noexcept { return permissions.filesystem.directories; }
+
+    [[nodiscard]] permission::vault::Roles& rolesPerms() noexcept { return permissions.roles; }
+    [[nodiscard]] const permission::vault::Roles& rolesPerms() const noexcept { return permissions.roles; }
+
+    [[nodiscard]] permission::vault::sync::Config& syncConfig() noexcept { return permissions.sync.config; }
+    [[nodiscard]] const permission::vault::sync::Config& syncConfig() const noexcept { return permissions.sync.config; }
+
+    [[nodiscard]] permission::vault::sync::Action& syncActions() noexcept { return permissions.sync.action; }
+    [[nodiscard]] const permission::vault::sync::Action& syncActions() const noexcept { return permissions.sync.action; }
+
     static Global fromJson(const nlohmann::json& j);
 };
 

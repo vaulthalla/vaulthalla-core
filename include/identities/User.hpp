@@ -11,24 +11,26 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace pqxx { class row; class result; }
-namespace vh::rbac::role { struct Admin; struct Vault; }
 
-namespace vh::rbac::permission {
-    struct Admin;
+namespace vh::rbac {
+    namespace role { struct Admin; struct Vault; }
 
-    namespace admin {
-        struct Identities;
-        struct Audits;
-        struct Settings;
-        struct Vaults;
+    namespace permission {
+        struct Admin;
 
-        namespace identities {
-            struct Users;
-            struct Groups;
-            struct Admins;
+        namespace admin {
+            struct Identities;
+            struct Audits;
+            struct Settings;
+            struct Vaults;
+
+            namespace identities {
+                struct Users;
+                struct Groups;
+                struct Admins;
+            }
         }
     }
-
 }
 
 namespace vh::identities {

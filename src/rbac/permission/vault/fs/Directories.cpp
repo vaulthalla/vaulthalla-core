@@ -5,6 +5,11 @@
 
 namespace vh::rbac::permission::vault::fs {
 
+std::string Directories::toFlagsString() const {
+    return joinFlagsWithOwn(share);
+}
+
+
 std::string Directories::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Directories:\n";

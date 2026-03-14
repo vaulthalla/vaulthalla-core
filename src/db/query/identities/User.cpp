@@ -15,7 +15,6 @@
 #include <array>
 
 #include "rbac/permission/Vault.hpp"
-#include "rbac/permission/vault/APIKey.hpp"
 
 using namespace vh::db::query::identities;
 using namespace vh::auth::model;
@@ -188,7 +187,6 @@ unsigned int User::createUser(const UserPtr& user) {
                 log::Registry::db()->debug("[User] User role assignment not set");
                 continue;
             }
-
 
             pqxx::params roleParams{
                 role->assignment->vault_id,

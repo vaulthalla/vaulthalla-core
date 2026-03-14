@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -17,9 +18,12 @@ enum class RolePermissions : uint8_t {
 };
 
 struct Roles final : Set<RolePermissions, uint8_t> {
+    static constexpr const auto* FLAG_CONTEXT = "roles";
+
     Roles() = default;
     explicit Roles(const Mask& mask) : Set(mask) {}
 
+    [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] bool canAssign() const noexcept { return has(RolePermissions::Assign); }
@@ -33,3 +37,14 @@ void to_json(nlohmann::json& j, const Roles& r);
 void from_json(const nlohmann::json& j, Roles& r);
 
 }
+
+template <>
+struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::vault::RolePermissions> {
+    using E = PermissionEntry<vault::RolePermissions>;
+
+    static constexpr std::array entries {
+        E{vault::RolePermissions::Assign, "assign"},
+        E{vault::RolePermissions::Modify, "modify"},
+        E{vault::RolePermissions::Revoke, "revoke"}
+    };
+};

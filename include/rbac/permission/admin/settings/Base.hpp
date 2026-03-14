@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
@@ -15,6 +16,7 @@ enum class SettingsPermissions : uint8_t {
 };
 
 struct Base : Set<SettingsPermissions, uint8_t> {
+    [[nodiscard]] const char* flagPrefix() const override = 0;
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] bool canView() const noexcept { return has(SettingsPermissions::View); }
@@ -25,3 +27,13 @@ void to_json(nlohmann::json& j, const Base& s);
 void from_json(const nlohmann::json& j, Base& s);
 
 }
+
+template <>
+struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::admin::settings::SettingsPermissions> {
+    using E = PermissionEntry<admin::settings::SettingsPermissions>;
+
+    static constexpr std::array entries {
+        E{admin::settings::SettingsPermissions::View, "view"},
+        E{admin::settings::SettingsPermissions::Edit, "edit"}
+    };
+};

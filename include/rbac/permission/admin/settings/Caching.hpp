@@ -7,6 +7,9 @@
 namespace vh::rbac::permission::admin::settings {
 
 struct Caching final : Base {
+    static constexpr const auto* FLAG_CONTEXT = "caching";
+
+    [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 };
 

@@ -18,6 +18,15 @@ Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
       sync(row["sync_permissions"].as<typename decltype(sync)::Mask>()),
       filesystem(row, overrides) {}
 
+std::string Vault::toFlagsString() const {
+    std::ostringstream oss;
+    oss << keys.toFlagsString()
+        << roles.toFlagsString()
+        << sync.toFlagsString()
+        << filesystem.toFlagString();
+    return oss.str();
+}
+
 std::string Vault::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Vault Permissions:\n";

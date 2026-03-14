@@ -22,6 +22,7 @@ struct Filesystem {
     Filesystem(const pqxx::row& row, const pqxx::result& overrideRes);
 
     [[nodiscard]] std::string toString(uint8_t indent) const;
+    [[nodiscard]] std::string toFlagString() const;
 };
 
 void to_json(nlohmann::json& j, const Filesystem& f);

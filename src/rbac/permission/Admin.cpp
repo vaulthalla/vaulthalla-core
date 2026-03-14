@@ -6,6 +6,21 @@
 
 namespace vh::rbac::permission {
 
+Admin::Admin(const pqxx::row& row, const pqxx::result& vaultGlobalPerms)
+    : identities(row["identities_permissions"].as<typename decltype(identities)::Mask>()),
+      vaults(vaultGlobalPerms),
+      audits(row["audits_permissions"].as<typename decltype(audits)::Mask>()),
+      settings(row["settings_permissions"].as<typename decltype(settings)::Mask>()) {}
+
+std::string Admin::toFlagsString() const {
+    std::ostringstream oss;
+    oss << identities.toFlagsString()
+        << vaults.toFlagsString()
+        << audits.toFlagsString()
+        << settings.toFlagsString();
+    return oss.str();
+}
+
 std::string Admin::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Admin Permissions:\n";
@@ -16,12 +31,6 @@ std::string Admin::toString(const uint8_t indent) const {
     oss << settings.toString(i);
     return oss.str();
 }
-
-Admin::Admin(const pqxx::row& row, const pqxx::result& vaultGlobalPerms)
-    : identities(row["identities_permissions"].as<typename decltype(identities)::Mask>()),
-      vaults(vaultGlobalPerms),
-      audits(row["audits_permissions"].as<typename decltype(audits)::Mask>()),
-      settings(row["settings_permissions"].as<typename decltype(settings)::Mask>()) {}
 
 void to_json(nlohmann::json& j, const Admin& a) {
     j = nlohmann::json{

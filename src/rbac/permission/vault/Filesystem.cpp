@@ -21,6 +21,12 @@ std::string Filesystem::toString(const uint8_t indent) const {
     return oss.str();
 }
 
+std::string Filesystem::toFlagString() const {
+    std::ostringstream oss;
+    oss << files.joinFlags() << " " << directories.joinFlags();
+    return oss.str();
+}
+
 void to_json(nlohmann::json& j, const Filesystem& f) {
     j = {
         {"files", f.files},

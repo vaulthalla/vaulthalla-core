@@ -5,6 +5,10 @@
 
 namespace vh::rbac::permission::vault {
 
+std::string Sync::toFlagsString() const {
+    return joinFlags(action, config);
+}
+
 std::string Sync::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Sync:\n";

@@ -5,6 +5,10 @@
 
 namespace vh::rbac::permission::admin {
 
+std::string Identities::toFlagsString() const {
+    return joinFlags(users, groups, admins);
+}
+
 std::string Identities::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Identities:\n";

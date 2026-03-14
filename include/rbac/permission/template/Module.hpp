@@ -27,6 +27,8 @@ struct Module {
     [[nodiscard]] virtual Mask toMask() const = 0;
     virtual void fromMask(Mask mask) = 0;
 
+    [[nodiscard]] virtual std::string toFlagsString() const = 0;
+
     [[nodiscard]] std::string toBitString() const {
         return maskToBitString(toMask());
     }
@@ -46,9 +48,9 @@ struct Module {
     [[nodiscard]] virtual std::string toString(uint8_t indent) const = 0;
 
 protected:
-    template <typename EnumT, typename SetMaskT>
-    static void append(Mask& dstMask, uint8_t& offset, const Set<EnumT, SetMaskT>& set, const char* context) {
-        constexpr auto setBits = Set<EnumT, SetMaskT>::bitWidth();
+    template <typename SetLikeT>
+    static void append(Mask& dstMask, uint8_t& offset, const SetLikeT& set, const char* context) {
+        constexpr auto setBits = SetLikeT::bitWidth();
 
         if (offset + setBits > bitWidth())
             throw std::runtime_error(std::string(context) + ": bit width exceeds destination mask");
@@ -57,9 +59,9 @@ protected:
         offset += static_cast<uint8_t>(setBits);
     }
 
-    template <typename EnumT, typename SetMaskT>
-    static void extract(const Mask srcMask, uint8_t& offset, Set<EnumT, SetMaskT>& set, const char* context) {
-        constexpr auto setBits = Set<EnumT, SetMaskT>::bitWidth();
+    template <typename SetLikeT>
+    static void extract(const Mask srcMask, uint8_t& offset, SetLikeT& set, const char* context) {
+        constexpr auto setBits = SetLikeT::bitWidth();
 
         if (offset + setBits > bitWidth())
             throw std::runtime_error(std::string(context) + ": bit width exceeds source mask");
@@ -69,7 +71,8 @@ protected:
                 ? static_cast<Mask>(~static_cast<Mask>(0))
                 : static_cast<Mask>((static_cast<Mask>(1) << setBits) - 1);
 
-        const auto value = static_cast<SetMaskT>((srcMask >> offset) & fieldMask);
+        using RawT = decltype(set.raw());
+        const auto value = static_cast<RawT>((srcMask >> offset) & fieldMask);
         set.setRaw(value);
 
         offset += static_cast<uint8_t>(setBits);
@@ -87,6 +90,24 @@ protected:
     void unpack(const Mask srcMask, SetTs&... sets) const {
         uint8_t offset = 0;
         (extract(srcMask, offset, sets, name()), ...);
+    }
+
+    template <typename... PermissionTs>
+    [[nodiscard]] static std::string joinFlags(const PermissionTs&... permissions) {
+        std::ostringstream oss;
+        bool first = true;
+
+        auto append = [&](const auto& permission) {
+            const auto flags = permission.toFlagsString();
+            if (flags.empty()) return;
+
+            if (!first) oss << ' ';
+            first = false;
+            oss << flags;
+        };
+
+        (append(permissions), ...);
+        return oss.str();
     }
 
     [[nodiscard]] static std::string bool_to_string(const bool value) {

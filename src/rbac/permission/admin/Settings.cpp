@@ -7,6 +7,10 @@
 
 namespace vh::rbac::permission::admin {
 
+std::string Settings::toFlagsString() const {
+    return joinFlags(websocket, http, database, auth, logging, caching, sharing, services);
+}
+
 std::string Settings::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Settings:\n";

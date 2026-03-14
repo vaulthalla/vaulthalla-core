@@ -20,6 +20,7 @@ struct Sync final : Module<uint32_t> {
     explicit Sync(const Mask& mask) { fromMask(mask); }
 
     [[nodiscard]] std::string toString(uint8_t indent) const override;
+    [[nodiscard]] std::string toFlagsString() const override;
 
     [[nodiscard]] const char* name() const override { return ModuleName; }
     [[nodiscard]] uint32_t toMask() const override { return pack(config, action); }

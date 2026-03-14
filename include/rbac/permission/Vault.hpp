@@ -22,6 +22,7 @@ struct Vault {
     Vault(const pqxx::row& row, const pqxx::result& overrides);
 
     [[nodiscard]] std::string toString(uint8_t indent) const;
+    [[nodiscard]] std::string toFlagsString() const;
 };
 
 void to_json(nlohmann::json& j, const Vault& v);

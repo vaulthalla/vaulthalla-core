@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -17,6 +18,9 @@ enum class EncryptionKeyPermissions : uint8_t {
 };
 
 struct EncryptionKey final : Set<EncryptionKeyPermissions, uint8_t> {
+    static constexpr const auto* FLAG_CONTEXT = "encryption-key";
+
+    [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] bool canView() const noexcept { return has(EncryptionKeyPermissions::View); }
@@ -30,3 +34,14 @@ void to_json(nlohmann::json& j, const EncryptionKey& k);
 void from_json(const nlohmann::json& j, EncryptionKey& k);
 
 }
+
+template <>
+struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::vault::EncryptionKeyPermissions> {
+    using E = PermissionEntry<vault::EncryptionKeyPermissions>;
+
+    static constexpr std::array entries {
+        E{vault::EncryptionKeyPermissions::View, "view"},
+        E{vault::EncryptionKeyPermissions::Export, "export"},
+        E{vault::EncryptionKeyPermissions::Rotate, "rotate"}
+    };
+};

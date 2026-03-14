@@ -1,11 +1,11 @@
 #pragma once
 
-#include "rbac/permission/vault/Share.hpp"
-#include "rbac/permission/template/Set.hpp"
+#include "Share.hpp"
 #include "rbac/permission/template/ModuleSet.hpp"
+#include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
-#include <boost/beast/core/file.hpp>
+#include <array>
 #include <nlohmann/json_fwd.hpp>
 
 namespace vh::rbac::permission::vault::fs {
@@ -20,11 +20,12 @@ enum class FilePermissions : uint16_t {
     Delete = 1 << 5,
     Move = 1 << 6,
     Copy = 1 << 7,
-    All = Preview | Upload | Download | Overwrite | Rename | Delete | Move
+    All = Preview | Upload | Download | Overwrite | Rename | Delete | Move | Copy
 };
 
 struct Files final : ModuleSet<uint32_t, FilePermissions, uint16_t> {
     static constexpr const auto* ModuleName = "Files";
+    static constexpr const auto* FLAG_PREFIX = "files";
 
     Share share;
 
@@ -32,6 +33,9 @@ struct Files final : ModuleSet<uint32_t, FilePermissions, uint16_t> {
     explicit Files(const Mask& mask) { fromMask(mask); }
 
     [[nodiscard]] std::string toString(uint8_t indent) const override;
+
+    [[nodiscard]] const char* flagPrefix() const override { return FLAG_PREFIX; }
+    [[nodiscard]] std::string toFlagsString() const override;
 
     [[nodiscard]] const char* name() const override { return ModuleName; }
     [[nodiscard]] uint32_t toMask() const override { return pack(permissions, share); }
@@ -45,8 +49,12 @@ struct Files final : ModuleSet<uint32_t, FilePermissions, uint16_t> {
     [[nodiscard]] bool canDelete() const noexcept { return has(FilePermissions::Delete); }
     [[nodiscard]] bool canMove() const noexcept { return has(FilePermissions::Move); }
     [[nodiscard]] bool canCopy() const noexcept { return has(FilePermissions::Copy); }
-    [[nodiscard]] bool all() const noexcept { return has(FilePermissions::All); }
-    [[nodiscard]] bool none() const noexcept { return has(FilePermissions::None); }
+    [[nodiscard]] bool none() const noexcept { return raw() == 0; }
+
+    [[nodiscard]] bool all() const noexcept {
+        return (raw() & static_cast<SetMask>(FilePermissions::All)) ==
+               static_cast<SetMask>(FilePermissions::All);
+    }
 
     [[nodiscard]] bool canShareInternally() const noexcept { return share.has(SharePermissions::Internal); }
     [[nodiscard]] bool canSharePublicly() const noexcept { return share.has(SharePermissions::Public); }
@@ -57,3 +65,19 @@ void to_json(nlohmann::json& j, const Files& f);
 void from_json(const nlohmann::json& j, Files& f);
 
 }
+
+template <>
+struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::vault::fs::FilePermissions> {
+    using E = PermissionEntry<vault::fs::FilePermissions>;
+
+    static constexpr std::array entries {
+        E{vault::fs::FilePermissions::Preview, "preview"},
+        E{vault::fs::FilePermissions::Upload, "upload"},
+        E{vault::fs::FilePermissions::Download, "download"},
+        E{vault::fs::FilePermissions::Overwrite, "overwrite"},
+        E{vault::fs::FilePermissions::Rename, "rename"},
+        E{vault::fs::FilePermissions::Delete, "delete"},
+        E{vault::fs::FilePermissions::Move, "move"},
+        E{vault::fs::FilePermissions::Copy, "copy"},
+    };
+};

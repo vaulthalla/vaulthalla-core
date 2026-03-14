@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace vh::rbac::permission {
@@ -24,6 +25,8 @@ struct ModuleSet : Module<MaskT> {
 
     ModuleSet() = default;
     explicit ModuleSet(const SetMask mask) : permissions(mask) {}
+
+    [[nodiscard]] virtual const char* flagPrefix() const = 0;
 
     [[nodiscard]] static constexpr std::size_t setBitWidth() {
         return sizeof(SetMask) * 8u;
@@ -69,6 +72,34 @@ struct ModuleSet : Module<MaskT> {
         }
     }
 
+    bool applyFlag(std::string_view flag,
+                   std::string_view allowPrefix = "--allow-",
+                   std::string_view denyPrefix = "--deny-")
+        requires HasPermissionTraits<Enum>
+    {
+        if (flag.starts_with(allowPrefix)) {
+            const auto slug = flag.substr(allowPrefix.size());
+            for (const auto& entry : PermissionTraits<Enum>::entries)
+                if (entry.slug == slug) {
+                    grant(entry.value);
+                    return true;
+                }
+            return false;
+        }
+
+        if (flag.starts_with(denyPrefix)) {
+            const auto slug = flag.substr(denyPrefix.size());
+            for (const auto& entry : PermissionTraits<Enum>::entries)
+                if (entry.slug == slug) {
+                    revoke(entry.value);
+                    return true;
+                }
+            return false;
+        }
+
+        return false;
+    }
+
 protected:
     template <typename... SetTs>
     [[nodiscard]] Mask packWithOwn(const SetTs&... sets) const {
@@ -87,6 +118,25 @@ protected:
 
         Base::extract(srcMask, offset, *this, this->name());
         (Base::extract(srcMask, offset, sets, this->name()), ...);
+    }
+
+    template <typename... PermissionTs>
+    [[nodiscard]] static std::string joinFlagsWithOwn(const PermissionTs&... p) {
+        std::ostringstream oss;
+        bool first = true;
+
+        auto append = [&](const auto& permission) {
+            const auto flags = permission.toFlagsString();
+            if (flags.empty()) return;
+
+            if (!first) oss << ' ';
+            first = false;
+            oss << flags;
+        };
+
+        append(permissions);
+        (append(p), ...);
+        return oss.str();
     }
 
 public:

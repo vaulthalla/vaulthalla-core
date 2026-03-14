@@ -5,6 +5,10 @@
 
 namespace vh::rbac::permission::vault {
 
+std::string Keys::toFlagsString() const {
+    return joinFlags(apiKey, encryptionKey);
+}
+
 std::string Keys::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Keys:\n";

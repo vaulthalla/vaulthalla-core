@@ -21,6 +21,7 @@ struct Admin {
     Admin(const pqxx::row& row, const pqxx::result& vaultGlobalPerms);
 
     [[nodiscard]] std::string toString(uint8_t indent) const;
+    [[nodiscard]] std::string toFlagsString() const;
 };
 
 void to_json(nlohmann::json& j, const Admin& a);

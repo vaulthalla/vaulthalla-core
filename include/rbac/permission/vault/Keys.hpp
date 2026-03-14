@@ -10,12 +10,14 @@ namespace vh::rbac::permission::vault {
 
 struct Keys final : Module<uint16_t> {
     static constexpr const auto* ModuleName = "Keys";
+
     APIKey apiKey;
     EncryptionKey encryptionKey;
 
     Keys() = default;
     explicit Keys(const Mask& mask) { fromMask(mask); }
 
+    [[nodiscard]] std::string toFlagsString() const override;
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] const char* name() const override { return ModuleName; }

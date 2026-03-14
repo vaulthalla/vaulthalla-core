@@ -1,9 +1,9 @@
-#include "rbac/permission/vault/Share.hpp"
+#include "rbac/permission/vault/fs/Share.hpp"
 
 #include <nlohmann/json.hpp>
 #include <ostream>
 
-namespace vh::rbac::permission::vault {
+namespace vh::rbac::permission::vault::fs {
 
 std::string Share::toString(const uint8_t indent) const {
     std::ostringstream oss;

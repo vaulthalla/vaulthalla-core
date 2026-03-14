@@ -24,6 +24,12 @@ Vaults::Vaults(const pqxx::result& res) {
     }
 }
 
+std::string Vaults::toFlagsString() const {
+    std::ostringstream oss;
+    oss << self.flagsToString() << "\n";
+    return oss.str();
+}
+
 std::string Vaults::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Global Vault Policies:\n";

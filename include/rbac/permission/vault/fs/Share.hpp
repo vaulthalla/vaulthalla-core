@@ -1,12 +1,13 @@
 #pragma once
 
 #include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
-namespace vh::rbac::permission::vault {
+namespace vh::rbac::permission::vault::fs {
 
 enum class SharePermissions : uint8_t {
     None = 0,
@@ -17,9 +18,12 @@ enum class SharePermissions : uint8_t {
 };
 
 struct Share final : Set<SharePermissions, uint8_t> {
+    static constexpr const auto* FLAG_PREFIX = "share";
+
     Share() = default;
     explicit Share(const Mask& mask) : Set(mask) {}
 
+    [[nodiscard]] const char* flagPrefix() const override { return FLAG_PREFIX; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] bool canShareInternally() const noexcept {
@@ -47,3 +51,14 @@ void to_json(nlohmann::json& j, const Share& s);
 void from_json(const nlohmann::json& j, Share& s);
 
 }
+
+template <>
+struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::vault::fs::SharePermissions> {
+    using E = PermissionEntry<vault::fs::SharePermissions>;
+
+    static constexpr std::array entries {
+        E{vault::fs::SharePermissions::Internal, "internal"},
+        E{vault::fs::SharePermissions::Public, "public"},
+        E{vault::fs::SharePermissions::PublicWithValidation, "public_with_val"},
+    };
+};

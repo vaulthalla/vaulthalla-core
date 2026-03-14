@@ -1,10 +1,14 @@
 #pragma once
 
 #include "protocols/ws/Session.hpp"
-#include "../../../identities/User.hpp"
+#include "identities/User.hpp"
+#include "rbac/vault/resolver/VaultResolver.hpp"
 
+#include <filesystem>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <string_view>
 
 namespace vh::protocols::ws::handler {
 
@@ -29,23 +33,47 @@ public:
     static json remove(const json& payload, const std::shared_ptr<Session>& session);
 
 private:
-    template <typename... Funcs> static void enforcePermissions(
-        const std::shared_ptr<Session>& session,
-        const unsigned int vaultId,
-        const std::filesystem::path& path, // Add path param
-        Funcs... checks) {
-        if (!session->user) throw std::runtime_error("Unauthorized");
+    template<typename EnumT>
+    static void enforcePermission(const std::shared_ptr<Session>& session,
+                                  const uint32_t vaultId,
+                                  const std::filesystem::path& path,
+                                  const EnumT permission,
+                                  const std::string_view error = "Permission denied") {
+        if (!session || !session->user)
+            throw std::runtime_error("Unauthorized");
 
-        if (session->user->isAdmin()) return;
-
-        const auto role = session->user->getRole(vaultId);
-        if (!role) throw std::runtime_error("No role assigned for this vault/volume");
-
-        if (!( ((role.get()->*checks)(path)) || ... )) {
-            throw std::runtime_error("Permission denied: Required permission not granted");
-        }
+        if (!rbac::vault::Resolver::has<EnumT>({
+            .user = session->user,
+            .permission = permission,
+            .vault_id = vaultId,
+            .path = path
+        })) throw std::runtime_error(std::string(error));
     }
 
+    template<typename EnumT, typename... EnumTs>
+    static void enforceAnyPermission(const std::shared_ptr<Session>& session,
+                                     const uint32_t vaultId,
+                                     const std::filesystem::path& path,
+                                     const EnumT permission,
+                                     const EnumTs... permissions) {
+        if (!session || !session->user)
+            throw std::runtime_error("Unauthorized");
+
+        if (!rbac::vault::Resolver::hasAny(
+            rbac::vault::Context<EnumT>{
+                .user = session->user,
+                .permission = permission,
+                .vault_id = vaultId,
+                .path = path
+            },
+            rbac::vault::Context<EnumTs>{
+                .user = session->user,
+                .permission = permissions,
+                .vault_id = vaultId,
+                .path = path
+            }...
+        )) throw std::runtime_error("Permission denied: Required permission not granted");
+    }
 };
 
 }

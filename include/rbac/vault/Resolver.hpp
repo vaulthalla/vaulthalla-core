@@ -1,10 +1,10 @@
 #pragma once
 
 #include "resolver/Context.hpp"
+#include "resolver/AccessTraitsFwd.hpp"
+
 #include "identities/User.hpp"
 #include "rbac/role/Vault.hpp"
-#include "rbac/permission/Vault.hpp"
-#include "rbac/permission/admin/Vaults.hpp"
 #include "vault/model/Vault.hpp"
 #include "runtime/Deps.hpp"
 #include "storage/Engine.hpp"
@@ -14,10 +14,8 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <tuple>
+#include <type_traits>
 #include <utility>
-
-namespace vh::identities { struct User; }
 
 namespace vh::rbac::vault {
 
@@ -32,14 +30,12 @@ class Resolver {
         }
     };
 
-    template <typename EnumT, typename DirectAccessor, typename SelfAccessor, typename AdminAccessor, typename UserAccessor>
-    static bool checkModulePermission(const std::shared_ptr<identities::User>& user,
-                                      const ResolvedVaultContext& resolved,
-                                      const EnumT permission,
-                                      DirectAccessor&& directAccessor,
-                                      SelfAccessor&& selfAccessor,
-                                      AdminAccessor&& adminAccessor,
-                                      UserAccessor&& userAccessor) {
+    template <typename EnumT>
+    static bool checkPermission(const std::shared_ptr<identities::User>& user,
+                                const ResolvedVaultContext& resolved,
+                                const EnumT permission) {
+        static_assert(std::is_enum_v<EnumT>, "vh::rbac::vault::Resolver::checkPermission(): EnumT must be an enum type");
+
         if (!user || !resolved.isValid()) return false;
 
         const auto vaultId = resolved.vault->id;
@@ -48,19 +44,19 @@ class Resolver {
             const auto role = user->getDirectVaultRole(vaultId);
             if (!role) return false;
 
-            if (directAccessor(*role).has(permission))
+            if (AccessTraits<EnumT>::direct(*role).has(permission))
                 return true;
         }
 
         const auto& globalPerms = user->globalVaultPerms();
 
         if (user->id == resolved.vault->owner_id)
-            return selfAccessor(globalPerms.self).has(permission);
+            return AccessTraits<EnumT>::self(globalPerms.self).has(permission);
 
         if (resolved.owner->isAdmin())
-            return adminAccessor(globalPerms.admin).has(permission);
+            return AccessTraits<EnumT>::admin(globalPerms.admin).has(permission);
 
-        return userAccessor(globalPerms.user).has(permission);
+        return AccessTraits<EnumT>::user(globalPerms.user).has(permission);
     }
 
     static std::shared_ptr<storage::Engine> resolveEngine(const std::optional<uint32_t>& vaultId,
@@ -68,11 +64,8 @@ class Resolver {
         auto& storageManager = runtime::Deps::get().storageManager;
         if (!storageManager) return nullptr;
 
-        if (vaultId)
-            return storageManager->getEngine(*vaultId);
-
-        if (path && !path->empty())
-            return storageManager->resolveStorageEngine(*path);
+        if (vaultId) return storageManager->getEngine(*vaultId);
+        if (path && !path->empty()) return storageManager->resolveStorageEngine(*path);
 
         return nullptr;
     }
@@ -103,87 +96,7 @@ public:
         const auto resolved = resolveVaultContext(ctx.vault_id, ctx.path);
         if (!resolved.isValid()) return false;
 
-        switch (ctx.module) {
-            case Module::Files:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.files(); },
-                    [](const auto& perms) -> const auto& { return perms.files(); },
-                    [](const auto& perms) -> const auto& { return perms.files(); },
-                    [](const auto& perms) -> const auto& { return perms.files(); }
-                );
-
-            case Module::Directory:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.directories(); },
-                    [](const auto& perms) -> const auto& { return perms.directories(); },
-                    [](const auto& perms) -> const auto& { return perms.directories(); },
-                    [](const auto& perms) -> const auto& { return perms.directories(); }
-                );
-
-            case Module::API_Keys:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.apiKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.apiKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.apiKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.apiKeys(); }
-                );
-
-            case Module::Encryption_Keys:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.encryptionKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.encryptionKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.encryptionKeys(); },
-                    [](const auto& perms) -> const auto& { return perms.encryptionKeys(); }
-                );
-
-            case Module::Roles:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.rolesPerms(); },
-                    [](const auto& perms) -> const auto& { return perms.roles(); },
-                    [](const auto& perms) -> const auto& { return perms.roles(); },
-                    [](const auto& perms) -> const auto& { return perms.roles(); }
-                );
-
-            case Module::Sync_Config:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.syncConfig(); },
-                    [](const auto& perms) -> const auto& { return perms.syncConfig(); },
-                    [](const auto& perms) -> const auto& { return perms.syncConfig(); },
-                    [](const auto& perms) -> const auto& { return perms.syncConfig(); }
-                );
-
-            case Module::Sync_Action:
-                return checkModulePermission(
-                    user,
-                    resolved,
-                    ctx.permission,
-                    [](const auto& role) -> const auto& { return role.syncActions(); },
-                    [](const auto& perms) -> const auto& { return perms.syncActions(); },
-                    [](const auto& perms) -> const auto& { return perms.syncActions(); },
-                    [](const auto& perms) -> const auto& { return perms.syncActions(); }
-                );
-
-            default:
-                return false;
-        }
+        return checkPermission(user, resolved, ctx.permission);
     }
 
     template<typename EnumT>

@@ -46,6 +46,12 @@ struct Global final : BasicMeta {
     [[nodiscard]] permission::vault::sync::Action& syncActions() noexcept { return permissions.sync.action; }
     [[nodiscard]] const permission::vault::sync::Action& syncActions() const noexcept { return permissions.sync.action; }
 
+    [[nodiscard]] permission::vault::APIKey& apiKey() noexcept { return permissions.keys.apiKey; }
+    [[nodiscard]] const permission::vault::APIKey& apiKey() const noexcept { return permissions.keys.apiKey; }
+
+    [[nodiscard]] permission::vault::EncryptionKey& encryptionKey() noexcept { return permissions.keys.encryptionKey; }
+    [[nodiscard]] const permission::vault::EncryptionKey& encryptionKey() const noexcept { return permissions.keys.encryptionKey; }
+
     static Global fromJson(const nlohmann::json& j);
 };
 

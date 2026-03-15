@@ -80,10 +80,10 @@ static CommandResult createUser(const CommandCall& call) {
     if (user->isSuperAdmin())
         return invalid("Cannot create user with super_admin role.");
 
-    if (user->isAdmin() && !call.user->adminUserPerms().canAdd())
+    if (user->isAdmin() && !call.user->admins().canAdd())
         return invalid("You do not have permission to create admin users.");
 
-    if (!user->isAdmin() && !call.user->userPerms().canAdd())
+    if (!user->isAdmin() && !call.user->users().canAdd())
         return invalid("You do not have permission to create users.");
 
     const auto password = tryAssignNewPassword(user);
@@ -108,10 +108,10 @@ static CommandResult handleUpdateUser(const CommandCall& call) {
         if (user->isSuperAdmin())
             return invalid("Cannot update super admin user: " + user->name);
 
-        if (user->isAdmin() && !call.user->adminUserPerms().canEdit())
+        if (user->isAdmin() && !call.user->admins().canEdit())
             return invalid("You do not have permission to update admin users.");
 
-        if (!user->isAdmin() && !call.user->userPerms().canEdit())
+        if (!user->isAdmin() && !call.user->users().canEdit())
             return invalid("You do not have permission to update users.");
     }
 
@@ -163,10 +163,10 @@ static CommandResult deleteUser(const CommandCall& call) {
         if (user->isSuperAdmin())
             return invalid("Cannot delete super admin user: " + user->name);
 
-        if (user->isAdmin() && !call.user->adminUserPerms().canDelete())
+        if (user->isAdmin() && !call.user->admins().canDelete())
             return invalid("You do not have permission to delete admin users.");
 
-        if (!user->isAdmin() && !call.user->userPerms().canDelete())
+        if (!user->isAdmin() && !call.user->users().canDelete())
             return invalid("You do not have permission to delete users.");
     }
 
@@ -185,13 +185,13 @@ static CommandResult handleUserInfo(const CommandCall& call) {
     const auto user = uLkp.ptr;
 
     if (call.user->id != user->id) {
-        if (user->isSuperAdmin() && !call.user->adminUserPerms().canView())
+        if (user->isSuperAdmin() && !call.user->admins().canView())
             return invalid("You do not have permission to view super admin users.");
 
-        if (user->isAdmin() && !call.user->adminUserPerms().canView())
+        if (user->isAdmin() && !call.user->admins().canView())
             return invalid("You do not have permission to view admin users.");
 
-        if (!user->isAdmin() && !call.user->userPerms().canView())
+        if (!user->isAdmin() && !call.user->users().canView())
             return invalid("You do not have permission to view users.");
     }
 
@@ -199,7 +199,7 @@ static CommandResult handleUserInfo(const CommandCall& call) {
 }
 
 static CommandResult handle_list_users(const CommandCall& call) {
-    if (!call.user->adminUserPerms().canView())
+    if (!call.user->admins().canView())
         return invalid("You do not have permission to list users.");
 
     return ok(to_string(db::query::identities::User::listUsers(parseListQuery(call))));

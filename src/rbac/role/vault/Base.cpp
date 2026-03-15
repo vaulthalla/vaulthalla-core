@@ -1,4 +1,4 @@
-#include "rbac/permission/Vault.hpp"
+#include "../../../../include/rbac/role/vault/Base.hpp"
 
 #include <nlohmann/json.hpp>
 #include <pqxx/result>

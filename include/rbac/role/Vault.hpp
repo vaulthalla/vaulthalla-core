@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rbac/role/Meta.hpp"
-#include "rbac/permission/Vault.hpp"
+#include "vault/Base.hpp"
 
 #include <string>
 #include <vector>
@@ -13,7 +13,7 @@
 
 namespace vh::rbac::role {
 
-struct Vault final : Meta {
+struct Vault final : Meta, vault::Base {
     struct AssignmentInfo {
         uint32_t subject_id{}, vault_id{};
         std::string subject_type; // 'user' or 'group'
@@ -21,8 +21,7 @@ struct Vault final : Meta {
         [[nodiscard]] std::string toString(uint8_t indent) const;
     };
 
-    std::optional<AssignmentInfo> assignment;  // Can exist as a template or assigned role
-    permission::Vault permissions{};
+    std::optional<AssignmentInfo> assignment;
 
     Vault() = default;
     Vault(const pqxx::row& row, const pqxx::result& overrides);
@@ -31,26 +30,20 @@ struct Vault final : Meta {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] std::string toString() const { return toString(0); }
 
-    [[nodiscard]] permission::vault::fs::Files& files() noexcept { return permissions.filesystem.files; }
-    [[nodiscard]] const permission::vault::fs::Files& files() const noexcept { return permissions.filesystem.files; }
+    [[nodiscard]] permission::vault::fs::Files& files() noexcept { return fs.files; }
+    [[nodiscard]] const permission::vault::fs::Files& files() const noexcept { return fs.files; }
 
-    [[nodiscard]] permission::vault::fs::Directories& directories() noexcept { return permissions.filesystem.directories; }
-    [[nodiscard]] const permission::vault::fs::Directories& directories() const noexcept { return permissions.filesystem.directories; }
+    [[nodiscard]] permission::vault::fs::Directories& directories() noexcept { return fs.directories; }
+    [[nodiscard]] const permission::vault::fs::Directories& directories() const noexcept { return fs.directories; }
 
-    [[nodiscard]] permission::vault::Roles& rolesPerms() noexcept { return permissions.roles; }
-    [[nodiscard]] const permission::vault::Roles& rolesPerms() const noexcept { return permissions.roles; }
+    [[nodiscard]] permission::vault::Roles& rolesPerms() noexcept { return roles; }
+    [[nodiscard]] const permission::vault::Roles& rolesPerms() const noexcept { return roles; }
 
-    [[nodiscard]] permission::vault::sync::Config& syncConfig() noexcept { return permissions.sync.config; }
-    [[nodiscard]] const permission::vault::sync::Config& syncConfig() const noexcept { return permissions.sync.config; }
+    [[nodiscard]] permission::vault::sync::Config& syncConfig() noexcept { return sync.config; }
+    [[nodiscard]] const permission::vault::sync::Config& syncConfig() const noexcept { return sync.config; }
 
-    [[nodiscard]] permission::vault::sync::Action& syncActions() noexcept { return permissions.sync.action; }
-    [[nodiscard]] const permission::vault::sync::Action& syncActions() const noexcept { return permissions.sync.action; }
-
-    [[nodiscard]] permission::vault::APIKey& apiKey() noexcept { return permissions.keys.apiKey; }
-    [[nodiscard]] const permission::vault::APIKey& apiKey() const noexcept { return permissions.keys.apiKey; }
-
-    [[nodiscard]] permission::vault::EncryptionKey& encryptionKey() noexcept { return permissions.keys.encryptionKey; }
-    [[nodiscard]] const permission::vault::EncryptionKey& encryptionKey() const noexcept { return permissions.keys.encryptionKey; }
+    [[nodiscard]] permission::vault::sync::Action& syncActions() noexcept { return sync.action; }
+    [[nodiscard]] const permission::vault::sync::Action& syncActions() const noexcept { return sync.action; }
 
     static Vault fromJson(const nlohmann::json& j);
 };

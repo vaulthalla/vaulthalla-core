@@ -1,20 +1,18 @@
 #include "rbac/role/Vault.hpp"
 #include "db/encoding/timestamp.hpp"
-#include "rbac/permission/Override.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
 #include <ostream>
 
 using namespace vh::db::encoding;
-using namespace vh::protocols::shell;
 
 namespace vh::rbac::role {
 
 Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
     : Meta(row),
-      assignment(std::nullopt),
-      permissions(row, overrides) {
+      Base(row),
+      assignment(std::nullopt) {
     if (!row["assignment_id"].is_null()) {
         assignment = AssignmentInfo();
         if (!row["subject_id"].is_null()) assignment->subject_id = row["subject_id"].as<uint32_t>();
@@ -25,8 +23,8 @@ Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
 
 Vault::Vault(const nlohmann::json& j)
     : Meta(j),
-      assignment(std::nullopt),
-      permissions(j) {
+      Base(j),
+      assignment(std::nullopt) {
     if (j.contains("assignment") && !j["assignment"].is_null()) {
         assignment = AssignmentInfo();
         if (j["assignment"].contains("subject_id") && !j["assignment"]["subject_id"].is_null())
@@ -55,7 +53,7 @@ std::string Vault::toString(const uint8_t indent) const {
     oss << std::string(indent, ' ') << "Vault Role:\n";
     const std::string in(indent + 2, ' ');
     if (assignment) oss << in << assignment->toString(indent);
-    oss << permissions.toString(indent);
+    oss << Base::toString(indent);
     return oss.str();
 }
 
@@ -63,7 +61,7 @@ void to_json(nlohmann::json& j, const Vault::AssignmentInfo& r) {
     j = {
         {"subject_id", std::to_string(r.subject_id)},
         {"vault_id", std::to_string(r.vault_id)},
-        {"subject_type", r.subject_type},
+        {"subject_type", r.subject_type}
     };
 }
 
@@ -84,9 +82,15 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Vault>>& roles
 }
 
 void to_json(nlohmann::json& j, const Vault& r) {
-    j = static_cast<const Meta&>(r);
-    if (r.assignment) to_json(j["assignment"], *r.assignment);
-    j["permissions"] = r.permissions;
+    j = nlohmann::json::object();
+
+    const nlohmann::json meta  = static_cast<const Meta&>(r);
+    const nlohmann::json perms = static_cast<const vault::Base&>(r);
+
+    j.update(meta);
+    j.update(perms);
+
+    if (r.assignment) j["assignment"] = *r.assignment;
 }
 
 void from_json(const nlohmann::json& j, Vault& r) { r = Vault(j); }

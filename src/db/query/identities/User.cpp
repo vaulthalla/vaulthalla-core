@@ -14,7 +14,7 @@
 #include <stdexcept>
 #include <array>
 
-#include "rbac/permission/Vault.hpp"
+#include "../../../../include/rbac/role/vault/Base.hpp"
 
 using namespace vh::db::query::identities;
 using namespace vh::auth::model;

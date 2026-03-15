@@ -50,6 +50,7 @@ namespace vh::rbac::permission {
             Vault admin{std::string(MODULE_NAME) + "-admin"};
             Vault user{std::string(MODULE_NAME) + "-user"};
 
+            Vaults() = default;
             explicit Vaults(const Mask mask) { fromMask(mask); }
 
             [[nodiscard]] const char *name() const override { return MODULE_NAME; }

@@ -38,10 +38,10 @@ json Auth::registerUser(const json& payload, const std::shared_ptr<Session>& ses
 
         if (userRole->name == "super_admin") throw std::runtime_error("Cannot assign super admin role to a user");
 
-        if (userRole->name == "admin" && !session->user->identityPerms().canAdd(Identities::Type::Admins))
+        if (userRole->name == "admin" && !session->user->identities().canAdd(Identities::Type::Admins))
             throw std::runtime_error("Permission denied: Only super admins can assign admin role");
 
-        if (!session->user->identityPerms().canAdd(Identities::Type::Users))
+        if (!session->user->identities().canAdd(Identities::Type::Users))
             throw std::runtime_error("Permission denied: Only admins can assign user roles");
 
         user->roles.admin = userRole;
@@ -66,10 +66,10 @@ json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& sessi
 
     if (targetUser->isSuperAdmin()) throw std::runtime_error("Cannot delete super admin user");
 
-    if (targetUser->isAdmin() && !session->user->identityPerms().canDelete(Identities::Type::Admins))
+    if (targetUser->isAdmin() && !session->user->identities().canDelete(Identities::Type::Admins))
         throw std::runtime_error("Permission denied: Only super admins can delete admin users");
 
-    if (!targetUser->isAdmin() && targetUser->id != session->user->id && !session->user->identityPerms().canDelete(Identities::Type::Users))
+    if (!targetUser->isAdmin() && targetUser->id != session->user->id && !session->user->identities().canDelete(Identities::Type::Users))
         throw std::runtime_error("Permission denied: Only admins can delete other users");
 
     db::query::identities::User::deleteUser(targetUser->id);
@@ -107,10 +107,10 @@ json Auth::getUser(const json& payload, const std::shared_ptr<Session>& session)
     if (!targetUser) throw std::runtime_error("User not found");
 
     if (session->user->id != targetUser->id) {
-        if (targetUser->isAdmin() && !session->user->identityPerms().canView(Identities::Type::Admins))
+        if (targetUser->isAdmin() && !session->user->identities().canView(Identities::Type::Admins))
             throw std::runtime_error("Permission denied: Only super admins can view admin users");
 
-        if (!targetUser->isAdmin() && !session->user->identityPerms().canView(Identities::Type::Users))
+        if (!targetUser->isAdmin() && !session->user->identities().canView(Identities::Type::Users))
             throw std::runtime_error("Permission denied: Only admins can view other users");
     }
 
@@ -123,7 +123,7 @@ json Auth::logout(const std::shared_ptr<Session>& session) {
 }
 
 json Auth::listUsers(const std::shared_ptr<Session>& session) {
-    if (!session->user->identityPerms().canView(Identities::Type::Admins))
+    if (!session->user->identities().canView(Identities::Type::Admins))
         throw std::runtime_error("Permission denied");
 
     return {{"users", to_json(db::query::identities::User::listUsers())}};
@@ -144,10 +144,10 @@ json Auth::getUserByName(const json& payload, const std::shared_ptr<Session>& se
     if (!targetUser) throw std::runtime_error("User not found");
 
     if (session->user->id != targetUser->id) {
-        if (targetUser->isAdmin() && !session->user->identityPerms().canView(Identities::Type::Admins))
+        if (targetUser->isAdmin() && !session->user->identities().canView(Identities::Type::Admins))
             throw std::runtime_error("Permission denied: Only super admins can view admin users");
 
-        if (!targetUser->isAdmin() && !session->user->identityPerms().canView(Identities::Type::Users))
+        if (!targetUser->isAdmin() && !session->user->identities().canView(Identities::Type::Users))
             throw std::runtime_error("Permission denied: Only admins can view other users");
     }
 

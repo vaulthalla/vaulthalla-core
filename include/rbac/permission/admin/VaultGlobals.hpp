@@ -11,6 +11,7 @@ namespace vh::rbac::permission::admin {
     struct VaultGlobals {
         role::vault::Global self{}, admin{}, user{};
 
+        VaultGlobals() = default;
         explicit VaultGlobals(const pqxx::result& res);
     };
 

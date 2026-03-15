@@ -2,7 +2,7 @@
 
 #include "Fwd.hpp"
 
-#include "rbac/permission/Vault.hpp"
+#include "../../../role/vault/Base.hpp"
 #include "rbac/permission/admin/Vaults.hpp"
 #include "rbac/role/Vault.hpp"
 #include "identities/User.hpp"

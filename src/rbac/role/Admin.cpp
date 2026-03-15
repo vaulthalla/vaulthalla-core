@@ -1,5 +1,4 @@
 #include "rbac/role/Admin.hpp"
-#include "rbac/permission/Admin.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
@@ -17,14 +16,35 @@ namespace vh::rbac::role {
 Admin::Admin(const pqxx::row& row, const pqxx::result& globalVaultRoles)
     : Meta(row),
       user_id(row["user_id"].as<uint32_t>()),
-      permissions(row, globalVaultRoles) {}
+    identities(row["identities_permissions"].as<typename decltype(identities)::Mask>()),
+    vaults(row["vaults_permissions"].as<typename decltype(vaults)::Mask>()),
+    audits(row["audits_permissions"].as<typename decltype(audits)::Mask>()),
+    settings(row["settings_permissions"].as<typename decltype(settings)::Mask>()),
+    roles(row["roles_permissions"].as<typename decltype(roles)::Mask>()),
+    keys(row["keys_permissions"].as<typename decltype(keys)::Mask>()),
+    vGlobals(globalVaultRoles) {}
 
 Admin::Admin(const pqxx::row& row) : Admin(row, {}) {}
 
 Admin::Admin(const nlohmann::json& j)
     : Meta(j) {
     if (j.contains("user_id")) user_id = j["user_id"].get<uint32_t>();
-    if (j.contains("permissions")) permissions = j["permissions"].get<permission::Admin>();
+    if (j.contains("permissions")) {
+        const auto& p = j["permissions"];
+        if (p.contains("identities"))
+            identities = permission::admin::Identities(p["identities"].get<typename decltype(identities)::Mask>());
+        if (p.contains("vaults"))
+            vaults = permission::admin::Vaults(p["vaults"].get<typename decltype(vaults)::Mask>());
+        if (p.contains("audits"))
+            audits = permission::admin::Audits(p["audits"].get<typename decltype(audits)::Mask>());
+        if (p.contains("settings"))
+            settings = permission::admin::Settings(p["settings"].get<typename decltype(settings)::Mask>());
+        if (p.contains("roles"))
+            roles = permission::admin::Roles(p["roles"].get<typename decltype(roles)::Mask>());
+        if (p.contains("keys"))
+            keys = permission::admin::Keys(p["keys"].get<typename decltype(keys)::Mask>());
+        if (p.contains("vaults_global")) p.at("vaults_global").get_to(vGlobals);
+    }
 }
 
 Admin Admin::fromJson(const nlohmann::json& j) { return Admin(j); }
@@ -39,7 +59,15 @@ std::vector<Admin> admin_roles_from_pq_res(const pqxx::result& res) {
 void to_json(nlohmann::json& j, const Admin& a) {
     j = static_cast<const Meta&>(a);
     j["user_id"] = a.user_id;
-    j["permissions"] = a.permissions;
+    j["permissions"] = {
+        {"identities", a.identities},
+        {"vaults", a.vaults},
+        {"audits", a.audits},
+        {"settings", a.settings},
+        {"roles", a.roles},
+        {"keys", a.keys},
+        {"vaults_global", a.vGlobals}
+    };
 }
 
 void from_json(const nlohmann::json& j, Admin& a) { a = Admin(j); }
@@ -57,10 +85,16 @@ void to_json(nlohmann::json& j, const std::vector<std::shared_ptr<Admin>>& roles
 std::string Admin::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << snake_case_to_title(name) << " (ID: " << id << ")\n";
-    const std::string in(indent + 2, ' ');
+    const auto i = indent + 2;
+    const std::string in(i, ' ');
     if (user_id) oss << in << "- User ID: " << std::to_string(*user_id) << std::endl;
-    oss << Meta::toString(indent);
-    oss << permissions.toString(indent);
+    oss << Meta::toString(indent)
+    << identities.toString(i)
+    << vaults.toString(i)
+    << audits.toString(i)
+    << settings.toString(i)
+    << roles.toString(i)
+    << keys.toString(i);
     return oss.str();
 }
 

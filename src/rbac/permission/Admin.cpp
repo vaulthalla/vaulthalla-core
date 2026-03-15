@@ -8,10 +8,12 @@ namespace vh::rbac::permission {
 
 Admin::Admin(const pqxx::row& row, const pqxx::result& vaultGlobalPerms)
     : identities(row["identities_permissions"].as<typename decltype(identities)::Mask>()),
-      vaults(vaultGlobalPerms),
+      vaults(row["vaults_permissions"].as<typename decltype(vaults)::Mask>()),
       audits(row["audits_permissions"].as<typename decltype(audits)::Mask>()),
       settings(row["settings_permissions"].as<typename decltype(settings)::Mask>()),
-      roles(row["roles_permissions"].as<typename decltype(roles)::Mask>()) {}
+      roles(row["roles_permissions"].as<typename decltype(roles)::Mask>()),
+      keys(row["keys_permissions"].as<typename decltype(keys)::Mask>()),
+      vGlobals(vaultGlobalPerms) {}
 
 std::string Admin::toFlagsString() const {
     std::ostringstream oss;
@@ -19,7 +21,8 @@ std::string Admin::toFlagsString() const {
         << vaults.toFlagsString()
         << audits.toFlagsString()
         << settings.toFlagsString()
-        << roles.toFlagsString();
+        << roles.toFlagsString()
+        << keys.toFlagsString();
     return oss.str();
 }
 
@@ -31,7 +34,8 @@ std::string Admin::toString(const uint8_t indent) const {
         << vaults.toString(i)
         << audits.toString(i)
         << settings.toString(i)
-        << roles.toString(i);
+        << roles.toString(i)
+        << keys.toString(i);
     return oss.str();
 }
 
@@ -41,7 +45,9 @@ void to_json(nlohmann::json& j, const Admin& a) {
         {"vaults", a.vaults},
         {"audits", a.audits},
         {"settings", a.settings},
-        {"roles", a.roles}
+        {"roles", a.roles},
+            {"keys", a.keys},
+        {"vault_globals", a.vGlobals}
     };
 }
 
@@ -51,6 +57,8 @@ void from_json(const nlohmann::json& j, Admin& a) {
     j.at("audits").get_to(a.audits);
     j.at("settings").get_to(a.settings);
     j.at("roles").get_to(a.roles);
+    j.at("keys").get_to(a.keys);
+    j.at("vault_globals").get_to(a.vGlobals);
 }
 
 }

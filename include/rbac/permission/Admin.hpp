@@ -1,10 +1,12 @@
 #pragma once
 
+#include "rbac/role/vault/Global.hpp"
 #include "rbac/permission/admin/Identities.hpp"
-#include "rbac/permission/admin/Vaults.hpp"
 #include "rbac/permission/admin/Audits.hpp"
 #include "rbac/permission/admin/Settings.hpp"
 #include "rbac/permission/admin/Roles.hpp"
+#include "rbac/permission/admin/Keys.hpp"
+#include "rbac/permission/admin/Vaults.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -18,6 +20,9 @@ struct Admin {
     admin::Audits audits;
     admin::Settings settings;
     admin::Roles roles;
+    admin::Keys keys;
+
+    VaultGlobals vGlobals;
 
     Admin() = default;
     Admin(const pqxx::row& row, const pqxx::result& vaultGlobalPerms);

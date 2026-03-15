@@ -1,18 +1,18 @@
 #pragma once
 
 #include "rbac/permission/template/Module.hpp"
-#include "rbac/permission/vault/APIKey.hpp"
-#include "rbac/permission/vault/EncryptionKey.hpp"
+#include "rbac/permission/admin/keys/API.hpp"
+#include "rbac/permission/admin/keys/Encryption.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
-namespace vh::rbac::permission::vault {
+namespace vh::rbac::permission::admin {
 
 struct Keys final : Module<uint16_t> {
-    static constexpr const auto* ModuleName = "Keys";
+    static constexpr const auto* ModuleName = "keys";
 
-    APIKey apiKey;
-    EncryptionKey encryptionKey;
+    keys::APIKeys apiKeys;
+    keys::EncryptionKey encryptionKeys;
 
     Keys() = default;
     explicit Keys(const Mask& mask) { fromMask(mask); }
@@ -21,8 +21,8 @@ struct Keys final : Module<uint16_t> {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 
     [[nodiscard]] const char* name() const override { return ModuleName; }
-    [[nodiscard]] uint16_t toMask() const override { return pack(apiKey, encryptionKey); }
-    void fromMask(const Mask mask) override { unpack(mask, apiKey, encryptionKey); }
+    [[nodiscard]] uint16_t toMask() const override;
+    void fromMask(Mask mask) override;
 };
 
 void to_json(nlohmann::json& j, const Keys& k);

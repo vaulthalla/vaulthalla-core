@@ -6,40 +6,44 @@
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 
-namespace vh::rbac::permission::admin::identities {
+namespace vh::rbac::permission {
 
-enum class IdentityPermissions : uint8_t {
-    None = 0,
-    View = 1 << 0,
-    Add = 1 << 1,
-    Edit = 1 << 2,
-    Delete = 1 << 3,
-    All = View | Add | Edit | Delete
-};
+    namespace admin::identities {
+        enum class IdentityPermissions : uint8_t {
+            None = 0,
+            View = 1 << 0,
+            Add = 1 << 1,
+            Edit = 1 << 2,
+            Delete = 1 << 3,
+            All = View | Add | Edit | Delete
+        };
+    }
 
-struct Base : Set<IdentityPermissions, uint8_t> {
-    [[nodiscard]] const char* flagPrefix() const override = 0;
-    [[nodiscard]] std::string toString(uint8_t indent) const override;
+    template<>
+    struct PermissionTraits<admin::identities::IdentityPermissions> {
+        using Entry = PermissionEntry<admin::identities::IdentityPermissions>;
 
-    [[nodiscard]] bool canView() const noexcept { return has(IdentityPermissions::View); }
-    [[nodiscard]] bool canAdd() const noexcept { return has(IdentityPermissions::Add); }
-    [[nodiscard]] bool canEdit() const noexcept { return has(IdentityPermissions::Edit); }
-    [[nodiscard]] bool canDelete() const noexcept { return has(IdentityPermissions::Delete); }
-};
+        static constexpr std::array entries {
+            Entry{ admin::identities::IdentityPermissions::View, "view" },
+            Entry{ admin::identities::IdentityPermissions::Add, "add" },
+            Entry{ admin::identities::IdentityPermissions::Edit, "edit" },
+            Entry{ admin::identities::IdentityPermissions::Delete, "delete" }
+        };
+    };
 
-void to_json(nlohmann::json& j, const Base& p);
-void from_json(const nlohmann::json& j, Base& p);
+    namespace admin::identities {
+        struct Base : Set<IdentityPermissions, uint8_t> {
+            [[nodiscard]] const char* flagPrefix() const override = 0;
+            [[nodiscard]] std::string toString(uint8_t indent) const override;
+
+            [[nodiscard]] bool canView() const noexcept { return has(IdentityPermissions::View); }
+            [[nodiscard]] bool canAdd() const noexcept { return has(IdentityPermissions::Add); }
+            [[nodiscard]] bool canEdit() const noexcept { return has(IdentityPermissions::Edit); }
+            [[nodiscard]] bool canDelete() const noexcept { return has(IdentityPermissions::Delete); }
+        };
+
+        void to_json(nlohmann::json& j, const Base& p);
+        void from_json(const nlohmann::json& j, Base& p);
+    }
 
 }
-
-template<>
-struct vh::rbac::permission::PermissionTraits<vh::rbac::permission::admin::identities::IdentityPermissions> {
-    using E = PermissionEntry<admin::identities::IdentityPermissions>;
-
-    static constexpr std::array entries {
-        E{ admin::identities::IdentityPermissions::View, "view" },
-        E{ admin::identities::IdentityPermissions::Add, "add" },
-        E{ admin::identities::IdentityPermissions::Edit, "edit" },
-        E{ admin::identities::IdentityPermissions::Delete, "delete" }
-    };
-};

@@ -12,6 +12,8 @@
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
+#include "rbac/vault/resolver/*.hpp"
+#include "rbac/role/Vault.hpp"
 
 #include <fstream>
 #include <paths.h>

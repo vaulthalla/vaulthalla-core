@@ -9,7 +9,7 @@ std::string Audits::toString(const uint8_t indent) const {
     std::ostringstream oss;
     oss << std::string(indent, ' ') << "Audits:\n";
     const auto in = std::string(indent + 2, ' ');
-    oss << in << "View: " << bool_to_string(view) << "\n";
+    oss << in << "View: " << bool_to_string(canView()) << "\n";
     return oss.str();
 }
 

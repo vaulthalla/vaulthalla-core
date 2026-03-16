@@ -15,7 +15,7 @@ class CommandUsage;
 }
 
 namespace vh::identities { struct User; }
-namespace vh::rbac::model { struct Vault; enum class OverrideOpt; }
+namespace vh::rbac::role { struct Vault; enum class OverrideOpt; }
 namespace vh::vault::model { struct Vault; struct S3Vault; struct APIKey; enum class VaultType; }
 namespace vh::sync::model { struct Policy; struct Waiver; }
 namespace vh::storage { struct Engine; }
@@ -73,7 +73,7 @@ std::optional<std::string> checkOverridePermissions(const CommandCall& call,
                                                     const std::shared_ptr<vh::vault::model::Vault>& vault,
                                                     const std::string& errPrefix);
 
-Lookup<rbac::model::Vault> resolveVRole(const std::string& roleArg,
+Lookup<rbac::role::Vault> resolveVRole(const std::string& roleArg,
                                       const std::shared_ptr<vh::vault::model::Vault>& vault,
                                       const Subject* subjectOrNull,
                                       const std::string& errPrefix);

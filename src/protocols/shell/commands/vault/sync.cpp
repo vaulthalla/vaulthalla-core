@@ -3,13 +3,14 @@
 #include "runtime/Deps.hpp"
 #include "sync/Controller.hpp"
 #include "storage/Engine.hpp"
-#include "../../../../../include/identities/User.hpp"
+#include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
 #include "db/encoding/interval.hpp"
 #include "CommandUsage.hpp"
+#include "rbac/resolver/vault/*.hpp"
 
 #include <optional>
 #include <string>
@@ -34,8 +35,12 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->
-        canSyncVaultData(vault->id)) return invalid("vault sync: you do not have permission to manage this vault");
+    using Perm = rbac::permission::vault::sync::SyncActionPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Trigger,
+        .vault_id = vault->id
+    })) return invalid("vault sync: you do not have permission to trigger a sync for this vault");
 
     runtime::Deps::get().syncController->runNow(vault->id);
 
@@ -52,9 +57,12 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
     const auto engine = eLkp.ptr;
 
-    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
-        !call.user->canSyncVaultData(engine->vault->id))
-        return invalid("vault sync update: you do not have permission to manage this vault");
+    using Perm = rbac::permission::vault::sync::SyncConfigPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Edit,
+        .vault_id = engine->vault->id
+    }))
 
     const auto& sync = engine->sync;
 
@@ -119,9 +127,12 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
     if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
     const auto engine = eLkp.ptr;
 
-    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
-        !call.user->canSyncVaultData(engine->vault->id))
-        return invalid("vault sync info: you do not have permission to view this vault's sync configuration");
+    using Perm = rbac::permission::vault::sync::SyncConfigPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::View,
+        .vault_id = engine->vault->id
+    })) return invalid("vault sync info: you do not have permission to view the sync configuration for this vault");
 
     if (!engine->sync) return invalid("vault sync info: vault does not have a sync configuration");
 

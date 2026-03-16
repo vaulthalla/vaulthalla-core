@@ -10,6 +10,7 @@ namespace vh::rbac::permission {
         enum class SyncActionPermissions : uint8_t {
             None = 0,
             Trigger = 1 << 0,
+            SignWaiver = 1 << 1,
         };
     }
 
@@ -18,7 +19,8 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::sync::SyncActionPermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::sync::SyncActionPermissions::Trigger, "trigger"}
+            Entry{vault::sync::SyncActionPermissions::Trigger, "trigger"},
+            Entry{vault::sync::SyncActionPermissions::SignWaiver, "sign_waiver"},
         };
     };
 
@@ -31,6 +33,7 @@ namespace vh::rbac::permission {
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 
             [[nodiscard]] bool canTrigger() const noexcept { return has(SyncActionPermissions::Trigger); }
+            [[nodiscard]] bool canSignWaiver() const noexcept { return has(SyncActionPermissions::SignWaiver); }
             [[nodiscard]] bool none() const noexcept { return has(SyncActionPermissions::None); }
         };
 

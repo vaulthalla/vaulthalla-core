@@ -3,6 +3,7 @@
 #include "Vault.hpp"
 #include <string>
 #include <nlohmann/json_fwd.hpp>
+#include <cstdint>
 
 namespace pqxx {
 class row;
@@ -11,12 +12,12 @@ class row;
 namespace vh::vault::model {
 
 struct S3Vault : Vault {
-    unsigned int api_key_id{};
+    uint32_t api_key_id{};
     std::string bucket;
     bool encrypt_upstream{true};
 
     S3Vault() = default;
-    S3Vault(const std::string& name, unsigned int apiKeyID, std::string bucketName);
+    S3Vault(const std::string& name, uint32_t apiKeyID, std::string bucketName);
     explicit S3Vault(const pqxx::row& row);
 };
 

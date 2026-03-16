@@ -10,23 +10,27 @@
 #include "storage/Engine.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "../../../../../include/rbac/role/Vault.hpp"
-#include "../../../../../include/identities/User.hpp"
+#include "rbac/role/Vault.hpp"
+#include "identities/User.hpp"
 
 #include "config/Registry.hpp"
 #include "CommandUsage.hpp"
+
+#include "rbac/resolver/admin/*.hpp"
 
 #include <optional>
 #include <string>
 #include <vector>
 #include <memory>
 
+#include "rbac/permission/admin/Vaults.hpp"
+
 using namespace vh;
 using namespace vh::protocols::shell;
 using namespace vh::protocols::shell::commands::vault;
 using namespace vh::vault::model;
 using namespace vh::rbac::model;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::crypto;
@@ -41,11 +45,12 @@ CommandResult commands::vault::handle_vault_info(const CommandCall& call) {
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id) return invalid(
-        "vault info: you do not have permission to view this vault");
-
-    if (!call.user->isAdmin() && !call.user->canListVaultData(vault->id)) return invalid(
-        "vault info: you do not have permission to view this vault's data");
+    using Perm = rbac::permission::admin::VaultPermissions;
+    if (!rbac::resolver::Admin::has<Perm>({
+        .user = call.user,
+        .permission = Perm::View,
+        .vault_id = vault->id
+    })) return invalid("vault info: insufficient permissions");
 
     return ok(to_string(vault));
 }
@@ -62,22 +67,21 @@ CommandResult commands::vault::handle_vaults_list(const CommandCall& call) {
     if (f_local) typeFilter = VaultType::Local;
     else if (f_s3) typeFilter = VaultType::S3;
 
-    const auto canListAll = call.user->isAdmin() || call.user->canManageVaults();
-
-    auto vaults = canListAll
-                      ? db::query::vault::Vault::listVaults(typeFilter, parseListQuery(call))
-                      : db::query::vault::Vault::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
-
-    if (!canListAll) {
-        for (const auto& [_, r] : call.user->vault) {
-            if (r->canList({})) {
-                const auto vault = runtime::Deps::get().storageManager->getEngine(r->vault_id)->vault;
-                if (!vault) continue;
-                if (vault->owner_id == call.user->id) continue; // Already added
-                vaults.push_back(vault);
-            }
+    std::vector<std::shared_ptr<Vault>> vaults;
+    if (call.user->vaultsPerms().self.canView() && !(call.user->vaultsPerms().admin.canView() || call.user->vaultsPerms().user.canView()))
+        vaults = db::query::vault::Vault::listUserVaults(call.user->id, typeFilter, parseListQuery(call));
+    else {
+        vaults = db::query::vault::Vault::listVaults(typeFilter, parseListQuery(call));
+        for (const auto& v : vaults) {
+            using Perm = rbac::permission::admin::VaultPermissions;
+            if (!rbac::resolver::Admin::has<Perm>({
+                .user = call.user,
+                .permission = Perm::View,
+                .vault_id = v->id
+            })) std::erase(vaults, v);
         }
     }
 
+    if (hasFlag(call, "json")) return ok(nlohmann::json(vaults).dump(4));
     return ok(to_string(vaults));
 }

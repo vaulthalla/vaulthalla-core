@@ -22,18 +22,20 @@ namespace vh::rbac::permission {
     template<>
     struct PermissionTraits<admin::identities::IdentityPermissions> {
         using Entry = PermissionEntry<admin::identities::IdentityPermissions>;
+        using P = admin::identities::IdentityPermissions;
 
         static constexpr std::array entries {
-            Entry{ admin::identities::IdentityPermissions::View, "view" },
-            Entry{ admin::identities::IdentityPermissions::Add, "add" },
-            Entry{ admin::identities::IdentityPermissions::Edit, "edit" },
-            Entry{ admin::identities::IdentityPermissions::Delete, "delete" }
+            Entry{ P::View, "view", "Allows viewing or listing of {}s"},
+            Entry{ P::Add, "add", "Allows adding new {}s"},
+            Entry{ P::Edit, "edit", "Allows editing existing {}s"},
+            Entry{ P::Delete, "delete", "Allows deleting existing {}s"},
         };
     };
 
     namespace admin::identities {
         struct Base : Set<IdentityPermissions, uint8_t> {
             [[nodiscard]] const char* flagPrefix() const override = 0;
+            [[nodiscard]] virtual const char* descriptionObject() const = 0;
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 
             [[nodiscard]] bool canView() const noexcept { return has(IdentityPermissions::View); }

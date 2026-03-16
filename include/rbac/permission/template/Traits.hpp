@@ -10,6 +10,7 @@ template <typename EnumT>
 struct PermissionEntry {
     EnumT value;
     std::string_view slug;
+    std::string_view description;
 };
 
 template <typename EnumT>

@@ -8,8 +8,10 @@ namespace vh::rbac::permission::admin::identities {
 
 struct Admins final : Base {
     static constexpr const auto* FLAG_CONTEXT = "admins";
+    static constexpr const auto* DESCRIPTION_CONTEXT = "admins";
 
     [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
+    [[nodiscard]] const char *descriptionObject() const override { return DESCRIPTION_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 };
 

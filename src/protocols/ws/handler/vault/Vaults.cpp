@@ -27,19 +27,18 @@ using namespace vh::sync::model;
 using namespace vh::rbac;
 using json = nlohmann::json;
 
-json Vaults::add(const json& payload, const std::shared_ptr<Session>& session) {
+json Vaults::add(const json &payload, const std::shared_ptr<Session> &session) {
     const std::string name = payload.at("name").get<std::string>();
     const std::string type = payload.at("type").get<std::string>();
     const std::string typeLower = boost::algorithm::to_lower_copy(type);
     const std::string mountPoint = payload.at("mount_point").get<std::string>();
-    const auto ownerId = payload.contains("owner_id") ?
-        std::make_optional(payload.at("owner_id").get<uint32_t>()) :
-        session->user->id;
+    const auto ownerId = payload.contains("owner_id")
+                             ? std::make_optional(payload.at("owner_id").get<uint32_t>())
+                             : session->user->id;
 
-    using Perm = permission::admin::VaultPermissions;
-    if (!resolver::Admin::has<Perm>({
+    if (!resolver::Admin::has<permission::admin::VaultPermissions>({
         .user = session->user,
-        .permission = Perm::Create,
+        .permission = permission::admin::VaultPermissions::Create,
         .target_user_id = ownerId
     })) throw std::runtime_error("User does not have permission to add vault.");
 
@@ -48,11 +47,10 @@ json Vaults::add(const json& payload, const std::shared_ptr<Session>& session) {
 
     if (typeLower == "s3") {
         const auto apiKeyID = payload.at("api_key_id").get<unsigned int>();
-        using APIPerm = permission::admin::keys::APIPermissions;
 
-        if (!resolver::Admin::has<APIPerm>({
+        if (!resolver::Admin::has<permission::admin::keys::APIPermissions>({
             .user = session->user,
-            .permission = APIPerm::Consume,
+            .permission = permission::admin::keys::APIPermissions::Consume,
             .api_key_id = apiKeyID
         })) throw std::runtime_error("User does not have permission to add this api-key to vault.");
 
@@ -70,12 +68,12 @@ json Vaults::add(const json& payload, const std::shared_ptr<Session>& session) {
     return {{"vault", *vault}};
 }
 
-json Vaults::update(const json& payload, const std::shared_ptr<Session>& session) {
+json Vaults::update(const json &payload, const std::shared_ptr<Session> &session) {
     const auto vault = std::make_shared<Vault>(payload);
-    using Perm = permission::admin::VaultPermissions;
-    if (!resolver::Admin::has<Perm>({
+
+    if (!resolver::Admin::has<permission::admin::VaultPermissions>({
         .user = session->user,
-        .permission = Perm::Edit,
+        .permission = permission::admin::VaultPermissions::Edit,
         .vault_id = vault->id
     })) throw std::runtime_error("User does not have permission to update vault.");
 
@@ -85,15 +83,15 @@ json Vaults::update(const json& payload, const std::shared_ptr<Session>& session
     return {{"vault", *vault}};
 }
 
-json Vaults::remove(const json& payload, const std::shared_ptr<Session>& session) {
+json Vaults::remove(const json &payload, const std::shared_ptr<Session> &session) {
     const auto vaultId = payload.at("id").get<unsigned int>();
 
-    using Perm = permission::admin::VaultPermissions;
-    if (!resolver::Admin::has<Perm>({
+    if (!resolver::Admin::has<permission::admin::VaultPermissions>({
         .user = session->user,
-        .permission = Perm::Remove,
+        .permission = permission::admin::VaultPermissions::Remove,
         .vault_id = vaultId
-    })) throw std::runtime_error("User does not have permission to remove vault.");
+    }))
+        throw std::runtime_error("User does not have permission to remove vault.");
 
     const auto vault = runtime::Deps::get().storageManager->getVault(vaultId);
     if (!vault) throw std::runtime_error("Vault not found with ID: " + std::to_string(vaultId));
@@ -102,15 +100,15 @@ json Vaults::remove(const json& payload, const std::shared_ptr<Session>& session
     return {};
 }
 
-json Vaults::get(const json& payload, const std::shared_ptr<Session>& session) {
+json Vaults::get(const json &payload, const std::shared_ptr<Session> &session) {
     const auto vaultId = payload.at("id").get<unsigned int>();
 
-    using Perm = permission::admin::VaultPermissions;
-    if (!resolver::Admin::has<Perm>({
+    if (!resolver::Admin::has<permission::admin::VaultPermissions>({
         .user = session->user,
-        .permission = Perm::View,
+        .permission = permission::admin::VaultPermissions::View,
         .vault_id = vaultId
-    })) throw std::runtime_error("User does not have permission to view vault.");
+    }))
+        throw std::runtime_error("User does not have permission to view vault.");
 
     const auto vault = runtime::Deps::get().storageManager->getVault(vaultId);
     if (!vault) throw std::runtime_error("Vault not found with ID: " + std::to_string(vaultId));
@@ -128,33 +126,33 @@ json Vaults::get(const json& payload, const std::shared_ptr<Session>& session) {
     return data;
 }
 
-json Vaults::list(const std::shared_ptr<Session>& session) {
-    const auto& adminVPerms = session->user->vaultsPerms();
+json Vaults::list(const std::shared_ptr<Session> &session) {
+    const auto &adminVPerms = session->user->vaultsPerms();
     if (adminVPerms.self.canView() && !(adminVPerms.admin.canView() || adminVPerms.user.canView()))
         return json{{"vaults", db::query::vault::Vault::listUserVaults(session->user->id)}};
 
-    using Perm = permission::admin::VaultPermissions;
     auto vaults = db::query::vault::Vault::listVaults();
-    for (const auto& v : vaults) {
-        if (!resolver::Admin::has<Perm>({
-            .user = session->user,
-            .permission = Perm::View,
-            .vault_id = v->id
-        })) std::erase(vaults, v);
+    for (const auto &v: vaults) {
+        std::erase_if(vaults, [&](const auto &v) {
+            return !resolver::Admin::has<permission::admin::VaultPermissions>({
+                .user = session->user,
+                .permission = permission::admin::VaultPermissions::View,
+                .vault_id = v->id
+            });
+        });
     }
 
     return json{{"vaults", vaults}};
 }
 
-json Vaults::sync(const json& payload, const std::shared_ptr<Session>& session) {
+json Vaults::sync(const json &payload, const std::shared_ptr<Session> &session) {
     const auto vaultId = payload.at("id").get<unsigned int>();
 
-    using Perm = permission::vault::sync::SyncActionPermissions;
-    if (!resolver::Vault::has<Perm>({
+    if (!resolver::Vault::has<permission::vault::sync::SyncActionPermissions>({
         .user = session->user,
-        .permission = Perm::Trigger,
+        .permission = permission::vault::sync::SyncActionPermissions::Trigger,
         .vault_id = vaultId
-    }))
+    })) throw std::runtime_error("User does not have permission to trigger vault.");
 
     runtime::Deps::get().syncController->runNow(vaultId);
     return {};

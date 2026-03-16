@@ -1,6 +1,6 @@
 #pragma once
 
-namespace vh::rbac::vault {
+namespace vh::rbac::resolver {
 
     template<typename EnumT>
     struct AccessTraits;

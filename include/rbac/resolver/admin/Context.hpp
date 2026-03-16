@@ -1,0 +1,35 @@
+#pragma once
+
+#include <memory>
+#include <optional>
+#include <type_traits>
+
+namespace vh::identities { struct User; }
+
+namespace vh::rbac::resolver::admin {
+
+    enum class Entity { User, Group, Admin };
+    enum class Scope { Self, Admin, User };
+
+    template<typename EnumT>
+    struct Context {
+        static_assert(std::is_enum_v<EnumT>, "vh::rbac::vault::Context<EnumT>: EnumT must be an enum type");
+
+        std::shared_ptr<identities::User> user;
+        EnumT permission{};
+        std::optional<Entity> identity{};
+        std::optional<Scope> scope{};
+        std::optional<uint32_t> api_key_id{};
+        std::optional<uint32_t> target_user_id{};
+        std::optional<uint32_t> vault_id{std::nullopt};
+
+        [[nodiscard]] bool isValid() const {
+            if (!user) return false;
+            if (!scope || !identity) return false;
+            if (identity && !(api_key_id || target_user_id)) return false;
+            if (scope && !(vault_id || target_user_id)) return false;
+            return true;
+        }
+    };
+
+}

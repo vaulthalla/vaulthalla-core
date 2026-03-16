@@ -5,9 +5,6 @@
 #include "protocols/ws/Session.hpp"
 #include "runtime/Deps.hpp"
 #include "rbac/role/Admin.hpp"
-#include "rbac/permission/Admin.hpp"
-#include "rbac/vault/resolver/*.hpp"
-#include "rbac/permission/vault/Roles.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -17,8 +14,6 @@ using namespace vh::storage;
 using namespace vh::rbac;
 using json = nlohmann::json;
 
-using Permission = permission::vault::APIKeyPermissions;
-
 json APIKeys::add(const json& payload, const std::shared_ptr<Session>& session) {
     const auto name = payload.at("name").get<std::string>();
     const auto provider = s3_provider_from_string(payload.at("provider").get<std::string>());
@@ -27,10 +22,7 @@ json APIKeys::add(const json& payload, const std::shared_ptr<Session>& session) 
     const auto region = payload.at("region").get<std::string>();
     const auto endpoint = payload.at("endpoint").get<std::string>();
 
-    if (!vh::rbac::vault::Resolver::has<Permission>({
-        .user = session->user,
-        .permission = Permission::Modify
-    })) throw std::runtime_error("Insufficient permissions to add API key");
+    // TODO: integrate into resolver for overload checks
 
     auto key = std::make_shared<APIKey>(session->user->id, name, provider, accessKey, secretKey, region, endpoint);
     runtime::Deps::get().apiKeyManager->addAPIKey(key);

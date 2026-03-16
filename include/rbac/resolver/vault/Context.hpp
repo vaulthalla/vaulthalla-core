@@ -8,7 +8,7 @@
 
 namespace vh::identities { struct User; }
 
-namespace vh::rbac::vault {
+namespace vh::rbac::resolver::vault {
 
     template<typename EnumT>
     struct Context {

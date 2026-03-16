@@ -6,6 +6,7 @@
 #include <vector>
 
 namespace vh::vault::model { struct APIKey; }
+namespace vh::identities { struct User; }
 
 namespace vh::db::query::vault {
 
@@ -27,6 +28,8 @@ public:
     static APIKeyPtr getAPIKey(unsigned int keyId);
 
     static APIKeyPtr getAPIKey(const std::string& keyName);
+
+    static std::shared_ptr<vh::identities::User> getAPIKeyOwner(unsigned int keyId);
 };
 
 }

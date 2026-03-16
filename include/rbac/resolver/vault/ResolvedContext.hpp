@@ -6,7 +6,7 @@
 
 #include <memory>
 
-namespace vh::rbac::vault::resolver {
+namespace vh::rbac::resolver::vault {
 
     struct ResolvedVaultContext {
         std::shared_ptr<storage::Engine> engine;

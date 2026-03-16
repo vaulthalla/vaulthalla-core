@@ -1,13 +1,13 @@
 #pragma once
 
-#include "resolver/Context.hpp"
-#include "resolver/AccessTraits/Fwd.hpp"
-#include "resolver/ContextPolicy/Base.hpp"
-#include "resolver/VaultContext.hpp"
+#include "vault/Context.hpp"
+#include "vault/ResolvedContext.hpp"
+#include "AccessTraits/Fwd.hpp"
+#include "admin/policy/Base.hpp"
 
 #include "identities/User.hpp"
 #include "rbac/role/Vault.hpp"
-#include "rbac/permission/admin/Vaults.hpp"
+#include "rbac/permission/admin/VaultGlobals.hpp"
 #include "vault/model/Vault.hpp"
 #include "runtime/Deps.hpp"
 #include "storage/Engine.hpp"
@@ -21,12 +21,12 @@
 #include <type_traits>
 #include <utility>
 
-namespace vh::rbac::vault {
+namespace vh::rbac::resolver {
 
 class Resolver {
     template <typename EnumT>
     static bool checkPermission(const std::shared_ptr<identities::User>& user,
-                                const resolver::ResolvedVaultContext& resolved,
+                                const vault::ResolvedVaultContext& resolved,
                                 const EnumT permission) {
         static_assert(std::is_enum_v<EnumT>,
                       "vh::rbac::vault::Resolver::checkPermission(): EnumT must be an enum type");
@@ -45,7 +45,7 @@ class Resolver {
         }
 
         if (!allowed) {
-            const auto& globalPerms = user->globalVaultPerms();
+            const auto& globalPerms = user->vaultGlobals();
 
             if (user->id == resolved.vault->owner_id)
                 allowed = AccessTraits<EnumT>::self(globalPerms.self).has(permission);
@@ -57,7 +57,7 @@ class Resolver {
 
         if (!allowed) return false;
 
-        return resolver::ContextPolicy<EnumT>::validate(user, resolved, permission);
+        return ContextPolicy<EnumT>::validate(user, resolved, permission);
     }
 
     static std::shared_ptr<storage::Engine> resolveEngine(const std::optional<uint32_t>& vaultId,
@@ -71,11 +71,11 @@ class Resolver {
         return nullptr;
     }
 
-    static resolver::ResolvedVaultContext resolveVaultContext(const std::optional<uint32_t>& vaultId,
+    static vault::ResolvedVaultContext resolveVaultContext(const std::optional<uint32_t>& vaultId,
                                                               const std::optional<std::filesystem::path>& path,
                                                               const std::optional<std::string>& targetSubjectType,
                                                               const std::optional<uint32_t>& targetSubjectId) {
-        resolver::ResolvedVaultContext resolved{};
+        vault::ResolvedVaultContext resolved{};
 
         resolved.engine = resolveEngine(vaultId, path);
         if (!resolved.engine) return resolved;
@@ -98,7 +98,7 @@ class Resolver {
 
 public:
     template<typename EnumT>
-    static bool has(Context<EnumT>&& ctx) {
+    static bool has(vault::Context<EnumT>&& ctx) {
         if (!ctx.isValid()) return false;
 
         const auto& user = ctx.user;
@@ -118,8 +118,8 @@ public:
     }
 
     template<typename EnumT>
-    static bool has(const Context<EnumT>& ctx) {
-        return has(Context<EnumT>{ctx});
+    static bool has(const vault::Context<EnumT>& ctx) {
+        return has(vault::Context<EnumT>{ctx});
     }
 
     template<typename... ContextTs>

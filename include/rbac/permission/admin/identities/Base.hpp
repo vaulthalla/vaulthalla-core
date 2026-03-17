@@ -35,7 +35,7 @@ namespace vh::rbac::permission {
     namespace admin::identities {
         struct Base : Set<IdentityPermissions, uint8_t> {
             [[nodiscard]] const char* flagPrefix() const override = 0;
-            [[nodiscard]] virtual const char* descriptionObject() const = 0;
+            [[nodiscard]] virtual std::string_view descriptionObject() const = 0;
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 
             [[nodiscard]] bool canView() const noexcept { return has(IdentityPermissions::View); }

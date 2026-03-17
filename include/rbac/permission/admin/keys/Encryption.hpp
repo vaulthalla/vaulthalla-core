@@ -22,9 +22,18 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::keys::EncryptionKeyPermissions>;
 
         static constexpr std::array entries{
-            Entry{admin::keys::EncryptionKeyPermissions::View, "view"},
-            Entry{admin::keys::EncryptionKeyPermissions::Export, "export"},
-            Entry{admin::keys::EncryptionKeyPermissions::Rotate, "rotate"}
+            Entry{
+                admin::keys::EncryptionKeyPermissions::View, "view",
+                "Allows viewing encryption key details, excluding the key material."
+            },
+            Entry{
+                admin::keys::EncryptionKeyPermissions::Export, "export",
+                "Allows exporting the encryption key material."
+            },
+            Entry{
+                admin::keys::EncryptionKeyPermissions::Rotate, "rotate",
+                "Allows rotating the encryption key, which generates a new key and deprecates the old one."
+            }
         };
     };
 

@@ -29,6 +29,13 @@ struct Sync final : Module<uint32_t> {
     [[nodiscard]] bool canViewConfig() const noexcept { return config.canView(); }
     [[nodiscard]] bool canEditConfig() const noexcept { return config.canEdit(); }
     [[nodiscard]] bool canTriggerSync() const noexcept { return action.canTrigger(); }
+
+    [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+        return packAndExportPerms(
+            mount("vault.sync.config", config),
+            mount("vault.sync.action", action)
+        );
+    }
 };
 
 void to_json(nlohmann::json& j, const Sync& v);

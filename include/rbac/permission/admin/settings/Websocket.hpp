@@ -10,6 +10,7 @@ struct Websocket final : Base {
     static constexpr const auto* FLAG_CONTEXT = "ws";
 
     [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
+    [[nodiscard]] std::string_view descriptionObject() const override { return FLAG_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 };
 

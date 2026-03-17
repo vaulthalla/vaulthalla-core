@@ -22,8 +22,8 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::settings::SettingsPermissions>;
 
         static constexpr std::array entries {
-            Entry{admin::settings::SettingsPermissions::View, "view"},
-            Entry{admin::settings::SettingsPermissions::Edit, "edit"}
+            Entry{admin::settings::SettingsPermissions::View, "view", "Allows viewing settings in module: {}"},
+            Entry{admin::settings::SettingsPermissions::Edit, "edit", "Allows editing settings in module: {}"},
         };
     };
 
@@ -31,6 +31,7 @@ namespace vh::rbac::permission {
         struct Base : Set<SettingsPermissions, uint8_t> {
             [[nodiscard]] const char* flagPrefix() const override = 0;
             [[nodiscard]] std::string toString(uint8_t indent) const override;
+            [[nodiscard]] virtual std::string_view descriptionObject() const = 0;
 
             [[nodiscard]] bool canView() const noexcept { return has(SettingsPermissions::View); }
             [[nodiscard]] bool canEdit() const noexcept { return has(SettingsPermissions::Edit); }

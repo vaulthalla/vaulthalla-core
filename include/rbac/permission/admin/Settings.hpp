@@ -54,6 +54,19 @@ struct Settings final : Module<uint64_t> {
         unpack(mask, websocket, http, database, auth, logging, caching, sharing, services);
     }
 
+    [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+        return packAndExportPerms(
+            mount("admin.settings.websocket", websocket),
+            mount("admin.settings.http", http),
+            mount("admin.settings.database", database),
+            mount("admin.settings.auth", auth),
+            mount("admin.settings.logging", logging),
+            mount("admin.settings.caching", caching),
+            mount("admin.settings.sharing", sharing),
+            mount("admin.settings.services", services)
+        );
+    }
+
     [[nodiscard]] bool canView(const Type& type) const;
     [[nodiscard]] bool canEdit(const Type& type) const;
 };

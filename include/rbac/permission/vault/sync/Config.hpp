@@ -21,8 +21,8 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::sync::SyncConfigPermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::sync::SyncConfigPermissions::View, "view"},
-            Entry{vault::sync::SyncConfigPermissions::Edit, "edit"}
+            Entry{vault::sync::SyncConfigPermissions::View, "view", "Allows viewing the synchronization configuration."},
+            Entry{vault::sync::SyncConfigPermissions::Edit, "edit", "Allows editing the synchronization configuration."},
         };
     };
 

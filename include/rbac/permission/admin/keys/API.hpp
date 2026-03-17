@@ -7,13 +7,12 @@
 #include <utility>
 
 namespace vh::rbac::permission {
-
     namespace admin::keys {
         enum class APIPermissions : uint8_t {
-            None   = 0,
-            View   = 1 << 0,
+            None = 0,
+            View = 1 << 0,
             Create = 1 << 1,
-            Edit   = 1 << 2,
+            Edit = 1 << 2,
             Remove = 1 << 3,
             Export = 1 << 4,
             Rotate = 1 << 5,
@@ -21,28 +20,34 @@ namespace vh::rbac::permission {
         };
     }
 
-    template <>
+    template<>
     struct PermissionTraits<admin::keys::APIPermissions> {
         using Entry = PermissionEntry<admin::keys::APIPermissions>;
 
         static constexpr std::array entries = {
-            Entry{admin::keys::APIPermissions::View, "view"},
-            Entry{admin::keys::APIPermissions::Create, "create"},
-            Entry{admin::keys::APIPermissions::Edit, "edit"},
-            Entry{admin::keys::APIPermissions::Remove, "remove"},
-            Entry{admin::keys::APIPermissions::Export, "export"},
-            Entry{admin::keys::APIPermissions::Rotate, "rotate"},
-            Entry{admin::keys::APIPermissions::Consume, "consume"}
+            Entry{admin::keys::APIPermissions::View, "view", "Allows the user to view api-keys scoped to '{}'"},
+            Entry{admin::keys::APIPermissions::Create, "create", "Allows the user to create a new API key for '{}'"},
+            Entry{admin::keys::APIPermissions::Edit, "edit", "Allows the user to edit a new API key for '{}'"},
+            Entry{admin::keys::APIPermissions::Remove, "remove", "Allows the user to remove a new API key for '{}'"},
+            Entry{admin::keys::APIPermissions::Export, "export", "Allows the user to export an API key for '{}'"},
+            Entry{admin::keys::APIPermissions::Rotate, "rotate", "Allows the user to rotate a new API key for '{}'"},
+            Entry{admin::keys::APIPermissions::Consume, "consume", "Allows the user to consume an API key for '{}'"},
         };
     };
 
     namespace admin::keys {
         struct APIKeyBase final : Set<APIPermissions, uint8_t> {
             std::string flag_prefix;
+            std::string description_context;
 
-            explicit APIKeyBase(std::string  extension) : flag_prefix(std::move(extension)) {}
+            APIKeyBase(std::string moduleName, std::string descriptionCtx)
+                : flag_prefix(std::move(moduleName) + "-" + descriptionCtx),
+                  description_context(std::move(descriptionCtx)) {
+            }
 
             [[nodiscard]] const char *flagPrefix() const override { return flag_prefix.c_str(); }
+            [[nodiscard]] std::string_view descriptionObject() const { return description_context; }
+
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 
             [[nodiscard]] bool canView() const noexcept { return has(APIPermissions::View); }
@@ -55,22 +60,25 @@ namespace vh::rbac::permission {
         };
 
         struct APIKeys {
-            static constexpr const auto* MODULE_NAME = "api";
+            static constexpr const auto *MODULE_NAME = "api";
 
-            APIKeyBase self{std::string(MODULE_NAME) + "-self"};
-            APIKeyBase admin{std::string(MODULE_NAME) + "-admin"};
-            APIKeyBase user{std::string(MODULE_NAME) + "-user"};
+            APIKeyBase self{std::string(MODULE_NAME), "self"};
+            APIKeyBase admin{std::string(MODULE_NAME), "admin"};
+            APIKeyBase user{std::string(MODULE_NAME), "user"};
 
             [[nodiscard]] static const char *name() { return MODULE_NAME; }
+
             [[nodiscard]] std::string toString(uint8_t indent) const;
+
             [[nodiscard]] std::string toFlagsString() const;
         };
 
-        void to_json(nlohmann::json& j, const APIKeyBase& p);
-        void from_json(const nlohmann::json& j, APIKeyBase& p);
+        void to_json(nlohmann::json &j, const APIKeyBase &p);
 
-        void to_json(nlohmann::json& j, const APIKeys& p);
-        void from_json(const nlohmann::json& j, APIKeys& p);
+        void from_json(const nlohmann::json &j, APIKeyBase &p);
+
+        void to_json(nlohmann::json &j, const APIKeys &p);
+
+        void from_json(const nlohmann::json &j, APIKeys &p);
     }
-
 }

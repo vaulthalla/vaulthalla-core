@@ -19,7 +19,7 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::AuditPermissions>;
 
         static constexpr std::array entries{
-            Entry{admin::AuditPermissions::View, "view"},
+            Entry{admin::AuditPermissions::View, "view", "ALlows viewing of audit logs and database objects."},
         };
     };
 

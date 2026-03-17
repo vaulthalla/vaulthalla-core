@@ -19,8 +19,8 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::sync::SyncActionPermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::sync::SyncActionPermissions::Trigger, "trigger"},
-            Entry{vault::sync::SyncActionPermissions::SignWaiver, "sign_waiver"},
+            Entry{vault::sync::SyncActionPermissions::Trigger, "trigger", "Allows the user to trigger a sync action."},
+            Entry{vault::sync::SyncActionPermissions::SignWaiver, "sign_waiver", "Allows the user to sign a waiver enabling upstream encryption (eg. S3) for vault."},
         };
     };
 

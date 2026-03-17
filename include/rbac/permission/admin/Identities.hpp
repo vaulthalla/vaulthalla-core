@@ -29,6 +29,14 @@ struct Identities final : Module<uint64_t> {
     [[nodiscard]] uint64_t toMask() const override { return pack(users, admins, groups); }
     void fromMask(const uint64_t mask) override { unpack(mask, users, admins, groups); }
 
+    [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+        return packAndExportPerms(
+            mount("admin.identities.users", users),
+            mount("admin.identities.admins", admins),
+            mount("admin.identities.groups", groups)
+        );
+    }
+
 private:
     template <typename Fn>
     decltype(auto) visit(const Type type, Fn&& fn) {

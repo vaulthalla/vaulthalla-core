@@ -11,7 +11,7 @@ struct Users final : Base {
     static constexpr const auto* DESCRIPTION_CONTEXT = "users";
 
     [[nodiscard]] const char* flagPrefix() const override { return FLAG_CONTEXT; }
-    [[nodiscard]] const char *descriptionObject() const override { return DESCRIPTION_CONTEXT; }
+    [[nodiscard]] std::string_view descriptionObject() const override { return DESCRIPTION_CONTEXT; }
     [[nodiscard]] std::string toString(uint8_t indent) const override;
 };
 

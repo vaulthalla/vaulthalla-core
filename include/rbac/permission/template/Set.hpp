@@ -2,12 +2,15 @@
 
 #include "Traits.hpp"
 #include "Meta.hpp"
+#include "Description.hpp"
+#include "rbac/permission/Permission.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
-#include <string_view>
-#include <string>
 #include <sstream>
+#include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace vh::rbac::permission {
@@ -98,7 +101,7 @@ struct Set {
     }
 
     [[nodiscard]] std::string toFlagsString() const
-    requires HasPermissionTraits<Enum>
+        requires HasPermissionTraits<Enum>
     {
         std::ostringstream oss;
         bool first = true;
@@ -118,9 +121,56 @@ struct Set {
 
     [[nodiscard]] virtual std::string toString(uint8_t indent) const = 0;
 
+    template <typename OutputIt>
+    void exportPermissions(
+        OutputIt out,
+        const std::size_t baseOffset,
+        std::string_view qualifiedPrefix,
+        std::string_view descriptionPrefix = {}
+    ) const
+        requires HasPermissionTraits<Enum>
+    {
+        for (const auto& entry : PermissionTraits<Enum>::entries) {
+            const auto raw = static_cast<Mask>(entry.value);
+            if (!hasSingleBit(raw))
+                continue;
+
+            const auto localBit = singleBitIndex(raw);
+            const auto globalBit = baseOffset + localBit;
+
+            std::string qualifiedName;
+            qualifiedName.reserve(qualifiedPrefix.size() + 1 + entry.slug.size());
+            qualifiedName.append(qualifiedPrefix);
+            qualifiedName.push_back('.');
+            qualifiedName.append(entry.slug);
+
+            *out++ = Permission{
+                static_cast<uint32_t>(globalBit),
+                std::move(qualifiedName),
+                buildPermissionDescription(*this, entry.description, descriptionPrefix)
+            };
+        }
+    }
+
 protected:
     [[nodiscard]] static std::string bool_to_string(const bool value) {
         return value ? "true" : "false";
+    }
+
+    [[nodiscard]] static constexpr uint32_t singleBitIndex(const Mask value) {
+        uint32_t index = 0;
+        Mask v = value;
+
+        while ((v & static_cast<Mask>(1)) == 0) {
+            v >>= 1;
+            ++index;
+        }
+
+        return index;
+    }
+
+    [[nodiscard]] static constexpr bool hasSingleBit(const Mask value) {
+        return value != 0 && (value & (value - 1)) == 0;
     }
 };
 

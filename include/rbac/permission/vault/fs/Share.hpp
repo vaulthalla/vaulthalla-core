@@ -23,9 +23,9 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::fs::SharePermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::fs::SharePermissions::Internal, "internal"},
-            Entry{vault::fs::SharePermissions::Public, "public"},
-            Entry{vault::fs::SharePermissions::PublicWithValidation, "public_with_val"},
+            Entry{vault::fs::SharePermissions::Internal, "internal", "Allows sharing with other users within the same vault."},
+            Entry{vault::fs::SharePermissions::Public, "public", "Allows sharing with users outside the vault without validation."},
+            Entry{vault::fs::SharePermissions::PublicWithValidation, "public_with_val", "Allows validation with valid public authority."},
         };
     };
 

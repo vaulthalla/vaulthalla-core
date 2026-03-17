@@ -23,6 +23,15 @@ struct Keys final : Module<uint16_t> {
     [[nodiscard]] const char* name() const override { return ModuleName; }
     [[nodiscard]] uint16_t toMask() const override;
     void fromMask(Mask mask) override;
+
+    [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+        return packAndExportPerms(
+            mount("admin.keys.api.self", apiKeys.self),
+            mount("admin.keys.api.admin", apiKeys.admin),
+            mount("admin.keys.api.user", apiKeys.user),
+            mount("admin.keys.encryption", encryptionKeys)
+        );
+    }
 };
 
 void to_json(nlohmann::json& j, const Keys& k);

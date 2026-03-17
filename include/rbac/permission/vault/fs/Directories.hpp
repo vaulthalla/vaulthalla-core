@@ -30,14 +30,14 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::fs::DirectoryPermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::fs::DirectoryPermissions::List, "list"},
-            Entry{vault::fs::DirectoryPermissions::Upload, "upload"},
-            Entry{vault::fs::DirectoryPermissions::Download, "download"},
-            Entry{vault::fs::DirectoryPermissions::Touch, "touch"},
-            Entry{vault::fs::DirectoryPermissions::Delete, "delete"},
-            Entry{vault::fs::DirectoryPermissions::Rename, "rename"},
-            Entry{vault::fs::DirectoryPermissions::Move, "move"},
-            Entry{vault::fs::DirectoryPermissions::Copy, "copy"}
+            Entry{vault::fs::DirectoryPermissions::List, "list", "Allow viewing or listing the contents of a directory."},
+            Entry{vault::fs::DirectoryPermissions::Upload, "upload", "Allow uploading directories."},
+            Entry{vault::fs::DirectoryPermissions::Download, "download", "Allow downloading directories."},
+            Entry{vault::fs::DirectoryPermissions::Touch, "touch", "Allow creating empty directories."},
+            Entry{vault::fs::DirectoryPermissions::Delete, "delete", "Allow deleting directories."},
+            Entry{vault::fs::DirectoryPermissions::Rename, "rename", "Allow renaming directories."},
+            Entry{vault::fs::DirectoryPermissions::Move, "move", "Allow moving directories."},
+            Entry{vault::fs::DirectoryPermissions::Copy, "copy", "Allow copying directories."}
         };
     };
 
@@ -62,6 +62,13 @@ namespace vh::rbac::permission {
 
             [[nodiscard]] uint32_t toMask() const override { return packWithOwn(share); }
             void fromMask(const Mask mask) override { unpackWithOwn(mask, share); }
+
+            [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+                return packAndExportWithOwn(
+                    "vault.fs.directories",
+                    mount("vault.fs.directories.share", share)
+                );
+            }
 
             [[nodiscard]] bool canList() const noexcept { return has(DirectoryPermissions::List); }
             [[nodiscard]] bool canUpload() const noexcept { return has(DirectoryPermissions::Upload); }

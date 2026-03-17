@@ -27,21 +27,24 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::VaultPermissions>;
 
         static constexpr std::array entries {
-            Entry{admin::VaultPermissions::View, "view"},
-            Entry{admin::VaultPermissions::ViewStats, "view_stats"},
-            Entry{admin::VaultPermissions::Create, "create"},
-            Entry{admin::VaultPermissions::Edit, "edit"},
-            Entry{admin::VaultPermissions::Remove, "remove"}
+            Entry{admin::VaultPermissions::View, "view", "Allows viewing vault details for '{}'"},
+            Entry{admin::VaultPermissions::ViewStats, "view_stats", "Allows viewing vault statistics for '{}'"},
+            Entry{admin::VaultPermissions::Create, "create", "Allows creating vaults for '{}'"},
+            Entry{admin::VaultPermissions::Edit, "edit", "Allows editing vault details for '{}'"},
+            Entry{admin::VaultPermissions::Remove, "remove", "Allows vault deletion for '{}'"},
         };
     };
 
     namespace admin {
         struct Vault : Set<VaultPermissions, uint8_t> {
             std::string flag_prefix;
+            std::string descriptionContext{"unset"};
 
-            explicit Vault(std::string  prefix) : flag_prefix(std::move(prefix)) {}
+            explicit Vault(std::string module, std::string entity)
+                : flag_prefix(std::move(module) + "-" + entity), descriptionContext(std::move(entity)) {}
 
             [[nodiscard]] const char *flagPrefix() const override { return flag_prefix.c_str(); }
+            [[nodiscard]] std::string_view descriptionObject() const { return descriptionContext; }
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 
             [[nodiscard]] bool canView() const noexcept { return has(VaultPermissions::View); }
@@ -56,9 +59,9 @@ namespace vh::rbac::permission {
 
             enum class Type : uint8_t { Self, Admin, User };
 
-            Vault self{std::string(MODULE_NAME) + "-self"};
-            Vault admin{std::string(MODULE_NAME) + "-admin"};
-            Vault user{std::string(MODULE_NAME) + "-user"};
+            Vault self{std::string(MODULE_NAME), "self"};
+            Vault admin{std::string(MODULE_NAME), "admin"};
+            Vault user{std::string(MODULE_NAME), "user"};
 
             Vaults() = default;
             explicit Vaults(const Mask mask) { fromMask(mask); }
@@ -68,6 +71,14 @@ namespace vh::rbac::permission {
             [[nodiscard]] std::string toFlagsString() const override;
             [[nodiscard]] Mask toMask() const override { return pack(self, admin, user); }
             void fromMask(const Mask mask) override { unpack(mask, self, admin, user); }
+
+            [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+                return packAndExportPerms(
+                    mount("admin.vaults.self", self),
+                    mount("admin.vaults.admin", admin),
+                    mount("admin.vaults.user", user)
+                );
+            }
         };
 
         void to_json(nlohmann::json& j, const Vault& v);

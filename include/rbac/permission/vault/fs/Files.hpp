@@ -29,14 +29,14 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::fs::FilePermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::fs::FilePermissions::Preview, "preview"},
-            Entry{vault::fs::FilePermissions::Upload, "upload"},
-            Entry{vault::fs::FilePermissions::Download, "download"},
-            Entry{vault::fs::FilePermissions::Overwrite, "overwrite"},
-            Entry{vault::fs::FilePermissions::Rename, "rename"},
-            Entry{vault::fs::FilePermissions::Delete, "delete"},
-            Entry{vault::fs::FilePermissions::Move, "move"},
-            Entry{vault::fs::FilePermissions::Copy, "copy"},
+            Entry{vault::fs::FilePermissions::Preview, "preview", "Allows previewing files without downloading them."},
+            Entry{vault::fs::FilePermissions::Upload, "upload", "Allows uploading new files to the vault."},
+            Entry{vault::fs::FilePermissions::Download, "download", "Allows downloading files from the vault."},
+            Entry{vault::fs::FilePermissions::Overwrite, "overwrite", "Allows overwriting existing files in the vault."},
+            Entry{vault::fs::FilePermissions::Rename, "rename", "Allows renaming files in the vault."},
+            Entry{vault::fs::FilePermissions::Delete, "delete", "Allows deleting files from the vault."},
+            Entry{vault::fs::FilePermissions::Move, "move", "Allows moving files within the vault."},
+            Entry{vault::fs::FilePermissions::Copy, "copy", "Allows copying files within the vault."},
         };
     };
 
@@ -58,8 +58,15 @@ namespace vh::rbac::permission {
             [[nodiscard]] std::string toFlagsString() const override;
 
             [[nodiscard]] const char *name() const override { return ModuleName; }
-            [[nodiscard]] uint32_t toMask() const override { return pack(permissions, share); }
-            void fromMask(const Mask mask) override { unpack(mask, permissions, share); }
+            [[nodiscard]] uint32_t toMask() const override { return packWithOwn(share); }
+            void fromMask(const Mask mask) override { unpackWithOwn(mask, share); }
+
+            [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+                return packAndExportWithOwn(
+                    "vault.fs.files",
+                    mount("vault.fs.files.share", share)
+                );
+            }
 
             [[nodiscard]] bool canPreview() const noexcept { return has(FilePermissions::Preview); }
             [[nodiscard]] bool canUpload() const noexcept { return has(FilePermissions::Upload); }

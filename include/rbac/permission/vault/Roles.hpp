@@ -23,9 +23,9 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<vault::RolePermissions>;
 
         static constexpr std::array entries{
-            Entry{vault::RolePermissions::Assign, "assign"},
-            Entry{vault::RolePermissions::Modify, "modify"},
-            Entry{vault::RolePermissions::Revoke, "revoke"}
+            Entry{vault::RolePermissions::Assign, "assign", "Allows user to assign roles in a vault to others."},
+            Entry{vault::RolePermissions::Modify, "modify", "Allows user to modify roles in a vault, including changing permissions and renaming."},
+            Entry{vault::RolePermissions::Revoke, "revoke", "Allows user to revoke roles and consequently access in vault."},
         };
     };
 
@@ -35,8 +35,7 @@ namespace vh::rbac::permission {
 
             Roles() = default;
 
-            explicit Roles(const Mask &mask) : Set(mask) {
-            }
+            explicit Roles(const Mask &mask) : Set(mask) {}
 
             [[nodiscard]] const char *flagPrefix() const override { return FLAG_CONTEXT; }
 

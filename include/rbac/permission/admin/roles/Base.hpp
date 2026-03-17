@@ -24,10 +24,10 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::roles::RolesPermissions>;
 
         static constexpr std::array entries {
-            Entry{ admin::roles::RolesPermissions::View, "view" },
-            Entry{ admin::roles::RolesPermissions::Add, "add" },
-            Entry{ admin::roles::RolesPermissions::Edit, "edit" },
-            Entry{ admin::roles::RolesPermissions::Delete, "delete" }
+            Entry{ admin::roles::RolesPermissions::View, "view", "Allows user to view {} roles"},
+            Entry{ admin::roles::RolesPermissions::Add, "add", "Allows user to add new {} roles"},
+            Entry{ admin::roles::RolesPermissions::Edit, "edit", "Allows user to edit existing {} roles"},
+            Entry{ admin::roles::RolesPermissions::Delete, "delete", "Allows user to delete existing {} roles"},
         };
     };
 
@@ -35,6 +35,7 @@ namespace vh::rbac::permission {
         struct Base : Set<RolesPermissions, uint8_t> {
             [[nodiscard]] const char* flagPrefix() const override = 0;
             [[nodiscard]] std::string toString(uint8_t indent) const override;
+            [[nodiscard]] virtual std::string_view descriptionObject() const = 0;
 
             [[nodiscard]] bool canView() const noexcept { return has(RolesPermissions::View); }
             [[nodiscard]] bool canAdd() const noexcept { return has(RolesPermissions::Add); }

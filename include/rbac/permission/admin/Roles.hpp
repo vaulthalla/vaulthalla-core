@@ -24,6 +24,13 @@ namespace vh::rbac::permission::admin {
 
         [[nodiscard]] std::string toFlagsString() const override;
         [[nodiscard]] std::string toString(uint8_t indent) const override;
+
+        [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+            return packAndExportPerms(
+                mount("admin.roles.admin", admin),
+                mount("admin.roles.vault", vault)
+            );
+        }
     };
 
     void to_json(nlohmann::json& j, const Roles& r);

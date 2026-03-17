@@ -11,7 +11,7 @@ namespace vh::rbac::role {
 
 Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
     : Meta(row),
-      Base(row),
+      Base(row, overrides),
       assignment(std::nullopt) {
     if (!row["assignment_id"].is_null()) {
         assignment = AssignmentInfo();
@@ -36,8 +36,30 @@ Vault::Vault(const nlohmann::json& j)
     }
 }
 
+std::vector<permission::Permission> Vault::toPermissions() const {
+    auto rolesPerms = roles.exportPermissions();
+    auto syncPerms = sync.exportPermissions();
+    auto filesPerms = fs.files.exportPermissions();
+    auto dirsPerms = fs.directories.exportPermissions();
+
+    std::vector<permission::Permission> perms;
+    perms.reserve(rolesPerms.size() + syncPerms.size() + filesPerms.size() + dirsPerms.size());
+
+    auto appendMoved = [&](auto &exportResult) {
+        auto &src = exportResult();
+        std::move(src.begin(), src.end(), std::back_inserter(perms));
+    };
+
+    appendMoved(rolesPerms);
+    appendMoved(syncPerms);
+    appendMoved(filesPerms);
+    appendMoved(dirsPerms);
+
+    return perms;
+}
+
 std::string Vault::toFlagsString() const {
-    return sync.toFlagsString() + " " +
+    return roles.toFlagsString() + " " + sync.toFlagsString() + " " + fs.toFlagString();
 }
 
 Vault Vault::fromJson(const nlohmann::json& j) { return Vault(j); }

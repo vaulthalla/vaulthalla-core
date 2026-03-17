@@ -71,42 +71,12 @@ void vh::seed::seed_database() {
 void vh::seed::initPermissions() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing permissions...");
 
-    const std::vector<permission::Permission> userPerms{
-        {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
-        {1, "manage_admins", "Can manage admin users (create, deactivate, modify)"},
-        {2, "manage_users", "Can manage regular users"},
-        {3, "manage_groups", "Can create, modify, delete groups"},
-        {4, "manage_roles", "Can create, modify, delete roles"},
-        {5, "manage_settings", "Can modify system-wide settings"},
-        {6, "manage_vaults", "Can create, delete, modify any vault and any vault settings"},
-        {7, "manage_api_keys", "Can manage API keys globally"},
-        {8, "access_audit_logs", "Can view system audit logs"},
-        {9, "create_vaults", "Can create new vaults"}
-    };
-
-    const std::vector<permission::Permission> vaultPerms{
-        {0, "manage_vault", "Can manage vault settings, including sync and upstream encryption"},
-        {1, "manage_access", "Can manage vault roles and access rules"},
-        {2, "manage_tags", "Can manage tags for files and directories"},
-        {3, "manage_metadata", "Can manage file and directory metadata"},
-        {4, "manage_versions", "Can manage file version history"},
-        {5, "manage_file_locks", "Can lock or unlock files"},
-        {6, "share", "Can create public sharing links"},
-        {7, "sync", "Can sync vault data to external/cloud storage"},
-        {8, "create", "Can create files or directories and upload files"},
-        {9, "download", "Can download files or read file contents"},
-        {10, "delete", "Can delete files or directories"},
-        {11, "rename", "Can rename files or directories"},
-        {12, "move", "Can move files or directories"},
-        {13, "list", "Can list directory contents"}
-    };
-
     db::Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
-        for (const auto& p : userPerms)
+        for (const auto& p : role::Admin().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
-                pqxx::params{p.bit_position, p.name, p.description, "user"});
+                pqxx::params{p.bit_position, p.name, p.description, "admin"});
 
-        for (const auto& p : vaultPerms)
+        for (const auto& p : role::Vault().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
                 pqxx::params{p.bit_position, p.name, p.description, "vault"});
     });

@@ -121,6 +121,14 @@ struct Set {
 
     [[nodiscard]] virtual std::string toString(uint8_t indent) const = 0;
 
+    [[nodiscard]] std::vector<Permission> exportPermissions() const
+    requires HasPermissionTraits<Enum>
+    {
+        std::vector<Permission> out;
+        exportPermissions(std::back_inserter(out), 0, flagPrefix());
+        return out;
+    }
+
     template <typename OutputIt>
     void exportPermissions(
         OutputIt out,

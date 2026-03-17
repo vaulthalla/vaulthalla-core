@@ -2,6 +2,7 @@
 
 #include "rbac/role/Meta.hpp"
 #include "vault/Base.hpp"
+#include "rbac/permission/Permission.hpp"
 
 #include <string>
 #include <vector>
@@ -27,8 +28,11 @@ struct Vault final : Meta, vault::Base {
     Vault(const pqxx::row& row, const pqxx::result& overrides);
     explicit Vault(const nlohmann::json& j);
 
+    [[nodiscard]] std::vector<permission::Permission> toPermissions() const;
+
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] std::string toString() const { return toString(0); }
+    [[nodiscard]] std::string toFlagsString() const;
 
     [[nodiscard]] permission::vault::fs::Files& files() noexcept { return fs.files; }
     [[nodiscard]] const permission::vault::fs::Files& files() const noexcept { return fs.files; }

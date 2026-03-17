@@ -2,10 +2,12 @@
 
 #include "rbac/role/Meta.hpp"
 #include "rbac/permission/admin/*.hpp"
+#include "rbac/permission/Permission.hpp"
 
 #include <string>
 #include <optional>
 #include <memory>
+#include <vector>
 #include <nlohmann/json_fwd.hpp>
 
 namespace vh::rbac::role {
@@ -29,6 +31,8 @@ struct Admin final : Meta {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] std::string toString() const { return toString(0); }
     [[nodiscard]] std::string toFlagsString() const;
+
+    [[nodiscard]] std::vector<permission::Permission> toPermissions() const;
 
     static Admin fromJson(const nlohmann::json& j);
 };

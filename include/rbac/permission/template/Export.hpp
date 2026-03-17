@@ -13,6 +13,12 @@ namespace vh::rbac::permission {
     struct PackedPermissionExportT {
         MaskT mask{};
         std::vector<Permission> permissions;
+
+        [[nodiscard]] const std::vector<Permission>& operator()() const & { return permissions; }
+        [[nodiscard]] std::vector<Permission>& operator()() & { return permissions; }
+        [[nodiscard]] std::vector<Permission>&& operator()() && { return std::move(permissions); }
+
+        [[nodiscard]] std::size_t size() const { return permissions.size(); }
     };
 
     template <typename T>

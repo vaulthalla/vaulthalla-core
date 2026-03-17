@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/ModuleSet.hpp"
 #include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
@@ -30,16 +30,22 @@ namespace vh::rbac::permission {
     };
 
     namespace vault {
-        struct Roles final : Set<RolePermissions, uint8_t> {
+        struct Roles final : ModuleSet<uint8_t, RolePermissions, uint8_t> {
             static constexpr const auto *FLAG_CONTEXT = "roles";
 
             Roles() = default;
 
-            explicit Roles(const Mask &mask) : Set(mask) {}
+            explicit Roles(const Mask &mask) : ModuleSet(mask) {}
 
+            [[nodiscard]] const char *name() const override { return FLAG_CONTEXT; }
             [[nodiscard]] const char *flagPrefix() const override { return FLAG_CONTEXT; }
-
             [[nodiscard]] std::string toString(uint8_t indent) const override;
+            [[nodiscard]] std::string toFlagsString() const override { return joinFlagsWithOwn(); }
+
+            [[nodiscard]] Mask toMask() const override { return packWithOwn(); }
+            void fromMask(const Mask mask) override { unpackWithOwn(mask); }
+
+            [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const { return packAndExportWithOwn("vault.roles"); }
 
             [[nodiscard]] bool canAssign() const noexcept { return has(RolePermissions::Assign); }
             [[nodiscard]] bool canModify() const noexcept { return has(RolePermissions::Modify); }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rbac/permission/template/Set.hpp"
+#include "rbac/permission/template/ModuleSet.hpp"
 #include "rbac/permission/template/Traits.hpp"
 
 #include <cstdint>
@@ -19,20 +19,27 @@ namespace vh::rbac::permission {
         using Entry = PermissionEntry<admin::AuditPermissions>;
 
         static constexpr std::array entries{
-            Entry{admin::AuditPermissions::View, "view", "ALlows viewing of audit logs and database objects."},
+            Entry{admin::AuditPermissions::View, "view", "Allows viewing of audit logs and database objects."},
         };
     };
 
     namespace admin {
-        struct Audits final : Set<AuditPermissions, uint8_t> {
+        struct Audits final : ModuleSet<uint8_t, AuditPermissions, uint8_t> {
             static constexpr const auto *FLAG_CONTEXT = "audit";
 
             Audits() = default;
 
-            explicit Audits(const Mask &mask) : Set(mask) {
-            }
+            explicit Audits(const Mask &mask) : ModuleSet(mask) {}
 
+            [[nodiscard]] const char *name() const override { return FLAG_CONTEXT; }
             [[nodiscard]] const char *flagPrefix() const override { return FLAG_CONTEXT; }
+            [[nodiscard]] Mask toMask() const override;
+            void fromMask(Mask mask) override;
+            [[nodiscard]] std::string toFlagsString() const override;
+
+            [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
+                return packAndExportWithOwn("admin.audits");
+            }
 
             [[nodiscard]] std::string toString(uint8_t indent) const override;
 

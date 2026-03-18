@@ -13,7 +13,6 @@
 #include "log/Registry.hpp"
 
 using namespace vh::protocols::ws;
-using namespace vh::protocols::ws::handler;
 
 void Handler::registerAllHandlers(const std::shared_ptr<Router>& r) {
     registerAuthHandlers(r);
@@ -30,18 +29,18 @@ void Handler::registerAllHandlers(const std::shared_ptr<Router>& r) {
 }
 
 void Handler::registerAuthHandlers(const std::shared_ptr<Router>& r) {
-    r->registerPayload("auth.login", &Auth::login);
-    r->registerPayload("auth.register", &Auth::registerUser);
-    r->registerPayload("auth.user.delete", &Auth::deleteUser);
-    r->registerSessionOnlyHandler("auth.logout", &Auth::logout);
-    r->registerPayload("auth.user.update", &Auth::updateUser);
-    r->registerPayload("auth.user.change_password", &Auth::changePassword);
-    r->registerHandlerWithToken("auth.isAuthenticated", &Auth::isUserAuthenticated);
-    r->registerPayload("auth.user.get", &Auth::getUser);
-    r->registerPayload("auth.user.get.byName", &Auth::getUserByName);
-    r->registerSessionOnlyHandler("auth.users.list", &Auth::listUsers);
-    r->registerEmptyHandler("auth.admin.default_password", &Auth::doesAdminHaveDefaultPassword);
-    r->registerHandlerWithToken("auth.refresh", &Auth::refreshToken);
+    r->registerPayload("auth.login", &handler::Auth::login);
+    r->registerPayload("auth.register", &handler::Auth::registerUser);
+    r->registerPayload("auth.user.delete", &handler::Auth::deleteUser);
+    r->registerSessionOnlyHandler("auth.logout", &handler::Auth::logout);
+    r->registerPayload("auth.user.update", &handler::Auth::updateUser);
+    r->registerPayload("auth.user.change_password", &handler::Auth::changePassword);
+    r->registerHandlerWithToken("auth.isAuthenticated", &handler::Auth::isUserAuthenticated);
+    r->registerPayload("auth.user.get", &handler::Auth::getUser);
+    r->registerPayload("auth.user.get.byName", &handler::Auth::getUserByName);
+    r->registerSessionOnlyHandler("auth.users.list", &handler::Auth::listUsers);
+    r->registerEmptyHandler("auth.admin.default_password", &handler::Auth::doesAdminHaveDefaultPassword);
+    r->registerHandlerWithToken("auth.refresh", &handler::Auth::refreshToken);
 }
 
 void Handler::registerFileSystemHandlers(const std::shared_ptr<Router>& r) {
@@ -56,19 +55,19 @@ void Handler::registerFileSystemHandlers(const std::shared_ptr<Router>& r) {
 }
 
 void Handler::registerStorageHandlers(const std::shared_ptr<Router>& r) {
-    r->registerSessionOnlyHandler("storage.vault.list", &Vaults::list);
-    r->registerPayload("storage.vault.add", &Vaults::add);
-    r->registerPayload("storage.vault.update", &Vaults::update);
-    r->registerPayload("storage.vault.remove", &Vaults::remove);
-    r->registerPayload("storage.vault.get", &Vaults::get);
-    r->registerPayload("storage.vault.sync", &Vaults::sync);
+    r->registerSessionOnlyHandler("storage.vault.list", &handler::Vaults::list);
+    r->registerPayload("storage.vault.add", &handler::Vaults::add);
+    r->registerPayload("storage.vault.update", &handler::Vaults::update);
+    r->registerPayload("storage.vault.remove", &handler::Vaults::remove);
+    r->registerPayload("storage.vault.get", &handler::Vaults::get);
+    r->registerPayload("storage.vault.sync", &handler::Vaults::sync);
 }
 
 void Handler::registerAPIKeyHandlers(const std::shared_ptr<Router>& r) {
-    r->registerPayload("storage.apiKey.add", &APIKeys::add);
-    r->registerPayload("storage.apiKey.remove", &APIKeys::remove);
-    r->registerSessionOnlyHandler("storage.apiKey.list", &APIKeys::list);
-    r->registerPayload("storage.apiKey.get", &APIKeys::get);
+    r->registerPayload("storage.apiKey.add", &handler::APIKeys::add);
+    r->registerPayload("storage.apiKey.remove", &handler::APIKeys::remove);
+    r->registerSessionOnlyHandler("storage.apiKey.list", &handler::APIKeys::list);
+    r->registerPayload("storage.apiKey.get", &handler::APIKeys::get);
 }
 
 void Handler::registerRoleHandlers(const std::shared_ptr<Router>& r) {
@@ -94,24 +93,24 @@ void Handler::registerPermissionsHandlers(const std::shared_ptr<Router>& r) {
 }
 
 void Handler::registerSettingsHandlers(const std::shared_ptr<Router>& r) {
-    r->registerSessionOnlyHandler("settings.get", &Settings::get);
-    r->registerPayload("settings.update", &Settings::update);
+    r->registerSessionOnlyHandler("settings.get", &handler::Settings::get);
+    r->registerPayload("settings.update", &handler::Settings::update);
 }
 
 void Handler::registerGroupHandlers(const std::shared_ptr<Router>& r) {
-    r->registerPayload("group.add", &Groups::add);
-    r->registerPayload("group.update", &Groups::update);
-    r->registerPayload("group.remove", &Groups::remove);
-    r->registerPayload("group.member.add", &Groups::addMember);
-    r->registerPayload("group.member.remove", &Groups::removeMember);
-    r->registerPayload("group.get", &Groups::get);
-    r->registerPayload("group.get.byName", &Groups::getByName);
-    r->registerPayload("groups.list.byUser", &Groups::listByUser);
-    r->registerSessionOnlyHandler("groups.list", &Groups::list);
+    r->registerPayload("group.add", &handler::Groups::add);
+    r->registerPayload("group.update", &handler::Groups::update);
+    r->registerPayload("group.remove", &handler::Groups::remove);
+    r->registerPayload("group.member.add", &handler::Groups::addMember);
+    r->registerPayload("group.member.remove", &handler::Groups::removeMember);
+    r->registerPayload("group.get", &handler::Groups::get);
+    r->registerPayload("group.get.byName", &handler::Groups::getByName);
+    r->registerPayload("groups.list.byUser", &handler::Groups::listByUser);
+    r->registerSessionOnlyHandler("groups.list", &handler::Groups::list);
 }
 
 void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
-    r->registerPayload("stats.vault", &Stats::vault);
-    r->registerSessionOnlyHandler("stats.fs.cache", &Stats::fsCache);
-    r->registerSessionOnlyHandler("stats.http.cache", &Stats::httpCache);
+    r->registerPayload("stats.vault", &handler::Stats::vault);
+    r->registerSessionOnlyHandler("stats.fs.cache", &handler::Stats::fsCache);
+    r->registerSessionOnlyHandler("stats.http.cache", &handler::Stats::httpCache);
 }

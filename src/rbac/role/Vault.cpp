@@ -1,5 +1,6 @@
 #include "rbac/role/Vault.hpp"
 #include "db/encoding/timestamp.hpp"
+#include "db/encoding/has.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
@@ -13,11 +14,11 @@ Vault::Vault(const pqxx::row& row, const pqxx::result& overrides)
     : Meta(row),
       Base(row, overrides),
       assignment(std::nullopt) {
-    if (!row["assignment_id"].is_null()) {
+    if (hasColumn(row, "assignment_id") && !row["assignment_id"].is_null()) {
         assignment = AssignmentInfo();
-        if (!row["subject_id"].is_null()) assignment->subject_id = row["subject_id"].as<uint32_t>();
-        if (!row["vault_id"].is_null()) assignment->vault_id = row["vault_id"].as<uint32_t>();
-        if (!row["subject_type"].is_null()) assignment->subject_type = row["subject_type"].as<std::string>();
+        if (const auto id = try_get<uint32_t>(row, "subject_id")) assignment->subject_id = *id;
+        if (const auto type = try_get<std::string>(row, "subject_type")) assignment->subject_type = *type;
+        if (const auto vId = try_get<uint32_t>(row, "vault_id")) assignment->vault_id = *vId;
     }
 }
 

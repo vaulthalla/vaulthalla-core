@@ -9,44 +9,30 @@
 using namespace vh::db::encoding;
 
 namespace vh::rbac::role {
-    BasicMeta::BasicMeta(const pqxx::row &row) {
-        if (hasColumn(row, "role_created_at") && !row["role_created_at"].is_null())
-            created_at = parsePostgresTimestamp(row["role_created_at"].as<std::string>());
-        else if (hasColumn(row, "created_at") && !row["created_at"].is_null())
-            created_at = parsePostgresTimestamp(row["created_at"].as<std::string>());
+    BasicMeta::BasicMeta(const pqxx::row& row) {
+        if (const auto v = try_get<std::string>(row, std::vector<std::string_view>{"role_created_at", "created_at"}))
+            created_at = parsePostgresTimestamp(*v);
 
-        if (hasColumn(row, "role_updated_at") && !row["role_updated_at"].is_null())
-            updated_at = parsePostgresTimestamp(row["role_updated_at"].as<std::string>());
-        else if (hasColumn(row, "updated_at") && !row["updated_at"].is_null())
-            updated_at = parsePostgresTimestamp(row["updated_at"].as<std::string>());
+        if (const auto v = try_get<std::string>(row, std::vector<std::string_view>{"role_updated_at", "updated_at"}))
+            updated_at = parsePostgresTimestamp(*v);
 
-        if (hasColumn(row, "role_assigned_at") && !row["role_assigned_at"].is_null())
-            assigned_at = parsePostgresTimestamp(row["role_assigned_at"].as<std::string>());
-        else if (hasColumn(row, "assigned_at") && !row["assigned_at"].is_null())
-            assigned_at = parsePostgresTimestamp(row["assigned_at"].as<std::string>());
+        if (const auto v = try_get<std::string>(row, std::vector<std::string_view>{"role_assigned_at", "assigned_at"}))
+            assigned_at = parsePostgresTimestamp(*v);
     }
 
-    Meta::Meta(const pqxx::row &row)
+    Meta::Meta(const pqxx::row& row)
         : BasicMeta(row) {
-        if (hasColumn(row, "role_id") && !row["role_id"].is_null())
-            id = row["role_id"].as<uint32_t>();
-        else if (hasColumn(row, "id") && !row["id"].is_null())
-            id = row["id"].as<uint32_t>();
+        if (const auto v = try_get<uint32_t>(row, std::vector<std::string_view>{"role_id", "id"}))
+            id = *v;
 
-        if (hasColumn(row, "role_assignment_id") && !row["role_assignment_id"].is_null())
-            assignment_id = row["role_assignment_id"].as<uint32_t>();
-        else if (hasColumn(row, "assignment_id") && !row["assignment_id"].is_null())
-            assignment_id = row["assignment_id"].as<uint32_t>();
+        if (const auto v = try_get<uint32_t>(row, std::vector<std::string_view>{"role_assignment_id", "assignment_id"}))
+            assignment_id = *v;
 
-        if (hasColumn(row, "role_name") && !row["role_name"].is_null())
-            name = row["role_name"].as<std::string>();
-        else if (hasColumn(row, "name") && !row["name"].is_null())
-            name = row["name"].as<std::string>();
+        if (const auto v = try_get<std::string>(row, std::vector<std::string_view>{"role_name", "name"}))
+            name = *v;
 
-        if (hasColumn(row, "role_description") && !row["role_description"].is_null())
-            description = row["role_description"].as<std::string>();
-        else if (hasColumn(row, "description") && !row["description"].is_null())
-            description = row["description"].as<std::string>();
+        if (const auto v = try_get<std::string>(row, std::vector<std::string_view>{"role_description", "description"}))
+            description = *v;
     }
 
     Meta::Meta(const nlohmann::json &json) { from_json(json, *this); }

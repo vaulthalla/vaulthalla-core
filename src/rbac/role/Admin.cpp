@@ -26,7 +26,7 @@ namespace vh::rbac::role {
           keys(static_cast<typename decltype(keys)::Mask>(
               row["keys_permissions"].as<uint64_t>())),
           vGlobals(globalVaultRoles) {
-        if (hasColumn(row, "user_id") && !row["user_id"].is_null()) user_id = row["user_id"].as<uint32_t>();
+        if (const auto id = try_get<uint32_t>(row, "user_id")) user_id = *id;
     }
 
     Admin::Admin(const pqxx::row &row) : Admin(row, {}) {

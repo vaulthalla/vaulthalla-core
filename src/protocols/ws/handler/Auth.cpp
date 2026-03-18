@@ -14,18 +14,19 @@ using namespace vh::auth;
 using namespace vh::identities;
 using namespace vh::rbac::permission::admin;
 
-json Auth::login(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::login(const json &payload, const std::shared_ptr<Session> &session) {
     const auto username = payload.at("name").get<std::string>();
     const auto password = payload.at("password").get<std::string>();
 
     runtime::Deps::get().authManager->loginUser(username, password, session);
-    if (!session::Validator::softValidateActiveSession(session)) throw std::runtime_error("Failed to validate session after login");
+    if (!session::Validator::softValidateActiveSession(session)) throw std::runtime_error(
+        "Failed to validate session after login");
 
     session->sendAccessTokenOnNextResponse();
     return {{"user", *session->user}};
 }
 
-json Auth::registerUser(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::registerUser(const json &payload, const std::shared_ptr<Session> &session) {
     const auto name = payload.at("name").get<std::string>();
     const auto email = payload.at("email").get<std::string>();
     const auto password = payload.at("password").get<std::string>();
@@ -53,13 +54,13 @@ json Auth::registerUser(const json& payload, const std::shared_ptr<Session>& ses
     return {{"user", *user}};
 }
 
-json Auth::refreshToken(const std::string& token, const std::shared_ptr<Session>& session) {
+json Auth::refreshToken(const std::string &token, const std::shared_ptr<Session> &session) {
     runtime::Deps::get().sessionManager->renewAccessToken(session, token);
     session->sendAccessTokenOnNextResponse();
     return {};
 }
 
-json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::deleteUser(const json &payload, const std::shared_ptr<Session> &session) {
     const auto id = payload.at("id").get<unsigned int>();
 
     const auto targetUser = db::query::identities::User::getUserById(id);
@@ -70,7 +71,8 @@ json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& sessi
     if (targetUser->isAdmin() && !session->user->identities().canDelete(Identities::Type::Admins))
         throw std::runtime_error("Permission denied: Only super admins can delete admin users");
 
-    if (!targetUser->isAdmin() && targetUser->id != session->user->id && !session->user->identities().canDelete(Identities::Type::Users))
+    if (!targetUser->isAdmin() && targetUser->id != session->user->id && !session->user->identities().canDelete(
+            Identities::Type::Users))
         throw std::runtime_error("Permission denied: Only admins can delete other users");
 
     db::query::identities::User::deleteUser(targetUser->id);
@@ -80,10 +82,10 @@ json Auth::deleteUser(const json& payload, const std::shared_ptr<Session>& sessi
 
     runtime::Deps::get().sessionManager->invalidate(std::to_string(targetUser->id));
 
-    return {{ "user_id", targetUser->id }};
+    return {{"user_id", targetUser->id}};
 }
 
-json Auth::updateUser(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::updateUser(const json &payload, const std::shared_ptr<Session> &session) {
     if (!session->user) throw std::runtime_error("User not authenticated");
 
     session->user->updateUser(payload);
@@ -92,7 +94,7 @@ json Auth::updateUser(const json& payload, const std::shared_ptr<Session>& sessi
     return {{"user", *session->user}};
 }
 
-json Auth::changePassword(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::changePassword(const json &payload, const std::shared_ptr<Session> &session) {
     const auto oldPassword = payload.at("old_password").get<std::string>();
     const auto newPassword = payload.at("new_password").get<std::string>();
 
@@ -101,7 +103,7 @@ json Auth::changePassword(const json& payload, const std::shared_ptr<Session>& s
     return {};
 }
 
-json Auth::getUser(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::getUser(const json &payload, const std::shared_ptr<Session> &session) {
     const auto userId = payload.at("id").get<unsigned int>();
 
     const auto targetUser = db::query::identities::User::getUserById(userId);
@@ -118,26 +120,26 @@ json Auth::getUser(const json& payload, const std::shared_ptr<Session>& session)
     return {{"user", *targetUser}};
 }
 
-json Auth::logout(const std::shared_ptr<Session>& session) {
+json Auth::logout(const std::shared_ptr<Session> &session) {
     runtime::Deps::get().sessionManager->invalidate(session);
     return {};
 }
 
-json Auth::listUsers(const std::shared_ptr<Session>& session) {
+json Auth::listUsers(const std::shared_ptr<Session> &session) {
     if (!session->user->identities().canView(Identities::Type::Admins))
         throw std::runtime_error("Permission denied");
 
     return {{"users", to_json(db::query::identities::User::listUsers())}};
 }
 
-json Auth::isUserAuthenticated(const std::string& token, const std::shared_ptr<Session>& session)  {
+json Auth::isUserAuthenticated(const std::string &token, const std::shared_ptr<Session> &session) {
     const bool isAuthenticated = runtime::Deps::get().sessionManager->validate(session, token);
     json data = {{"isAuthenticated", isAuthenticated}};
     if (isAuthenticated) data["user"] = *session->user;
     return data;
 }
 
-json Auth::getUserByName(const json& payload, const std::shared_ptr<Session>& session) {
+json Auth::getUserByName(const json &payload, const std::shared_ptr<Session> &session) {
     if (!session->user) throw std::runtime_error("User not authenticated");
     const auto name = payload.at("name").get<std::string>();
 

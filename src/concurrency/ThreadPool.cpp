@@ -6,7 +6,7 @@
 
 using namespace vh::concurrency;
 
-ThreadPool::ThreadPool(const std::shared_ptr<std::atomic<bool> >& interruptFlag,
+ThreadPool::ThreadPool(const std::shared_ptr<std::atomic<bool> > &interruptFlag,
                        unsigned int nThreads)
     : interruptFlag(interruptFlag), stopFlag(false) {
     for (unsigned int i = 0; i < nThreads; ++i) {
@@ -27,7 +27,7 @@ void ThreadPool::stop(std::chrono::milliseconds gracefulTimeout) { {
     stopFlag.store(true);
     cv.notify_all();
 
-    for (auto& t : threads_) {
+    for (auto &t: threads_) {
         if (!t.joinable()) continue;
 
         if (t.joinable()) {
@@ -35,7 +35,11 @@ void ThreadPool::stop(std::chrono::milliseconds gracefulTimeout) { {
                 auto start = std::chrono::steady_clock::now();
                 while (std::chrono::steady_clock::now() - start < gracefulTimeout) {
                     if (t.joinable()) {
-                        try { t.join(); break; } catch (...) {}
+                        try {
+                            t.join();
+                            break;
+                        } catch (...) {
+                        }
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 }
@@ -64,7 +68,7 @@ size_t ThreadPool::queueDepth() const {
 }
 
 bool ThreadPool::hasIdleWorker() const {
-    return std::ranges::any_of(idleFlags_, [](auto& flag) { return flag->load(); });
+    return std::ranges::any_of(idleFlags_, [](auto &flag) { return flag->load(); });
 }
 
 bool ThreadPool::isUnderloaded() const {

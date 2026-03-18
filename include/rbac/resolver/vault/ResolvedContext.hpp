@@ -7,7 +7,6 @@
 #include <memory>
 
 namespace vh::rbac::resolver::vault {
-
     struct ResolvedContext {
         std::shared_ptr<storage::Engine> engine;
         std::shared_ptr<vh::vault::model::Vault> vault;
@@ -20,5 +19,4 @@ namespace vh::rbac::resolver::vault {
         [[nodiscard]] bool hasTargetGroup() const { return !!targetGroup; }
         [[nodiscard]] bool hasTargetSubject() const { return targetUser || targetGroup; }
     };
-
 }

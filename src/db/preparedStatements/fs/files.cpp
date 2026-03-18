@@ -79,7 +79,7 @@ void vh::db::DBConnection::initPreparedFiles() const {
         ") "
         "DELETE FROM fs_entry "
         "WHERE id IN (SELECT fs_entry_id FROM target);"
-        );
+    );
 
     conn_->prepare(
         "mark_file_trashed_by_id",
@@ -117,7 +117,7 @@ void vh::db::DBConnection::initPreparedFiles() const {
         ") "
         "DELETE FROM fs_entry "
         "WHERE id IN (SELECT fs_entry_id FROM target);"
-        );
+    );
 
     conn_->prepare("list_trashed_files",
                    "SELECT * FROM files_trashed WHERE vault_id = $1 AND deleted_at IS NULL");
@@ -290,5 +290,4 @@ void vh::db::DBConnection::initPreparedFiles() const {
     ORDER BY total_bytes DESC
     LIMIT $2
 )SQL");
-
 }

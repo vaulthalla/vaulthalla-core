@@ -6,11 +6,15 @@
 #include <optional>
 #include <type_traits>
 
-namespace vh::identities { struct User; }
-namespace vh::fs::model { struct Entry; }
+namespace vh::identities {
+    struct User;
+}
+
+namespace vh::fs::model {
+    struct Entry;
+}
 
 namespace vh::rbac::resolver::vault {
-
     template<typename EnumT>
     struct Context {
         static_assert(std::is_enum_v<EnumT>, "vh::rbac::vault::Context<EnumT>: EnumT must be an enum type");
@@ -21,11 +25,10 @@ namespace vh::rbac::resolver::vault {
         std::optional<uint32_t> target_subject_id{std::nullopt};
         std::optional<uint32_t> vault_id{std::nullopt};
         std::optional<std::filesystem::path> path{std::nullopt};
-        std::optional<std::shared_ptr<vh::fs::model::Entry>> entry{std::nullopt};
+        std::optional<std::shared_ptr<vh::fs::model::Entry> > entry{std::nullopt};
 
         [[nodiscard]] bool isValid() const {
             return !!user;
         }
     };
-
 }

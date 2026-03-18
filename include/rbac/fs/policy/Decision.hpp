@@ -10,7 +10,6 @@
 #include <string_view>
 
 namespace vh::rbac::fs::policy {
-
     struct Decision {
         enum class Reason : uint8_t {
             Allowed,
@@ -32,5 +31,4 @@ namespace vh::rbac::fs::policy {
 
         [[nodiscard]] std::string toString() const;
     };
-
 }

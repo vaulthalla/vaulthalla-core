@@ -1,7 +1,6 @@
 #include "db/DBConnection.hpp"
 
 void vh::db::DBConnection::initPreparedSyncEvents() const {
-
     // ---------------------------------------
     // CREATE (DB generates run_uuid)
     // ---------------------------------------
@@ -27,7 +26,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
             )
             RETURNING id, run_uuid;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // UPSERT (deterministic by UUID)
@@ -102,7 +101,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
                 config_hash          = EXCLUDED.config_hash
             RETURNING id, run_uuid;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // READ by UUID
@@ -114,7 +113,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
             WHERE vault_id = $1
               AND run_uuid = $2;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // LIST runs for vault
@@ -127,7 +126,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
             ORDER BY timestamp_begin DESC
             LIMIT $2 OFFSET $3;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // TOUCH HEARTBEAT
@@ -140,7 +139,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // FINISH RUN
@@ -158,7 +157,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // UPDATE COUNTERS
@@ -176,7 +175,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // DELETE RUN
@@ -188,7 +187,7 @@ void vh::db::DBConnection::initPreparedSyncEvents() const {
               AND run_uuid = $2
             RETURNING id;
         )SQL"
-        );
+    );
 
 
     // ---------------------------------------

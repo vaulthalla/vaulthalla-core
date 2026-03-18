@@ -113,10 +113,13 @@ namespace vh::rbac::permission {
             std::vector<Override> overrides{};
 
             Filesystem() = default;
-            explicit Filesystem(const pqxx::row& row);
-            Filesystem(const pqxx::row& row, const pqxx::result& overrideRes);
+
+            explicit Filesystem(const pqxx::row &row);
+
+            Filesystem(const pqxx::row &row, const pqxx::result &overrideRes);
 
             [[nodiscard]] std::string toString(uint8_t indent) const;
+
             [[nodiscard]] std::string toFlagString() const;
 
             static Filesystem None() {
@@ -210,7 +213,8 @@ namespace vh::rbac::permission {
             }
         };
 
-        void to_json(nlohmann::json& j, const Filesystem& f);
-        void from_json(const nlohmann::json& j, Filesystem& f);
+        void to_json(nlohmann::json &j, const Filesystem &f);
+
+        void from_json(const nlohmann::json &j, Filesystem &f);
     }
 }

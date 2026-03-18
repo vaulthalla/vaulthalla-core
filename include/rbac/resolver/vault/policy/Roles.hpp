@@ -7,12 +7,11 @@
 #include "vault/model/Vault.hpp"
 
 namespace vh::rbac::resolver::vault {
-
     template<>
     struct ContextPolicy<permission::vault::RolePermissions> {
     private:
-        static bool validateAssignUser(const std::shared_ptr<identities::User>& actor,
-                                       const ResolvedContext& resolved) {
+        static bool validateAssignUser(const std::shared_ptr<identities::User> &actor,
+                                       const ResolvedContext &resolved) {
             if (!resolved.targetUser) return false;
             if (resolved.targetUser->id == actor->id) return false;
             if (resolved.targetUser->id == resolved.vault->owner_id) return false;
@@ -21,8 +20,8 @@ namespace vh::rbac::resolver::vault {
             return true;
         }
 
-        static bool validateAssignGroup(const std::shared_ptr<identities::User>& actor,
-                                        const ResolvedContext& resolved) {
+        static bool validateAssignGroup(const std::shared_ptr<identities::User> &actor,
+                                        const ResolvedContext &resolved) {
             if (!actor) return false;
             if (!resolved.targetGroup) return false;
 
@@ -31,8 +30,8 @@ namespace vh::rbac::resolver::vault {
             return true;
         }
 
-        static bool validateAssign(const std::shared_ptr<identities::User>& actor,
-                                   const ResolvedContext& resolved) {
+        static bool validateAssign(const std::shared_ptr<identities::User> &actor,
+                                   const ResolvedContext &resolved) {
             if (!actor || !resolved.isValid()) return false;
             if (!resolved.hasTargetSubject()) return false;
 
@@ -46,8 +45,8 @@ namespace vh::rbac::resolver::vault {
         }
 
     public:
-        static bool validate(const std::shared_ptr<identities::User>& actor,
-                             const ResolvedContext& resolved,
+        static bool validate(const std::shared_ptr<identities::User> &actor,
+                             const ResolvedContext &resolved,
                              permission::vault::RolePermissions permission) {
             if (!actor || !resolved.isValid()) return false;
 
@@ -60,5 +59,4 @@ namespace vh::rbac::resolver::vault {
             }
         }
     };
-
 }

@@ -10,92 +10,104 @@
 #include <curl/curl.h>
 #include <unordered_map>
 
-namespace vh::vault::model { struct APIKey; }
+namespace vh::vault::model {
+    struct APIKey;
+}
 
 namespace vh::storage::s3 {
+    namespace fs = std::filesystem;
 
-namespace fs = std::filesystem;
+    struct ValidateResult {
+        bool ok;
+        std::string msg;
+    };
 
-struct ValidateResult { bool ok; std::string msg; };
+    class Controller {
+    public:
+        static constexpr uintmax_t MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MiB
 
-class Controller {
-public:
-    static constexpr uintmax_t MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MiB
+        Controller(const std::shared_ptr<vault::model::APIKey> &apiKey, std::string bucket);
 
-    Controller(const std::shared_ptr<vault::model::APIKey>& apiKey, std::string bucket);
+        ~Controller();
 
-    ~Controller();
+        // #########################################################################
+        // ########################### FILE OPS ####################################
+        // #########################################################################
 
-    // #########################################################################
-    // ########################### FILE OPS ####################################
-    // #########################################################################
+        void uploadLargeObject(const fs::path &key, const fs::path &filePath, uintmax_t partSize = MIN_PART_SIZE) const;
 
-    void uploadLargeObject(const fs::path& key, const fs::path& filePath, uintmax_t partSize = MIN_PART_SIZE) const;
-    void uploadObject(const fs::path& key, const fs::path& filePath) const;
-    void downloadObject(const fs::path& key, const fs::path& outputPath) const;
+        void uploadObject(const fs::path &key, const fs::path &filePath) const;
 
-    // #########################################################################
-    // ########################### BUFFER OPS ##################################
-    // #########################################################################
+        void downloadObject(const fs::path &key, const fs::path &outputPath) const;
 
-    void uploadLargeObject(const fs::path& key, const std::vector<uint8_t>& buffer, uintmax_t partSize = MIN_PART_SIZE) const;
+        // #########################################################################
+        // ########################### BUFFER OPS ##################################
+        // #########################################################################
 
-    void uploadBufferWithMetadata(
-        const fs::path& key,
-        const std::vector<uint8_t>& buffer,
-        const std::unordered_map<std::string, std::string>& metadata) const;
+        void uploadLargeObject(const fs::path &key, const std::vector<uint8_t> &buffer,
+                               uintmax_t partSize = MIN_PART_SIZE) const;
 
-    void downloadToBuffer(const fs::path& key, std::vector<uint8_t>& outBuffer) const;
+        void uploadBufferWithMetadata(
+            const fs::path &key,
+            const std::vector<uint8_t> &buffer,
+            const std::unordered_map<std::string, std::string> &metadata) const;
 
-    // #########################################################################
-    // ######################## MULTIPART UPLOADS ##############################
-    // #########################################################################
+        void downloadToBuffer(const fs::path &key, std::vector<uint8_t> &outBuffer) const;
 
-    [[nodiscard]] std::string initiateMultipartUpload(const fs::path& key) const;
+        // #########################################################################
+        // ######################## MULTIPART UPLOADS ##############################
+        // #########################################################################
 
-    void uploadPart(const fs::path& key, const std::string& uploadId,
-                    int partNumber, const std::string& partData, std::string& etagOut) const;
+        [[nodiscard]] std::string initiateMultipartUpload(const fs::path &key) const;
 
-    void completeMultipartUpload(const fs::path& key, const std::string& uploadId,
-                                 const std::vector<std::string>& etags) const;
+        void uploadPart(const fs::path &key, const std::string &uploadId,
+                        int partNumber, const std::string &partData, std::string &etagOut) const;
 
-    void abortMultipartUpload(const fs::path& key, const std::string& uploadId) const;
+        void completeMultipartUpload(const fs::path &key, const std::string &uploadId,
+                                     const std::vector<std::string> &etags) const;
 
-    // #########################################################################
-    // ######################## METADATA & TAGS ################################
-    // #########################################################################
+        void abortMultipartUpload(const fs::path &key, const std::string &uploadId) const;
 
-    [[nodiscard]] std::optional<std::unordered_map<std::string, std::string>> getHeadObject(const fs::path& key) const;
-    void setObjectContentHash(const fs::path& key, const std::string& hash) const;
-    void setObjectEncryptionMetadata(const std::string& key, const std::string& iv_b64, unsigned int key_version) const;
+        // #########################################################################
+        // ######################## METADATA & TAGS ################################
+        // #########################################################################
 
-    // #########################################################################
-    // ########################### VALIDATION ##################################
-    // #########################################################################
+        [[nodiscard]] std::optional<std::unordered_map<std::string, std::string> > getHeadObject(
+            const fs::path &key) const;
 
-    [[nodiscard]] ValidateResult validateAPICredentials() const;
-    [[nodiscard]] bool isBucketEmpty() const;
+        void setObjectContentHash(const fs::path &key, const std::string &hash) const;
 
-    // #########################################################################
-    // ############################### GENERAL #################################
-    // #########################################################################
+        void setObjectEncryptionMetadata(const std::string &key, const std::string &iv_b64,
+                                         unsigned int key_version) const;
 
-    void deleteObject(const fs::path& key) const;
-    [[nodiscard]] std::u8string listObjects(const fs::path& prefix = {}) const;
+        // #########################################################################
+        // ########################### VALIDATION ##################################
+        // #########################################################################
 
-private:
-    std::shared_ptr<vault::model::APIKey> apiKey_;
-    std::string bucket_;
+        [[nodiscard]] ValidateResult validateAPICredentials() const;
 
-    [[nodiscard]] std::map<std::string, std::string> buildHeaderMap(const std::string& payloadHash) const;
+        [[nodiscard]] bool isBucketEmpty() const;
 
-    std::pair<std::string, std::string> constructPaths(CURL* curl, const fs::path& p,
-                                                       const std::string& query = "") const;
+        // #########################################################################
+        // ############################### GENERAL #################################
+        // #########################################################################
 
-    [[nodiscard]] SList makeSigHeaders(const std::string& method,
-                                       const std::string& canonical,
-                                       const std::string& payloadHash,
-                                       const std::string& query = "") const;
-};
+        void deleteObject(const fs::path &key) const;
 
+        [[nodiscard]] std::u8string listObjects(const fs::path &prefix = {}) const;
+
+    private:
+        std::shared_ptr<vault::model::APIKey> apiKey_;
+        std::string bucket_;
+
+        [[nodiscard]] std::map<std::string, std::string> buildHeaderMap(const std::string &payloadHash) const;
+
+        std::pair<std::string, std::string> constructPaths(CURL *curl, const fs::path &p,
+                                                           const std::string &query = "") const;
+
+        [[nodiscard]] SList makeSigHeaders(const std::string &method,
+                                           const std::string &canonical,
+                                           const std::string &payloadHash,
+                                           const std::string &query = "") const;
+    };
 }

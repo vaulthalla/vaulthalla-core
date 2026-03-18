@@ -22,7 +22,7 @@ namespace {
     }
 }
 
-Override::Override(const pqxx::row& row)
+Override::Override(const pqxx::row &row)
     : assignment_id(row["assignment_id"].as<unsigned int>()),
       permission(row),
       effect(overrideOptFromString(row["effect"].as<std::string>())),
@@ -32,33 +32,34 @@ Override::Override(const pqxx::row& row)
     else if (!row["id"].is_null()) id = row["id"].as<uint32_t>();
 }
 
-Override::Override(const nlohmann::json& j)
+Override::Override(const nlohmann::json &j)
     : id(j.value("id", 0u)),
       assignment_id(j.value("assignment_id", 0u)),
       permission(j.at("permission").get<Permission>()),
       effect(overrideOptFromString(j.value("effect", std::string("allow")))),
       enabled(j.value("enabled", true)),
-      pattern(j.value("glob_path", std::string())) {}
+      pattern(j.value("glob_path", std::string())) {
+}
 
-std::string vh::rbac::permission::to_string(const OverrideOpt& opt) {
+std::string vh::rbac::permission::to_string(const OverrideOpt &opt) {
     switch (opt) {
         case OverrideOpt::ALLOW: return "allow";
-        case OverrideOpt::DENY:  return "deny";
+        case OverrideOpt::DENY: return "deny";
     }
 
     throw std::invalid_argument("Unhandled OverrideOpt enum value");
 }
 
-OverrideOpt vh::rbac::permission::overrideOptFromString(const std::string& str) {
+OverrideOpt vh::rbac::permission::overrideOptFromString(const std::string &str) {
     const auto lwr = lowerCopy(str);
 
     if (lwr == "allow") return OverrideOpt::ALLOW;
-    if (lwr == "deny")  return OverrideOpt::DENY;
+    if (lwr == "deny") return OverrideOpt::DENY;
 
     throw std::invalid_argument("Invalid OverrideOpt string: " + str);
 }
 
-void vh::rbac::permission::to_json(nlohmann::json& j, const Override& po) {
+void vh::rbac::permission::to_json(nlohmann::json &j, const Override &po) {
     j = {
         {"id", po.id},
         {"permission", po.permission},
@@ -69,7 +70,7 @@ void vh::rbac::permission::to_json(nlohmann::json& j, const Override& po) {
     };
 }
 
-void vh::rbac::permission::from_json(const nlohmann::json& j, Override& po) {
+void vh::rbac::permission::from_json(const nlohmann::json &j, Override &po) {
     if (!j.contains("permission"))
         throw std::runtime_error("Override JSON must contain 'permission'");
 
@@ -81,58 +82,58 @@ void vh::rbac::permission::from_json(const nlohmann::json& j, Override& po) {
     po.pattern = fs::glob::model::Pattern(j.value("glob_path", std::string()));
 }
 
-std::vector<Override> vh::rbac::permission::permissionOverridesFromPqRes(const pqxx::result& res) {
+std::vector<Override> vh::rbac::permission::permissionOverridesFromPqRes(const pqxx::result &res) {
     std::vector<Override> overrides;
     overrides.reserve(res.size());
 
-    for (const auto& row : res) overrides.emplace_back(row);
+    for (const auto &row: res) overrides.emplace_back(row);
 
     return overrides;
 }
 
-std::vector<Override> vh::rbac::permission::permissionOverridesFromJson(const nlohmann::json& j) {
+std::vector<Override> vh::rbac::permission::permissionOverridesFromJson(const nlohmann::json &j) {
     if (!j.is_array())
         throw std::runtime_error("permissionOverridesFromJson expected a JSON array");
 
     std::vector<Override> overrides;
     overrides.reserve(j.size());
 
-    for (const auto& item : j) overrides.emplace_back(item);
+    for (const auto &item: j) overrides.emplace_back(item);
 
     return overrides;
 }
 
-void vh::rbac::permission::to_json(nlohmann::json& j, const std::vector<Override>& overrides) {
+void vh::rbac::permission::to_json(nlohmann::json &j, const std::vector<Override> &overrides) {
     j = nlohmann::json::array();
-    for (const auto& override : overrides) j.emplace_back(override);
+    for (const auto &override: overrides) j.emplace_back(override);
 }
 
-std::string vh::rbac::permission::to_string(const Override& override) {
+std::string vh::rbac::permission::to_string(const Override &override) {
     std::ostringstream ss;
 
     ss << "ID: " << override.id << "\n"
-       << "Permission: " << override.permission.name << " (" << override.permission.description << ")\n"
-       << "Glob Path: " << override.glob_path() << "\n"
-       << "Effect: " << to_string(override.effect) << "\n"
-       << "Enabled: " << (override.enabled ? "On" : "Off") << "\n"
-       << "Assignment ID: " << override.assignment_id << "\n";
+            << "Permission: " << override.permission.name << " (" << override.permission.description << ")\n"
+            << "Glob Path: " << override.glob_path() << "\n"
+            << "Effect: " << to_string(override.effect) << "\n"
+            << "Enabled: " << (override.enabled ? "On" : "Off") << "\n"
+            << "Assignment ID: " << override.assignment_id << "\n";
 
     return ss.str();
 }
 
-std::string vh::rbac::permission::to_string(const std::vector<Override>& overrides) {
+std::string vh::rbac::permission::to_string(const std::vector<Override> &overrides) {
     if (overrides.empty()) return "No overrides";
 
     Table tbl({
-        {"ID",          Align::Left, 4, 8,  false, false},
-        {"NAME",        Align::Left, 4, 32, false, false},
-        {"DESCRIPTION", Align::Left, 4, 64, false, false},
-        {"GLOB PATH",   Align::Left, 4, 64, false, false},
-        {"EFFECT",      Align::Left, 4, 8,  false, false},
-        {"ENABLED",     Align::Left, 4, 8,  false, false}
-    }, term_width());
+                  {"ID", Align::Left, 4, 8, false, false},
+                  {"NAME", Align::Left, 4, 32, false, false},
+                  {"DESCRIPTION", Align::Left, 4, 64, false, false},
+                  {"GLOB PATH", Align::Left, 4, 64, false, false},
+                  {"EFFECT", Align::Left, 4, 8, false, false},
+                  {"ENABLED", Align::Left, 4, 8, false, false}
+              }, term_width());
 
-    for (const auto& ovr : overrides) {
+    for (const auto &ovr: overrides) {
         tbl.add_row({
             std::to_string(ovr.id),
             ovr.permission.name,

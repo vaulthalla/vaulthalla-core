@@ -51,14 +51,14 @@ using namespace vh::rbac::fs::policy;
 }
 
 [[nodiscard]] bool Evaluator::allowedByBase(
-    const permission::vault::Filesystem& perms,
+    const permission::vault::Filesystem &perms,
     const bool isDir,
     const permission::vault::FilesystemAction action
 ) {
     using A = permission::vault::FilesystemAction;
 
     if (isDir) {
-        const auto& d = perms.directories;
+        const auto &d = perms.directories;
         switch (action) {
             case A::List: return d.canList();
             case A::Upload: return d.canUpload();
@@ -77,7 +77,7 @@ using namespace vh::rbac::fs::policy;
         }
     }
 
-    const auto& f = perms.files;
+    const auto &f = perms.files;
     switch (action) {
         case A::Preview: return f.canPreview();
         case A::Upload: return f.canUpload();
@@ -97,14 +97,14 @@ using namespace vh::rbac::fs::policy;
     return false;
 }
 
-const vh::rbac::permission::Override* Evaluator::findBestOverride(
-    const std::vector<permission::Override>& overrides,
+const vh::rbac::permission::Override *Evaluator::findBestOverride(
+    const std::vector<permission::Override> &overrides,
     const std::string_view absolutePath
 ) {
-    const permission::Override* best = nullptr;
+    const permission::Override *best = nullptr;
     std::size_t bestScore = 0;
 
-    for (const auto& o : overrides) {
+    for (const auto &o: overrides) {
         if (!o.enabled)
             continue;
 
@@ -121,15 +121,18 @@ const vh::rbac::permission::Override* Evaluator::findBestOverride(
     return best;
 }
 
-std::size_t Evaluator::scorePattern(const glob::model::Pattern& pattern) {
+std::size_t Evaluator::scorePattern(const glob::model::Pattern &pattern) {
     using T = glob::model::Token::Type;
 
     std::size_t score = 0;
-    for (const auto& token : pattern.tokens) {
+    for (const auto &token: pattern.tokens) {
         switch (token.type) {
-            case T::Literal: score += 10 + token.value.size(); break;
-            case T::Slash: score += 1; break;
-            case T::Question: score += 2; break;
+            case T::Literal: score += 10 + token.value.size();
+                break;
+            case T::Slash: score += 1;
+                break;
+            case T::Question: score += 2;
+                break;
             case T::Star: break;
             case T::DoubleStar: break;
         }

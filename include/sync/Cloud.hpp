@@ -10,87 +10,95 @@
 #include <vector>
 
 namespace vh::fs::model {
-struct File;
+    struct File;
 }
 
 namespace vh::sync::model {
-struct Conflict;
+    struct Conflict;
 }
 
 namespace vh::storage {
-class CloudEngine;
+    class CloudEngine;
 }
 
 namespace vh::sync {
+    struct Cloud final : Local {
+        std::vector<std::shared_ptr<fs::model::File> > localFiles, s3Files;
+        std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > localMap, s3Map;
+        std::unordered_map<std::u8string, std::optional<std::string> > remoteHashMap;
 
-struct Cloud final : Local {
-    std::vector<std::shared_ptr<fs::model::File>> localFiles, s3Files;
-    std::unordered_map<std::u8string, std::shared_ptr<fs::model::File>> localMap, s3Map;
-    std::unordered_map<std::u8string, std::optional<std::string>> remoteHashMap;
+        ~Cloud() override = default;
 
-    ~Cloud() override = default;
-    explicit Cloud(const std::shared_ptr<storage::Engine>& engine) : Local(engine) {}
-
-
-    // ##########################################
-    // ########### FSTask Overrides #############
-    // ##########################################
-
-    void operator()() override;
+        explicit Cloud(const std::shared_ptr<storage::Engine> &engine) : Local(engine) {
+        }
 
 
-    // ##########################################
-    // ############# Sync Operations ############
-    // ##########################################
+        // ##########################################
+        // ########### FSTask Overrides #############
+        // ##########################################
 
-    void sync();
-    void initBins();
-    void clearBins();
+        void operator()() override;
 
 
-    // ##########################################
-    // ########### File Operations #############
-    // ##########################################
+        // ##########################################
+        // ############# Sync Operations ############
+        // ##########################################
 
-    void upload(const std::shared_ptr<fs::model::File>& file);
-    void download(const std::shared_ptr<fs::model::File>& file, bool freeAfterDownload = false);
-    void remove(const std::shared_ptr<fs::model::File>& file,
-                const tasks::Delete::Type& type = tasks::Delete::Type::PURGE);
+        void sync();
 
+        void initBins();
 
-    // ##########################################
-    // ############ Internal Helpers ############
-    // ##########################################
-
-    std::shared_ptr<storage::CloudEngine> cloudEngine() const;
-    std::vector<model::EntryKey> allKeysSorted() const;
-    void ensureDirectoriesFromRemote();
+        void clearBins();
 
 
-    // ##########################################
-    // ########### Conflict Handling ############
-    // ##########################################
+        // ##########################################
+        // ########### File Operations #############
+        // ##########################################
 
-    [[nodiscard]] static bool hasPotentialConflict(const std::shared_ptr<fs::model::File>& local, const std::shared_ptr<fs::model::File>& upstream, bool upstream_decryption_failure);
+        void upload(const std::shared_ptr<fs::model::File> &file);
 
-    std::shared_ptr<model::Conflict> maybeBuildConflict(const std::shared_ptr<fs::model::File>& local,
-                             const std::shared_ptr<fs::model::File>& upstream) const;
+        void download(const std::shared_ptr<fs::model::File> &file, bool freeAfterDownload = false);
 
-    bool handleConflict(const std::shared_ptr<model::Conflict>& c) const;
+        void remove(const std::shared_ptr<fs::model::File> &file,
+                    const tasks::Delete::Type &type = tasks::Delete::Type::PURGE);
 
 
-    // ##########################################
-    // ########### Static Helpers ###############
-    // ##########################################
+        // ##########################################
+        // ############ Internal Helpers ############
+        // ##########################################
 
-    static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<fs::model::File> >& files);
+        std::shared_ptr<storage::CloudEngine> cloudEngine() const;
 
-    static std::vector<std::shared_ptr<fs::model::File> > uMap2Vector(
-        std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> >& map);
+        std::vector<model::EntryKey> allKeysSorted() const;
 
-    static std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > intersect(
-        const std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> >& a,
-        const std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> >& b);
-};
+        void ensureDirectoriesFromRemote();
 
+
+        // ##########################################
+        // ########### Conflict Handling ############
+        // ##########################################
+
+        [[nodiscard]] static bool hasPotentialConflict(const std::shared_ptr<fs::model::File> &local,
+                                                       const std::shared_ptr<fs::model::File> &upstream,
+                                                       bool upstream_decryption_failure);
+
+        std::shared_ptr<model::Conflict> maybeBuildConflict(const std::shared_ptr<fs::model::File> &local,
+                                                            const std::shared_ptr<fs::model::File> &upstream) const;
+
+        bool handleConflict(const std::shared_ptr<model::Conflict> &c) const;
+
+
+        // ##########################################
+        // ########### Static Helpers ###############
+        // ##########################################
+
+        static uintmax_t computeReqFreeSpaceForDownload(const std::vector<std::shared_ptr<fs::model::File> > &files);
+
+        static std::vector<std::shared_ptr<fs::model::File> > uMap2Vector(
+            std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > &map);
+
+        static std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > intersect(
+            const std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > &a,
+            const std::unordered_map<std::u8string, std::shared_ptr<fs::model::File> > &b);
+    };
 }

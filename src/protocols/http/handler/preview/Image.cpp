@@ -12,7 +12,8 @@ using namespace vh::fs::ops;
 using namespace vh::preview;
 
 namespace vh::protocols::http::handler::preview {
-    model::preview::Response handler::preview::Image::handle(request&& req, const std::unique_ptr<model::preview::Request>&& pr) {
+    model::preview::Response handler::preview::Image::handle(request &&req,
+                                                             const std::unique_ptr<model::preview::Request> &&pr) {
         try {
             const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
 
@@ -27,9 +28,11 @@ namespace vh::protocols::http::handler::preview {
             if (ec) return Router::makeErrorResponse(req, "File not found.", http::status::not_found);
 
             return Router::makeResponse(req, std::move(body), "image/jpeg");
-        } catch (const std::exception& e) {
-            log::Registry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}", pr->rel_path.string(), e.what());
-            return Router::makeErrorResponse(req, "Failed to load image: " + std::string(e.what()), http::status::unsupported_media_type);
+        } catch (const std::exception &e) {
+            log::Registry::http()->error("[ImagePreviewHandler] Error handling image preview for {}: {}",
+                                         pr->rel_path.string(), e.what());
+            return Router::makeErrorResponse(req, "Failed to load image: " + std::string(e.what()),
+                                             http::status::unsupported_media_type);
         }
     }
 }

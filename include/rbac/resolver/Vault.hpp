@@ -22,115 +22,113 @@
 #include <utility>
 
 namespace vh::rbac::resolver {
+    class Vault {
+        template<typename EnumT>
+        static bool checkPermission(const std::shared_ptr<identities::User> &user,
+                                    const vault::ResolvedContext &resolved,
+                                    const EnumT permission) {
+            static_assert(std::is_enum_v<EnumT>,
+                          "vh::rbac::resolver::Vault::checkPermission(): EnumT must be an enum type");
 
-class Vault {
-    template <typename EnumT>
-    static bool checkPermission(const std::shared_ptr<identities::User>& user,
-                                const vault::ResolvedContext& resolved,
-                                const EnumT permission) {
-        static_assert(std::is_enum_v<EnumT>,
-                      "vh::rbac::resolver::Vault::checkPermission(): EnumT must be an enum type");
+            if (!user || !resolved.isValid()) return false;
 
-        if (!user || !resolved.isValid()) return false;
+            bool allowed = false;
+            const auto vaultId = resolved.vault->id;
 
-        bool allowed = false;
-        const auto vaultId = resolved.vault->id;
+            if (user->hasDirectVaultRole(vaultId)) {
+                const auto role = user->getDirectVaultRole(vaultId);
+                if (!role) return false;
 
-        if (user->hasDirectVaultRole(vaultId)) {
-            const auto role = user->getDirectVaultRole(vaultId);
-            if (!role) return false;
+                if (VaultResolverTraits<EnumT>::direct(*role).has(permission))
+                    allowed = true;
+            }
 
-            if (VaultResolverTraits<EnumT>::direct(*role).has(permission))
-                allowed = true;
+            if (!allowed) {
+                const auto &globalPerms = user->vaultGlobals();
+
+                if (user->id == resolved.vault->owner_id)
+                    allowed = VaultResolverTraits<EnumT>::self(globalPerms.self).has(permission);
+                else if (resolved.owner->isAdmin())
+                    allowed = VaultResolverTraits<EnumT>::admin(globalPerms.admin).has(permission);
+                else
+                    allowed = VaultResolverTraits<EnumT>::user(globalPerms.user).has(permission);
+            }
+
+            if (!allowed) return false;
+
+            return vault::ContextPolicy<EnumT>::validate(user, resolved, permission);
         }
 
-        if (!allowed) {
-            const auto& globalPerms = user->vaultGlobals();
+        static std::shared_ptr<storage::Engine> resolveEngine(const std::optional<uint32_t> &vaultId,
+                                                              const std::optional<std::filesystem::path> &path) {
+            auto &storageManager = runtime::Deps::get().storageManager;
+            if (!storageManager) return nullptr;
 
-            if (user->id == resolved.vault->owner_id)
-                allowed = VaultResolverTraits<EnumT>::self(globalPerms.self).has(permission);
-            else if (resolved.owner->isAdmin())
-                allowed = VaultResolverTraits<EnumT>::admin(globalPerms.admin).has(permission);
-            else
-                allowed = VaultResolverTraits<EnumT>::user(globalPerms.user).has(permission);
+            if (vaultId) return storageManager->getEngine(*vaultId);
+            if (path && !path->empty()) return storageManager->resolveStorageEngine(*path);
+
+            return nullptr;
         }
 
-        if (!allowed) return false;
+        static vault::ResolvedContext resolveVaultContext(const std::optional<uint32_t> &vaultId,
+                                                          const std::optional<std::filesystem::path> &path,
+                                                          const std::optional<std::string> &targetSubjectType,
+                                                          const std::optional<uint32_t> &targetSubjectId) {
+            vault::ResolvedContext resolved{};
 
-        return vault::ContextPolicy<EnumT>::validate(user, resolved, permission);
-    }
+            resolved.engine = resolveEngine(vaultId, path);
+            if (!resolved.engine) return resolved;
 
-    static std::shared_ptr<storage::Engine> resolveEngine(const std::optional<uint32_t>& vaultId,
-                                                          const std::optional<std::filesystem::path>& path) {
-        auto& storageManager = runtime::Deps::get().storageManager;
-        if (!storageManager) return nullptr;
+            resolved.vault = resolved.engine->vault;
+            if (!resolved.vault) return resolved;
 
-        if (vaultId) return storageManager->getEngine(*vaultId);
-        if (path && !path->empty()) return storageManager->resolveStorageEngine(*path);
+            resolved.owner = db::query::identities::User::getUserById(resolved.vault->owner_id);
+            if (!resolved.owner) return resolved;
 
-        return nullptr;
-    }
+            if (targetSubjectType && targetSubjectId) {
+                if (*targetSubjectType == "user")
+                    resolved.targetUser = db::query::identities::User::getUserById(*targetSubjectId);
+                else if (*targetSubjectType == "group")
+                    resolved.targetGroup = db::query::identities::Group::getGroup(*targetSubjectId);
+            }
 
-    static vault::ResolvedContext resolveVaultContext(const std::optional<uint32_t>& vaultId,
-                                                              const std::optional<std::filesystem::path>& path,
-                                                              const std::optional<std::string>& targetSubjectType,
-                                                              const std::optional<uint32_t>& targetSubjectId) {
-        vault::ResolvedContext resolved{};
-
-        resolved.engine = resolveEngine(vaultId, path);
-        if (!resolved.engine) return resolved;
-
-        resolved.vault = resolved.engine->vault;
-        if (!resolved.vault) return resolved;
-
-        resolved.owner = db::query::identities::User::getUserById(resolved.vault->owner_id);
-        if (!resolved.owner) return resolved;
-
-        if (targetSubjectType && targetSubjectId) {
-            if (*targetSubjectType == "user")
-                resolved.targetUser = db::query::identities::User::getUserById(*targetSubjectId);
-            else if (*targetSubjectType == "group")
-                resolved.targetGroup = db::query::identities::Group::getGroup(*targetSubjectId);
+            return resolved;
         }
 
-        return resolved;
-    }
+    public:
+        template<typename EnumT>
+        static bool has(vault::Context<EnumT> &&ctx) {
+            if (!ctx.isValid()) return false;
 
-public:
-    template<typename EnumT>
-    static bool has(vault::Context<EnumT>&& ctx) {
-        if (!ctx.isValid()) return false;
+            const auto &user = ctx.user;
+            if (!user) return false;
+            if (user->isSuperAdmin()) return true;
 
-        const auto& user = ctx.user;
-        if (!user) return false;
-        if (user->isSuperAdmin()) return true;
+            const auto resolved = resolveVaultContext(
+                ctx.vault_id,
+                ctx.path,
+                ctx.target_subject_type,
+                ctx.target_subject_id
+            );
 
-        const auto resolved = resolveVaultContext(
-            ctx.vault_id,
-            ctx.path,
-            ctx.target_subject_type,
-            ctx.target_subject_id
-        );
+            if (!resolved.isValid()) return false;
 
-        if (!resolved.isValid()) return false;
+            return checkPermission(user, resolved, ctx.permission);
+        }
 
-        return checkPermission(user, resolved, ctx.permission);
-    }
+        template<typename EnumT>
+        static bool has(const vault::Context<EnumT> &ctx) {
+            return has(vault::Context<EnumT>{ctx});
+        }
 
-    template<typename EnumT>
-    static bool has(const vault::Context<EnumT>& ctx) {
-        return has(vault::Context<EnumT>{ctx});
-    }
+        template<typename... ContextTs>
+        static bool hasAll(ContextTs &&... ctxs) {
+            return (has(std::forward<ContextTs>(ctxs)) && ...);
+        }
 
-    template<typename... ContextTs>
-    static bool hasAll(ContextTs&&... ctxs) {
-        return (has(std::forward<ContextTs>(ctxs)) && ...);
-    }
-
-    template<typename... ContextTs>
-    static bool hasAny(ContextTs&&... ctxs) {
-        return (has(std::forward<ContextTs>(ctxs)) || ...);
-    }
-};
-
+        template<typename... ContextTs>
+        static bool hasAny(ContextTs &&... ctxs) {
+            return (has(std::forward<ContextTs>(ctxs)) || ...);
+        }
+    };
 }

@@ -25,8 +25,6 @@ using namespace vh::storage;
 using namespace vh::fs;
 using namespace vh::fs::model;
 
-using Permission = permission::vault::FilesystemAction;
-
 json Storage::startUpload(const json& payload, const std::shared_ptr<Session>& session) {
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
@@ -35,7 +33,7 @@ json Storage::startUpload(const json& payload, const std::shared_ptr<Session>& s
         session,
         vaultId,
         path,
-        Permission::Upload,
+        permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for this path in the vault"
     );
 
@@ -67,7 +65,7 @@ json Storage::finishUpload(const json& payload, const std::shared_ptr<Session>& 
         session,
         vaultId,
         path,
-        Permission::Upload,
+        permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for this path in the vault"
     );
 
@@ -83,7 +81,7 @@ json Storage::mkdir(const json& payload, const std::shared_ptr<Session>& session
         session,
         vaultId,
         path,
-        Permission::Touch,
+        permission::vault::FilesystemAction::Touch,
         "Permission denied: User does not have create-directory permission for this path in the vault"
     );
 
@@ -105,7 +103,7 @@ json Storage::move(const json& payload, const std::shared_ptr<Session>& session)
         session,
         vaultId,
         from,
-        Permission::Move,
+        permission::vault::FilesystemAction::Move,
         "Permission denied: User does not have move permission for the source path in the vault"
     );
 
@@ -113,7 +111,7 @@ json Storage::move(const json& payload, const std::shared_ptr<Session>& session)
         session,
         vaultId,
         to,
-        Permission::Upload,
+        permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for the destination path in the vault"
     );
 
@@ -138,7 +136,7 @@ json Storage::rename(const json& payload, const std::shared_ptr<Session>& sessio
         session,
         vaultId,
         from,
-        Permission::Rename,
+        permission::vault::FilesystemAction::Rename,
         "Permission denied: User does not have rename permission for the source path in the vault"
     );
 
@@ -146,7 +144,7 @@ json Storage::rename(const json& payload, const std::shared_ptr<Session>& sessio
         session,
         vaultId,
         to,
-        Permission::Upload,
+        permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for the destination path in the vault"
     );
 
@@ -171,7 +169,7 @@ json Storage::copy(const json& payload, const std::shared_ptr<Session>& session)
         session,
         vaultId,
         from,
-        Permission::Copy,
+        permission::vault::FilesystemAction::Copy,
         "Permission denied: User does not have read permission for the source path in the vault"
     );
 
@@ -179,7 +177,7 @@ json Storage::copy(const json& payload, const std::shared_ptr<Session>& session)
         session,
         vaultId,
         to,
-        Permission::Upload,
+        permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for the destination path in the vault"
     );
 
@@ -199,12 +197,12 @@ json Storage::listDir(const json& payload, const std::shared_ptr<Session>& sessi
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     auto path = std::filesystem::path(payload.value("path", "/"));
     if (path.empty()) path = std::filesystem::path("/");
-
+    
     enforcePermission(
         session,
         vaultId,
         path,
-        Permission::List,
+        permission::vault::FilesystemAction::List,
         "Permission denied: User does not have list permission for this path in the vault"
     );
 
@@ -235,12 +233,12 @@ json Storage::remove(const json& payload, const std::shared_ptr<Session>& sessio
 
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
-
+    
     enforcePermission(
         session,
         vaultId,
         path,
-        Permission::Delete,
+        permission::vault::FilesystemAction::Delete,
         "Permission denied: User does not have delete permission for this path in the vault"
     );
 

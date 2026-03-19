@@ -118,9 +118,9 @@ Decision Evaluator::evaluate(const Request &req) {
     if (const auto invalid = resolveTarget(req, target))
         return *invalid;
 
-    const auto engine = runtime::Deps::get().storageManager->resolveStorageEngine(
-        std::filesystem::path{target.absolutePath}
-    );
+    std::shared_ptr<storage::Engine> engine = nullptr;
+    if (req.vaultId) engine = runtime::Deps::get().storageManager->getEngine(*req.vaultId);
+    if (!engine) engine = runtime::Deps::get().storageManager->resolveStorageEngine(std::filesystem::path{target.absolutePath});
 
     if (!engine)
         return {

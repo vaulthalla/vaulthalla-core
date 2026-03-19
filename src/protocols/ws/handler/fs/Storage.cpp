@@ -29,20 +29,20 @@ json Storage::startUpload(const json& payload, const std::shared_ptr<Session>& s
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
-    enforcePermission(
-        session,
-        vaultId,
-        path,
-        permission::vault::FilesystemAction::Upload,
-        "Permission denied: User does not have upload permission for this path in the vault"
-    );
-
     const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
     if (!engine) throw std::runtime_error("Unknown storage engine");
 
     const auto uploadId = Session::generateUUIDv4();
     const auto absPath = engine->paths->absPath(path, PathType::VAULT_ROOT);
     const auto tmpPath = absPath.parent_path() / (".upload-" + uploadId + ".part");
+
+    enforcePermission(
+        session,
+        engine,
+        path,
+        permission::vault::FilesystemAction::Upload,
+        "Permission denied: User does not have upload permission for this path in the vault"
+    );
 
     session->getUploadHandler()->startUpload({
         .uploadId = uploadId,
@@ -61,9 +61,12 @@ json Storage::finishUpload(const json& payload, const std::shared_ptr<Session>& 
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("Unknown storage engine");
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         path,
         permission::vault::FilesystemAction::Upload,
         "Permission denied: User does not have upload permission for this path in the vault"
@@ -77,16 +80,16 @@ json Storage::mkdir(const json& payload, const std::shared_ptr<Session>& session
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
 
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         path,
         permission::vault::FilesystemAction::Touch,
         "Permission denied: User does not have create-directory permission for this path in the vault"
     );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     engine->mkdir(path, session->user->id);
     runtime::Deps::get().syncController->runNow(vaultId);
@@ -99,24 +102,16 @@ json Storage::move(const json& payload, const std::shared_ptr<Session>& session)
     const auto from = std::filesystem::path(payload.at("from").get<std::string>());
     const auto to = std::filesystem::path(payload.at("to").get<std::string>());
 
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         from,
         permission::vault::FilesystemAction::Move,
         "Permission denied: User does not have move permission for the source path in the vault"
     );
-
-    enforcePermission(
-        session,
-        vaultId,
-        to,
-        permission::vault::FilesystemAction::Upload,
-        "Permission denied: User does not have upload permission for the destination path in the vault"
-    );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     engine->move(from, to, session->user->id);
     runtime::Deps::get().syncController->runNow(vaultId);
@@ -132,24 +127,16 @@ json Storage::rename(const json& payload, const std::shared_ptr<Session>& sessio
     const auto from = std::filesystem::path(payload.at("from").get<std::string>());
     const auto to = std::filesystem::path(payload.at("to").get<std::string>());
 
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         from,
         permission::vault::FilesystemAction::Rename,
         "Permission denied: User does not have rename permission for the source path in the vault"
     );
-
-    enforcePermission(
-        session,
-        vaultId,
-        to,
-        permission::vault::FilesystemAction::Upload,
-        "Permission denied: User does not have upload permission for the destination path in the vault"
-    );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     engine->rename(from, to, session->user->id);
     runtime::Deps::get().syncController->runNow(vaultId);
@@ -165,24 +152,16 @@ json Storage::copy(const json& payload, const std::shared_ptr<Session>& session)
     const auto from = std::filesystem::path(payload.at("from").get<std::string>());
     const auto to = std::filesystem::path(payload.at("to").get<std::string>());
 
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         from,
         permission::vault::FilesystemAction::Copy,
         "Permission denied: User does not have read permission for the source path in the vault"
     );
-
-    enforcePermission(
-        session,
-        vaultId,
-        to,
-        permission::vault::FilesystemAction::Upload,
-        "Permission denied: User does not have upload permission for the destination path in the vault"
-    );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     engine->copy(from, to, session->user->id);
     runtime::Deps::get().syncController->runNow(vaultId);
@@ -197,17 +176,17 @@ json Storage::listDir(const json& payload, const std::shared_ptr<Session>& sessi
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     auto path = std::filesystem::path(payload.value("path", "/"));
     if (path.empty()) path = std::filesystem::path("/");
-    
+
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         path,
         permission::vault::FilesystemAction::List,
         "Permission denied: User does not have list permission for this path in the vault"
     );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     const auto fusePath = engine->paths->absRelToAbsRel(path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
     if (!Filesystem::exists(fusePath)) throw std::runtime_error("Path does not exist: " + fusePath.string());
@@ -233,17 +212,17 @@ json Storage::remove(const json& payload, const std::shared_ptr<Session>& sessio
 
     const auto vaultId = payload.at("vault_id").get<uint32_t>();
     const auto path = std::filesystem::path(payload.at("path").get<std::string>());
-    
+
+    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
+    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
+
     enforcePermission(
         session,
-        vaultId,
+        engine,
         path,
         permission::vault::FilesystemAction::Delete,
         "Permission denied: User does not have delete permission for this path in the vault"
     );
-
-    const auto engine = runtime::Deps::get().storageManager->getEngine(vaultId);
-    if (!engine) throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(vaultId));
 
     engine->remove(path, userId);
     runtime::Deps::get().syncController->runNow(vaultId);

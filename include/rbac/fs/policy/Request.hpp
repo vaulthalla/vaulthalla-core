@@ -13,6 +13,7 @@ namespace vh::rbac::fs::policy {
     struct Request {
         std::shared_ptr<identities::User> user;
         permission::vault::FilesystemAction action{};
+        std::optional<uint32_t> vaultId{};
         std::optional<std::filesystem::path> path{};
         std::shared_ptr<vh::fs::model::Entry> entry{};
 

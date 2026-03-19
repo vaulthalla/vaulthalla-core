@@ -11,7 +11,7 @@
 
 namespace vh::rbac::permission::admin {
 
-struct Identities final : Module<uint64_t> {
+struct Identities final : Module<uint32_t> {
     static constexpr const auto* ModuleName = "Identities";
     enum class Type : uint8_t { Users, Admins, Groups };
 
@@ -27,8 +27,8 @@ struct Identities final : Module<uint64_t> {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] const char* name() const override { return ModuleName; }
 
-    [[nodiscard]] uint64_t toMask() const override { return pack(users, admins, groups); }
-    void fromMask(const uint64_t mask) override { unpack(mask, users, admins, groups); }
+    [[nodiscard]] uint32_t toMask() const override { return pack(users, admins, groups); }
+    void fromMask(const uint32_t mask) override { unpack(mask, users, admins, groups); }
 
     [[nodiscard]] PackedPermissionExportT<Mask> exportPermissions() const {
         return packAndExportPerms(

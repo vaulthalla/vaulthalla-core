@@ -4,6 +4,7 @@
 #include "rbac/resolver/vault/Context.hpp"
 #include "rbac/resolver/vault/ResolvedContext.hpp"
 #include "rbac/resolver/vault/policy/Base.hpp"
+#include "log/Registry.hpp"
 
 namespace vh::rbac::resolver::vault {
     template<>
@@ -11,22 +12,42 @@ namespace vh::rbac::resolver::vault {
         static bool validate(
             const std::shared_ptr<identities::User> &actor,
             const ResolvedContext &resolved,
-            permission::vault::FilesystemAction action,
+            const permission::vault::FilesystemAction action,
             const Context<permission::vault::FilesystemAction> &ctx
         ) {
-            if (!actor || !resolved.isValid()) return false;
+            if (!actor) {
+                log::Registry::auth()->warn("Access denied for unauthenticated user");
+                return false;
+            }
 
-            fs::policy::Request req{
+            if (!resolved.isValid()) return false;
+
+            const fs::policy::Request req{
                 .user = actor,
                 .action = action,
+                .vaultId = ctx.vault_id,
                 .path = ctx.path,
-                .entry = {}
+                .entry = ctx.entry ? *ctx.entry : nullptr
             };
 
             const auto decision = fs::policy::Evaluator::evaluate(req);
 
-            // Optional:
-            // stash decision somewhere for later error/report handling
+            if (!decision.allowed) {
+                if (ctx.path) {
+                    log::Registry::auth()->warn(
+                        "Access denied for user {} on path {} with decision context:\n{}",
+                        actor->name,
+                        ctx.path->string(),
+                        decision.toString()
+                    );
+                } else {
+                    log::Registry::auth()->warn(
+                        "Access denied for user {} with decision context:\n{}",
+                        actor->name,
+                        decision.toString()
+                    );
+                }
+            }
 
             return decision.allowed;
         }

@@ -8,6 +8,7 @@
 
 #include "identities/User.hpp"
 #include "rbac/role/Vault.hpp"
+#include "rbac/role/Admin.hpp"
 #include "rbac/permission/admin/VaultGlobals.hpp"
 #include "vault/model/Vault.hpp"
 #include "runtime/Deps.hpp"
@@ -15,6 +16,8 @@
 #include "storage/Manager.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
+#include "fs/model/Entry.hpp"
+#include "fs/model/Path.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -123,13 +126,29 @@ namespace vh::rbac::resolver {
 
         static std::shared_ptr<storage::Engine> resolveEngine(
             const std::optional<uint32_t> &vaultId,
-            const std::optional<std::filesystem::path> &path
+            const std::optional<std::filesystem::path> &path,
+            const std::shared_ptr<vh::fs::model::Entry> &entry
         ) {
-            auto &storageManager = runtime::Deps::get().storageManager;
-            if (!storageManager) return nullptr;
+            const auto storageManager = runtime::Deps::get().storageManager;
+            if (!storageManager)
+                throw std::runtime_error(
+                    "vh::rbac::resolver::Vault::resolveEngine(): StorageManager dependency not available");
 
-            if (vaultId) return storageManager->getEngine(*vaultId);
-            if (path && !path->empty()) return storageManager->resolveStorageEngine(*path);
+            if (vaultId && *vaultId != 0)
+                if (auto engine = storageManager->getEngine(*vaultId))
+                    return engine;
+
+            if (path && !path->empty())
+                if (auto engine = storageManager->resolveStorageEngine(*path))
+                    return engine;
+
+            if (entry && entry->vault_id && *entry->vault_id != 0)
+                if (auto engine = storageManager->getEngine(*entry->vault_id))
+                    return engine;
+
+            if (entry && !entry->path.empty())
+                if (auto engine = storageManager->resolveStorageEngine(entry->path))
+                    return engine;
 
             return nullptr;
         }
@@ -137,12 +156,13 @@ namespace vh::rbac::resolver {
         static vault::ResolvedContext resolveVaultContext(
             const std::optional<uint32_t> &vaultId,
             const std::optional<std::filesystem::path> &path,
+            const std::shared_ptr<vh::fs::model::Entry> &entry,
             const std::optional<std::string> &targetSubjectType,
             const std::optional<uint32_t> &targetSubjectId
         ) {
             vault::ResolvedContext resolved{};
 
-            resolved.engine = resolveEngine(vaultId, path);
+            resolved.engine = resolveEngine(vaultId, path, entry);
             if (!resolved.engine) return resolved;
 
             resolved.vault = resolved.engine->vault;
@@ -166,20 +186,32 @@ namespace vh::rbac::resolver {
         static bool has(vault::Context<EnumT> &&ctx) {
             if (!ctx.isValid()) return false;
 
-            const auto &user = ctx.user;
-            if (!user) return false;
-            if (user->isSuperAdmin()) return true;
+            log::Registry::auth()->warn(
+    "user bypass check: isSuperAdmin={}, name='{}', size={}, id={}, role_name={}",
+    ctx.user->isSuperAdmin(),
+    ctx.user->name,
+    ctx.user->name.size(),
+    ctx.user->id,
+    ctx.user->roles.admin->name
+);
+
+            if (ctx.user->isSuperAdmin()) return true;
 
             const auto resolved = resolveVaultContext(
                 ctx.vault_id,
                 ctx.path,
+                ctx.entry,
                 ctx.target_subject_type,
                 ctx.target_subject_id
             );
 
-            if (!resolved.isValid()) return false;
+            if (!resolved.isValid()) {
+                log::Registry::auth()->warn("vh::rbac::resolver::Vault::resolveVaultContext(): Failed to resolve:\n{}",
+                                            ctx.dump());
+                return false;
+            }
 
-            return checkPermissions(user, resolved, ctx);
+            return checkPermissions(ctx.user, resolved, ctx);
         }
 
         template<typename EnumT>

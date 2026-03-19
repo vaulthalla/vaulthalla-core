@@ -42,7 +42,7 @@ public:
     [[nodiscard]] bool uploadInProgress() const { return currentUpload_.has_value(); }
 
 private:
-    const std::shared_ptr<Session>& session_;
+    std::shared_ptr<Session> session_;
     std::optional<UploadContext> currentUpload_;
 };
 

@@ -103,8 +103,8 @@ namespace vh::identities {
         const pqxx::row &user,
         const pqxx::row &adminRole,
         const pqxx::result &globalVaultRoles,
-        std::unordered_map<uint32_t, std::shared_ptr<rbac::role::Vault>>&& vRoles,
-        std::vector<std::shared_ptr<Group>>&& groups
+        std::unordered_map<uint32_t, std::shared_ptr<rbac::role::Vault> > &&vRoles,
+        std::vector<std::shared_ptr<Group> > &&groups
     ) : User(user) {
         roles.admin = std::make_shared<Admin>(adminRole, globalVaultRoles);
         roles.vaults = std::move(vRoles);
@@ -228,9 +228,7 @@ namespace vh::identities {
 
         if (u.meta.linux_uid) j["linux_uid"] = *u.meta.linux_uid;
         if (u.meta.created_by) j["created_by"] = *u.meta.created_by;
-        if (u.meta.updated_by) j["updated_by"] = *u.meta.updated_by;
-
-        {
+        if (u.meta.updated_by) j["updated_by"] = *u.meta.updated_by; {
             std::scoped_lock lock(u.mutex_);
 
             if (u.roles.admin) j["admin_role"] = *u.roles.admin;
@@ -312,16 +310,16 @@ namespace vh::identities {
 
     bool User::isSuperAdmin() const {
         std::scoped_lock lock(mutex_);
-        if (!roles.admin) return false;
-
-        return roles.admin->identities.admins.canDelete()
+        return roles.admin
+               && roles.admin->identities.admins.canDelete()
+               && roles.admin->vaults.admin.canRemove()
                && roles.admin->keys.encryptionKeys.canRotate()
                && roles.admin->name == "super_admin";
     }
 
     bool User::isAdmin() const {
         std::scoped_lock lock(mutex_);
-        return roles.admin != nullptr;
+        return roles.admin && roles.admin->identities.admins.canDelete() && roles.admin->vaults.admin.canRemove();
     }
 
     std::string to_string(const std::shared_ptr<User> &user) {

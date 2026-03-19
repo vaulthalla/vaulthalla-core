@@ -2,6 +2,7 @@
 
 #include "protocols/ws/Session.hpp"
 #include "rbac/resolver/vault/all.hpp"
+#include "fs/model/Path.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -34,24 +35,27 @@ public:
 private:
     template<typename EnumT>
     static void enforcePermission(const std::shared_ptr<Session>& session,
-                                  const uint32_t vaultId,
+                                  const std::shared_ptr<storage::Engine>& engine,
                                   const std::filesystem::path& path,
                                   const EnumT permission,
                                   const std::string_view error = "Permission denied") {
         if (!session || !session->user)
             throw std::runtime_error("Unauthorized");
 
+        if (!engine || !engine->vault)
+            throw std::runtime_error("Internal server error: Storage engine not available");
+
         if (!vh::rbac::resolver::Vault::has<EnumT>({
             .user = session->user,
             .permission = permission,
-            .vault_id = vaultId,
-            .path = path
+            .vault_id = engine->vault->id,
+            .path = engine->paths->absRelToAbsRel(path, vh::fs::model::PathType::VAULT_ROOT, vh::fs::model::PathType::FUSE_ROOT)
         })) throw std::runtime_error(std::string(error));
     }
 
     template<typename EnumT, typename... EnumTs>
     static void enforceAnyPermission(const std::shared_ptr<Session>& session,
-                                     const uint32_t vaultId,
+                                     const std::shared_ptr<storage::Engine>& engine,
                                      const std::filesystem::path& path,
                                      const EnumT permission,
                                      const EnumTs... permissions) {
@@ -62,13 +66,13 @@ private:
             vh::rbac::resolver::vault::Context<EnumT>{
                 .user = session->user,
                 .permission = permission,
-                .vault_id = vaultId,
+                .vault_id = engine->vault->id,
                 .path = path
             },
             vh::rbac::resolver::vault::Context<EnumTs>{
                 .user = session->user,
                 .permission = permissions,
-                .vault_id = vaultId,
+                .vault_id = engine->vault->id,
                 .path = path
             }...
         )) throw std::runtime_error("Permission denied: Required permission not granted");

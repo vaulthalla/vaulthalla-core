@@ -166,14 +166,12 @@ namespace vh::rbac::resolver {
         static bool has(admin::Context<EnumT> &&ctx) {
             if (!ctx.isValid()) return false;
 
-            const auto &user = ctx.user;
-            if (!user) return false;
-            if (user->isSuperAdmin()) return true;
+            if (ctx.user->isSuperAdmin()) return true;
 
             const auto resolved = resolveContext(ctx);
             if (!resolved.isValid()) return false;
 
-            return checkPermissions(user, resolved, ctx);
+            return checkPermissions(ctx.user, resolved, ctx);
         }
 
         template<typename EnumT>

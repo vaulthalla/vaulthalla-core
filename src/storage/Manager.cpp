@@ -152,8 +152,10 @@ std::shared_ptr<Vault> Manager::getVault(const unsigned int vaultId) const {
 
 std::shared_ptr<Engine> Manager::getEngine(const unsigned int id) const {
     std::scoped_lock lock(mutex_);
-    if (!vaultToEngine_.contains(id))
-        throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(id));
+    if (!vaultToEngine_.contains(id)) {
+        log::Registry::storage()->warn("[StorageManager] No engine found for vault ID: {}", id);
+        return nullptr;
+    }
     return vaultToEngine_.at(id);
 }
 

@@ -1,5 +1,5 @@
 #include "protocols/ws/handler/Settings.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "protocols/ws/Session.hpp"
 #include "config/Registry.hpp"
 #include "config/Config.hpp"
@@ -9,12 +9,13 @@
 using namespace vh::protocols::ws::handler;
 
 json Settings::get(const std::shared_ptr<Session>& session) {
-    if (!session->user->canManageSettings()) throw std::runtime_error("Permission denied: Only admins can view settings");
+    // TODO: need to make settings granular by permissions
+    if (!session->user->isSuperAdmin()) throw std::runtime_error("Permission denied: Only admins can view settings");
     return {{"settings", config::Registry::get()}};
 }
 
 json Settings::update(const json& payload, const std::shared_ptr<Session>& session) {
-    if (!session->user->canManageSettings()) throw std::runtime_error("Permission denied: Only admins can update settings");
+    if (!session->user->isSuperAdmin()) throw std::runtime_error("Permission denied: Only admins can update settings");
 
     const config::Config config(payload);
     config.save();

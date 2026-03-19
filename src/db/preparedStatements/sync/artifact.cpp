@@ -1,7 +1,6 @@
 #include "db/DBConnection.hpp"
 
 void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
-
     conn_->prepare(
         "sync_conflict_artifact.upsert",
         R"SQL(
@@ -29,7 +28,7 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
                                           sync_conflict_artifacts.local_backing_path)
         RETURNING id
     )SQL"
-        );
+    );
 
     // Update local backing path (if artifact file later cached)
     conn_->prepare(
@@ -39,7 +38,7 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
                SET local_backing_path = $1
              WHERE id = $2
         )SQL"
-        );
+    );
 
     // Select both artifacts for a conflict
     conn_->prepare(
@@ -59,7 +58,7 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
               FROM sync_conflict_artifacts
              WHERE conflict_id = $1
         )SQL"
-        );
+    );
 
     // Select one side (local or upstream)
     conn_->prepare(
@@ -80,7 +79,7 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
              WHERE conflict_id = $1
                AND side = $2
         )SQL"
-        );
+    );
 
     // Delete all artifacts for a conflict (CASCADE usually handles this, but useful standalone)
     conn_->prepare(
@@ -89,7 +88,7 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
             DELETE FROM sync_conflict_artifacts
              WHERE conflict_id = $1
         )SQL"
-        );
+    );
 
     // Optional: retention cleanup (if you ever do artifact pruning)
     conn_->prepare(
@@ -98,5 +97,5 @@ void vh::db::DBConnection::initPreparedSyncConflictArtifacts() const {
             DELETE FROM sync_conflict_artifacts
              WHERE created_at < NOW() - ($1::INTERVAL)
         )SQL"
-        );
+    );
 }

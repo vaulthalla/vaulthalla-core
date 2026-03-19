@@ -1,6 +1,6 @@
 #include "vault/model/APIKey.hpp"
 #include "db/query/identities/User.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/Key.hpp"
 #include "protocols/shell/Table.hpp"

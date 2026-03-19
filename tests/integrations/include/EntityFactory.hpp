@@ -2,12 +2,11 @@
 
 #include "EntityType.hpp"
 #include "generators.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
-#include "identities/model/Group.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "identities/Group.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 #include "CLITestContext.hpp"
 #include "permsUtil.hpp"
 
@@ -15,8 +14,8 @@
 #include <memory>
 #include <optional>
 
-using namespace vh::identities::model;
-using namespace vh::rbac::model;
+using namespace vh::identities;
+using namespace vh::rbac;
 using namespace vh::vault::model;
 
 namespace vh::test::cli {
@@ -31,7 +30,7 @@ public:
             const auto user = std::make_shared<User>();
             user->name = generateName(usage);
             if (coin()) user->email = generateEmail(usage);
-            user->role = ctx_->randomUserRole();
+            user->roles.admin = ctx_->randomUserRole();
             return user;
         }
 
@@ -51,20 +50,19 @@ public:
         }
 
         if (type == EntityType::USER_ROLE) {
-            const auto role = std::make_shared<UserRole>();
+            const auto role = std::make_shared<role::Admin>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated user role";
-            role->type = "user";
-            role->permissions = generateBitmask(ADMIN_SHELL_PERMS.size());
+            // TODO: permissions
+            // role->permissions = generateBitmask(ADMIN_SHELL_PERMS.size());
             return role;
         }
 
         if (type == EntityType::VAULT_ROLE) {
-            const auto role = std::make_shared<VaultRole>();
+            const auto role = std::make_shared<Vault>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated vault role";
-            role->type = "vault";
-            role->permissions = generateBitmask(VAULT_SHELL_PERMS.size());
+            // role->permissions = generateBitmask(VAULT_SHELL_PERMS.size());
             return role;
         }
 

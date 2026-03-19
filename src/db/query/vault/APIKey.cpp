@@ -2,6 +2,8 @@
 #include "db/Transactions.hpp"
 #include "vault/model/APIKey.hpp"
 #include "db/encoding/bytea.hpp"
+#include "identities/User.hpp"
+#include "db/query/identities/helpers.hpp"
 
 using namespace vh::db::query::vault;
 using namespace vh::db::model;
@@ -64,5 +66,13 @@ APIKey::APIKeyPtr APIKey::getAPIKey(const std::string& keyName) {
         const auto res = txn.exec(pqxx::prepped{"get_api_key_by_name"}, keyName);
         if (res.empty()) return nullptr;
         return std::make_shared<AK>(res.one_row());
+    });
+}
+
+std::shared_ptr<vh::identities::User> APIKey::getAPIKeyOwner(unsigned int keyId) {
+    return Transactions::exec("APIKey::getAPIKeyOwner", [&](pqxx::work& txn) -> std::shared_ptr<vh::identities::User> {
+        const auto res = txn.exec(pqxx::prepped{"get_api_key_owner"}, keyId);
+        if (res.empty()) return nullptr;
+        return identities::hydrateUser(txn, res.one_row());
     });
 }

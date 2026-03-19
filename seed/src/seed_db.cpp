@@ -1,8 +1,9 @@
-#include "seed_db.hpp"
+#include "seed/include/seed_db.hpp"
 
 // Database
 #include "db/query/vault/Vault.hpp"
 #include "db/query/rbac/Permission.hpp"
+#include "db/query/rbac/role/Admin.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "db/query/fs/Directory.hpp"
@@ -10,15 +11,15 @@
 #include "db/Transactions.hpp"
 
 // Types
-#include "rbac/model/Permission.hpp"
+#include "rbac/permission/Permission.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/LocalPolicy.hpp"
-#include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
-#include "rbac/model/Role.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "identities/User.hpp"
+#include "identities/Group.hpp"
+#include "rbac/role/Vault.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 #include "vault/model/Vault.hpp"
 #include "fs/model/Directory.hpp"
 #include "vault/model/APIKey.hpp"
@@ -45,8 +46,8 @@
 using namespace vh::seed;
 using namespace vh::config;
 using namespace vh::crypto;
-using namespace vh::identities::model;
-using namespace vh::rbac::model;
+using namespace vh::identities;
+using namespace vh::rbac;
 using namespace vh::vault::model;
 using namespace vh::crypto;
 using namespace vh::sync::model;
@@ -71,68 +72,71 @@ void vh::seed::seed_database() {
 void vh::seed::initPermissions() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing permissions...");
 
-    const std::vector<Permission> userPerms{
-        {0, "manage_encryption_keys", "Can manage encryption keys for the system"},
-        {1, "manage_admins", "Can manage admin users (create, deactivate, modify)"},
-        {2, "manage_users", "Can manage regular users"},
-        {3, "manage_groups", "Can create, modify, delete groups"},
-        {4, "manage_roles", "Can create, modify, delete roles"},
-        {5, "manage_settings", "Can modify system-wide settings"},
-        {6, "manage_vaults", "Can create, delete, modify any vault and any vault settings"},
-        {7, "manage_api_keys", "Can manage API keys globally"},
-        {8, "access_audit_logs", "Can view system audit logs"},
-        {9, "create_vaults", "Can create new vaults"}
-    };
-
-    const std::vector<Permission> vaultPerms{
-        {0, "manage_vault", "Can manage vault settings, including sync and upstream encryption"},
-        {1, "manage_access", "Can manage vault roles and access rules"},
-        {2, "manage_tags", "Can manage tags for files and directories"},
-        {3, "manage_metadata", "Can manage file and directory metadata"},
-        {4, "manage_versions", "Can manage file version history"},
-        {5, "manage_file_locks", "Can lock or unlock files"},
-        {6, "share", "Can create public sharing links"},
-        {7, "sync", "Can sync vault data to external/cloud storage"},
-        {8, "create", "Can create files or directories and upload files"},
-        {9, "download", "Can download files or read file contents"},
-        {10, "delete", "Can delete files or directories"},
-        {11, "rename", "Can rename files or directories"},
-        {12, "move", "Can move files or directories"},
-        {13, "list", "Can list directory contents"}
-    };
-
     db::Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
-        for (const auto& p : userPerms)
+        for (const auto& p : role::Admin().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
-                pqxx::params{p.bit_position, p.name, p.description, "user"});
+                pqxx::params{p.name, p.description, "admin", p.bit_position});
 
-        for (const auto& p : vaultPerms)
+        for (const auto& p : role::Vault().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
-                pqxx::params{p.bit_position, p.name, p.description, "vault"});
+                pqxx::params{p.name, p.description, "vault", p.bit_position});
     });
 }
 
 void vh::seed::initRoles() {
     log::Registry::vaulthalla()->debug("[initdb] Initializing roles...");
 
-    std::vector<Role> roles{
-        {"super_admin", "Root-level system owner with unrestricted access", "user", 0b0000001111111111},
-        {"admin", "System administrator with all non-root administrative powers", "user", 0b0000001111111100},
-        {"unprivileged", "User with no admin privileges", "user", 0b0000000000000000},
-        {"power_user", "Advanced user with full vault level control", "vault", 0b0011111111111111},
-        {"user", "Standard user with basic file operations", "vault", 0b0000000111101000},
-        {"guest", "Minimal access: can download files and list directories", "vault", 0b0000000000101000},
-        {"implicit_deny", "Role that denies all permissions", "vault", 0b0000000000000000}
+    const std::vector adminRoles{
+        role::Admin::None(),
+        role::Admin::Auditor(),
+        role::Admin::Support(),
+        role::Admin::IdentityAdmin(),
+        role::Admin::PlatformOperator(),
+        role::Admin::VaultAdmin(),
+        role::Admin::SecurityAdmin(),
+        role::Admin::OrgAdmin(),
+        role::Admin::SuperAdmin(),
+        role::Admin::KeyCustodian()
+    };
+
+    const std::vector vaultRoles{
+        role::Vault::ImplicitDeny(),
+        role::Vault::Guest(),
+        role::Vault::Reader(),
+        role::Vault::Contributor(),
+        role::Vault::Editor(),
+        role::Vault::Manager(),
+        role::Vault::PowerUser()
     };
 
     db::Transactions::exec("initdb::initRoles", [&](pqxx::work& txn) {
-        for (auto& r : roles) {
-            r.id = txn.exec(pqxx::prepped{"insert_role"},
-                pqxx::params{r.name, r.description, r.type}).one_field().as<unsigned int>();
+        for (const auto& role : adminRoles)
+            txn.exec(
+            pqxx::prepped{"admin_role_upsert_by_name"},
+            pqxx::params{
+                role.name,
+                role.description,
+                role.identities.toBitString(),
+                role.audits.toBitString(),
+                role.settings.toBitString(),
+                role.roles.toBitString(),
+                role.vaults.toBitString(),
+                role.keys.toBitString()
+            }
+        );
 
-            txn.exec(pqxx::prepped{"assign_permission_to_role"},
-                pqxx::params{r.id, bitmask_to_bitset(r.permissions).to_string()});
-        }
+        for (const auto& role : vaultRoles)
+            txn.exec(
+                pqxx::prepped{"vault_role_upsert_by_name"},
+                pqxx::params{
+                    role.name,
+                    role.description,
+                    role.fs.files.toBitString(),
+                    role.fs.directories.toBitString(),
+                    role.sync.toBitString(),
+                    role.roles.toBitString(),
+                }
+            );
     });
 }
 
@@ -155,23 +159,16 @@ void vh::seed::initSystemUser() {
                 sysUid, existingByUid->name
             );
 
-            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-
             // If your schema supports updating users, do it.
             // If you don't have update queries yet, you can just return here.
             existingByUid->name = "system";
             existingByUid->email = "no-reply@system";
-            existingByUid->linux_uid = sysUid;
+            existingByUid->meta.linux_uid = sysUid;
 
-            existingByUid->role = std::make_shared<UserRole>();
-            existingByUid->role->id = role->id;
-            existingByUid->role->name = role->name;
-            existingByUid->role->description = role->description;
-            existingByUid->role->type = role->type;
-            existingByUid->role->permissions = role->permissions;
+            existingByUid->roles.admin = db::query::rbac::role::Admin::get("super_admin");
+            existingByUid->roles.admin->user_id = existingByUid->id;
 
-            // If you have an update query, use it. If not, skip.
-            // db::query::identities::User::updateUser(existingByUid);
+            db::query::identities::User::updateUser(existingByUid);
             return;
         }
     } catch (...) {
@@ -186,20 +183,13 @@ void vh::seed::initSystemUser() {
                 existingByName->id, sysUid
             );
 
-            const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-
-            existingByName->linux_uid = sysUid;
+            existingByName->meta.linux_uid = sysUid;
             existingByName->email = "";
 
-            existingByName->role = std::make_shared<UserRole>();
-            existingByName->role->id = role->id;
-            existingByName->role->name = role->name;
-            existingByName->role->description = role->description;
-            existingByName->role->type = role->type;
-            existingByName->role->permissions = role->permissions;
+            existingByName->roles.admin = db::query::rbac::role::Admin::get("super_admin");
+            existingByName->roles.admin->user_id = existingByName->id;
 
-            // If you have an update query, use it. If not, you can delete+recreate, but updating is better.
-            // db::query::identities::User::updateUser(existingByName);
+            db::query::identities::User::updateUser(existingByName);
             return;
         }
     } catch (...) {
@@ -217,15 +207,10 @@ void vh::seed::initSystemUser() {
     const auto pwSeed = id::Generator({ .namespace_token = "vaulthalla-system-user" }).generate();
     user->setPasswordHash(hash::password(pwSeed));
 
-    user->linux_uid = sysUid;
+    user->meta.linux_uid = sysUid;
 
-    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-    user->role = std::make_shared<UserRole>();
-    user->role->id = role->id;
-    user->role->name = role->name;
-    user->role->description = role->description;
-    user->role->type = role->type;
-    user->role->permissions = role->permissions;
+    user->roles.admin = db::query::rbac::role::Admin::get("super_admin");
+    user->roles.admin->user_id = user->id;
 
     db::query::identities::User::createUser(user);
 
@@ -276,20 +261,15 @@ void initAdmin() {
     user->name = "admin";
     user->email = "";
     user->setPasswordHash(hash::password("vh!adm1n"));
-    user->linux_uid = loadPendingSuperAdminUid();
+    user->meta.linux_uid = loadPendingSuperAdminUid();
 
-    const auto role = db::query::rbac::Permission::getRoleByName("super_admin");
-    user->role = std::make_shared<UserRole>();
-    user->role->id = role->id;
-    user->role->name = role->name;
-    user->role->description = role->description;
-    user->role->type = role->type;
-    user->role->permissions = role->permissions;
+    user->roles.admin = db::query::rbac::role::Admin::get("super_admin");
+    user->roles.admin->user_id = user->id;
 
     db::query::identities::User::createUser(user);
 }
 
-} // namespace vh::seed
+}
 
 
 void vh::seed::initAdminGroup() {

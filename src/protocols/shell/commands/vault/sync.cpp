@@ -3,13 +3,14 @@
 #include "runtime/Deps.hpp"
 #include "sync/Controller.hpp"
 #include "storage/Engine.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "sync/model/LocalPolicy.hpp"
 #include "sync/model/RemotePolicy.hpp"
 #include "sync/model/Policy.hpp"
 #include "db/encoding/interval.hpp"
 #include "CommandUsage.hpp"
+#include "rbac/resolver/vault/all.hpp"
 
 #include <optional>
 #include <string>
@@ -34,8 +35,12 @@ static CommandResult handle_vault_sync(const CommandCall& call) {
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id && !call.user->
-        canSyncVaultData(vault->id)) return invalid("vault sync: you do not have permission to manage this vault");
+    using Perm = rbac::permission::vault::sync::SyncActionPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Trigger,
+        .vault_id = vault->id
+    })) return invalid("vault sync: you do not have permission to trigger a sync for this vault");
 
     runtime::Deps::get().syncController->runNow(vault->id);
 
@@ -52,15 +57,16 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
     const auto engine = eLkp.ptr;
 
-    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
-        !call.user->canSyncVaultData(engine->vault->id))
-        return invalid("vault sync update: you do not have permission to manage this vault");
-
-    const auto& sync = engine->sync;
+    using Perm = rbac::permission::vault::sync::SyncConfigPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Edit,
+        .vault_id = engine->vault->id
+    }))
 
     if (const auto intervalOpt = optVal(call, "interval")) {
         try {
-            sync->interval = parseSyncInterval(*intervalOpt);
+            engine->sync->interval = parseSyncInterval(*intervalOpt);
         } catch (const std::exception& e) {
             return invalid("vault sync update: " + std::string(e.what()));
         }
@@ -68,7 +74,7 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
 
     if (engine->vault->type == VaultType::Local) {
         if (const auto onSyncConflictOpt = optVal(call, usage->resolveOptional("on-sync-conflict")->option_tokens)) {
-            const auto fsync = std::static_pointer_cast<LocalPolicy>(sync);
+            const auto fsync = std::static_pointer_cast<LocalPolicy>(engine->sync);
 
             try {
                 fsync->conflict_policy = fsConflictPolicyFromString(*onSyncConflictOpt);
@@ -77,7 +83,7 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
             }
         }
     } else if (engine->vault->type == VaultType::S3) {
-        const auto rsync = std::static_pointer_cast<RemotePolicy>(sync);
+        const auto rsync = std::static_pointer_cast<RemotePolicy>(engine->sync);
 
         if (const auto syncStrategyOpt = optVal(call, usage->resolveOptional("sync-strategy")->option_tokens)) {
             try {
@@ -97,12 +103,12 @@ static CommandResult handle_vault_sync_update(const CommandCall& call) {
     }
 
     if (engine->vault->type == VaultType::Local) {
-        const auto fsync = std::static_pointer_cast<LocalPolicy>(sync);
+        const auto fsync = std::static_pointer_cast<LocalPolicy>(engine->sync);
         return ok("Successfully updated local vault sync configuration!\n" + to_string(fsync));
     }
 
     if (engine->vault->type == VaultType::S3) {
-        const auto rsync = std::static_pointer_cast<RemotePolicy>(sync);
+        const auto rsync = std::static_pointer_cast<RemotePolicy>(engine->sync);
         return ok("Successfully updated S3 vault sync configuration!\n" + to_string(rsync));
     }
 
@@ -119,9 +125,12 @@ static CommandResult handle_vault_sync_info(const CommandCall& call) {
     if (!eLkp || !eLkp.ptr) return invalid(eLkp.error);
     const auto engine = eLkp.ptr;
 
-    if (!call.user->canManageVaults() && engine->vault->owner_id != call.user->id &&
-        !call.user->canSyncVaultData(engine->vault->id))
-        return invalid("vault sync info: you do not have permission to view this vault's sync configuration");
+    using Perm = rbac::permission::vault::sync::SyncConfigPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::View,
+        .vault_id = engine->vault->id
+    })) return invalid("vault sync info: you do not have permission to view the sync configuration for this vault");
 
     if (!engine->sync) return invalid("vault sync info: vault does not have a sync configuration");
 

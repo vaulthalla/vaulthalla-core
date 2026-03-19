@@ -4,7 +4,7 @@
 
 using namespace vh::test::cli;
 using namespace vh::protocols::shell;
-using namespace vh::identities::model;
+using namespace vh::identities;
 
 GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
     : CommandBuilder(usage, ctx, "group"), groupAliases_(ctx) {}

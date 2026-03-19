@@ -2,7 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "crypto/secrets/TPMKeyProvider.hpp"
 #include "crypto/secrets/Manager.hpp"
 #include "fs/ops/file.hpp"
@@ -12,13 +12,15 @@
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 
 #include <fstream>
 #include <paths.h>
 
 using namespace vh;
 using namespace vh::protocols::shell;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::fs::ops;
 
 static std::vector<uint8_t> trimSecret(const std::vector<uint8_t>& secret) {
@@ -139,8 +141,8 @@ static bool isSecretsMatch(const std::string& cmd, const std::string_view input)
 }
 
 static CommandResult handle_secrets(const CommandCall& call) {
-    if (!call.user->isSuperAdmin() && !call.user->canManageEncryptionKeys())
-        return invalid("secrets: only super admins or users with ManageEncryptionKeys permission can manage secrets");
+    if (!call.user->encryptionKeysPerms().canExport())
+        return invalid("secrets export: insufficient permissions to export secrets. Requires encryption keys export permission.");
 
     if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
         return usage(call.constructFullArgs());

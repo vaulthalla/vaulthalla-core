@@ -4,7 +4,7 @@
 #include "config/Registry.hpp"
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "fs/model/Path.hpp"
 #include "db/query/vault/Vault.hpp"
 #include "db/query/identities/User.hpp"
@@ -14,7 +14,7 @@
 
 using namespace vh::storage;
 using namespace vh::vault::model;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::config;
 using namespace vh::fs::model;
 using namespace vh::crypto;
@@ -152,8 +152,10 @@ std::shared_ptr<Vault> Manager::getVault(const unsigned int vaultId) const {
 
 std::shared_ptr<Engine> Manager::getEngine(const unsigned int id) const {
     std::scoped_lock lock(mutex_);
-    if (!vaultToEngine_.contains(id))
-        throw std::runtime_error("No storage engine found for vault with ID: " + std::to_string(id));
+    if (!vaultToEngine_.contains(id)) {
+        log::Registry::storage()->warn("[StorageManager] No engine found for vault ID: {}", id);
+        return nullptr;
+    }
     return vaultToEngine_.at(id);
 }
 

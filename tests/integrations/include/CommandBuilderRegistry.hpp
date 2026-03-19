@@ -6,8 +6,8 @@
 
 #include <memory>
 
-using namespace vh::rbac::model;
-using namespace vh::identities::model;
+using namespace vh::rbac;
+using namespace vh::identities;
 using namespace vh::vault::model;
 
 namespace vh::test::cli {
@@ -67,21 +67,21 @@ public:
             default: throw std::runtime_error("CommandBuilderRegistry: unsupported command type for GROUP");
             }
         case EntityType::USER_ROLE: switch (cmdType) {
-            case CommandType::CREATE: return userRoleBuilder->create(std::static_pointer_cast<UserRole>(entity));
-            case CommandType::UPDATE: return userRoleBuilder->update(std::static_pointer_cast<UserRole>(entity));
-            case CommandType::DELETE: return userRoleBuilder->remove(std::static_pointer_cast<UserRole>(entity));
-            case CommandType::INFO: return userRoleBuilder->info(std::static_pointer_cast<UserRole>(entity));
+            case CommandType::CREATE: return userRoleBuilder->create(std::static_pointer_cast<role::Admin>(entity));
+            case CommandType::UPDATE: return userRoleBuilder->update(std::static_pointer_cast<role::Admin>(entity));
+            case CommandType::DELETE: return userRoleBuilder->remove(std::static_pointer_cast<role::Admin>(entity));
+            case CommandType::INFO: return userRoleBuilder->info(std::static_pointer_cast<role::Admin>(entity));
             case CommandType::LIST: return userRoleBuilder->list();
             default: throw std::runtime_error("CommandBuilderRegistry: unsupported command type for USER_ROLE");
             }
         case EntityType::VAULT_ROLE: switch (cmdType) {
             case CommandType::CREATE: return vaultRoleBuilder->create(
-                    std::static_pointer_cast<VaultRole>(entity));
+                    std::static_pointer_cast<role::Vault>(entity));
             case CommandType::UPDATE: return vaultRoleBuilder->update(
-                    std::static_pointer_cast<VaultRole>(entity));
+                    std::static_pointer_cast<role::Vault>(entity));
             case CommandType::DELETE: return vaultRoleBuilder->remove(
-                    std::static_pointer_cast<VaultRole>(entity));
-            case CommandType::INFO: return vaultRoleBuilder->info(std::static_pointer_cast<VaultRole>(entity));
+                    std::static_pointer_cast<role::Vault>(entity));
+            case CommandType::INFO: return vaultRoleBuilder->info(std::static_pointer_cast<role::Vault>(entity));
             case CommandType::LIST: return vaultRoleBuilder->list();
             default: throw std::runtime_error("CommandBuilderRegistry: unsupported command type for VAULT_ROLE");
             }
@@ -105,12 +105,12 @@ public:
 
         if (cmdType == CommandType::ASSIGN)
             return vaultBuilder->assignVaultRole(std::static_pointer_cast<Vault>(entity),
-                                            std::static_pointer_cast<VaultRole>(target),
+                                            std::static_pointer_cast<role::Vault>(target),
                                             subjectType,
                                             subject);
 
         return vaultBuilder->unassignVaultRole(std::static_pointer_cast<Vault>(entity),
-                                              std::static_pointer_cast<VaultRole>(target),
+                                              std::static_pointer_cast<role::Vault>(target),
                                               subjectType,
                                               subject);
     }

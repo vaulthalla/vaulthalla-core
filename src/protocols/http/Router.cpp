@@ -16,7 +16,7 @@
 #include "log/Registry.hpp"
 #include "protocols/cookie.hpp"
 #include "protocols/ws/Session.hpp"
-#include "identities/model/User.hpp"
+#include "../../../include/identities/User.hpp"
 
 #include <nlohmann/json.hpp>
 

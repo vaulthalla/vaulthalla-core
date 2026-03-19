@@ -1,7 +1,6 @@
 #include "db/DBConnection.hpp"
 
 void vh::db::DBConnection::initPreparedSyncThroughput() const {
-
     // ---------------------------------------
     // UPSERT (overwrite values)
     // ---------------------------------------
@@ -32,7 +31,7 @@ void vh::db::DBConnection::initPreparedSyncThroughput() const {
                 duration_ms = EXCLUDED.duration_ms
             RETURNING id;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // ACCUMULATE (additive worker updates)
@@ -64,7 +63,7 @@ void vh::db::DBConnection::initPreparedSyncThroughput() const {
                 duration_ms = sync_throughput.duration_ms + EXCLUDED.duration_ms
             RETURNING id;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // READ ALL throughput for run
@@ -77,7 +76,7 @@ void vh::db::DBConnection::initPreparedSyncThroughput() const {
               AND run_uuid = $2
             ORDER BY metric_type;
         )SQL"
-        );
+    );
 
     // ---------------------------------------
     // DELETE ALL throughput for run
@@ -88,5 +87,5 @@ void vh::db::DBConnection::initPreparedSyncThroughput() const {
             WHERE vault_id = $1
               AND run_uuid = $2;
         )SQL"
-        );
+    );
 }

@@ -1,7 +1,6 @@
 #include "db/DBConnection.hpp"
 
 void vh::db::DBConnection::initPreparedSyncConflicts() const {
-
     // Upsert conflict (insert or update)
     conn_->prepare(
         "sync_conflict.upsert",
@@ -25,7 +24,7 @@ void vh::db::DBConnection::initPreparedSyncConflicts() const {
                             END
         RETURNING id
     )SQL"
-        );
+    );
 
     // Explicit manual resolution
     conn_->prepare(
@@ -36,7 +35,7 @@ void vh::db::DBConnection::initPreparedSyncConflicts() const {
                    resolved_at = NOW()
              WHERE id = $2
         )SQL"
-        );
+    );
 
     // Select all conflicts for event
     conn_->prepare(
@@ -52,7 +51,7 @@ void vh::db::DBConnection::initPreparedSyncConflicts() const {
               FROM sync_conflicts
              WHERE event_id = $1
         )SQL"
-        );
+    );
 
     // Select unresolved conflicts for event (scheduler gate)
     conn_->prepare(
@@ -66,7 +65,7 @@ void vh::db::DBConnection::initPreparedSyncConflicts() const {
              WHERE event_id = $1
                AND resolution = 'unresolved'
         )SQL"
-        );
+    );
 
     // Count unresolved conflicts (fast gate check)
     conn_->prepare(
@@ -77,5 +76,5 @@ void vh::db::DBConnection::initPreparedSyncConflicts() const {
              WHERE event_id = $1
                AND resolution = 'unresolved'
         )SQL"
-        );
+    );
 }

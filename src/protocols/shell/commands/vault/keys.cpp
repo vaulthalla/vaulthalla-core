@@ -16,11 +16,13 @@
 
 #include "vault/model/Vault.hpp"
 #include "vault/model/APIKey.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 
 #include "config/Registry.hpp"
 #include "CommandUsage.hpp"
 #include "usages.hpp"
+
+#include "rbac/permission/admin/Keys.hpp"
 
 #include <optional>
 #include <string>
@@ -31,11 +33,6 @@
 using namespace vh;
 using namespace vh::protocols::shell;
 using namespace vh::protocols::shell::commands::vault;
-using namespace vh::vault::model;
-using namespace vh::identities::model;
-using namespace vh::storage;
-using namespace vh::config;
-using namespace vh::crypto;
 
 
 static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
@@ -48,7 +45,7 @@ static CommandResult handle_key_encrypt_and_response(const CommandCall& call,
         if (!outputOpt) return invalid("vault keys export: --recipient requires --output to specify the output file");
 
         try {
-            encryptors::GPG::encryptToFile(output, *recipientOpt, *outputOpt);
+            crypto::encryptors::GPG::encryptToFile(output, *recipientOpt, *outputOpt);
             return ok("Vault key successfully encrypted and saved to " + *outputOpt);
         } catch (const std::exception& e) {
             return invalid("vault keys export: failed to encrypt vault key: " + std::string(e.what()));
@@ -117,8 +114,8 @@ static CommandResult export_all_keys(const CommandCall& call, const std::shared_
 
 static CommandResult handle_export_vault_keys(const CommandCall& call) {
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys()) return invalid(
-            "vault keys export: only super admins can export vault keys");
+        if (!call.user->encryptionKeysPerms().canExport()) return invalid(
+            "vault keys export: only super admins or users with export encryption keys permission can export vault keys");
 
         log::Registry::audit()->warn(
             "\n[shell::handle_export_vault_keys] User {} called to export vault keys without super admin privileges\n"
@@ -138,8 +135,8 @@ static CommandResult handle_inspect_vault_key(const CommandCall& call) {
     constexpr const auto* ERR = "vault keys inspect";
 
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys()) return invalid(
-            "vault keys inspect: only super admins can inspect vault keys");
+        if (!call.user->encryptionKeysPerms().canView())
+            return invalid("vault keys inspect: only super admins or users with view encryption keys permission can inspect vault keys");
 
         log::Registry::audit()->warn(
             "\n[shell::handle_inspect_vault_key] User {} called to inspect vault keys without super admin privileges\n"
@@ -164,8 +161,8 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     constexpr const auto* ERR = "vault keys rotate";
 
     if (!call.user->isSuperAdmin()) {
-        if (!call.user->canManageEncryptionKeys()) return invalid(
-            "vault keys rotate: only super admins or users with manage encryption keys or vaults can rotate vault keys");
+        if (!call.user->encryptionKeysPerms().canRotate())
+            return invalid("vault keys rotate: only super admins or users with rotate encryption keys permission can rotate vault keys");
 
         log::Registry::audit()->warn(
             "\n[shell::handle_rotate_vault_keys] User {} called to rotate vault keys without super admin privileges\n"
@@ -177,7 +174,7 @@ static CommandResult handle_rotate_vault_keys(const CommandCall& call) {
     validatePositionals(call, usage);
 
     const auto syncNow = hasFlag(call, usage->resolveFlag("now")->aliases);
-    const auto rotateKey = [&syncNow](const std::shared_ptr<Engine>& engine) {
+    const auto rotateKey = [&syncNow](const std::shared_ptr<storage::Engine>& engine) {
         engine->encryptionManager->prepare_key_rotation();
         if (syncNow) runtime::Deps::get().syncController->runNow(engine->vault->id);
     };

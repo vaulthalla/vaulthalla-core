@@ -11,10 +11,11 @@
 #include "vault/model/Vault.hpp"
 #include "vault/model/S3Vault.hpp"
 #include "vault/model/APIKey.hpp"
-#include "rbac/model/VaultRole.hpp"
-#include "identities/model/User.hpp"
+#include "rbac/role/Vault.hpp"
+#include "identities/User.hpp"
 #include "sync/model/Waiver.hpp"
-#include "rbac/model/UserRole.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/resolver/vault/all.hpp"
 
 #include "config/Registry.hpp"
 #include "vault/terms/waiver.hpp"
@@ -31,7 +32,6 @@ using namespace vh::storage;
 using namespace vh::config;
 using namespace vh::crypto;
 using namespace vh::sync::model;
-using namespace vh::rbac::model;
 using namespace vh::vault::terms;
 
 static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, const std::shared_ptr<S3Vault>& s3Vault) {
@@ -43,23 +43,12 @@ static std::shared_ptr<Waiver> create_encrypt_waiver(const CommandCall& call, co
     waiver->waiver_text = s3Vault->encrypt_upstream ?
         ENABLE_UPSTREAM_ENCRYPTION_WAIVER : DISABLE_UPSTREAM_ENCRYPTION_WAIVER;
 
-    if (s3Vault->owner_id != call.user->id) {
-        waiver->owner = db::query::identities::User::getUserById(s3Vault->owner_id);
-        if (!waiver->owner) throw std::runtime_error("Failed to load owner ID " + std::to_string(s3Vault->owner_id));
-
-        if (waiver->owner->canManageVaults()) waiver->overridingRole = std::make_shared<Role>(*call.user->role);
-        else {
-            const auto role = call.user->getRole(s3Vault->id);
-            if (!role || role->type != "vault") throw std::runtime_error(
-                "User ID " + std::to_string(call.user->id) + " does not have a role for vault ID " + std::to_string(s3Vault->id));
-
-            // validate role has vault management perms
-            if (!role->canManageVault({})) throw std::runtime_error(
-                "User ID " + std::to_string(call.user->id) + " does not have permission to manage vault ID " + std::to_string(s3Vault->id));
-
-            waiver->overridingRole = std::make_shared<Role>(*role);
-        }
-    }
+    using Perm = rbac::permission::vault::sync::SyncActionPermissions;
+    if (!rbac::resolver::Vault::has<Perm>({
+        .user = call.user,
+        .permission = Perm::SignWaiver,
+        .vault_id = s3Vault->id
+    })) throw std::runtime_error("Failed to get permissions for vault");
 
     return waiver;
 }

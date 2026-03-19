@@ -2,7 +2,7 @@
 #include "protocols/shell/Token.hpp"
 #include "protocols/shell/Parser.hpp"
 #include "log/Registry.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "CommandUsage.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
 
@@ -11,7 +11,7 @@
 #include <string>
 #include <algorithm>
 
-using namespace vh::identities::model;
+using namespace vh::identities;
 
 using namespace vh::protocols::shell;
 

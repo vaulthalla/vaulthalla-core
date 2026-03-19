@@ -3,16 +3,16 @@
 #include "EntityRegistrar.hpp"
 #include "CLITestContext.hpp"
 
-#include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
+#include "identities/User.hpp"
+#include "identities/Group.hpp"
 #include "vault/model/Vault.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 
 using namespace vh::test::cli;
 using namespace vh::protocols::shell;
-using namespace vh::identities::model;
-using namespace vh::rbac::model;
+using namespace vh::identities;
+using namespace vh::rbac;
 using namespace vh::vault::model;
 
 CommandRouter::CommandRouter(const std::shared_ptr<CLITestContext>& ctx)
@@ -100,7 +100,7 @@ void CommandRouter::registerAll() {
 
     registerRoute("user/update", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user entity provided for update");
-        const auto user = std::static_pointer_cast<User>(entity);
+        const auto user = std::static_pointer_cast<Admin>(entity);
         return registrar_->update(EntityType::USER, user);
     });
 
@@ -118,13 +118,13 @@ void CommandRouter::registerAll() {
 
     registerRoute("role/update/user", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user role entity provided for update");
-        const auto role = std::static_pointer_cast<UserRole>(entity);
+        const auto role = std::static_pointer_cast<Admin>(entity);
         return registrar_->update(EntityType::USER_ROLE, role);
     });
 
     registerRoute("role/update/vault", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for update");
-        const auto role = std::static_pointer_cast<VaultRole>(entity);
+        const auto role = std::static_pointer_cast<Vault>(entity);
         return registrar_->update(EntityType::VAULT_ROLE, role);
     });
 
@@ -150,7 +150,7 @@ void CommandRouter::registerAll() {
 
     registerRoute("user/info", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user entity provided for info");
-        const auto user = std::static_pointer_cast<User>(entity);
+        const auto user = std::static_pointer_cast<Admin>(entity);
         return registrar_->info(EntityType::USER, user);
     });
 
@@ -168,19 +168,19 @@ void CommandRouter::registerAll() {
 
     registerRoute("role/info/user", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user role entity provided for info");
-        const auto role = std::static_pointer_cast<UserRole>(entity);
+        const auto role = std::static_pointer_cast<Admin>(entity);
         return registrar_->info(EntityType::USER_ROLE, role);
     });
 
     registerRoute("role/info/vault", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for info");
-        const auto role = std::static_pointer_cast<VaultRole>(entity);
+        const auto role = std::static_pointer_cast<Vault>(entity);
         return registrar_->info(EntityType::VAULT_ROLE, role);
     });
 
     registerRoute("user/delete", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user entity provided for deletion");
-        const auto user = std::static_pointer_cast<User>(entity);
+        const auto user = std::static_pointer_cast<Admin>(entity);
         return registrar_->remove(EntityType::USER, user);
     });
 
@@ -198,27 +198,27 @@ void CommandRouter::registerAll() {
 
     registerRoute("role/delete/user", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no user role entity provided for deletion");
-        const auto role = std::static_pointer_cast<UserRole>(entity);
+        const auto role = std::static_pointer_cast<Admin>(entity);
         return registrar_->remove(EntityType::USER_ROLE, role);
     });
 
     registerRoute("role/delete/vault", [&](const std::shared_ptr<void>& entity) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no vault role entity provided for deletion");
-        const auto role = std::static_pointer_cast<VaultRole>(entity);
+        const auto role = std::static_pointer_cast<Vault>(entity);
         return registrar_->remove(EntityType::VAULT_ROLE, role);
     });
 
     registerRoute("group/user/add", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no group-user entity pair provided for addition");
         const auto group = std::static_pointer_cast<Group>(entity);
-        const auto user = std::static_pointer_cast<User>(target);
+        const auto user = std::static_pointer_cast<Admin>(target);
         return registrar_->manageGroup(EntityType::USER, ActionType::ADD, group, user);
     });
 
     registerRoute("group/user/remove", [&](const std::shared_ptr<void>& entity, const std::shared_ptr<void>& target) -> EntityResult {
         if (!entity) throw std::runtime_error("CommandRouter: no group-user entity pair provided for removal");
         const auto group = std::static_pointer_cast<Group>(entity);
-        const auto user = std::static_pointer_cast<User>(target);
+        const auto user = std::static_pointer_cast<Admin>(target);
         return registrar_->manageGroup(EntityType::USER, ActionType::REMOVE, group, user);
     });
 
@@ -227,7 +227,7 @@ void CommandRouter::registerAll() {
         if (!target) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for assignment");
         if (!subject) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for assignment");
         const auto vault = std::static_pointer_cast<Vault>(entity);
-        const auto role = std::static_pointer_cast<VaultRole>(target);
+        const auto role = std::static_pointer_cast<Vault>(target);
 
         if (subjectType == EntityType::USER)
             return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::ASSIGN, vault, role, subject);
@@ -242,7 +242,7 @@ void CommandRouter::registerAll() {
         if (!target) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for unassignment");
         if (!subject) throw std::runtime_error("CommandRouter: no vault-role entity-subject triplet provided for unassignment");
         const auto vault = std::static_pointer_cast<Vault>(entity);
-        const auto role = std::static_pointer_cast<VaultRole>(target);
+        const auto role = std::static_pointer_cast<Vault>(target);
 
         if (subjectType == EntityType::USER)
             return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::UNASSIGN, vault, role, subject);

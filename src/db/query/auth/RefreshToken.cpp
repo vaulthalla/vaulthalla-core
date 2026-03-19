@@ -1,9 +1,10 @@
 #include "db/query/auth/RefreshToken.hpp"
 #include "auth/model/RefreshToken.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 #include "db/Transactions.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "log/Registry.hpp"
+#include "db/query/identities/helpers.hpp"
 
 #include <chrono>
 
@@ -102,34 +103,11 @@ void RefreshToken::revokeAndPurge(const unsigned int userId) {
     });
 }
 
-std::shared_ptr<vh::identities::model::User> RefreshToken::getUserByJti(const std::string& jti) {
+std::shared_ptr<vh::identities::User> RefreshToken::getUserByJti(const std::string& jti) {
     return Transactions::exec(
         "RefreshToken::getUserByRefreshToken",
-        [&](pqxx::work& txn) -> std::shared_ptr<identities::model::User> {
+        [&](pqxx::work& txn) -> std::shared_ptr<vh::identities::User> {
             const auto res = txn.exec(pqxx::prepped{"get_user_by_refresh_token_jti"}, pqxx::params{jti});
-
-            if (res.empty()) {
-                log::Registry::db()->trace("[RefreshToken] No user found for refresh token JTI: {}", jti);
-                return nullptr;
-            }
-
-            const auto userRow = res.one_row();
-            const auto userId = userRow["id"].as<unsigned int>();
-
-            const auto userRoleRow =
-                txn.exec(pqxx::prepped{"get_user_assigned_role"}, pqxx::params{userId}).one_row();
-
-            const auto rolesRes =
-                txn.exec(pqxx::prepped{"get_user_and_group_assigned_vault_roles"}, pqxx::params{userId});
-
-            const auto overridesRes =
-                txn.exec(pqxx::prepped{"list_user_and_group_permission_overrides"}, pqxx::params{userId});
-
-            return std::make_shared<identities::model::User>(
-                userRow,
-                userRoleRow,
-                rolesRes,
-                overridesRes
-            );
+            return identities::hydrateUser(txn, res.one_row());
         });
 }

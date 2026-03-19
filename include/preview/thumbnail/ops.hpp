@@ -5,8 +5,6 @@
 #include <filesystem>
 
 namespace vh::preview::thumbnail {
-
-void generateAndStore(const std::vector<uint8_t>& buffer, const std::filesystem::path& outputPath,
-                               const std::string& mime, unsigned int size = 128);
-
+    void generateAndStore(const std::vector<uint8_t> &buffer, const std::filesystem::path &outputPath,
+                          const std::string &mime, unsigned int size = 128);
 }

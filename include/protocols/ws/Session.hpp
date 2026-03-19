@@ -21,14 +21,14 @@ struct UploadContext {
 
 using RequestType = boost::beast::http::request<boost::beast::http::string_body>;
 
-namespace vh::identities::model { struct User; }
+namespace vh::identities { struct User; }
 namespace vh::auth::model { struct TokenPair; }
 
 namespace vh::protocols::ws {
 
 class Router;
 
-namespace handler { class Upload; }
+namespace handler::fs { class Upload; }
 
 namespace beast     = boost::beast;
 namespace websocket = beast::websocket;
@@ -39,7 +39,7 @@ using json          = nlohmann::json;
 class Session : public std::enable_shared_from_this<Session> {
 public:
     const std::string uuid{generateUUIDv4()};
-    std::shared_ptr<identities::model::User> user{nullptr};
+    std::shared_ptr<identities::User> user{nullptr};
     std::shared_ptr<auth::model::TokenPair> tokens;
     std::string userAgent, ipAddress;
     const std::chrono::system_clock::time_point connectionOpenedAt = std::chrono::system_clock::now();
@@ -51,12 +51,12 @@ public:
     void send(json message);
     void close();
 
-    void setAuthenticatedUser(const std::shared_ptr<identities::model::User>& user);
+    void setAuthenticatedUser(const std::shared_ptr<identities::User>& u);
     void setHandshakeRequest(const RequestType& req);
 
     void sendAccessTokenOnNextResponse() { sendAccessToken_ = true; }
 
-    std::shared_ptr<handler::Upload> getUploadHandler() const { return uploadHandler_; }
+    std::shared_ptr<handler::fs::Upload> getUploadHandler() const { return uploadHandler_; }
 
     static std::string generateUUIDv4();
 
@@ -90,7 +90,7 @@ private:
     beast::flat_buffer tmpBuffer_{4096}; // used during HTTP header read/handshake
     RequestType handshakeRequest_;
 
-    std::shared_ptr<handler::Upload> uploadHandler_{nullptr};
+    std::shared_ptr<handler::fs::Upload> uploadHandler_{nullptr};
     std::shared_ptr<Router> router_;
 
     std::atomic_bool closing_{false};

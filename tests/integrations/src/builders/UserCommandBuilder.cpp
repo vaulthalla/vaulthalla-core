@@ -4,7 +4,7 @@
 #include "generators.hpp"
 
 using namespace vh::test::cli;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::protocols::shell;
 
 UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<CLITestContext>& ctx)
@@ -28,13 +28,13 @@ std::string UserCommandBuilder::updateAndResolveVar(const std::shared_ptr<User>&
 
     if (userAliases_.isRole(field)) {
         if (ctx_->userRoles.empty()) throw std::runtime_error("UserCommandBuilder: no user roles available to assign");
-        entity->role = ctx_->randomUserRole();
-        return std::to_string(entity->role->id);
+        entity->roles.admin = ctx_->randomUserRole();
+        return std::to_string(entity->roles.admin->id);
     }
 
     if (userAliases_.isLinuxUID(field)) {
         const auto linuxUid = randomLinuxId();
-        entity->linux_uid = std::make_optional(linuxUid);
+        entity->meta.linux_uid = std::make_optional(linuxUid);
         return std::to_string(linuxUid);
     }
 
@@ -45,7 +45,7 @@ static std::optional<std::string> resolveVar(const std::string& name, const std:
     if (name == "id" || name == "user_id") return std::to_string(user->id);
     if (name == "name" || name == "username") return user->name;
     if (name == "email") return user->email;
-    if (name == "role" || name == "role_id") return std::to_string(user->role->id);
+    if (name == "role" || name == "role_id") return std::to_string(user->roles.admin->id);
     throw std::runtime_error("UserCommandBuilder: unsupported user field for resolveVar: " + name);
 }
 

@@ -10,8 +10,8 @@
 #include <optional>
 
 namespace vh::protocols::shell { class UsageManager; }
-namespace vh::identities::model { struct User; }
-namespace vh::rbac::model { struct PermissionOverride; }
+namespace vh::identities::model { struct Admin; }
+namespace vh::rbac::model { struct Override; }
 
 namespace vh::test::cli {
 
@@ -72,7 +72,7 @@ private:
     void teardownStage();
 
     // FUSE steps
-    std::shared_ptr<identities::model::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<rbac::model::PermissionOverride>>& overrides = {});
+    std::shared_ptr<identities::model::Admin> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<rbac::model::Override>>& overrides = {});
     void runFUSETests();
     void testFUSECRUD();
     void testFUSEAllow();

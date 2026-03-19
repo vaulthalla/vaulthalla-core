@@ -13,11 +13,11 @@
 #include "TestTask.hpp"
 #include "CLITestTask.hpp"
 
-#include "identities/model/User.hpp"
-#include "identities/model/Group.hpp"
+#include "identities/User.hpp"
+#include "identities/Group.hpp"
 #include "vault/model/Vault.hpp"
-#include "rbac/model/UserRole.hpp"
-#include "rbac/model/VaultRole.hpp"
+#include "rbac/role/Admin.hpp"
+#include "rbac/role/Vault.hpp"
 
 #include <cstdlib>
 #include <cstdio>
@@ -29,15 +29,15 @@
 
 using namespace vh::protocols::shell;
 using namespace vh::args;
-using namespace vh::identities::model;
+using namespace vh::identities;
 using namespace vh::vault::model;
-using namespace vh::rbac::model;
+using namespace vh::rbac;
 
 
 // forward decls so casts compile even if headers aren’t pulled here
-namespace vh::identities::model { struct User; struct Group; }
+namespace vh::identities { struct Admin; struct Group; }
 namespace vh::vault::model { struct Vault; }
-namespace vh::rbac::model { struct UserRole; struct VaultRole; }
+namespace vh::rbac::role { struct Admin; struct Vault; }
 
 
 namespace vh::test::cli {
@@ -84,7 +84,7 @@ template <> struct EntityTraits<EntityType::VAULT> {
 };
 
 template <> struct EntityTraits<EntityType::USER_ROLE> {
-    using Type = UserRole;
+    using Type = role::Admin;
     static constexpr std::string_view kStage = "User Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.userRoles; }
@@ -92,7 +92,7 @@ template <> struct EntityTraits<EntityType::USER_ROLE> {
 
 // VaultRole
 template <> struct EntityTraits<EntityType::VAULT_ROLE> {
-    using Type = VaultRole;
+    using Type = role::Vault;
     static constexpr std::string_view kStage = "Vault Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
     static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.vaultRoles; }
@@ -374,8 +374,8 @@ void IntegrationsTestRunner::validateAllTestObjects() const {
     Validator<EntityType::USER,       User>::assert_all_exist(ctx_->users);
     Validator<EntityType::VAULT,      Vault>::assert_all_exist(ctx_->vaults);
     Validator<EntityType::GROUP,      Group>::assert_all_exist(ctx_->groups);
-    Validator<EntityType::USER_ROLE,  UserRole>::assert_all_exist(ctx_->userRoles);
-    Validator<EntityType::VAULT_ROLE, VaultRole>::assert_all_exist(ctx_->vaultRoles);
+    Validator<EntityType::USER_ROLE,  role::Admin>::assert_all_exist(ctx_->userRoles);
+    Validator<EntityType::VAULT_ROLE, role::Vault>::assert_all_exist(ctx_->vaultRoles);
 }
 
 }

@@ -9,10 +9,12 @@
 #include "storage/Manager.hpp"
 
 #include "vault/model/Vault.hpp"
-#include "identities/model/User.hpp"
+#include "identities/User.hpp"
 
 #include "config/Registry.hpp"
 #include "CommandUsage.hpp"
+
+#include "rbac/resolver/admin/all.hpp"
 
 #include <string>
 #include <memory>
@@ -34,8 +36,12 @@ CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults() && vault->owner_id != call.user->id)
-        return invalid("vault update: you do not have permission to update this vault");
+    using Perm = rbac::permission::admin::VaultPermissions;
+    if (!rbac::resolver::Admin::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Edit,
+        .vault_id = vault->id
+    })) return invalid("vault update: you do not have permission to edit this vault");
 
     assignDescIfAvailable(call, usage, vault);
     assignQuotaIfAvailable(call, usage, vault);
@@ -43,7 +49,7 @@ CommandResult commands::vault::handle_vault_update(const CommandCall& call) {
 
     const auto sync = db::query::sync::Policy::getSync(vault->id);
     parseSync(call, usage, vault, sync);
-    parseS3API(call, usage, vault, vault->owner_id, false);
+    parseS3API(call, usage, vault, false);
 
     const auto [okToProceed, waiver] = handle_encryption_waiver({call, vault, true});
     if (!okToProceed) return invalid("vault create: user did not accept encryption waiver");
@@ -65,13 +71,12 @@ CommandResult commands::vault::handle_vault_delete(const CommandCall& call) {
     if (!vLkp || !vLkp.ptr) return invalid(vLkp.error);
     const auto vault = vLkp.ptr;
 
-    if (!call.user->canManageVaults()) {
-        if (call.user->id != vault->owner_id) return invalid(
-            "vault delete: you do not have permission to delete this vault");
-
-        if (!call.user->canDeleteVaultData(vault->id)) return invalid(
-            "vault delete: you do not have permission to delete this vault's data");
-    }
+    using Perm = rbac::permission::admin::VaultPermissions;
+    if (!rbac::resolver::Admin::has<Perm>({
+        .user = call.user,
+        .permission = Perm::Remove,
+        .vault_id = vault->id
+    })) return invalid("vault delete: you do not have permission to remove this user");
 
     runtime::Deps::get().storageManager->removeVault(vault->id);
 

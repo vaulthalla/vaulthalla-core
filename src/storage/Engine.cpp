@@ -131,7 +131,9 @@ namespace vh::storage {
                 continue;
             }
 
-            Filesystem::mkdir(toPath.parent_path());
+            if (const auto err = Filesystem::mkdir(toPath.parent_path()); err)
+                throw std::runtime_error("Failed to create thumbnail directory: " + toPath.parent_path().string() + " Error: " + std::to_string(err));
+
             fs::rename(fromPath, toPath);
         }
     }
@@ -151,32 +153,38 @@ namespace vh::storage {
                 continue;
             }
 
-            Filesystem::mkdir(toPath.parent_path());
+            if (const auto err = Filesystem::mkdir(toPath.parent_path()); err)
+                throw std::runtime_error("Failed to create thumbnail directory: " + toPath.parent_path().string() + " Error: " + std::to_string(err));
+
             fs::copy_file(fromPath, toPath, fs::copy_options::overwrite_existing);
         }
     }
 
     void Engine::mkdir(const fs::path &relPath, const unsigned int userId) {
-        Filesystem::mkdir(paths->absRelToAbsRel(relPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT), 0755, userId,
-                          shared_from_this());
+        if (const auto err = Filesystem::mkdir(paths->absRelToAbsRel(relPath, PathType::VAULT_ROOT, PathType::FUSE_ROOT), 0755, userId,
+                          shared_from_this()); err)
+            throw std::runtime_error("Failed to create directory: " + relPath.string());
     }
 
     void Engine::move(const fs::path &from, const fs::path &to, const unsigned int userId) {
-        Filesystem::rename(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+        if (const auto err = Filesystem::rename(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
                            paths->absRelToAbsRel(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId,
-                           shared_from_this());
+                           shared_from_this()); err)
+            throw std::runtime_error("Failed to move directory: " + from.string() + " to " + to.string());
     }
 
     void Engine::rename(const fs::path &from, const fs::path &to, const unsigned int userId) {
-        Filesystem::rename(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+        if (const auto err = Filesystem::rename(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
                            paths->absRelToAbsRel(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId,
-                           shared_from_this());
+                           shared_from_this()); err)
+            throw std::runtime_error("Failed to rename: " + from.string() + " to " + to.string());
     }
 
     void Engine::copy(const fs::path &from, const fs::path &to, const unsigned int userId) {
-        Filesystem::copy(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
+        if (const auto err = Filesystem::copy(paths->absRelToAbsRel(from, PathType::VAULT_ROOT, PathType::FUSE_ROOT),
                          paths->absRelToAbsRel(to, PathType::VAULT_ROOT, PathType::FUSE_ROOT), userId,
-                         shared_from_this());
+                         shared_from_this()); err)
+            throw std::runtime_error("Failed to copy: " + from.string() + " to " + to.string());
     }
 
     void Engine::remove(const fs::path &rel_path, const unsigned int userId) const {

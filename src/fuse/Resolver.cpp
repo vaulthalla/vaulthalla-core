@@ -106,7 +106,13 @@ namespace vh::fuse {
                 return false;
             }
 
-            out.path = runtime::Deps::get().fsCache->resolvePath(*req.parentIno) / *req.childName;
+            try {
+                out.path = runtime::Deps::get().fsCache->resolvePath(*req.parentIno) / *req.childName;
+            } catch (const std::exception &e) {
+                log::Registry::fuse()->error("[{}] Failed to resolve path: {}", req.caller, e.what());
+                out.setStatus(Status::MissingPath, ENOENT);
+                return false;
+            }
         }
 
         return true;
@@ -114,6 +120,13 @@ namespace vh::fuse {
 
     bool Resolver::resolveEntryForPath(const resolver::Request &req, resolver::Resolved &out) {
         if (resolver::hasFlag(req.target, Target::EntryForPath)) {
+            if (!out.path) {
+                log::Registry::fuse()->debug("[{}] Request target includes EntryForPath but no path resolved",
+                                             req.caller);
+                out.setStatus(Status::MissingPath, EINVAL);
+                return false;
+            }
+
             out.entry = runtime::Deps::get().fsCache->getEntry(*out.path);
             if (!out.entry) {
                 log::Registry::fuse()->error("[{}] Failed to resolve entry for path {}", req.caller,

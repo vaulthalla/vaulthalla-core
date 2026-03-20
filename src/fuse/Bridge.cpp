@@ -43,12 +43,8 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
         return;
     }
 
-    try {
-        const auto st = statFromEntry(resolved.entry, ino);
-        fuse_reply_attr(req, &st, 0.1); // match attr_timeout from lookup()
-    } catch (const std::exception&) {
-        fuse_reply_err(req, ENOENT);
-    }
+    const auto st = statFromEntry(resolved.entry, ino);
+    fuse_reply_attr(req, &st, 0.1); // match attr_timeout from lookup()
 }
 
 void setattr(const fuse_req_t req, const fuse_ino_t ino,
@@ -81,29 +77,25 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
         return;
     }
 
-    try {
-        timespec times[2];
-        if (to_set & FUSE_SET_ATTR_ATIME) times[0] = attr->st_atim;
-        else times[0].tv_nsec = UTIME_OMIT;
-        if (to_set & FUSE_SET_ATTR_MTIME) times[1] = attr->st_mtim;
-        else times[1].tv_nsec = UTIME_OMIT;
+    timespec times[2];
+    if (to_set & FUSE_SET_ATTR_ATIME) times[0] = attr->st_atim;
+    else times[0].tv_nsec = UTIME_OMIT;
+    if (to_set & FUSE_SET_ATTR_MTIME) times[1] = attr->st_mtim;
+    else times[1].tv_nsec = UTIME_OMIT;
 
-        if (::utimensat(AT_FDCWD, resolved.entry->backing_path.c_str(), times, 0) < 0) {
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        // Re-stat file so kernel gets fresh info
-        struct stat st = {};
-        if (::stat(resolved.entry->backing_path.c_str(), &st) < 0) {
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        fuse_reply_attr(req, &st, 1.0);
-    } catch (...) {
-        fuse_reply_err(req, EIO);
+    if (::utimensat(AT_FDCWD, resolved.entry->backing_path.c_str(), times, 0) < 0) {
+        fuse_reply_err(req, errno);
+        return;
     }
+
+    // Re-stat file so kernel gets fresh info
+    struct stat st = {};
+    if (::stat(resolved.entry->backing_path.c_str(), &st) < 0) {
+        fuse_reply_err(req, errno);
+        return;
+    }
+
+    fuse_reply_attr(req, &st, 1.0);
 }
 
 void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const off_t off, fuse_file_info* fi) {
@@ -212,34 +204,34 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         return;
     }
 
-    try {
-        const auto newEntry = Filesystem::createFile(*resolved.path, getuid(), getgid(), mode);
-        const auto st = statFromEntry(newEntry, *newEntry->inode);
-
-        // open backing file immediately
-        const int fd = ::open(newEntry->backing_path.c_str(), O_CREAT | O_RDWR, mode);
-        if (fd < 0) {
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        auto* fh = new FileHandle{newEntry->backing_path.string(), fd};
-        fi->fh = reinterpret_cast<uint64_t>(fh);
-
-        fi->direct_io = 1;
-        fi->keep_cache = 0;
-
-        fuse_entry_param e{};
-        e.ino           = *newEntry->inode;
-        e.attr          = st;
-        e.attr_timeout  = 60.0;
-        e.entry_timeout = 60.0;
-
-        fuse_reply_create(req, &e, fi);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[create] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    const auto [err, newEntry] = Filesystem::createFile(*resolved.path, getuid(), getgid(), mode);
+    if (err) {
+        fuse_reply_err(req, err);
+        return;
     }
+
+    const auto st = statFromEntry(newEntry, *newEntry->inode);
+
+    // open backing file immediately
+    const int fd = ::open(newEntry->backing_path.c_str(), O_CREAT | O_RDWR, mode);
+    if (fd < 0) {
+        fuse_reply_err(req, errno);
+        return;
+    }
+
+    auto* fh = new FileHandle{newEntry->backing_path.string(), fd};
+    fi->fh = reinterpret_cast<uint64_t>(fh);
+
+    fi->direct_io = 1;
+    fi->keep_cache = 0;
+
+    fuse_entry_param e{};
+    e.ino           = *newEntry->inode;
+    e.attr          = st;
+    e.attr_timeout  = 60.0;
+    e.entry_timeout = 60.0;
+
+    fuse_reply_create(req, &e, fi);
 }
 
 void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
@@ -260,24 +252,19 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
         return;
     }
 
-    try {
-        const int fd = ::open(resolved.entry->backing_path.c_str(), fi->flags, 0644);
-        if (fd < 0) {
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        auto* fh = new FileHandle{resolved.entry->backing_path.string(), fd};
-        fi->fh = reinterpret_cast<uint64_t>(fh);
-
-        fi->direct_io = 1;
-        fi->keep_cache = 0;
-
-        fuse_reply_open(req, fi);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[open] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    const int fd = ::open(resolved.entry->backing_path.c_str(), fi->flags, 0644);
+    if (fd < 0) {
+        fuse_reply_err(req, errno);
+        return;
     }
+
+    auto* fh = new FileHandle{resolved.entry->backing_path.string(), fd};
+    fi->fh = reinterpret_cast<uint64_t>(fh);
+
+    fi->direct_io = 1;
+    fi->keep_cache = 0;
+
+    fuse_reply_open(req, fi);
 }
 
 void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
@@ -356,29 +343,26 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
         return;
     }
 
-    try {
-        if (std::string_view(name).find('/') != std::string::npos) {
-            fuse_reply_err(req, EINVAL);
-            return;
-        }
-
-        Filesystem::mkdir(*resolved.path, mode);
-
-        const auto finalInode = runtime::Deps::get().fsCache->resolveInode(*resolved.path);
-        const auto finalEntry = runtime::Deps::get().fsCache->getEntry(*resolved.path);
-
-        fuse_entry_param e{};
-        e.ino = finalInode;
-        e.attr_timeout = 1.0;
-        e.entry_timeout = 1.0;
-        e.attr = statFromEntry(finalEntry, finalInode);
-
-        fuse_reply_entry(req, &e);
-
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[mkdir] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    if (std::string_view(name).find('/') != std::string::npos) {
+        fuse_reply_err(req, EINVAL);
+        return;
     }
+
+    if (const auto err = Filesystem::mkdir(*resolved.path, mode); err) {
+        fuse_reply_err(req, err);
+        return;
+    }
+
+    const auto finalInode = runtime::Deps::get().fsCache->resolveInode(*resolved.path);
+    const auto finalEntry = runtime::Deps::get().fsCache->getEntry(*resolved.path);
+
+    fuse_entry_param e{};
+    e.ino = finalInode;
+    e.attr_timeout = 1.0;
+    e.entry_timeout = 1.0;
+    e.attr = statFromEntry(finalEntry, finalInode);
+
+    fuse_reply_entry(req, &e);
 }
 
 void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, const fuse_ino_t newparent, const char* newname, const unsigned int flags) {
@@ -403,20 +387,18 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
         return;
     }
 
-    try {
-        // Flags handling (RENAME_NOREPLACE = 1, RENAME_EXCHANGE = 2)
-        if ((flags & RENAME_NOREPLACE) && cache->entryExists(toPath)) {
-            fuse_reply_err(req, EEXIST);
-            return;
-        }
-
-        Filesystem::rename(*resolved.path, toPath);
-
-        fuse_reply_err(req, 0);  // Success
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[rename] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    // Flags handling (RENAME_NOREPLACE = 1, RENAME_EXCHANGE = 2)
+    if ((flags & RENAME_NOREPLACE) && cache->entryExists(toPath)) {
+        fuse_reply_err(req, EEXIST);
+        return;
     }
+
+    if (const auto err = Filesystem::rename(*resolved.path, toPath); err) {
+        fuse_reply_err(req, err);
+        return;
+    }
+
+    fuse_reply_err(req, 0);  // Success
 }
 
 void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) {
@@ -478,17 +460,12 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         return;
     }
 
-    try {
-        db::query::fs::File::markFileAsTrashed(resolved.user->id, *resolved.entry->vault_id, resolved.entry->path, true);
+    db::query::fs::File::markFileAsTrashed(resolved.user->id, *resolved.entry->vault_id, resolved.entry->path, true);
 
-        if (::unlink(resolved.entry->backing_path.c_str()) < 0)
-            log::Registry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
+    if (::unlink(resolved.entry->backing_path.c_str()) < 0)
+        log::Registry::fuse()->debug("[unlink] Failed to remove backing file: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
 
-        fuse_reply_err(req, 0);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[unlink] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
-    }
+    fuse_reply_err(req, 0);
 }
 
 void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
@@ -508,17 +485,12 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         return;
     }
 
-    try {
-        db::query::fs::Directory::deleteEmptyDirectory(resolved.entry->id);
+    db::query::fs::Directory::deleteEmptyDirectory(resolved.entry->id);
 
-        if (::rmdir(resolved.entry->backing_path.c_str()) < 0)
-            log::Registry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
+    if (::rmdir(resolved.entry->backing_path.c_str()) < 0)
+        log::Registry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
 
-        fuse_reply_err(req, 0);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[rmdir] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
-    }
+    fuse_reply_err(req, 0);
 }
 
 void flush(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
@@ -568,18 +540,13 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
         return;
     }
 
-    try {
-        if (const int fd = fi->fh; ::fsync(fd) < 0) {
-            log::Registry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        fuse_reply_err(req, 0);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[fsync] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    if (const int fd = fi->fh; ::fsync(fd) < 0) {
+        log::Registry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
+        fuse_reply_err(req, errno);
+        return;
     }
+
+    fuse_reply_err(req, 0);
 }
 
 void statfs(const fuse_req_t req, const fuse_ino_t ino) {
@@ -598,20 +565,15 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
         return;
     }
 
-    try {
-        struct statvfs st{};
+    struct statvfs st{};
 
-        if (::statvfs(resolved.entry->backing_path.c_str(), &st) < 0) {
-            log::Registry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
-            fuse_reply_err(req, errno);
-            return;
-        }
-
-        fuse_reply_statfs(req, &st);
-    } catch (const std::exception& ex) {
-        log::Registry::fuse()->error("[statfs] Exception: {}", ex.what());
-        fuse_reply_err(req, EIO);
+    if (::statvfs(resolved.entry->backing_path.c_str(), &st) < 0) {
+        log::Registry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
+        fuse_reply_err(req, errno);
+        return;
     }
+
+    fuse_reply_statfs(req, &st);
 }
 
 fuse_lowlevel_ops getOperations() {

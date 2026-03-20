@@ -23,7 +23,7 @@ namespace vh {
         void upsertVaultRoles(pqxx::work& txn, const std::unordered_map<uint32_t, std::shared_ptr<vh::rbac::role::Vault>>& vRoles,
                                      const std::string &subjectType, uint32_t subjectId);
 
-        void upsertGlobalVRoles(pqxx::work& txn, const rbac::permission::admin::VaultGlobals &vGlobal, uint32_t userId);
+        void upsertGlobalVRoles(pqxx::work& txn, const vh::rbac::permission::admin::VaultGlobals &vGlobal, uint32_t userId);
 
         void upsertAdminRoleAssignment(pqxx::work& txn, uint32_t userId, uint32_t roleId);
 

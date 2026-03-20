@@ -14,6 +14,7 @@
 #include "log/Registry.hpp"
 #include "fs/cache/Registry.hpp"
 #include "rbac/resolver/vault/all.hpp"
+#include "fuse/Resolver.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -231,55 +232,27 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
 }
 
 void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
-    log::Registry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
-    if (!name || strlen(name) == 0) {
-        fuse_reply_err(req, EINVAL);
+    log::Registry::fuse()->error("[lookup] Called for parent: {}, name: {}", parent, name);
+
+    const auto resolved = Resolver::resolve({
+        .caller = "lookup",
+        .fuseReq = req,
+        .parentIno = parent,
+        .childName = name,
+        .action = permission::vault::FilesystemAction::List,
+        .target = resolver::Target::EntryForPath
+    });
+
+    if (!resolved.ok()) {
+        fuse_reply_err(req, resolved.errnum);
         return;
     }
-
-    const fuse_ctx* ctx = fuse_req_ctx(req);
-    uid_t uid = ctx->uid;
-    // gid_t gid = ctx->gid;
-    
-    const auto user = db::query::identities::User::getUserByLinuxUID(uid);
-    if (!user) {
-        log::Registry::fuse()->debug("[lookup] No user found for UID: {}", uid);
-        fuse_reply_err(req, EACCES);
-        return;
-    }
-
-    const auto& cache = runtime::Deps::get().fsCache;
-
-    const auto parentPath = cache->resolvePath(parent);
-    const auto path = parentPath / name;
-    const fuse_ino_t ino = cache->getOrAssignInode(path);
-
-    log::Registry::fuse()->debug("[lookup] name: {}, parentPath: {}, inode: {}, Resolved path: {}", name, parentPath.string(), ino, path.string());
-
-    const auto entry = cache->getEntry(path);
-    if (!entry) {
-        log::Registry::fuse()->debug("[lookup] Entry not found for path: {}", path.string());
-        fuse_reply_err(req, ENOENT);
-        return;
-    }
-
-    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
-            .user = user,
-            .permission = permission::vault::FilesystemAction::List,
-            .entry = entry
-        })) {
-        log::Registry::fuse()->error("[lookup] Access denied for user {} on path {}", user->name, entry->path.string());
-        fuse_reply_err(req, EPERM);
-        return;
-        }
-
-    const auto st = statFromEntry(entry, ino);
 
     fuse_entry_param e{};
-    e.ino = ino;
+    e.ino = *resolved.ino;
     e.attr_timeout = 0.1;
     e.entry_timeout = 0.1;
-    e.attr = st;
+    e.attr = statFromEntry(resolved.entry, *resolved.ino);
 
     fuse_reply_entry(req, &e);
 }

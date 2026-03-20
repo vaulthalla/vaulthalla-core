@@ -36,13 +36,13 @@ namespace vh::fuse::resolver {
 
     struct Request {
         std::string caller;
-        fuse_req_t fuseReq {};
+        fuse_req_t fuseReq;
 
-        std::optional<fuse_ino_t> ino, parentIno;
-        std::optional<std::string> childName;
+        std::optional<fuse_ino_t> ino{}, parentIno{};
+        std::optional<std::string> childName{};
 
-        std::optional<rbac::permission::vault::FilesystemAction> action;
-        std::vector<rbac::permission::vault::FilesystemAction> actions;
+        std::optional<rbac::permission::vault::FilesystemAction> action{};
+        std::vector<rbac::permission::vault::FilesystemAction> actions{};
 
         Target target {Target::Entry};
     };

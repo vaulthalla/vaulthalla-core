@@ -33,12 +33,12 @@ namespace vh {
             Status status {Status::Ok};
             int errnum {0};
 
-            std::shared_ptr<identities::User> user;
-            std::shared_ptr<identities::Group> group;
-            std::shared_ptr<fs::model::Entry> entry, parentEntry;
-            std::optional<std::filesystem::path> path, fusePath;
-            std::optional<fuse_ino_t> ino;
-            std::shared_ptr<storage::Engine> engine;
+            std::shared_ptr<identities::User> user{};
+            std::shared_ptr<identities::Group> group{};
+            std::shared_ptr<fs::model::Entry> entry{}, parentEntry{};
+            std::optional<std::filesystem::path> path{};
+            std::optional<fuse_ino_t> ino{};
+            std::shared_ptr<storage::Engine> engine{};
 
             [[nodiscard]] bool ok() const {
                 return status == Status::Ok;

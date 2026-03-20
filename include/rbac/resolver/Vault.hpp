@@ -185,16 +185,6 @@ namespace vh::rbac::resolver {
         template<typename EnumT>
         static bool has(vault::Context<EnumT> &&ctx) {
             if (!ctx.isValid()) return false;
-
-            log::Registry::auth()->warn(
-    "user bypass check: isSuperAdmin={}, name='{}', size={}, id={}, role_name={}",
-    ctx.user->isSuperAdmin(),
-    ctx.user->name,
-    ctx.user->name.size(),
-    ctx.user->id,
-    ctx.user->roles.admin->name
-);
-
             if (ctx.user->isSuperAdmin()) return true;
 
             const auto resolved = resolveVaultContext(

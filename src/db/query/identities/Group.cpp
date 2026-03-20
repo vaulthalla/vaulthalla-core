@@ -109,4 +109,12 @@ bool Group::groupExists(const std::string& name) {
     });
 }
 
+Group::GroupPtr Group::getGroupByLinuxGID(uint32_t gid) {
+    return Transactions::exec("Group::getGroupByLinuxGID", [&](pqxx::work& txn) -> GroupPtr {
+            const auto res = txn.exec(pqxx::prepped{"get_group_by_linux_gid"}, gid);
+            if (res.empty()) return nullptr;
+            return hydrateGroup(txn, res.one_row());
+        });
+}
+
 }

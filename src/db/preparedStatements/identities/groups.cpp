@@ -193,4 +193,6 @@ void vh::db::DBConnection::initPreparedGroups() const {
             ) AS exists
         )SQL"
     );
+
+    conn_->prepare("get_group_by_linux_gid", "SELECT * FROM groups WHERE linux_gid = $1");
 }

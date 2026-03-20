@@ -30,6 +30,7 @@ public:
     static GroupPtr getGroupByName(const std::string& name);
     static std::vector<GroupPtr> listGroups(const std::optional<uint32_t>& userId = {}, model::ListQueryParams&& params = {});
     [[nodiscard]] static bool groupExists(const std::string& name);
+    static GroupPtr getGroupByLinuxGID(uint32_t gid);
 };
 
 }

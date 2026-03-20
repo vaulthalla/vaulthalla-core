@@ -70,7 +70,7 @@ void getattr(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::List,
             .entry = entry
@@ -124,7 +124,7 @@ void setattr(const fuse_req_t req, const fuse_ino_t ino,
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Upload,
             .entry = entry
@@ -179,7 +179,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
         return;
     }
 
-    if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::List,
             .entry = entry
@@ -263,7 +263,7 @@ void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
         return;
     }
 
-    if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::List,
             .entry = entry
@@ -315,7 +315,7 @@ void create(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Upload,
             .path = vaultPath,
@@ -383,7 +383,7 @@ void open(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Download,
             .entry = entry
@@ -442,7 +442,7 @@ void write(const fuse_req_t req, const fuse_ino_t ino, const char* buf,
         return;
     }
 
-    if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Upload,
             .entry = entry
@@ -483,7 +483,7 @@ void read(const fuse_req_t req, const fuse_ino_t ino, const size_t size, const o
         return;
     }
 
-    if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Download,
             .entry = entry
@@ -537,7 +537,7 @@ void mkdir(const fuse_req_t req, const fuse_ino_t parent, const char* name, cons
         }
 
         const auto vaultPath = engine->paths->absRelToAbsRel(fullPath, PathType::FUSE_ROOT, PathType::VAULT_ROOT);
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Touch,
             .path = vaultPath,
@@ -606,7 +606,7 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Rename,
             .entry = entry
@@ -668,19 +668,19 @@ void access(const fuse_req_t req, const fuse_ino_t ino, const int mask) {
     if (entry->vault_id) {
         bool allowed = true;
 
-        if ((mask & R_OK) && !resolver::Vault::has<permission::vault::FilesystemAction>({
+        if ((mask & R_OK) && !rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Download,
             .entry = entry
         })) allowed = false;
 
-        if ((mask & W_OK) && !resolver::Vault::has<permission::vault::FilesystemAction>({
+        if ((mask & W_OK) && !rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Upload,
             .entry = entry
         })) allowed = false;
 
-        if ((mask & X_OK) && !resolver::Vault::has<permission::vault::FilesystemAction>({
+        if ((mask & X_OK) && !rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::List,
             .entry = entry
@@ -734,7 +734,7 @@ void unlink(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Delete,
             .entry = file
@@ -797,7 +797,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Delete,
             .entry = entry
@@ -871,7 +871,7 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
         return;
     }
 
-    if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+    if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Upload,
             .entry = entry
@@ -917,7 +917,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
             return;
         }
 
-        if (!resolver::Vault::has<permission::vault::FilesystemAction>({
+        if (!rbac::resolver::Vault::has<permission::vault::FilesystemAction>({
             .user = user,
             .permission = permission::vault::FilesystemAction::Download,
             .entry = entry

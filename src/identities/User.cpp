@@ -138,7 +138,7 @@ namespace vh::identities {
         return roles.admin->keys.encryptionKeys;
     }
 
-    std::shared_ptr<Vault> User::getDirectVaultRole(const uint32_t vaultId) const {
+    std::shared_ptr<rbac::role::Vault> User::getDirectVaultRole(const uint32_t vaultId) const {
         std::scoped_lock lock(mutex_);
 
         const auto it = roles.vaults.find(vaultId);

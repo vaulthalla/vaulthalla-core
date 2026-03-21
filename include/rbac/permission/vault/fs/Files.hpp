@@ -50,10 +50,12 @@ namespace vh::rbac::permission {
             Files() = default;
             explicit Files(const Mask& mask) { fromMask(mask); }
 
+            [[nodiscard]] const char* name() const override { return ModuleName; }
             [[nodiscard]] std::string toString(uint8_t indent) const override;
             [[nodiscard]] const char* flagPrefix() const override { return FLAG_PREFIX; }
+
             [[nodiscard]] std::string toFlagsString() const override;
-            [[nodiscard]] const char* name() const override { return ModuleName; }
+            [[nodiscard]] std::vector<std::string> getFlags() const override { return getFlagsWithOwn(share); }
 
             [[nodiscard]] uint32_t toMask() const override { return packWithOwn(share); }
             void fromMask(const Mask mask) override { unpackWithOwn(mask, share); }

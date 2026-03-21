@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 namespace vh::rbac::permission {
     template<typename MaskT, typename SetEnumT, typename SetMaskT>
@@ -32,6 +33,8 @@ namespace vh::rbac::permission {
         }
 
         [[nodiscard]] virtual const char *flagPrefix() const = 0;
+
+        [[nodiscard]] virtual std::vector<std::string> getFlags() const = 0;
 
         [[nodiscard]] static constexpr std::size_t setBitWidth() {
             return sizeof(SetMask) * 8u;
@@ -159,23 +162,70 @@ namespace vh::rbac::permission {
             (Base::extract(srcMask, offset, sets, this->name()), ...);
         }
 
+        [[nodiscard]] std::string ownFlagsString() const
+            requires HasPermissionTraits<Enum> {
+            std::ostringstream oss;
+            bool first = true;
+
+            const auto allowFullPrefix = std::format("--{}-{}-", ALLOW_FLAG_ALIAS, flagPrefix());
+            const auto denyFullPrefix = std::format("--{}-{}-", DENY_FLAG_ALIAS, flagPrefix());
+
+            for (const auto &entry: PermissionTraits<Enum>::entries) {
+                if (!first) oss << ' ';
+                first = false;
+
+                oss << (has(entry.value) ? allowFullPrefix : denyFullPrefix) << entry.slug;
+            }
+
+            return oss.str();
+        }
+
         template<typename... PermissionTs>
         [[nodiscard]] std::string joinFlagsWithOwn(const PermissionTs &... p) const {
             std::ostringstream oss;
-            bool first = true;
 
             auto append = [&](const auto &permission) {
                 const auto flags = permission.toFlagsString();
                 if (flags.empty()) return;
 
-                if (!first) oss << ' ';
-                first = false;
+                oss << ' ';
                 oss << flags;
             };
 
-            append(*this);
+            (void) append;
+
+            oss << ownFlagsString();
             (append(p), ...);
             return oss.str();
+        }
+
+        [[nodiscard]] std::vector<std::string> ownFlags() const {
+            std::vector<std::string> flags;
+
+            const auto allowFullPrefix = std::format("--{}-{}-", ALLOW_FLAG_ALIAS, flagPrefix());
+            const auto denyFullPrefix = std::format("--{}-{}-", DENY_FLAG_ALIAS, flagPrefix());
+
+            for (const auto &entry: PermissionTraits<Enum>::entries) {
+                flags.emplace_back("--" + std::string(entry.slug));
+                flags.emplace_back(allowFullPrefix + std::string(entry.slug));
+                flags.emplace_back(denyFullPrefix + std::string(entry.slug));
+            }
+
+            return flags;
+        }
+
+        template<typename... PermissionTs>
+        [[nodiscard]] std::vector<std::string> getFlagsWithOwn(const PermissionTs &... p) const {
+            std::vector<std::string> flags = ownFlags();
+
+            auto append = [&](const auto &permission) {
+                for (const auto& flag : permission.getFlags()) flags.emplace_back(flag);
+            };
+
+            (void) append;
+
+            (append(p), ...);
+            return flags;
         }
 
         template<typename... SetTs>

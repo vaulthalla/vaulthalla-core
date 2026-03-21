@@ -118,6 +118,21 @@ namespace vh::rbac::permission {
             return oss.str();
         }
 
+        [[nodiscard]] std::vector<std::string> getFlags() const {
+            std::vector<std::string> flags;
+
+            const auto allowFullPrefix = std::format("--{}-{}-", ALLOW_FLAG_ALIAS, flagPrefix());
+            const auto denyFullPrefix = std::format("--{}-{}-", DENY_FLAG_ALIAS, flagPrefix());
+
+            for (const auto& entry : PermissionTraits<Enum>::entries) {
+                flags.emplace_back("--" + std::string(entry.slug));
+                flags.emplace_back(allowFullPrefix + std::string(entry.slug));
+                flags.emplace_back(denyFullPrefix + std::string(entry.slug));
+            }
+
+            return flags;
+        }
+
         [[nodiscard]] virtual std::string toString(uint8_t indent) const = 0;
 
         template<typename Describer, typename OutputIt>

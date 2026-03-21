@@ -52,6 +52,20 @@ namespace vh::rbac::permission {
             return bits;
         }
 
+        template<typename... PermissionTs>
+        [[nodiscard]] std::vector<std::string> getFlags(const PermissionTs&... p) const {
+            std::vector<std::string> flags;
+
+            auto append = [&](const auto& permission) {
+                for (const auto& perm : permission.getFlags()) flags.push_back(perm);
+            };
+
+            (void) append;
+
+            (append(p), ...);
+            return flags;
+        }
+
     protected:
         template<SetLike SetLikeT>
         static void append(Mask &dstMask, Offset &offset, const SetLikeT &set, const char *context) {

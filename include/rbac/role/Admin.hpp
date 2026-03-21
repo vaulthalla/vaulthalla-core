@@ -31,6 +31,7 @@ struct Admin final : Meta {
     [[nodiscard]] std::string toString(uint8_t indent) const override;
     [[nodiscard]] std::string toString() const { return toString(0); }
     [[nodiscard]] std::string toFlagsString() const;
+    [[nodiscard]] std::vector<std::string> getFlags() const;
 
     [[nodiscard]] std::vector<permission::Permission> toPermissions() const;
 

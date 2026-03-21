@@ -30,6 +30,8 @@ namespace vh::rbac::role {
 
         explicit Vault(const nlohmann::json &j);
 
+        [[nodiscard]] std::vector<std::string> getFlags() const;
+
         [[nodiscard]] std::vector<permission::Permission> toPermissions() const;
 
         [[nodiscard]] std::string toString(uint8_t indent) const override;

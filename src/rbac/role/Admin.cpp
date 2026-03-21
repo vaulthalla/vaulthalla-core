@@ -53,6 +53,36 @@ namespace vh::rbac::role {
         }
     }
 
+    std::vector<std::string> Admin::getFlags() const {
+        auto identitiesFlags = identities.getFlags();
+        auto vaultsFlags = vaults.getFlags();
+        auto auditsFlags = audits.getFlags();
+        auto settingsFlags = settings.getFlags();
+        auto rolesFlags = roles.getFlags();
+        auto keysFlags = keys.getFlags();
+
+        std::vector<std::string> flags;
+        flags.reserve(
+            identitiesFlags.size() +
+            vaultsFlags.size() +
+            auditsFlags.size() +
+            settingsFlags.size() +
+            rolesFlags.size() +
+            keysFlags.size()
+        );
+
+        auto append = [&](auto &src) { std::move(src.begin(), src.end(), std::back_inserter(flags)); };
+
+        append(identitiesFlags);
+        append(vaultsFlags);
+        append(auditsFlags);
+        append(settingsFlags);
+        append(rolesFlags);
+        append(keysFlags);
+
+        return flags;
+    }
+
     std::vector<permission::Permission> Admin::toPermissions() const {
         auto identitiesPerms = identities.exportPermissions();
         auto vaultsPerms = vaults.exportPermissions();

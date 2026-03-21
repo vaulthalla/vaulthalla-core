@@ -57,6 +57,7 @@ namespace vh::rbac::permission {
             [[nodiscard]] const char* flagPrefix() const override { return FLAG_PREFIX; }
 
             [[nodiscard]] std::string toFlagsString() const override;
+            [[nodiscard]] std::vector<std::string> getFlags() const override { return getFlagsWithOwn(share); }
 
             [[nodiscard]] uint32_t toMask() const override { return packWithOwn(share); }
             void fromMask(const Mask mask) override { unpackWithOwn(mask, share); }

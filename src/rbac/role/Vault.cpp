@@ -38,6 +38,25 @@ Vault::Vault(const nlohmann::json& j)
     }
 }
 
+    std::vector<std::string> Vault::getFlags() const {
+        auto rolesFlags = roles.getFlags();
+        auto syncFlags = sync.getFlags();
+        auto filesFlags = fs.files.getFlags();
+        auto dirsFlags = fs.directories.getFlags();
+
+        std::vector<std::string> flags;
+        flags.reserve(rolesFlags.size() + syncFlags.size() + filesFlags.size() + dirsFlags.size());
+
+        auto append = [&](auto &src) { std::move(src.begin(), src.end(), std::back_inserter(flags)); };
+
+        append(rolesFlags);
+        append(syncFlags);
+        append(filesFlags);
+        append(dirsFlags);
+
+        return flags;
+    }
+
 std::vector<permission::Permission> Vault::toPermissions() const {
     auto rolesPerms = roles.exportPermissions();
     auto syncPerms = sync.exportPermissions();

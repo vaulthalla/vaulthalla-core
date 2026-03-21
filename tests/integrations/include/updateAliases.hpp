@@ -1,7 +1,7 @@
 #pragma once
 
-#include "EntityType.hpp"
-#include "CLITestContext.hpp"
+#include "Type.hpp"
+#include "cli/Context.hpp"
 #include "CommandUsage.hpp"
 
 #include <string>
@@ -11,7 +11,7 @@
 #include <ranges>
 #include <stdexcept>
 
-namespace vh::test::cli {
+namespace vh::test::integrations {
 
 static bool isFieldMatch(const std::string& field, const std::vector<std::string>& aliases) {
     return std::ranges::any_of(aliases, [&field](const std::string& t){ return t == field; });
@@ -23,7 +23,7 @@ struct UserAliases {
     std::vector<std::string> roleAliases;
     std::vector<std::string> linuxUidAliases;
 
-    explicit UserAliases(const std::shared_ptr<CLITestContext>& ctx) {
+    explicit UserAliases(const std::shared_ptr<cli::Context>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::USER, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for user update");
         for (const auto& opt : cmd->optional) {
@@ -48,7 +48,7 @@ struct UserAliases {
 struct GroupAliases {
     std::vector<std::string> nameAliases, descAliases, gidAliases;
 
-    explicit GroupAliases(const std::shared_ptr<CLITestContext>& ctx) {
+    explicit GroupAliases(const std::shared_ptr<cli::Context>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::GROUP, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for group update");
         for (const auto& opt : cmd->optional) {
@@ -70,7 +70,7 @@ struct GroupAliases {
 struct UserRoleAliases {
     std::vector<std::string> nameAliases, permAliases, descAliases;
 
-    explicit UserRoleAliases(const std::shared_ptr<CLITestContext>& ctx) {
+    explicit UserRoleAliases(const std::shared_ptr<cli::Context>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::USER_ROLE, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for user role update");
         for (const auto& opt : cmd->optional) {
@@ -93,7 +93,7 @@ struct UserRoleAliases {
 struct VaultRoleAliases {
     std::vector<std::string> nameAliases, permAliases, descAliases;
 
-    explicit VaultRoleAliases(const std::shared_ptr<CLITestContext>& ctx) {
+    explicit VaultRoleAliases(const std::shared_ptr<cli::Context>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::VAULT_ROLE, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for vault role update");
         for (const auto& opt : cmd->optional) {
@@ -116,7 +116,7 @@ struct VaultRoleAliases {
 struct VaultAliases {
     std::vector<std::string> nameAliases, descAliases, quotaAliases, ownerAliases, conflictPolicyAliases, intervalAliases;
 
-    explicit VaultAliases(const std::shared_ptr<CLITestContext>& ctx) {
+    explicit VaultAliases(const std::shared_ptr<cli::Context>& ctx) {
         const auto cmd = ctx->getCommand(EntityType::VAULT, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for vault update");
         for (const auto& opt : cmd->optional) {
@@ -147,7 +147,7 @@ struct VaultAliases {
 struct S3VaultAliases : VaultAliases {
     std::vector<std::string> apiKeyAliases, syncStrategyAliases;
 
-    explicit S3VaultAliases(const std::shared_ptr<CLITestContext>& ctx) : VaultAliases(ctx) {
+    explicit S3VaultAliases(const std::shared_ptr<cli::Context>& ctx) : VaultAliases(ctx) {
         const auto cmd = ctx->getCommand(EntityType::VAULT, "update");
         if (!cmd) throw std::runtime_error("EntityFactory: command usage not found for vault update");
         for (const auto& opt : cmd->optional) {

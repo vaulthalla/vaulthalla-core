@@ -1,18 +1,18 @@
 #pragma once
 
-namespace vh::test::cli {
+namespace vh::test::integrations::cli {
 
-struct CLITestConfig {
+struct Config {
     unsigned int numUsers = 10,
            numVaults = 15,
            numGroups = 5,
            numUserRoles = 7,
            numVaultRoles = 7;
 
-    static CLITestConfig Default() { return CLITestConfig{}; }
+    static Config Default() { return Config{}; }
 
-    static CLITestConfig Minimal() {
-        return CLITestConfig{
+    static Config Minimal() {
+        return Config{
             .numUsers = 2,
             .numVaults = 2,
             .numGroups = 1,
@@ -21,8 +21,8 @@ struct CLITestConfig {
         };
     }
 
-    static CLITestConfig Medium() {
-        return CLITestConfig{
+    static Config Medium() {
+        return Config{
             .numUsers = 15,
             .numVaults = 20,
             .numGroups = 10,
@@ -31,8 +31,8 @@ struct CLITestConfig {
         };
     }
 
-    static CLITestConfig Large() {
-        return CLITestConfig{
+    static Config Large() {
+        return Config{
             .numUsers = 50,
             .numVaults = 75,
             .numGroups = 20,
@@ -41,8 +41,8 @@ struct CLITestConfig {
         };
     }
 
-    static CLITestConfig ExtraLarge() {
-        return CLITestConfig{
+    static Config ExtraLarge() {
+        return Config{
             .numUsers = 100,
             .numVaults = 150,
             .numGroups = 50,
@@ -51,8 +51,8 @@ struct CLITestConfig {
         };
     }
 
-    static CLITestConfig NG_STRESS() {
-        return CLITestConfig{
+    static Config NG_STRESS() {
+        return Config{
             .numUsers = 500,
             .numVaults = 750,
             .numGroups = 100,

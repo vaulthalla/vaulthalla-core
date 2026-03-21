@@ -15,12 +15,11 @@ class CommandUsage;
 class UsageManager;
 }
 
-namespace vh::test::cli {
+namespace vh::test::integrations { enum class EntityType; }
 
-struct CLITestContext;
-enum class EntityType;
+namespace vh::test::integrations::cli {
 
-struct CLITestContext {
+struct Context {
     static constexpr std::array<std::string_view, 4> ENTITIES = {"user", "vault", "group", "role"};
     static constexpr std::array<std::string_view, 5> ACTIONS = {"create", "update", "delete", "list", "info"};
 
@@ -33,7 +32,7 @@ struct CLITestContext {
     std::shared_ptr<protocols::shell::UsageManager> usage;
     std::unordered_map<std::string, std::shared_ptr<protocols::shell::CommandUsage>> commands;
 
-    CLITestContext();
+    Context();
 
     [[nodiscard]] std::shared_ptr<identities::User> pickRandomUser() const;
     [[nodiscard]] std::shared_ptr<identities::Group> pickRandomGroup() const;

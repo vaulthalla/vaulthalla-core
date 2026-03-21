@@ -1,13 +1,13 @@
 #pragma once
 
-#include "EntityType.hpp"
-#include "generators.hpp"
+#include "tests/integrations/include/Type.hpp"
+#include "tests/integrations/include/generators.hpp"
+#include "tests/integrations/include/cli/Context.hpp"
 #include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "identities/Group.hpp"
 #include "rbac/role/Admin.hpp"
 #include "rbac/role/Vault.hpp"
-#include "CLITestContext.hpp"
 #include "permsUtil.hpp"
 
 #include <string>
@@ -18,11 +18,11 @@ using namespace vh::identities;
 using namespace vh::rbac;
 using namespace vh::vault::model;
 
-namespace vh::test::cli {
+namespace vh::test::integrations::entity {
 
-class EntityFactory {
+class Factory {
 public:
-    explicit EntityFactory(const std::shared_ptr<CLITestContext>& ctx) : ctx_(ctx) {}
+    explicit Factory(const std::shared_ptr<cli::Context>& ctx) : ctx_(ctx) {}
 
     [[nodiscard]] std::shared_ptr<void> create(const EntityType& type) const {
         if (type == EntityType::USER) {
@@ -69,10 +69,10 @@ public:
         return nullptr;
     }
 
-    void seedBaseline(const std::shared_ptr<CLITestContext>& ctx);
+    void seedBaseline(const std::shared_ptr<cli::Context>& ctx);
 
 private:
-    std::shared_ptr<CLITestContext> ctx_;
+    std::shared_ptr<cli::Context> ctx_;
 };
 
 }

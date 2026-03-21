@@ -5,10 +5,11 @@
 #include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "protocols/shell/Router.hpp"
-#include "CLITestContext.hpp"
-#include "CommandBuilderRegistry.hpp"
+#include "tests/integrations/include/cli/Context.hpp"
+#include "tests/integrations/include/cmd/Registry.hpp"
+#include "tests/integrations/include/Type.hpp"
+#include "tests/integrations/include/entity/Factory.hpp"
 #include "protocols/shell/commands/all.hpp"
-#include "EntityFactory.hpp"
 #include "db/query/identities/User.hpp"
 
 #include <string>
@@ -17,7 +18,7 @@
 #include <stdexcept>
 #include <iostream>
 
-namespace vh::test::cli {
+namespace vh::test::integrations::entity {
 
 struct SeedContext {
     unsigned int numUsers = 10;
@@ -27,10 +28,10 @@ struct SeedContext {
     unsigned int numVaultRoles = 7;
 };
 
-class EntityRegistrar {
+class Registrar {
 public:
-    explicit EntityRegistrar(const std::shared_ptr<CLITestContext>& ctx)
-        : factory_(std::make_shared<EntityFactory>(ctx)),
+    explicit Registrar(const std::shared_ptr<cli::Context>& ctx)
+        : factory_(std::make_shared<Factory>(ctx)),
           router_(std::make_shared<protocols::shell::Router>()), ctx_(ctx) {
         if (!router_) throw std::runtime_error("EntityRegistrar: router is null");
         protocols::shell::commands::registerAllCommands(router_);
@@ -45,7 +46,7 @@ public:
         const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
         const auto buildCommand = [&](const std::shared_ptr<void>& entity) {
-            const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::CREATE, entity);
+            const auto command = cmd::Registry::instance().buildCommand(type, CommandType::CREATE, entity);
             std::cout << command << std::endl;
             return command;
         };
@@ -91,7 +92,7 @@ public:
 
     template <typename T>
     [[nodiscard]] EntityResult update(const EntityType& type, const std::shared_ptr<T>& entity) const {
-        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::UPDATE, entity);
+        const auto command = cmd::Registry::instance().buildCommand(type, CommandType::UPDATE, entity);
         std::cout << command << std::endl;
         const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
@@ -102,7 +103,7 @@ public:
     [[nodiscard]] EntityResult list(const EntityType& type) const {
         const auto cmd = ctx_->getCommand(type, "list");
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for listing");
-        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::LIST, nullptr);
+        const auto command = cmd::Registry::instance().buildCommand(type, CommandType::LIST, nullptr);
         std::cout << command << std::endl;
         const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
@@ -114,7 +115,7 @@ public:
     [[nodiscard]] EntityResult info(const EntityType& type, const std::shared_ptr<T>& entity) const {
         const auto cmd = ctx_->getCommand(type, "info");
         if (!cmd) throw std::runtime_error("EntityRegistrar: command usage not found for info");
-        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::INFO, entity);
+        const auto command = cmd::Registry::instance().buildCommand(type, CommandType::INFO, entity);
         std::cout << command << std::endl;
         const auto admin = db::query::identities::User::getUserByName("admin");
         int fd;
@@ -130,7 +131,7 @@ public:
         int fd;
         const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
-        const auto command = CommandBuilderRegistry::instance().buildCommand(type, CommandType::DELETE, entity);
+        const auto command = cmd::Registry::instance().buildCommand(type, CommandType::DELETE, entity);
         std::cout << command << std::endl;
         return { router_->executeLine(command, admin, io.get()), entity };
     }
@@ -143,7 +144,7 @@ public:
         int fd;
         const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
-        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::GROUP, type, action, group, user);
+        const auto command = cmd::Registry::instance().buildCommand(EntityType::GROUP, type, action, group, user);
 
         std::cout << command << std::endl;
         return { router_->executeLine(command, admin, io.get()), group };
@@ -163,7 +164,7 @@ public:
         int fd;
         const auto io = std::make_unique<protocols::shell::SocketIO>(fd);
 
-        const auto command = CommandBuilderRegistry::instance().buildCommand(EntityType::VAULT, EntityType::VAULT_ROLE, type, cmdType, vault, role, entity);
+        const auto command = cmd::Registry::instance().buildCommand(EntityType::VAULT, EntityType::VAULT_ROLE, type, cmdType, vault, role, entity);
 
         std::cout << command << std::endl;
         return { router_->executeLine(command, admin, io.get()), role };
@@ -171,9 +172,9 @@ public:
 
 private:
     static constexpr std::string_view ID_REGEX = R"(ID:\s*(\d+))";
-    std::shared_ptr<EntityFactory> factory_;
+    std::shared_ptr<Factory> factory_;
     std::shared_ptr<protocols::shell::Router> router_;
-    std::shared_ptr<CLITestContext> ctx_;
+    std::shared_ptr<cli::Context> ctx_;
 
     static std::regex toRegex(const std::string_view& pattern) {
         return std::regex(std::string(pattern), std::regex::icase);

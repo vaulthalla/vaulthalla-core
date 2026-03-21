@@ -6,7 +6,7 @@
 #include <optional>
 #include <variant>
 
-namespace vh::test::cli {
+namespace vh::test::integrations::concurrency {
 
 typedef std::variant<std::vector<std::shared_ptr<TestCase>>> TestFuture;
 

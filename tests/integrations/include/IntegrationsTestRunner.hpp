@@ -1,6 +1,7 @@
 #pragma once
 
-#include "CLITestConfig.hpp"
+#include "cli/Config.hpp"
+#include "rbac/permission/Override.hpp"
 
 #include <memory>
 #include <string>
@@ -10,20 +11,23 @@
 #include <optional>
 
 namespace vh::protocols::shell { class UsageManager; }
-namespace vh::identities::model { struct Admin; }
-namespace vh::rbac::model { struct Override; }
+namespace vh::identities { struct User; }
 
-namespace vh::test::cli {
+namespace vh::test::integrations {
 
-class TestThreadPool;
-struct CLITestContext;
-class CommandRouter;
-struct TestCase;
+    namespace concurrency {
+        class TestThreadPool;
+        struct TestCase;
+    }
+
+    namespace cli { struct Context; }
+    namespace cmd { struct Router; }
+
 enum class EntityType;
 
 struct TestStage {
     std::string name;
-    std::vector<std::shared_ptr<TestCase>> tests;
+    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
 };
 
 struct Expectations {
@@ -33,7 +37,7 @@ struct Expectations {
 
 class IntegrationsTestRunner {
 public:
-    explicit IntegrationsTestRunner(CLITestConfig&& cfg = CLITestConfig::Default());
+    explicit IntegrationsTestRunner(cli::Config&& cfg = cli::Config::Default());
 
     void registerStdoutContains(const std::string& path, std::string needle);
     void registerStdoutNotContains(const std::string& path, std::string needle);
@@ -45,12 +49,12 @@ public:
     static std::optional<unsigned int> extractId(std::string_view output, std::string_view idPrefix);
 
 private:
-    CLITestConfig config_;
-    std::shared_ptr<CLITestContext> ctx_;
+    cli::Config config_;
+    std::shared_ptr<cli::Context> ctx_;
     std::shared_ptr<protocols::shell::UsageManager> usage_;
-    std::shared_ptr<CommandRouter> router_;
+    std::shared_ptr<cmd::Router> router_;
     std::shared_ptr<std::atomic<bool>> interruptFlag;
-    std::shared_ptr<TestThreadPool> threadPool_;
+    std::shared_ptr<concurrency::TestThreadPool> threadPool_;
 
     // Expectations are keyed by command path
     std::unordered_map<std::string, Expectations> expectations_by_path_;
@@ -72,7 +76,7 @@ private:
     void teardownStage();
 
     // FUSE steps
-    std::shared_ptr<identities::model::Admin> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<std::shared_ptr<rbac::model::Override>>& overrides = {});
+    std::shared_ptr<identities::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<rbac::permission::Override>& overrides = {});
     void runFUSETests();
     void testFUSECRUD();
     void testFUSEAllow();
@@ -89,7 +93,7 @@ private:
     int  printResults() const;
 
     template <EntityType E>
-    void finish_seed(const std::vector<std::shared_ptr<TestCase>>& res);
+    void finish_seed(const std::vector<std::shared_ptr<concurrency::TestCase>>& res);
 };
 
 }

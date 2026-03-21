@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #include <iostream>
 
-#include "TestCase.hpp"
+#include "concurrency/TestCase.hpp"
 #include "protocols/shell/types.hpp"
 #include "log/Registry.hpp"
 #include "fs/ops/file.hpp"

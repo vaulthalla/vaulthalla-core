@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EntityType.hpp"
+#include "Type.hpp"
 #include "AssertionResult.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/vault/Vault.hpp"
@@ -19,21 +19,17 @@
 #include <memory>
 #include <vector>
 
-using namespace vh::identities;
-using namespace vh::vault::model;
-using namespace vh::rbac;
-
-namespace vh::test::cli {
+namespace vh::test::integrations {
 
 template <EntityType type, typename T>
 struct Validator {
     // Nice hard error if someone mismatches <type, T>
     static constexpr bool TypeOK =
-        (type == EntityType::USER      && std::is_same_v<T, User>)      ||
-        (type == EntityType::VAULT     && std::is_same_v<T, Vault>)     ||
-        (type == EntityType::GROUP     && std::is_same_v<T, Group>)     ||
-        (type == EntityType::USER_ROLE && std::is_same_v<T, role::Admin>)  ||
-        (type == EntityType::VAULT_ROLE&& std::is_same_v<T, role::Vault>);
+        (type == EntityType::USER      && std::is_same_v<T, identities::User>)      ||
+        (type == EntityType::VAULT     && std::is_same_v<T, vault::model::Vault>)     ||
+        (type == EntityType::GROUP     && std::is_same_v<T, identities::Group>)     ||
+        (type == EntityType::USER_ROLE && std::is_same_v<T, rbac::role::Admin>)  ||
+        (type == EntityType::VAULT_ROLE&& std::is_same_v<T, rbac::role::Vault>);
     static_assert(TypeOK, "Validator<type,T> mismatch: T must match the entity class for 'type'.");
 
     static AssertionResult assert_all_exist(const std::vector<std::shared_ptr<T>>& entities) {

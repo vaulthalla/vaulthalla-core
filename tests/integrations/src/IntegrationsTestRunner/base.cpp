@@ -1,17 +1,18 @@
-#include "IntegrationsTestRunner.hpp"
+#include "tests/integrations/include/IntegrationsTestRunner.hpp"
+#include "tests/integrations/include/Validator.hpp"
 
 #include "UsageManager.hpp"
-#include "CLITestContext.hpp"
-#include "Validator.hpp"
-#include "EntityRegistrar.hpp"
-#include "TestCase.hpp"
-#include "CommandRouter.hpp"
-#include "CommandBuilderRegistry.hpp"
-#include "EntityType.hpp"
+#include "tests/integrations/include/cli/Context.hpp"
+#include "tests/integrations/include/entity/Registrar.hpp"
 
-#include "TestThreadPool.hpp"
-#include "TestTask.hpp"
-#include "CLITestTask.hpp"
+#include "tests/integrations/include/cmd/Router.hpp"
+#include "tests/integrations/include/cmd/Registry.hpp"
+#include "tests/integrations/include/Type.hpp"
+
+#include "tests/integrations/include/concurrency/TestThreadPool.hpp"
+#include "tests/integrations/include/concurrency/TestCase.hpp"
+#include "tests/integrations/include/concurrency/TestTask.hpp"
+#include "tests/integrations/include/cli/Task.hpp"
 
 #include "identities/User.hpp"
 #include "identities/Group.hpp"
@@ -27,7 +28,6 @@
 #include <utility>
 #include <future>
 
-using namespace vh::protocols::shell;
 using namespace vh::args;
 using namespace vh::identities;
 using namespace vh::vault::model;
@@ -40,7 +40,7 @@ namespace vh::vault::model { struct Vault; }
 namespace vh::rbac::role { struct Admin; struct Vault; }
 
 
-namespace vh::test::cli {
+namespace vh::test::integrations {
 
 // ---------- Small utilities
 
@@ -66,28 +66,28 @@ template <> struct EntityTraits<EntityType::USER> {
     using Type = User;
     static constexpr std::string_view kStage = "Users";
     static constexpr std::string_view kIdPrefix = "User ID:";
-    static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.users; }
+    static std::vector<std::shared_ptr<Type>>& vec(cli::Context& c) { return c.users; }
 };
 
 template <> struct EntityTraits<EntityType::GROUP> {
     using Type = Group;
     static constexpr std::string_view kStage = "Groups";
     static constexpr std::string_view kIdPrefix = "Group ID:";
-    static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.groups; }
+    static std::vector<std::shared_ptr<Type>>& vec(cli::Context& c) { return c.groups; }
 };
 
 template <> struct EntityTraits<EntityType::VAULT> {
     using Type = Vault;
     static constexpr std::string_view kStage = "Vaults";
     static constexpr std::string_view kIdPrefix = "ID:";
-    static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.vaults; }
+    static std::vector<std::shared_ptr<Type>>& vec(cli::Context& c) { return c.vaults; }
 };
 
 template <> struct EntityTraits<EntityType::USER_ROLE> {
     using Type = role::Admin;
     static constexpr std::string_view kStage = "User Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
-    static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.userRoles; }
+    static std::vector<std::shared_ptr<Type>>& vec(cli::Context& c) { return c.userRoles; }
 };
 
 // VaultRole
@@ -95,70 +95,70 @@ template <> struct EntityTraits<EntityType::VAULT_ROLE> {
     using Type = role::Vault;
     static constexpr std::string_view kStage = "Vault Roles";
     static constexpr std::string_view kIdPrefix = "Role ID:";
-    static std::vector<std::shared_ptr<Type>>& vec(CLITestContext& c) { return c.vaultRoles; }
+    static std::vector<std::shared_ptr<Type>>& vec(cli::Context& c) { return c.vaultRoles; }
 };
 
 // ---------- Tiny generic helpers (local to this TU)
 
 template <EntityType E>
-static std::vector<std::shared_ptr<TestCase>>
+static std::vector<std::shared_ptr<concurrency::TestCase>>
 makeCreateTests(std::size_t count) {
-    std::vector<std::shared_ptr<TestCase>> v;
+    std::vector<std::shared_ptr<concurrency::TestCase>> v;
     v.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {
-        v.push_back(std::make_shared<TestCase>(TestCase::Generate(E, CommandType::CREATE)));
+        v.push_back(std::make_shared<concurrency::TestCase>(concurrency::TestCase::Generate(E, CommandType::CREATE)));
     }
     return v;
 }
 
 template <EntityType E>
-static std::vector<std::shared_ptr<TestCase>>
+static std::vector<std::shared_ptr<concurrency::TestCase>>
 makeInfoTests(const std::vector<std::shared_ptr<typename EntityTraits<E>::Type>>& src) {
-    std::vector<std::shared_ptr<TestCase>> v;
+    std::vector<std::shared_ptr<concurrency::TestCase>> v;
     v.reserve(src.size());
     for (const auto& e : src) {
-        v.push_back(std::make_shared<TestCase>(TestCase::Generate(E, CommandType::INFO, e)));
+        v.push_back(std::make_shared<concurrency::TestCase>(concurrency::TestCase::Generate(E, CommandType::INFO, e)));
     }
     return v;
 }
 
 template <EntityType E>
-static std::vector<std::shared_ptr<TestCase>>
+static std::vector<std::shared_ptr<concurrency::TestCase>>
 makeUpdateTests(const std::vector<std::shared_ptr<typename EntityTraits<E>::Type>>& src) {
-    std::vector<std::shared_ptr<TestCase>> v;
+    std::vector<std::shared_ptr<concurrency::TestCase>> v;
     v.reserve(src.size());
     for (const auto& e : src) {
-        v.push_back(std::make_shared<TestCase>(TestCase::Generate(E, CommandType::UPDATE, e)));
+        v.push_back(std::make_shared<concurrency::TestCase>(concurrency::TestCase::Generate(E, CommandType::UPDATE, e)));
     }
     return v;
 }
 
 template <EntityType E>
-static std::vector<std::shared_ptr<TestCase>>
+static std::vector<std::shared_ptr<concurrency::TestCase>>
 makeDeleteTests(const std::vector<std::shared_ptr<typename EntityTraits<E>::Type>>& src) {
-    std::vector<std::shared_ptr<TestCase>> v;
+    std::vector<std::shared_ptr<concurrency::TestCase>> v;
     v.reserve(src.size());
     for (const auto& e : src) {
-        v.push_back(std::make_shared<TestCase>(TestCase::Delete(E, e)));
+        v.push_back(std::make_shared<concurrency::TestCase>(concurrency::TestCase::Delete(E, e)));
     }
     return v;
 }
 
 // one LIST per-entity type
 template <EntityType E>
-static std::shared_ptr<TestCase> makeListTest() {
-    return std::make_shared<TestCase>(TestCase::List(E));
+static std::shared_ptr<concurrency::TestCase> makeListTest() {
+    return std::make_shared<concurrency::TestCase>(concurrency::TestCase::List(E));
 }
 
 // Inject IDs into ctx after CREATE
 template <EntityType E>
 static void harvestIdsIntoContext(
-    CLITestContext& ctx,
-    const std::vector<std::shared_ptr<TestCase>>& results,
+    cli::Context& ctx,
+    const std::vector<std::shared_ptr<concurrency::TestCase>>& results,
     std::string_view idPrefix,
     std::ostream& err
 ) {
-    using T = typename EntityTraits<E>::Type;
+    using T = EntityTraits<E>::Type;
     auto& bucket = EntityTraits<E>::vec(ctx);
 
     for (const auto& r : results) {
@@ -178,14 +178,14 @@ static void harvestIdsIntoContext(
 
 // ---------- Runner
 
-IntegrationsTestRunner::IntegrationsTestRunner(CLITestConfig&& cfg)
+IntegrationsTestRunner::IntegrationsTestRunner(cli::Config&& cfg)
     : config_(cfg),
-      ctx_(std::make_shared<CLITestContext>()),
-      usage_(std::make_shared<UsageManager>()),
-      router_(std::make_shared<CommandRouter>(ctx_)),
+      ctx_(std::make_shared<cli::Context>()),
+      usage_(std::make_shared<protocols::shell::UsageManager>()),
+      router_(std::make_shared<cmd::Router>(ctx_)),
       interruptFlag(std::make_shared<std::atomic<bool>>(false)),
-      threadPool_(std::make_shared<TestThreadPool>(interruptFlag, std::thread::hardware_concurrency())) {
-    CommandBuilderRegistry::init(usage_, ctx_);
+      threadPool_(std::make_shared<concurrency::TestThreadPool>(interruptFlag, std::thread::hardware_concurrency())) {
+    cmd::Registry::init(usage_, ctx_);
     registerAllContainsAssertions();
 }
 
@@ -202,8 +202,8 @@ int IntegrationsTestRunner::operator()() {
     return printResults();
 }
 
-static std::vector<std::vector<std::shared_ptr<TestCase>>> split(const std::vector<std::shared_ptr<TestCase>>& tests, const std::size_t n) {
-    std::vector<std::vector<std::shared_ptr<TestCase>>> result;
+static std::vector<std::vector<std::shared_ptr<concurrency::TestCase>>> split(const std::vector<std::shared_ptr<concurrency::TestCase>>& tests, const std::size_t n) {
+    std::vector<std::vector<std::shared_ptr<concurrency::TestCase>>> result;
     if (n == 0) return result;
     result.resize(n);
     for (std::size_t i = 0; i < tests.size(); ++i) result[i % n].push_back(tests[i]);
@@ -215,7 +215,7 @@ void IntegrationsTestRunner::seed() {
 
     const struct SeedJob {
         EntityType type;
-        std::vector<std::shared_ptr<TestCase>> tests;
+        std::vector<std::shared_ptr<concurrency::TestCase>> tests;
     } jobs[] = {
         { EntityType::USER_ROLE,  makeCreateTests<EntityType::USER_ROLE>(config_.numUserRoles) },
         { EntityType::VAULT_ROLE, makeCreateTests<EntityType::VAULT_ROLE>(config_.numVaultRoles) },
@@ -227,25 +227,25 @@ void IntegrationsTestRunner::seed() {
     for (const auto& [type, tests] : jobs) {
         const auto splits = split(tests, numThreads);
 
-        std::vector<std::pair<std::optional<std::future<TestFuture>>, EntityType>> futures;
+        std::vector<std::pair<std::optional<std::future<concurrency::TestFuture>>, EntityType>> futures;
 
         for (const auto& splitVec : splits) {
             if (splitVec.empty()) continue;
 
-            const auto task = std::make_shared<CLITestTask>(router_, splitVec);
+            const auto task = std::make_shared<cli::Task>(router_, splitVec);
             futures.emplace_back(task->getFuture(), type);
             threadPool_->submit(task);
             std::this_thread::sleep_for(std::chrono::milliseconds(50)); // light stagger
         }
 
         // Recombine results across splits
-        std::vector<std::shared_ptr<TestCase>> combined;
+        std::vector<std::shared_ptr<concurrency::TestCase>> combined;
 
         for (auto& [fut, futType] : futures) {
             if (!fut.has_value()) continue;
             const auto res = fut->get();
 
-            const auto* ptr = std::get_if<std::vector<std::shared_ptr<TestCase>>>(&res);
+            const auto* ptr = std::get_if<std::vector<std::shared_ptr<concurrency::TestCase>>>(&res);
             if (!ptr) continue;
 
             combined.insert(combined.end(), ptr->begin(), ptr->end());
@@ -275,14 +275,14 @@ void IntegrationsTestRunner::seed() {
 }
 
 template <EntityType E>
-void IntegrationsTestRunner::finish_seed(const std::vector<std::shared_ptr<TestCase>>& res) {
+void IntegrationsTestRunner::finish_seed(const std::vector<std::shared_ptr<concurrency::TestCase>>& res) {
     harvestIdsIntoContext<E>(*ctx_, res, EntityTraits<E>::kIdPrefix, std::cerr);
     stages_.push_back(TestStage(std::string("Seed ") + std::string(EntityTraits<E>::kStage), res));
     validateStage(stages_.back());
 }
 
 void IntegrationsTestRunner::readStage() {
-    std::vector<std::shared_ptr<TestCase>> tests;
+    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
 
     // INFO for each entity
     {
@@ -310,18 +310,18 @@ void IntegrationsTestRunner::readStage() {
 }
 
 void IntegrationsTestRunner::assign() {
-    std::vector<std::shared_ptr<TestCase>> tests;
+    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
 
     for (const auto& user : ctx_->users)
-        tests.push_back(std::make_shared<TestCase>(
-                TestCase::Generate(EntityType::GROUP, EntityType::USER, ActionType::ADD, ctx_->pickRandomGroup(), user)));
+        tests.push_back(std::make_shared<concurrency::TestCase>(
+                concurrency::TestCase::Generate(EntityType::GROUP, EntityType::USER, ActionType::ADD, ctx_->pickRandomGroup(), user)));
 
     for (const auto& user : ctx_->users)
-        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::USER, CommandType::ASSIGN,
+        tests.push_back(concurrency::TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::USER, CommandType::ASSIGN,
                 ctx_->pickRandomVault(), ctx_->randomVaultRole(), user));
 
     for (const auto& group : ctx_->groups)
-        tests.push_back(TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::GROUP, CommandType::ASSIGN,
+        tests.push_back(concurrency::TestCase::Generate(EntityType::VAULT, EntityType::VAULT_ROLE, EntityType::GROUP, CommandType::ASSIGN,
                 ctx_->pickRandomVault(), ctx_->randomVaultRole(), group));
 
     const auto res = router_->route(tests);
@@ -330,7 +330,7 @@ void IntegrationsTestRunner::assign() {
 }
 
 void IntegrationsTestRunner::updateStage() {
-    std::vector<std::shared_ptr<TestCase>> tests;
+    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
 
     const auto& C = *ctx_;
     auto append = [&](auto&& vec) {
@@ -348,7 +348,7 @@ void IntegrationsTestRunner::updateStage() {
 }
 
 void IntegrationsTestRunner::teardownStage() {
-    std::vector<std::shared_ptr<TestCase>> tests;
+    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
     auto& C = *ctx_;
 
     // Order chosen to avoid fk/rbac headaches

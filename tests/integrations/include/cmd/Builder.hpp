@@ -5,7 +5,7 @@
 #include "identities/Group.hpp"
 #include "rbac/role/Admin.hpp"
 #include "rbac/role/Vault.hpp"
-#include "updateAliases.hpp"
+#include "tests/integrations/include/updateAliases.hpp"
 #include "UsageManager.hpp"
 
 #include <memory>
@@ -16,14 +16,14 @@ class CommandUsage;
 class UsageManager;
 }
 
-namespace vh::test::cli {
+namespace vh::test::integrations::cmd {
 
-template <typename T = void> class CommandBuilder {
+template <typename T = void> class Builder {
 public:
-    virtual ~CommandBuilder() = default;
+    virtual ~Builder() = default;
 
-    explicit CommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                            const std::shared_ptr<CLITestContext>& ctx, const std::string& rootTopLevelAlias)
+    explicit Builder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
+                            const std::shared_ptr<cli::Context>& ctx, const std::string& rootTopLevelAlias)
         : ctx_(ctx) {
         if (!usage) throw std::runtime_error("CommandBuilder: usage manager is null");
         const auto cmd = usage->resolve(rootTopLevelAlias);
@@ -43,15 +43,15 @@ public:
 
 protected:
     std::shared_ptr<protocols::shell::CommandUsage> root_;
-    std::shared_ptr<CLITestContext> ctx_;
+    std::shared_ptr<cli::Context> ctx_;
 
     virtual std::string updateAndResolveVar(const std::shared_ptr<T>& entity, const std::string& field) = 0;
 };
 
-class UserCommandBuilder final : CommandBuilder<identities::User> {
+class UserCommandBuilder final : Builder<identities::User> {
 public:
     explicit UserCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                                const std::shared_ptr<CLITestContext>& ctx);
+                                const std::shared_ptr<cli::Context>& ctx);
 
     ~UserCommandBuilder() override = default;
 
@@ -72,10 +72,10 @@ private:
     UserAliases userAliases_;
 };
 
-class VaultCommandBuilder final : CommandBuilder<vault::model::Vault> {
+class VaultCommandBuilder final : Builder<vault::model::Vault> {
 public:
     explicit VaultCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                                 const std::shared_ptr<CLITestContext>& ctx);
+                                 const std::shared_ptr<cli::Context>& ctx);
 
     ~VaultCommandBuilder() override = default;
 
@@ -123,10 +123,10 @@ private:
     static std::string chooseVaultType();
 };
 
-class GroupCommandBuilder final : CommandBuilder<identities::Group> {
+class GroupCommandBuilder final : Builder<identities::Group> {
 public:
     explicit GroupCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                                 const std::shared_ptr<CLITestContext>& ctx);
+                                 const std::shared_ptr<cli::Context>& ctx);
 
     ~GroupCommandBuilder() override = default;
 
@@ -151,10 +151,10 @@ private:
     GroupAliases groupAliases_;
 };
 
-class UserRoleCommandBuilder final : CommandBuilder<rbac::role::Admin> {
+class UserRoleCommandBuilder final : Builder<rbac::role::Admin> {
 public:
     explicit UserRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                                    const std::shared_ptr<CLITestContext>& ctx);
+                                    const std::shared_ptr<cli::Context>& ctx);
 
     ~UserRoleCommandBuilder() override = default;
 
@@ -175,10 +175,10 @@ private:
     UserRoleAliases userRoleAliases_;
 };
 
-class VaultRoleCommandBuilder final : CommandBuilder<rbac::role::Vault> {
+class VaultRoleCommandBuilder final : Builder<rbac::role::Vault> {
 public:
     explicit VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage,
-                                     const std::shared_ptr<CLITestContext>& ctx);
+                                     const std::shared_ptr<cli::Context>& ctx);
 
     ~VaultRoleCommandBuilder() override = default;
 

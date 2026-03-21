@@ -2,7 +2,7 @@
 
 #include "protocols/shell/types.hpp"
 
-namespace vh::test::cli {
+namespace vh::test::integrations {
 
 enum class EntityType {
     USER,

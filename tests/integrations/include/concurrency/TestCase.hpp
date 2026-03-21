@@ -1,12 +1,12 @@
 #pragma once
 
-#include "EntityType.hpp"
-#include "AssertionResult.hpp"
+#include "tests/integrations/include/Type.hpp"
+#include "tests/integrations/include/AssertionResult.hpp"
 
 #include <string>
 #include <vector>
 
-namespace vh::test::cli {
+namespace vh::test::integrations::concurrency {
 
 struct TestCase {
     std::string name{};

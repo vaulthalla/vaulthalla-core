@@ -24,20 +24,4 @@ namespace vh::rbac::permission {
         std::string flag;
         std::function<void()> apply;
     };
-
-    struct FlagResolutionResult {
-        std::vector<std::string> errors;
-
-        [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
-
-        [[nodiscard]] std::string toString() const {
-            if (errors.empty()) return {};
-
-            std::ostringstream oss;
-            oss << "Failed to update permissions from flags:\n";
-            for (const auto &error : errors)
-                oss << "  - " << error << '\n';
-            return oss.str();
-        }
-    };
 }

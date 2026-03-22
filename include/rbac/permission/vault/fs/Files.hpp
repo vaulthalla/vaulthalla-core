@@ -45,7 +45,7 @@ namespace vh::rbac::permission {
             static constexpr const auto* ModuleName = "Files";
             static constexpr const auto* FLAG_PREFIX = "files";
 
-            Share share;
+            Share share{std::string(FLAG_PREFIX)};
 
             Files() = default;
             explicit Files(const Mask& mask) { fromMask(mask); }

@@ -46,7 +46,7 @@ namespace vh::rbac::permission {
             static constexpr const auto* ModuleName = "Directories";
             static constexpr const auto* FLAG_PREFIX = "dirs";
 
-            Share share;
+            Share share{std::string(FLAG_PREFIX)};
 
             Directories() = default;
             explicit Directories(const Mask& mask) { fromMask(mask); }

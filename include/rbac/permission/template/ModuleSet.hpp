@@ -34,7 +34,7 @@ namespace vh::rbac::permission {
 
         [[nodiscard]] virtual const char *flagPrefix() const = 0;
 
-        [[nodiscard]] virtual std::vector<std::string> getFlags() const = 0;
+        [[nodiscard]] std::vector<std::string> getFlags() const override = 0;
 
         [[nodiscard]] static constexpr std::size_t setBitWidth() {
             return sizeof(SetMask) * 8u;

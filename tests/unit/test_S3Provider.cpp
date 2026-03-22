@@ -10,8 +10,6 @@
 #include <algorithm>
 #include <pdfium/fpdfview.h>
 
-namespace fs = std::filesystem;
-
 using namespace vh::storage::s3;
 using namespace vh::vault::model;
 using namespace vh::fs::model;
@@ -63,7 +61,7 @@ class S3ProviderIntegrationTest : public ::testing::Test {
         FPDF_DestroyLibrary();
     }
 
-    static void writeTextFile(const fs::path& path, const std::string& content) {
+    static void writeTextFile(const std::filesystem::path& path, const std::string& content) {
         std::ofstream out(path);
         out << content;
     }
@@ -98,11 +96,11 @@ TEST_F(S3ProviderIntegrationTest, test_BulkUploadDownloadDeleteTestAssets) {
     std::vector<std::filesystem::path> uploadedKeys;
 
     for (const auto& name : filenames) {
-        const fs::path src = fs::path(name);
+        const std::filesystem::path src = std::filesystem::path(name);
         ASSERT_TRUE(fs::exists(src)) << "Test asset missing: " << src;
 
-        const fs::path relKey = fs::path("test-assets") / src.filename();
-        const fs::path dest = test_dir / src.filename();
+        const std::filesystem::path relKey = std::filesystem::path("test-assets") / src.filename();
+        const std::filesystem::path dest = test_dir / src.filename();
         fs::copy_file(src, dest, fs::copy_options::overwrite_existing);
 
         ASSERT_TRUE(fs::exists(dest)) << "Failed to copy file to: " << dest;
@@ -239,7 +237,7 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
     if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"test-image.jpg"};
-    const auto srcPath = fs::path("sample.jpg");
+    const auto srcPath = std::filesystem::path("sample.jpg");
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_NO_THROW(s3Provider_->uploadObject(key, srcPath.string()));
 
@@ -261,7 +259,7 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
     if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"test-pdf.pdf"};
-    const auto srcPath = fs::path("sample.pdf");
+    const auto srcPath = std::filesystem::path("sample.pdf");
     ASSERT_TRUE(fs::exists(srcPath));
     ASSERT_NO_THROW(s3Provider_->uploadObject(key, srcPath.string()));
 

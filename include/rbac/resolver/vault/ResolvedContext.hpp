@@ -11,7 +11,7 @@
 namespace vh::rbac::resolver::vault {
     struct ResolvedContext {
         std::shared_ptr<storage::Engine> engine;
-        std::shared_ptr<vh::vault::model::Vault> vault;
+        std::shared_ptr<::vh::vault::model::Vault> vault;
         std::shared_ptr<identities::User> owner;
         std::shared_ptr<identities::User> targetUser;
         std::shared_ptr<identities::Group> targetGroup;

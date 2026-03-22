@@ -141,9 +141,9 @@ namespace vh::rbac::role {
         static Vault Custom(
             std::string name,
             std::string description,
-            vault::Base base
+            const vault::Base& base
         ) {
-            return make(std::move(name), std::move(description), std::move(base));
+            return make(std::move(name), std::move(description), base);
         }
 
     private:

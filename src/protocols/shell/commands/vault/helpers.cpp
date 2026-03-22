@@ -97,11 +97,11 @@ Lookup<storage::Engine> resolveEngine(const CommandCall& call, const std::string
 std::optional<std::string> checkOverridePermissions(const CommandCall& call, const std::shared_ptr<vh::vault::model::Vault>& vault, const std::string& errPrefix) {
     if (vault->owner_id == call.user->id) return std::nullopt;
 
-    using Perm = rbac::permission::vault::RolePermissions;
-    if (!rbac::resolver::Vault::has<Perm>({
+    using Perm = ::vh::rbac::permission::vault::RolePermissions;
+    if (!::vh::rbac::resolver::Vault::has<Perm>({
         .user = call.user,
         .permission = Perm::Assign,
-        .vault_id = vault->id,
+        .vault_id = vault->id
     })) return errPrefix + ": you do not have permission to override roles for this vault";
 
     return std::nullopt;

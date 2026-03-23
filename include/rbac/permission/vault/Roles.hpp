@@ -14,7 +14,12 @@ namespace vh::rbac::permission {
             Assign = 1 << 0,
             Modify = 1 << 1,
             Revoke = 1 << 2,
-            All = Assign | Modify | Revoke
+            View = 1 << 3,
+            AssignOverride = 1 << 4,
+            ModifyOverride = 1 << 5,
+            RevokeOverride = 1 << 6,
+            ViewOverride = 1 << 7,
+            All = Assign | Modify | Revoke | View
         };
     }
 
@@ -26,6 +31,11 @@ namespace vh::rbac::permission {
             Entry{vault::RolePermissions::Assign, "assign", "Allows user to assign roles in a vault to others."},
             Entry{vault::RolePermissions::Modify, "modify", "Allows user to modify roles in a vault, including changing permissions and renaming."},
             Entry{vault::RolePermissions::Revoke, "revoke", "Allows user to revoke roles and consequently access in vault."},
+            Entry{vault::RolePermissions::View, "view", "Allows user to view assigned roles in a vault."},
+            Entry{vault::RolePermissions::AssignOverride, "assign_override", "Allows user to override assign permissions of a role."},
+            Entry{vault::RolePermissions::ModifyOverride, "modify_override", "Allows user to modify roles in a vault."},
+            Entry{vault::RolePermissions::RevokeOverride, "revoke_override", "Allows user to override revoke permissions of a role."},
+            Entry{vault::RolePermissions::ViewOverride, "view_override", "Allows user to view roles in a vault."},
         };
     };
 
@@ -52,6 +62,11 @@ namespace vh::rbac::permission {
             [[nodiscard]] bool canAssign() const noexcept { return has(RolePermissions::Assign); }
             [[nodiscard]] bool canModify() const noexcept { return has(RolePermissions::Modify); }
             [[nodiscard]] bool canRevoke() const noexcept { return has(RolePermissions::Revoke); }
+            [[nodiscard]] bool canView() const noexcept { return has(RolePermissions::View); }
+            [[nodiscard]] bool canAssignOverride() const noexcept { return has(RolePermissions::AssignOverride); }
+            [[nodiscard]] bool canModifyOverride() const noexcept { return has(RolePermissions::ModifyOverride); }
+            [[nodiscard]] bool canRevokeOverride() const noexcept { return has(RolePermissions::RevokeOverride); }
+            [[nodiscard]] bool canViewOverride() const noexcept { return has(RolePermissions::ViewOverride); }
 
             static Roles None() {
                 Roles r;
@@ -62,6 +77,7 @@ namespace vh::rbac::permission {
             static Roles Assigner() {
                 Roles r;
                 r.clear();
+                r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
                 return r;
             }
@@ -69,6 +85,7 @@ namespace vh::rbac::permission {
             static Roles Editor() {
                 Roles r;
                 r.clear();
+                r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Modify);
                 return r;
             }
@@ -76,6 +93,7 @@ namespace vh::rbac::permission {
             static Roles Moderator() {
                 Roles r;
                 r.clear();
+                r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
                 r.grant(RolePermissions::Revoke);
                 return r;
@@ -84,6 +102,7 @@ namespace vh::rbac::permission {
             static Roles Manager() {
                 Roles r;
                 r.clear();
+                r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
                 r.grant(RolePermissions::Modify);
                 return r;

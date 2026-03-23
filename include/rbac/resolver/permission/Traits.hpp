@@ -5,8 +5,11 @@
 #include <vector>
 
 namespace vh::rbac::resolver {
+    enum class RoleDomain { Admin, Vault };
+
     template<typename Enum>
     struct PermissionTargetTraits {
+        static constexpr bool canOverride = false;
     };
 
     template<typename Enum>
@@ -39,4 +42,13 @@ namespace vh::rbac::resolver {
     {
         Traits::resolve(role, parts);
     };
+
+    template<typename T>
+    struct is_shared_ptr : std::false_type {};
+
+    template<typename T>
+    struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+
+    template<typename T>
+    inline constexpr bool is_shared_ptr_v = is_shared_ptr<std::remove_cvref_t<T>>::value;
 }

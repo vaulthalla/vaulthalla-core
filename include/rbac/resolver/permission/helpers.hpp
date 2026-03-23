@@ -3,6 +3,7 @@
 #include "rbac/permission/Permission.hpp"
 #include "rbac/role/Vault.hpp"
 #include "rbac/role/Admin.hpp"
+#include "rbac/permission/Override.hpp"
 
 #include <cstdint>
 #include <string_view>
@@ -13,6 +14,10 @@ namespace vh::rbac::resolver {
         Grant,
         Revoke
     };
+
+    inline permission::OverrideOpt overrideOptFromPermissionOp(const PermissionOperation op) {
+        return op == PermissionOperation::Grant ? permission::OverrideOpt::ALLOW : permission::OverrideOpt::DENY;
+    }
 
     struct ResolvedPermissionFlag {
         const permission::Permission* permission{};

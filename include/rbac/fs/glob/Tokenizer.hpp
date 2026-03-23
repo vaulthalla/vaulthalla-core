@@ -8,5 +8,6 @@ namespace vh::rbac::fs::glob {
     struct Tokenizer {
         static model::Pattern parse(std::string_view pattern);
         static void validate(std::string_view pattern);
+        [[nodiscard]] static bool isValid(std::string_view pattern);
     };
 }

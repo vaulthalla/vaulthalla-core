@@ -36,7 +36,7 @@ namespace vh::protocols::shell::commands::rbac::roles::vault {
         if (const auto existing = resolveVaultRole(roleName, "role vault create"); existing.ptr)
             return invalid("Vault role already exists: '" + roleName + "'");
 
-        using VaultPermissionResolver = resolver::PermissionResolverEnumPack<vh::rbac::role::Vault>::type;
+        using VaultPermissionResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<vh::rbac::role::Vault>>::type;
 
         auto staged = std::make_shared<vh::rbac::role::Vault>();
         staged->name = roleName;
@@ -56,7 +56,7 @@ namespace vh::protocols::shell::commands::rbac::roles::vault {
                 continue;
             }
 
-            if (!VaultPermissionResolver::apply(*staged, *it->second.permission, it->second.operation))
+            if (!VaultPermissionResolver::apply(staged, it->second))
                 errors.push_back("Failed to apply permission flag '" + *opt.value + "'");
         }
 
@@ -81,7 +81,7 @@ namespace vh::protocols::shell::commands::rbac::roles::vault {
         const auto roleLkp = resolveVaultRole(call.positionals[0], "role vault update");
         if (!roleLkp.ptr) return invalid(roleLkp.error);
 
-        using VaultPermissionResolver = resolver::PermissionResolverEnumPack<vh::rbac::role::Vault>::type;
+        using VaultPermissionResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<vh::rbac::role::Vault>>::type;
 
         auto staged = std::make_shared<vh::rbac::role::Vault>(*roleLkp.ptr);
         const auto exported = staged->toPermissions();
@@ -98,7 +98,7 @@ namespace vh::protocols::shell::commands::rbac::roles::vault {
                 continue;
             }
 
-            if (!VaultPermissionResolver::apply(*staged, *it->second.permission, it->second.operation))
+            if (!VaultPermissionResolver::apply(staged, it->second))
                 errors.push_back("Failed to apply permission flag '" + *opt.value + "'");
         }
 
@@ -152,21 +152,21 @@ namespace vh::protocols::shell::commands::rbac::roles::vault {
         return ok(to_string(db::query::rbac::role::Vault::list(parseListQuery(call))));
     }
 
-    static bool is_role_match(const std::string& cmd, const std::string_view input) {
-        return isCommandMatch({"role", cmd}, input);
+    static bool is_vault_role_match(const std::string& cmd, const std::string_view input) {
+        return isCommandMatch({"role", "vault", cmd}, input);
     }
 
     CommandResult handle_vault_roles(const CommandCall &call) {
-        const auto usageManager = runtime::Deps::get().shellUsageManager;
-        if (call.positionals.empty()) return usage(call.constructFullArgs());
+        if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+            return usage(call.constructFullArgs());
 
         const auto [sub, subcall] = descend(call);
 
-        if (is_role_match("create", sub)) return handle_create(subcall);
-        if (is_role_match("update", sub)) return handle_update(subcall);
-        if (is_role_match("delete", sub)) return handle_delete(subcall);
-        if (is_role_match("info", sub)) return handle_info(subcall);
-        if (is_role_match("list", sub)) return handle_list(subcall);
+        if (is_vault_role_match("create", sub)) return handle_create(subcall);
+        if (is_vault_role_match("update", sub)) return handle_update(subcall);
+        if (is_vault_role_match("delete", sub)) return handle_delete(subcall);
+        if (is_vault_role_match("info", sub)) return handle_info(subcall);
+        if (is_vault_role_match("list", sub)) return handle_list(subcall);
 
         return invalid(call.constructFullArgs(), "Unknown vault roles subcommand: '" + std::string(sub) + "'");
     }

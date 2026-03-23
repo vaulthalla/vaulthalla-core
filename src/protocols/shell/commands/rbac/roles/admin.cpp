@@ -36,7 +36,7 @@ namespace vh::protocols::shell::commands::rbac::roles::admin {
         if (const auto existing = resolveAdminRole(roleName, "role admin create"); existing.ptr)
             return invalid("Admin role already exists: '" + roleName + "'");
 
-        using AdminPermissionResolver = resolver::PermissionResolverEnumPack<vh::rbac::role::Admin>::type;
+        using AdminPermissionResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<vh::rbac::role::Admin>>::type;
 
         auto staged = std::make_shared<vh::rbac::role::Admin>();
         staged->name = roleName;
@@ -56,7 +56,7 @@ namespace vh::protocols::shell::commands::rbac::roles::admin {
                 continue;
             }
 
-            if (!AdminPermissionResolver::apply(*staged, *it->second.permission, it->second.operation))
+            if (!AdminPermissionResolver::apply(staged, it->second))
                 errors.push_back("Failed to apply permission flag '" + *opt.value + "'");
         }
 
@@ -81,7 +81,7 @@ namespace vh::protocols::shell::commands::rbac::roles::admin {
         const auto roleLkp = resolveAdminRole(call.positionals[0], "role admin update");
         if (!roleLkp.ptr) return invalid(roleLkp.error);
 
-        using AdminPermissionResolver = resolver::PermissionResolverEnumPack<vh::rbac::role::Admin>::type;
+        using AdminPermissionResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<vh::rbac::role::Admin>>::type;
 
         auto staged = std::make_shared<vh::rbac::role::Admin>(*roleLkp.ptr);
         const auto exported = staged->toPermissions();
@@ -98,7 +98,7 @@ namespace vh::protocols::shell::commands::rbac::roles::admin {
                 continue;
             }
 
-            if (!AdminPermissionResolver::apply(*staged, *it->second.permission, it->second.operation))
+            if (!AdminPermissionResolver::apply(staged, it->second))
                 errors.push_back("Failed to apply permission flag '" + *opt.value + "'");
         }
 
@@ -146,21 +146,21 @@ namespace vh::protocols::shell::commands::rbac::roles::admin {
         return ok(to_string(db::query::rbac::role::Admin::list(parseListQuery(call))));
     }
 
-    static bool is_role_match(const std::string& cmd, const std::string_view input) {
-        return isCommandMatch({"role", cmd}, input);
+    static bool is_admin_role_match(const std::string& cmd, const std::string_view input) {
+        return isCommandMatch({"role", "admin", cmd}, input);
     }
 
     CommandResult handle_admin_roles(const CommandCall &call) {
-        const auto usageManager = runtime::Deps::get().shellUsageManager;
-        if (call.positionals.empty()) return usage(call.constructFullArgs());
+        if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+            return usage(call.constructFullArgs());
 
         const auto [sub, subcall] = descend(call);
 
-        if (is_role_match("create", sub)) return handle_create(subcall);
-        if (is_role_match("update", sub)) return handle_update(subcall);
-        if (is_role_match("delete", sub)) return handle_delete(subcall);
-        if (is_role_match("info", sub)) return handle_info(subcall);
-        if (is_role_match("list", sub)) return handle_list(subcall);
+        if (is_admin_role_match("create", sub)) return handle_create(subcall);
+        if (is_admin_role_match("update", sub)) return handle_update(subcall);
+        if (is_admin_role_match("delete", sub)) return handle_delete(subcall);
+        if (is_admin_role_match("info", sub)) return handle_info(subcall);
+        if (is_admin_role_match("list", sub)) return handle_list(subcall);
 
         return invalid(call.constructFullArgs(), "Unknown admin roles subcommand: '" + std::string(sub) + "'");
     }

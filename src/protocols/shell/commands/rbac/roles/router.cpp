@@ -13,8 +13,8 @@ namespace vh::protocols::shell::commands::rbac::roles {
     }
 
     static CommandResult handle_role(const CommandCall& call) {
-        const auto usageManager = runtime::Deps::get().shellUsageManager;
-        if (call.positionals.empty()) return usage(call.constructFullArgs());
+        if (call.positionals.empty() || hasKey(call, "help") || hasKey(call, "h"))
+            return usage(call.constructFullArgs());
 
         const auto [sub, subcall] = descend(call);
 

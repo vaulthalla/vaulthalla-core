@@ -20,7 +20,7 @@ namespace vh::rbac::fs::glob {
         }
     }
 
-    void Tokenizer::validate(std::string_view pattern) {
+    void Tokenizer::validate(const std::string_view pattern) {
         if (pattern.empty()) throw std::runtime_error("Glob pattern cannot be empty");
         if (pattern.front() != '/') throw std::runtime_error(
             "Glob pattern must be vault-absolute and begin with '/'");
@@ -43,7 +43,16 @@ namespace vh::rbac::fs::glob {
         }
     }
 
-    model::Pattern Tokenizer::parse(std::string_view pattern) {
+    bool Tokenizer::isValid(const std::string_view pattern) {
+        try {
+            validate(pattern);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    model::Pattern Tokenizer::parse(const std::string_view pattern) {
         validate(pattern);
 
         Pattern compiled;

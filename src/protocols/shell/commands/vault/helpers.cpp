@@ -19,6 +19,7 @@
 #include "db/encoding/interval.hpp"
 #include "rbac/resolver/admin/all.hpp"
 #include "rbac/resolver/vault/all.hpp"
+#include "rbac/fs/glob/Tokenizer.hpp"
 
 using namespace vh;
 
@@ -127,7 +128,7 @@ Lookup<::vh::rbac::role::Vault> resolveVRole(const std::string& roleArg,
     return out;
 }
 
-PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
+PatternParse parseGlobPatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
     PatternParse out;
     auto p = optVal(call, "path");
     if (!p) p = optVal(call, "pattern");
@@ -136,11 +137,16 @@ PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::
         else { out.ok = true; }
         return out;
     }
-    out.raw = *p;
+
+    out.pattern = rbac::fs::glob::model::Pattern();
+    out.pattern->source = *p;
+
     try {
-        out.compiled = std::regex(out.raw);
+        rbac::fs::glob::Tokenizer::validate(out.pattern->source);
     } catch (const std::regex_error&) {
         out.error = errPrefix + ": invalid regex for --path/--pattern";
+        out.pattern = std::nullopt;
+        out.ok = false;
         return out;
     }
     out.ok = true;

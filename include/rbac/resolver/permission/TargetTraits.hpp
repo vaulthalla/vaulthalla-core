@@ -7,8 +7,8 @@
 namespace vh::rbac::resolver {
     template<>
     struct PermissionTargetTraits<permission::admin::AuditPermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Admin;
+        static constexpr bool canOverride = false;
 
         static auto& target(role::Admin& role) { return role.audits; }
         static const auto& target(const role::Admin& role) { return role.audits; }
@@ -16,8 +16,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::admin::keys::EncryptionKeyPermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Admin;
+        static constexpr bool canOverride = false;
 
         static auto& target(role::Admin& role) { return role.keys.encryptionKeys; }
         static const auto& target(const role::Admin& role) { return role.keys.encryptionKeys; }
@@ -25,8 +25,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::vault::RolePermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Vault;
+        static constexpr bool canOverride = false;
 
         static auto& target(role::Vault& role) { return role.roles; }
         static const auto& target(const role::Vault& role) { return role.roles; }
@@ -34,8 +34,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::vault::sync::SyncConfigPermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Vault;
+        static constexpr bool canOverride = false;
 
         static auto& target(role::Vault& role) { return role.sync.config; }
         static const auto& target(const role::Vault& role) { return role.sync.config; }
@@ -43,8 +43,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::vault::sync::SyncActionPermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Vault;
+        static constexpr bool canOverride = false;
 
         static auto& target(role::Vault& role) { return role.sync.action; }
         static const auto& target(const role::Vault& role) { return role.sync.action; }
@@ -52,8 +52,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::vault::fs::FilePermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Vault;
+        static constexpr bool canOverride = true;
 
         static auto& target(role::Vault& role) { return role.fs.files; }
         static const auto& target(const role::Vault& role) { return role.fs.files; }
@@ -61,8 +61,8 @@ namespace vh::rbac::resolver {
 
     template<>
     struct PermissionTargetTraits<permission::vault::fs::DirectoryPermissions> {
-        static constexpr bool enabled = true;
-        static constexpr bool requires_context = false;
+        static constexpr auto domain = RoleDomain::Vault;
+        static constexpr bool canOverride = true;
 
         static auto& target(role::Vault& role) { return role.fs.directories; }
         static const auto& target(const role::Vault& role) { return role.fs.directories; }

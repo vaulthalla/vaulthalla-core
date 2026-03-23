@@ -189,7 +189,8 @@ namespace vh::config {
             {"sync", c.sync},
             {"thumb", c.thumb},
             {"storage", c.storage},
-            {"types", c.types}
+            {"types", c.types},
+            {"runtime", c.runtime}
         };
     }
 
@@ -207,6 +208,7 @@ namespace vh::config {
         c.thumb = j.value("thumb", spdlog::level::info);
         c.storage = j.value("storage", spdlog::level::info);
         c.types = j.value("types", spdlog::level::info);
+        c.runtime = j.value("runtime", spdlog::level::info);
     }
 
     void to_json(nlohmann::json &j, const ThumbnailsConfig &c) {

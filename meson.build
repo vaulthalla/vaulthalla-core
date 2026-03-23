@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.24.0',
+        version: '0.25.0',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
@@ -238,39 +238,62 @@ configure_file(
 
 # ╭────────────────────────────────────── TESTS ────────────────────────────────────────╮
 
-configure_file(input: 'test-assets/sample.jpg', output: 'sample.jpg', copy: true)
-configure_file(input: 'test-assets/sample.pdf', output: 'sample.pdf', copy: true)
-configure_file(
-    input: 'test-assets/Screenshot 2025-06-26 at 3.29.35\u202FPM.png',
-    output: 'Screenshot 2025-06-26 at 3.29.35\u202FPM.png',
-    copy: true
-)
+if get_option('build_unit_tests') or get_option('permission_export_tests') or get_option('integration_tests')
+    configure_file(input: 'test-assets/sample.jpg', output: 'sample.jpg', copy: true)
+    configure_file(input: 'test-assets/sample.pdf', output: 'sample.pdf', copy: true)
+    configure_file(
+        input: 'test-assets/Screenshot 2025-06-26 at 3.29.35 PM.png',
+        output: 'Screenshot 2025-06-26 at 3.29.35 PM.png',
+        copy: true
+    )
+endif
 
-all_test_sources = sources
-foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
-    all_test_sources += files(f)
-endforeach
+if get_option('build_unit_tests')
+    all_test_sources = sources
+    foreach f : run_command('find', tests_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
+        all_test_sources += files(f)
+    endforeach
 
-test('vh_unit_tests',
-     executable('vh_unit_tests', all_test_sources,
-                link_with: [lib_core, lib_seed, lib_usage],
-                include_directories: inc,
-                dependencies: test_deps))
+    vh_unit_tests = executable(
+        'vh_unit_tests',
+        all_test_sources,
+        link_with: [lib_core, lib_seed, lib_usage],
+        include_directories: inc,
+        dependencies: test_deps,
+        install: false,
+    )
 
-perms_test_sources = sources
-perms_test_sources += join_paths(tests_src, 'test_permission_export.cpp')
-perms_test_sources += join_paths(tests_src, 'gtest_main.cpp')
+    test('vh_unit_tests', vh_unit_tests)
+endif
 
-test('vh_permission_export_tests',
-     executable('vh_permission_export_tests', perms_test_sources,
-                link_with: [lib_core, lib_seed, lib_usage],
-                include_directories: inc,
-                dependencies: test_deps))
+if get_option('permission_export_tests')
+    perms_test_sources = sources
+    perms_test_sources += join_paths(tests_src, 'test_permission_export.cpp')
+    perms_test_sources += join_paths(tests_src, 'gtest_main.cpp')
+
+    vh_permission_export_tests = executable(
+        'vh_permission_export_tests',
+        perms_test_sources,
+        link_with: [lib_core, lib_seed, lib_usage],
+        include_directories: inc,
+        dependencies: test_deps,
+        install: false,
+    )
+
+    test('vh_permission_export_tests', vh_permission_export_tests)
+endif
 
 if get_option('integration_tests')
-    cli_test_inc = include_directories('tests/integrations/include', 'usage/include', 'include', 'vendor')
+    cli_test_inc = include_directories(
+        'tests/integrations/include',
+        'usage/include',
+        'include',
+        'vendor'
+    )
+
     cli_test_src = join_paths(source_root, 'tests/integrations/src')
     cli_test_sources = []
+
     foreach f : run_command('find', cli_test_src, '-type', 'f', '-name', '*.cpp', check: true).stdout().strip().split('\n')
         cli_test_sources += files(f)
     endforeach

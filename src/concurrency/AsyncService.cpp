@@ -20,21 +20,21 @@ void AsyncService::start() {
         try {
             runLoop();
         } catch (const std::exception& e) {
-            log::Registry::vaulthalla()->error("[{}] Service error: {}", serviceName_, e.what());
+            log::Registry::runtime()->error("[{}] Service error: {}", serviceName_, e.what());
         } catch (...) {
-            log::Registry::vaulthalla()->error("[{}] Service error: unknown exception.", serviceName_);
+            log::Registry::runtime()->error("[{}] Service error: unknown exception.", serviceName_);
         }
 
         running_.store(false, std::memory_order_release);
     });
 
-    log::Registry::vaulthalla()->info("[{}] Service started.", serviceName_);
+    log::Registry::runtime()->info("[{}] Service started.", serviceName_);
 }
 
 void AsyncService::stop() {
     if (!isRunning()) return;
 
-    log::Registry::vaulthalla()->info("[{}] Stopping service...", serviceName_);
+    log::Registry::runtime()->info("[{}] Stopping service...", serviceName_);
     interruptFlag_.store(true, std::memory_order_release);
 
     if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) {
@@ -43,11 +43,11 @@ void AsyncService::stop() {
 
     running_.store(false, std::memory_order_release);
     // Leave interruptFlag_ true until next start() resets it
-    log::Registry::vaulthalla()->info("[{}] Service stopped.", serviceName_);
+    log::Registry::runtime()->info("[{}] Service stopped.", serviceName_);
 }
 
 void AsyncService::restart() {
-    log::Registry::vaulthalla()->info("[{}] Restarting service...", serviceName_);
+    log::Registry::runtime()->info("[{}] Restarting service...", serviceName_);
     stop();
     start();
 }

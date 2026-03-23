@@ -16,27 +16,27 @@ static std::optional<std::string> getFirstInitDBPass() {
     const std::filesystem::path f{"/run/vaulthalla/db_password"};
 
     if (!std::filesystem::exists(f)) {
-        log::Registry::vaulthalla()->debug("[seed] No pending db_password file at {}", f.string());
+        log::Registry::runtime()->debug("[seed] No pending db_password file at {}", f.string());
         return std::nullopt;
     }
 
     std::ifstream in(f);
     if (!in.is_open()) {
-        log::Registry::vaulthalla()->warn("[seed] Failed to open db_password file: {}", f.string());
+        log::Registry::runtime()->warn("[seed] Failed to open db_password file: {}", f.string());
         return std::nullopt;
     }
 
     std::string pass{};
     if (!(in >> pass)) {
-        log::Registry::vaulthalla()->warn("[seed] Invalid contents in {}", f.string());
+        log::Registry::runtime()->warn("[seed] Invalid contents in {}", f.string());
         return std::nullopt;
     }
 
     try {
         std::filesystem::remove(f);
-        log::Registry::vaulthalla()->debug("[seed] Consumed and removed pending db_password file {}", f.string());
+        log::Registry::runtime()->debug("[seed] Consumed and removed pending db_password file {}", f.string());
     } catch (const std::exception& e) {
-        log::Registry::vaulthalla()->warn("[seed] Failed to remove {}: {}", f.string(), e.what());
+        log::Registry::runtime()->warn("[seed] Failed to remove {}: {}", f.string(), e.what());
     }
 
     return pass;
@@ -54,7 +54,7 @@ DBConnection::DBConnection() : tpmKeyProvider_(
             DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host)
                                 + ":" + std::string(port) + "/" + std::string(name);
             conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
-            log::Registry::vaulthalla()->info(
+            log::Registry::runtime()->info(
                 "[DBConnection] Test mode: using connection string from environment variables");
             return;
         }

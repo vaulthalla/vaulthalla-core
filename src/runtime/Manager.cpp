@@ -41,7 +41,7 @@ Manager::Manager()
 }
 
 void Manager::startAll() {
-    log::Registry::vaulthalla()->debug("[ServiceManager] Starting all services...");
+    log::Registry::runtime()->debug("[ServiceManager] Starting all services...");
     std::lock_guard lock(mutex_);
     tryStart("ProtocolService", protocolService);
     tryStart("FUSE", fuseService);
@@ -51,7 +51,7 @@ void Manager::startAll() {
     tryStart("ConnectionLifecycleManager", connectionLifecycleManager);
     tryStart("LogRotationService", logRotationService);
     tryStart("DBJanitor", dbSweeperService);
-    log::Registry::vaulthalla()->debug("[ServiceManager] All services started.");
+    log::Registry::runtime()->debug("[ServiceManager] All services started.");
 
     startWatchdog();
 }
@@ -64,7 +64,7 @@ void Manager::startTestServices() {
 
 
 void Manager::stopAll(const int signal) {
-    log::Registry::vaulthalla()->debug("[ServiceManager] Stopping all services...");
+    log::Registry::runtime()->debug("[ServiceManager] Stopping all services...");
     {
         std::lock_guard lock(mutex_);
         stopService("SyncController", syncController, signal);
@@ -78,7 +78,7 @@ void Manager::stopAll(const int signal) {
 
     stopWatchdog();
 
-    log::Registry::vaulthalla()->debug("[ServiceManager] All services stopped.");
+    log::Registry::runtime()->debug("[ServiceManager] All services stopped.");
 }
 
 void Manager::restartService(const std::string& name) {
@@ -87,7 +87,7 @@ void Manager::restartService(const std::string& name) {
     const auto svc = services_.at(name);
     if (!svc) return;
 
-    log::Registry::vaulthalla()->warn("[ServiceManager] Restarting service: {}", name);
+    log::Registry::runtime()->warn("[ServiceManager] Restarting service: {}", name);
     stopService(name, svc, SIGTERM);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     tryStart(name, svc);
@@ -101,11 +101,11 @@ bool Manager::allRunning() const {
 
 void Manager::tryStart(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc) {
     if (!svc) return;
-    log::Registry::vaulthalla()->debug("[ServiceManager] Starting service: {}", name);
+    log::Registry::runtime()->debug("[ServiceManager] Starting service: {}", name);
     try {
         svc->start();
     } catch (const std::exception& e) {
-        log::Registry::vaulthalla()->error("[ServiceManager] Failed to start {}: {}", name, e.what());
+        log::Registry::runtime()->error("[ServiceManager] Failed to start {}: {}", name, e.what());
         hardFail();
     }
 }
@@ -113,11 +113,11 @@ void Manager::tryStart(const std::string& name, const std::shared_ptr<concurrenc
 void Manager::stopService(const std::string& name, const std::shared_ptr<concurrency::AsyncService>& svc, int signal) {
     if (!svc || !svc->isRunning()) return;
 
-    log::Registry::vaulthalla()->debug("[ServiceManager] Stopping service: {}", name);
+    log::Registry::runtime()->debug("[ServiceManager] Stopping service: {}", name);
     try {
         svc->stop();
     } catch (...) {
-        log::Registry::vaulthalla()->error("[ServiceManager] Failed to stop {} gracefully, sending signal {}", name, signal);
+        log::Registry::runtime()->error("[ServiceManager] Failed to stop {} gracefully, sending signal {}", name, signal);
         std::raise(SIGKILL); // Kill whole process group
     }
 }
@@ -125,13 +125,13 @@ void Manager::stopService(const std::string& name, const std::shared_ptr<concurr
 void Manager::startWatchdog() {
     if (watchdogRunning.exchange(true)) return; // already running
     watchdogThread = std::thread([this]() {
-        log::Registry::vaulthalla()->info("[ServiceManager] Watchdog started.");
+        log::Registry::runtime()->info("[ServiceManager] Watchdog started.");
         while (watchdogRunning) {
             {
                 std::lock_guard lock(mutex_);
                 for (auto& [name, svc] : services_) {
                     if (svc && !svc->isRunning()) {
-                        log::Registry::vaulthalla()->warn("[Watchdog] {} is down, restarting...", name);
+                        log::Registry::runtime()->warn("[Watchdog] {} is down, restarting...", name);
                         if (name == "FUSE") system(fmt::format("fusermount3 -u {} > /dev/null 2>&1 || fusermount -u {} > /dev/null 2>&1",
                    paths::getMountPath().string(), paths::getMountPath().string()).c_str());
 
@@ -141,7 +141,7 @@ void Manager::startWatchdog() {
             }
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
-        log::Registry::vaulthalla()->info("[ServiceManager] Watchdog stopped.");
+        log::Registry::runtime()->info("[ServiceManager] Watchdog stopped.");
     });
 }
 
@@ -152,9 +152,9 @@ void Manager::stopWatchdog() {
 }
 
 [[noreturn]] void Manager::hardFail() {
-    log::Registry::vaulthalla()->error("[ServiceManager] Critical failure, cannot continue.");
+    log::Registry::runtime()->error("[ServiceManager] Critical failure, cannot continue.");
     stopAll(SIGTERM);
-    log::Registry::vaulthalla()->error("[ServiceManager] Exiting with failure status.");
+    log::Registry::runtime()->error("[ServiceManager] Exiting with failure status.");
     std::_Exit(EXIT_FAILURE);
 }
 

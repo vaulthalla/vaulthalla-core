@@ -8,8 +8,22 @@ option(
 option('manpage', type: 'boolean', value: true, description: 'Build and install manpage via pandoc')
 
 option(
+    'build_unit_tests',
+    type: 'boolean',
+    value: false,
+    description: 'Build all unit test executables'
+)
+
+option(
     'integration_tests',
     type: 'boolean',
     value: false,
     description: 'Build integration test executable'
+)
+
+option(
+    'permission_export_tests',
+    type: 'boolean',
+    value: false,
+    description: 'Build permission export test executable'
 )

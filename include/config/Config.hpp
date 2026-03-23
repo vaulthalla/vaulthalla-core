@@ -122,6 +122,7 @@ struct SubsystemLogLevelsConfig {
     spdlog::level::level_enum thumb        = spdlog::level::warn;   // Failed renders only
     spdlog::level::level_enum storage      = spdlog::level::warn;   // Underlying I/O issues
     spdlog::level::level_enum types        = spdlog::level::err;    // Violations of invariants or schema errors
+    spdlog::level::level_enum runtime      = spdlog::level::warn;   // Runtime service manager
 };
 
 struct LogLevelsConfig {

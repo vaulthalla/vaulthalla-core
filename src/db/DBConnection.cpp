@@ -50,10 +50,17 @@ DBConnection::DBConnection() : tpmKeyProvider_(
         const auto host = std::getenv("VH_TEST_DB_HOST");
         const auto port = std::getenv("VH_TEST_DB_PORT");
         const auto name = std::getenv("VH_TEST_DB_NAME");
+
         if (user && pass && host && port && name) {
-            DB_CONNECTION_STR = "postgresql://" + std::string(user) + ":" + std::string(pass) + "@" + std::string(host)
-                                + ":" + std::string(port) + "/" + std::string(name);
+            DB_CONNECTION_STR =
+                "user=" + std::string(user) +
+                " password=" + std::string(pass) +
+                " host=" + std::string(host) +
+                " port=" + std::string(port) +
+                " dbname=" + std::string(name);
+
             conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
+
             log::Registry::runtime()->info(
                 "[DBConnection] Test mode: using connection string from environment variables");
             return;

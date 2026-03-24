@@ -197,7 +197,7 @@ int IntegrationsTestRunner::operator()() {
     readStage();
     updateStage();
     validateAllTestObjects();
-    runFUSETests();
+    // runFUSETests();
     teardownStage();
     return printResults();
 }

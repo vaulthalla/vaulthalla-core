@@ -168,7 +168,7 @@ namespace vh::test::integrations::cmd {
         return oss.str();
     }
 
-    static std::string manageRole(const std::shared_ptr<Vault>& vault, const std::shared_ptr<role::Vault>& role, const EntityType& entityType, const std::shared_ptr<void>& entity, const std::shared_ptr<CommandUsage>& root, std::string action) {
+    static std::string manageRole(const std::shared_ptr<Vault>& vault, const std::shared_ptr<role::Vault>& role, const EntityType& entityType, const std::shared_ptr<void>& entity, const std::shared_ptr<protocols::shell::CommandUsage>& root, std::string action) {
         const auto cmdBase = root->findSubcommand("role");
         if (!cmdBase) throw std::runtime_error("vault.roles usage not found");
         const auto cmd = cmdBase->findSubcommand(action);

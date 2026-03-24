@@ -72,6 +72,7 @@ namespace vh::protocols::shell::commands::vault {
 
     // role.cpp
     CommandResult handle_vault_role(const CommandCall &call);
+    CommandResult handle_vault_role_override(const CommandCall& call);
 
     // keys.cpp
     CommandResult handle_vault_keys(const CommandCall &call);
@@ -98,12 +99,12 @@ namespace vh::protocols::shell::commands::vault {
                                                         const std::shared_ptr<vh::vault::model::Vault> &vault,
                                                         const std::string &errPrefix);
 
-    Lookup<rbac::role::Vault> resolveVRole(const std::string &roleArg,
+    Lookup<vh::rbac::role::Vault> resolveVRole(const std::string &roleArg,
                                            const std::shared_ptr<vh::vault::model::Vault> &vault,
                                            const Subject *subjectOrNull,
                                            const std::string &errPrefix);
 
-    PatternParse parsePatternOpt(const CommandCall &call, bool required, const std::string &errPrefix);
+    PatternParse parseGlobPatternOpt(const CommandCall &call, bool required, const std::string &errPrefix);
 
     EnableParse parseEnableDisableOpt(const CommandCall &call, const std::string &errPrefix);
 

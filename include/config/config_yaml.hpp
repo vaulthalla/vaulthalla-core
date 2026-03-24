@@ -75,6 +75,7 @@ struct convert<SubsystemLogLevelsConfig> {
         node["thumb"]       = to_std_string(spdlog::level::to_string_view(rhs.thumb));
         node["storage"]     = to_std_string(spdlog::level::to_string_view(rhs.storage));
         node["types"]       = to_std_string(spdlog::level::to_string_view(rhs.types));
+        node["runtime"]     = to_std_string(spdlog::level::to_string_view(rhs.runtime));
         return node;
     }
 
@@ -94,6 +95,7 @@ struct convert<SubsystemLogLevelsConfig> {
         rhs.thumb = spdlog::level::from_str(node["thumb"].as<std::string>("info"));
         rhs.storage = spdlog::level::from_str(node["storage"].as<std::string>("info"));
         rhs.types = spdlog::level::from_str(node["types"].as<std::string>("info"));
+        rhs.runtime = spdlog::level::from_str(node["runtime"].as<std::string>("info"));
         return true;
     }
 };

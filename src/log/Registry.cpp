@@ -28,12 +28,13 @@ void Registry::init() {
     console_sink_ = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console_sink_->set_level(cnf.levels.console_log_level);
     console_sink_->set_color_mode(spdlog::color_mode::automatic);
-    console_sink_->set_pattern(LOG_FORMAT);
+    console_sink_->set_pattern(CONSOLE_LOG_FORMAT);
 
     // main file sink (rotating)
     main_file_sink_ = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
         main_log_path_.string(), main_max_bytes_, main_max_files_);
     main_file_sink_->set_level(cnf.levels.file_log_level);
+    main_file_sink_->set_pattern(FILE_LOG_FORMAT);
 
     auto makeLogger = [&](const std::string& name,
                           const spdlog::level::level_enum lvl = spdlog::level::debug) {
@@ -59,6 +60,7 @@ void Registry::init() {
     makeLogger("thumb",      sub_levels.thumb);
     makeLogger("storage",    sub_levels.storage);
     makeLogger("types",      sub_levels.types);
+    makeLogger("runtime",    sub_levels.runtime);
 
     // audit: file-only sink (append)
     {
@@ -121,7 +123,7 @@ void Registry::reopenMainLog() {
 
     // Keep level/pattern identical to the old sink.
     fresh->set_level(main_file_sink_->level());
-    fresh->set_pattern(LOG_FORMAT);
+    fresh->set_pattern(FILE_LOG_FORMAT);
 
     replaceSinkEverywhere_(main_file_sink_, fresh);
     main_file_sink_ = std::move(fresh);
@@ -134,6 +136,7 @@ void Registry::reopenAuditLog() {
     auto fresh = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
         audit_log_path_.string(), /*truncate=*/false);
     fresh->set_level(audit_file_sink_->level());
+    fresh->set_pattern(FILE_LOG_FORMAT);
 
     // Swap on the audit logger (and any others that might have it)
     replaceSinkEverywhere_(audit_file_sink_, fresh);

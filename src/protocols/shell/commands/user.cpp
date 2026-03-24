@@ -154,8 +154,6 @@ static CommandResult deleteUser(const CommandCall& call) {
             user->name, call.user->name);
         log::Registry::shell()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
             user->name, call.user->name);
-        log::Registry::vaulthalla()->warn("[UserCommands] Attempt to delete super_admin user: {}, by user: {}",
-            user->name, call.user->name);
         return invalid("Cannot delete super admin user: " + user->name);
     }
 

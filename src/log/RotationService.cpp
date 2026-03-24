@@ -20,7 +20,7 @@ RotationService::RotationService()
         .compression = Rotator::Compression::Zstd,
         .ignore_compress_errors = true,
         .on_reopen = []() { Registry::reopenMainLog(); },
-        .diag_log = [](const std::string_view& msg) { Registry::vaulthalla()->debug("[LogRotator] {}", msg); }
+        .diag_log = [](const std::string_view& msg) { Registry::runtime()->debug("[LogRotator] {}", msg); }
       })),
       auditRot_(std::make_unique<Rotator>(Rotator::Options{
         .active_path = paths::getLogPath() / "audit.log",
@@ -40,7 +40,7 @@ RotationService::~RotationService() { stop(); }
 void RotationService::runLoop() {
     while (!shouldStop()) {
         lazySleep(CHECK_INTERVAL);
-        Registry::vaulthalla()->debug("[LogRotationService] Checking for log rotation...");
+        Registry::runtime()->debug("[LogRotationService] Checking for log rotation...");
         appRot_->maybeRotate();
         auditRot_->maybeRotate();
     }

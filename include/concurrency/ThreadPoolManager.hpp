@@ -54,10 +54,10 @@ public:
         }
         pressureCv_.notify_all();  // wake the monitor
 
-        log::Registry::vaulthalla()->debug("[ThreadPoolManager] Waiting for monitor thread to finish...");
+        log::Registry::runtime()->debug("[ThreadPoolManager] Waiting for monitor thread to finish...");
         if (monitorThread_.joinable()) monitorThread_.join();
 
-        log::Registry::vaulthalla()->info("[ThreadPoolManager] Stopping thread pools...");
+        log::Registry::runtime()->info("[ThreadPoolManager] Stopping thread pools...");
         if (fuse_)  fuse_->stop();
         if (sync_)  sync_->stop();
         if (thumb_) thumb_->stop();

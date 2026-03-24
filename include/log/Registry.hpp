@@ -35,6 +35,7 @@ public:
     static std::shared_ptr<spdlog::logger> db()          { return get("db"); }
     static std::shared_ptr<spdlog::logger> types()       { return get("types"); }
     static std::shared_ptr<spdlog::logger> audit()       { return get("audit"); }
+    static std::shared_ptr<spdlog::logger> runtime()     { return get("runtime"); }
 
     [[nodiscard]] static bool isInitialized();
 
@@ -42,7 +43,8 @@ public:
     static void reopenAuditLog();
 
 private:
-    static constexpr const auto* LOG_FORMAT = "[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%n] %v";
+    static constexpr const auto* FILE_LOG_FORMAT = "[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%n] %v";
+    static constexpr const auto* CONSOLE_LOG_FORMAT = "[%^%l%$] [%n] %v";
 
     static inline bool initialized_ = false;
 

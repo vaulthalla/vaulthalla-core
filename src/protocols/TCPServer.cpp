@@ -26,7 +26,7 @@ std::shared_ptr<spdlog::logger> TCPServer::logger() const {
     case LogChannel::Http:      return log::Registry::http();
     case LogChannel::WebSocket: return log::Registry::ws();
     case LogChannel::General:
-    default: return log::Registry::vaulthalla();
+    default: return log::Registry::runtime();
     }
 }
 

@@ -3,6 +3,7 @@
 #include "protocols/shell/types.hpp"
 #include "rbac/permission/Override.hpp"
 #include "db/model/ListQueryParams.hpp"
+#include "rbac/fs/glob/model/Pattern.hpp"
 
 #include <optional>
 #include <string>
@@ -31,8 +32,7 @@ namespace vh::protocols::shell {
 
     struct PatternParse {
         bool ok = false;
-        std::string raw;
-        std::optional<std::regex> compiled;
+        std::optional<rbac::fs::glob::model::Pattern> pattern{};
         std::string error;
     };
 

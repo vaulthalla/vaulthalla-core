@@ -6,7 +6,7 @@
 #include "vault/APIKeyManager.hpp"
 #include "log/Registry.hpp"
 #include "stats/model/CacheStats.hpp"
-#include "usage/include/UsageManager.hpp"
+#include "UsageManager.hpp"
 #include "crypto/secrets/Manager.hpp"
 
 using namespace vh::runtime;
@@ -20,11 +20,8 @@ void Deps::init() {
     if (const auto& registry = get();
         registry.storageManager || registry.apiKeyManager || registry.authManager || registry.sessionManager
         || registry.secretsManager || registry.fsCache || registry.syncController || registry.shellUsageManager) {
-        log::Registry::vaulthalla()->warn("[Deps] Already initialized, ignoring second init()");
         return;
     }
-
-    log::Registry::vaulthalla()->info("[Deps] Initializing...");
 
     auto& ctx = get();
     ctx.storageManager = std::make_shared<storage::Manager>();
@@ -35,8 +32,6 @@ void Deps::init() {
     ctx.fsCache = std::make_shared<fs::cache::Registry>();
     ctx.shellUsageManager = std::make_shared<protocols::shell::UsageManager>();
     ctx.httpCacheStats = std::make_shared<stats::model::CacheStats>();
-
-    log::Registry::vaulthalla()->info("[Deps] Initialized.");
 }
 
 void Deps::setSyncController(const std::shared_ptr<sync::Controller>& syncController) {

@@ -1,7 +1,7 @@
 #include "protocols/shell/util/argsHelpers.hpp"
 #include "runtime/Deps.hpp"
-#include "usage/include/CommandUsage.hpp"
-#include "usage/include/UsageManager.hpp"
+#include "CommandUsage.hpp"
+#include "UsageManager.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/identities/Group.hpp"
 #include "db/query/rbac/role/Vault.hpp"
@@ -39,7 +39,7 @@ CommandResult invalid(const std::vector<std::string>& args, std::string msg) {
 CommandResult usage(const std::vector<std::string>& args) {
     const auto usageManager = runtime::Deps::get().shellUsageManager;
     const auto usage = args.empty() ? usageManager->root()->basicStr() : usageManager->renderHelp(args);
-    return {0, usageManager->renderHelp(args), ""};
+    return {0, usage, ""};
 }
 
 std::optional<std::string> optVal(const CommandCall& c, const std::string& key) {

@@ -13,16 +13,13 @@ using namespace vh::protocols;
 using namespace vh::config;
 using namespace vh::crypto;
 
-ProtocolService::ProtocolService() : AsyncService("Vaulthalla") {}
+ProtocolService::ProtocolService() : AsyncService("ProtocolService") {}
 
 void ProtocolService::runLoop() {
-    log::Registry::vaulthalla()->info("[Vaulthalla] Starting Vaulthalla - The Final Cloud...");
-
     try {
         if (sodium_init() < 0) throw std::runtime_error("libsodium initialization failed");
         initThreatIntelligence();
         initProtocols();
-        log::Registry::vaulthalla()->debug("[Vaulthalla] Protocols initialized successfully");
 
         while (!shouldStop()) std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -31,18 +28,18 @@ void ProtocolService::runLoop() {
 
         exit(EXIT_SUCCESS);
     } catch (const std::exception& e) {
-        log::Registry::vaulthalla()->error("[Vaulthalla] Exception in run loop: {}", e.what());
+        log::Registry::runtime()->error("[ProtocolService] Exception in run loop: {}", e.what());
         exit(EXIT_FAILURE);
     } catch (...) {
-        log::Registry::vaulthalla()->error("[Vaulthalla] Unknown exception in run loop");
+        log::Registry::runtime()->error("[ProtocolService] Unknown exception in run loop");
         exit(EXIT_FAILURE);
     }
 }
 
 void ProtocolService::initProtocols() {
     if (const auto& cfg = Registry::get(); !cfg.websocket.enabled && !cfg.http_preview.enabled) {
-        log::Registry::vaulthalla()->warn(
-            "[Vaulthalla] Both WebSocket and HTTP preview servers are disabled in configuration. Nothing to start.");
+        log::Registry::runtime()->warn(
+            "[ProtocolService] Both WebSocket and HTTP preview servers are disabled in configuration. Nothing to start.");
         return;
     }
 
@@ -58,7 +55,7 @@ void ProtocolService::initProtocols() {
 void ProtocolService::initWebsocketServer() {
     const auto& cfg = Registry::get().websocket;
     if (!cfg.enabled) {
-        log::Registry::vaulthalla()->info("[Vaulthalla] WebSocket server is disabled in configuration.");
+        log::Registry::runtime()->info("[ProtocolService] WebSocket server is disabled in configuration.");
         return;
     }
 
@@ -70,7 +67,7 @@ void ProtocolService::initWebsocketServer() {
 void ProtocolService::initHttpServer() {
     const auto& cfg = Registry::get().http_preview;
     if (!cfg.enabled) {
-        log::Registry::vaulthalla()->info("[Vaulthalla] HTTP preview server is disabled in configuration.");
+        log::Registry::runtime()->info("[ProtocolService] HTTP preview server is disabled in configuration.");
         return;
     }
 

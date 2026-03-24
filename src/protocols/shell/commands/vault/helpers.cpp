@@ -19,6 +19,7 @@
 #include "db/encoding/interval.hpp"
 #include "rbac/resolver/admin/all.hpp"
 #include "rbac/resolver/vault/all.hpp"
+#include "rbac/fs/glob/Tokenizer.hpp"
 
 using namespace vh;
 
@@ -66,8 +67,8 @@ Lookup<identities::User> resolveOwnerRequired(const CommandCall& call, const std
     return out;
 }
 
-Lookup<vh::vault::model::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
-    Lookup<vh::vault::model::Vault> out;
+Lookup<::vh::vault::model::Vault> resolveVault(const CommandCall& call, const std::string& vaultArg, const std::shared_ptr<CommandUsage>& usage, const std::string& errPrefix) {
+    Lookup<::vh::vault::model::Vault> out;
     if (const auto idOpt = parseUInt(vaultArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": vault ID must be a positive integer"; return out; }
         out.ptr = db::query::vault::Vault::getVault(*idOpt);
@@ -97,21 +98,21 @@ Lookup<storage::Engine> resolveEngine(const CommandCall& call, const std::string
 std::optional<std::string> checkOverridePermissions(const CommandCall& call, const std::shared_ptr<vh::vault::model::Vault>& vault, const std::string& errPrefix) {
     if (vault->owner_id == call.user->id) return std::nullopt;
 
-    using Perm = rbac::permission::vault::RolePermissions;
-    if (!rbac::resolver::Vault::has<Perm>({
+    using Perm = ::vh::rbac::permission::vault::RolePermissions;
+    if (!::vh::rbac::resolver::Vault::has<Perm>({
         .user = call.user,
         .permission = Perm::Assign,
-        .vault_id = vault->id,
+        .vault_id = vault->id
     })) return errPrefix + ": you do not have permission to override roles for this vault";
 
     return std::nullopt;
 }
 
-Lookup<rbac::role::Vault> resolveVRole(const std::string& roleArg,
+Lookup<::vh::rbac::role::Vault> resolveVRole(const std::string& roleArg,
                               const std::shared_ptr<vh::vault::model::Vault>& vault,
                               const Subject* subjectOrNull,
                               const std::string& errPrefix) {
-    Lookup<rbac::role::Vault> out;
+    Lookup<::vh::rbac::role::Vault> out;
     if (const auto idOpt = parseUInt(roleArg)) {
         if (*idOpt <= 0) { out.error = errPrefix + ": role ID must be a positive integer"; return out; }
         out.ptr = db::query::rbac::role::Vault::get(*idOpt);
@@ -127,7 +128,7 @@ Lookup<rbac::role::Vault> resolveVRole(const std::string& roleArg,
     return out;
 }
 
-PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
+PatternParse parseGlobPatternOpt(const CommandCall& call, bool required, const std::string& errPrefix) {
     PatternParse out;
     auto p = optVal(call, "path");
     if (!p) p = optVal(call, "pattern");
@@ -136,11 +137,16 @@ PatternParse parsePatternOpt(const CommandCall& call, bool required, const std::
         else { out.ok = true; }
         return out;
     }
-    out.raw = *p;
+
+    out.pattern = rbac::fs::glob::model::Pattern();
+    out.pattern->source = *p;
+
     try {
-        out.compiled = std::regex(out.raw);
+        rbac::fs::glob::Tokenizer::validate(out.pattern->source);
     } catch (const std::regex_error&) {
         out.error = errPrefix + ": invalid regex for --path/--pattern";
+        out.pattern = std::nullopt;
+        out.ok = false;
         return out;
     }
     out.ok = true;
@@ -169,18 +175,18 @@ EffectParse parseEffectChangeOpt(const CommandCall& call, const std::string& err
         out.error = errPrefix + ": cannot set both --allow and --deny";
         return out;
     }
-    if (allowFlag) out.value = rbac::permission::OverrideOpt::ALLOW;
-    if (denyFlag)  out.value = rbac::permission::OverrideOpt::DENY;
+    if (allowFlag) out.value = ::vh::rbac::permission::OverrideOpt::ALLOW;
+    if (denyFlag)  out.value = ::vh::rbac::permission::OverrideOpt::DENY;
     out.ok = true;
     return out;
 }
 
-std::unique_ptr<vh::vault::model::VaultType> parseVaultType(const CommandCall& call) {
+std::unique_ptr<::vh::vault::model::VaultType> parseVaultType(const CommandCall& call) {
     const bool local = hasFlag(call, "local");
     const bool s3    = hasFlag(call, "s3");
     if (local && s3) throw std::runtime_error("--local and --s3 are mutually exclusive");
-    if (local) return std::make_unique<vh::vault::model::VaultType>(vh::vault::model::VaultType::Local);
-    if (s3)    return std::make_unique<vh::vault::model::VaultType>(vh::vault::model::VaultType::S3);
+    if (local) return std::make_unique<::vh::vault::model::VaultType>(::vh::vault::model::VaultType::Local);
+    if (s3)    return std::make_unique<::vh::vault::model::VaultType>(::vh::vault::model::VaultType::S3);
 
     throw std::runtime_error("Vault type not specified: must provide either --local or --s3");
 }
@@ -243,8 +249,8 @@ void parseS3API(const CommandCall& call, const std::shared_ptr<CommandUsage>& us
             const auto apiKey = db::query::vault::APIKey::getAPIKey(*apiKeyOpt);
             if (!apiKey) throw std::runtime_error("API key not found: " + *apiKeyOpt);
 
-            using AKPerm = rbac::permission::admin::keys::APIPermissions;
-            if (!rbac::resolver::Admin::has<AKPerm>({
+            using AKPerm = ::vh::rbac::permission::admin::keys::APIPermissions;
+            if (!::vh::rbac::resolver::Admin::has<AKPerm>({
                 .user = call.user,
                 .permission = AKPerm::Consume,
                 .api_key_id = s3Vault->api_key_id

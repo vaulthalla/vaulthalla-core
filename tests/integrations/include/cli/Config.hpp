@@ -1,6 +1,6 @@
 #pragma once
 
-namespace vh::test::integrations::cli {
+namespace vh::test::integration::cli {
 
 struct Config {
     unsigned int numUsers = 10,

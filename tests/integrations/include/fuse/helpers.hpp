@@ -1,5 +1,11 @@
 #pragma once
 
+#define FUSE_USE_VERSION 35
+
+#include "log/Registry.hpp"
+#include "fs/ops/file.hpp"
+#include "types/Type.hpp"
+
 #include <functional>
 #include <string>
 #include <string_view>
@@ -12,24 +18,15 @@
 #include <fcntl.h>
 #include <iostream>
 
-#include "../concurrency/TestCase.hpp"
-#include "protocols/shell/types.hpp"
-#include "log/Registry.hpp"
-#include "fs/ops/file.hpp"
-#include "../types/AssertionResult.hpp"
+#include <fuse3/fuse.h>
 
 using namespace vh::fs::ops;
 
-namespace vh::test::fuse {
+namespace vh::test::integration::fuse {
 
 // ------------------------------------------------------------
 // Low-level execution: run lambda in a child with UID/GID, capture stdout
 // ------------------------------------------------------------
-
-struct ExecResult {
-    int exit_code = -1;          // 0 on success, else (errno & 0xFF)
-    std::string stdout_text;     // child stdout
-};
 
 inline ExecResult run_as_uid(const uid_t uid, const gid_t gid, const std::function<int()>& work_fn) {
     int pipefd[2];
@@ -180,71 +177,4 @@ inline ExecResult chmod_as(const uid_t uid, const std::filesystem::path& p, cons
     return run_as_uid(uid, [=]{ return chmod_path(p, mode); });
 }
 
-// ------------------------------------------------------------
-// Glue: build TestCases, run them, fill TestCase.result
-// ------------------------------------------------------------
-
-struct FuseStep {
-    std::shared_ptr<vh::test::cli::TestCase> tc;
-    std::function<ExecResult()> fn;
-};
-
-// Executes each step, maps ExecResult -> tc->result, and pre-fills assertion pass/fail
-inline std::vector<std::shared_ptr<vh::test::cli::TestCase>>
-run_fuse_steps(const std::vector<FuseStep>& steps) {
-    using vh::test::cli::TestCase;
-    std::vector<std::shared_ptr<TestCase>> out;
-    out.reserve(steps.size());
-
-    for (const auto& s : steps) {
-        if (!s.tc || !s.fn) continue;
-        const ExecResult exec = s.fn();
-
-        // Map into TestCase::result
-        s.tc->result.exit_code  = exec.exit_code;
-        s.tc->result.stdout_text = exec.stdout_text;
-        s.tc->result.stderr_text.clear(); // FUSE ops print only to stdout in our helpers
-
-        // Pre-evaluate expectation (validateStage can still re-check if you prefer)
-        bool ok = (s.tc->expect_exit == exec.exit_code);
-        if (ok && !s.tc->must_contain.empty()) {
-            for (const auto& needle : s.tc->must_contain) {
-                if (s.tc->result.stdout_text.find(needle) == std::string::npos) { ok = false; break; }
-            }
-        }
-        if (ok && !s.tc->must_not_contain.empty()) {
-            for (const auto& bad : s.tc->must_not_contain) {
-                if (s.tc->result.stdout_text.find(bad) != std::string::npos) { ok = false; break; }
-            }
-        }
-        s.tc->assertion = ok ? cli::AssertionResult::Pass()
-                             : cli::AssertionResult::Fail("FUSE: expectation mismatch (exit/stdout)");
-
-        out.push_back(s.tc);
-    }
-    return out;
 }
-
-// Quick builder for a FUSE case (lets you set name/path/expected/matchers)
-inline std::shared_ptr<vh::test::cli::TestCase>
-make_fuse_case(std::string name, std::string path, int expect_exit,
-               std::vector<std::string> must_contain = {},
-               std::vector<std::string> must_not_contain = {}) {
-    using vh::test::cli::TestCase;
-    auto tc = std::make_shared<TestCase>();
-    tc->name = std::move(name);
-    tc->path = std::move(path);         // e.g. "fuse/mkdir"
-    tc->expect_exit = expect_exit;      // 0 or EACCES, etc.
-    tc->must_contain = std::move(must_contain);
-    tc->must_not_contain = std::move(must_not_contain);
-    return tc;
-}
-
-// Seeding helper (write a small tree as a specific UID, typically admin)
-inline void seed_vault_tree(uid_t admin_uid, const std::filesystem::path& root, const std::string& base = "perm_seed") {
-    (void)mkdir_as(admin_uid, root / base / "docs");
-    (void)write_as(admin_uid, root / base / "docs" / "secret.txt", "TOP SECRET\n");
-    (void)write_as(admin_uid, root / base / "note.txt", "hello\n");
-}
-
-} // namespace vh::test::fuse

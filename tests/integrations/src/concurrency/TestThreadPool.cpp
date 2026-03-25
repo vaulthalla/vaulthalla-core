@@ -1,10 +1,10 @@
-#include "tests/integrations/include/concurrency/TestThreadPool.hpp"
+#include "concurrency/TestThreadPool.hpp"
 #include "concurrency/ThreadPoolManager.hpp"
 
 #include <ranges>
 #include <algorithm>
 
-namespace vh::test::integrations::concurrency {
+namespace vh::test::integration::concurrency {
     TestThreadPool::TestThreadPool(const std::shared_ptr<std::atomic<bool> >& interruptFlag,
                            const unsigned int nThreads)
         : interruptFlag(interruptFlag), stopFlag(false) {

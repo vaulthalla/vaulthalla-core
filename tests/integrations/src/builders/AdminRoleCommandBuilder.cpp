@@ -1,16 +1,16 @@
-#include "tests/integrations/include/cmd/Builder.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "cmd/Builder.hpp"
+#include "cmd/generators.hpp"
+#include "cli/Context.hpp"
 #include "CommandUsage.hpp"
 #include "rbac/role/Admin.hpp"
-#include "tests/integrations/include/randomizer/AdminRole.hpp"
+#include "randomizer/AdminRole.hpp"
 
 using namespace vh::rbac;
 using namespace vh::identities;
 using namespace vh::vault::model;
 
-namespace vh::test::integrations::cmd {
-    AdminRoleCommandBuilder::AdminRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<integrations::cli::Context>& ctx)
+namespace vh::test::integration::cmd {
+    AdminRoleCommandBuilder::AdminRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<cli::Context>& ctx)
         : Builder(usage, ctx, std::vector<std::string>{"role", "admin"}), adminRoleAliases_(ctx) {}
 
     std::string AdminRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<role::Admin>& entity, const std::string& field) {
@@ -27,7 +27,7 @@ namespace vh::test::integrations::cmd {
         }
 
         if (adminRoleAliases_.isPermissions(field)) {
-            tests::integrations::randomizer::AdminRole::assignRandomPermissions(entity);
+            randomizer::AdminRole::assignRandomPermissions(entity);
             return entity->toFlagsString();
         }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tests/integrations/include/randomizer/Permission.hpp"
+#include "randomizer/Permission.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -9,7 +9,7 @@
 namespace vh::rbac::role { struct Vault; }
 namespace vh::identities { struct User; struct Group; }
 
-namespace vh::tests::integrations::randomizer {
+namespace vh::test::integration::randomizer {
     struct VaultRole {
         static void assignRandomPermissions(const std::shared_ptr<rbac::role::Vault>& vRole);
 

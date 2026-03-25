@@ -1,7 +1,7 @@
-#include "tests/integrations/include/cmd/Router.hpp"
-#include "tests/integrations/include/concurrency/TestCase.hpp"
-#include "tests/integrations/include/entity/Registrar.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "cmd/Router.hpp"
+#include "TestCase.hpp"
+#include "entity/Registrar.hpp"
+#include "cli/Context.hpp"
 
 #include "identities/User.hpp"
 #include "identities/Group.hpp"
@@ -14,7 +14,7 @@ using namespace vh::identities;
 using namespace vh::rbac;
 using namespace vh::vault::model;
 
-namespace vh::test::integrations::cmd {
+namespace vh::test::integration::cmd {
     Router::Router(const std::shared_ptr<cli::Context>& ctx)
         : registrar_(std::make_shared<entity::Registrar>(ctx)) {
         registerAll();
@@ -25,7 +25,7 @@ namespace vh::test::integrations::cmd {
         routes_[path] = handler;
     }
 
-    std::shared_ptr<concurrency::TestCase> Router::route(const std::shared_ptr<concurrency::TestCase>& test) const {
+    std::shared_ptr<TestCase> Router::route(const std::shared_ptr<TestCase>& test) const {
         if (!routes_.contains(test->path)) throw std::runtime_error("cmd::Router: no route registered for path: " + test->path);
 
         if (test->subject && test->subjectType) {
@@ -71,8 +71,8 @@ namespace vh::test::integrations::cmd {
         return test;
     }
 
-    std::vector<std::shared_ptr<concurrency::TestCase>> Router::route(const std::vector<std::shared_ptr<concurrency::TestCase>>& tests) const {
-        std::vector<std::shared_ptr<concurrency::TestCase>> results;
+    std::vector<std::shared_ptr<TestCase>> Router::route(const std::vector<std::shared_ptr<TestCase>>& tests) const {
+        std::vector<std::shared_ptr<TestCase>> results;
         for (auto& t : tests) results.push_back(route(t));
         return results;
     }
@@ -227,7 +227,7 @@ namespace vh::test::integrations::cmd {
             if (!target) throw std::runtime_error("cmd::Router: no vault-role entity-subject triplet provided for assignment");
             if (!subject) throw std::runtime_error("cmd::Router: no vault-role entity-subject triplet provided for assignment");
             const auto vault = std::static_pointer_cast<Vault>(entity);
-            const auto role = std::static_pointer_cast<Vault>(target);
+            const auto role = std::static_pointer_cast<role::Vault>(target);
 
             if (subjectType == EntityType::USER)
                 return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::ASSIGN, vault, role, subject);
@@ -242,7 +242,7 @@ namespace vh::test::integrations::cmd {
             if (!target) throw std::runtime_error("cmd::Router: no vault-role entity-subject triplet provided for unassignment");
             if (!subject) throw std::runtime_error("cmd::Router: no vault-role entity-subject triplet provided for unassignment");
             const auto vault = std::static_pointer_cast<Vault>(entity);
-            const auto role = std::static_pointer_cast<Vault>(target);
+            const auto role = std::static_pointer_cast<role::Vault>(target);
 
             if (subjectType == EntityType::USER)
                 return registrar_->manageVaultRoleAssignments(EntityType::USER, CommandType::UNASSIGN, vault, role, subject);

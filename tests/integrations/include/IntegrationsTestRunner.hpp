@@ -2,6 +2,7 @@
 
 #include "cli/Config.hpp"
 #include "rbac/permission/Override.hpp"
+#include "TestStage.hpp"
 
 #include <memory>
 #include <string>
@@ -13,22 +14,13 @@
 namespace vh::protocols::shell { class UsageManager; }
 namespace vh::identities { struct User; }
 
-namespace vh::test::integrations {
-
-    namespace concurrency {
-        class TestThreadPool;
-        struct TestCase;
-    }
-
+namespace vh::test::integration {
+    struct TestCase;
+    namespace concurrency { class TestThreadPool; }
     namespace cli { struct Context; }
     namespace cmd { struct Router; }
 
 enum class EntityType;
-
-struct TestStage {
-    std::string name;
-    std::vector<std::shared_ptr<concurrency::TestCase>> tests;
-};
 
 struct Expectations {
     std::vector<std::string> must_have;
@@ -78,14 +70,6 @@ private:
     // FUSE steps
     std::shared_ptr<identities::User> createUser(unsigned int vaultId, const std::optional<uint16_t>& vaultPerms = std::nullopt, const std::vector<rbac::permission::Override>& overrides = {});
     void runFUSETests();
-    void testFUSECRUD();
-    void testFUSEAllow();
-    void testFUSEDeny();
-    void testVaultPermOverridesAllow();
-    void testVaultPermOverridesDeny();
-    void testFUSEGroupPermissions();
-    void testGroupPermOverrides();
-    void testFUSEUserOverridesGroupOverride();
 
     // Helpers
     void validateStage(const TestStage& stage) const;
@@ -93,7 +77,7 @@ private:
     int  printResults() const;
 
     template <EntityType E>
-    void finish_seed(const std::vector<std::shared_ptr<concurrency::TestCase>>& res);
+    void finish_seed(const std::vector<std::shared_ptr<TestCase>>& res);
 };
 
 }

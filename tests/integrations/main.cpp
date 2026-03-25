@@ -1,4 +1,4 @@
-#include "tests/integrations/include/IntegrationsTestRunner.hpp"
+#include "IntegrationsTestRunner.hpp"
 #include "db/Transactions.hpp"
 #include "db/query/identities/User.hpp"
 #include "seed/include/init_db_tables.hpp"
@@ -16,7 +16,7 @@
 #include <chrono>
 #include <paths.h>
 
-using namespace vh::test::integrations;
+using namespace vh::test::integration;
 using namespace vh::protocols::shell;
 using namespace vh::concurrency;
 using namespace vh::storage;

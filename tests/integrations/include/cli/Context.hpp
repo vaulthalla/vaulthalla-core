@@ -15,9 +15,9 @@ class CommandUsage;
 class UsageManager;
 }
 
-namespace vh::test::integrations { enum class EntityType; }
+namespace vh::test::integration { enum class EntityType; }
 
-namespace vh::test::integrations::cli {
+namespace vh::test::integration::cli {
 
 struct Context {
     static constexpr std::array<std::string_view, 4> ENTITIES = {"user", "vault", "group", "role"};

@@ -1,8 +1,8 @@
-#include "tests/integrations/include/cmd/Builder.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "cmd/Builder.hpp"
+#include "cmd/generators.hpp"
+#include "cli/Context.hpp"
 #include "CommandUsage.hpp"
-#include "tests/integrations/include/randomizer/VaultRole.hpp"
+#include "randomizer/VaultRole.hpp"
 
 #include <iomanip>
 
@@ -10,8 +10,8 @@ using namespace vh::identities;
 using namespace vh::rbac;
 using namespace vh::vault::model;
 
-namespace vh::test::integrations::cmd {
-    VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<integrations::cli::Context>& ctx)
+namespace vh::test::integration::cmd {
+    VaultRoleCommandBuilder::VaultRoleCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<cli::Context>& ctx)
         : Builder(usage, ctx, std::vector<std::string>{"role", "vault"}), vaultRoleAliases_(ctx) {}
 
     std::string VaultRoleCommandBuilder::updateAndResolveVar(const std::shared_ptr<role::Vault>& entity, const std::string& field) {
@@ -28,7 +28,7 @@ namespace vh::test::integrations::cmd {
         }
 
         if (vaultRoleAliases_.isPermissions(field)) {
-            tests::integrations::randomizer::VaultRole::assignRandomPermissions(entity);
+            randomizer::VaultRole::assignRandomPermissions(entity);
             return entity->toFlagsString();
         }
 

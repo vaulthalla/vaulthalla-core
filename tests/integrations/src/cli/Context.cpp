@@ -1,8 +1,6 @@
-#include "tests/integrations/include/cli/Context.hpp"
-
-#include "tests/integrations/include/types/Type.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-
+#include "cli/Context.hpp"
+#include "types/Type.hpp"
+#include "cmd/generators.hpp"
 #include "UsageManager.hpp"
 #include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
@@ -17,7 +15,7 @@ using namespace vh::identities;
 using namespace vh::rbac;
 using namespace vh::vault::model;
 
-namespace vh::test::integrations::cli {
+namespace vh::test::integration::cli {
     Context::Context()
         : usage(std::make_shared<UsageManager>()) {
         for (const auto& entity : ENTITIES) {

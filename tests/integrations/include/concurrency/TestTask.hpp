@@ -1,12 +1,10 @@
 #pragma once
 
-#include "TestCase.hpp"
-
 #include <future>
 #include <optional>
 #include <variant>
 
-namespace vh::test::integrations::concurrency {
+namespace vh::test::integration::concurrency {
 
 typedef std::variant<std::vector<std::shared_ptr<TestCase>>> TestFuture;
 

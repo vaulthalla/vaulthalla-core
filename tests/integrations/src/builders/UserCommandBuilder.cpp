@@ -1,11 +1,11 @@
-#include "tests/integrations/include/cmd/Builder.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "cmd/Builder.hpp"
+#include "cmd/generators.hpp"
+#include "cli/Context.hpp"
 #include "CommandUsage.hpp"
 
 using namespace vh::identities;
 
-namespace vh::test::integrations::cmd {
+namespace vh::test::integration::cmd {
     UserCommandBuilder::UserCommandBuilder(const std::shared_ptr<protocols::shell::UsageManager>& usage, const std::shared_ptr<cli::Context>& ctx)
         : Builder(usage, ctx, "user"), userAliases_(ctx) {}
 

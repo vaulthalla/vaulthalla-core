@@ -1,4 +1,4 @@
-#include "tests/integrations/include/randomizer/AdminRole.hpp"
+#include "randomizer/AdminRole.hpp"
 
 #include "identities/User.hpp"
 #include "identities/Group.hpp"
@@ -10,7 +10,7 @@
 
 using namespace vh;
 using namespace vh::rbac;
-using namespace vh::tests::integrations::randomizer;
+using namespace vh::test::integration::randomizer;
 
 std::shared_ptr<role::Admin> AdminRole::getRandomRole() {
     const auto roles = db::query::rbac::role::Admin::list();

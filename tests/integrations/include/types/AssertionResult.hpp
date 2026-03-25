@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace vh::test::integrations {
+namespace vh::test::integration {
 
 struct AssertionResult {
     bool ok{true};

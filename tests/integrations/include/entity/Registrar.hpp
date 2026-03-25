@@ -5,10 +5,10 @@
 #include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "protocols/shell/Router.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
-#include "tests/integrations/include/cmd/Registry.hpp"
-#include "tests/integrations/include/types/Type.hpp"
-#include "tests/integrations/include/entity/Factory.hpp"
+#include "cli/Context.hpp"
+#include "cmd/Registry.hpp"
+#include "types/Type.hpp"
+#include "entity/Factory.hpp"
 #include "protocols/shell/commands/all.hpp"
 #include "db/query/identities/User.hpp"
 
@@ -18,7 +18,7 @@
 #include <stdexcept>
 #include <iostream>
 
-namespace vh::test::integrations::entity {
+namespace vh::test::integration::entity {
 
 struct SeedContext {
     unsigned int numUsers = 10;
@@ -152,7 +152,7 @@ public:
 
     [[nodiscard]] EntityResult manageVaultRoleAssignments(const EntityType& type, const CommandType& cmdType,
                                                           const std::shared_ptr<Vault>& vault,
-                                                          const std::shared_ptr<Vault>& role,
+                                                          const std::shared_ptr<role::Vault>& role,
                                                           const std::shared_ptr<void>& entity) const {
         if (type != EntityType::USER && type != EntityType::GROUP)
             throw std::runtime_error("EntityRegistrar: manageVaultRoleAssignments only supports USER and GROUP entity types");

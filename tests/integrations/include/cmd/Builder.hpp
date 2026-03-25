@@ -17,7 +17,7 @@ class CommandUsage;
 class UsageManager;
 }
 
-namespace vh::test::integrations::cmd {
+namespace vh::test::integration::cmd {
 
 template <typename T = void> class Builder {
 public:

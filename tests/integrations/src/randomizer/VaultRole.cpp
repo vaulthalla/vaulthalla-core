@@ -1,4 +1,4 @@
-#include "tests/integrations/include/randomizer/VaultRole.hpp"
+#include "randomizer/VaultRole.hpp"
 
 #include "identities/User.hpp"
 #include "identities/Group.hpp"
@@ -10,7 +10,7 @@
 
 using namespace vh;
 using namespace vh::rbac;
-using namespace vh::tests::integrations::randomizer;
+using namespace vh::test::integration::randomizer;
 
 std::shared_ptr<role::Vault> VaultRole::getRandomRole() {
     const auto roles = db::query::rbac::role::Vault::list();

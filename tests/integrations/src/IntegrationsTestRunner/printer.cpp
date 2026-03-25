@@ -1,6 +1,6 @@
-#include "tests/integrations/include/IntegrationsTestRunner.hpp"
-#include "tests/integrations/include/concurrency/TestCase.hpp"
-#include "tests/integrations/include/Validator.hpp"
+#include "IntegrationsTestRunner.hpp"
+#include "TestCase.hpp"
+#include "Validator.hpp"
 
 #include <unistd.h> // isatty
 #include <cstdlib>
@@ -11,7 +11,7 @@
 #include <string>
 #include <iomanip>
 
-namespace vh::test::integrations {
+namespace vh::test::integration {
     static std::string joinLines(const std::vector<std::string>& lines) {
         std::ostringstream oss;
         for (const auto& e : lines) oss << e << '\n';

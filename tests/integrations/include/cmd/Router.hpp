@@ -1,14 +1,15 @@
 #pragma once
 
-#include "../types/Type.hpp"
+#include "types/Type.hpp"
 
 #include <unordered_map>
 #include <string>
 #include <functional>
 #include <memory>
 
-namespace vh::test::integrations {
-    namespace concurrency { struct TestCase; }
+namespace vh::test::integration {
+    struct TestCase;
+
     namespace entity { class Registrar; }
     namespace cli { struct Context; }
 
@@ -32,9 +33,9 @@ namespace vh::test::integrations {
 
             void registerRoute(const std::string &path, const CallType &handler);
 
-            std::shared_ptr<concurrency::TestCase> route(const std::shared_ptr<concurrency::TestCase> &test) const;
+            std::shared_ptr<TestCase> route(const std::shared_ptr<TestCase> &test) const;
 
-            std::vector<std::shared_ptr<concurrency::TestCase> > route(const std::vector<std::shared_ptr<concurrency::TestCase> > &tests) const;
+            std::vector<std::shared_ptr<TestCase> > route(const std::vector<std::shared_ptr<TestCase>> &tests) const;
 
         private:
             std::shared_ptr<entity::Registrar> registrar_;

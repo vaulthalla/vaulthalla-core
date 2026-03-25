@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tests/integrations/include/types/Type.hpp"
+#include "types/Type.hpp"
 #include "types/AssertionResult.hpp"
 #include "db/query/identities/User.hpp"
 #include "db/query/vault/Vault.hpp"
@@ -19,7 +19,7 @@
 #include <memory>
 #include <vector>
 
-namespace vh::test::integrations {
+namespace vh::test::integration {
 
 template <EntityType type, typename T>
 struct Validator {

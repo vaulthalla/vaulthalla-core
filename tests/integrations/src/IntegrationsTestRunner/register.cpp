@@ -1,7 +1,7 @@
-#include "tests/integrations/include/IntegrationsTestRunner.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "IntegrationsTestRunner.hpp"
+#include "cli/Context.hpp"
 
-namespace vh::test::integrations {
+namespace vh::test::integration {
     void IntegrationsTestRunner::registerStdoutContains(const std::string& path, std::string needle) {
         expectations_by_path_[path].must_have.push_back(std::move(needle));
     }

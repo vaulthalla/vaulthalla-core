@@ -1,12 +1,12 @@
 #pragma once
 
-#include "tests/integrations/include/cmd/Builder.hpp"
-#include "../types/Type.hpp"
+#include "cmd/Builder.hpp"
+#include "types/Type.hpp"
 #include "UsageManager.hpp"
 
 #include <memory>
 
-namespace vh::test::integrations::cmd {
+namespace vh::test::integration::cmd {
 
 class Registry {
 public:

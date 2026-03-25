@@ -5,7 +5,7 @@
 #include <random>
 #include <stdexcept>
 
-namespace vh::tests::integrations::randomizer {
+namespace vh::test::integration::randomizer {
     inline thread_local std::mt19937_64 rng{std::random_device{}()};
 
     inline std::size_t generateRandomIndex(const std::size_t count) {

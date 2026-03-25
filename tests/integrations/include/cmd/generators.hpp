@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ArgsGenerator.hpp"
-#include "../types/Type.hpp"
+#include "types/Type.hpp"
 #include "permsUtil.hpp"
 
 #include <string>
@@ -13,7 +13,7 @@
 #include <random>
 #include <cstdint>
 
-namespace vh::test::integrations {
+namespace vh::test::integration {
 
 static inline thread_local std::mt19937_64 rng{std::random_device{}()};
 

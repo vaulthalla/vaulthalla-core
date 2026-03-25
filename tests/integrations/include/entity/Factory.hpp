@@ -1,15 +1,15 @@
 #pragma once
 
-#include "tests/integrations/include/types/Type.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "types/Type.hpp"
+#include "cmd/generators.hpp"
+#include "cli/Context.hpp"
 #include "identities/User.hpp"
 #include "vault/model/Vault.hpp"
 #include "identities/Group.hpp"
 #include "rbac/role/Admin.hpp"
 #include "rbac/role/Vault.hpp"
-#include "tests/integrations/include/randomizer/AdminRole.hpp"
-#include "tests/integrations/include/randomizer/VaultRole.hpp"
+#include "randomizer/AdminRole.hpp"
+#include "randomizer/VaultRole.hpp"
 
 #include <string>
 #include <memory>
@@ -19,7 +19,7 @@ using namespace vh::identities;
 using namespace vh::rbac;
 using namespace vh::vault::model;
 
-namespace vh::test::integrations::entity {
+namespace vh::test::integration::entity {
 
 class Factory {
 public:
@@ -54,7 +54,7 @@ public:
             const auto role = std::make_shared<role::Admin>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated user role";
-            tests::integrations::randomizer::AdminRole::assignRandomPermissions(role);
+            randomizer::AdminRole::assignRandomPermissions(role);
             return role;
         }
 
@@ -62,7 +62,7 @@ public:
             const auto role = std::make_shared<role::Vault>();
             role->name = generateRoleName(type, "role/create");
             role->description = "Auto-generated vault role";
-            tests::integrations::randomizer::VaultRole::assignRandomPermissions(role);
+            randomizer::VaultRole::assignRandomPermissions(role);
             return role;
         }
 

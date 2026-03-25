@@ -11,7 +11,7 @@
 #include <vector>
 #include <chrono>
 
-namespace vh::test::integrations::concurrency {
+namespace vh::test::integration::concurrency {
 
 class TestThreadPool {
 public:

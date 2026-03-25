@@ -1,15 +1,15 @@
 #pragma once
 
-#include "tests/integrations/include/concurrency/TestCase.hpp"
-#include "tests/integrations/include/concurrency/TestTask.hpp"
-#include "tests/integrations/include/cmd/Router.hpp"
+#include "TestCase.hpp"
+#include "concurrency/TestTask.hpp"
+#include "cmd/Router.hpp"
 
-namespace vh::test::integrations::cli {
+namespace vh::test::integration::cli {
 
 class Task final : public concurrency::PromisedTestTask {
 public:
     explicit Task(const std::shared_ptr<cmd::Router>& router,
-                         const std::vector<std::shared_ptr<concurrency::TestCase>>& tests)
+                         const std::vector<std::shared_ptr<TestCase>>& tests)
         : PromisedTestTask(), router_(router), tests_(tests) {
         if (!router_) throw std::runtime_error("CLITestTask: router is null");
     }
@@ -22,7 +22,7 @@ public:
 
 private:
     std::shared_ptr<cmd::Router> router_;
-    std::vector<std::shared_ptr<concurrency::TestCase>> tests_;
+    std::vector<std::shared_ptr<TestCase>> tests_;
 };
 
 }

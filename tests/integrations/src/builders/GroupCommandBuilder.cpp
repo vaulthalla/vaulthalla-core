@@ -1,12 +1,12 @@
-#include "tests/integrations/include/cmd/Builder.hpp"
-#include "tests/integrations/include/cmd/generators.hpp"
-#include "tests/integrations/include/cli/Context.hpp"
+#include "cmd/Builder.hpp"
+#include "cmd/generators.hpp"
+#include "cli/Context.hpp"
 #include "CommandUsage.hpp"
 
 using namespace vh::protocols::shell;
 using namespace vh::identities;
 
-namespace vh::test::integrations::cmd {
+namespace vh::test::integration::cmd {
     GroupCommandBuilder::GroupCommandBuilder(const std::shared_ptr<UsageManager>& usage, const std::shared_ptr<cli::Context>& ctx)
         : Builder(usage, ctx, "group"), groupAliases_(ctx) {}
 

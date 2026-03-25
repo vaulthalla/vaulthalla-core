@@ -8,7 +8,7 @@ using namespace vh::identities;
 
 namespace vh::test::integration {
 
-    TestStage testFUSECRUD() {
+    static TestStage testFUSECRUD() {
         auto builder = Builder::make({
             .name = "CRUD",
             .baseDir = "crud_seed"
@@ -53,7 +53,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testFUSEAllow() {
+    static TestStage testFUSEAllow() {
         auto builder = Builder::make({
             .name = "Permissions Allow",
             .baseDir = "perm_allow_seed"
@@ -92,7 +92,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testFUSEDeny() {
+    static TestStage testFUSEDeny() {
         auto builder = Builder::make({
             .name = "Permissions Deny",
             .baseDir = "perm_deny_seed"
@@ -133,7 +133,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testVaultPermOverridesAllow() {
+    static TestStage testVaultPermOverridesAllow() {
         auto builder = Builder::make({
             .name = "Vault Permission Overrides Allow",
             .baseDir = "perm_override_allow_seed"
@@ -180,7 +180,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testVaultPermOverridesDeny() {
+    static TestStage testVaultPermOverridesDeny() {
         auto builder = Builder::make({
             .name = "Vault Permission Overrides Deny",
             .baseDir = "perm_override_deny_seed"
@@ -226,7 +226,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testFUSEGroupPermissions() {
+    static TestStage testFUSEGroupPermissions() {
         auto builder = Builder::make({
             .name = "Group Permissions",
             .baseDir = "group_perm_allow_seed"
@@ -267,7 +267,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testGroupPermOverrides() {
+    static TestStage testGroupPermOverrides() {
         auto builder = Builder::make({
             .name = "Group Permission Overrides",
             .baseDir = "group_perm_override_deny_seed"
@@ -315,7 +315,7 @@ namespace vh::test::integration {
         return builder.exec();
     }
 
-    TestStage testFUSEUserOverridesGroupOverride() {
+    static TestStage testFUSEUserOverridesGroupOverride() {
         auto builder = Builder::make({
             .name = "User Overrides Group Override",
             .baseDir = "user_override_group_override_seed"
@@ -377,27 +377,36 @@ namespace vh::test::integration {
     }
 
     void IntegrationsTestRunner::runFUSETests() {
-        testFUSECRUD();
+        constexpr std::array always_run {
+            testFUSECRUD
+        };
 
-        // FUSE permission tests require root to change the effective uid
-        if (geteuid() == 0) {
-            constexpr std::array functions {
-                testFUSEAllow,
-                testFUSEDeny,
-                testVaultPermOverridesAllow,
-                testVaultPermOverridesDeny,
-                testFUSEGroupPermissions,
-                testGroupPermOverrides,
-                testFUSEUserOverridesGroupOverride
-            };
+        for (const auto& function : always_run) {
+            stages_.push_back(function());
+            validateStage(stages_.back());
 
-            for (const auto& function : functions) {
-                stages_.push_back(function());
-                validateStage(stages_.back());
+            for (const auto& uid : stages_.back().uids) linux_uids_.push_back(uid);
+            for (const auto& gid : stages_.back().gids) linux_gids_.push_back(gid);
+        }
 
-                for (const auto& uid : stages_.back().uids) linux_uids_.push_back(uid);
-                for (const auto& gid : stages_.back().gids) linux_gids_.push_back(gid);
-            }
+        if (geteuid() != 0) return;
+
+        constexpr std::array root_only {
+            testFUSEAllow,
+            testFUSEDeny,
+            testVaultPermOverridesAllow,
+            testVaultPermOverridesDeny,
+            testFUSEGroupPermissions,
+            testGroupPermOverrides,
+            testFUSEUserOverridesGroupOverride
+        };
+
+        for (const auto& function : root_only) {
+            stages_.push_back(function());
+            validateStage(stages_.back());
+
+            for (const auto& uid : stages_.back().uids) linux_uids_.push_back(uid);
+            for (const auto& gid : stages_.back().gids) linux_gids_.push_back(gid);
         }
     }
 }

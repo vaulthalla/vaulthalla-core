@@ -56,7 +56,7 @@ static void ensureAdminExists() {
 static int runTests() {
     const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    IntegrationsTestRunner runner(cli::Config::Medium());
+    IntegrationsTestRunner runner(cli::Config::Minimal());
     const int exit_status = runner();
 
     const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

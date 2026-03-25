@@ -31,16 +31,16 @@ using namespace vh::identities;
 static unsigned int id_index = 1001;
 
 Builder Builder::make(BuilderSpec&& spec) {
-    const auto admin = db::query::identities::User::getUserByName("admin");
-    if (!admin || !admin->meta.linux_uid) throw std::runtime_error("Admin user/uid not found");
+    const auto system = db::query::identities::User::getUserByName("system");
+    if (!system || !system->meta.linux_uid) throw std::runtime_error("Admin user/uid not found");
 
     const auto engine = makeVault();
     if (!engine) throw std::runtime_error("Failed to create vault");
 
     const auto root = std::filesystem::path(engine->paths->fuseRoot / fs::model::to_snake_case(engine->vault->name));
-    seed_vault_tree(*admin->meta.linux_uid, root, spec.baseDir);
+    seed_vault_tree(*system->meta.linux_uid, root, spec.baseDir);
 
-    return Builder{FuseScenarioContext{ "FUSE: " + spec.name, admin, engine, root, spec.baseDir }};
+    return Builder{FuseScenarioContext{ "FUSE: " + spec.name, system, engine, root, spec.baseDir }};
 }
 
 void Builder::buildAssignVRole(VaultRoleSpec&& spec) {

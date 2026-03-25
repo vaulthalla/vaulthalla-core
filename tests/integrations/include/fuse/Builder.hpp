@@ -25,13 +25,13 @@ namespace vh::test::integration::fuse {
 
         [[nodiscard]] TestStage exec() const;
 
-        [[nodiscard]] const std::pair<FuseScenarioContext, FuseSubject>& scenario() const { return {ctx_, subject_}; }
+        [[nodiscard]] std::pair<FuseScenarioContext, FuseSubject> scenario() const { return {ctx_, subject_}; }
 
         void addUserToGroup();
 
     private:
-        FuseScenarioContext ctx_;
-        FuseSubject subject_;
+        FuseScenarioContext ctx_{};
+        FuseSubject subject_{};
         std::vector<uint32_t> uids_, gids_;
 
         [[nodiscard]] std::vector<std::shared_ptr<TestCase>> runSteps() const;

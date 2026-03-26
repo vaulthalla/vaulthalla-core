@@ -20,34 +20,34 @@ namespace vh::test::integration {
             .name = "FUSE mkdir (admin)",
             .path = "fuse/mkdir",
             .must_contain = {"OK mkdir"},
-            .fn = [=]{ return mkdir_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return mkdir_as(subj.uid, ctx.base()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE write (admin)",
             .path = "fuse/write",
             .must_contain = {"OK write"},
-            .fn = [=]{ return write_as(subj.uid, ctx.getBaseDir() / "hello.txt", "hello world!\n"); }
+            .fn = [=]{ return write_as(subj.uid, ctx.hello(), "hello world!\n"); }
         });
 
         builder.makeTestCase({
             .name = "FUSE read (admin)",
             .path = "fuse/read",
-            .fn = [=] { return read_as(subj.uid, ctx.getBaseDir() / "hello.txt"); }
+            .fn = [=] { return read_as(subj.uid, ctx.hello()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE rename (admin)",
             .path = "fuse/rename",
             .must_contain = {"OK mv"},
-            .fn = [=]{ return mv_as(subj.uid, ctx.getBaseDir() / "hello.txt", ctx.getBaseDir() / "hello2.txt"); }
+            .fn = [=]{ return mv_as(subj.uid, ctx.hello(), ctx.base() / "hello2.txt"); }
         });
 
         builder.makeTestCase({
             .name = "FUSE rm -rf (admin)",
             .path = "fuse/rmrf",
             .must_contain = {"OK rm -rf"},
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();
@@ -73,20 +73,20 @@ namespace vh::test::integration {
         builder.makeTestCase({
              .name = "FUSE allow: ls seed",
              .path = "fuse/ls",
-             .fn = [=]{ return ls_as(subj.uid, ctx.getBaseDir()); }
+             .fn = [=]{ return ls_as(subj.uid, ctx.base()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: read secret",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: write user_note",
             .path = "fuse/write",
             .must_contain = {"OK write"},
-            .fn = [=]{ return write_as(subj.uid, ctx.getBaseDir() / "docs" / "user_note.txt", "hey\n"); },
+            .fn = [=]{ return write_as(subj.uid, ctx.note(), "hey\n"); },
         });
 
         return builder.exec();
@@ -106,28 +106,28 @@ namespace vh::test::integration {
             .name = "FUSE deny: ls seed",
             .path = "fuse/ls",
             .expect_exit = EACCES,
-            .fn = [=]{ return ls_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return ls_as(subj.uid, ctx.base()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE deny: read secret",
             .path = "fuse/read",
             .expect_exit = EACCES,
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE deny: write hax",
             .path = "fuse/write",
             .expect_exit = EACCES,
-            .fn = [=]{ return write_as(subj.uid, ctx.getBaseDir() / "docs" / "hax.txt", "nope\n"); }
+            .fn = [=]{ return write_as(subj.uid, ctx.docs() / "hax.txt", "nope\n"); }
         });
 
         builder.makeTestCase({
             .name = "FUSE deny: rm -rf seed",
             .path = "fuse/rmrf",
             .expect_exit = EACCES,
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();
@@ -154,27 +154,27 @@ namespace vh::test::integration {
             .subjectType = TargetSubject::User,
             .permName = "vault.fs.file.download",
             .effect = permission::OverrideOpt::ALLOW,
-            .pattern = ctx.getBaseDir() / "docs" / "*.txt"
+            .pattern = ctx.docs() / "*.txt"
         });
 
         builder.makeTestCase({
             .name = "FUSE override allow: read secret",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE deny: read note",
             .path = "fuse/read",
             .expect_exit = EACCES,
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "note.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.note()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE deny: rm -rf seed",
             .path = "fuse/rmrf",
             .expect_exit = EACCES,
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();
@@ -201,26 +201,26 @@ namespace vh::test::integration {
             .subjectType = TargetSubject::User,
             .permName = "vault.fs.file.download",
             .effect = permission::OverrideOpt::DENY,
-            .pattern = ctx.getBaseDir() / "docs" / "*.txt"
+            .pattern = ctx.base() / "docs" / "*.txt"
         });
 
         builder.makeTestCase({
             .name = "FUSE override deny: read secret",
             .path = "fuse/read",
             .expect_exit = EACCES,
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
         
         builder.makeTestCase({
             .name = "FUSE allow: read note",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "note.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.note()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: rm -rf seed",
             .path = "fuse/rmrf",
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();
@@ -248,20 +248,20 @@ namespace vh::test::integration {
         builder.makeTestCase({
             .name = "FUSE allow: ls seed",
             .path = "fuse/ls",
-            .fn = [=]{ return ls_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return ls_as(subj.uid, ctx.base()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: read secret",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: write user_note",
             .path = "fuse/write",
             .must_contain = {"OK write"},
-            .fn = [=]{ return write_as(subj.uid, ctx.getBaseDir() / "docs" / "user_note.txt", "hey\n"); }
+            .fn = [=]{ return write_as(subj.uid, ctx.note(), "hey\n"); }
         });
 
         return builder.exec();
@@ -290,26 +290,26 @@ namespace vh::test::integration {
             .subjectType = TargetSubject::Group,
             .permName = "vault.fs.file.download",
             .effect = permission::OverrideOpt::DENY,
-            .pattern = ctx.getBaseDir() / "docs" / "*.txt"
+            .pattern = ctx.docs() / "*.txt"
         });
 
         builder.makeTestCase({
             .name = "FUSE override deny: read secret",
             .path = "fuse/read",
             .expect_exit = EACCES,
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: read note",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "note.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.note()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: rm -rf seed",
             .path = "fuse/rmrf",
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();
@@ -317,7 +317,7 @@ namespace vh::test::integration {
 
     static TestStage testFUSEUserOverridesGroupOverride() {
         auto builder = Builder::make({
-            .name = "User Overrides Group Override",
+            .name = "User Vault Perm Override - Overrides Group Vault Perm Override",
             .baseDir = "user_override_group_override_seed"
         });
 
@@ -341,36 +341,38 @@ namespace vh::test::integration {
             .description = "Vault role for testing user override perms",
         });
 
+        const auto pattern = ctx.docs() / "*.txt";
+
         builder.makeOverride({
             .subjectType = TargetSubject::Group,
             .permName = "vault.fs.file.download",
             .effect = permission::OverrideOpt::DENY,
-            .pattern = ctx.getBaseDir() / "docs" / "*.txt"
+            .pattern = pattern
         });
 
         builder.makeOverride({
             .subjectType = TargetSubject::User,
             .permName = "vault.fs.file.download",
             .effect = permission::OverrideOpt::ALLOW,
-            .pattern = ctx.getBaseDir() / "docs" / "*.txt"
+            .pattern = pattern
         });
 
         builder.makeTestCase({
             .name = "FUSE override user allow/group deny: read secret",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "docs" / "secret.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.secret()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: read note",
             .path = "fuse/read",
-            .fn = [=]{ return read_as(subj.uid, ctx.getBaseDir() / "note.txt"); }
+            .fn = [=]{ return read_as(subj.uid, ctx.note()); }
         });
 
         builder.makeTestCase({
             .name = "FUSE allow: rm -rf seed",
             .path = "fuse/rmrf",
-            .fn = [=]{ return rmrf_as(subj.uid, ctx.getBaseDir()); }
+            .fn = [=]{ return rmrf_as(subj.uid, ctx.base()); }
         });
 
         return builder.exec();

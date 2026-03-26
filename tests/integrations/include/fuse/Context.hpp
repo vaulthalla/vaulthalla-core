@@ -47,7 +47,11 @@ namespace vh::test::integration::fuse {
         std::string baseDir;
         std::vector<FuseStep> steps{};
 
-        [[nodiscard]] std::filesystem::path getBaseDir() const { return root / baseDir; }
+        [[nodiscard]] std::filesystem::path base() const { return root / baseDir; }
+        [[nodiscard]] std::filesystem::path docs() const { return base() / "docs"; }
+        [[nodiscard]] std::filesystem::path secret() const { return docs() / "secret.txt"; }
+        [[nodiscard]] std::filesystem::path note() const { return base() / "note.txt"; }
+        [[nodiscard]] std::filesystem::path hello() const { return base() / "hello.txt"; }
     };
 
     struct FuseTestCaseSpec {

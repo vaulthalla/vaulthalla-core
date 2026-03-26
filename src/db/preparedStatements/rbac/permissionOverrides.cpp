@@ -1,6 +1,6 @@
 #include "db/DBConnection.hpp"
 
-void vh::db::DBConnection::initPreparedPermOverrides() const {
+void vh::db::Connection::initPreparedPermOverrides() const {
     conn_->prepare(
         "get_permission_override_by_vault_subject_and_bitpos",
         R"SQL(

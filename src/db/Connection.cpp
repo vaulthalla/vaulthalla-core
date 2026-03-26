@@ -42,7 +42,7 @@ static std::optional<std::string> getFirstInitDBPass() {
     return pass;
 }
 
-DBConnection::DBConnection() : tpmKeyProvider_(
+Connection::Connection() : tpmKeyProvider_(
     std::make_unique<secrets::TPMKeyProvider>(paths::testMode ? "test_psql" : "psql")) {
     if (paths::testMode) {
         const auto user = std::getenv("VH_TEST_DB_USER");
@@ -92,11 +92,11 @@ DBConnection::DBConnection() : tpmKeyProvider_(
     conn_ = std::make_unique<pqxx::connection>(DB_CONNECTION_STR);
 }
 
-DBConnection::~DBConnection() { if (conn_ && conn_->is_open()) conn_->close(); }
+Connection::~Connection() { if (conn_ && conn_->is_open()) conn_->close(); }
 
-pqxx::connection& DBConnection::get() const { return *conn_; }
+pqxx::connection& Connection::get() const { return *conn_; }
 
-void DBConnection::initPrepared() const {
+void Connection::initPrepared() const {
     if (!conn_ || !conn_->is_open()) throw std::runtime_error("Database connection is not open");
 
     // Auth

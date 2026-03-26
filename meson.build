@@ -55,6 +55,7 @@ conf.set_quoted('VH_RUNTIME_PATH', runtime_dir)
 conf.set_quoted('VH_CACHE_PATH', '/.cache')
 conf.set_quoted('VH_PSQL_SCHEMAS_PATH', psql_dir)
 conf.set_quoted('VH_PSQL_TEST_SCHEMAS_PATH', join_paths(source_root, 'deploy/psql'))
+conf.set_quoted('VH_TEST_ENV_PATH', join_paths(source_root, 'deploy/vaulthalla.env'))
 
 vh_paths_header = configure_file(
     input: 'deploy/path/paths.h.in',

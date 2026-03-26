@@ -1,6 +1,6 @@
 #include "db/DBConnection.hpp"
 
-void vh::db::DBConnection::initPreparedUsers() const {
+void vh::db::Connection::initPreparedUsers() const {
     conn_->prepare("insert_user",
                    "INSERT INTO users (name, email, password_hash, is_active, linux_uid, last_modified_by) "
                    "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id");

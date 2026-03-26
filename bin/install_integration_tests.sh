@@ -20,7 +20,6 @@ fi
 echo "🔍 Build mode: ${VH_BUILD_MODE:-unset}"
 echo "🔍 Dev mode active: $DEV_MODE"
 
-BUILD_MANPAGE=false
 CLEAN_BUILD=false
 
 # parse command line arguments
@@ -30,14 +29,8 @@ while [[ $# -gt 0 ]]; do
           CLEAN_BUILD=true
           shift
           ;;
-        -m|--manpage)
-            BUILD_MANPAGE=true
-            shift
-            ;;
         -h|--help)
             echo "Usage: $0 [options]"
-            echo "  -d, --dev        Enable dev mode (e.g., debug build)"
-            echo "  -m, --manpage    Build and install manpage"
             echo "  -h, --help       Show this help"
             exit 0
             ;;
@@ -51,18 +44,8 @@ done
 
 # Construct Meson setup args
 MESON_ARGS=()
-
-if [[ "$DEV_MODE" == true ]]; then
-    MESON_ARGS+=("-Dbuildtype=debug")
-else
-    MESON_ARGS+=("-Dbuildtype=release")
-fi
-
-if [[ "$BUILD_MANPAGE" == true ]]; then
-    MESON_ARGS+=("-Dmanpage=true")
-else
-    MESON_ARGS+=("-Dmanpage=false")
-fi
+MESON_ARGS+=("-Dbuildtype=debug")
+MESON_ARGS+=("-Dintegration_tests=true")
 
 echo "Setting up build with:"
 printf '  %s\n' "${MESON_ARGS[@]}"
@@ -99,7 +82,7 @@ sudo meson install -C build
 sudo ldconfig
 
 # === 4) Setup Database ===
-./bin/setup/install_db.sh
+./bin/tests/install_db.sh
 
-# === 5) Install systemd service ===
-./bin/setup/install_systemd.sh
+# === 5) Run Tests ===
+sudo bash --rcfile './deploy/vaulthalla.env' -i -c "./build/vh_integration_tests"

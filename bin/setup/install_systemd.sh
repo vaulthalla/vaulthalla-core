@@ -1,13 +1,6 @@
-DEV_MODE=false
+source "$(dirname "$0")/../lib/dev_mode.sh"
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -d|--dev)
-            DEV_MODE=true
-            shift
-            ;;
-    esac
-done
+vh_require_dev_mode
 
 echo "🛠️  Installing systemd service..."
 

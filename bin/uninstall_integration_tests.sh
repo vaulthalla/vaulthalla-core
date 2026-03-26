@@ -15,26 +15,17 @@ fi
 echo "🔍 Build mode: ${VH_BUILD_MODE:-unset}"
 echo "🔍 Dev mode active: $DEV_MODE"
 
-# === Make sure FUSE is fully unmounted ===
-./bin/teardown/unmount_fuse.sh
-
-# === 1) Stop and disable systemd service (if exists) ===
-./bin/teardown/uninstall_systemd.sh
-
-# === 2) Remove binaries ===
+# === 1) Remove binaries ===
 ./bin/teardown/uninstall_binaries.sh
 
-# === 3) Remove runtime and config dirs ===
+# === 2) Remove runtime and config dirs ===
 ./bin/teardown/uninstall_dirs.sh
 
-# === 4) Remove system user ===
+# === 3) Remove system user ===
 ./bin/teardown/uninstall_users.sh
 
-# === 5) Drop PostgreSQL DB and user ===
-./bin/teardown/uninstall_db.sh
-
-# === 6) Uninstall Deps ===
-./bin/teardown/uninstall_deps.sh
+# === 4) Drop PostgreSQL DB and user ===
+./bin/tests/uninstall_db.sh
 
 # === Done ===
 echo

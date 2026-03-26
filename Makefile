@@ -26,10 +26,15 @@ dev:
 	@echo "🛡️  Running install script..."
 	./bin/install.sh
 
-integration_tests:
+test:
 	./bin/uninstall_integration_tests.sh
 	@echo "🛡️  Running integration tests install script..."
 	./bin/install_integration_tests.sh
+
+run_test:
+	./bin/uninstall_integration_tests.sh
+	@echo "🛡️  Running integration tests install script..."
+	./bin/install_integration_tests.sh --run
 
 deb:
 	@echo "🔧 Building Debian package..."

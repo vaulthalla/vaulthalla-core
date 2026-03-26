@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sstream>
 
 namespace vh::rbac::fs::policy {
     struct Decision {
@@ -34,4 +35,6 @@ namespace vh::rbac::fs::policy {
 
         [[nodiscard]] std::string toString() const;
     };
+
+    std::string reasonToString(const Decision::Reason& reason);
 }

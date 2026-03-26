@@ -31,7 +31,6 @@ static void initBase() {
 
 static void initDB() {
     vh::db::Transactions::init();
-
     vh::db::seed::wipe_all_data_restart_identity();
     vh::db::seed::init_tables_if_not_exists();
     vh::db::Transactions::dbPool_->initPreparedStatements();

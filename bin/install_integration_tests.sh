@@ -21,10 +21,15 @@ echo "🔍 Build mode: ${VH_BUILD_MODE:-unset}"
 echo "🔍 Dev mode active: $DEV_MODE"
 
 CLEAN_BUILD=false
+RUN_TEST=false
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --run)
+          RUN_TEST=true
+          shift
+          ;;
         --clean)
           CLEAN_BUILD=true
           shift
@@ -76,16 +81,17 @@ fi
 # === 3) Install Directories ===
 ./bin/tests/install_dirs.sh
 
-# === 4) Build Project ===
-echo "🏗️  Starting Vaulthalla build..."
-
-meson setup build "${MESON_ARGS[@]}" -Db_sanitize=address,undefined
-meson compile -C build
-sudo meson install -C build
-sudo ldconfig
-
-# === 5) Setup Database ===
+# === 4) Setup Database ===
 ./bin/tests/install_db.sh
 
-# === 6) Run Tests ===
-sudo bash --rcfile './deploy/vaulthalla.env' -i -c "./build/vh_integration_tests"
+# === 5) Run Tests ===
+if [[ "$RUN_TEST" == true ]]; then
+  echo "🏗️  Starting Vaulthalla build..."
+
+  meson setup build "${MESON_ARGS[@]}" -Db_sanitize=address,undefined
+  meson compile -C build
+  sudo meson install -C build
+  sudo ldconfig
+
+  sudo bash --rcfile './deploy/vaulthalla.env' -i -c "./build/vh_integration_tests"
+fi

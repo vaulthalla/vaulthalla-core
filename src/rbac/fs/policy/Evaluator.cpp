@@ -205,7 +205,7 @@ std::optional<Decision> Evaluator::resolveTarget(const Request &req, TargetConte
             .reason = Decision::Reason::MissingPathAndEntry
         };
 
-    if ((req.action == Action::Touch || req.action == Action::Upload) && !req.hasPath())
+    if ((req.action == Action::Touch || req.action == Action::Upload) && (!req.hasPath()))
         return Decision{
             .allowed = false,
             .reason = Decision::Reason::MissingPath

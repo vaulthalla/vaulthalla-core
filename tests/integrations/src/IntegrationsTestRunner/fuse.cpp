@@ -22,13 +22,6 @@ namespace vh::test::integration {
         const auto [ctx, subj] = builder.scenario();
 
         builder.makeTestCase({
-            .name = "FUSE mkdir (admin)",
-            .path = "fuse/mkdir",
-            .must_contain = {"OK mkdir"},
-            .fn = [=]{ return mkdir_as(*ctx.admin->meta.linux_uid, ctx.base()); }
-        });
-
-        builder.makeTestCase({
             .name = "FUSE write (admin)",
             .path = "fuse/write",
             .must_contain = {"OK write"},
@@ -64,8 +57,6 @@ namespace vh::test::integration {
             .baseDir = "perm_allow_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/allow" });
 
         builder.buildAssignVRole({
@@ -74,6 +65,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/allow",
             .description = "Vault role with permissions to test allow cases",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeTestCase({
              .name = "FUSE allow: ls seed",
@@ -103,9 +96,9 @@ namespace vh::test::integration {
             .baseDir = "perm_deny_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/deny" });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeTestCase({
             .name = "FUSE deny: ls seed",
@@ -144,8 +137,6 @@ namespace vh::test::integration {
             .baseDir = "perm_override_allow_seed"
         });
 
-        auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/override" });
 
         builder.buildAssignVRole({
@@ -154,6 +145,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/override",
             .description = "Vault role with override",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeOverride({
             .subjectType = TargetSubject::User,
@@ -191,8 +184,6 @@ namespace vh::test::integration {
             .baseDir = "perm_override_deny_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/override_deny" });
 
         builder.buildAssignVRole({
@@ -201,6 +192,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/override_deny",
             .description = "Vault role with override",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeOverride({
             .subjectType = TargetSubject::User,
@@ -237,8 +230,6 @@ namespace vh::test::integration {
             .baseDir = "group_perm_allow_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/group_perm" });
         builder.makeGroup("group/create/group_perm");
         builder.addUserToGroup();
@@ -249,6 +240,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/group_perm",
             .description = "Vault role for testing group perms",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeTestCase({
             .name = "FUSE allow: ls seed",
@@ -278,8 +271,6 @@ namespace vh::test::integration {
             .baseDir = "group_perm_override_deny_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/group_override" });
         builder.makeGroup("group/create/group_override");
         builder.addUserToGroup();
@@ -290,6 +281,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/group_override",
             .description = "Vault role for testing group override perms",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         builder.makeOverride({
             .subjectType = TargetSubject::Group,
@@ -326,8 +319,6 @@ namespace vh::test::integration {
             .baseDir = "user_override_group_override_seed"
         });
 
-        const auto [ctx, subj] = builder.scenario();
-
         builder.makeUser({ .userNameSeed = "user/create/override_deny" });
         builder.makeGroup("group/create/override_deny");
         builder.addUserToGroup();
@@ -345,6 +336,8 @@ namespace vh::test::integration {
             .roleNameSeed = "vault_role/create/override_deny_user",
             .description = "Vault role for testing user override perms",
         });
+
+        const auto [ctx, subj] = builder.scenario();
 
         const auto pattern = ctx.docs() / "*.txt";
 

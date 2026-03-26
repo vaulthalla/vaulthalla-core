@@ -65,7 +65,7 @@ namespace vh::fuse {
 
         out.user = db::query::identities::User::getUserByLinuxUID(uid);
         if (!out.user) {
-            log::Registry::fuse()->error("[{}] No user found for UID {}", req.caller, uid);
+            log::Registry::fuse()->debug("[{}] No user found for UID {}", req.caller, uid);
             out.setStatus(Status::MissingUser, EACCES);
             return false;
         }
@@ -113,7 +113,7 @@ namespace vh::fuse {
             try {
                 out.path = runtime::Deps::get().fsCache->resolvePath(*req.parentIno) / *req.childName;
             } catch (const std::exception &e) {
-                log::Registry::fuse()->error("[{}] Failed to resolve path: {}", req.caller, e.what());
+                log::Registry::fuse()->debug("[{}] Failed to resolve path: {}", req.caller, e.what());
                 out.setStatus(Status::MissingPath, ENOENT);
                 return false;
             }
@@ -141,7 +141,7 @@ namespace vh::fuse {
 
         out.entry = runtime::Deps::get().fsCache->getEntry(*out.path);
         if (!out.entry) {
-            log::Registry::fuse()->error("[{}] Failed to resolve entry for path {}", req.caller,
+            log::Registry::fuse()->debug("[{}] Failed to resolve entry for path {}", req.caller,
                                          out.path->string());
             out.setStatus(Status::MissingEntry, ENOENT);
             return false;
@@ -180,8 +180,11 @@ namespace vh::fuse {
         const bool checkPath =
                 resolver::hasFlag(req.target, Target::Path);
 
+        if (out.entry && (!out.path || out.path->empty()))
+            out.path = out.engine->paths->absRelToAbsRel(out.entry->path, fs::model::PathType::VAULT_ROOT, fs::model::PathType::FUSE_ROOT);
+
         if (req.action) {
-            if (checkEntry && !enforcePermission(out.user, *req.action, out.entry)) {
+            if (checkEntry && !enforcePermission(out.user, *req.action, out.entry, out.path)) {
                 out.setStatus(Status::AccessDenied, EACCES);
                 return false;
             }
@@ -194,7 +197,7 @@ namespace vh::fuse {
 
         if (!req.actions.empty()) {
             for (const auto &action: req.actions) {
-                if (checkEntry && !enforcePermission(out.user, action, out.entry)) {
+                if (checkEntry && !enforcePermission(out.user, action, out.entry, out.path)) {
                     out.setStatus(Status::AccessDenied, EACCES);
                     return false;
                 }
@@ -221,7 +224,7 @@ namespace vh::fuse {
                 out.engine = runtime::Deps::get().storageManager->resolveStorageEngine(*out.path);
 
             if (out.engine && out.path) out.vaultPath = out.engine->paths->absRelToAbsRel(
-                                            *out.path, fs::model::PathType::FUSE_ROOT, fs::model::PathType::FUSE_ROOT);
+                                            *out.path, fs::model::PathType::FUSE_ROOT, fs::model::PathType::VAULT_ROOT);
             if (!out.engine) {
                 out.setStatus(Status::MissingEngine, EIO);
                 return false;

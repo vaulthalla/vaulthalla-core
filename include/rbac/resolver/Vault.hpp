@@ -18,6 +18,7 @@
 #include "db/query/identities/Group.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/Path.hpp"
+#include "rbac/fs/policy/Evaluator.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -39,6 +40,31 @@ namespace vh::rbac::resolver {
             return vault::ContextPolicy<EnumT>::validate(user, resolved, permission, ctx);
         }
 
+        static bool checkFilesystemPermission(
+            const std::shared_ptr<identities::User> &user,
+            const vault::ResolvedContext &resolved,
+            const vault::Context<permission::vault::FilesystemAction> &ctx,
+            permission::vault::FilesystemAction permission
+        ) {
+            if (!user || !resolved.isValid()) return false;
+
+            const fs::policy::Request req{
+                .user = user,
+                .action = permission,
+                .vaultId = resolved.vault ? std::optional<uint32_t>{resolved.vault->id} : ctx.vault_id,
+                .path = ctx.path,
+                .entry = ctx.entry
+            };
+
+            const auto decision = fs::policy::Evaluator::evaluate(req);
+            if (!decision.allowed) {
+                log::Registry::auth()->warn("Filesystem permission denied. Context:\n{}", decision.toString());
+                return false;
+            }
+
+            return vault::ContextPolicy<permission::vault::FilesystemAction>::validate(user, resolved, permission, ctx);
+        }
+
         template<typename EnumT>
         static bool checkSinglePermissionTraits(
             const std::shared_ptr<identities::User> &user,
@@ -46,30 +72,17 @@ namespace vh::rbac::resolver {
             const vault::Context<EnumT> &ctx,
             const EnumT permission
         ) {
+            const auto &globalPerms = user->vaultGlobals();
             bool allowed = false;
-            const auto vaultId = resolved.vault->id;
 
-            if (user->hasDirectVaultRole(vaultId)) {
-                const auto role = user->getDirectVaultRole(vaultId);
-                if (!role) return false;
-
-                if (VaultResolverTraits<EnumT>::direct(*role).has(permission))
-                    allowed = true;
-            }
-
-            if (!allowed) {
-                const auto &globalPerms = user->vaultGlobals();
-
-                if (user->id == resolved.vault->owner_id)
-                    allowed = VaultResolverTraits<EnumT>::self(globalPerms.self).has(permission);
-                else if (resolved.owner->isAdmin())
-                    allowed = VaultResolverTraits<EnumT>::admin(globalPerms.admin).has(permission);
-                else
-                    allowed = VaultResolverTraits<EnumT>::user(globalPerms.user).has(permission);
-            }
+            if (user->id == resolved.vault->owner_id)
+                allowed = VaultResolverTraits<EnumT>::self(globalPerms.self).has(permission);
+            else if (resolved.owner->isAdmin())
+                allowed = VaultResolverTraits<EnumT>::admin(globalPerms.admin).has(permission);
+            else
+                allowed = VaultResolverTraits<EnumT>::user(globalPerms.user).has(permission);
 
             if (!allowed) return false;
-
             return vault::ContextPolicy<EnumT>::validate(user, resolved, permission, ctx);
         }
 
@@ -103,7 +116,9 @@ namespace vh::rbac::resolver {
 
             if (!user || !resolved.isValid()) return false;
 
-            if constexpr (VaultResolverMode<EnumT>::policy_only)
+            if constexpr (std::is_same_v<EnumT, permission::vault::FilesystemAction>)
+                return checkFilesystemPermission(user, resolved, ctx, permission);
+            else if constexpr (VaultResolverMode<EnumT>::policy_only)
                 return checkSinglePermissionPolicyOnly(user, resolved, ctx, permission);
             else
                 return checkSinglePermissionTraits(user, resolved, ctx, permission);

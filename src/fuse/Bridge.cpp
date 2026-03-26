@@ -156,7 +156,7 @@ void readdir(const fuse_req_t req, const fuse_ino_t ino, const size_t size, cons
 }
 
 void lookup(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
-    log::Registry::fuse()->error("[lookup] Called for parent: {}, name: {}", parent, name);
+    log::Registry::fuse()->debug("[lookup] Called for parent: {}, name: {}", parent, name);
 
     const auto resolved = Resolver::resolve({
         .caller = "lookup",
@@ -410,7 +410,7 @@ void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) 
         return;
     }
 
-    log::Registry::fuse()->error("[forget] No entry found for inode {}", ino);
+    log::Registry::fuse()->debug("[forget] No entry found for inode {}", ino);
     fuse_reply_none(req); // no return value
 }
 
@@ -488,7 +488,7 @@ void rmdir(const fuse_req_t req, const fuse_ino_t parent, const char* name) {
     db::query::fs::Directory::deleteEmptyDirectory(resolved.entry->id);
 
     if (::rmdir(resolved.entry->backing_path.c_str()) < 0)
-        log::Registry::fuse()->error("[rmdir] Failed to remove backing directory: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
+        log::Registry::fuse()->warn("[rmdir] Failed to remove backing directory: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
 
     fuse_reply_err(req, 0);
 }
@@ -507,13 +507,13 @@ void release(const fuse_req_t req, const fuse_ino_t ino, fuse_file_info* fi) {
 
     const auto* fh = reinterpret_cast<FileHandle*>(fi->fh);
     if (!fh) {
-        log::Registry::fuse()->error("[release] Invalid file handle for inode: {}", ino);
+        log::Registry::fuse()->debug("[release] Invalid file handle for inode: {}", ino);
         fuse_reply_err(req, EBADF);
         return;
     }
 
     if (::close(fh->fd) < 0)
-        log::Registry::fuse()->error("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
+        log::Registry::fuse()->debug("[release] Failed to close file handle: {}: {}", fh->path.string(), strerror(errno));
 
     delete fh;  // clean up heap allocation
     fi->fh = 0; // clear the kernel-side handle
@@ -541,7 +541,7 @@ void fsync(const fuse_req_t req, const fuse_ino_t ino, const int datasync, fuse_
     }
 
     if (const int fd = fi->fh; ::fsync(fd) < 0) {
-        log::Registry::fuse()->error("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
+        log::Registry::fuse()->debug("[fsync] Failed to sync file handle: {}: {}", fd, strerror(errno));
         fuse_reply_err(req, errno);
         return;
     }
@@ -568,7 +568,7 @@ void statfs(const fuse_req_t req, const fuse_ino_t ino) {
     struct statvfs st{};
 
     if (::statvfs(resolved.entry->backing_path.c_str(), &st) < 0) {
-        log::Registry::fuse()->error("[statfs] Failed to get filesystem stats for: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
+        log::Registry::fuse()->debug("[statfs] Failed to get filesystem stats for: {}: {}", resolved.entry->backing_path.string(), strerror(errno));
         fuse_reply_err(req, errno);
         return;
     }

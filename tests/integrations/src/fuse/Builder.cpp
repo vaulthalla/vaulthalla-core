@@ -197,20 +197,18 @@ std::vector<std::shared_ptr<test::integration::TestCase>> Builder::runSteps() co
         // Map into TestCase::result
         s.tc->result.exit_code  = exec.exit_code;
         s.tc->result.stdout_text = exec.stdout_text;
-        s.tc->result.stderr_text.clear(); // FUSE ops print only to stdout in our helpers
+        s.tc->result.stderr_text = exec.stderr_text;
 
-        // Pre-evaluate expectation (validateStage can still re-check if you prefer)
-        bool ok = (s.tc->expect_exit == exec.exit_code);
-        if (ok && !s.tc->must_contain.empty()) {
-            for (const auto& needle : s.tc->must_contain) {
+        // Pre-evaluate expectation (validateStage can still re-check)
+        bool ok = s.tc->expect_exit == exec.exit_code;
+        if (ok && !s.tc->must_contain.empty())
+            for (const auto& needle : s.tc->must_contain)
                 if (s.tc->result.stdout_text.find(needle) == std::string::npos) { ok = false; break; }
-            }
-        }
-        if (ok && !s.tc->must_not_contain.empty()) {
-            for (const auto& bad : s.tc->must_not_contain) {
+
+        if (ok && !s.tc->must_not_contain.empty())
+            for (const auto& bad : s.tc->must_not_contain)
                 if (s.tc->result.stdout_text.find(bad) != std::string::npos) { ok = false; break; }
-            }
-        }
+
         s.tc->assertion = ok ? AssertionResult::Pass()
                              : AssertionResult::Fail("FUSE: expectation mismatch (exit/stdout)");
 
@@ -223,4 +221,5 @@ void Builder::addUserToGroup() {
     if (!subject_.user || !subject_.group) throw std::runtime_error("Builder::addUserToGroup(): subject user/group not set");
     db::query::identities::Group::addMemberToGroup(subject_.group->id, subject_.user->id);
     subject_.group = db::query::identities::Group::getGroup(subject_.group->id);
+    subject_.user = db::query::identities::User::getUserById(subject_.user->id);
 }

@@ -173,20 +173,20 @@ Decision Evaluator::evaluate(const Request &req) {
     }
 
     // 3) Global vault filesystem policy: last resort
-    if (user->roles.admin) {
-        auto& global = user->roles.admin->vGlobals.self;
-        if (user->id != engine->vault->owner_id) {
-            const auto owner = runtime::Deps::get().authManager->getUser(engine->vault->owner_id);
-            if (!owner) throw std::runtime_error("User not found with id: " + std::to_string(engine->vault->owner_id));
-            if (owner->isAdmin()) global = user->roles.admin->vGlobals.admin;
-            else global = user->roles.admin->vGlobals.user;
-        }
-
-        if (allowedByBase(global.fs, target.isDir, req.action))
+    std::array vGlobals {
+        user->roles.admin->vGlobals.self,
+        user->roles.admin->vGlobals.admin,
+        user->roles.admin->vGlobals.user
+    };
+    for (const auto& global : vGlobals) {
+        const auto stage = resolveStage(global.fs, target, req.action);
+        if (stage.matched && stage.allowed.has_value())
             return {
-                .allowed = true,
-                .reason = Decision::Reason::AllowedByBasePermissions,
-                .evaluated_path = target.absolutePath
+                .allowed = *stage.allowed,
+                .reason = stage.reason,
+                .evaluated_path = target.absolutePath,
+                .matched_override = stage.matchedOverride,
+                .override_effect = stage.overrideEffect
             };
     }
 
@@ -198,6 +198,11 @@ Decision Evaluator::evaluate(const Request &req) {
     };
 }
 
+[[nodiscard]]
+static bool hasTargetIdentity(const Request &req) noexcept {
+    return req.hasEntry() || req.hasPath();
+}
+
 std::optional<Decision> Evaluator::resolveTarget(const Request &req, TargetContext &out) {
     if (!req.hasEntry() && !req.hasPath())
         return Decision{
@@ -205,13 +210,13 @@ std::optional<Decision> Evaluator::resolveTarget(const Request &req, TargetConte
             .reason = Decision::Reason::MissingPathAndEntry
         };
 
-    if ((req.action == Action::Touch || req.action == Action::Upload) && (!req.hasPath()))
+    out.absolutePath = resolvePath(req);
+
+    if (out.absolutePath.empty())
         return Decision{
             .allowed = false,
             .reason = Decision::Reason::MissingPath
         };
-
-    out.absolutePath = resolvePath(req);
 
     const auto pathObj = std::filesystem::path{out.absolutePath};
 
@@ -220,7 +225,6 @@ std::optional<Decision> Evaluator::resolveTarget(const Request &req, TargetConte
         : runtime::Deps::get().fsCache->getEntry(pathObj);
 
     out.exists = !!out.entry;
-
     out.isDir = out.entry
         ? out.entry->isDirectory()
         : inferIsDirectoryForMissingEntry(req.action);
@@ -304,10 +308,13 @@ Evaluator::StageResult Evaluator::resolveOverrides(
 }
 
 std::string Evaluator::resolvePath(const Request &req) {
-    const auto path = req.hasEntry() ? req.entry->path : *req.path;
+    const auto raw = req.hasEntry() ? req.entry->path : *req.path;
+    auto normalized = raw.lexically_normal().generic_string();
 
-    auto normalized = path.lexically_normal().generic_string();
     if (normalized.empty()) return "/";
+
+    if (normalized[0] != '/')
+        normalized.insert(normalized.begin(), '/');
 
     return normalized;
 }

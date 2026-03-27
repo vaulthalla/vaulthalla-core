@@ -403,14 +403,23 @@ void rename(const fuse_req_t req, const fuse_ino_t parent, const char* name, con
 
 void forget(const fuse_req_t req, const fuse_ino_t ino, const uint64_t nlookup) {
     log::Registry::fuse()->debug("[forget] Called for inode: {}, nlookup: {}", ino, nlookup);
-    if (const auto entry = runtime::Deps::get().fsCache->getEntry(ino)) {
-        log::Registry::fuse()->debug("[forget] Evicting inode: {} (path: {})", ino, entry->path.string());
-        runtime::Deps::get().fsCache->evictIno(ino);
-        fuse_reply_err(req, 0);
+
+    const auto resolved = Resolver::resolve({
+        .caller = "forget",
+        .fuseReq = req,
+        .ino = ino,
+        .target = resolver::Target::EntryForPath
+    });
+
+    if (!resolved.ok()) {
+        log::Registry::fuse()->debug("[forget] No entry found for inode {}: {}", ino, resolved.errnum);
+        fuse_reply_none(req); // still need to reply to avoid hanging the kernel, even if we have nothing to evict
         return;
     }
 
-    log::Registry::fuse()->debug("[forget] No entry found for inode {}", ino);
+    runtime::Deps::get().fsCache->evictIno(ino);
+
+    log::Registry::fuse()->debug("[forget] Evicted inode {}", ino);
     fuse_reply_none(req); // no return value
 }
 

@@ -2,13 +2,13 @@ import { LocalDiskVault, S3Vault, Vault } from '@/models/vaults'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { APIKey, S3APIKey } from '@/models/apiKey'
 import { User } from '@/models/user'
-import { VaultRole, AdminRole, IRole } from '@/models/role'
-import { Permission } from '@/models/permission'
+import { VaultRole, AdminRole, AdminRolePayload, VaultRolePayload, Permission } from '@/models/role'
 import { Settings } from '@/models/settings'
 import { Group } from '@/models/group'
 import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
 
 export interface WebSocketCommandMap {
   // Auth
@@ -78,21 +78,29 @@ export interface WebSocketCommandMap {
 
   // Roles and Permissions
 
-  'role.add': { payload: Partial<VaultRole | AdminRole>; response: { role: VaultRole | AdminRole } }
+  'role.admin.add': { payload: AdminRolePayload; response: { role: AdminRoleDTO } }
 
-  'role.delete': { payload: { id: number }; response: null }
+  'role.admin.update': { payload: AdminRolePayload; response: { role: AdminRoleDTO } }
 
-  'role.update': { payload: Partial<IRole | VaultRole | AdminRole>; response: { role: VaultRole | AdminRole } }
+  'role.admin.delete': { payload: { id: number }; response: { role: AdminRoleDTO } }
 
-  'role.get': { payload: { id: number }; response: { role: VaultRole | AdminRole } }
+  'role.admin.get': { payload: { id: number }; response: { role: AdminRoleDTO } }
 
-  'role.get.byName': { payload: { name: string }; response: { role: VaultRole | AdminRole } }
+  'role.admin.get.byName': { payload: { name: string }; response: { role: AdminRoleDTO } }
 
-  'roles.list': { payload: null; response: { roles: (VaultRole | AdminRole)[] } }
+  'roles.admin.list': { payload: null; response: { roles: AdminRoleDTO[] } }
 
-  'roles.vault.list': { payload: null; response: { roles: VaultRole[] } }
+  'roles.vault.add': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
 
-  'roles.admin.list': { payload: null; response: { roles: AdminRole[] } }
+  'roles.vault.update': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
+
+  'roles.vault.delete': { payload: { id: number }; response: { vault: VaultRoleDTO } }
+
+  'roles.vault.get': { payload: { id: number }; response: { vault: VaultRoleDTO } }
+
+  'roles.vault.get.byName': { payload: { name: string }; response: { vault: VaultRoleDTO } }
+
+  'roles.vault.list': { payload: null; response: { roles: VaultRoleDTO[] } }
 
   'permission.get': { payload: { id: number }; response: { permission: Permission } }
 

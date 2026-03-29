@@ -8,6 +8,31 @@ import {
 } from '@/models/permission'
 import { toDate } from '@/util/toDate'
 
+export class PermissionPayload {
+  constructor(
+    public qualified: string,
+    public value: boolean,
+  ) {}
+}
+
+export type AdminRolePayload = {
+  id?: number
+  type: 'admin'
+  name: string
+  description: string
+  permissions: PermissionPayload[]
+}
+export type VaultRolePayload = {
+  id?: number
+  type: 'vault'
+  name: string
+  description: string
+  permissions: PermissionPayload[]
+  vault_id: number
+  subject_type?: SubjectType | null
+  subject_id?: number | null
+}
+
 export class Permission {
   constructor(
     public bit_position: number,

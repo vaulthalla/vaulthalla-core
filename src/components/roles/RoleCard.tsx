@@ -1,5 +1,5 @@
 import { VaultRole, AdminRole, Permission } from '@/models/role'
-import { motion } from 'framer-motion'
+import * as motion from 'motion/react-client'
 import { permissionIconMap } from '@/util/icons/permissionIconMap'
 import { prettifySnakeCase } from '@/util/prettifySnakeCase'
 import Link from 'next/link'
@@ -138,7 +138,7 @@ const RoleCard = ({ role }: RoleCardProps) => {
   const totalCount = role.permissions.length
 
   return (
-    <Link href={`/roles/${role.id}`} className="block">
+    <Link href={`/roles/${role.type}/${role.id}`} className="block">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

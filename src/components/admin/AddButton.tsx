@@ -9,7 +9,7 @@ interface AddButtonProps {
 
 export const AddButton = ({ title, href }: AddButtonProps) => (
   <Link href={href}>
-    <Button type="button">
+    <Button type="button" className="my-4">
       <Plus className="text-secondary mr-2 fill-current" /> {title}
     </Button>
   </Link>

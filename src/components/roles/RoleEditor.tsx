@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { usePermsStore } from '@/stores/permissionStore'
+import { usePermsStore } from '@/stores/usePermStore'
 import RoleForm, { RoleFormData, RoleType } from '@/components/roles/RoleForm'
 import type { AdminRole, VaultRole } from '@/models/role'
 
@@ -42,7 +42,7 @@ export const RoleEditor = ({ type, mode, defaultValues, redirectTo = '/dashboard
       }
 
       if (data.type === 'vault') await store.fetchVaultRoles()
-      else await store.fetchUserRoles()
+      else await store.fetchAdminRoles()
 
       router.push(redirectTo)
       router.refresh() // nice when server components also depend on this data

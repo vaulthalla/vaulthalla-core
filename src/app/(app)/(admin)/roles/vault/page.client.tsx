@@ -1,10 +1,10 @@
 'use client'
 
-import { usePermsStore } from '@/stores/permissionStore'
 import RolesComponent from '@/components/roles/RolesComponent'
+import { useVaultRoleStore } from '@/stores/useVaultRoleStore'
 
 const VaultRolesClientPage = () => {
-  const { vaultRoles } = usePermsStore()
+  const { vaultRoles } = useVaultRoleStore()
   return <RolesComponent roles={vaultRoles} />
 }
 

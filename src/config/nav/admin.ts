@@ -18,8 +18,8 @@ export const adminNavItems: NavItem[] = [
     href: '/roles',
     icon: ShieldKeyhole,
     subItems: [
-      { label: 'User Roles', href: '/roles/user', icon: UserShield },
-      { label: 'Vault Roles', href: '/roles/vault', icon: VaultShield },
+      { label: 'Admin', href: '/roles/admin', icon: UserShield },
+      { label: 'Vault', href: '/roles/vault', icon: VaultShield },
     ],
   },
   { label: 'Groups', href: '/groups', icon: PeopleGroup },

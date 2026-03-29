@@ -7,7 +7,7 @@ export const AdminSidebar = async ({ config }: { config: NavConfig }) => {
   const btnProps = { isCompact: false }
 
   return (
-    <aside className="hidden h-full w-72 border-r border-white/20 bg-linear-to-b from-white/10 to-black/20 shadow-[0_0_60px_20px_rgba(100,255,255,0.1)] backdrop-blur-xl backdrop-saturate-150 md:block">
+    <aside className="hidden h-full w-80 border-r border-white/20 bg-linear-to-b from-white/10 to-black/20 shadow-[0_0_60px_20px_rgba(100,255,255,0.1)] backdrop-blur-xl backdrop-saturate-150 md:block">
       <div className="flex h-full flex-col space-y-3 p-6">
         <Banner />
         <ToggleNavButton {...btnProps} />

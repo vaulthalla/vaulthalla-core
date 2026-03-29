@@ -13,9 +13,9 @@ const RolesPage = () => {
     <AdminPage {...props}>
       <AdminGrid>
         <RoleCategoryCard
-          title="User Roles"
-          description="Permissions and roles assigned to users."
-          href="/roles/user"
+          title="Admin Roles"
+          description="Administrative permissions and roles assigned to users."
+          href="/roles/admin"
           Icon={UserIcon}
         />
 

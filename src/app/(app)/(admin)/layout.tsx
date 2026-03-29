@@ -20,12 +20,12 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="flex h-screen">
       <AdminSidebar config={adminNav} />
 
-      <div className="flex min-w-0 grow flex-col">
+      <div className="flex max-h-screen min-w-0 grow flex-col overflow-scroll">
         <div className="border-b border-white/10 bg-black/20 p-3 backdrop-blur md:hidden">
           <MobileDrawer mode="admin" title="Admin" />
         </div>
 
-        <main className="min-w-0 grow p-6 md:p-10">{children}</main>
+        <main className="min-w-0 grow p-6 lg:p-8">{children}</main>
       </div>
     </div>
   </RequireAuth>

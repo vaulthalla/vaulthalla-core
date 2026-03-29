@@ -19,8 +19,8 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 $2,
                 $3,
                 $4::global_name,
-                $5::bit(64),
-                $6::bit(64),
+                $5::bit(32),
+                $6::bit(32),
                 $7::bit(32),
                 $8::bit(16)
             )
@@ -38,10 +38,10 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 scope::text                    AS scope,
                 created_at,
                 updated_at,
-                files_permissions::text        AS files_permissions,
-                directories_permissions::text  AS directories_permissions,
-                sync_permissions::text         AS sync_permissions,
-                roles_permissions::text        AS roles_permissions
+                files_permissions::bigint        AS files_permissions,
+                directories_permissions::bigint  AS directories_permissions,
+                sync_permissions::bigint         AS sync_permissions,
+                roles_permissions::bigint        AS roles_permissions
         )SQL"
     );
 
@@ -63,8 +63,8 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 $2,
                 $3,
                 $4::global_name,
-                $5::bit(64),
-                $6::bit(64),
+                $5::bit(32),
+                $6::bit(32),
                 $7::bit(32),
                 $8::bit(16)
             )
@@ -75,10 +75,10 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 scope::text                    AS scope,
                 created_at,
                 updated_at,
-                files_permissions::text        AS files_permissions,
-                directories_permissions::text  AS directories_permissions,
-                sync_permissions::text         AS sync_permissions,
-                roles_permissions::text        AS roles_permissions
+                files_permissions::bigint        AS files_permissions,
+                directories_permissions::bigint  AS directories_permissions,
+                sync_permissions::bigint         AS sync_permissions,
+                roles_permissions::bigint        AS roles_permissions
         )SQL"
     );
 
@@ -92,10 +92,10 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 scope::text                    AS scope,
                 created_at,
                 updated_at,
-                files_permissions::text        AS files_permissions,
-                directories_permissions::text  AS directories_permissions,
-                sync_permissions::text         AS sync_permissions,
-                roles_permissions::text        AS roles_permissions
+                files_permissions::bigint        AS files_permissions,
+                directories_permissions::bigint  AS directories_permissions,
+                sync_permissions::bigint         AS sync_permissions,
+                roles_permissions::bigint        AS roles_permissions
             FROM user_global_vault_policy
             WHERE user_id = $1
               AND scope = $2::global_name
@@ -109,8 +109,8 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
             SET
                 template_role_id        = $3,
                 enforce_template        = $4,
-                files_permissions       = $5::bit(64),
-                directories_permissions = $6::bit(64),
+                files_permissions       = $5::bit(32),
+                directories_permissions = $6::bit(32),
                 sync_permissions        = $7::bit(32),
                 roles_permissions       = $8::bit(16)
             WHERE user_id = $1
@@ -157,10 +157,10 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 scope::text                    AS scope,
                 created_at,
                 updated_at,
-                files_permissions::text        AS files_permissions,
-                directories_permissions::text  AS directories_permissions,
-                sync_permissions::text         AS sync_permissions,
-                roles_permissions::text        AS roles_permissions
+                files_permissions::bigint        AS files_permissions,
+                directories_permissions::bigint  AS directories_permissions,
+                sync_permissions::bigint         AS sync_permissions,
+                roles_permissions::bigint        AS roles_permissions
             FROM user_global_vault_policy
             WHERE user_id = $1
             ORDER BY scope
@@ -177,10 +177,10 @@ void vh::db::Connection::initPreparedGlobalVaultRoles() const {
                 scope::text                    AS scope,
                 created_at,
                 updated_at,
-                files_permissions::text        AS files_permissions,
-                directories_permissions::text  AS directories_permissions,
-                sync_permissions::text         AS sync_permissions,
-                roles_permissions::text        AS roles_permissions
+                files_permissions::bigint        AS files_permissions,
+                directories_permissions::bigint  AS directories_permissions,
+                sync_permissions::bigint         AS sync_permissions,
+                roles_permissions::bigint        AS roles_permissions
             FROM user_global_vault_policy
             ORDER BY user_id, scope
         )SQL"

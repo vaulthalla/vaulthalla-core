@@ -8,7 +8,7 @@
 
 namespace vh::rbac::role::vault { struct Global; }
 
-namespace vh::db::query::rbac::roles::vault {
+namespace vh::db::query::rbac::role::vault {
 
 struct Global {
     using GlobalVaultRole = vh::rbac::role::vault::Global;

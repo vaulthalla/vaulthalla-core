@@ -63,7 +63,7 @@ namespace vh::rbac::permission {
         constexpr void clear() { permissions = 0; }
 
         [[nodiscard]] std::string toBitString() const override {
-            return Base::maskToBitString(static_cast<Mask>(permissions));
+            return Base::maskToBitString(toMask());
         }
 
         [[nodiscard]] Mask toMask() const override {

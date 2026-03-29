@@ -208,7 +208,7 @@ static bool hasTargetIdentity(const Request &req) noexcept {
 }
 
 std::optional<Decision> Evaluator::resolveTarget(const Request &req, TargetContext &out) {
-    if (!req.hasEntry() && !req.hasPath())
+    if (!hasTargetIdentity(req))
         return Decision{
             .allowed = false,
             .reason = Decision::Reason::MissingPathAndEntry

@@ -30,7 +30,19 @@ namespace vh::rbac::role {
         if (const auto id = try_get<uint32_t>(row, "user_id")) user_id = *id;
     }
 
-    Admin::Admin(const pqxx::row &row) : Admin(row, {}) {
+    Admin::Admin(const pqxx::row &row)
+        : Meta(row),
+          identities(static_cast<typename decltype(identities)::Mask>(
+              row["identity_permissions"].as<uint64_t>())),
+          vaults(row["vaults_permissions"].as<typename decltype(vaults)::Mask>()),
+          audits(static_cast<typename decltype(audits)::Mask>(row["audit_permissions"].as<uint64_t>())),
+          settings(static_cast<typename decltype(settings)::Mask>(
+              row["settings_permissions"].as<uint64_t>())),
+          roles(static_cast<typename decltype(roles)::Mask>(
+              row["roles_permissions"].as<uint64_t>())),
+          keys(static_cast<typename decltype(keys)::Mask>(
+              row["keys_permissions"].as<uint64_t>())) {
+        if (const auto id = try_get<uint32_t>(row, "user_id")) user_id = *id;
     }
 
     Admin::Admin(const nlohmann::json &j)

@@ -19,7 +19,7 @@ namespace vh::rbac::permission {
             ModifyOverride = 1 << 5,
             RevokeOverride = 1 << 6,
             ViewOverride = 1 << 7,
-            All = Assign | Modify | Revoke | View
+            All = Assign | Modify | Revoke | View | AssignOverride | ModifyOverride | RevokeOverride | ViewOverride
         };
     }
 
@@ -40,7 +40,7 @@ namespace vh::rbac::permission {
     };
 
     namespace vault {
-        struct Roles final : ModuleSet<uint8_t, RolePermissions, uint8_t> {
+        struct Roles final : ModuleSet<uint16_t, RolePermissions, uint16_t> {
             static constexpr const auto* FLAG_CONTEXT = "roles";
 
             Roles() = default;
@@ -79,6 +79,8 @@ namespace vh::rbac::permission {
                 r.clear();
                 r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
+                r.grant(RolePermissions::ViewOverride);
+                r.grant(RolePermissions::AssignOverride);
                 return r;
             }
 
@@ -87,6 +89,8 @@ namespace vh::rbac::permission {
                 r.clear();
                 r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Modify);
+                r.grant(RolePermissions::ViewOverride);
+                r.grant(RolePermissions::ModifyOverride);
                 return r;
             }
 
@@ -96,6 +100,9 @@ namespace vh::rbac::permission {
                 r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
                 r.grant(RolePermissions::Revoke);
+                r.grant(RolePermissions::ViewOverride);
+                r.grant(RolePermissions::AssignOverride);
+                r.grant(RolePermissions::RevokeOverride);
                 return r;
             }
 
@@ -105,6 +112,11 @@ namespace vh::rbac::permission {
                 r.grant(RolePermissions::View);
                 r.grant(RolePermissions::Assign);
                 r.grant(RolePermissions::Modify);
+                r.grant(RolePermissions::Revoke);
+                r.grant(RolePermissions::ViewOverride);
+                r.grant(RolePermissions::AssignOverride);
+                r.grant(RolePermissions::ModifyOverride);
+                r.grant(RolePermissions::RevokeOverride);
                 return r;
             }
 

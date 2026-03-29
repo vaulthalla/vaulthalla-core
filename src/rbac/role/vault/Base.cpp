@@ -15,9 +15,9 @@ namespace vh::rbac::role::vault {
 
     Base::Base(const pqxx::row &row, const pqxx::result &overrides)
         : roles(static_cast<permission::vault::Roles::Mask>(
-              row["roles_permissions"].as<uint32_t>())),
+              row["roles_permissions"].as<uint64_t>())),
           sync(static_cast<permission::vault::Sync::Mask>(
-              row["sync_permissions"].as<uint32_t>())),
+              row["sync_permissions"].as<uint64_t>())),
           fs(row, overrides) {
     }
 

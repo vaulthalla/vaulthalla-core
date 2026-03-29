@@ -21,7 +21,7 @@ void vh::db::Connection::initPreparedAdminRoles() const {
                 $3,
                 $4::bit(32),
                 $5::bit(8),
-                $6::bit(16),
+                $6::bit(64),
                 $7::bit(16),
                 $8::bit(32),
                 $9::bit(32)
@@ -56,7 +56,7 @@ void vh::db::Connection::initPreparedAdminRoles() const {
                 $2,
                 $3::bit(32),
                 $4::bit(8),
-                $5::bit(16),
+                $5::bit(64),
                 $6::bit(16),
                 $7::bit(32),
                 $8::bit(32)
@@ -94,7 +94,7 @@ void vh::db::Connection::initPreparedAdminRoles() const {
                 $2,
                 $3::bit(32),
                 $4::bit(8),
-                $5::bit(16),
+                $5::bit(64),
                 $6::bit(16),
                 $7::bit(32),
                 $8::bit(32)

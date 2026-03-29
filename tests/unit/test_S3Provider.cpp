@@ -21,7 +21,7 @@ protected:
     inline static std::string bucket_;
     inline static std::shared_ptr<Controller> s3Provider_;
     inline static std::filesystem::path test_dir;
-    inline static bool skipTests;
+    inline static bool skipTests = false;
 
     static void SetUpTestSuite() {
         test_dir = std::filesystem::temp_directory_path() / "vaulthalla_test_dir";

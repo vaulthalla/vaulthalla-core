@@ -1,6 +1,7 @@
 #include "rbac/role/vault/Global.hpp"
 #include "rbac/role/Vault.hpp"
 #include "db/encoding/has.hpp"
+#include "rbac/resolver/permission/all.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
@@ -28,9 +29,72 @@ namespace vh::rbac::role::vault {
           scope(global_vault_role_scope_from_string(j.at("scope").get<std::string>())),
           enforce_template(j.at("enforce_template").get<bool>()) {
         if (j.contains("template_id")) template_role_id = j.at("template_id").get<uint32_t>();
+
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j["permissions"])
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Global>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
     }
 
     Global Global::fromJson(const nlohmann::json &j) { return Global(j); }
+
+    void Global::updateFromJson(const nlohmann::json &j) {
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j["permissions"])
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Global>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
+    }
+
+    std::vector<std::string> Global::getFlags() const {
+        auto rolesFlags = roles.getFlags();
+        auto syncFlags = sync.getFlags();
+        auto filesFlags = fs.files.getFlags();
+        auto dirsFlags = fs.directories.getFlags();
+
+        std::vector<std::string> flags;
+        flags.reserve(rolesFlags.size() + syncFlags.size() + filesFlags.size() + dirsFlags.size());
+
+        auto append = [&](auto &src) { std::move(src.begin(), src.end(), std::back_inserter(flags)); };
+
+        append(rolesFlags);
+        append(syncFlags);
+        append(filesFlags);
+        append(dirsFlags);
+
+        return flags;
+    }
+
+    std::vector<permission::Permission> Global::toPermissions() const {
+        auto rolesPerms = roles.exportPermissions();
+        auto syncPerms = sync.exportPermissions();
+        auto filesPerms = fs.files.exportPermissions();
+        auto dirsPerms = fs.directories.exportPermissions();
+
+        std::vector<permission::Permission> perms;
+        perms.reserve(rolesPerms.size() + syncPerms.size() + filesPerms.size() + dirsPerms.size());
+
+        auto appendMoved = [&](auto &exportResult) {
+            auto &src = exportResult();
+            std::move(src.begin(), src.end(), std::back_inserter(perms));
+        };
+
+        appendMoved(rolesPerms);
+        appendMoved(syncPerms);
+        appendMoved(filesPerms);
+        appendMoved(dirsPerms);
+
+        return perms;
+    }
 
     std::string Global::usage() {
         return formatPermissionTable(

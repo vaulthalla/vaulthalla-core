@@ -25,7 +25,7 @@ namespace vh::protocols::ws::handler::rbac::roles {
         if (!session->user->vaultRolePerms().canDelete())
             throw std::runtime_error("Permission denied: Only admins can remove roles");
 
-        const auto roleId = payload.at("id").get<unsigned int>();
+        const auto roleId = payload.at("id").get<uint32_t>();
         db::query::rbac::role::Vault::remove(roleId);
         return {{"role_id", roleId}};
     }
@@ -34,7 +34,8 @@ namespace vh::protocols::ws::handler::rbac::roles {
         if (!session->user->vaultRolePerms().canEdit())
             throw std::runtime_error("Permission denied: Only admins can update roles");
 
-        auto role = std::make_shared<role::Vault>(payload);
+        auto role = db::query::rbac::role::Vault::get(payload.at("id").get<uint32_t>());
+        role->updateFromJson(payload);
         db::query::rbac::role::Vault::upsert(role);
         return {{"role", *role}};
     }
@@ -43,7 +44,7 @@ namespace vh::protocols::ws::handler::rbac::roles {
         if (!session->user->vaultRolePerms().canView())
             throw std::runtime_error("Permission denied: Only admins can view roles");
 
-        const auto roleId = payload.at("id").get<unsigned int>();
+        const auto roleId = payload.at("id").get<uint32_t>();
         auto role = db::query::rbac::role::Vault::get(roleId);
         if (!role) throw std::runtime_error("Role not found");
         return {{"role", *role}};

@@ -3,6 +3,7 @@
 #include "db/encoding/has.hpp"
 #include "protocols/shell/util/lineHelpers.hpp"
 #include "usages.hpp"
+#include "rbac/resolver/permission/all.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
@@ -35,22 +36,30 @@ namespace vh::rbac::role {
     Admin::Admin(const nlohmann::json &j)
         : Meta(j) {
         if (j.contains("user_id")) user_id = j["user_id"].get<uint32_t>();
-        if (j.contains("permissions")) {
-            const auto &p = j["permissions"];
-            if (p.contains("identities"))
-                identities = permission::admin::Identities(p["identities"].get<typename decltype(identities)::Mask>());
-            if (p.contains("vaults"))
-                vaults = permission::admin::Vaults(p["vaults"].get<typename decltype(vaults)::Mask>());
-            if (p.contains("audits"))
-                audits = permission::admin::Audits(p["audits"].get<typename decltype(audits)::Mask>());
-            if (p.contains("settings"))
-                settings = permission::admin::Settings(p["settings"].get<typename decltype(settings)::Mask>());
-            if (p.contains("roles"))
-                roles = permission::admin::Roles(p["roles"].get<typename decltype(roles)::Mask>());
-            if (p.contains("keys"))
-                keys = permission::admin::Keys(p["keys"].get<typename decltype(keys)::Mask>());
-            if (p.contains("vaults_global")) p.at("vaults_global").get_to(vGlobals);
-        }
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j.at("permissions"))
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Admin>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
+    }
+
+    void Admin::updateFromJson(const nlohmann::json &j) {
+        Meta::updateFromJson(j);
+        if (j.contains("user_id")) user_id = j["user_id"].get<uint32_t>();
+
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j.at("permissions"))
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Admin>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
     }
 
     std::string Admin::usage() {

@@ -37,6 +37,11 @@ namespace vh::rbac::role {
 
     Meta::Meta(const nlohmann::json &json) { from_json(json, *this); }
 
+    void Meta::updateFromJson(const nlohmann::json &j) {
+        if (j.contains("name")) j.at("name").get_to(name);
+        if (j.contains("description")) j.at("description").get_to(description);
+    }
+
     std::string BasicMeta::toString(const uint8_t indent) const {
         const std::string in(indent + 2, ' ');
         std::ostringstream oss;

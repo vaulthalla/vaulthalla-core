@@ -42,6 +42,8 @@ namespace vh::rbac::role {
 
         explicit Meta(const nlohmann::json &json);
 
+        void updateFromJson(const nlohmann::json &j);
+
         [[nodiscard]] std::string toString(uint8_t indent) const override;
     };
 

@@ -13,7 +13,7 @@
 #include <unordered_map>
 
 namespace vh::rbac::role {
-    struct Vault final : Meta, vault::Base {
+    struct Vault final : Meta, vault::Base, std::enable_shared_from_this<Vault> {
         struct AssignmentInfo {
             uint32_t subject_id{}, vault_id{};
             std::string subject_type{}; // 'user' or 'group'
@@ -34,6 +34,8 @@ namespace vh::rbac::role {
         void assign(const uint32_t subject_id, const std::string &subject_type, const uint32_t vault_id) {
             assignment = AssignmentInfo{subject_id, vault_id, subject_type};
         }
+
+        void updateFromJson(const nlohmann::json &j);
 
         [[nodiscard]] static std::string usage();
 

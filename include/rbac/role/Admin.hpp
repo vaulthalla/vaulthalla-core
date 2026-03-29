@@ -12,7 +12,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace vh::rbac::role {
-    struct Admin final : Meta {
+    struct Admin final : Meta, std::enable_shared_from_this<Admin> {
         std::optional<uint32_t> user_id;
 
         permission::admin::Identities identities{};
@@ -44,6 +44,8 @@ namespace vh::rbac::role {
         [[nodiscard]] std::unordered_map<std::string, permission::Permission> toFlagMap() const;
 
         [[nodiscard]] static std::string usage();
+
+        void updateFromJson(const nlohmann::json &j);
 
         static Admin fromJson(const nlohmann::json &j);
 

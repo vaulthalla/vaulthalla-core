@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 namespace vh::rbac::role::vault {
-    struct Global final : BasicMeta, Base {
+    struct Global final : BasicMeta, Base, std::enable_shared_from_this<Global> {
         enum class Scope { Self, User, Admin };
 
         uint32_t user_id{};
@@ -25,6 +25,12 @@ namespace vh::rbac::role::vault {
         explicit Global(const pqxx::row &row);
 
         explicit Global(const nlohmann::json &j);
+
+        void updateFromJson(const nlohmann::json &j);
+
+        [[nodiscard]] std::vector<std::string> getFlags() const;
+
+        [[nodiscard]] std::vector<permission::Permission> toPermissions() const;
 
         [[nodiscard]] static std::string usage();
 

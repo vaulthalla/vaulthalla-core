@@ -1,6 +1,7 @@
 #include "rbac/role/Vault.hpp"
 #include "db/encoding/timestamp.hpp"
 #include "db/encoding/has.hpp"
+#include "rbac/resolver/permission/all.hpp"
 
 #include <pqxx/result>
 #include <nlohmann/json.hpp>
@@ -46,6 +47,40 @@ namespace vh::rbac::role {
             if (j["assignment"].contains("subject_type") && !j["assignment"]["subject_type"].is_null())
                 assignment->subject_type = j["assignment"]["subject_type"].get<std::string>();
         }
+
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j["permissions"])
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Vault>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
+    }
+
+    void Vault::updateFromJson(const nlohmann::json &j) {
+        Meta::updateFromJson(j);
+
+        if (j.contains("assignment") && !j["assignment"].is_null()) {
+            assignment = AssignmentInfo();
+            if (j["assignment"].contains("subject_id") && !j["assignment"]["subject_id"].is_null())
+                assignment->subject_id = j["assignment"]["subject_id"].get<uint32_t>();
+            if (j["assignment"].contains("vault_id") && !j["assignment"]["vault_id"].is_null())
+                assignment->vault_id = j["assignment"]["vault_id"].get<uint32_t>();
+            if (j["assignment"].contains("subject_type") && !j["assignment"]["subject_type"].is_null())
+                assignment->subject_type = j["assignment"]["subject_type"].get<std::string>();
+        }
+
+        if (!j.contains("permissions") || !j["permissions"].is_array()) return;
+
+        std::unordered_map<std::string, bool> pMap;
+        for (const auto& p : j["permissions"])
+            pMap.emplace(p.at("qualified").get<std::string>(), p.at("value").get<bool>());
+
+        using PermResolver = resolver::PermissionResolverEnumPack<std::shared_ptr<Vault>>::type;
+        auto self = shared_from_this();
+        PermResolver::applyPermissionsFromWebCli(self, toPermissions(), pMap);
     }
 
     std::vector<std::string> Vault::getFlags() const {

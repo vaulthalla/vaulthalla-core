@@ -118,7 +118,7 @@ std::string vh::rbac::permission::to_string(const Override &override) {
     std::ostringstream ss;
 
     ss << "ID: " << override.id << "\n"
-            << "Permission: " << override.permission.name << " (" << override.permission.description << ")\n"
+            << "Permission: " << override.permission.qualified_name << " (" << override.permission.description << ")\n"
             << "Glob Path: " << override.glob_path() << "\n"
             << "Effect: " << to_string(override.effect) << "\n"
             << "Enabled: " << (override.enabled ? "On" : "Off") << "\n"
@@ -142,7 +142,7 @@ std::string vh::rbac::permission::to_string(const std::vector<Override> &overrid
     for (const auto &ovr: overrides) {
         tbl.add_row({
             std::to_string(ovr.id),
-            ovr.permission.name,
+            ovr.permission.qualified_name,
             ovr.permission.description,
             ovr.glob_path(),
             to_string(ovr.effect),

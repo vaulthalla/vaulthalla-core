@@ -20,7 +20,7 @@ std::shared_ptr<vh::rbac::permission::Permission> Permission::getPermissionByNam
 
 std::vector<std::shared_ptr<vh::rbac::permission::Permission>> Permission::listPermissions() {
     return Transactions::exec("Permission::listPermissions", [&](pqxx::work& txn) {
-        const auto res = txn.exec("SELECT * FROM permissions");
+        const auto res = txn.exec("SELECT * FROM permission");
         std::vector<std::shared_ptr<vh::rbac::permission::Permission>> out;
         for (const auto& row : res) out.push_back(std::make_shared<vh::rbac::permission::Permission>(row));
         return out;
@@ -29,7 +29,7 @@ std::vector<std::shared_ptr<vh::rbac::permission::Permission>> Permission::listP
 
 unsigned short Permission::countPermissions() {
     return Transactions::exec("Permission::countPermissions", [&](pqxx::work& txn) {
-        return txn.exec("SELECT COUNT(*) FROM permissions")[0][0].as<unsigned short>();
+        return txn.exec("SELECT COUNT(*) FROM permission")[0][0].as<unsigned short>();
     });
 }
 

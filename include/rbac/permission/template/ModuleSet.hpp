@@ -161,14 +161,15 @@ namespace vh::rbac::permission {
                 flags.emplace_back(std::format("--{}-{}-{}", ALLOW_FLAG_ALIAS, dashed, slug));
                 flags.emplace_back(std::format("--{}-{}-{}", DENY_FLAG_ALIAS, dashed, slug));
 
-                *out++ = Permission{
-                    static_cast<uint32_t>(globalBit),
-                    std::move(qualifiedName),
-                    buildPermissionDescription(describer, entry.description, descriptionPrefix),
-                    flags,
-                    static_cast<uint64_t>(raw),
-                    typeid(Enum)
-                };
+                Permission p;
+                p.bit_position = static_cast<uint32_t>(globalBit);
+                p.qualified_name = std::move(qualifiedName);
+                p.description = buildPermissionDescription(describer, entry.description, descriptionPrefix);
+                p.flags = std::move(flags);
+                p.rawValue = static_cast<uint64_t>(raw);
+                p.enumType = typeid(Enum);
+                p.value = has(entry.value);
+                *out++ = p;
             }
         }
 

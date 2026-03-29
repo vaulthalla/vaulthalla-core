@@ -506,12 +506,12 @@ const vh::rbac::permission::Override *Evaluator::findBestOverride(
     for (const auto &o : overrides) {
         if (!o.enabled) continue;
 
-        if (const auto fPerm = permission::vault::fs::Files::resolveFromQualifiedName(o.permission.name); fPerm.has_value()) {
+        if (const auto fPerm = permission::vault::fs::Files::resolveFromQualifiedName(o.permission.qualified_name); fPerm.has_value()) {
             const auto reqPerm = tryParseFilePerm(action);
             if (!reqPerm.has_value() || *fPerm != *reqPerm) continue;
         }
 
-        if (const auto dPerm = permission::vault::fs::Directories::resolveFromQualifiedName(o.permission.name); dPerm.has_value()) {
+        if (const auto dPerm = permission::vault::fs::Directories::resolveFromQualifiedName(o.permission.qualified_name); dPerm.has_value()) {
             const auto reqPerm = tryParseDirectoryPerm(action);
             if (!reqPerm.has_value() || *dPerm != *reqPerm) continue;
         }

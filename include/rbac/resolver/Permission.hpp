@@ -299,7 +299,7 @@ namespace vh::rbac::resolver {
             if constexpr (!HasMutableResolve<Traits, RawRole>)
                 return false;
             else {
-                const auto parts = splitQualifiedName(perm.name);
+                const auto parts = splitQualifiedName(perm.qualified_name);
                 auto *target = Traits::resolve(roleObject(role), parts);
                 if (!target) return false;
                 return applyToSet<Enum>(*target, perm, op);
@@ -314,7 +314,7 @@ namespace vh::rbac::resolver {
             if constexpr (!HasConstResolve<Traits, RawRole>)
                 return false;
             else {
-                const auto parts = splitQualifiedName(perm.name);
+                const auto parts = splitQualifiedName(perm.qualified_name);
                 const auto *target = Traits::resolve(roleObject(role), parts);
                 if (!target) return false;
                 return hasInSet<Enum>(*target, perm);

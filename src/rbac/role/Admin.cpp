@@ -152,15 +152,7 @@ namespace vh::rbac::role {
     void to_json(nlohmann::json &j, const Admin &a) {
         j = static_cast<const Meta &>(a);
         j["user_id"] = a.user_id;
-        j["permissions"] = {
-            {"identities", a.identities},
-            {"vaults", a.vaults},
-            {"audits", a.audits},
-            {"settings", a.settings},
-            {"roles", a.roles},
-            {"keys", a.keys},
-            {"vaults_global", a.vGlobals}
-        };
+        j["permissions"] = a.toPermissions();
     }
 
     void from_json(const nlohmann::json &j, Admin &a) { a = Admin(j); }

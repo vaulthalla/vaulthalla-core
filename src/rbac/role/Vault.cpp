@@ -146,13 +146,8 @@ namespace vh::rbac::role {
     }
 
     void to_json(nlohmann::json &j, const Vault &r) {
-        j = nlohmann::json::object();
-
-        const nlohmann::json meta = static_cast<const Meta &>(r);
-        const nlohmann::json perms = static_cast<const vault::Base &>(r);
-
-        j.update(meta);
-        j.update(perms);
+        j = static_cast<const Meta &>(r);
+        j["permissions"] = r.toPermissions();
 
         if (r.assignment) j["assignment"] = *r.assignment;
     }
@@ -163,7 +158,6 @@ namespace vh::rbac::role {
         const pqxx::result &res, const pqxx::result &overrides) {
         std::unordered_map<uint32_t, std::shared_ptr<Vault> > roles;
         for (const auto &row: res) {
-            // TODO: Either split the overrides by vault id or share a central map pointer
             const auto role = std::make_shared<Vault>(row, overrides);
             roles[role->id] = role;
         }

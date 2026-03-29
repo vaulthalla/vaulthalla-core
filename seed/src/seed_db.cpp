@@ -75,11 +75,11 @@ void vh::seed::initPermissions() {
     db::Transactions::exec("initdb::initPermissions", [&](pqxx::work& txn) {
         for (const auto& p : role::Admin().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
-                pqxx::params{p.name, p.description, "admin", p.bit_position});
+                pqxx::params{p.qualified_name, p.description, "admin", p.bit_position});
 
         for (const auto& p : role::Vault().toPermissions())
             txn.exec(pqxx::prepped{"insert_raw_permission"},
-                pqxx::params{p.name, p.description, "vault", p.bit_position});
+                pqxx::params{p.qualified_name, p.description, "vault", p.bit_position});
     });
 }
 

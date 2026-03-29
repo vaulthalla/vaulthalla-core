@@ -20,12 +20,12 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="flex h-screen">
       <FSRail config={fsNav} />
 
-      <div className="flex min-w-0 grow flex-col">
+      <div className="flex max-h-screen min-w-0 grow flex-col overflow-scroll">
         <div className="border-b border-white/10 bg-black/20 p-3 backdrop-blur md:hidden">
           <MobileDrawer mode="fs" title="Files" />
         </div>
 
-        <main className="container mx-auto my-4 min-w-0 grow">{children}</main>
+        <main className="container mx-auto my-4 min-w-0 grow px-6 lg:px-8">{children}</main>
       </div>
     </div>
   </RequireAuth>

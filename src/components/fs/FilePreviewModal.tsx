@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import * as motion from 'motion/react-client'
+import { AnimatePresence } from 'motion/react'
 import Image from 'next/image'
 import type { File as FileModel } from '@/models/file'
 import { getPreviewUrl } from '@/util/getUrl'

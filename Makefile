@@ -36,6 +36,10 @@ run_test:
 	@echo "🛡️  Running integration tests install script..."
 	./bin/tests/install.sh --run
 
+clean_test:
+	@echo "💣 Running integration tests uninstall script..."
+	./bin/tests/uninstall.sh
+
 deb:
 	@echo "🔧 Building Debian package..."
 	./bin/install_deb.sh

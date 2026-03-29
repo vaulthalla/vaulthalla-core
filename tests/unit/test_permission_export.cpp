@@ -17,7 +17,7 @@ using namespace vh;
 
 class PermExportTest : public ::testing::Test {
 protected:
-    static bool skipTests;
+    inline static bool skipTests = false;
 
     static void SetUpTestSuite() {
         if (!static_cast<bool>(std::getenv("VH_TEST_DB_USER")) ||
@@ -31,7 +31,6 @@ protected:
             return;
         }
 
-        skipTests = false;
         paths::enableTestMode();
         db::Transactions::init();
         db::seed::wipe_all_data_restart_identity();

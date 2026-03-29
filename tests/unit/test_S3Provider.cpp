@@ -17,11 +17,11 @@ using namespace vh::preview;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
 protected:
-    static std::shared_ptr<APIKey> apiKey_;
-    static std::string bucket_;
-    static std::shared_ptr<Controller> s3Provider_;
-    static std::filesystem::path test_dir;
-    static bool skipTests;
+    inline static std::shared_ptr<APIKey> apiKey_;
+    inline static std::string bucket_;
+    inline static std::shared_ptr<Controller> s3Provider_;
+    inline static std::filesystem::path test_dir;
+    inline static bool skipTests;
 
     static void SetUpTestSuite() {
         test_dir = std::filesystem::temp_directory_path() / "vaulthalla_test_dir";
@@ -30,7 +30,8 @@ protected:
         if (!static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY")) ||
             !static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY")) ||
             !static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_REGION")) ||
-            !static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_ENDPOINT"))) {
+            !static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_ENDPOINT")) ||
+            !static_cast<bool>(std::getenv("VAULTHALLA_TEST_R2_BUCKET"))) {
             skipTests = true;
             std::cout << "[test_S3Provider] Skipping S3 tests due to missing environment variables." << std::endl;
             return;

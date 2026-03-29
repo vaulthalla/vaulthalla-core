@@ -16,14 +16,14 @@ using namespace vh::fs::model;
 using namespace vh::preview;
 
 class S3ProviderIntegrationTest : public ::testing::Test {
-  protected:
-    std::shared_ptr<APIKey> apiKey_;
-    std::string bucket_;
-    std::shared_ptr<Controller> s3Provider_;
-    std::filesystem::path test_dir;
-    bool skipTests = false;
+protected:
+    static std::shared_ptr<APIKey> apiKey_;
+    static std::string bucket_;
+    static std::shared_ptr<Controller> s3Provider_;
+    static std::filesystem::path test_dir;
+    static bool skipTests;
 
-    void SetUp() override {
+    static void SetUpTestSuite() {
         test_dir = std::filesystem::temp_directory_path() / "vaulthalla_test_dir";
         std::filesystem::create_directory(test_dir);
 
@@ -37,12 +37,12 @@ class S3ProviderIntegrationTest : public ::testing::Test {
         }
 
         apiKey_ = std::make_shared<APIKey>(1,
-                                                             "Test S3 Key",
-                                                             S3Provider::CloudflareR2,
-                                                             std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY"),
-                                                             std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY"),
-                                                             std::getenv("VAULTHALLA_TEST_R2_REGION"),
-                                                             std::getenv("VAULTHALLA_TEST_R2_ENDPOINT"));
+                                           "Test S3 Key",
+                                           S3Provider::CloudflareR2,
+                                           std::getenv("VAULTHALLA_TEST_R2_ACCESS_KEY"),
+                                           std::getenv("VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY"),
+                                           std::getenv("VAULTHALLA_TEST_R2_REGION"),
+                                           std::getenv("VAULTHALLA_TEST_R2_ENDPOINT"));
 
         bucket_ = std::getenv("VAULTHALLA_TEST_R2_BUCKET");
 
@@ -56,19 +56,20 @@ class S3ProviderIntegrationTest : public ::testing::Test {
         FPDF_InitLibraryWithConfig(&config);
     }
 
-    void TearDown() override {
+    static void TearDownTestSuite() {
         std::filesystem::remove_all(test_dir);
         FPDF_DestroyLibrary();
     }
 
-    static void writeTextFile(const std::filesystem::path& path, const std::string& content) {
+    static void writeTextFile(const std::filesystem::path &path, const std::string &content) {
         std::ofstream out(path);
         out << content;
     }
 };
 
 TEST_F(S3ProviderIntegrationTest, test_DeleteUnicodeFilename) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = u8"Screenshot 2025-06-26 at 3.29.35\u202FPM.png";
     ASSERT_TRUE(std::filesystem::exists(key));
@@ -85,7 +86,8 @@ TEST_F(S3ProviderIntegrationTest, test_DeleteUnicodeFilename) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_BulkUploadDownloadDeleteTestAssets) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::vector<std::filesystem::path> filenames = {
         "sample.jpg",
@@ -95,7 +97,7 @@ TEST_F(S3ProviderIntegrationTest, test_BulkUploadDownloadDeleteTestAssets) {
 
     std::vector<std::filesystem::path> uploadedKeys;
 
-    for (const auto& name : filenames) {
+    for (const auto &name: filenames) {
         const std::filesystem::path src = std::filesystem::path(name);
         ASSERT_TRUE(std::filesystem::exists(src)) << "Test asset missing: " << src;
 
@@ -116,14 +118,15 @@ TEST_F(S3ProviderIntegrationTest, test_BulkUploadDownloadDeleteTestAssets) {
         EXPECT_GT(buffer.size(), 10) << "Buffer too small for: " << relKey;
     }
 
-    for (const auto& key : uploadedKeys) {
+    for (const auto &key: uploadedKeys) {
         std::cout << "Deleting uploaded key: " << key << std::endl;
         EXPECT_NO_THROW(s3Provider_->deleteObject(key)) << "Failed to delete key: " << key;
     }
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"simple-test.txt"};
     const auto filePath = test_dir / key;
@@ -154,7 +157,8 @@ TEST_F(S3ProviderIntegrationTest, test_S3SimpleUploadRoundTrip) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"multipart-test-2.txt"};
 
@@ -188,7 +192,8 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartUploadRoundtrip) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"abort-test.txt"};
 
@@ -205,7 +210,8 @@ TEST_F(S3ProviderIntegrationTest, test_S3MultipartAbortOnFailure) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"list-download-test.txt"};
     const auto filePath = test_dir / key;
@@ -216,7 +222,7 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
 
     const auto entries = fromS3XML(xml);
     EXPECT_FALSE(entries.empty()) << "fromS3XML should return at least one entry";
-    auto match = std::ranges::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+    auto match = std::ranges::find_if(entries.begin(), entries.end(), [&](const auto &entry) {
         return !entry->isDirectory() && entry->path.filename() == key;
     });
     EXPECT_TRUE(match != entries.end()) << "Uploaded key not found in fromS3XML()";
@@ -234,7 +240,8 @@ TEST_F(S3ProviderIntegrationTest, test_S3ListObjectsAndDownloadToBuffer) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"test-image.jpg"};
     const auto srcPath = std::filesystem::path("sample.jpg");
@@ -256,7 +263,8 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressImageBuffer) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     const std::filesystem::path key = {"test-pdf.pdf"};
     const auto srcPath = std::filesystem::path("sample.pdf");
@@ -278,13 +286,15 @@ TEST_F(S3ProviderIntegrationTest, test_ResizeAndCompressPdfBuffer) {
 }
 
 TEST_F(S3ProviderIntegrationTest, test_ValidateS3Credentials) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     EXPECT_NO_THROW(const auto ok = s3Provider_->validateAPICredentials());
 }
 
 TEST_F(S3ProviderIntegrationTest, test_isBucketEmpty) {
-    if (skipTests) GTEST_SKIP() << "Skipping test due to missing environment variables.";
+    if (skipTests)
+        GTEST_SKIP() << "Skipping test due to missing environment variables.";
 
     EXPECT_NO_THROW(const auto _ = s3Provider_->isBucketEmpty());
 }

@@ -8,6 +8,13 @@ option(
 option('manpage', type: 'boolean', value: true, description: 'Build and install manpage via pandoc')
 
 option(
+    'install_data',
+    type: 'boolean',
+    value: true,
+    description: 'Install data files (e.g. systemd unit files, manpage, etc.)'
+)
+
+option(
     'build_unit_tests',
     type: 'boolean',
     value: false,

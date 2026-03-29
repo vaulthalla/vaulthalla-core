@@ -1,5 +1,5 @@
 project('vaulthalla', 'cpp',
-        version: '0.27.0',
+        version: '0.28.0',
         license: 'AGPL-3.0-or-later',
         license_files: ['LICENSE', 'debian/copyright'],
         default_options: [
@@ -203,55 +203,57 @@ endif
 
 # ╭─────────────────────────────────── INSTALLATION ───────────────────────────────────╮
 
-license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', meson.project_name())
-install_data('LICENSE', install_dir: license_dir)
-install_data('debian/copyright', install_dir: license_dir, rename: 'copyright')
+if get_option('install_data')
+    license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', meson.project_name())
+    install_data('LICENSE', install_dir: license_dir)
+    install_data('debian/copyright', install_dir: license_dir, rename: 'copyright')
 
-install_emptydir(runtime_dir, install_mode: ['rwxr-x---', 'vaulthalla', 'vaulthalla'])
-install_emptydir(state_dir, install_mode: ['rwx------', 'vaulthalla', 'vaulthalla'])
-install_emptydir(log_dir, install_mode: ['rwxr-x---', 'vaulthalla', 'vaulthalla'])
-install_emptydir(join_paths('/mnt', meson.project_name()), install_mode: ['rwxr-xr-x', 'vaulthalla', 'vaulthalla'])
+    install_emptydir(runtime_dir, install_mode: ['rwxr-x---', 'vaulthalla', 'vaulthalla'])
+    install_emptydir(state_dir, install_mode: ['rwx------', 'vaulthalla', 'vaulthalla'])
+    install_emptydir(log_dir, install_mode: ['rwxr-x---', 'vaulthalla', 'vaulthalla'])
+    install_emptydir(join_paths('/mnt', meson.project_name()), install_mode: ['rwxr-xr-x', 'vaulthalla', 'vaulthalla'])
 
-install_dir = join_paths(get_option('prefix'), get_option('bindir'))
-install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
-install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
+    install_dir = join_paths(get_option('prefix'), get_option('bindir'))
+    install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
+    install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
 
-if fs.exists('config.yaml')
-    install_data('config.yaml', install_dir: config_dir)
-else
-    install_data('deploy/config/config.yaml', install_dir: config_dir)
+    if fs.exists('config.yaml')
+        install_data('config.yaml', install_dir: config_dir)
+    else
+        install_data('deploy/config/config.yaml', install_dir: config_dir)
+    endif
+
+    if fs.exists('deploy/vaulthalla.env')
+        install_data('deploy/vaulthalla.env', install_dir: config_dir)
+    endif
+
+    install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
+
+    install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
+
+    install_data('debian/tmpfiles.d/vaulthalla.conf',
+                 install_dir: join_paths(get_option('prefix'), get_option('libdir'), 'tmpfiles.d'))
+
+    install_data('debian/vaulthalla.udev',
+                 install_dir: join_paths(get_option('libdir'), 'udev', 'rules.d'),
+                 rename: '60-vaulthalla-tpm.rules')
+
+    install_subdir('deploy/psql', install_dir: data_dir)
+
+    configure_file(
+        input: 'deploy/systemd/vaulthalla.service.in',
+        output: 'vaulthalla.service',
+        configuration: { 'BINDIR': install_dir },
+        install_dir: get_option('systemd_system_unit_dir')
+    )
+
+    configure_file(
+        input: 'deploy/systemd/vaulthalla-cli.service.in',
+        output: 'vaulthalla-cli.service',
+        configuration: { 'BINDIR': install_dir },
+        install_dir: get_option('systemd_system_unit_dir')
+    )
 endif
-
-if fs.exists('deploy/vaulthalla.env')
-    install_data('deploy/vaulthalla.env', install_dir: config_dir)
-endif
-
-install_data('deploy/config/config_template.yaml.in', install_dir: config_dir)
-
-install_data('deploy/systemd/vaulthalla-cli.socket', install_dir: get_option('systemd_system_unit_dir'))
-
-install_data('debian/tmpfiles.d/vaulthalla.conf',
-             install_dir: join_paths(get_option('prefix'), get_option('libdir'), 'tmpfiles.d'))
-
-install_data('debian/vaulthalla.udev',
-             install_dir: join_paths(get_option('libdir'), 'udev', 'rules.d'),
-             rename: '60-vaulthalla-tpm.rules')
-
-install_subdir('deploy/psql', install_dir: data_dir)
-
-configure_file(
-    input: 'deploy/systemd/vaulthalla.service.in',
-    output: 'vaulthalla.service',
-    configuration: { 'BINDIR': install_dir },
-    install_dir: get_option('systemd_system_unit_dir')
-)
-
-configure_file(
-    input: 'deploy/systemd/vaulthalla-cli.service.in',
-    output: 'vaulthalla-cli.service',
-    configuration: { 'BINDIR': install_dir },
-    install_dir: get_option('systemd_system_unit_dir')
-)
 
 
 # ╭────────────────────────────────────── TESTS ────────────────────────────────────────╮

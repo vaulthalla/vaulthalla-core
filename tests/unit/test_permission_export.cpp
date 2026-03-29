@@ -7,14 +7,41 @@
 #include "db/query/rbac/role/Admin.hpp"
 #include "db/query/rbac/role/Vault.hpp"
 #include "db/query/rbac/role/vault/Global.hpp"
+#include "db/Transactions.hpp"
+#include "seed/include/init_db_tables.hpp"
 
+#include <paths.h>
 #include <gtest/gtest.h>
 
 using namespace vh;
 
 class PermExportTest : public ::testing::Test {
 protected:
-    void SetUp() override { /* no op for now */ }
+    static bool skipTests;
+
+    static void SetUpTestSuite() {
+        if (!static_cast<bool>(std::getenv("VH_TEST_DB_USER")) ||
+            !static_cast<bool>(std::getenv("VH_TEST_DB_PSS")) ||
+            !static_cast<bool>(std::getenv("VH_TEST_DB_HOST")) ||
+            !static_cast<bool>(std::getenv("VH_TEST_DB_PORT")) ||
+            !static_cast<bool>(std::getenv("VH_TEST_DB_NAME"))) {
+            skipTests = true;
+            std::cout << "[test_permission_export] Skipping db tests due to missing environment variables." <<
+                    std::endl;
+            return;
+        }
+
+        skipTests = false;
+        paths::enableTestMode();
+        db::Transactions::init();
+        db::seed::wipe_all_data_restart_identity();
+        db::seed::init_tables_if_not_exists();
+        db::Transactions::dbPool_->initPreparedStatements();
+    }
+
+    void SetUp() override {
+        /* no op for now */
+    }
 };
 
 TEST_F(PermExportTest, TestVaultPermExport) {
@@ -34,7 +61,10 @@ TEST_F(PermExportTest, TestAdminPermExport) {
 }
 
 TEST_F(PermExportTest, TestAdminRoleDBRoundTripBitStrings) {
-    auto role = std::make_shared<rbac::role::Admin>(rbac::role::Admin::SuperAdmin());
+    if (skipTests)
+        GTEST_SKIP() << "Skipping db tests due to missing environment variables.";
+
+    const auto role = std::make_shared<rbac::role::Admin>(rbac::role::Admin::SuperAdmin());
     role->id = 0;
     role->name = "test_super_admin_roundtrip";
     role->description = "A test super admin role";
@@ -60,7 +90,10 @@ TEST_F(PermExportTest, TestAdminRoleDBRoundTripBitStrings) {
 }
 
 TEST_F(PermExportTest, TestVaultRoleDBRoundTripBitStrings) {
-    auto role = std::make_shared<rbac::role::Vault>(rbac::role::Vault::PowerUser());
+    if (skipTests)
+        GTEST_SKIP() << "Skipping db tests due to missing environment variables.";
+
+    const auto role = std::make_shared<rbac::role::Vault>(rbac::role::Vault::PowerUser());
     role->id = 0;
     role->name = "test_power_user_vault_roundtrip";
     role->description = "A test power user vault role";
@@ -82,6 +115,9 @@ TEST_F(PermExportTest, TestVaultRoleDBRoundTripBitStrings) {
 }
 
 TEST_F(PermExportTest, TestUserAdminVaultGlobalsDBRoundTripBitStrings) {
+    if (skipTests)
+        GTEST_SKIP() << "Skipping db tests due to missing environment variables.";
+
     const auto user = std::make_shared<identities::User>();
     user->name = "test_user_vglobals_roundtrip";
     user->email = "test_user_vglobals_roundtrip@vaulthalla.test";
@@ -97,13 +133,13 @@ TEST_F(PermExportTest, TestUserAdminVaultGlobalsDBRoundTripBitStrings) {
     ASSERT_NE(user->id, 0u);
 
     user->roles.admin->vGlobals.self =
-        rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::Self);
+            rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::Self);
 
     user->roles.admin->vGlobals.user =
-        rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::User);
+            rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::User);
 
     user->roles.admin->vGlobals.admin =
-        rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::Admin);
+            rbac::role::vault::Global::PowerUser(user->id, rbac::role::vault::Global::Scope::Admin);
 
     const auto selfRolesBefore = user->roles.admin->vGlobals.self.roles.toBitString();
     const auto selfSyncBefore = user->roles.admin->vGlobals.self.sync.toBitString();

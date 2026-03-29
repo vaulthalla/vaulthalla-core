@@ -203,6 +203,13 @@ endif
 
 # ╭─────────────────────────────────── INSTALLATION ───────────────────────────────────╮
 
+# install config.yaml regardless for CI test integration
+if fs.exists('config.yaml')
+    install_data('config.yaml', install_dir: config_dir)
+else
+    install_data('deploy/config/config.yaml', install_dir: config_dir)
+endif
+
 if get_option('install_data')
     license_dir = join_paths(get_option('prefix'), get_option('datadir'), 'doc', meson.project_name())
     install_data('LICENSE', install_dir: license_dir)
@@ -216,12 +223,6 @@ if get_option('install_data')
     install_dir = join_paths(get_option('prefix'), get_option('bindir'))
     install_symlink('vaulthalla', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
     install_symlink('vh', install_dir: install_dir, pointing_to: 'vaulthalla-cli')
-
-    if fs.exists('config.yaml')
-        install_data('config.yaml', install_dir: config_dir)
-    else
-        install_data('deploy/config/config.yaml', install_dir: config_dir)
-    endif
 
     if fs.exists('deploy/vaulthalla.env')
         install_data('deploy/vaulthalla.env', install_dir: config_dir)

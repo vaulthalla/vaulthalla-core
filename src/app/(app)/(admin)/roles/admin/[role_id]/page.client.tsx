@@ -44,7 +44,7 @@ export default function EditAdminRoleClientPage({ id }: { id: number }) {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-white">Edit Admin role</h1>
 
-      <RoleForm type="admin" defaultValues={role} onSavedAction={() => router.push('/dashboard/roles/admin')} />
+      <RoleForm type="admin" defaultValues={role} onSavedAction={async () => router.push('/roles/admin')} />
     </div>
   )
 }

@@ -90,15 +90,15 @@ export interface WebSocketCommandMap {
 
   'roles.admin.list': { payload: null; response: { roles: AdminRoleDTO[] } }
 
-  'roles.vault.add': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
+  'role.vault.add': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
 
-  'roles.vault.update': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
+  'role.vault.update': { payload: VaultRolePayload; response: { vault: VaultRoleDTO } }
 
-  'roles.vault.delete': { payload: { id: number }; response: { vault: VaultRoleDTO } }
+  'role.vault.delete': { payload: { id: number }; response: { vault: VaultRoleDTO } }
 
-  'roles.vault.get': { payload: { id: number }; response: { vault: VaultRoleDTO } }
+  'role.vault.get': { payload: { id: number }; response: { vault: VaultRoleDTO } }
 
-  'roles.vault.get.byName': { payload: { name: string }; response: { vault: VaultRoleDTO } }
+  'role.vault.get.byName': { payload: { name: string }; response: { vault: VaultRoleDTO } }
 
   'roles.vault.list': { payload: null; response: { roles: VaultRoleDTO[] } }
 

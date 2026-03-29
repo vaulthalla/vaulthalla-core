@@ -44,7 +44,7 @@ export default function EditAdminRoleClientPage({ id }: { id: number }) {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-white">Edit Vault role</h1>
 
-      <RoleForm type="vault" defaultValues={role} onSavedAction={() => router.push('/dashboard/roles/vault')} />
+      <RoleForm type="vault" defaultValues={role} onSavedAction={() => router.push('/roles/vault')} />
     </div>
   )
 }

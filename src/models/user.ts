@@ -1,4 +1,5 @@
 import { AdminRole, VaultRole } from '@/models/role'
+import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
 
 export interface IUser {
   id: number
@@ -8,11 +9,11 @@ export interface IUser {
   created_at: string
   last_login: string
   is_active: boolean
-  role: AdminRole
-  roles: VaultRole[]
+  role: AdminRoleDTO
+  roles: VaultRoleDTO[]
 }
 
-export class User implements IUser {
+export class User {
   id: number
   name: string
   email: string

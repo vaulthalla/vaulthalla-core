@@ -5,6 +5,20 @@ import type { IEvent } from '@/models/stats/sync'
 import { StatsCard } from '@/components/stats/StatsCard'
 
 type LatestSyncHealthProps = { event: IEvent | null | undefined; title?: string }
+type MetricSummary = { ops: number; bytes: number; ms: number; failed: number }
+type PieTooltipDatum = { name?: string; value?: number }
+type EventCompat = IEvent & {
+  conflicts?: Array<{ resolved_at?: string | null }>
+  throughputs?: Array<{
+    metric_type?: string
+    num_ops?: number
+    failed_ops?: number
+    size_bytes?: number
+    duration_ms?: number
+  }>
+  run_uuid?: string
+  vault_id?: number
+}
 
 const clampNonNeg = (n: number) => (Number.isFinite(n) ? Math.max(0, n) : 0)
 
@@ -128,10 +142,11 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
 
   const d = useMemo(() => {
     if (!event) return null
+    const eventData = event as EventCompat
 
-    const beginMs = parseIsoMs(event.timestamp_begin)
-    const endMs = parseIsoMs(event.timestamp_end)
-    const hbMs = parseIsoMs(event.heartbeat_at)
+    const beginMs = parseIsoMs(eventData.timestamp_begin)
+    const endMs = parseIsoMs(eventData.timestamp_end)
+    const hbMs = parseIsoMs(eventData.heartbeat_at)
 
     const now = Date.now()
     const durationMs =
@@ -141,26 +156,26 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
         : now - beginMs
       : 0
 
-    const opsTotal = clampNonNeg(event.num_ops_total ?? 0)
-    const opsFailed = clampNonNeg(event.num_failed_ops ?? 0)
+    const opsTotal = clampNonNeg(eventData.num_ops_total ?? 0)
+    const opsFailed = clampNonNeg(eventData.num_failed_ops ?? 0)
     const opsOk = Math.max(0, opsTotal - opsFailed)
 
-    const bytesUp = clampNonNeg(event.bytes_up ?? 0)
-    const bytesDown = clampNonNeg(event.bytes_down ?? 0)
+    const bytesUp = clampNonNeg(eventData.bytes_up ?? 0)
+    const bytesDown = clampNonNeg(eventData.bytes_down ?? 0)
 
-    const conflicts = Array.isArray((event as any).conflicts) ? (event as any).conflicts : []
-    const numConflicts = clampNonNeg(event.num_conflicts ?? conflicts.length ?? 0)
-    const unresolved = conflicts.filter((c: any) => !c?.resolved_at).length
+    const conflicts = Array.isArray(eventData.conflicts) ? eventData.conflicts : []
+    const numConflicts = clampNonNeg(eventData.num_conflicts ?? conflicts.length ?? 0)
+    const unresolved = conflicts.filter(conflict => !conflict?.resolved_at).length
 
-    const divergence = event.divergence_detected
-    const localHash = event.local_state_hash ?? null
-    const remoteHash = event.remote_state_hash ?? null
-    const configHash = event.config_hash ?? null
+    const divergence = eventData.divergence_detected
+    const localHash = eventData.local_state_hash ?? null
+    const remoteHash = eventData.remote_state_hash ?? null
+    const configHash = eventData.config_hash ?? null
     const hashMismatch = localHash && remoteHash ? localHash !== remoteHash : false
 
     // Throughput aggregation
-    const th = Array.isArray((event as any).throughputs) ? (event as any).throughputs : []
-    const byMetric = new Map<string, { ops: number; bytes: number; ms: number; failed: number }>()
+    const th = Array.isArray(eventData.throughputs) ? eventData.throughputs : []
+    const byMetric = new Map<string, MetricSummary>()
     for (const t of th) {
       const k = String(t?.metric_type ?? 'unknown')
       const cur = byMetric.get(k) ?? { ops: 0, bytes: 0, ms: 0, failed: 0 }
@@ -178,9 +193,9 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
     const topMetric = throughputPie[0]?.name ?? '—'
 
     return {
-      status: event.status,
-      trigger: event.trigger,
-      retry_attempt: clampNonNeg(event.retry_attempt ?? 0),
+      status: eventData.status,
+      trigger: eventData.trigger,
+      retry_attempt: clampNonNeg(eventData.retry_attempt ?? 0),
       beginMs,
       endMs,
       hbMs,
@@ -197,13 +212,13 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
       localHash,
       remoteHash,
       configHash,
-      stall_reason: event.stall_reason ?? null,
-      error_code: event.error_code ?? null,
-      error_message: event.error_message ?? null,
+      stall_reason: eventData.stall_reason ?? null,
+      error_code: eventData.error_code ?? null,
+      error_message: eventData.error_message ?? null,
       throughputPie,
       topMetric,
-      run_uuid: (event as any).run_uuid ?? '',
-      vault_id: (event as any).vault_id ?? 0,
+      run_uuid: eventData.run_uuid ?? '',
+      vault_id: eventData.vault_id ?? 0,
       now: Date.now(),
     }
   }, [event])
@@ -241,7 +256,7 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           type: 'value',
           gridIndex: 1,
           max: maxBytes,
-          axisLabel: { formatter: (v: any) => bytes(Number(v)), color: 'rgba(255,255,255,0.45)' },
+          axisLabel: { formatter: (value: unknown) => bytes(Number(value)), color: 'rgba(255,255,255,0.45)' },
           splitLine: { show: true, lineStyle: { opacity: 0.18 } },
           axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
         },
@@ -275,7 +290,7 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           barWidth: 18,
           data: [d.opsOk],
           itemStyle: { borderRadius: [10, 0, 0, 10], opacity: 0.92 },
-          tooltip: { valueFormatter: (v: any) => `${Number(v).toLocaleString()} ops` },
+          tooltip: { valueFormatter: (value: unknown) => `${Number(value).toLocaleString()} ops` },
         },
         {
           name: 'Failed',
@@ -286,7 +301,7 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           barWidth: 18,
           data: [d.opsFailed],
           itemStyle: { borderRadius: [0, 10, 10, 0], opacity: 0.55 },
-          tooltip: { valueFormatter: (v: any) => `${Number(v).toLocaleString()} ops` },
+          tooltip: { valueFormatter: (value: unknown) => `${Number(value).toLocaleString()} ops` },
         },
 
         // Bytes up/down
@@ -299,7 +314,7 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           barWidth: 18,
           data: [d.bytesUp],
           itemStyle: { borderRadius: [10, 0, 0, 10], opacity: 0.9 },
-          tooltip: { valueFormatter: (v: any) => bytes(Number(v)) },
+          tooltip: { valueFormatter: (value: unknown) => bytes(Number(value)) },
         },
         {
           name: 'Down',
@@ -310,7 +325,7 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           barWidth: 18,
           data: [d.bytesDown],
           itemStyle: { borderRadius: [0, 10, 10, 0], opacity: 0.7 },
-          tooltip: { valueFormatter: (v: any) => bytes(Number(v)) },
+          tooltip: { valueFormatter: (value: unknown) => bytes(Number(value)) },
         },
 
         // Throughput pie (inset)
@@ -323,7 +338,12 @@ export default function LatestSyncHealth({ event, title = 'Latest sync health' }
           label: { show: false },
           labelLine: { show: false },
           itemStyle: { borderRadius: 10, borderColor: 'rgba(0,0,0,0)', borderWidth: 2 },
-          tooltip: { formatter: (p: any) => `${p?.name ?? ''}: ${bytes(Number(p?.value ?? 0))}` },
+          tooltip: {
+            formatter: (param: unknown) => {
+              const datum = (param ?? {}) as PieTooltipDatum
+              return `${datum.name ?? ''}: ${bytes(Number(datum.value ?? 0))}`
+            },
+          },
         },
       ],
     }

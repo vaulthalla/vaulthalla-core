@@ -5,6 +5,17 @@ import * as echarts from 'echarts/core'
 import type { CapacityStats as CapacityStatsModel } from '@/models/stats/vaultStats'
 import { StatsCard } from '@/components/stats/StatsCard'
 type CapacityStatsProps = { capacityStats: CapacityStatsModel; title?: string }
+type CapacityStatsCompat = CapacityStatsModel & {
+  capacity_bytes?: number
+  physical_size_bytes?: number
+  logical_size_bytes?: number
+  cache_size_bytes?: number
+  free_space_bytes?: number
+  average_file_size_bytes?: number
+  largest_file_size_bytes?: number
+}
+
+type PieTooltipDatum = { name?: string; value?: number }
 
 const clampNonNeg = (n: number) => (Number.isFinite(n) ? Math.max(0, n) : 0)
 
@@ -48,11 +59,12 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
   const extChartRef = useRef<echarts.EChartsType | null>(null)
 
   const d = useMemo(() => {
-    const capacity = clampNonNeg(Number((capacityStats as any).capacity_bytes ?? capacityStats.capacity ?? 0))
-    const physical = clampNonNeg(Number((capacityStats as any).physical_size_bytes ?? capacityStats.physical_size ?? 0))
-    const logical = clampNonNeg(Number((capacityStats as any).logical_size_bytes ?? capacityStats.logical_size ?? 0))
-    const cache = clampNonNeg(Number((capacityStats as any).cache_size_bytes ?? capacityStats.cache_size ?? 0))
-    const free = clampNonNeg(Number((capacityStats as any).free_space_bytes ?? capacityStats.free_space ?? 0))
+    const stats = capacityStats as CapacityStatsCompat
+    const capacity = clampNonNeg(Number(stats.capacity_bytes ?? stats.capacity ?? 0))
+    const physical = clampNonNeg(Number(stats.physical_size_bytes ?? stats.physical_size ?? 0))
+    const logical = clampNonNeg(Number(stats.logical_size_bytes ?? stats.logical_size ?? 0))
+    const cache = clampNonNeg(Number(stats.cache_size_bytes ?? stats.cache_size ?? 0))
+    const free = clampNonNeg(Number(stats.free_space_bytes ?? stats.free_space ?? 0))
 
     const total = capacity > 0 ? capacity : physical + free
     const used = Math.min(physical, total)
@@ -62,7 +74,7 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
     const dataShown = Math.max(0, used - cacheShown)
 
     // ✅ Record<string, number> → top-N array
-    const extensions = Object.entries((capacityStats as any).top_file_extensions ?? {})
+    const extensions = Object.entries(stats.top_file_extensions ?? {})
       .map(([ext, bytes]) => ({ name: ext || 'unknown', value: clampNonNeg(Number(bytes) || 0) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8)
@@ -78,14 +90,10 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
       freeShown,
       cacheShown,
       dataShown,
-      average_file_size: clampNonNeg(
-        Number((capacityStats as any).average_file_size_bytes ?? (capacityStats as any).average_file_size ?? 0),
-      ),
-      largest_file_size: clampNonNeg(
-        Number((capacityStats as any).largest_file_size_bytes ?? (capacityStats as any).largest_file_size ?? 0),
-      ),
-      file_count: clampNonNeg((capacityStats as any).file_count ?? 0),
-      directory_count: clampNonNeg((capacityStats as any).directory_count ?? 0),
+      average_file_size: clampNonNeg(Number(stats.average_file_size_bytes ?? stats.average_file_size ?? 0)),
+      largest_file_size: clampNonNeg(Number(stats.largest_file_size_bytes ?? stats.largest_file_size ?? 0)),
+      file_count: clampNonNeg(stats.file_count ?? 0),
+      directory_count: clampNonNeg(stats.directory_count ?? 0),
       extensions,
     }
   }, [capacityStats])
@@ -105,7 +113,7 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        valueFormatter: (v: any) => bytes(Number(v)),
+        valueFormatter: (value: unknown) => bytes(Number(value)),
         backgroundColor: 'rgba(10,10,12,0.85)',
         borderColor: 'rgba(255,255,255,0.10)',
         textStyle: { color: 'rgba(255,255,255,0.92)' },
@@ -121,7 +129,7 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
       xAxis: {
         type: 'value',
         max: d.total > 0 ? d.total : undefined,
-        axisLabel: { formatter: (v: any) => bytes(Number(v)), color: 'rgba(255,255,255,0.45)' },
+        axisLabel: { formatter: (value: unknown) => bytes(Number(value)), color: 'rgba(255,255,255,0.45)' },
         splitLine: { show: true, lineStyle: { opacity: 0.18 } },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
       },
@@ -165,7 +173,9 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
           data: [[Math.min(d.logical, d.total), 0]],
           z: 10,
           itemStyle: { opacity: 0.9 },
-          tooltip: { valueFormatter: (v: any) => bytes(Number(Array.isArray(v) ? v[0] : v)) },
+          tooltip: {
+            valueFormatter: (value: unknown) => bytes(Number(Array.isArray(value) ? value[0] : value)),
+          },
         },
       ],
     }
@@ -176,7 +186,10 @@ export default function CapacityStats({ capacityStats, title = 'Capacity' }: Cap
         backgroundColor: 'rgba(10,10,12,0.85)',
         borderColor: 'rgba(255,255,255,0.10)',
         textStyle: { color: 'rgba(255,255,255,0.92)' },
-        formatter: (p: any) => `${p?.name ?? ''}: ${bytes(Number(p?.value ?? 0))}`,
+        formatter: (param: unknown) => {
+          const datum = (param ?? {}) as PieTooltipDatum
+          return `${datum.name ?? ''}: ${bytes(Number(datum.value ?? 0))}`
+        },
       },
       title: {
         text: 'Top extensions',

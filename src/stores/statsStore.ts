@@ -3,6 +3,7 @@ import { WSCommandPayload } from '@/util/webSocketCommands'
 import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { getErrorMessage } from '@/util/handleErrors'
 
 /**
  * Generic wrapper that carries:
@@ -40,8 +41,8 @@ interface StatsStore {
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
-  getFsCacheStats: (payload: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
-  getHttpCacheStats: (payload: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
+  getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
+  getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
   // Refresh helpers
   refreshFsCacheStats: () => Promise<CacheStats>
@@ -93,7 +94,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ fsCacheStats: { ...current, loading: true, error: null } })
 
     try {
-      const stats = await get().getFsCacheStats(null as any)
+      const stats = await get().getFsCacheStats()
       const nextData = new CacheStats(stats ?? {})
       const now = Date.now()
 
@@ -109,8 +110,8 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       })
 
       return nextData
-    } catch (e: any) {
-      const msg = e?.message ?? 'Failed to fetch FS cache stats'
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch FS cache stats'
       const now = Date.now()
 
       set({ fsCacheStats: { ...get().fsCacheStats, loading: false, error: msg, lastErrorAt: now } })
@@ -126,7 +127,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ httpCacheStats: { ...current, loading: true, error: null } })
 
     try {
-      const stats = await get().getHttpCacheStats(null as any)
+      const stats = await get().getHttpCacheStats()
       const nextData = new CacheStats(stats ?? {})
       const now = Date.now()
 
@@ -142,8 +143,8 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       })
 
       return nextData
-    } catch (e: any) {
-      const msg = e?.message ?? 'Failed to fetch HTTP cache stats'
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch HTTP cache stats'
       const now = Date.now()
 
       set({ httpCacheStats: { ...get().httpCacheStats, loading: false, error: msg, lastErrorAt: now } })

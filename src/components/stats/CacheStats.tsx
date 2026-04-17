@@ -24,6 +24,7 @@ echarts.use([
 ])
 
 type CacheStatsSource = 'fs' | 'http'
+type StatsState = ReturnType<typeof useStatsStore.getState>
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
@@ -56,9 +57,9 @@ function getSourceConfig(source: CacheStatsSource) {
       title: 'HTTP Cache',
       subtitle: 'Preview & request-path performance',
       // store selectors
-      selectWrapper: (s: any): CacheStatsWrapper => s.httpCacheStats,
-      startPolling: (s: any) => s.startHttpCacheStatsPolling,
-      stopPolling: (s: any) => s.stopHttpCacheStatsPolling,
+      selectWrapper: (s: StatsState): CacheStatsWrapper => s.httpCacheStats,
+      startPolling: (s: StatsState) => s.startHttpCacheStatsPolling,
+      stopPolling: (s: StatsState) => s.stopHttpCacheStatsPolling,
     }
   }
 
@@ -66,9 +67,9 @@ function getSourceConfig(source: CacheStatsSource) {
   return {
     title: 'FS Cache',
     subtitle: 'Hot-path performance & memory footprint',
-    selectWrapper: (s: any): CacheStatsWrapper => s.fsCacheStats,
-    startPolling: (s: any) => s.startFsCacheStatsPolling,
-    stopPolling: (s: any) => s.stopFsCacheStatsPolling,
+    selectWrapper: (s: StatsState): CacheStatsWrapper => s.fsCacheStats,
+    startPolling: (s: StatsState) => s.startFsCacheStatsPolling,
+    stopPolling: (s: StatsState) => s.stopFsCacheStatsPolling,
   }
 }
 

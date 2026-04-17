@@ -18,6 +18,10 @@ export interface IVaultStats {
   latest_sync_event: IEvent | null
 }
 
+function asObject(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+}
+
 /** -------------------------
  *  Tiny runtime helpers
  *  ------------------------- */
@@ -63,18 +67,19 @@ export class CapacityStats implements ICapacityStats {
     this.top_file_extensions = data.top_file_extensions ?? this.top_file_extensions
   }
 
-  static from(raw: any): CapacityStats {
+  static from(raw: unknown): CapacityStats {
+    const data = asObject(raw)
     return new CapacityStats({
-      capacity: asNumber(raw?.capacity),
-      logical_size: asNumber(raw?.logical_size),
-      physical_size: asNumber(raw?.physical_size),
-      cache_size: asNumber(raw?.cache_size),
-      free_space: asNumber(raw?.free_space),
-      file_count: asNumber(raw?.file_count),
-      directory_count: asNumber(raw?.directory_count),
-      average_file_size: asNumber(raw?.average_file_size),
-      largest_file_size: asNumber(raw?.largest_file_size),
-      top_file_extensions: asRecordNumber(raw?.top_file_extensions),
+      capacity: asNumber(data.capacity),
+      logical_size: asNumber(data.logical_size),
+      physical_size: asNumber(data.physical_size),
+      cache_size: asNumber(data.cache_size),
+      free_space: asNumber(data.free_space),
+      file_count: asNumber(data.file_count),
+      directory_count: asNumber(data.directory_count),
+      average_file_size: asNumber(data.average_file_size),
+      largest_file_size: asNumber(data.largest_file_size),
+      top_file_extensions: asRecordNumber(data.top_file_extensions),
     })
   }
 }
@@ -88,12 +93,13 @@ export class VaultStats implements IVaultStats {
     this.latest_sync_event = data?.latest_sync_event ?? null
   }
 
-  static from(raw: any): VaultStats {
-    const capacity = CapacityStats.from(raw?.capacity)
+  static from(raw: unknown): VaultStats {
+    const data = asObject(raw)
+    const capacity = CapacityStats.from(data.capacity)
 
     // Prefer a real SyncEvent instance (runtime safe), but allow null if missing.
     const latest =
-      raw?.latest_sync_event && typeof raw.latest_sync_event === 'object' ? SyncEvent.from(raw.latest_sync_event) : null
+      data.latest_sync_event && typeof data.latest_sync_event === 'object' ? SyncEvent.from(data.latest_sync_event) : null
 
     return new VaultStats({ capacity, latest_sync_event: latest })
   }

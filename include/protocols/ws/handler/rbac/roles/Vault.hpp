@@ -16,6 +16,7 @@ namespace vh::protocols::ws::handler::rbac::roles {
         static json get(const json& payload, const std::shared_ptr<Session>& session);
         static json getByName(const json& payload, const std::shared_ptr<Session>& session);
         static json list(const std::shared_ptr<Session>& session);
+        static json listAssigned(const json& payload, const std::shared_ptr<Session>& session);
         static json assign(const json& payload, const std::shared_ptr<Session>& session);
         static json unassign(const json& payload, const std::shared_ptr<Session>& session);
     };

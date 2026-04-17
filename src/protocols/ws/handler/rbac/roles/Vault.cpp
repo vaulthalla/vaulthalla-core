@@ -67,6 +67,19 @@ namespace vh::protocols::ws::handler::rbac::roles {
         return {{"roles", db::query::rbac::role::Vault::list()}};
     }
 
+    json Vault::listAssigned(const json &payload, const std::shared_ptr<Session> &session) {
+        const auto& vaultId = payload.at("id").get<uint32_t>();
+
+        using Permission = permission::vault::RolePermissions;
+        if (!resolver::Vault::has<Permission>({
+            .user = session->user,
+            .permission = Permission::View,
+            .vault_id = vaultId
+        })) throw std::runtime_error("Permission denied");
+
+        return {{"assigned_roles", db::query::rbac::role::vault::Assignments::listForVault(vaultId)}};
+    }
+
     json Vault::assign(const json &payload, const std::shared_ptr<Session> &session) {
         const auto& subjectType = payload.at("subject_type").get<std::string>();
         const auto& subjectId = payload.at("subject_id").get<uint32_t>();

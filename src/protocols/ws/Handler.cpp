@@ -84,6 +84,7 @@ void Handler::registerRoleHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("role.vault.get", &handler::rbac::roles::Vault::get);
     r->registerPayload("role.vault.get.byName", &handler::rbac::roles::Vault::getByName);
     r->registerSessionOnlyHandler("roles.vault.list", &handler::rbac::roles::Vault::list);
+    r->registerPayload("roles.vault.list.assigned", &handler::rbac::roles::Vault::listAssigned);
 
     r->registerPayload("role.vault.assign", &handler::rbac::roles::Vault::assign);
     r->registerPayload("role.vault.unassign", &handler::rbac::roles::Vault::unassign);

@@ -5,7 +5,7 @@ import { useVaultStore } from '@/stores/vaultStore'
 import { useFSStore } from '@/stores/fsStore'
 
 export const VaultSelector = () => {
-  const { currVault, setCurrVault, path, setPath } = useFSStore()
+  const { currVault, setCurrVault, setPath } = useFSStore()
   const { vaults } = useVaultStore()
 
   const onVaultChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

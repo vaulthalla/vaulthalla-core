@@ -2,7 +2,7 @@
 
 import { useApiKeyStore } from '@/stores/apiKeyStore'
 import { useVaultStore } from '@/stores/vaultStore'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useWatch } from 'react-hook-form'
 import * as motion from 'motion/react-client'
 import { Button } from '@/components/Button'
 import { LocalDiskVault, S3Vault } from '@/models/vaults'
@@ -24,12 +24,11 @@ const VaultForm = ({ initialValues }: { initialValues?: Partial<LocalDiskVault |
   const {
     register,
     handleSubmit,
-    watch,
     control,
     formState: { errors },
   } = useForm<VaultFormValues>({ defaultValues: initialValues || { name: '', type: 'local', mount_point: '' } })
 
-  const type = watch('type')
+  const type = useWatch({ control, name: 'type' }) ?? 'local'
 
   const onSubmit = async (data: VaultFormValues) => {
     setIsSubmitting(true)

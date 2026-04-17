@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import * as motion from 'motion/react-client'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/Button'
 import { Permission } from '@/models/role'
 import { usePermStore } from '@/stores/usePermStore'
@@ -81,7 +81,7 @@ export default function VaultPermissionOverrideForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -90,9 +90,9 @@ export default function VaultPermissionOverrideForm({
     mode: 'onChange',
   })
 
-  const permissionQualified = watch('permission_qualified')
-  const enabled = watch('enabled')
-  const effect = watch('effect')
+  const permissionQualified = useWatch({ control, name: 'permission_qualified' }) ?? ''
+  const enabled = useWatch({ control, name: 'enabled' }) ?? true
+  const effect = useWatch({ control, name: 'effect' }) ?? 'allow'
   const isEditing = Boolean(initialFormValues.id)
 
   useEffect(() => {

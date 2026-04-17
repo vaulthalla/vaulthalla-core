@@ -31,11 +31,11 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
     deleteItem(entryName)
       .then(() => fetchFiles())
       .catch(err => console.error('Error deleting file:', err))
-  }, [])
+  }, [deleteItem, fetchFiles])
 
   const onNavigate = React.useCallback((path: string) => {
     setPath(path)
-  }, [])
+  }, [setPath])
 
   const handleTableClick = React.useCallback(
     async (e: React.MouseEvent) => {

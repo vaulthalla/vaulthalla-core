@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import * as motion from 'motion/react-client'
 import { useRouter } from 'next/navigation'
 import OverrideForm, { PermissionOverrideFormData } from '@/components/roles/vault/OverrideForm'
@@ -42,7 +42,7 @@ export const AssignUserForm = ({ vault }: AssignUserFormProps) => {
   const {
     register,
     setValue,
-    watch,
+    control,
     handleSubmit,
     formState: { errors },
     reset,
@@ -53,8 +53,8 @@ export const AssignUserForm = ({ vault }: AssignUserFormProps) => {
     },
   })
 
-  const selectedUserId = watch('user_id')
-  const selectedRoleId = watch('role_id')
+  const selectedUserId = useWatch({ control, name: 'user_id' }) ?? 0
+  const selectedRoleId = useWatch({ control, name: 'role_id' }) ?? 0
 
   useEffect(() => {
     let mounted = true

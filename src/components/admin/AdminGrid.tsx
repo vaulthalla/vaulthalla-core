@@ -18,5 +18,5 @@ export const AdminGrid = ({ contentWidth = 'normal', children, className }: Admi
     : contentWidth === 'normal' ? 'gap-4 md:gap-5'
     : 'gap-4 md:gap-6'
 
-  return <div className={clsx('grid', colsClasses, gapClasses)}>{children}</div>
+  return <div className={clsx('grid', colsClasses, gapClasses, className)}>{children}</div>
 }

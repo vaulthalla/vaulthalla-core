@@ -86,7 +86,6 @@ export default function CacheStatsComponent({
   const startPolling = useStatsStore(cfg.startPolling)
   const stopPolling = useStatsStore(cfg.stopPolling)
 
-  const stats = wrapper?.data ?? new CacheStats({})
   const loading = !!wrapper?.loading
   const lastUpdated = wrapper?.lastUpdated ?? null
   const error = wrapper?.error ?? null
@@ -102,7 +101,7 @@ export default function CacheStatsComponent({
   }, [startPolling, stopPolling, intervalMs])
 
   const derived = useMemo(() => {
-    const s = stats ?? new CacheStats({})
+    const s = wrapper?.data ?? new CacheStats({})
 
     const hits = s.hits ?? 0
     const misses = s.misses ?? 0
@@ -118,7 +117,7 @@ export default function CacheStatsComponent({
     const maxOpMs = msFromUs(s.op?.max_us ?? 0)
 
     return { s, hits, misses, hitRate, used, cap, free, opCount, avgOpMs, maxOpMs }
-  }, [stats])
+  }, [wrapper?.data])
 
   // init charts once
   useEffect(() => {

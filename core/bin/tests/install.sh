@@ -1,97 +1,72 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ═══════════════════════════════════════════════════════
-#             ⚔️  VAULTHALLA INSTALLATION ⚔️
-#       This script sets up the entire environment
-# ═══════════════════════════════════════════════════════
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CORE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$CORE_DIR/.." && pwd)"
 
-source ./bin/lib/dev_mode.sh
+source "$ROOT_DIR/bin/lib/dev_mode.sh"
 
-echo "🗡️  Initiating Vaulthalla uninstallation sequence..."
+echo "🏗️  Preparing Vaulthalla core integration tests..."
 
 vh_assert_dev_mode_consistency
 
-DEV_MODE=false
-if vh_is_dev_mode; then
-    DEV_MODE=true
-fi
-
-echo "🔍 Build mode: ${VH_BUILD_MODE:-unset}"
-echo "🔍 Dev mode active: $DEV_MODE"
-
-CLEAN_BUILD=false
 RUN_TEST=false
+CLEAN_BUILD=false
 
-# parse command line arguments
+usage() {
+  cat <<EOF
+Usage: $0 [options]
+
+Options:
+  --run         Run integration tests after build/install
+  --clean       Clean build first
+  -h, --help    Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --run)
-          RUN_TEST=true
-          shift
-          ;;
-        --clean)
-          CLEAN_BUILD=true
-          shift
-          ;;
-        -h|--help)
-            echo "Usage: $0 [options]"
-            echo "  -h, --help       Show this help"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help to see available options."
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    --run)
+      RUN_TEST=true
+      shift
+      ;;
+    --clean)
+      CLEAN_BUILD=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
 done
 
-# Construct Meson setup args
-MESON_ARGS=()
-MESON_ARGS+=("-Dbuildtype=debug")
-MESON_ARGS+=("-Dintegration_tests=true")
+MESON_ARGS=(
+  "-Dbuildtype=debug"
+  "-Dintegration_tests=true"
+  "-Db_sanitize=address,undefined"
+)
 
-echo "Setting up build with:"
-printf '  %s\n' "${MESON_ARGS[@]}"
+BUILD_DIR="$CORE_DIR/build"
 
-
-# Check if we're root OR have passwordless sudo
-if [[ $EUID -ne 0 ]]; then
-    if ! sudo -n true 2>/dev/null; then
-        echo "❗️ This script must be run as root or with passwordless sudo."
-        exit 1
-    fi
+if [[ "$CLEAN_BUILD" == true && -d "$BUILD_DIR" ]]; then
+  echo "🧹 Cleaning previous build artifacts..."
+  rm -rf "$BUILD_DIR"
 fi
 
-# Clean build environment
-if [[ -d build && "$CLEAN_BUILD" == true ]]; then
-    echo "🧹 Cleaning previous build artifacts..."
-    rm -rf build
-else
-    mkdir -p build
-fi
+mkdir -p "$BUILD_DIR"
 
-# === 1) Install Build Dependencies ===
-./bin/setup/install_deps.sh
+meson setup "$BUILD_DIR" "$CORE_DIR" "${MESON_ARGS[@]}" --reconfigure
+meson compile -C "$BUILD_DIR"
+sudo meson install -C "$BUILD_DIR"
+sudo ldconfig
 
-# === 2) Create System User and Group ===
-./bin/setup/install_users.sh
-
-# === 3) Install Directories ===
-./bin/tests/install_dirs.sh
-
-# === 4) Setup Database ===
-./bin/tests/install_db.sh
-
-# === 5) Run Tests ===
 if [[ "$RUN_TEST" == true ]]; then
-  echo "🏗️  Starting Vaulthalla build..."
-
-  meson setup build "${MESON_ARGS[@]}" -Db_sanitize=address,undefined
-  meson compile -C build
-  sudo meson install -C build
-  sudo ldconfig
-
-  sudo bash --rcfile './deploy/vaulthalla.env' -i -c "./build/vh_integration_tests"
+  sudo bash --rcfile "$ROOT_DIR/deploy/vaulthalla.env" -i -c "$BUILD_DIR/vh_integration_tests"
 fi

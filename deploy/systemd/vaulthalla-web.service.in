@@ -3,7 +3,7 @@ Description=Vaulthalla Web
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /usr/share/vaulthalla-web/server.js
+ExecStart=@BINDIR@/node /usr/share/vaulthalla-web/server.js
 Restart=always
 User=www-data
 Environment=NODE_ENV=production

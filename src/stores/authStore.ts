@@ -13,7 +13,7 @@ interface AuthState {
   user: User | null
   loading: boolean
   error: string | null
-  adminPasswordIsDefault: boolean | null
+  adminPasswordIsDefault: boolean | undefined
 
   login: (payload: WSCommandPayload<'auth.login'>) => Promise<void>
   registerUser: (name: string, email: string, password: string, is_active: boolean, role: string) => Promise<void>
@@ -25,7 +25,7 @@ interface AuthState {
   fetchUser: () => Promise<void>
   getUser: (id: number) => Promise<User | null>
   getUsers: () => Promise<User[]>
-  fetchAdminPasswordIsDefault: () => Promise<void>
+  fetchAdminPasswordIsDefault: (force: boolean) => Promise<boolean>
   getUserByName: (payload: WSCommandPayload<'auth.user.get.byName'>) => Promise<User>
   setToken: (token: string | null) => void
 }
@@ -37,7 +37,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       loading: false,
       error: null,
-      adminPasswordIsDefault: null,
+      adminPasswordIsDefault: undefined,
 
       login: async ({ name, password }) => {
         set({ loading: true, error: null })
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        set({ token: null, user: null })
+        set({ token: null, user: null, adminPasswordIsDefault: undefined })
         try {
           const sendCommand = useWebSocketStore.getState().sendCommand
           const socket = useWebSocketStore.getState().socket
@@ -177,6 +177,11 @@ export const useAuthStore = create<AuthState>()(
           await useWebSocketStore.getState().waitForConnection()
           const sendCommand = useWebSocketStore.getState().sendCommand
           await sendCommand('auth.user.change_password', { id, old_password, new_password })
+          // If we were forcing a default-password change for the current user,
+          // trust the successful update and stop re-checking this flag.
+          if (get().adminPasswordIsDefault && get().user?.id === id) {
+            set({ adminPasswordIsDefault: false })
+          }
         } catch (err) {
           set({ error: getErrorMessage(err) || 'Password change failed' })
           throw err
@@ -217,12 +222,16 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      fetchAdminPasswordIsDefault: async () => {
+      fetchAdminPasswordIsDefault: async (force = false) => {
+        const cached = get().adminPasswordIsDefault
+        if (!force && cached !== undefined) return cached
+
         try {
           await useWebSocketStore.getState().waitForConnection()
           const sendCommand = useWebSocketStore.getState().sendCommand
           const response = await sendCommand('auth.admin.default_password', null)
           set({ adminPasswordIsDefault: response.isDefault })
+          return response.isDefault
         } catch (err) {
           set({ error: getErrorMessage(err) || 'Failed to fetch admin password' })
           throw err

@@ -1,8 +1,9 @@
 'use client'
 
+import React from 'react'
 import { useWebSocketLifecycle } from '@/hooks/useWebSocketLifecycle'
 
-export const WebSocketProvider = () => {
+export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   useWebSocketLifecycle()
-  return null
+  return children
 }

@@ -5,72 +5,77 @@ import { useEffect, useRef, useState } from 'react'
 import CircleNotchLoader from '@/components/loading/CircleNotchLoader'
 import { useAuthStore } from '@/stores/authStore'
 
-const PUBLIC_ROUTES = new Set<string>(['/login']) // add '/dashboard' here if it's meant to be public
+const PUBLIC_ROUTES = new Set<string>(['/login'])
+const CHANGE_PASSWORD_ROUTE = '/dashboard/users/admin/change-password'
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+
   const [checked, setChecked] = useState(false)
-  const running = useRef(false)
+  const requestId = useRef(0)
 
   useEffect(() => {
-    // Let public routes render without gating
+    if (!pathname) return
+
     if (PUBLIC_ROUTES.has(pathname)) {
       setChecked(true)
       return
     }
 
-    let cancelled = false
+    const id = ++requestId.current
+    let disposed = false
 
-    const checkAuth = async () => {
-      if (running.current) return
-      running.current = true
-      setChecked(false)
-
+    const run = async () => {
       try {
         const store = useAuthStore.getState()
 
-        // 1) Load default-password flag (freshly)
-        await store.fetchAdminPasswordIsDefault()
-        const { adminPasswordIsDefault } = useAuthStore.getState()
+        let authed = await store.isUserAuthenticated()
 
-        // 2) Check auth (freshly)
-        let authed = await useAuthStore.getState().isUserAuthenticated()
-
-        // 3) If not authed, try refresh once
         if (!authed) {
-          await useAuthStore.getState().refreshToken()
+          await store.refreshToken()
           authed = await useAuthStore.getState().isUserAuthenticated()
         }
 
-        if (cancelled) return
+        if (disposed || id !== requestId.current) return
 
-        // 4) Not authed => kick out
         if (!authed) {
+          setChecked(false)
           router.replace('/login')
           return
         }
 
-        // 5) Authed but default admin password => force change
-        if (!process.env.NEXT_PUBLIC_VAULTHALLA_DEV_MODE && adminPasswordIsDefault) {
-          // avoid redirect loop
-          if (pathname !== '/dashboard/users/admin/change-password') {
-            router.replace('/dashboard/users/admin/change-password')
-          }
+        const cached = useAuthStore.getState().adminPasswordIsDefault
+        const adminPasswordIsDefault = await useAuthStore.getState().fetchAdminPasswordIsDefault(cached === true)
+
+        if (disposed || id !== requestId.current) return
+
+        if (
+          !process.env.NEXT_PUBLIC_VAULTHALLA_DEV_MODE
+          && adminPasswordIsDefault
+          && pathname !== CHANGE_PASSWORD_ROUTE
+        ) {
+          setChecked(false)
+          router.replace(CHANGE_PASSWORD_ROUTE)
           return
         }
 
-        // 6) All good
         setChecked(true)
-      } finally {
-        running.current = false
+      } catch (err) {
+        console.error('RequireAuth failed:', err)
+        if (!disposed && id === requestId.current) {
+          setChecked(false)
+          router.replace('/login')
+        }
       }
     }
 
-    checkAuth()
+    // only show loader until first successful resolution
+    if (!checked) run()
+    else void run()
 
     return () => {
-      cancelled = true
+      disposed = true
     }
   }, [pathname, router])
 

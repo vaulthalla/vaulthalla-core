@@ -14,7 +14,8 @@ enable_dev_mode
 /deploy/hash_password
 /deploy/bashrc
 
-# Core build
+# Core build (also cover root-level build artifacts)
+/build
 /core/build/
 
 # Production artifacts (multi-project)

@@ -1,320 +1,248 @@
+---
+
 # Release Changelog Roadmap (Pipeline Completion)
 
-Scope: finish changelog automation quality and workflow on top of the **existing** `tools/release` architecture before full API integration.
-
-Status baseline:
-
-- Version pipeline is production-usable (`check/sync/set-version/bump`).
-- Changelog primitives exist (`git_collect`, `categorize`, `scoring`, `snippets`, `context_builder`, `render_raw`).
-- Debug harness exists (`python -m tools.release.debug.release_context`).
-- Main CLI has no changelog draft flow yet.
+Scope: complete the full release pipeline from git → AI → packaged artifact → CI/CD deployment signal.
 
 ---
 
-## Phase 0: Baseline + Guardrails (Before Any New Feature Work)
+## Status (Current Reality)
+
+The system has progressed significantly beyond the original baseline.
+
+Completed:
+
+- ✅ Version pipeline is production-usable (`check/sync/set-version/bump`)
+- ✅ Collector pipeline exists and is stable (`git_collect`, `categorize`, `scoring`, `snippets`, `context_builder`)
+- ✅ Deterministic raw renderer implemented (`render_raw`)
+- ✅ CLI draft workflow implemented (`changelog draft`)
+- ✅ Deterministic AI payload builder implemented (Phase 4)
+- ✅ AI draft stage implemented (Phase 5a)
+- ✅ AI triage optimizer stage implemented (Phase 5b)
+
+Current pipeline:
+
+git → categorized → scored → payload → triage → IR → draft → markdown
+
+Remaining work focuses on:
+- polish stage
+- provider flexibility
+- packaging automation
+- CI/CD integration
+
+---
+
+## Phase 5c: Polish Stage (Editorial Pass)
 
 Goal:
 
-- lock down a reproducible baseline for collector output quality and drift.
+- refine AI draft output for readability, flow, and conciseness
+- eliminate redundancy and awkward phrasing
+- preserve strict factual grounding
+
+Key constraints:
+
+- input must NOT be raw payload
+- input must be:
+  - structured draft result OR
+  - rendered markdown + minimal structure
+- must NOT reintroduce hallucination risk
+- must NOT expand scope beyond draft content
 
 Concrete tasks:
 
-1. Define 3-5 representative release ranges (small/medium/large diff spans).
-2. Capture baseline `ReleaseContext` JSON snapshots from debug harness for each range.
-3. Record current weak spots per snapshot:
-   - wrong category assignment
-   - noisy files promoted
-   - missing important snippets
-   - weak reason text.
+1. Add polish contract:
+   - `contracts/polish.py`
+   - structured output similar to draft, or minimal markdown rewrite
 
-Expected outputs:
+2. Add polish prompt:
+   - `prompts/polish.py`
+   - enforce:
+     - no new facts
+     - no feature invention
+     - compression + clarity only
 
-- baseline fixture directory (JSON snapshots + short notes) under `tools/release` test/docs area.
-- explicit quality checklist for ranking/categorization/snippets.
+3. Add polish stage:
+   - `stages/polish.py`
+   - input: draft result
+   - output: refined result
+
+4. CLI integration:
+   - optional flag: `--polish`
+   - pipeline:
+     - payload → (triage?) → draft → polish
+
+Expected output:
+
+- clean, professional changelog suitable for publishing
 
 Verification:
 
-- rerun debug command against each range and confirm snapshot reproducibility with same git state.
-
-Modules expected to change:
-
-- none required for setup; primarily test/docs artifacts.
-
-Must remain unchanged unless necessary:
-
-- `version/*` code path and existing `check/sync/set-version/bump` behavior.
+- fixture-based tests comparing:
+  - original draft vs polished output
+  - preservation of facts
+  - reduced redundancy
 
 ---
 
-## Phase 1: Collector Quality Improvements (Pre-OpenAI Required)
+## Phase 6: Provider Abstraction + Local LLM Support
 
 Goal:
 
-- improve relevance/precision of categorized files and selected snippets.
+- support multiple inference backends:
+  - OpenAI hosted
+  - OpenAI-compatible local endpoints (vLLM, mlx, etc.)
 
 Concrete tasks:
 
-1. Refine path categorization rules in `changelog/categorize.py`:
-   - tighten deploy/bin edge cases
-   - reduce false meta/default fallthrough where possible.
-2. Tune file scoring in `changelog/scoring.py`:
-   - adjust noise penalties and category-specific boosts based on Phase 0 fixtures.
-3. Improve snippet extraction in `changelog/snippets.py`:
-   - better candidate file caps per category where warranted
-   - improve `build_snippet_reason(...)` with hunk-aware signals.
-4. Add collector-focused tests/fixtures for:
-   - category assignment
-   - file ranking ordering
-   - snippet selection determinism.
+1. Expand provider layer:
+   - `providers/base.py` (interface)
+   - `providers/openai.py`
+   - `providers/openai_compatible.py`
 
-Expected outputs:
+2. Add config surface (code-level only):
+   - base_url
+   - model
+   - api_key (env)
 
-- improved `ReleaseContext` fidelity (files/snippets closer to human relevance).
-- deterministic behavior documented by fixtures/tests.
+3. Allow CLI override:
+   - `--model`
+   - optional future: `--provider`, `--base-url`
+
+4. Ensure:
+   - all stages are provider-agnostic
+   - contracts remain identical regardless of backend
+
+Expected output:
+
+- identical pipeline behavior across hosted and local models
 
 Verification:
 
-- compare before/after fixture outputs and confirm improved ranking/snippet quality.
-- no regressions to git collection API functions.
-
-Modules expected to change:
-
-- `tools/release/changelog/categorize.py`
-- `tools/release/changelog/scoring.py`
-- `tools/release/changelog/snippets.py`
-- tests/fixtures alongside changelog modules.
-
-Must remain unchanged unless necessary:
-
-- `tools/release/changelog/git_collect.py` raw git boundary.
-- `tools/release/version/*`.
+- mock tests
+- manual run against local OpenAI-compatible endpoint
 
 ---
 
-## Phase 2: Raw Renderer Improvements (Pre-OpenAI Required)
+## Phase 7: Debian Packaging Automation
 
 Goal:
 
-- make deterministic, high-signal non-AI raw changelog output usable as a first draft.
+- automate `.deb` build pipeline from inside `tools/release`
+
+This phase transitions from:
+> changelog generation → actual release artifact creation
 
 Concrete tasks:
 
-1. Enhance `changelog/render_raw.py` structure:
-   - stable section ordering
-   - consistent top-N policies by category/files/snippets
-   - clear headings and summary lines.
-2. Add explicit rendering contract:
-   - required sections
-   - max lengths
-   - fallback behavior on empty categories/snippets.
-3. Keep debug render and raw release render separated but consistent in data semantics.
+1. Add packaging module:
+   - `tools/release/debian/` (or similar)
 
-Expected outputs:
+2. Implement build orchestration:
+   - run `dpkg-buildpackage` or equivalent
+   - ensure:
+     - version is synced
+     - changelog is updated
+     - build artifacts are captured
 
-- deterministic raw changelog format from existing `ReleaseContext`.
-- easier diffability and repeatability for CI/local checks.
+3. Add release output directory:
+   - e.g. `/release/` or `/dist/`
+   - store:
+     - `.deb`
+     - build logs
+     - metadata
+
+4. Optional:
+   - hook changelog generation into Debian changelog automatically
+
+Expected output:
+
+- one command produces a full `.deb` artifact
+
+Example CLI:
+
+    python -m tools.release build-deb
 
 Verification:
 
-- golden output tests for representative fixture contexts.
-- byte-for-byte stability with unchanged input context.
-
-Modules expected to change:
-
-- `tools/release/changelog/render_raw.py`
-- render tests/fixtures.
-
-Must remain unchanged unless necessary:
-
-- collection internals in `git_collect.py`.
-- CLI version commands.
+- successful local `.deb` build
+- install test via dpkg/apt
 
 ---
 
-## Phase 3: CLI Changelog Draft Workflow (Pre-OpenAI Required)
+## Phase 8: GitHub CI/CD + Production Channel
 
 Goal:
 
-- expose changelog drafting from the main `python -m tools.release` CLI.
+- fully integrate release pipeline into CI/CD
+- surface deployments as “Production” in GitHub UI
 
 Concrete tasks:
 
-1. Add new CLI subcommand(s) in `tools/release/cli.py` (example shape):
-   - `changelog draft`
-   - optional args: `--since-tag`, `--format raw|json`, `--output`.
-2. Wire command to:
-   - `build_release_context(...)`
-   - `render_release_changelog(...)` / JSON output path.
-3. Add dry-run/no-write semantics by default (output only).
+1. GitHub Actions workflow:
+   - trigger on:
+     - tag push OR manual dispatch
+   - steps:
+     - version validation
+     - changelog generation
+     - optional AI draft
+     - Debian build
+     - artifact upload
 
-Expected outputs:
+2. Add release publishing:
+   - attach `.deb` to GitHub Release
+   - optionally push to Nexus APT repo
 
-- one-command local draft generation without using debug module directly.
+3. Add environment deployment signal:
+   - mark release as:
+     - `production`
+   - use GitHub environments:
+     - `production`
+     - optional `staging`
 
-Verification:
+4. Optional:
+   - release notes auto-filled from AI changelog
 
-- command works for tag and no-tag repos.
-- output matches `render_raw` contract from Phase 2.
+Expected output:
 
-Modules expected to change:
-
-- `tools/release/cli.py`
-- `tools/release/changelog/__init__.py` (if export updates needed)
-- potentially `tools/release/__main__.py` only if entry wiring changes.
-
-Must remain unchanged unless necessary:
-
-- existing behavior of `check/sync/set-version/bump`.
-- `version/*` internals.
-
----
-
-## Phase 4: Deterministic AI Payload Builder (Pre-OpenAI Required)
-
-Goal:
-
-- produce a strict, model-ready payload schema separate from human render output.
-
-Concrete tasks:
-
-1. Introduce a new changelog payload module (e.g., `changelog/payload.py`):
-   - deterministic field ordering
-   - bounded list sizes and truncation rules
-   - explicit schema version key.
-2. Build payload from `ReleaseContext` (not from markdown text).
-3. Include stable metadata:
-   - version, previous_tag, head_sha, commit_count
-   - category summaries/files/snippets
-   - normalization notes/limits applied.
-4. Add JSON schema tests/golden snapshots.
-
-Expected outputs:
-
-- deterministic AI input object that is safe for local/offline inspection.
+- full pipeline:
+  - commit/tag → CI → artifact → release → production signal
 
 Verification:
 
-- schema validation + snapshot tests.
-- same input context yields byte-stable serialized JSON.
-
-Modules expected to change:
-
-- new `tools/release/changelog/payload.py` (or equivalent)
-- `tools/release/changelog/__init__.py` exports
-- tests for schema/snapshots.
-
-Must remain unchanged unless necessary:
-
-- `render_raw.py` human-facing format semantics.
-- git collection boundaries.
+- test workflow on tagged release
+- confirm:
+  - artifact present
+  - release notes generated
+  - environment marked as deployed
 
 ---
 
-## Phase 5: Local OpenAI Draft Generation (First Integration Step)
+## Final Pipeline (Target State)
 
-Goal:
-
-- add optional local command that takes deterministic payload and returns draft text.
-
-Concrete tasks:
-
-1. Add integration module isolated from collector logic (e.g., `tools/release/changelog/ai_draft.py`).
-2. Add CLI command (or `--ai` mode) that:
-   - builds deterministic payload
-   - sends to model
-   - returns draft markdown/text.
-3. Add strict fallback modes:
-   - missing API key
-   - model timeout/error
-   - deterministic raw output fallback.
-
-Expected outputs:
-
-- local AI-assisted draft command with clear failure boundaries.
-
-Verification:
-
-- manual integration test with known payload fixture.
-- graceful fallback when AI unavailable.
-
-Modules expected to change:
-
-- new AI module(s)
-- `tools/release/cli.py` changelog command wiring
-- docs for env/config usage.
-
-Must remain unchanged unless necessary:
-
-- collector/scoring heuristics from earlier phases unless bugs are discovered.
+git
+ → collector
+ → payload
+ → triage (5b)
+ → draft (5a)
+ → polish (5c)
+ → markdown
+ → debian packaging (7)
+ → CI/CD release (8)
+ → production deployment signal
 
 ---
 
-## Phase 6: Optional Refinement Passes (Post-Integration)
+## Updated Progress Tracker
 
-Goal:
-
-- improve draft quality/consistency after initial AI integration is stable.
-
-Possible tasks:
-
-1. second-pass refinement prompt against generated draft.
-2. category-specific style passes (core/web/deploy/debian tone shaping).
-3. policy checks (forbidden claims, missing high-impact files).
-
-Expected outputs:
-
-- improved readability while preserving factual grounding from deterministic payload.
-
-Verification:
-
-- regression suite comparing factual coverage and hallucination rate vs Phase 5 baseline.
-
-Modules expected to change:
-
-- AI modules/prompts only.
-
-Should remain unchanged:
-
-- payload schema contract
-- collector and raw renderer, except for bug fixes.
-
----
-
-## Dependency Chain (Strict Order)
-
-1. Phase 0 baseline
-2. Phase 1 collector quality
-3. Phase 2 raw renderer
-4. Phase 3 CLI draft workflow
-5. Phase 4 deterministic AI payload
-6. Phase 5 local OpenAI draft
-7. Phase 6 optional refinements
-
-Critical rule: **do not start Phase 5 before Phase 4 is stable and tested**.
-
----
-
-## Pre-OpenAI Build List (Explicit)
-
-Must be complete before OpenAI integration:
-
-- collector quality tuning with fixtures (Phase 1)
-- deterministic raw renderer contract (Phase 2)
-- main CLI draft workflow (Phase 3)
-- deterministic AI payload builder + schema tests (Phase 4)
-
-Not required before OpenAI integration:
-
-- stylistic refinement passes (Phase 6)
-
----
-
-## Progress Tracker
-
-- [ ] Phase 0 baseline + fixtures
-- [ ] Phase 1 collector quality
-- [ ] Phase 2 raw renderer contract
-- [ ] Phase 3 CLI changelog draft command
-- [ ] Phase 4 deterministic AI payload builder
-- [ ] Phase 5 local OpenAI draft integration
-- [ ] Phase 6 optional refinement passes
+- [ ] Phase 0 baseline (optional / partially bypassed)
+- [x] Phase 1 collector quality
+- [x] Phase 2 raw renderer
+- [x] Phase 3 CLI draft workflow
+- [x] Phase 4 deterministic AI payload
+- [x] Phase 5a AI draft
+- [x] Phase 5b AI triage
+- [ ] Phase 5c AI polish
+- [ ] Phase 6 provider abstraction + local LLM
+- [ ] Phase 7 Debian packaging automation
+- [ ] Phase 8 CI/CD + production channel

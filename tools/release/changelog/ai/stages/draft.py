@@ -20,11 +20,12 @@ def generate_draft_from_payload(
     *,
     model: str | None = None,
     provider: StructuredJSONProvider | None = None,
+    source_kind: str = "payload",
 ) -> AIDraftResult:
     active_provider = provider or OpenAIProvider(model=model or DEFAULT_AI_DRAFT_MODEL)
     structured = active_provider.generate_structured_json(
         system_prompt=build_draft_system_prompt(),
-        user_prompt=build_draft_user_prompt(payload),
+        user_prompt=build_draft_user_prompt(payload, source_kind=source_kind),
         json_schema=AI_DRAFT_RESPONSE_JSON_SCHEMA,
     )
     return parse_ai_draft_response(structured)

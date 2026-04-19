@@ -48,6 +48,20 @@ class AIDraftMiniStageTests(unittest.TestCase):
         self.assertIn("json_schema", call)
         self.assertIn("schema_version", call["user_prompt"])
         self.assertIn("vaulthalla.release.ai_payload.v1", call["user_prompt"])
+        self.assertIn("Release payload", call["user_prompt"])
+
+    def test_generate_draft_can_use_triage_input_label(self) -> None:
+        triage_ir = {
+            "schema_version": "vaulthalla.release.ai_triage.v1",
+            "version": "2.4.0",
+            "summary_points": ["Core work dominates."],
+            "categories": [],
+        }
+        fake = _FakeOpenAIClient(_load_json_fixture("ai_draft_valid.json"))
+
+        _ = generate_draft_from_payload(triage_ir, provider=fake, source_kind="triage")
+        call = fake.calls[0]
+        self.assertIn("Triage IR", call["user_prompt"])
 
     def test_markdown_render_matches_fixture(self) -> None:
         draft = generate_draft_from_payload(

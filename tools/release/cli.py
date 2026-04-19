@@ -5,8 +5,10 @@ import sys
 from pathlib import Path
 
 from tools.release.changelog.ai.config import DEFAULT_AI_DRAFT_MODEL
+from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
 from tools.release.changelog.ai.render.markdown import render_draft_markdown
 from tools.release.changelog.ai.stages.draft import generate_draft_from_payload, render_draft_result_json
+from tools.release.changelog.ai.stages.triage import render_triage_result_json, run_triage_stage
 from tools.release.changelog.context_builder import build_release_context
 from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
@@ -165,6 +167,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=DEFAULT_AI_DRAFT_MODEL,
         help=f"OpenAI model to use (default: {DEFAULT_AI_DRAFT_MODEL}).",
+    )
+    changelog_ai_draft_parser.add_argument(
+        "--use-triage",
+        action="store_true",
+        help="Run optional AI triage stage before draft generation.",
+    )
+    changelog_ai_draft_parser.add_argument(
+        "--save-triage-json",
+        default=None,
+        help="Optional path to save validated structured triage JSON when --use-triage is enabled.",
     )
     changelog_ai_draft_parser.set_defaults(func=cmd_changelog_ai_draft)
 
@@ -329,11 +341,25 @@ def cmd_changelog_payload(args: argparse.Namespace) -> int:
 
 
 def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
+    if args.save_triage_json and not args.use_triage:
+        raise ValueError("--save-triage-json requires --use-triage.")
+
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
     payload = build_ai_payload(context)
+    draft_input: dict = payload
+    source_kind = "payload"
 
-    draft = generate_draft_from_payload(payload, model=args.model)
+    if args.use_triage:
+        triage_result = run_triage_stage(payload, model=args.model)
+        draft_input = build_triage_ir_payload(triage_result)
+        source_kind = "triage"
+
+        if args.save_triage_json:
+            write_output(render_triage_result_json(triage_result), args.save_triage_json)
+            print(f"Wrote AI triage JSON to {Path(args.save_triage_json).resolve()}")
+
+    draft = generate_draft_from_payload(draft_input, model=args.model, source_kind=source_kind)
     markdown = render_draft_markdown(draft)
     write_output(markdown, args.output)
 

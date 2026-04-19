@@ -1,0 +1,291 @@
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from tools.release.files import (
+    read_debian_version,
+    write_debian_version,
+    write_meson_version,
+    write_package_json_version,
+    write_version_file,
+)
+from tools.release.validate import (
+    build_sync_required_message,
+    get_release_state,
+    require_release_files,
+    require_synced_release_state,
+)
+from tools.release.versioning import Version
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m tools.release",
+        description="Vaulthalla release and packaging tooling.",
+    )
+
+    parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path to the repository root (default: current directory).",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Validate release file versions and repo release state.",
+    )
+    check_parser.set_defaults(func=cmd_check)
+
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Synchronize managed release files to the canonical VERSION file.",
+    )
+    sync_parser.add_argument(
+        "--debian-revision",
+        type=int,
+        default=None,
+        help="Optional Debian revision override. Defaults to existing revision or 1.",
+    )
+    sync_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would change without writing files.",
+    )
+    sync_parser.set_defaults(func=cmd_sync)
+
+    set_version_parser = subparsers.add_parser(
+        "set-version",
+        help="Set the application version across release-managed files.",
+    )
+    set_version_parser.add_argument("version", help="Semantic version to set (e.g. 0.3.0).")
+    set_version_parser.add_argument(
+        "--debian-revision",
+        type=int,
+        default=1,
+        help="Debian package revision to write (default: 1).",
+    )
+    set_version_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would change without writing files.",
+    )
+    set_version_parser.set_defaults(func=cmd_set_version)
+
+    bump_parser = subparsers.add_parser(
+        "bump",
+        help="Bump the current semantic version.",
+    )
+    bump_parser.add_argument(
+        "part",
+        choices=("major", "minor", "patch"),
+        help="Version component to bump.",
+    )
+    bump_parser.add_argument(
+        "--debian-revision",
+        type=int,
+        default=1,
+        help="Debian package revision to write after bump (default: 1).",
+    )
+    bump_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would change without writing files.",
+    )
+    bump_parser.set_defaults(func=cmd_bump)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        return int(args.func(args))
+    except KeyboardInterrupt:
+        print("Interrupted.", file=sys.stderr)
+        return 130
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    state = get_release_state(args.repo_root)
+    print_release_state(state)
+
+    if state.has_structural_errors:
+        return 1
+    if state.has_drift:
+        print()
+        print(build_sync_required_message(state))
+        return 1
+    return 0
+
+
+def cmd_sync(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    state = require_release_files(repo_root)
+    paths = state.paths
+
+    canonical = state.versions.canonical
+    if canonical is None:
+        raise ValueError("Canonical VERSION could not be resolved")
+
+    current_debian = state.versions.debian
+    debian_revision = (
+        args.debian_revision
+        if args.debian_revision is not None
+        else (current_debian.revision if current_debian is not None else 1)
+    )
+
+    print(f"Canonical version: {canonical}")
+    print(f"Debian revision:   {debian_revision}")
+    print()
+
+    print_planned_changes(
+        current_canonical=state.versions.canonical,
+        current_meson=state.versions.meson,
+        current_package_json=state.versions.package_json,
+        current_debian=state.versions.debian,
+        target_version=canonical,
+        target_debian_revision=debian_revision,
+    )
+
+    if args.dry_run:
+        print("\nDry run only. No files were modified.")
+        return 0
+
+    apply_managed_file_sync(
+        paths=paths,
+        version=canonical,
+        debian_revision=debian_revision,
+        write_canonical=False,
+    )
+
+    print("\nSync complete.")
+    return 0
+
+
+def cmd_set_version(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    _ = require_synced_release_state(repo_root)
+
+    target_version = Version.parse(args.version)
+    debian_revision = args.debian_revision
+    state = get_release_state(repo_root)
+    paths = state.paths
+
+    print(f"Target version:    {target_version}")
+    print(f"Debian revision:   {debian_revision}")
+    print()
+
+    print_planned_changes(
+        current_canonical=state.versions.canonical,
+        current_meson=state.versions.meson,
+        current_package_json=state.versions.package_json,
+        current_debian=state.versions.debian,
+        target_version=target_version,
+        target_debian_revision=debian_revision,
+    )
+
+    if args.dry_run:
+        print("\nDry run only. No files were modified.")
+        return 0
+
+    apply_managed_file_sync(
+        paths=paths,
+        version=target_version,
+        debian_revision=debian_revision,
+        write_canonical=True,
+    )
+
+    print("\nVersion update complete.")
+    return 0
+
+
+def cmd_bump(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    state = require_synced_release_state(repo_root)
+
+    current_version = state.versions.canonical
+    if current_version is None:
+        raise ValueError("Could not determine canonical version from VERSION")
+
+    target_version = bump_version(current_version, args.part)
+
+    print(f"Current version:   {current_version}")
+    print(f"Bump part:         {args.part}")
+    print(f"Target version:    {target_version}")
+    print()
+
+    set_args = argparse.Namespace(
+        repo_root=str(repo_root),
+        version=str(target_version),
+        debian_revision=args.debian_revision,
+        dry_run=args.dry_run,
+    )
+    return cmd_set_version(set_args)
+
+
+def apply_managed_file_sync(*, paths, version: Version, debian_revision: int, write_canonical: bool) -> None:
+    if write_canonical:
+        write_version_file(paths.version_file, version)
+
+    write_meson_version(paths.meson_file, version)
+    write_package_json_version(paths.package_json_file, version)
+    write_debian_version(paths.debian_changelog_file, version, revision=debian_revision)
+
+
+def bump_version(version: Version, part: str) -> Version:
+    if part == "major":
+        return version.bump_major()
+    if part == "minor":
+        return version.bump_minor()
+    if part == "patch":
+        return version.bump_patch()
+    raise ValueError(f"Unsupported bump part: {part}")
+
+
+def print_release_state(state) -> None:
+    print("Release state")
+    print("-------------")
+    print(f"Repo root:         {state.paths.repo_root}")
+    print(f"VERSION:           {format_value(state.versions.canonical)}")
+    print(f"meson.build:       {format_value(state.versions.meson)}")
+    print(f"package.json:      {format_value(state.versions.package_json)}")
+    print(f"debian/changelog:  {format_value(state.versions.debian)}")
+    print(f"Status:            {'OK' if state.is_valid else 'INVALID'}")
+
+    if state.issues:
+        print("\nIssues:")
+        for issue in state.issues:
+            print(f"  - [{issue.code}] {issue.message}")
+
+
+def print_planned_changes(
+    *,
+    current_canonical,
+    current_meson,
+    current_package_json,
+    current_debian,
+    target_version: Version,
+    target_debian_revision: int,
+) -> None:
+    print("Planned changes")
+    print("---------------")
+    print(f"VERSION:           {format_value(current_canonical)} -> {target_version}")
+    print(f"meson.build:       {format_value(current_meson)} -> {target_version}")
+    print(f"package.json:      {format_value(current_package_json)} -> {target_version}")
+    print(
+        f"debian/changelog:  {format_value(current_debian)} -> "
+        f"{target_version}-{target_debian_revision}"
+    )
+
+
+def format_value(value) -> str:
+    return str(value) if value is not None else "<unavailable>"

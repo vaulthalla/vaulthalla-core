@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from tools.release.changelog.context_builder import build_release_context
+from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
 from tools.release.version.adapters.version_file import read_version_file
 from tools.release.version.models import Version
@@ -121,6 +122,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write rendered output to a file path instead of stdout.",
     )
     changelog_draft_parser.set_defaults(func=cmd_changelog_draft)
+
+    changelog_payload_parser = changelog_subparsers.add_parser(
+        "payload",
+        help="Render deterministic model-ready payload JSON from release context.",
+    )
+    changelog_payload_parser.add_argument(
+        "--since-tag",
+        default=None,
+        help="Optional tag to use as lower bound (overrides latest-tag auto-detection).",
+    )
+    changelog_payload_parser.add_argument(
+        "--output",
+        default=None,
+        help="Write rendered output to a file path instead of stdout.",
+    )
+    changelog_payload_parser.set_defaults(func=cmd_changelog_payload)
 
     return parser
 
@@ -257,18 +274,7 @@ def cmd_bump(args: argparse.Namespace) -> int:
 
 def cmd_changelog_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
-    version_path = repo_root / "VERSION"
-
-    try:
-        version = read_version_file(version_path)
-    except Exception as exc:
-        raise ValueError(f"Failed to read canonical version from {version_path}: {exc}") from exc
-
-    context = build_release_context(
-        version=str(version),
-        repo_root=repo_root,
-        previous_tag=args.since_tag,
-    )
+    context = build_changelog_context(repo_root, args.since_tag)
 
     if args.format == "json":
         rendered = f"{render_debug_json(context)}\n"
@@ -278,6 +284,18 @@ def cmd_changelog_draft(args: argparse.Namespace) -> int:
     write_output(rendered, args.output)
     if args.output:
         print(f"Wrote changelog draft to {Path(args.output).resolve()}")
+    return 0
+
+
+def cmd_changelog_payload(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    context = build_changelog_context(repo_root, args.since_tag)
+    payload = build_ai_payload(context)
+    rendered = render_ai_payload_json(payload)
+
+    write_output(rendered, args.output)
+    if args.output:
+        print(f"Wrote changelog payload to {Path(args.output).resolve()}")
     return 0
 
 
@@ -341,3 +359,18 @@ def write_output(content: str, output_path: str | None) -> None:
         target.write_text(content, encoding="utf-8")
     except Exception as exc:
         raise ValueError(f"Failed to write output to {target}: {exc}") from exc
+
+
+def build_changelog_context(repo_root: Path, since_tag: str | None):
+    version_path = repo_root / "VERSION"
+
+    try:
+        version = read_version_file(version_path)
+    except Exception as exc:
+        raise ValueError(f"Failed to read canonical version from {version_path}: {exc}") from exc
+
+    return build_release_context(
+        version=str(version),
+        repo_root=repo_root,
+        previous_tag=since_tag,
+    )

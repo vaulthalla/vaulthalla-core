@@ -33,8 +33,7 @@ class CliChangelogDraftTests(unittest.TestCase):
         out = StringIO()
 
         with (
-            patch("tools.release.cli.read_version_file", return_value=Version(1, 2, 3)) as read_version,
-            patch("tools.release.cli.build_release_context", return_value=object()) as build_context,
+            patch("tools.release.cli.build_changelog_context", return_value=object()) as build_context,
             patch("tools.release.cli.render_release_changelog", return_value="# Release Draft\n") as render_raw,
             patch("tools.release.cli.render_debug_json") as render_json,
             redirect_stdout(out),
@@ -43,11 +42,8 @@ class CliChangelogDraftTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         self.assertEqual(out.getvalue(), "# Release Draft\n")
-        read_version.assert_called_once()
         build_context.assert_called_once()
-        kwargs = build_context.call_args.kwargs
-        self.assertEqual(kwargs["version"], "1.2.3")
-        self.assertIsNone(kwargs["previous_tag"])
+        self.assertEqual(build_context.call_args.args[1], None)
         render_raw.assert_called_once()
         render_json.assert_not_called()
 
@@ -56,8 +52,7 @@ class CliChangelogDraftTests(unittest.TestCase):
         out = StringIO()
 
         with (
-            patch("tools.release.cli.read_version_file", return_value=Version(0, 28, 1)),
-            patch("tools.release.cli.build_release_context", return_value=object()),
+            patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.render_release_changelog") as render_raw,
             patch("tools.release.cli.render_debug_json", return_value='{"ok":true}') as render_json,
             redirect_stdout(out),
@@ -74,15 +69,14 @@ class CliChangelogDraftTests(unittest.TestCase):
         out = StringIO()
 
         with (
-            patch("tools.release.cli.read_version_file", return_value=Version(1, 0, 0)),
-            patch("tools.release.cli.build_release_context", return_value=object()) as build_context,
+            patch("tools.release.cli.build_changelog_context", return_value=object()) as build_context,
             patch("tools.release.cli.render_release_changelog", return_value="# Draft\n"),
             redirect_stdout(out),
         ):
             result = cli.cmd_changelog_draft(args)
 
         self.assertEqual(result, 0)
-        self.assertEqual(build_context.call_args.kwargs["previous_tag"], "v0.27.0")
+        self.assertEqual(build_context.call_args.args[1], "v0.27.0")
 
     def test_output_file_writing(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -91,8 +85,7 @@ class CliChangelogDraftTests(unittest.TestCase):
             out = StringIO()
 
             with (
-                patch("tools.release.cli.read_version_file", return_value=Version(2, 0, 0)),
-                patch("tools.release.cli.build_release_context", return_value=object()),
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.render_release_changelog", return_value="# File Draft\n"),
                 redirect_stdout(out),
             ):
@@ -129,6 +122,82 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_json.format, "json")
         self.assertEqual(parsed_json.since_tag, "v0.1.0")
         self.assertEqual(parsed_json.output, "/tmp/x.md")
+
+        parsed_payload = parser.parse_args(
+            ["changelog", "payload", "--since-tag", "v0.1.0", "--output", "/tmp/payload.json"]
+        )
+        self.assertEqual(parsed_payload.command, "changelog")
+        self.assertEqual(parsed_payload.changelog_command, "payload")
+        self.assertEqual(parsed_payload.since_tag, "v0.1.0")
+        self.assertEqual(parsed_payload.output, "/tmp/payload.json")
+
+
+class CliChangelogPayloadTests(unittest.TestCase):
+    def _args(
+        self,
+        *,
+        repo_root: str = ".",
+        since_tag: str | None = None,
+        output: str | None = None,
+    ) -> argparse.Namespace:
+        return argparse.Namespace(
+            repo_root=repo_root,
+            since_tag=since_tag,
+            output=output,
+        )
+
+    def test_payload_to_stdout(self) -> None:
+        args = self._args(since_tag="v0.1.0")
+        out = StringIO()
+
+        with (
+            patch("tools.release.cli.build_changelog_context", return_value=object()) as build_context,
+            patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}) as build_payload,
+            patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n') as render_payload,
+            redirect_stdout(out),
+        ):
+            result = cli.cmd_changelog_payload(args)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(out.getvalue(), '{"schema_version":"x"}\n')
+        self.assertEqual(build_context.call_args.args[1], "v0.1.0")
+        build_payload.assert_called_once()
+        render_payload.assert_called_once()
+
+    def test_payload_to_output_file(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "payload.json"
+            args = self._args(output=str(target))
+            out = StringIO()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                redirect_stdout(out),
+            ):
+                result = cli.cmd_changelog_payload(args)
+
+            self.assertEqual(result, 0)
+            self.assertTrue(target.is_file())
+            self.assertEqual(target.read_text(encoding="utf-8"), '{"schema_version":"x"}\n')
+            self.assertIn("Wrote changelog payload to", out.getvalue())
+
+
+class CliChangelogContextHelperTests(unittest.TestCase):
+    def test_build_changelog_context_reads_version_and_passes_since_tag(self) -> None:
+        repo_root = Path("/tmp/repo")
+        context_obj = object()
+
+        with (
+            patch("tools.release.cli.read_version_file", return_value=Version(1, 2, 3)) as read_version,
+            patch("tools.release.cli.build_release_context", return_value=context_obj) as build_context,
+        ):
+            context = cli.build_changelog_context(repo_root, "v0.9.0")
+
+        self.assertIs(context, context_obj)
+        read_version.assert_called_once_with(repo_root / "VERSION")
+        build_context.assert_called_once_with(version="1.2.3", repo_root=repo_root, previous_tag="v0.9.0")
 
 
 if __name__ == "__main__":

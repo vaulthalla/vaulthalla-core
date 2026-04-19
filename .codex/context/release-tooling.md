@@ -7,16 +7,16 @@ This is the current architecture and status map for release/version/changelog au
 `tools/release` currently does two real jobs:
 
 1. Version-state management (authoritative `VERSION` sync and drift validation).
-2. Changelog intelligence primitives (collect/categorize/score/snippet/render of release context).
+2. Changelog generation pipeline (collect/categorize/score/snippet/context, raw draft rendering, and deterministic AI payload projection).
 
-It does **not** yet provide a full CLI changelog draft pipeline or OpenAI integration.
+It does **not** yet include OpenAI API integration; payload generation is local/offline only.
 
 ## Package Layout (Current Code)
 
 Top level:
 
 - `tools/release/__main__.py`: `python -m tools.release` entrypoint.
-- `tools/release/cli.py`: CLI parser + `check/sync/set-version/bump`.
+- `tools/release/cli.py`: CLI parser + version commands + changelog `draft`/`payload` flows.
 
 Version system:
 
@@ -44,6 +44,7 @@ Changelog system:
 - `tools/release/changelog/snippets.py`: patch hunk splitting + top snippet selection.
 - `tools/release/changelog/context_builder.py`: orchestration into `ReleaseContext` (commit/file stats + snippets).
 - `tools/release/changelog/render_raw.py`: raw markdown/debug/json rendering.
+- `tools/release/changelog/payload.py`: deterministic model-ready payload builder (`schema_version`, bounded evidence, truncation metadata).
 
 Debug surface:
 
@@ -56,9 +57,11 @@ python3 -m tools.release check
 python3 -m tools.release sync [--dry-run] [--debian-revision N]
 python3 -m tools.release set-version X.Y.Z [--dry-run] [--debian-revision N]
 python3 -m tools.release bump {major|minor|patch} [--dry-run] [--debian-revision N]
+python3 -m tools.release changelog draft [--format raw|json] [--since-tag TAG] [--output PATH]
+python3 -m tools.release changelog payload [--since-tag TAG] [--output PATH]
 ```
 
-Debug-only (not wired into main CLI):
+Debug harness:
 
 ```bash
 python3 -m tools.release.debug.release_context [--repo-root PATH] [--json]
@@ -116,27 +119,21 @@ This is currently the best introspection path for tuning collector quality.
 
 ## Known Gaps / Limitations (Current)
 
-1. Main CLI has no `changelog` command yet.
-2. No deterministic changelog payload contract formalized for AI consumption (current JSON is debug-oriented).
-3. Raw renderer is minimal:
+1. Raw renderer is intentionally conservative and heuristic-driven:
    - no strong section templates
-   - no deterministic ordering guarantees beyond category traversal
    - limited narrative synthesis.
-4. Categorization/scoring/snippet logic is heuristic and not yet benchmarked by quality fixtures.
-5. Snippet reasoning is shallow (`build_snippet_reason` ignores hunk content beyond score).
-6. No stored golden tests for changelog context stability across representative commit sets.
-7. No OpenAI client integration in `tools/release` yet (by design at current stage).
+2. Categorization/scoring/snippet logic is heuristic and not yet benchmarked by representative git-range fixtures.
+3. Snippet reasoning is shallow (`build_snippet_reason` still mostly file-level).
+4. No OpenAI client integration in `tools/release` yet (by design at current stage).
 
 ## Intended Progression Toward AI-Assisted Changelog Generation
 
-Planned progression should remain staged:
+Planned progression from current state:
 
-1. Improve collector quality and deterministic context assembly.
-2. Improve raw renderer quality and deterministic section structure.
-3. Add CLI workflow for draft changelog generation from existing pipeline.
-4. Add deterministic AI payload builder (separate from display renderer).
-5. Integrate local OpenAI draft generation behind explicit command/flag.
-6. Add optional refinement passes only after baseline deterministic quality is stable.
+1. Continue collector quality and determinism tuning.
+2. Improve/validate renderer quality using representative fixtures.
+3. Add local OpenAI draft integration on top of deterministic payload input.
+4. Add optional refinement passes only after baseline deterministic quality is stable.
 
 Roadmap tracking file:
 

@@ -21,3 +21,25 @@ die() {
   printf '[codex] ERROR: %s\n' "$*" >&2
   exit 1
 }
+
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+run_in() {
+  local dir="$1"
+  shift
+  (
+    cd "$dir"
+    "$@"
+  )
+}
+
+run_eval_in() {
+  local dir="$1"
+  local cmd="$2"
+  (
+    cd "$dir"
+    eval "$cmd"
+  )
+}

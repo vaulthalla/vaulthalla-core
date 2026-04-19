@@ -4,6 +4,10 @@
 
 <!-- One sentence -->
 
+## Subsystems
+
+- core / web / deploy / debian / tools / bin / github
+
 ## Constraints
 
 - 
@@ -16,8 +20,9 @@
 
 ## Validation
 
-- Command:
+- Command(s):
 - Expected:
+- Profile: `web` / `release` / `all`
 
 ## Risks
 

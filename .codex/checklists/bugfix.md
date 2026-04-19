@@ -8,4 +8,7 @@
 - Types are tightened where ambiguity caused the issue.
 - Verification includes before/after behavior checks.
 - `bash .codex/scripts/changed.sh all` passes.
-- `bash .codex/scripts/verify.sh` passes before handoff.
+- Run subsystem verification:
+- Web scope: `bash .codex/scripts/verify.sh web`
+- Release/version scope: `bash .codex/scripts/verify.sh release`
+- Cross-cutting scope: `bash .codex/scripts/verify.sh all`

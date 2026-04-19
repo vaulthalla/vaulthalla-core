@@ -15,6 +15,20 @@ out_file="${CONTEXT_DIR:-.codex/context}/snapshot_${timestamp}.md"
   echo "- Timestamp: $(date -Iseconds)"
   echo "- Branch: $(git rev-parse --abbrev-ref HEAD)"
   echo "- Commit: $(git rev-parse --short HEAD)"
+  if [[ -f VERSION ]]; then
+    echo "- VERSION: $(tr -d '[:space:]' < VERSION)"
+  fi
+  echo
+  echo "## Monorepo Areas"
+  echo
+  echo '```'
+  git diff --name-only --diff-filter=ACMRTUXB \
+    | awk -F/ '
+      NF==1 {k="[root]"; c[k]++ ; next}
+      {k=$1; c[k]++}
+      END {for (k in c) printf "%-12s %d\n", k, c[k]}
+    ' | sort
+  echo '```'
   echo
   echo "## Git Status"
   echo

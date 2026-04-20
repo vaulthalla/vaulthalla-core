@@ -11,8 +11,7 @@ from tools.release.changelog.ai.config import (
 
 
 def _write_profile(repo_root: Path, content: str) -> None:
-    cfg = repo_root / ".vaulthalla" / "ai.yml"
-    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg = repo_root / "ai.yml"
     cfg.write_text(content, encoding="utf-8")
 
 

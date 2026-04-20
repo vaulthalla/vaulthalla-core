@@ -184,7 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     changelog_ai_check_parser.add_argument(
         "--ai-profile",
         default=None,
-        help="Named AI profile slug from .vaulthalla/ai.yml.",
+        help="Named AI profile slug from ai.yml at repo root.",
     )
     changelog_ai_check_parser.add_argument(
         "--model",
@@ -229,7 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
     changelog_ai_draft_parser.add_argument(
         "--ai-profile",
         default=None,
-        help="Named AI profile slug from .vaulthalla/ai.yml.",
+        help="Named AI profile slug from ai.yml at repo root.",
     )
     changelog_ai_draft_parser.add_argument(
         "--model",

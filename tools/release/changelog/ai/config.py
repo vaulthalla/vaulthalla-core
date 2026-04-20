@@ -85,7 +85,7 @@ class AIPipelineCLIOverrides:
     model: str | None = None
 
 
-DEFAULT_AI_PROFILE_PATH = Path(".vaulthalla/ai.yml")
+DEFAULT_AI_PROFILE_PATH = Path("ai.yml")
 
 
 def resolve_ai_pipeline_config(

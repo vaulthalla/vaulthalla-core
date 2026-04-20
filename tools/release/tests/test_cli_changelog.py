@@ -617,8 +617,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
     def test_ai_draft_stage_reasoning_and_mode_resolve_from_profile(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
-            profile_cfg = repo_root / ".vaulthalla" / "ai.yml"
-            profile_cfg.parent.mkdir(parents=True, exist_ok=True)
+            profile_cfg = repo_root / "ai.yml"
             profile_cfg.write_text(
                 """
 profiles:

@@ -34,7 +34,12 @@ from tools.release.changelog.release_workflow import (
 from tools.release.changelog.context_builder import build_release_context
 from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
-from tools.release.packaging import build_debian_package, validate_release_artifacts
+from tools.release.packaging import (
+    build_debian_package,
+    publish_debian_artifacts,
+    resolve_debian_publication_settings,
+    validate_release_artifacts,
+)
 from tools.release.version.adapters.version_file import read_version_file
 from tools.release.version.models import Version
 from tools.release.version.sync import apply_version_update, resolve_debian_revision
@@ -154,6 +159,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip changelog artifact checks.",
     )
     validate_release_artifacts_parser.set_defaults(func=cmd_validate_release_artifacts)
+
+    publish_deb_parser = subparsers.add_parser(
+        "publish-deb",
+        help="Publish staged Debian package artifacts to Nexus.",
+    )
+    publish_deb_parser.add_argument(
+        "--output-dir",
+        default="release",
+        help="Release artifact directory that contains Debian packages to publish (default: release/ at repo root).",
+    )
+    publish_deb_parser.add_argument(
+        "--mode",
+        default=None,
+        help="Publication mode override (disabled|nexus). Defaults to RELEASE_PUBLISH_MODE env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-repo-url",
+        default=None,
+        help="Nexus repository URL override. Defaults to NEXUS_REPO_URL env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-user",
+        default=None,
+        help="Nexus username override. Defaults to NEXUS_USER env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-pass",
+        default=None,
+        help="Nexus password override. Defaults to NEXUS_PASS env.",
+    )
+    publish_deb_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate publication settings and artifact selection without uploading.",
+    )
+    publish_deb_parser.set_defaults(func=cmd_publish_deb)
 
     changelog_parser = subparsers.add_parser(
         "changelog",
@@ -509,6 +550,49 @@ def cmd_validate_release_artifacts(args: argparse.Namespace) -> int:
     if not args.skip_changelog:
         print(f"Changelog files:   {len(result.changelog_artifacts)}")
     print("Status:            OK")
+    return 0
+
+
+def cmd_publish_deb(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = (repo_root / output_dir).resolve()
+
+    settings = resolve_debian_publication_settings(
+        mode=args.mode,
+        nexus_repo_url=args.nexus_repo_url,
+        nexus_user=args.nexus_user,
+        nexus_password=args.nexus_pass,
+        env=os.environ,
+    )
+    result = publish_debian_artifacts(
+        output_dir=output_dir,
+        settings=settings,
+        dry_run=bool(args.dry_run),
+    )
+
+    print("Debian publication")
+    print("------------------")
+    print(f"Mode:              {result.mode}")
+    print(f"Output dir:        {result.output_dir}")
+    print(f"Debian artifacts:  {len(result.artifacts)}")
+    for artifact in result.artifacts:
+        print(f"- {artifact}")
+
+    if not result.enabled:
+        print("Status:            SKIPPED")
+        print(f"Reason:            {result.skipped_reason or 'Publication disabled.'}")
+        return 0
+
+    print(f"Target URLs:       {len(result.target_urls)}")
+    for target_url in result.target_urls:
+        print(f"- {target_url}")
+
+    if result.dry_run:
+        print("Status:            DRY-RUN (validated, not uploaded)")
+    else:
+        print("Status:            PUBLISHED")
     return 0
 
 

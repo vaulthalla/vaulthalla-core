@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.release import cli
-from tools.release.packaging import DebianBuildResult
+from tools.release.packaging import DebianBuildResult, DebianPublicationResult
 
 
 class CliBuildDebParsingTests(unittest.TestCase):
@@ -36,6 +36,34 @@ class CliBuildDebParsingTests(unittest.TestCase):
         self.assertEqual(parsed.command, "validate-release-artifacts")
         self.assertEqual(parsed.output_dir, "/tmp/release")
         self.assertTrue(parsed.skip_changelog)
+        self.assertTrue(callable(parsed.func))
+
+    def test_publish_deb_parser_flags(self) -> None:
+        parser = cli.build_parser()
+        parsed = parser.parse_args(
+            [
+                "publish-deb",
+                "--output-dir",
+                "/tmp/release",
+                "--mode",
+                "nexus",
+                "--nexus-repo-url",
+                "https://nexus.example/repository/vaulthalla-debian",
+                "--nexus-user",
+                "ci-user",
+                "--nexus-pass",
+                "secret",
+                "--dry-run",
+            ]
+        )
+
+        self.assertEqual(parsed.command, "publish-deb")
+        self.assertEqual(parsed.output_dir, "/tmp/release")
+        self.assertEqual(parsed.mode, "nexus")
+        self.assertEqual(parsed.nexus_repo_url, "https://nexus.example/repository/vaulthalla-debian")
+        self.assertEqual(parsed.nexus_user, "ci-user")
+        self.assertEqual(parsed.nexus_pass, "secret")
+        self.assertTrue(parsed.dry_run)
         self.assertTrue(callable(parsed.func))
 
 
@@ -136,6 +164,94 @@ class CliBuildDebCommandTests(unittest.TestCase):
         rendered = out.getvalue()
         self.assertIn("Release artifact validation", rendered)
         self.assertIn("Status:            OK", rendered)
+
+    def test_publish_deb_command_reports_skipped_when_disabled(self) -> None:
+        args = argparse.Namespace(
+            repo_root=".",
+            output_dir="release",
+            mode="disabled",
+            nexus_repo_url=None,
+            nexus_user=None,
+            nexus_pass=None,
+            dry_run=False,
+        )
+        out = StringIO()
+        fake_settings = type(
+            "_Settings",
+            (),
+            {
+                "mode": "disabled",
+                "nexus_repo_url": "",
+                "nexus_user": "",
+                "nexus_password": "",
+            },
+        )()
+        fake_result = DebianPublicationResult(
+            output_dir=Path("/tmp/repo/release"),
+            mode="disabled",
+            enabled=False,
+            dry_run=False,
+            artifacts=(Path("/tmp/repo/release/vaulthalla_1.2.3-1_amd64.deb"),),
+            target_urls=(),
+            skipped_reason="Publication mode is disabled.",
+        )
+
+        with (
+            patch("tools.release.cli.resolve_debian_publication_settings", return_value=fake_settings),
+            patch("tools.release.cli.publish_debian_artifacts", return_value=fake_result),
+            redirect_stdout(out),
+        ):
+            rc = cli.cmd_publish_deb(args)
+
+        self.assertEqual(rc, 0)
+        rendered = out.getvalue()
+        self.assertIn("Debian publication", rendered)
+        self.assertIn("Status:            SKIPPED", rendered)
+        self.assertIn("Publication mode is disabled.", rendered)
+
+    def test_publish_deb_command_reports_published_targets(self) -> None:
+        args = argparse.Namespace(
+            repo_root=".",
+            output_dir="release",
+            mode="nexus",
+            nexus_repo_url=None,
+            nexus_user=None,
+            nexus_pass=None,
+            dry_run=False,
+        )
+        out = StringIO()
+        fake_settings = type(
+            "_Settings",
+            (),
+            {
+                "mode": "nexus",
+                "nexus_repo_url": "https://nexus.example/repository/vaulthalla-debian",
+                "nexus_user": "ci-user",
+                "nexus_password": "secret",
+            },
+        )()
+        fake_result = DebianPublicationResult(
+            output_dir=Path("/tmp/repo/release"),
+            mode="nexus",
+            enabled=True,
+            dry_run=False,
+            artifacts=(Path("/tmp/repo/release/vaulthalla_1.2.3-1_amd64.deb"),),
+            target_urls=("https://nexus.example/repository/vaulthalla-debian/vaulthalla_1.2.3-1_amd64.deb",),
+            skipped_reason=None,
+        )
+
+        with (
+            patch("tools.release.cli.resolve_debian_publication_settings", return_value=fake_settings),
+            patch("tools.release.cli.publish_debian_artifacts", return_value=fake_result),
+            redirect_stdout(out),
+        ):
+            rc = cli.cmd_publish_deb(args)
+
+        self.assertEqual(rc, 0)
+        rendered = out.getvalue()
+        self.assertIn("Mode:              nexus", rendered)
+        self.assertIn("Target URLs:       1", rendered)
+        self.assertIn("Status:            PUBLISHED", rendered)
 
 
 if __name__ == "__main__":

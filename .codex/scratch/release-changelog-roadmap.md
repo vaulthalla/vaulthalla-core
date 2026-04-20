@@ -1,103 +1,82 @@
-# Release Changelog Roadmap (Post-Buildout State)
+# Release Roadmap Status (Post Phase 12a)
 
-This roadmap is now a status-and-hardening tracker.  
-The original buildout phases are implemented; current work is integration polish and production hardening.
+This is the condensed status snapshot for release/changelog/packaging/install/publication work.
 
----
+## Completed Through Current Implementation
 
-## Implemented Spine (As Of Today)
+## Foundation (pre-Phase 10)
 
-Completed phases:
+- Deterministic changelog context/payload generation.
+- AI changelog drafting pipeline (triage/draft/polish) with provider abstraction.
+- Version synchronization and release-state validation tooling.
+- Debian + web artifact build tooling.
 
-- ✅ Phase 1: collector quality foundation
-- ✅ Phase 2: deterministic raw renderer
-- ✅ Phase 3: CLI changelog draft workflow
-- ✅ Phase 4: deterministic AI payload builder
-- ✅ Phase 5a: AI draft stage
-- ✅ Phase 5b: optional triage stage
-- ✅ Phase 5c: optional polish stage
-- ✅ Phase 6a: provider seam (hosted OpenAI + OpenAI-compatible)
-- ✅ Phase 6b: operator preflight workflow (`changelog ai-check`)
-- ✅ Phase 7a: local Debian packaging orchestration (`build-deb`)
-- ✅ Phase 7b: web deployable artifact inclusion in release outputs
-- ✅ Phase 8: GitHub release workflow with `Production` environment tracking
-- [] Phase 9a: Prompt for nginx install in debian package postinst script (deferred from initial buildout to avoid blocking core release flow).
-- [] Phase 9b: Nexus/APT publication automation
+## Phase 10a - AI release integration
 
-Current command spine exists end-to-end from local tooling through CI release artifact generation.
+- `changelog release` integrated into canonical package action flow.
+- Deterministic provider order implemented:
+  - Hosted OpenAI
+  - Local OpenAI-compatible
+  - Manual/no-AI
+- Local fallback explicitly gated (`RELEASE_LOCAL_LLM_ENABLED=true`).
+- `RELEASE_LOCAL_LLM_BASE_URL` override implemented and logged.
+- Manual path stale/missing changelog validation against `VERSION`.
 
----
+## Phase 10b - workflow hardening
 
-## Current End-to-End Flow
+- Clear failure boundaries for changelog, packaging, and artifact validation stages.
+- Runner/env preflight checks added.
+- Package action kept canonical for packaging logic.
 
-1. Version guard/sync:
-   - `check`, `sync`, `set-version`, `bump`
-2. Deterministic release context:
-   - git collect -> categorize -> score -> snippets -> context
-3. Deterministic outputs:
-   - raw markdown draft
-   - model-ready payload JSON
-4. AI drafting path:
-   - payload -> optional triage -> draft -> optional polish -> local markdown
-5. Local packaging:
-   - `build-deb` (Debian artifacts + Next standalone tarball)
-6. CI release path:
-   - `.github/workflows/release.yml`
-   - canonical package action: `.github/actions/package/action.yml`
-   - artifact upload + optional GitHub Release attachment
-   - deployment tracked under GitHub `Production` environment
+## Phase 10c - packaging validation
 
----
+- Artifact completeness checks expanded beyond "build succeeded":
+  - Debian package payload contract
+  - web standalone archive contract
+  - staged release artifact presence checks
 
-## Today’s Key Contract Learnings
+## Phase 11 - install/deployment completion
 
-1. Debian version validation is upstream-only:
-   - `upstream(debian/changelog) == VERSION`
-   - revision suffix is not part of canonical comparison.
-2. Release workflow web parity requires `build_web` semantics:
-   - private icon sync from `~/vaulthalla-web-icons` must happen before web checks.
-3. Debian Meson source directory must be `core/` in `debian/rules`.
-4. Debian packaging requires explicit staging of non-Meson payloads expected by `debian/install`.
-5. Next standalone archive copy must preserve symlinks in CI (pnpm-linked layouts).
-6. `environment: Production` in release workflow is mandatory by design.
-7. `.github/actions/package` is the canonical CI packaging entrypoint; avoid duplicate packaging logic in workflows.
+- Web runtime deployment completed in Debian package payload.
+- Web systemd unit alignment completed.
+- Conservative nginx install-time integration implemented.
+- Debconf prompt path (`debian/templates`) reused and extended.
+- Maintainer lifecycle semantics hardened (install/remove/purge behavior clarified and tested).
 
----
+## Phase 12a - publication automation (implemented)
 
-## Current Reality vs Deferred Items
+- Nexus publication path restored via `python3 -m tools.release publish-deb`.
+- Explicit publication gating/config:
+  - `RELEASE_PUBLISH_MODE=disabled|nexus`
+  - `NEXUS_REPO_URL`, `NEXUS_USER`, `NEXUS_PASS`
+- Deterministic `.deb` artifact selection for upload.
+- Clear skip/fail diagnostics for publication stage.
+- Release workflow now includes explicit post-package publication step.
 
-Implemented now:
+## Current Release Spine
 
-- deterministic changelog + AI drafting stack
-- provider/local-compatible operator workflow
-- Debian + web artifact generation
-- CI release artifact workflow with Production deployment signal
+1. Release state validation (`tools.release check`).
+2. Core/web build and tests.
+3. Canonical package action:
+   - preflight
+   - changelog resolution (AI/manual fallback)
+   - build (`build-deb`)
+   - artifact contract validation
+4. Workflow artifact upload + tag release attachment.
+5. Publication step (`publish-deb`) with explicit mode/config gating.
 
-Still intentionally deferred:
+## Remaining Work (Not Yet Implemented)
 
-- automatic AI-authored release notes integrated into CI publish flow
-- Nexus/APT publication/promotion automation
-- stricter CI release gates beyond current validation/test/build coverage
-- broader collector quality tuning and rubric hardening
+## Phase 12b - distribution runtime validation
 
----
+Still pending:
 
-## Next Likely Work (Tomorrow-Focused)
+- Install/upgrade validation against the real published APT/Nexus path.
+- Clean-host live tests for package dependency resolution and runtime behavior.
+- End-to-end validation that remove/purge lifecycle behaves as expected in live environments.
 
-1. Deployment-pipeline release-note integration:
-   - decide how/when to invoke AI drafting in release workflow
-   - keep non-AI fallback deterministic and explicit.
-2. CI hardening:
-   - tighten failure diagnostics around packaging and artifact validation
-   - confirm stable runner assumptions for web/debian steps.
-3. Packaging polish:
-   - continue validating Debian staging contract against actual package contents.
-4. Publication path planning:
-   - design safe Nexus/APT publish automation boundary (secrets/env/promotion rules).
+## Deferred Beyond Current Scope
 
----
-
-## Fast Status Summary
-
-The core release/deployment backbone is implemented.  
-Remaining work is now integration quality, publication automation, and operational hardening, not foundational architecture buildout.
+- Publication promotion/orchestration beyond current Nexus upload boundary.
+- Unrelated installer UX expansion or packaging redesign.
+- Non-essential changelog polish automation beyond current release contract.

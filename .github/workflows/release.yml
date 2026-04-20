@@ -18,6 +18,18 @@ jobs:
       - X64
       - ubuntu-latest-lts
     environment: Production
+    env:
+      RELEASE_AI_MODE: ${{ vars.RELEASE_AI_MODE || 'auto' }}
+      RELEASE_AI_PROFILE_OPENAI: ${{ vars.RELEASE_AI_PROFILE_OPENAI || 'openai-balanced' }}
+      RELEASE_LOCAL_LLM_ENABLED: ${{ vars.RELEASE_LOCAL_LLM_ENABLED || 'false' }}
+      RELEASE_LOCAL_LLM_PROFILE: ${{ vars.RELEASE_LOCAL_LLM_PROFILE || '' }}
+      RELEASE_LOCAL_LLM_BASE_URL: ${{ vars.RELEASE_LOCAL_LLM_BASE_URL || '' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || '' }}
+      RELEASE_LOCAL_LLM_API_KEY: ${{ secrets.RELEASE_LOCAL_LLM_API_KEY || '' }}
+      RELEASE_PUBLISH_MODE: ${{ vars.RELEASE_PUBLISH_MODE || 'disabled' }}
+      NEXUS_REPO_URL: ${{ vars.NEXUS_REPO_URL || '' }}
+      NEXUS_USER: ${{ secrets.NEXUS_USER || '' }}
+      NEXUS_PASS: ${{ secrets.NEXUS_PASS || '' }}
 
     steps:
       - name: Checkout
@@ -48,18 +60,28 @@ jobs:
       - name: Run web checks
         uses: ./.github/actions/test_web
 
-      - name: Generate changelog evidence artifacts
-        shell: bash
-        run: |
-          mkdir -p release
-          python3 -m tools.release changelog draft --format raw --output release/changelog.raw.md
-          python3 -m tools.release changelog payload --output release/changelog.payload.json
-
       - name: Build release artifacts (Debian + web deployable)
         id: package
         uses: ./.github/actions/package
         with:
           output_dir: release
+
+      - name: Verify release artifact directory before upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${{ steps.package.outputs.artifact_dir }}"
+          if [ -z "$artifact_dir" ]; then
+            echo "::error::Package action did not return artifact_dir output."
+            exit 1
+          fi
+          if [ ! -d "$artifact_dir" ]; then
+            echo "::error::artifact_dir does not exist: $artifact_dir"
+            exit 1
+          fi
+          echo "Artifact directory: $artifact_dir"
+          echo "Staged files:"
+          find "$artifact_dir" -maxdepth 2 -type f | sort
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -67,6 +89,33 @@ jobs:
           name: vaulthalla-release-${{ github.ref_name }}
           path: ${{ steps.package.outputs.artifact_dir }}
           if-no-files-found: error
+
+      - name: Publish Debian packages to Nexus
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${{ steps.package.outputs.artifact_dir }}"
+          echo "[publish] RELEASE_PUBLISH_MODE=${RELEASE_PUBLISH_MODE:-disabled}"
+          if [ -n "${NEXUS_REPO_URL:-}" ]; then
+            echo "[publish] NEXUS_REPO_URL configured: ${NEXUS_REPO_URL}"
+          else
+            echo "[publish] NEXUS_REPO_URL configured: no"
+          fi
+          if [ -n "${NEXUS_USER:-}" ]; then
+            echo "[publish] NEXUS_USER configured: yes"
+          else
+            echo "[publish] NEXUS_USER configured: no"
+          fi
+          if [ -n "${NEXUS_PASS:-}" ]; then
+            echo "[publish] NEXUS_PASS configured: yes"
+          else
+            echo "[publish] NEXUS_PASS configured: no"
+          fi
+
+          if ! python3 -m tools.release publish-deb --output-dir "$artifact_dir"; then
+            echo "::error::Debian publication stage failed. Review publication logs for configuration, artifact selection, and upload diagnostics."
+            exit 1
+          fi
 
       - name: Attach artifacts to GitHub Release (tag only)
         if: startsWith(github.ref, 'refs/tags/')

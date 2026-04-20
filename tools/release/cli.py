@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 
-from tools.release.changelog.ai.config import AIProviderConfig, DEFAULT_AI_DRAFT_MODEL, DEFAULT_AI_PROVIDER_KIND
+from tools.release.changelog.ai.config import (
+    AIPipelineCLIOverrides,
+    AIPipelineConfig,
+    AIProviderConfig,
+    AIStageName,
+    DEFAULT_AI_DRAFT_MODEL,
+    DEFAULT_AI_PROVIDER_KIND,
+    resolve_ai_pipeline_config,
+)
 from tools.release.changelog.ai.contracts.polish import AIPolishResult
 from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
 from tools.release.changelog.ai.providers import (
@@ -17,10 +27,19 @@ from tools.release.changelog.ai.render.markdown import render_draft_markdown, re
 from tools.release.changelog.ai.stages.draft import generate_draft_from_payload, render_draft_result_json
 from tools.release.changelog.ai.stages.polish import render_polish_result_json, run_polish_stage
 from tools.release.changelog.ai.stages.triage import render_triage_result_json, run_triage_stage
+from tools.release.changelog.release_workflow import (
+    parse_release_ai_settings,
+    resolve_release_changelog,
+)
 from tools.release.changelog.context_builder import build_release_context
 from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
-from tools.release.packaging import build_debian_package
+from tools.release.packaging import (
+    build_debian_package,
+    publish_debian_artifacts,
+    resolve_debian_publication_settings,
+    validate_release_artifacts,
+)
 from tools.release.version.adapters.version_file import read_version_file
 from tools.release.version.models import Version
 from tools.release.version.sync import apply_version_update, resolve_debian_revision
@@ -125,6 +144,58 @@ def build_parser() -> argparse.ArgumentParser:
     )
     build_deb_parser.set_defaults(func=cmd_build_deb)
 
+    validate_release_artifacts_parser = subparsers.add_parser(
+        "validate-release-artifacts",
+        help="Validate staged release artifacts before upload/publication.",
+    )
+    validate_release_artifacts_parser.add_argument(
+        "--output-dir",
+        default="release",
+        help="Release artifact directory to validate (default: release/ at repo root).",
+    )
+    validate_release_artifacts_parser.add_argument(
+        "--skip-changelog",
+        action="store_true",
+        help="Skip changelog artifact checks.",
+    )
+    validate_release_artifacts_parser.set_defaults(func=cmd_validate_release_artifacts)
+
+    publish_deb_parser = subparsers.add_parser(
+        "publish-deb",
+        help="Publish staged Debian package artifacts to Nexus.",
+    )
+    publish_deb_parser.add_argument(
+        "--output-dir",
+        default="release",
+        help="Release artifact directory that contains Debian packages to publish (default: release/ at repo root).",
+    )
+    publish_deb_parser.add_argument(
+        "--mode",
+        default=None,
+        help="Publication mode override (disabled|nexus). Defaults to RELEASE_PUBLISH_MODE env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-repo-url",
+        default=None,
+        help="Nexus repository URL override. Defaults to NEXUS_REPO_URL env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-user",
+        default=None,
+        help="Nexus username override. Defaults to NEXUS_USER env.",
+    )
+    publish_deb_parser.add_argument(
+        "--nexus-pass",
+        default=None,
+        help="Nexus password override. Defaults to NEXUS_PASS env.",
+    )
+    publish_deb_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate publication settings and artifact selection without uploading.",
+    )
+    publish_deb_parser.set_defaults(func=cmd_publish_deb)
+
     changelog_parser = subparsers.add_parser(
         "changelog",
         help="Generate changelog artifacts from git history.",
@@ -169,20 +240,59 @@ def build_parser() -> argparse.ArgumentParser:
     )
     changelog_payload_parser.set_defaults(func=cmd_changelog_payload)
 
+    changelog_release_parser = changelog_subparsers.add_parser(
+        "release",
+        help="Generate release changelog artifacts with deterministic AI/manual fallback behavior.",
+    )
+    changelog_release_parser.add_argument(
+        "--since-tag",
+        default=None,
+        help="Optional tag to use as lower bound (overrides latest-tag auto-detection).",
+    )
+    changelog_release_parser.add_argument(
+        "--output",
+        default="release/changelog.release.md",
+        help="Output markdown path for the selected release changelog path.",
+    )
+    changelog_release_parser.add_argument(
+        "--raw-output",
+        default="release/changelog.raw.md",
+        help="Output path for deterministic raw changelog evidence.",
+    )
+    changelog_release_parser.add_argument(
+        "--payload-output",
+        default="release/changelog.payload.json",
+        help="Output path for deterministic AI payload evidence JSON.",
+    )
+    changelog_release_parser.add_argument(
+        "--manual-changelog-path",
+        default="debian/changelog",
+        help="Manual changelog file used when AI is disabled/unavailable.",
+    )
+    changelog_release_parser.set_defaults(func=cmd_changelog_release)
+
     changelog_ai_check_parser = changelog_subparsers.add_parser(
         "ai-check",
         help="Validate AI provider connectivity and model availability.",
     )
     changelog_ai_check_parser.add_argument(
+        "--ai-profile",
+        default=None,
+        help="Named AI profile slug from ai.yml at repo root.",
+    )
+    changelog_ai_check_parser.add_argument(
         "--model",
-        default=DEFAULT_AI_DRAFT_MODEL,
-        help=f"Model to verify against provider model discovery (default: {DEFAULT_AI_DRAFT_MODEL}).",
+        default=None,
+        help=(
+            "Override model for this check (defaults resolved from built-ins/profile; "
+            f"legacy default: {DEFAULT_AI_DRAFT_MODEL})."
+        ),
     )
     changelog_ai_check_parser.add_argument(
         "--provider",
         choices=("openai", "openai-compatible"),
-        default=DEFAULT_AI_PROVIDER_KIND,
-        help="AI provider transport to use (default: openai).",
+        default=None,
+        help=f"AI provider transport override (default resolved from config; legacy: {DEFAULT_AI_PROVIDER_KIND}).",
     )
     changelog_ai_check_parser.add_argument(
         "--base-url",
@@ -211,15 +321,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to save the validated structured AI draft JSON.",
     )
     changelog_ai_draft_parser.add_argument(
+        "--ai-profile",
+        default=None,
+        help="Named AI profile slug from ai.yml at repo root.",
+    )
+    changelog_ai_draft_parser.add_argument(
         "--model",
-        default=DEFAULT_AI_DRAFT_MODEL,
-        help=f"OpenAI model to use (default: {DEFAULT_AI_DRAFT_MODEL}).",
+        default=None,
+        help=(
+            "Global model override for all AI stages (triage/draft/polish). "
+            f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
+        ),
     )
     changelog_ai_draft_parser.add_argument(
         "--provider",
         choices=("openai", "openai-compatible"),
-        default=DEFAULT_AI_PROVIDER_KIND,
-        help="AI provider transport to use (default: openai).",
+        default=None,
+        help=f"AI provider transport override (default resolved from config; legacy: {DEFAULT_AI_PROVIDER_KIND}).",
     )
     changelog_ai_draft_parser.add_argument(
         "--base-url",
@@ -414,6 +532,70 @@ def cmd_build_deb(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_validate_release_artifacts(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = (repo_root / output_dir).resolve()
+
+    result = validate_release_artifacts(
+        output_dir=output_dir,
+        require_changelog=not bool(args.skip_changelog),
+    )
+    print("Release artifact validation")
+    print("---------------------------")
+    print(f"Output dir:        {result.output_dir}")
+    print(f"Debian artifacts:  {len(result.debian_artifacts)}")
+    print(f"Web artifacts:     {len(result.web_artifacts)}")
+    if not args.skip_changelog:
+        print(f"Changelog files:   {len(result.changelog_artifacts)}")
+    print("Status:            OK")
+    return 0
+
+
+def cmd_publish_deb(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = (repo_root / output_dir).resolve()
+
+    settings = resolve_debian_publication_settings(
+        mode=args.mode,
+        nexus_repo_url=args.nexus_repo_url,
+        nexus_user=args.nexus_user,
+        nexus_password=args.nexus_pass,
+        env=os.environ,
+    )
+    result = publish_debian_artifacts(
+        output_dir=output_dir,
+        settings=settings,
+        dry_run=bool(args.dry_run),
+    )
+
+    print("Debian publication")
+    print("------------------")
+    print(f"Mode:              {result.mode}")
+    print(f"Output dir:        {result.output_dir}")
+    print(f"Debian artifacts:  {len(result.artifacts)}")
+    for artifact in result.artifacts:
+        print(f"- {artifact}")
+
+    if not result.enabled:
+        print("Status:            SKIPPED")
+        print(f"Reason:            {result.skipped_reason or 'Publication disabled.'}")
+        return 0
+
+    print(f"Target URLs:       {len(result.target_urls)}")
+    for target_url in result.target_urls:
+        print(f"- {target_url}")
+
+    if result.dry_run:
+        print("Status:            DRY-RUN (validated, not uploaded)")
+    else:
+        print("Status:            PUBLISHED")
+    return 0
+
+
 def cmd_changelog_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
@@ -441,27 +623,97 @@ def cmd_changelog_payload(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
-    if args.save_triage_json and not args.use_triage:
-        raise ValueError("--save-triage-json requires --use-triage.")
-    if args.save_polish_json and not args.polish:
-        raise ValueError("--save-polish-json requires --polish.")
+def cmd_changelog_release(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    try:
+        print("Changelog release stage: build deterministic context + payload")
+        context = build_changelog_context(repo_root, args.since_tag)
+        payload = build_ai_payload(context)
+        raw_markdown = render_release_changelog(context)
+        payload_json = render_ai_payload_json(payload)
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during context/payload generation: {exc}") from exc
 
+    try:
+        print("Changelog release stage: write evidence artifacts")
+        write_output(raw_markdown, args.raw_output)
+        print(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
+        write_output(payload_json, args.payload_output)
+        print(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing evidence artifacts: {exc}") from exc
+
+    try:
+        print("Changelog release stage: resolve AI/manual changelog path")
+        env_settings = parse_release_ai_settings(os.environ)
+        _log_release_ai_preflight(env_settings)
+        selection = resolve_release_changelog(
+            repo_root=repo_root,
+            payload=payload,
+            settings=env_settings,
+            manual_changelog_path=args.manual_changelog_path,
+            logger=print,
+        )
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during path selection/generation: {exc}") from exc
+
+    try:
+        print("Changelog release stage: write selected release changelog")
+        write_output(selection.content, args.output)
+        print(f"Wrote release changelog to {Path(args.output).resolve()}")
+        if selection.path == "local" and env_settings.local_base_url_override:
+            if selection.local_base_url_overrode_profile:
+                print("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
+            else:
+                print("Local base_url override status: set but not applied.")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing selected output: {exc}") from exc
+    return 0
+
+
+def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
     payload = build_ai_payload(context)
-    provider_config = build_ai_provider_config_from_args(args)
-    provider = build_ai_provider_from_args(args)
+    pipeline_config = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
+    run_triage = bool(args.use_triage) or pipeline_config.is_stage_enabled("triage")
+    run_polish = bool(args.polish) or pipeline_config.is_stage_enabled("polish")
+    if args.save_triage_json and not run_triage:
+        raise ValueError("--save-triage-json requires triage stage to run.")
+    if args.save_polish_json and not run_polish:
+        raise ValueError("--save-polish-json requires polish stage to run.")
+    draft_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="draft")
 
     # Local-compatible runs should fail early with explicit endpoint/model diagnostics.
-    if provider_config.kind == "openai-compatible":
-        _ = run_provider_preflight(provider_config, provider=provider, require_model=True)
+    if pipeline_config.provider == "openai-compatible":
+        _run_stage_preflight(
+            args=args,
+            repo_root=repo_root,
+            draft_provider=draft_provider,
+            include_triage=run_triage,
+            include_polish=run_polish,
+        )
 
     draft_input: dict = payload
     source_kind = "payload"
+    triage_stage_cfg = pipeline_config.stages["triage"]
+    draft_stage_cfg = pipeline_config.stages["draft"]
+    polish_stage_cfg = pipeline_config.stages["polish"]
 
-    if args.use_triage:
-        triage_result = run_triage_stage(payload, provider=provider)
+    if run_triage:
+        triage_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="triage")
+        try:
+            triage_result = run_triage_stage(
+                payload,
+                provider=triage_provider,
+                provider_kind=pipeline_config.provider,
+                reasoning_effort=triage_stage_cfg.reasoning_effort,
+                structured_mode=triage_stage_cfg.structured_mode,
+                temperature=triage_stage_cfg.temperature,
+                max_output_tokens_policy=triage_stage_cfg.max_output_tokens,
+            )
+        except Exception as exc:
+            raise _stage_failure("Triage", exc) from exc
         draft_input = build_triage_ir_payload(triage_result)
         source_kind = "triage"
 
@@ -469,11 +721,35 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             write_output(render_triage_result_json(triage_result), args.save_triage_json)
             print(f"Wrote AI triage JSON to {Path(args.save_triage_json).resolve()}")
 
-    draft = generate_draft_from_payload(draft_input, provider=provider, source_kind=source_kind)
+    try:
+        draft = generate_draft_from_payload(
+            draft_input,
+            provider=draft_provider,
+            source_kind=source_kind,
+            provider_kind=pipeline_config.provider,
+            reasoning_effort=draft_stage_cfg.reasoning_effort,
+            structured_mode=draft_stage_cfg.structured_mode,
+            temperature=draft_stage_cfg.temperature,
+            max_output_tokens_policy=draft_stage_cfg.max_output_tokens,
+        )
+    except Exception as exc:
+        raise _stage_failure("Draft", exc) from exc
     polish_result: AIPolishResult | None = None
 
-    if args.polish:
-        polish_result = run_polish_stage(draft, provider=provider)
+    if run_polish:
+        polish_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="polish")
+        try:
+            polish_result = run_polish_stage(
+                draft,
+                provider=polish_provider,
+                provider_kind=pipeline_config.provider,
+                reasoning_effort=polish_stage_cfg.reasoning_effort,
+                structured_mode=polish_stage_cfg.structured_mode,
+                temperature=polish_stage_cfg.temperature,
+                max_output_tokens_policy=polish_stage_cfg.max_output_tokens,
+            )
+        except Exception as exc:
+            raise _stage_failure("Polish", exc) from exc
         final_markdown = render_polish_markdown(polish_result)
 
         if args.save_polish_json:
@@ -562,6 +838,9 @@ def write_output(content: str, output_path: str | None) -> None:
 
     target = Path(output_path)
     try:
+        parent = target.parent
+        if parent != Path(""):
+            parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
     except Exception as exc:
         raise ValueError(f"Failed to write output to {target}: {exc}") from exc
@@ -582,20 +861,78 @@ def build_changelog_context(repo_root: Path, since_tag: str | None):
     )
 
 
-def build_ai_provider_config_from_args(args: argparse.Namespace) -> AIProviderConfig:
-    return AIProviderConfig(
-        kind=args.provider,
-        model=args.model,
-        base_url=args.base_url,
+def build_ai_pipeline_config_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+) -> AIPipelineConfig:
+    active_repo_root = repo_root if repo_root is not None else Path(args.repo_root).resolve()
+    overrides = AIPipelineCLIOverrides(
+        provider=getattr(args, "provider", None),
+        base_url=getattr(args, "base_url", None),
+        model=getattr(args, "model", None),
     )
+    return resolve_ai_pipeline_config(
+        repo_root=active_repo_root,
+        profile_slug=getattr(args, "ai_profile", None),
+        cli_overrides=overrides,
+    )
+
+
+def build_ai_provider_config_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+    stage: AIStageName = "draft",
+) -> AIProviderConfig:
+    pipeline = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
+    return pipeline.provider_config_for_stage(stage)
 
 
 def build_ai_provider_from_config(config: AIProviderConfig) -> StructuredJSONProvider:
     return build_structured_json_provider(config)
 
 
-def build_ai_provider_from_args(args: argparse.Namespace) -> StructuredJSONProvider:
-    return build_ai_provider_from_config(build_ai_provider_config_from_args(args))
+def build_ai_provider_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+    stage: AIStageName = "draft",
+) -> StructuredJSONProvider:
+    return build_ai_provider_from_config(
+        build_ai_provider_config_from_args(args, repo_root=repo_root, stage=stage)
+    )
+
+
+def _run_stage_preflight(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    draft_provider: StructuredJSONProvider,
+    include_triage: bool,
+    include_polish: bool,
+) -> None:
+    seen: set[tuple[str, str | None]] = set()
+    stage_order: list[AIStageName] = []
+    if include_triage:
+        stage_order.append("triage")
+    stage_order.append("draft")
+    if include_polish:
+        stage_order.append("polish")
+
+    for stage in stage_order:
+        stage_config = build_ai_provider_config_from_args(args, repo_root=repo_root, stage=stage)
+        fingerprint = (stage_config.model, stage_config.base_url)
+        if fingerprint in seen:
+            continue
+
+        provider = (
+            draft_provider
+            if stage == "draft"
+            else build_ai_provider_from_args(args, repo_root=repo_root, stage=stage)
+        )
+        _ = run_provider_preflight(stage_config, provider=provider, require_model=True)
+        seen.add(fingerprint)
 
 
 def print_provider_preflight_result(result: ProviderPreflightResult) -> None:
@@ -612,3 +949,51 @@ def print_provider_preflight_result(result: ProviderPreflightResult) -> None:
         print("Sample models:")
         for model in result.discovered_models[:10]:
             print(f"  - {model}")
+
+
+def _stage_failure(stage: str, exc: Exception) -> ValueError:
+    message = str(exc).strip()
+    field = _extract_missing_field(message)
+    if field is not None:
+        return ValueError(f"{stage} stage failed: missing required field `{field}`. {message}")
+    return ValueError(f"{stage} stage failed: {message}")
+
+
+def _extract_missing_field(message: str) -> str | None:
+    direct = re.match(r"^`([^`]+)` must be a non-empty string\.$", message)
+    if direct:
+        return direct.group(1)
+    nested = re.match(r"^`([^`]+)\[[0-9]+\]` must be a non-empty string\.$", message)
+    if nested:
+        return nested.group(1)
+    list_field = re.search(r"`([^`]+)` must be a non-empty list of strings\.$", message)
+    if list_field:
+        return list_field.group(1)
+    sections = re.search(r"must include non-empty `([^`]+)` list", message)
+    if sections:
+        return sections.group(1)
+    return None
+
+
+def _log_release_ai_preflight(settings) -> None:
+    print("Release AI preflight")
+    print("--------------------")
+    print(f"RELEASE_AI_MODE:               {settings.mode}")
+    print(f"RELEASE_AI_PROFILE_OPENAI:     {settings.openai_profile}")
+    print(f"OPENAI_API_KEY configured:     {'yes' if settings.openai_api_key_present else 'no'}")
+    print(f"RELEASE_LOCAL_LLM_ENABLED:     {'true' if settings.local_enabled else 'false'}")
+    print(
+        f"RELEASE_LOCAL_LLM_PROFILE:     "
+        f"{settings.local_profile if settings.local_profile else '<unset>'}"
+    )
+    print(
+        f"RELEASE_LOCAL_LLM_BASE_URL:    "
+        f"{settings.local_base_url_override if settings.local_base_url_override else '<unset>'}"
+    )
+    if settings.mode == "openai-only" and not settings.openai_api_key_present:
+        print("Preflight note: openai-only requested but OPENAI_API_KEY is missing; manual fallback may be used.")
+    if settings.mode == "local-only" and (not settings.local_enabled or not settings.local_profile):
+        print(
+            "Preflight note: local-only requested but local fallback is not fully configured; "
+            "manual fallback may be used."
+        )

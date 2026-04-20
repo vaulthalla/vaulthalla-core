@@ -28,9 +28,12 @@ class _FakeCompletions:
     def __init__(self, response):
         self._response = response
         self.calls: list[dict] = []
+        self.error: Exception | None = None
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
         return self._response
 
 
@@ -42,6 +45,19 @@ class _FakeChat:
 class _FakeSDKClient:
     def __init__(self, response):
         self.chat = _FakeChat(_FakeCompletions(response))
+
+
+class _CompatFallbackCompletions:
+    def __init__(self, final_response):
+        self._final_response = final_response
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        response_format = kwargs.get("response_format")
+        if isinstance(response_format, dict) and response_format.get("type") == "json_object":
+            raise RuntimeError("response_format json_object unsupported")
+        return self._final_response
 
 
 class OpenAICompatibleProviderTests(unittest.TestCase):
@@ -66,7 +82,7 @@ class OpenAICompatibleProviderTests(unittest.TestCase):
             timeout_seconds=None,
         )
 
-    def test_structured_request_uses_json_schema_response_format(self) -> None:
+    def test_structured_request_defaults_to_json_object_response_format(self) -> None:
         sdk = _FakeSDKClient(
             _FakeResponse(
                 '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
@@ -87,9 +103,32 @@ class OpenAICompatibleProviderTests(unittest.TestCase):
         self.assertEqual(result["title"], "x")
         call = sdk.chat.completions.calls[0]
         self.assertEqual(call["model"], "Qwen3.5-122B")
+        self.assertEqual(call["response_format"]["type"], "json_object")
+
+    def test_strict_schema_request_attempts_strict_and_omits_unsupported_reasoning(self) -> None:
+        sdk = _FakeSDKClient(
+            _FakeResponse(
+                '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
+            )
+        )
+        client = OpenAICompatibleProvider(
+            sdk_client=sdk,
+            model="Qwen3.5-122B",
+            base_url="http://localhost:8888/v1",
+        )
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="strict_json_schema",
+            reasoning_effort="high",
+        )
+
+        call = sdk.chat.completions.calls[0]
         self.assertEqual(call["response_format"]["type"], "json_schema")
         self.assertTrue(call["response_format"]["json_schema"]["strict"])
-        self.assertEqual(call["response_format"]["json_schema"]["schema"], {"type": "object"})
+        self.assertNotIn("reasoning", call)
 
     def test_missing_base_url_fails_clearly(self) -> None:
         with self.assertRaisesRegex(ValueError, "base_url"):
@@ -98,6 +137,76 @@ class OpenAICompatibleProviderTests(unittest.TestCase):
     def test_malformed_base_url_fails_clearly(self) -> None:
         with self.assertRaisesRegex(ValueError, "http"):
             OpenAICompatibleProvider(model="Qwen3.5-122B", base_url="localhost:8888/v1")
+
+    def test_provider_exposes_limited_capabilities(self) -> None:
+        sdk = _FakeSDKClient(_FakeResponse("{}"))
+        client = OpenAICompatibleProvider(
+            sdk_client=sdk,
+            model="Qwen3.5-122B",
+            base_url="http://localhost:8888/v1",
+        )
+        caps = client.capabilities()
+        self.assertFalse(caps.supports_reasoning_effort)
+        self.assertFalse(caps.supports_strict_schema)
+
+    def test_openai_compatible_falls_back_to_prompt_json_when_json_object_fails(self) -> None:
+        final = _FakeResponse(
+            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
+        )
+        completions = _CompatFallbackCompletions(final)
+        sdk = type("SDK", (), {})()
+        sdk.chat = _FakeChat(completions)
+        client = OpenAICompatibleProvider(
+            sdk_client=sdk,
+            model="Qwen3.5-122B",
+            base_url="http://localhost:8888/v1",
+        )
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+        )
+
+        self.assertEqual(len(completions.calls), 2)
+        self.assertEqual(completions.calls[0]["response_format"]["type"], "json_object")
+        self.assertNotIn("response_format", completions.calls[1])
+
+    def test_openai_compatible_explicit_strict_attempts_strict_first_then_falls_back(self) -> None:
+        final = _FakeResponse(
+            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
+        )
+        calls: list[dict] = []
+
+        class _StrictCompatFallbackCompletions:
+            def create(self, **kwargs):
+                calls.append(kwargs)
+                response_format = kwargs.get("response_format")
+                if isinstance(response_format, dict):
+                    fmt = response_format.get("type")
+                    if fmt in {"json_schema", "json_object"}:
+                        raise RuntimeError(f"{fmt} unsupported")
+                return final
+
+        sdk = type("SDK", (), {})()
+        sdk.chat = _FakeChat(_StrictCompatFallbackCompletions())
+        client = OpenAICompatibleProvider(
+            sdk_client=sdk,
+            model="Qwen3.5-122B",
+            base_url="http://localhost:8888/v1",
+        )
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="strict_json_schema",
+        )
+
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls[0]["response_format"]["type"], "json_schema")
+        self.assertEqual(calls[1]["response_format"]["type"], "json_object")
+        self.assertNotIn("response_format", calls[2])
 
 
 if __name__ == "__main__":

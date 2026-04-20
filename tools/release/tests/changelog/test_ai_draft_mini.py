@@ -63,6 +63,24 @@ class AIDraftMiniStageTests(unittest.TestCase):
         call = fake.calls[0]
         self.assertIn("Triage IR", call["user_prompt"])
 
+    def test_generate_draft_passes_reasoning_and_structured_mode(self) -> None:
+        payload = {"schema_version": "x", "metadata": {}, "categories": []}
+        fake = _FakeOpenAIClient(_load_json_fixture("ai_draft_valid.json"))
+
+        _ = generate_draft_from_payload(
+            payload,
+            provider=fake,
+            reasoning_effort="medium",
+            structured_mode="json_object",
+            temperature=0.3,
+            max_output_tokens_policy=456,
+        )
+        call = fake.calls[0]
+        self.assertEqual(call["reasoning_effort"], "medium")
+        self.assertEqual(call["structured_mode"], "json_object")
+        self.assertEqual(call["temperature"], 0.3)
+        self.assertEqual(call["max_output_tokens"], 456)
+
     def test_markdown_render_matches_fixture(self) -> None:
         draft = generate_draft_from_payload(
             {"schema_version": "x", "metadata": {}, "categories": []},

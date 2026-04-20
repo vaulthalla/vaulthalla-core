@@ -248,7 +248,7 @@ class CliBuildDebCommandTests(unittest.TestCase):
             enabled=True,
             dry_run=False,
             artifacts=(Path("/tmp/repo/release/vaulthalla_1.2.3-1_amd64.deb"),),
-            target_urls=("https://nexus.example/repository/vaulthalla-debian/vaulthalla_1.2.3-1_amd64.deb",),
+            target_urls=("https://nexus.example/repository/vaulthalla-debian",),
             skipped_reason=None,
         )
 

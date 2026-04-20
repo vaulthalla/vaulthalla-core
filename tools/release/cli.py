@@ -582,6 +582,8 @@ def cmd_publish_deb(args: argparse.Namespace) -> int:
     print("------------------")
     print(f"Publication required: {'yes' if args.require_enabled else 'no'}")
     print(f"Mode:              {result.mode}")
+    print("Upload mode:       post-binary-to-base-url")
+    print("Append filename:   no")
     print(f"Output dir:        {result.output_dir}")
     print(f"Debian artifacts:  {len(result.artifacts)}")
     for artifact in result.artifacts:

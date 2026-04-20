@@ -5,7 +5,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 
 DEFAULT_PUBLICATION_MODE = "disabled"
 SUPPORTED_PUBLICATION_MODES: tuple[str, ...] = ("disabled", "nexus")
@@ -121,7 +121,8 @@ def publish_debian_artifacts(
 
     artifacts = select_debian_publication_artifacts(output_dir=destination)
     upload = _upload_file_to_nexus_with_curl if uploader is None else uploader
-    target_urls = tuple(_join_nexus_target_url(settings.nexus_repo_url, artifact.name) for artifact in artifacts)
+    target_url = settings.nexus_repo_url
+    target_urls = tuple(target_url for _ in artifacts)
     if not dry_run:
         for artifact, target_url in zip(artifacts, target_urls):
             upload(artifact, target_url, settings.nexus_user, settings.nexus_password)
@@ -144,12 +145,6 @@ def _validate_nexus_repo_url(repo_url: str) -> None:
             "NEXUS_REPO_URL must be an absolute http(s) URL, "
             f"received `{repo_url}`."
         )
-
-
-def _join_nexus_target_url(repo_url: str, filename: str) -> str:
-    base = repo_url.rstrip("/")
-    encoded = quote(filename, safe="")
-    return f"{base}/{encoded}"
 
 
 def _find_debian_publication_artifacts(destination: Path) -> tuple[Path, ...]:
@@ -186,8 +181,10 @@ def _upload_file_to_nexus_with_curl(
                 "300",
                 "--user",
                 f"{username}:{password}",
-                "--upload-file",
-                str(artifact),
+                "-H",
+                "Content-Type: multipart/form-data",
+                "--data-binary",
+                f"@{artifact}",
                 target_url,
             ),
             text=True,
@@ -207,7 +204,8 @@ def _upload_file_to_nexus_with_curl(
         stderr = _tail_lines(completed.stderr, limit=20)
         raise ValueError(
             "Debian publication failed: Nexus upload returned a non-zero exit code "
-            f"for {artifact.name} -> {target_url} (exit {completed.returncode}).\n{stderr}"
+            f"for {artifact.name} -> {target_url} "
+            f"(upload_mode=post-binary-to-base-url, append_filename=no, exit {completed.returncode}).\n{stderr}"
         )
 
 

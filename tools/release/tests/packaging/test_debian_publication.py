@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from tools.release.packaging.publication import (
     DebianPublicationSettings,
+    _upload_file_to_nexus_with_curl,
     publish_debian_artifacts,
     resolve_debian_publication_settings,
     select_debian_publication_artifacts,
@@ -155,7 +158,7 @@ class DebianPublicationTests(unittest.TestCase):
             self.assertEqual(upload_calls, [])
             self.assertEqual(
                 result.target_urls,
-                ("https://nexus.example/repository/vaulthalla-debian/vaulthalla_1.2.3-1_amd64.deb",),
+                ("https://nexus.example/repository/vaulthalla-debian",),
             )
 
     def test_publish_uploads_all_selected_debs_in_sorted_order(self) -> None:
@@ -190,8 +193,8 @@ class DebianPublicationTests(unittest.TestCase):
             self.assertEqual(
                 [call[1] for call in upload_calls],
                 [
-                    "https://nexus.example/repository/vaulthalla-debian/vaulthalla_1.2.3-1_amd64.deb",
-                    "https://nexus.example/repository/vaulthalla-debian/vaulthalla_1.2.3-1_arm64.deb",
+                    "https://nexus.example/repository/vaulthalla-debian",
+                    "https://nexus.example/repository/vaulthalla-debian",
                 ],
             )
             self.assertEqual(
@@ -223,6 +226,53 @@ class DebianPublicationTests(unittest.TestCase):
 
             self.assertTrue(result.enabled)
             self.assertEqual(len(upload_calls), 1)
+
+    def test_publication_target_url_is_not_filename_appended(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "release"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            _write(output_dir / "vaulthalla_1.2.3-1_amd64.deb", "deb")
+
+            result = publish_debian_artifacts(
+                output_dir=output_dir,
+                settings=self._settings_nexus(),
+                dry_run=True,
+            )
+
+            self.assertEqual(len(result.target_urls), 1)
+            self.assertEqual(result.target_urls[0], "https://nexus.example/repository/vaulthalla-debian")
+            self.assertNotIn("vaulthalla_1.2.3-1_amd64.deb", result.target_urls[0])
+
+    def test_curl_upload_uses_post_binary_base_url_shape(self) -> None:
+        artifact = Path("/tmp/vaulthalla_1.2.3-1_amd64.deb")
+        target_url = "https://nexus.example/repository/vaulthalla-debian"
+
+        with patch(
+            "tools.release.packaging.publication.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=("curl",), returncode=0, stdout="", stderr=""),
+        ) as run:
+            _upload_file_to_nexus_with_curl(artifact, target_url, "ci-user", "secret")
+
+        run.assert_called_once()
+        command = run.call_args.args[0]
+        self.assertIn("--data-binary", command)
+        self.assertIn(f"@{artifact}", command)
+        self.assertIn("Content-Type: multipart/form-data", command)
+        self.assertNotIn("--upload-file", command)
+        self.assertEqual(command[-1], target_url)
+
+    def test_curl_upload_failure_reports_upload_mode_and_no_append(self) -> None:
+        artifact = Path("/tmp/vaulthalla_1.2.3-1_amd64.deb")
+        target_url = "https://nexus.example/repository/vaulthalla-debian"
+
+        with (
+            patch(
+                "tools.release.packaging.publication.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=("curl",), returncode=22, stdout="", stderr="HTTP 405"),
+            ),
+            self.assertRaisesRegex(ValueError, "upload_mode=post-binary-to-base-url, append_filename=no"),
+        ):
+            _upload_file_to_nexus_with_curl(artifact, target_url, "ci-user", "secret")
 
 
 if __name__ == "__main__":

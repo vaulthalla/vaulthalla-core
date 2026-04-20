@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -28,6 +29,14 @@ def _make_web_build_outputs(repo_root: Path) -> None:
     _write(repo_root / "web" / ".next" / "standalone" / "server.js", "console.log('ok')\n")
     _write(repo_root / "web" / ".next" / "static" / "chunks" / "main.js", "chunk\n")
     _write(repo_root / "web" / "public" / "favicon.ico", "ico\n")
+
+
+def _make_broken_standalone_symlink(repo_root: Path) -> None:
+    link_path = repo_root / "web" / ".next" / "standalone" / "node_modules" / ".pnpm" / "node_modules" / "semver"
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    link_path.symlink_to(
+        repo_root / "web" / ".next" / "standalone" / "node_modules" / ".pnpm" / "semver@0.0.0" / "node_modules" / "semver"
+    )
 
 
 def _synced_state(repo_root: Path) -> ReleaseState:
@@ -268,6 +277,60 @@ class DebianPackagingTests(unittest.TestCase):
                     _ = build_debian_package(repo_root=repo_root, output_dir=output_dir)
 
             self.assertTrue((output_dir / "build-deb.log").is_file())
+
+    def test_standalone_packaging_preserves_symlinks_and_handles_missing_link_targets(self) -> None:
+        if os.name == "nt":
+            self.skipTest("symlink semantics differ on Windows runners")
+
+        with TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir)
+            repo_root = parent / "repo"
+            repo_root.mkdir()
+            _make_repo_layout(repo_root)
+            _make_web_build_outputs(repo_root)
+            _make_broken_standalone_symlink(repo_root)
+
+            for filename in ("vaulthalla_1.2.3-1_amd64.deb",):
+                (parent / filename).write_text("artifact\n", encoding="utf-8")
+
+            web_install = subprocess.CompletedProcess(
+                args=["pnpm", "install", "--frozen-lockfile"],
+                returncode=0,
+                stdout="install ok\n",
+                stderr="",
+            )
+            web_build = subprocess.CompletedProcess(
+                args=["pnpm", "build"],
+                returncode=0,
+                stdout="build web ok\n",
+                stderr="",
+            )
+            deb_build = subprocess.CompletedProcess(
+                args=["dpkg-buildpackage", "-us", "-uc", "-b"],
+                returncode=0,
+                stdout="build ok\n",
+                stderr="",
+            )
+
+            with (
+                patch(
+                    "tools.release.packaging.debian.require_synced_release_state",
+                    return_value=_synced_state(repo_root),
+                ),
+                patch(
+                    "tools.release.packaging.debian.shutil.which",
+                    side_effect=lambda tool: f"/usr/bin/{tool}",
+                ),
+                patch(
+                    "tools.release.packaging.debian.subprocess.run",
+                    side_effect=[web_install, web_build, deb_build],
+                ),
+            ):
+                result = build_debian_package(repo_root=repo_root)
+
+            self.assertIsNotNone(result.web_artifact)
+            assert result.web_artifact is not None
+            self.assertTrue(result.web_artifact.is_file())
 
 
 if __name__ == "__main__":

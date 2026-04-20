@@ -311,11 +311,14 @@ def _create_web_deployable_archive(
 
     with tempfile.TemporaryDirectory(prefix="vh-web-artifact-") as temp_dir:
         staging_root = Path(temp_dir) / "vaulthalla-web"
-        shutil.copytree(standalone_dir, staging_root, dirs_exist_ok=True)
+        # Preserve symlinks from Next standalone output (notably pnpm node_modules links).
+        # Some runner layouts can contain links whose targets are not materialized inside
+        # `.next/standalone`; preserving links avoids copy-time FileNotFound failures.
+        shutil.copytree(standalone_dir, staging_root, dirs_exist_ok=True, symlinks=True)
         (staging_root / ".next").mkdir(parents=True, exist_ok=True)
-        shutil.copytree(static_dir, staging_root / ".next" / "static", dirs_exist_ok=True)
+        shutil.copytree(static_dir, staging_root / ".next" / "static", dirs_exist_ok=True, symlinks=True)
         if public_dir.is_dir():
-            shutil.copytree(public_dir, staging_root / "public", dirs_exist_ok=True)
+            shutil.copytree(public_dir, staging_root / "public", dirs_exist_ok=True, symlinks=True)
 
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(staging_root, arcname="vaulthalla-web")

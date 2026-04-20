@@ -61,16 +61,25 @@ def resolve_generation_settings(
     capabilities = get_provider_capabilities(provider_kind)
     degradations: list[str] = []
 
+    explicit_structured_mode = requested_structured_mode is not None
     if requested_structured_mode is not None:
         _validate_structured_mode(requested_structured_mode)
         structured_mode: AIStructuredMode = requested_structured_mode
     else:
         structured_mode = capabilities.default_structured_mode
 
-    if structured_mode == "strict_json_schema" and not capabilities.supports_strict_schema:
+    if (
+        structured_mode == "strict_json_schema"
+        and not capabilities.supports_strict_schema
+        and not explicit_structured_mode
+    ):
         structured_mode = "json_object"
         degradations.append(
             "strict_json_schema unsupported by provider; downgraded to json_object."
+        )
+    elif structured_mode == "strict_json_schema" and not capabilities.supports_strict_schema:
+        degradations.append(
+            "strict_json_schema requested on provider without strict-schema guarantees; runtime fallback enabled."
         )
 
     if requested_reasoning_effort is not None:

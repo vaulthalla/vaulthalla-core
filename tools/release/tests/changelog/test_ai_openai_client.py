@@ -187,6 +187,23 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(completions.calls[0]["response_format"]["type"], "json_schema")
         self.assertEqual(completions.calls[1]["response_format"]["type"], "json_object")
         self.assertNotIn("response_format", completions.calls[2])
+        self.assertEqual(client.last_structured_mode_used, "prompt_json")
+
+    def test_non_recoverable_transport_error_does_not_fallback(self) -> None:
+        sdk = _FakeSDKClient(_FakeResponse("{}"))
+        sdk.chat.completions.error = RuntimeError("network timeout")
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        with self.assertRaisesRegex(ValueError, "Chat Completions request failed"):
+            client.generate_structured_json(
+                system_prompt="sys",
+                user_prompt="usr",
+                json_schema={"type": "object"},
+                structured_mode="strict_json_schema",
+            )
+
+        self.assertEqual(len(sdk.chat.completions.calls), 1)
+        self.assertEqual(client.last_structured_mode_used, None)
 
     def test_json_wrapper_noise_is_recovered(self) -> None:
         sdk = _FakeSDKClient(

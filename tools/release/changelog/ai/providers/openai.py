@@ -51,6 +51,7 @@ class OpenAIProvider:
         self.model = model
         self.provider_kind = provider_kind
         self.base_url = base_url
+        self.last_structured_mode_used: AIStructuredMode | None = None
 
         if sdk_client is not None:
             self._client = sdk_client
@@ -98,6 +99,7 @@ class OpenAIProvider:
         reasoning_effort: AIReasoningEffort | None = None,
         structured_mode: AIStructuredMode | None = None,
     ) -> dict[str, Any]:
+        self.last_structured_mode_used = None
         settings = resolve_generation_settings(
             provider_kind=self.provider_kind,
             requested_structured_mode=structured_mode,
@@ -115,6 +117,7 @@ class OpenAIProvider:
                     structured_mode=mode,
                     reasoning_effort=settings.reasoning_effort,
                 )
+                self.last_structured_mode_used = mode
                 return parse_json_object_from_text(content)
             except Exception as exc:
                 message = str(exc)

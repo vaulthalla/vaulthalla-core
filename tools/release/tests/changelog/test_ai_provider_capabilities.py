@@ -32,15 +32,19 @@ class AIProviderCapabilitiesTests(unittest.TestCase):
         self.assertEqual(resolved.reasoning_effort, "high")
         self.assertEqual(resolved.degradations, ())
 
-    def test_openai_compatible_degrades_strict_and_reasoning(self) -> None:
+    def test_openai_compatible_keeps_explicit_strict_but_degrades_reasoning(self) -> None:
         resolved = resolve_generation_settings(
             provider_kind="openai-compatible",
             requested_structured_mode="strict_json_schema",
             requested_reasoning_effort="medium",
         )
-        self.assertEqual(resolved.structured_mode, "json_object")
+        self.assertEqual(resolved.structured_mode, "strict_json_schema")
         self.assertIsNone(resolved.reasoning_effort)
         self.assertEqual(len(resolved.degradations), 2)
+
+    def test_openai_compatible_default_mode_stays_safe(self) -> None:
+        resolved = resolve_generation_settings(provider_kind="openai-compatible")
+        self.assertEqual(resolved.structured_mode, "json_object")
 
     def test_defaults_resolve_when_unset(self) -> None:
         hosted = resolve_generation_settings(provider_kind="openai")

@@ -23,6 +23,7 @@ WEB_SYSTEMD_UNIT="vaulthalla-web.service"
 NGINX_TEMPLATE="/usr/share/vaulthalla/nginx/vaulthalla.conf"
 NGINX_SITE_AVAIL="/etc/nginx/sites-available/vaulthalla"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/vaulthalla"
+NGINX_MANAGED_MARKER="/var/lib/vaulthalla/nginx_site_managed"
 
 # ---------- helpers ----------
 
@@ -190,6 +191,8 @@ configure_nginx_if_safe() {
 
     if [ ! -f "$NGINX_SITE_AVAIL" ]; then
         install -m 0644 "$NGINX_TEMPLATE" "$NGINX_SITE_AVAIL"
+        printf '%s\n' "managed-by=${PKG}" > "$NGINX_MANAGED_MARKER"
+        chmod 0644 "$NGINX_MANAGED_MARKER" >/dev/null 2>&1 || true
         echo "[${PKG}] Installed nginx site config: ${NGINX_SITE_AVAIL}"
     else
         echo "[${PKG}] nginx site config already exists; keeping existing file: ${NGINX_SITE_AVAIL}"
@@ -265,14 +268,15 @@ case "$1" in
 
         ROLE_EXISTS="$(psql_q "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")"
         DB_EXISTS="$(psql_q "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")"
-
-        VAUL_PG_PASS="$(openssl rand -base64 32 | tr -d '\n')"
+        ROLE_CREATED="false"
 
         if [ "$ROLE_EXISTS" != "1" ]; then
+            VAUL_PG_PASS="$(openssl rand -base64 32 | tr -d '\n')"
             run_as_postgres psql -X -v ON_ERROR_STOP=1 postgres <<EOF
 CREATE ROLE ${DB_USER} LOGIN PASSWORD '${VAUL_PG_PASS}';
 EOF
             echo "[${PKG}] Created role '${DB_USER}'."
+            ROLE_CREATED="true"
         else
             echo "[${PKG}] Role '${DB_USER}' already exists."
         fi
@@ -289,11 +293,15 @@ EOF
         run_as_postgres psql -X -v ON_ERROR_STOP=1 \
           -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" postgres
 
-        # Seed DB password (for runtime TPM sealing)
-        umask 077
-        printf '%s\n' "$VAUL_PG_PASS" > "$PENDING_DB_PASS_FILE"
-        chown "$DB_USER:$DB_USER" "$PENDING_DB_PASS_FILE"
-        echo "[${PKG}] Seeded DB password to ${PENDING_DB_PASS_FILE} (mode 600)."
+        if [ "$ROLE_CREATED" = "true" ]; then
+            # Seed DB password (for runtime TPM sealing) only when a new role password was generated.
+            umask 077
+            printf '%s\n' "$VAUL_PG_PASS" > "$PENDING_DB_PASS_FILE"
+            chown "$DB_USER:$DB_USER" "$PENDING_DB_PASS_FILE"
+            echo "[${PKG}] Seeded DB password to ${PENDING_DB_PASS_FILE} (mode 600)."
+        else
+            echo "[${PKG}] Role already existed; preserving current DB password seed state."
+        fi
     else
         echo "[${PKG}] Skipping PostgreSQL initialization per user choice."
     fi

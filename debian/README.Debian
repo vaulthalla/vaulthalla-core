@@ -67,6 +67,33 @@ The script skips automatic nginx enablement when:
 
 In all skip cases, install continues and logs the reason.
 
+Remove vs purge lifecycle semantics
+===================================
+
+Remove (`apt remove` / `dpkg -r`)
+---------------------------------
+
+- stops and disables `vaulthalla-web.service`
+- removes pending runtime seed files under `/run/vaulthalla`
+- disables `/etc/nginx/sites-enabled/vaulthalla` only when it points to the
+  package site path
+- preserves:
+  - `/etc/nginx/sites-available/vaulthalla`
+  - `/var/lib/vaulthalla`
+  - `/var/log/vaulthalla`
+  - debconf answers
+
+Purge (`apt purge` / `dpkg -P`)
+-------------------------------
+
+- includes remove behavior, plus:
+  - removes package-managed nginx site file when installer created it
+  - preserves nginx site file when no package-managed marker is present
+  - removes `/var/lib/vaulthalla` and `/var/log/vaulthalla`
+  - attempts to remove `/mnt/vaulthalla` only when empty
+  - deletes `vaulthalla` system user
+  - purges debconf answers
+
 Practical clean-host validation
 ===============================
 

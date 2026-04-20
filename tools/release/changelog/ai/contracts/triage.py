@@ -246,7 +246,14 @@ def _read_non_empty_string_list(
 
     normalized: list[str] = []
     for index, value in enumerate(raw):
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str):
             raise ValueError(f"`{prefix}{key}[{index}]` must be a non-empty string.")
-        normalized.append(value.strip())
+        trimmed = value.strip()
+        if not trimmed:
+            if required:
+                raise ValueError(f"`{prefix}{key}[{index}]` must be a non-empty string.")
+            continue
+        normalized.append(trimmed)
+    if required and not normalized:
+        raise ValueError(f"`{prefix}{key}` must be a non-empty list of strings.")
     return normalized

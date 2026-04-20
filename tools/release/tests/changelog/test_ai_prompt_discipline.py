@@ -38,6 +38,7 @@ class AIPromptDisciplineTests(unittest.TestCase):
         user = build_triage_user_prompt({"schema_version": "x"}).lower()
         self.assertIn("required top-level output fields", user)
         self.assertIn("schema_version", user)
+        self.assertIn("never emit empty placeholders in arrays", user)
 
     def test_required_input_labels_preserved(self) -> None:
         triage_user = build_triage_user_prompt({"schema_version": "x"})

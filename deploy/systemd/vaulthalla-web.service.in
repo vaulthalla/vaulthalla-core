@@ -5,8 +5,12 @@ After=network.target
 [Service]
 ExecStart=@BINDIR@/node /usr/share/vaulthalla-web/server.js
 Restart=always
-User=www-data
+User=vaulthalla
+Group=vaulthalla
+WorkingDirectory=/usr/share/vaulthalla-web
 Environment=NODE_ENV=production
+Environment=PORT=36968
+Environment=HOSTNAME=127.0.0.1
 
 [Install]
 WantedBy=multi-user.target

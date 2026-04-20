@@ -1,14 +1,16 @@
 #!/bin/sh
 set -e
 
+. /usr/share/debconf/confmodule
+
 case "$1" in
     purge)
         deluser --system --quiet vaulthalla || true
         rm -rf /mnt/vaulthalla /var/lib/vaulthalla /var/log/vaulthalla
 
         # purge the debconf
-        echo "Purging debconf settings..."
-        db_purge vaulthalla/init-db || true
+        echo "Purging debconf settings for vaulthalla..."
+        db_purge || true
         ;;
 esac
 

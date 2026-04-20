@@ -6,15 +6,23 @@ set -e
 # - (Optional) initializes PostgreSQL role/db
 # - Seeds super-admin UID to /run for runtime consumption
 # - Seeds DB password to /run for runtime TPM sealing
+# - Installs/starts web runtime service
+# - Optionally enables conservative nginx reverse-proxy integration
 # - Does NOT write secrets to /etc/vaulthalla/config.yaml
 #
-# Depends (in debian/control): postgresql, openssl
+# Depends (in debian/control): postgresql, openssl, nodejs
 
 . /usr/share/debconf/confmodule
 
 PKG="vaulthalla"
 DB_USER="vaulthalla"
 DB_NAME="vaulthalla"
+PENDING_SUPERADMIN_UID_FILE="/run/vaulthalla/superadmin_uid"
+PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
+WEB_SYSTEMD_UNIT="vaulthalla-web.service"
+NGINX_TEMPLATE="/usr/share/vaulthalla/nginx/vaulthalla.conf"
+NGINX_SITE_AVAIL="/etc/nginx/sites-available/vaulthalla"
+NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/vaulthalla"
 
 # ---------- helpers ----------
 
@@ -25,17 +33,191 @@ create_dir() {
 
 psql_q() {
     # psql_q "SQL" [database]
-    sudo -u postgres psql -X -v ON_ERROR_STOP=1 -tAc "$1" "${2:-postgres}"
+    run_as_postgres psql -X -v ON_ERROR_STOP=1 -tAc "$1" "${2:-postgres}"
 }
 
 ensure_tss_group_and_user_added() {
     if getent group tss > /dev/null; then
-        echo "🔑 Adding 'vaulthalla' to existing 'tss' group..."
+        echo "[${PKG}] Ensuring '${DB_USER}' is a member of the existing 'tss' group."
     else
-        echo "⚠️ No 'tss' group found, creating one..."
+        echo "[${PKG}] No 'tss' group found; creating one."
         addgroup --system tss
     fi
-    adduser vaulthalla tss
+    if id -nG "$DB_USER" 2>/dev/null | tr ' ' '\n' | grep -qx tss; then
+        return 0
+    fi
+    adduser "$DB_USER" tss
+}
+
+has_command() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+safe_systemctl() {
+    if ! has_command systemctl; then
+        return 0
+    fi
+    systemctl --system "$@" >/dev/null 2>&1 || true
+}
+
+run_as_postgres() {
+    if has_command runuser; then
+        runuser -u postgres -- "$@"
+        return $?
+    fi
+    if has_command sudo; then
+        sudo -u postgres "$@"
+        return $?
+    fi
+    return 1
+}
+
+seed_superadmin_uid() {
+    db_get vaulthalla/superadmin-uid || true
+    REQUESTED_UID="${RET:-auto}"
+    RESOLVED_UID=""
+
+    case "$REQUESTED_UID" in
+        ""|auto)
+            if [ -n "${SUDO_UID:-}" ]; then
+                RESOLVED_UID="$SUDO_UID"
+            elif [ -n "${PKEXEC_UID:-}" ]; then
+                RESOLVED_UID="$PKEXEC_UID"
+            else
+                LOGNAME_USER="$(logname 2>/dev/null || true)"
+                if [ -n "$LOGNAME_USER" ] && [ "$LOGNAME_USER" != "root" ]; then
+                    RESOLVED_UID="$(id -u "$LOGNAME_USER" 2>/dev/null || true)"
+                fi
+            fi
+            if [ -z "$RESOLVED_UID" ]; then
+                RESOLVED_UID="$(
+                    getent passwd 2>/dev/null \
+                        | awk -F: '$3 >= 1000 && $3 < 65534 { print $3; exit }'
+                )"
+            fi
+            ;;
+        *)
+            if printf '%s' "$REQUESTED_UID" | grep -Eq '^[0-9]+$'; then
+                RESOLVED_UID="$REQUESTED_UID"
+            else
+                echo "[${PKG}] WARNING: Invalid super-admin UID value '$REQUESTED_UID'; skipping UID seed."
+            fi
+            ;;
+    esac
+
+    if [ -z "$RESOLVED_UID" ]; then
+        echo "[${PKG}] WARNING: Could not determine super-admin UID automatically; skipping UID seed."
+        return 0
+    fi
+
+    umask 077
+    printf '%s\n' "$RESOLVED_UID" > "$PENDING_SUPERADMIN_UID_FILE"
+    chown "$DB_USER:$DB_USER" "$PENDING_SUPERADMIN_UID_FILE"
+    echo "[${PKG}] Seeded super-admin UID to ${PENDING_SUPERADMIN_UID_FILE} (uid=${RESOLVED_UID})."
+}
+
+nginx_installed() {
+    has_command nginx && [ -d /etc/nginx ]
+}
+
+nginx_active() {
+    has_command systemctl && systemctl --quiet is-active nginx.service 2>/dev/null
+}
+
+has_non_nginx_listener_on_web_ports() {
+    if ! has_command ss; then
+        return 1
+    fi
+    WEB_LISTENERS="$(ss -H -ltnp '( sport = :80 or sport = :443 )' 2>/dev/null || true)"
+    if [ -z "$WEB_LISTENERS" ]; then
+        return 1
+    fi
+    echo "$WEB_LISTENERS" | grep -v "nginx" | grep -q .
+}
+
+has_custom_nginx_sites_enabled() {
+    if [ ! -d /etc/nginx/sites-enabled ]; then
+        return 1
+    fi
+    for entry in /etc/nginx/sites-enabled/*; do
+        [ -e "$entry" ] || continue
+        base="$(basename "$entry")"
+        case "$base" in
+            default|vaulthalla)
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+configure_nginx_if_safe() {
+    db_get vaulthalla/configure-nginx || true
+    CONFIGURE_NGINX="${RET:-true}"
+    if [ "$CONFIGURE_NGINX" != "true" ]; then
+        echo "[${PKG}] Skipping nginx integration per user choice."
+        return 0
+    fi
+
+    if ! nginx_installed; then
+        echo "[${PKG}] nginx not installed; skipping automatic reverse-proxy setup."
+        return 0
+    fi
+
+    if ! nginx_active; then
+        echo "[${PKG}] nginx installed but inactive; skipping automatic reverse-proxy setup."
+        return 0
+    fi
+
+    if has_non_nginx_listener_on_web_ports; then
+        echo "[${PKG}] Detected non-nginx listeners on port 80/443; skipping nginx setup for safety."
+        return 0
+    fi
+
+    if has_custom_nginx_sites_enabled; then
+        echo "[${PKG}] Existing custom nginx sites detected; skipping automatic site enablement."
+        return 0
+    fi
+
+    if [ ! -f "$NGINX_TEMPLATE" ]; then
+        echo "[${PKG}] WARNING: nginx template missing at ${NGINX_TEMPLATE}; skipping nginx setup."
+        return 0
+    fi
+
+    install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+    if [ ! -f "$NGINX_SITE_AVAIL" ]; then
+        install -m 0644 "$NGINX_TEMPLATE" "$NGINX_SITE_AVAIL"
+        echo "[${PKG}] Installed nginx site config: ${NGINX_SITE_AVAIL}"
+    else
+        echo "[${PKG}] nginx site config already exists; keeping existing file: ${NGINX_SITE_AVAIL}"
+    fi
+
+    CREATED_SITE_LINK="false"
+    if [ -e "$NGINX_SITE_ENABLED" ] && [ ! -L "$NGINX_SITE_ENABLED" ]; then
+        echo "[${PKG}] WARNING: ${NGINX_SITE_ENABLED} exists and is not a symlink; skipping nginx enablement."
+        return 0
+    fi
+
+    if [ ! -e "$NGINX_SITE_ENABLED" ]; then
+        ln -s "$NGINX_SITE_AVAIL" "$NGINX_SITE_ENABLED"
+        CREATED_SITE_LINK="true"
+        echo "[${PKG}] Enabled nginx site: ${NGINX_SITE_ENABLED}"
+    fi
+
+    if nginx -t >/dev/null 2>&1; then
+        safe_systemctl reload nginx.service
+        echo "[${PKG}] nginx reverse-proxy setup applied."
+        return 0
+    fi
+
+    echo "[${PKG}] WARNING: nginx configuration test failed; reverting Vaulthalla site enablement."
+    if [ "$CREATED_SITE_LINK" = "true" ]; then
+        rm -f "$NGINX_SITE_ENABLED"
+    fi
+    return 0
 }
 
 # ---------- main ----------
@@ -57,13 +239,29 @@ case "$1" in
     create_dir /run/vaulthalla     0700 "$DB_USER" "$DB_USER"
     install -d -m 0755 /etc/vaulthalla
     [ -d /mnt/vaulthalla ] || create_dir /mnt/vaulthalla 0755 "$DB_USER" "$DB_USER"
+    seed_superadmin_uid
 
     # --- Debconf: initialize database? ---
     db_get vaulthalla/init-db || true
     INIT_DB="${RET:-true}"
 
     if [ "$INIT_DB" = "true" ]; then
-        echo "[${PKG}] Setting up PostgreSQL role/database…"
+        if ! has_command psql; then
+            echo "[${PKG}] WARNING: psql not found; skipping PostgreSQL initialization."
+            INIT_DB="false"
+        fi
+        if [ "$INIT_DB" = "true" ] && ! id postgres >/dev/null 2>&1; then
+            echo "[${PKG}] WARNING: postgres system user not found; skipping PostgreSQL initialization."
+            INIT_DB="false"
+        fi
+        if [ "$INIT_DB" = "true" ] && ! run_as_postgres true >/dev/null 2>&1; then
+            echo "[${PKG}] WARNING: unable to execute commands as postgres user; skipping PostgreSQL initialization."
+            INIT_DB="false"
+        fi
+    fi
+
+    if [ "$INIT_DB" = "true" ]; then
+        echo "[${PKG}] Setting up PostgreSQL role/database..."
 
         ROLE_EXISTS="$(psql_q "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")"
         DB_EXISTS="$(psql_q "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")"
@@ -71,7 +269,7 @@ case "$1" in
         VAUL_PG_PASS="$(openssl rand -base64 32 | tr -d '\n')"
 
         if [ "$ROLE_EXISTS" != "1" ]; then
-            sudo -u postgres psql -X -v ON_ERROR_STOP=1 postgres <<EOF
+            run_as_postgres psql -X -v ON_ERROR_STOP=1 postgres <<EOF
 CREATE ROLE ${DB_USER} LOGIN PASSWORD '${VAUL_PG_PASS}';
 EOF
             echo "[${PKG}] Created role '${DB_USER}'."
@@ -80,7 +278,7 @@ EOF
         fi
 
         if [ "$DB_EXISTS" != "1" ]; then
-            sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+            run_as_postgres psql -X -v ON_ERROR_STOP=1 \
               -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" postgres
             echo "[${PKG}] Created database '${DB_NAME}'."
         else
@@ -88,11 +286,10 @@ EOF
         fi
 
         # Harmless if owner already
-        sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+        run_as_postgres psql -X -v ON_ERROR_STOP=1 \
           -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" postgres
 
         # Seed DB password (for runtime TPM sealing)
-        PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
         umask 077
         printf '%s\n' "$VAUL_PG_PASS" > "$PENDING_DB_PASS_FILE"
         chown "$DB_USER:$DB_USER" "$PENDING_DB_PASS_FILE"
@@ -101,11 +298,15 @@ EOF
         echo "[${PKG}] Skipping PostgreSQL initialization per user choice."
     fi
 
-    systemctl --system daemon-reexec
-    systemctl --system daemon-reload
-    systemctl --system preset vaulthalla.service >/dev/null || true
-    systemctl --system preset vaulthalla-cli.socket >/dev/null || true
-    systemctl --system preset vaulthalla-cli.service >/dev/null || true
+    safe_systemctl daemon-reexec
+    safe_systemctl daemon-reload
+    safe_systemctl preset vaulthalla.service
+    safe_systemctl preset vaulthalla-cli.socket
+    safe_systemctl preset vaulthalla-cli.service
+    safe_systemctl preset "$WEB_SYSTEMD_UNIT"
+    safe_systemctl enable --now "$WEB_SYSTEMD_UNIT"
+
+    configure_nginx_if_safe
 
     #DEBHELPER#
     ;;

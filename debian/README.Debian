@@ -1,6 +1,89 @@
 vaulthalla for Debian
---------------------
+---------------------
 
-<Possible notes regarding this package - if none, delete this file.>
+Install-time prompts (debconf)
+==============================
 
- -- Cooper Larson <cooper@valkyrianlabs.com>  Mon, 21 Jul 2025 19:18:51 +0000
+The package uses debconf templates in `/debian/templates` to collect install-time
+choices:
+
+1. `vaulthalla/init-db`
+2. `vaulthalla/superadmin-uid`
+3. `vaulthalla/configure-nginx`
+
+Database initialization
+=======================
+
+If `vaulthalla/init-db=true`, the maintainer script attempts to create:
+
+- PostgreSQL role: `vaulthalla`
+- PostgreSQL database: `vaulthalla`
+
+It also writes a pending database password seed file to:
+
+- `/run/vaulthalla/db_password`
+
+If disabled, create the database and role manually before first runtime setup.
+
+Super-admin UID seed
+====================
+
+The package writes a pending super-admin UID seed file to:
+
+- `/run/vaulthalla/superadmin_uid`
+
+This is consumed by runtime initialization on first seed pass.
+
+Web runtime deployment
+======================
+
+The package deploys the standalone web runtime to:
+
+- `/usr/share/vaulthalla-web`
+
+and installs the unit:
+
+- `/lib/systemd/system/vaulthalla-web.service`
+
+The service is configured to run Node in production mode on localhost port
+`36968`.
+
+Nginx integration (conservative mode)
+=====================================
+
+When `vaulthalla/configure-nginx=true`, postinst attempts safe nginx integration
+using:
+
+- template source: `/usr/share/vaulthalla/nginx/vaulthalla.conf`
+- target site: `/etc/nginx/sites-available/vaulthalla`
+- enabled link: `/etc/nginx/sites-enabled/vaulthalla`
+
+The script skips automatic nginx enablement when:
+
+- nginx is not installed
+- nginx is installed but inactive
+- non-nginx listeners are detected on port 80/443
+- custom nginx site layouts are already enabled
+
+In all skip cases, install continues and logs the reason.
+
+Practical clean-host validation
+===============================
+
+On a clean Debian/Ubuntu test VM:
+
+1. Install package:
+   - `sudo dpkg -i ./vaulthalla_<version>_<arch>.deb`
+2. Verify services:
+   - `systemctl status vaulthalla-web.service`
+   - `systemctl status vaulthalla.service`
+3. Verify runtime payload:
+   - `test -f /usr/share/vaulthalla-web/server.js`
+   - `test -d /usr/share/vaulthalla-web/.next/static`
+4. Verify nginx decision:
+   - If auto-config applied: `test -L /etc/nginx/sites-enabled/vaulthalla`
+   - If skipped: check `/var/log/dpkg.log` or install output for skip reason.
+5. Verify local web reachability:
+   - `curl -I http://127.0.0.1:36968/`
+
+ -- Cooper Larson <cooper@valkyrianlabs.com>  Mon, 20 Apr 2026 00:00:00 +0000

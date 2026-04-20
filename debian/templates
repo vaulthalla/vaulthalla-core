@@ -15,3 +15,15 @@ Description: Linux UID to assign as super-admin (leave empty to auto-detect)
  The super-admin account is mapped to a Linux user for privileged operations.
  Enter a numeric UID, or leave as 'auto' to detect the installing user.
  The UID will be assigned once and not modified automatically thereafter.
+
+Template: vaulthalla/configure-nginx
+Type: boolean
+Default: true
+Description: Configure nginx reverse proxy for Vaulthalla web (safe mode)?
+ If enabled, the installer will try to enable a conservative nginx site config
+ for Vaulthalla only when the host appears safe for automatic changes.
+ .
+ The installer will skip configuration when nginx is missing, inactive, already
+ serving non-nginx listeners on ports 80/443, or running custom site layouts.
+ .
+ If disabled or skipped, configure your reverse proxy manually.

@@ -26,7 +26,7 @@ class ReleaseArtifactValidationTests(unittest.TestCase):
             "lib/systemd/system/vaulthalla-cli.service",
             "lib/systemd/system/vaulthalla-cli.socket",
             "lib/systemd/system/vaulthalla-web.service",
-            "usr/share/doc/vaulthalla/LICENSE",
+            "usr/share/doc/vaulthalla/LICENSE.gz",
             "usr/share/doc/vaulthalla/copyright",
             "usr/share/vaulthalla/nginx/vaulthalla.conf",
             "usr/share/vaulthalla-web/server.js",
@@ -154,6 +154,24 @@ class ReleaseArtifactValidationTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, r"\[web artifact\].*server\.js"),
             ):
                 _ = validate_release_artifacts(output_dir=output_dir, require_changelog=True)
+
+    def test_validation_accepts_uncompressed_debian_license_doc_too(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "release"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            _write(output_dir / "vaulthalla_1.2.3-1_amd64.deb", "deb")
+            self._write_valid_web_archive(output_dir / "vaulthalla-web_1.2.3-1_next-standalone.tar.gz")
+            _write(output_dir / "changelog.release.md", "# release")
+            _write(output_dir / "changelog.raw.md", "# raw")
+            _write(output_dir / "changelog.payload.json", '{"schema_version":"x"}')
+
+            members = self._valid_debian_members()
+            members.remove("usr/share/doc/vaulthalla/LICENSE.gz")
+            members.add("usr/share/doc/vaulthalla/LICENSE")
+            with patch("tools.release.packaging.debian._read_debian_package_members", return_value=members):
+                result = validate_release_artifacts(output_dir=output_dir, require_changelog=True)
+
+            self.assertEqual(len(result.debian_artifacts), 1)
 
 
 if __name__ == "__main__":

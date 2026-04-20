@@ -6,7 +6,7 @@
 - `web/`: Next.js app router client using websocket commands + preview/auth middleware.
 - `deploy/`: runtime config, SQL schema/migrations, systemd templates, env example.
 - `debian/`: Debian packaging for single package `vaulthalla`.
-- `tools/release/`: version drift checks, sync/set-version/bump automation, release context/changelog internals.
+- `tools/release/`: version management, deterministic changelog pipeline, AI draft stages, Debian packaging orchestration.
 - `bin/`: install, uninstall, test install flows and system setup scripts.
 - `.github/`: composite actions and workflows for core/web build+test and release package.
 
@@ -25,6 +25,10 @@ python3 -m tools.release check
 python3 -m tools.release sync
 python3 -m tools.release set-version X.Y.Z
 python3 -m tools.release bump patch
+python3 -m tools.release changelog draft --format raw
+python3 -m tools.release changelog payload
+python3 -m tools.release changelog ai-draft --provider openai-compatible --base-url http://localhost:8888/v1
+python3 -m tools.release build-deb --dry-run
 ```
 
 ## Build + Install Entry Surface

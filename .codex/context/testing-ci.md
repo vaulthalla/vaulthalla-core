@@ -9,16 +9,27 @@
     - core tests
     - web setup/build/test
 - `.github/workflows/release.yml`
-  - runs on published release
-  - runner action with `release: true` (includes package step)
+  - runs on:
+    - `workflow_dispatch`
+    - tag push (`v*`)
+  - release job is explicitly bound to GitHub `Production` environment
+  - flow:
+    - release-state validation (`python3 -m tools.release check`)
+    - core build/tests
+    - release-tooling unit tests
+    - web setup + build + test
+    - deterministic changelog artifacts (`raw`, `payload`)
+    - canonical packaging action
+    - artifact upload
+    - optional GitHub Release attachment on tag builds
 
 ## Composite Actions
 
 - `.github/actions/build`: Meson configure/compile/install for `core/`
 - `.github/actions/setup_web`: pnpm + Node setup using `web/.nvmrc`, install deps
-- `.github/actions/build_web`: install private icons, run `pnpm build`
+- `.github/actions/build_web`: installs private icons from `~/vaulthalla-web-icons`, then runs `pnpm build`
 - `.github/actions/test_web`: run `pnpm test`
-- `.github/actions/package`: release packaging flow
+- `.github/actions/package`: canonical CI packaging wrapper (`python3 -m tools.release build-deb --output-dir ...`)
 
 ## Local Verification Shortcuts
 
@@ -44,6 +55,9 @@ Release/version-specific:
 
 - `python3 -m tools.release check`
 - `python3 -m tools.release sync --dry-run`
+- `python3 -m tools.release changelog draft --format raw`
+- `python3 -m tools.release changelog payload`
+- `python3 -m tools.release build-deb --dry-run`
 
 ## Integration Harness Notes
 

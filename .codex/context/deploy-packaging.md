@@ -47,6 +47,18 @@ Installed payload (`debian/install`) includes:
 - Config: `/etc/vaulthalla/config.yaml`
 - Systemd units: core + cli service/socket
 - Static libs and docs/manpage
+- Udev rule + tmpfiles payload
+
+Packaging contract notes:
+
+- Debian Meson build is sourced from `core/` (`debian/rules` uses `--sourcedirectory=core`).
+- `override_dh_auto_install` stages non-Meson payloads into `debian/tmp`:
+  - config files (`deploy/config`)
+  - rendered systemd templates (`deploy/systemd/*.in`)
+  - doc files (`LICENSE`, `debian/copyright`)
+  - CLI symlink shims (`/usr/bin/vaulthalla`, `/usr/bin/vh`)
+  - udev + tmpfiles entries
+- `debian/install` uses multiarch globs (`usr/lib/*/...`) for portability across runner/arch layouts.
 
 `debian/postinst` behavior:
 
@@ -61,3 +73,12 @@ Installed payload (`debian/install`) includes:
 ## Important Packaging Reality
 
 The repo currently builds/deploys as a single package `vaulthalla`; web-specific Debian files under `web/debian/` are not the active monorepo packaging path by default.
+
+## Release Tooling Packaging Path
+
+`python3 -m tools.release build-deb` is the local packaging entrypoint used by CI:
+
+- validates synced release state first,
+- builds web standalone artifact and Debian package artifacts,
+- writes outputs to `release/` by default,
+- emits `release/build-deb.log` with web/debian command output sections.

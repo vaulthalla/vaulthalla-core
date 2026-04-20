@@ -79,7 +79,7 @@ Current command spine exists end-to-end from local tooling through CI release ar
 
 **Goal:** Replace ad-hoc CLI-driven AI configuration with a structured, reusable control plane.
 
-### 9a: Multi-Stage Model Configuration
+### Part 1: Control Plane Spine
 
 - Support per-stage model configuration:
   - triage
@@ -87,29 +87,9 @@ Current command spine exists end-to-end from local tooling through CI release ar
   - polish
 - Allow global fallback model if stage-specific config is absent.
 - Remove assumption of single model across entire pipeline.
-
-### 9b: Reasoning Effort Integration
-
-- Introduce `reasoning_effort` at stage level:
-  - `low`, `medium`, `high`
-- Map to provider-specific behavior:
-  - OpenAI: native API support
-  - OpenAI-compatible: best-effort or prompt-level hint
-- Ensure safe no-op when unsupported.
-
-### 9c: Structured Output Strategy Control
-
-- Add configurable structured output modes:
-  - strict JSON schema
-  - JSON object
-  - prompt-driven JSON
-- Default behavior adapts per provider capability.
-
-### 9d: AI Profile System (Config File)
-
 - Introduce config file (e.g. `.vaulthalla/ai.yml`)
 - Support named profiles for reusable provider and stage configuration
-- CLI support:
+- Add CLI support:
   - `--ai-profile <slug>`
 
 ```yaml
@@ -142,27 +122,34 @@ profiles:
         reasoning_effort: high
 ```
 
-### 9e: CLI Simplification & Override Layer
-
-- CLI becomes override-only:
+- Make CLI an override layer:
   - profile provides defaults
   - flags override selectively
-- Reduce verbosity for common usage:
-  - `--ai-profile local-gemma` becomes primary entrypoint
+- Reduce verbosity for common usage.
 
-### 9f: Provider Capability Mapping
+### Part 2: Provider Semantics & Capability Layer
 
+- Introduce `reasoning_effort` at stage level:
+  - `low`, `medium`, `high`
+- Map to provider-specific behavior:
+  - OpenAI: native API support
+  - OpenAI-compatible: best-effort or prompt-level hint
+- Ensure safe no-op when unsupported.
+- Add configurable structured output modes:
+  - strict JSON schema
+  - JSON object
+  - prompt-driven JSON
+- Default behavior adapts per provider capability.
 - Providers declare capabilities:
   - supports_reasoning_effort
   - supports_strict_schema
 - Pipeline adapts behavior dynamically based on provider.
 
-### 9g: Provider Transport Refinement
+### Part 3: Provider Transport Refinement
 
 - OpenAIProvider:
   - migrate toward Responses API where applicable
   - support reasoning effort natively
-
 - OpenAICompatibleProvider:
   - support fallback structured modes
   - avoid strict schema assumptions

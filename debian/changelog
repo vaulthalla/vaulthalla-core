@@ -1,8 +1,8 @@
-vaulthalla (0.30.2-1) unstable; urgency=medium
+vaulthalla (0.30.3-1) unstable; urgency=medium
 
   - merge web into core monorepo layout
   - major RBAC and protocol refactors
   - integration test rewrite and build cleanup
   - initial Debian packaging and release tooling foundation
 
- -- Cooper Larson <cooper@valkyrianlabs.com>  Sun, 19 April 2026 10:33:00 +0000
+ -- Cooper Larson <cooper@valkyrianlabs.com>  Sun, 19 Apr 2026 10:33:00 +0000

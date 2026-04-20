@@ -1,82 +1,41 @@
-# Release Roadmap Status (Post Phase 12a)
+# Release Roadmap Status (Stable Through Phase 12a)
 
-This is the condensed status snapshot for release/changelog/packaging/install/publication work.
+## Current Mode: Stable Release Maintenance
 
-## Completed Through Current Implementation
+Foundational release-tooling implementation is complete through publication automation.  
+Current roadmap focus is live distribution/runtime validation and operational hardening.
 
-## Foundation (pre-Phase 10)
+## Completed Milestones
 
-- Deterministic changelog context/payload generation.
-- AI changelog drafting pipeline (triage/draft/polish) with provider abstraction.
-- Version synchronization and release-state validation tooling.
-- Debian + web artifact build tooling.
+- Foundation (pre-10): version/check/sync tooling, changelog context/payload generation, Debian+web build tooling.
+- Phase 10a: deterministic changelog path selection (OpenAI -> local gated fallback -> manual stale-check path).
+- Phase 10b: release workflow diagnostics and preflight hardening.
+- Phase 10c: artifact completeness validation for Debian/web/staged release outputs.
+- Phase 11: install/deployment completion (web runtime install, service alignment, conservative nginx path, debconf/templates integration, lifecycle hardening).
+- Phase 12a: Nexus publication automation restored and policy-gated in release workflow.
 
-## Phase 10a - AI release integration
+## Current Operational Spine
 
-- `changelog release` integrated into canonical package action flow.
-- Deterministic provider order implemented:
-  - Hosted OpenAI
-  - Local OpenAI-compatible
-  - Manual/no-AI
-- Local fallback explicitly gated (`RELEASE_LOCAL_LLM_ENABLED=true`).
-- `RELEASE_LOCAL_LLM_BASE_URL` override implemented and logged.
-- Manual path stale/missing changelog validation against `VERSION`.
-
-## Phase 10b - workflow hardening
-
-- Clear failure boundaries for changelog, packaging, and artifact validation stages.
-- Runner/env preflight checks added.
-- Package action kept canonical for packaging logic.
-
-## Phase 10c - packaging validation
-
-- Artifact completeness checks expanded beyond "build succeeded":
-  - Debian package payload contract
-  - web standalone archive contract
-  - staged release artifact presence checks
-
-## Phase 11 - install/deployment completion
-
-- Web runtime deployment completed in Debian package payload.
-- Web systemd unit alignment completed.
-- Conservative nginx install-time integration implemented.
-- Debconf prompt path (`debian/templates`) reused and extended.
-- Maintainer lifecycle semantics hardened (install/remove/purge behavior clarified and tested).
-
-## Phase 12a - publication automation (implemented)
-
-- Nexus publication path restored via `python3 -m tools.release publish-deb`.
-- Explicit publication gating/config:
-  - `RELEASE_PUBLISH_MODE=disabled|nexus`
-  - `NEXUS_REPO_URL`, `NEXUS_USER`, `NEXUS_PASS`
-- Deterministic `.deb` artifact selection for upload.
-- Clear skip/fail diagnostics for publication stage.
-- Release workflow now includes explicit post-package publication step.
-
-## Current Release Spine
-
-1. Release state validation (`tools.release check`).
-2. Core/web build and tests.
-3. Canonical package action:
-   - preflight
-   - changelog resolution (AI/manual fallback)
-   - build (`build-deb`)
+1. Release validation (`tools.release check`) + build/test stages.
+2. Canonical package action performs:
+   - release preflight
+   - changelog resolution
+   - artifact build/staging
    - artifact contract validation
-4. Workflow artifact upload + tag release attachment.
-5. Publication step (`publish-deb`) with explicit mode/config gating.
+3. Workflow upload of staged artifacts.
+4. Publication policy resolution:
+   - tag runs: publication required by default (`RELEASE_PUBLISH_REQUIRED=auto`)
+   - non-tag runs: publication optional by default
+5. Nexus publication via `python3 -m tools.release publish-deb`.
+6. Tag-only GitHub release asset attachment using a deduped asset manifest.
 
-## Remaining Work (Not Yet Implemented)
+## Remaining Work (Phase 12b)
 
-## Phase 12b - distribution runtime validation
+- Live install/upgrade validation through the published APT/Nexus path.
+- Clean-host runtime verification for install/service/nginx behavior.
+- Operational validation of lifecycle behavior (remove/purge/upgrade) in real install environments.
 
-Still pending:
+## Still Deferred (Intentional)
 
-- Install/upgrade validation against the real published APT/Nexus path.
-- Clean-host live tests for package dependency resolution and runtime behavior.
-- End-to-end validation that remove/purge lifecycle behaves as expected in live environments.
-
-## Deferred Beyond Current Scope
-
-- Publication promotion/orchestration beyond current Nexus upload boundary.
-- Unrelated installer UX expansion or packaging redesign.
-- Non-essential changelog polish automation beyond current release contract.
+- Promotion/orchestration beyond current Nexus upload boundary.
+- Broader installer UX redesign outside current packaging/install contract.

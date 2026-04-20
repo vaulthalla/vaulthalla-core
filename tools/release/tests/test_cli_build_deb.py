@@ -29,6 +29,15 @@ class CliBuildDebParsingTests(unittest.TestCase):
         self.assertEqual(parsed.output_dir, "/tmp/out")
         self.assertTrue(parsed.dry_run)
 
+    def test_validate_release_artifacts_parser_flags(self) -> None:
+        parser = cli.build_parser()
+        parsed = parser.parse_args(["validate-release-artifacts", "--output-dir", "/tmp/release", "--skip-changelog"])
+
+        self.assertEqual(parsed.command, "validate-release-artifacts")
+        self.assertEqual(parsed.output_dir, "/tmp/release")
+        self.assertTrue(parsed.skip_changelog)
+        self.assertTrue(callable(parsed.func))
+
 
 class CliBuildDebCommandTests(unittest.TestCase):
     def _args(self, *, repo_root: str = ".", output_dir: str = "release", dry_run: bool = False) -> argparse.Namespace:
@@ -96,6 +105,37 @@ class CliBuildDebCommandTests(unittest.TestCase):
 
         self.assertEqual(rc, 1)
         self.assertIn("ERROR: build failed", err.getvalue())
+
+    def test_validate_release_artifacts_command_prints_summary(self) -> None:
+        args = argparse.Namespace(repo_root=".", output_dir="release", skip_changelog=False)
+        out = StringIO()
+
+        fake_result = type(
+            "_Validation",
+            (),
+            {
+                "output_dir": Path("/tmp/repo/release"),
+                "debian_artifacts": (Path("/tmp/repo/release/pkg.deb"),),
+                "web_artifacts": (Path("/tmp/repo/release/web.tar.gz"),),
+                "changelog_artifacts": (
+                    Path("/tmp/repo/release/changelog.release.md"),
+                    Path("/tmp/repo/release/changelog.raw.md"),
+                    Path("/tmp/repo/release/changelog.payload.json"),
+                ),
+            },
+        )()
+
+        with (
+            patch("tools.release.cli.validate_release_artifacts", return_value=fake_result) as validate,
+            redirect_stdout(out),
+        ):
+            rc = cli.cmd_validate_release_artifacts(args)
+
+        self.assertEqual(rc, 0)
+        validate.assert_called_once()
+        rendered = out.getvalue()
+        self.assertIn("Release artifact validation", rendered)
+        self.assertIn("Status:            OK", rendered)
 
 
 if __name__ == "__main__":

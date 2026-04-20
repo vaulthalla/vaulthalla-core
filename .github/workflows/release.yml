@@ -62,6 +62,23 @@ jobs:
         with:
           output_dir: release
 
+      - name: Verify release artifact directory before upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${{ steps.package.outputs.artifact_dir }}"
+          if [ -z "$artifact_dir" ]; then
+            echo "::error::Package action did not return artifact_dir output."
+            exit 1
+          fi
+          if [ ! -d "$artifact_dir" ]; then
+            echo "::error::artifact_dir does not exist: $artifact_dir"
+            exit 1
+          fi
+          echo "Artifact directory: $artifact_dir"
+          echo "Staged files:"
+          find "$artifact_dir" -maxdepth 2 -type f | sort
+
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:

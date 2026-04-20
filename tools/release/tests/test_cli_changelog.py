@@ -308,7 +308,22 @@ class CliChangelogReleaseTests(unittest.TestCase):
                 patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
                 patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
-                patch("tools.release.cli.parse_release_ai_settings", return_value=object()),
+                patch(
+                    "tools.release.cli.parse_release_ai_settings",
+                    return_value=type(
+                        "_ReleaseSettings",
+                        (),
+                        {
+                            "mode": "auto",
+                            "openai_profile": "openai-balanced",
+                            "openai_api_key_present": False,
+                            "local_enabled": False,
+                            "local_profile": None,
+                            "local_base_url_override": None,
+                            "local_api_key": None,
+                        },
+                    )(),
+                ),
                 patch(
                     "tools.release.cli.resolve_release_changelog",
                     return_value=type(

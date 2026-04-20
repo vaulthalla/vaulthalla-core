@@ -15,21 +15,109 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Release preflight (runner + env assumptions)
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "[preflight] validating runner + release environment assumptions"
+        echo "[preflight] RELEASE_AI_MODE=${RELEASE_AI_MODE:-<unset>}"
+        echo "[preflight] RELEASE_AI_PROFILE_OPENAI=${RELEASE_AI_PROFILE_OPENAI:-<unset>}"
+        echo "[preflight] RELEASE_LOCAL_LLM_ENABLED=${RELEASE_LOCAL_LLM_ENABLED:-<unset>}"
+        echo "[preflight] RELEASE_LOCAL_LLM_PROFILE=${RELEASE_LOCAL_LLM_PROFILE:-<unset>}"
+        echo "[preflight] RELEASE_LOCAL_LLM_BASE_URL=${RELEASE_LOCAL_LLM_BASE_URL:-<unset>}"
+        if [ -n "${OPENAI_API_KEY:-}" ]; then
+          echo "[preflight] OPENAI_API_KEY configured: yes"
+        else
+          echo "[preflight] OPENAI_API_KEY configured: no"
+        fi
+        if [ -n "${RELEASE_LOCAL_LLM_API_KEY:-}" ]; then
+          echo "[preflight] RELEASE_LOCAL_LLM_API_KEY configured: yes"
+        else
+          echo "[preflight] RELEASE_LOCAL_LLM_API_KEY configured: no"
+        fi
+
+        case "${RELEASE_AI_MODE:-auto}" in
+          auto|openai-only|local-only|disabled) ;;
+          *)
+            echo "::error::Release preflight failed: RELEASE_AI_MODE must be one of auto|openai-only|local-only|disabled."
+            exit 1
+            ;;
+        esac
+
+        if [ "${RELEASE_AI_MODE:-auto}" = "local-only" ]; then
+          if [ "${RELEASE_LOCAL_LLM_ENABLED:-false}" != "true" ]; then
+            echo "::error::Release preflight failed: RELEASE_AI_MODE=local-only requires RELEASE_LOCAL_LLM_ENABLED=true."
+            exit 1
+          fi
+          if [ -z "${RELEASE_LOCAL_LLM_PROFILE:-}" ]; then
+            echo "::error::Release preflight failed: RELEASE_AI_MODE=local-only requires RELEASE_LOCAL_LLM_PROFILE."
+            exit 1
+          fi
+        fi
+
+        if [ ! -f VERSION ]; then
+          echo "::error::Release preflight failed: VERSION is missing in workspace."
+          exit 1
+        fi
+        if [ ! -f debian/changelog ]; then
+          echo "::error::Release preflight failed: debian/changelog is missing."
+          exit 1
+        fi
+        if [ ! -f web/package.json ]; then
+          echo "::error::Release preflight failed: web/package.json is missing."
+          exit 1
+        fi
+
+        command -v python3 >/dev/null 2>&1 || { echo "::error::python3 is not available on runner PATH."; exit 1; }
+        command -v pnpm >/dev/null 2>&1 || { echo "::error::pnpm is not available on runner PATH."; exit 1; }
+        command -v dpkg-buildpackage >/dev/null 2>&1 || { echo "::error::dpkg-buildpackage is not available on runner PATH."; exit 1; }
+        echo "[preflight] runner checks passed"
+
     - name: Resolve release changelog (AI or manual fallback)
       shell: bash
       run: |
         set -euo pipefail
-        python3 -m tools.release changelog release \
+        echo "[changelog] starting changelog generation/validation"
+        if ! python3 -m tools.release changelog release \
           --output "${{ inputs.output_dir }}/changelog.release.md" \
           --raw-output "${{ inputs.output_dir }}/changelog.raw.md" \
-          --payload-output "${{ inputs.output_dir }}/changelog.payload.json"
+          --payload-output "${{ inputs.output_dir }}/changelog.payload.json"; then
+          echo "::error::Changelog stage failed. See logs above for path selection/fallback/stale-check diagnostics."
+          exit 1
+        fi
+        echo "[changelog] completed successfully"
 
     - name: Build Debian + web release artifacts
+      id: build
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "[package] starting Debian + web artifact build"
+        if ! python3 -m tools.release build-deb --output-dir "${{ inputs.output_dir }}"; then
+          echo "::error::Packaging stage failed (Debian build, web build, or artifact staging)."
+          exit 1
+        fi
+        echo "[package] build completed"
+
+    - name: Validate release artifact contract
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "[validate] validating staged release artifact contract"
+        if ! python3 -m tools.release validate-release-artifacts --output-dir "${{ inputs.output_dir }}"; then
+          echo "::error::Release artifact validation failed. Missing/invalid outputs were reported above."
+          exit 1
+        fi
+        echo "[validate] staged artifact contract passed"
+
+    - name: Expose artifact directory output
       id: package
       shell: bash
       run: |
         set -euo pipefail
-        python3 -m tools.release build-deb --output-dir "${{ inputs.output_dir }}"
-
         artifact_dir="${{ github.workspace }}/${{ inputs.output_dir }}"
+        if [ ! -d "$artifact_dir" ]; then
+          echo "::error::Expected artifact directory does not exist: $artifact_dir"
+          exit 1
+        fi
         echo "artifact_dir=$artifact_dir" >> "$GITHUB_OUTPUT"

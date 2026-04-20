@@ -34,7 +34,7 @@ from tools.release.changelog.release_workflow import (
 from tools.release.changelog.context_builder import build_release_context
 from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
-from tools.release.packaging import build_debian_package
+from tools.release.packaging import build_debian_package, validate_release_artifacts
 from tools.release.version.adapters.version_file import read_version_file
 from tools.release.version.models import Version
 from tools.release.version.sync import apply_version_update, resolve_debian_revision
@@ -138,6 +138,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate and print planned build actions without running dpkg-buildpackage.",
     )
     build_deb_parser.set_defaults(func=cmd_build_deb)
+
+    validate_release_artifacts_parser = subparsers.add_parser(
+        "validate-release-artifacts",
+        help="Validate staged release artifacts before upload/publication.",
+    )
+    validate_release_artifacts_parser.add_argument(
+        "--output-dir",
+        default="release",
+        help="Release artifact directory to validate (default: release/ at repo root).",
+    )
+    validate_release_artifacts_parser.add_argument(
+        "--skip-changelog",
+        action="store_true",
+        help="Skip changelog artifact checks.",
+    )
+    validate_release_artifacts_parser.set_defaults(func=cmd_validate_release_artifacts)
 
     changelog_parser = subparsers.add_parser(
         "changelog",
@@ -475,6 +491,27 @@ def cmd_build_deb(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_validate_release_artifacts(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = (repo_root / output_dir).resolve()
+
+    result = validate_release_artifacts(
+        output_dir=output_dir,
+        require_changelog=not bool(args.skip_changelog),
+    )
+    print("Release artifact validation")
+    print("---------------------------")
+    print(f"Output dir:        {result.output_dir}")
+    print(f"Debian artifacts:  {len(result.debian_artifacts)}")
+    print(f"Web artifacts:     {len(result.web_artifacts)}")
+    if not args.skip_changelog:
+        print(f"Changelog files:   {len(result.changelog_artifacts)}")
+    print("Status:            OK")
+    return 0
+
+
 def cmd_changelog_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
@@ -504,31 +541,49 @@ def cmd_changelog_payload(args: argparse.Namespace) -> int:
 
 def cmd_changelog_release(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
-    context = build_changelog_context(repo_root, args.since_tag)
-    payload = build_ai_payload(context)
-    raw_markdown = render_release_changelog(context)
-    payload_json = render_ai_payload_json(payload)
+    try:
+        print("Changelog release stage: build deterministic context + payload")
+        context = build_changelog_context(repo_root, args.since_tag)
+        payload = build_ai_payload(context)
+        raw_markdown = render_release_changelog(context)
+        payload_json = render_ai_payload_json(payload)
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during context/payload generation: {exc}") from exc
 
-    write_output(raw_markdown, args.raw_output)
-    print(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
-    write_output(payload_json, args.payload_output)
-    print(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
+    try:
+        print("Changelog release stage: write evidence artifacts")
+        write_output(raw_markdown, args.raw_output)
+        print(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
+        write_output(payload_json, args.payload_output)
+        print(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing evidence artifacts: {exc}") from exc
 
-    env_settings = parse_release_ai_settings(os.environ)
-    selection = resolve_release_changelog(
-        repo_root=repo_root,
-        payload=payload,
-        settings=env_settings,
-        manual_changelog_path=args.manual_changelog_path,
-        logger=print,
-    )
-    write_output(selection.content, args.output)
-    print(f"Wrote release changelog to {Path(args.output).resolve()}")
-    if selection.path == "local" and env_settings.local_base_url_override:
-        if selection.local_base_url_overrode_profile:
-            print("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
-        else:
-            print("Local base_url override status: set but not applied.")
+    try:
+        print("Changelog release stage: resolve AI/manual changelog path")
+        env_settings = parse_release_ai_settings(os.environ)
+        _log_release_ai_preflight(env_settings)
+        selection = resolve_release_changelog(
+            repo_root=repo_root,
+            payload=payload,
+            settings=env_settings,
+            manual_changelog_path=args.manual_changelog_path,
+            logger=print,
+        )
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during path selection/generation: {exc}") from exc
+
+    try:
+        print("Changelog release stage: write selected release changelog")
+        write_output(selection.content, args.output)
+        print(f"Wrote release changelog to {Path(args.output).resolve()}")
+        if selection.path == "local" and env_settings.local_base_url_override:
+            if selection.local_base_url_overrode_profile:
+                print("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
+            else:
+                print("Local base_url override status: set but not applied.")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing selected output: {exc}") from exc
     return 0
 
 
@@ -834,3 +889,27 @@ def _extract_missing_field(message: str) -> str | None:
     if sections:
         return sections.group(1)
     return None
+
+
+def _log_release_ai_preflight(settings) -> None:
+    print("Release AI preflight")
+    print("--------------------")
+    print(f"RELEASE_AI_MODE:               {settings.mode}")
+    print(f"RELEASE_AI_PROFILE_OPENAI:     {settings.openai_profile}")
+    print(f"OPENAI_API_KEY configured:     {'yes' if settings.openai_api_key_present else 'no'}")
+    print(f"RELEASE_LOCAL_LLM_ENABLED:     {'true' if settings.local_enabled else 'false'}")
+    print(
+        f"RELEASE_LOCAL_LLM_PROFILE:     "
+        f"{settings.local_profile if settings.local_profile else '<unset>'}"
+    )
+    print(
+        f"RELEASE_LOCAL_LLM_BASE_URL:    "
+        f"{settings.local_base_url_override if settings.local_base_url_override else '<unset>'}"
+    )
+    if settings.mode == "openai-only" and not settings.openai_api_key_present:
+        print("Preflight note: openai-only requested but OPENAI_API_KEY is missing; manual fallback may be used.")
+    if settings.mode == "local-only" and (not settings.local_enabled or not settings.local_profile):
+        print(
+            "Preflight note: local-only requested but local fallback is not fully configured; "
+            "manual fallback may be used."
+        )

@@ -50,6 +50,14 @@ class DebianBuildResult:
     web_artifact: Path | None = None
 
 
+@dataclass(frozen=True)
+class ReleaseArtifactValidationResult:
+    output_dir: Path
+    debian_artifacts: tuple[Path, ...]
+    web_artifacts: tuple[Path, ...]
+    changelog_artifacts: tuple[Path, ...]
+
+
 def build_debian_package(
     *,
     repo_root: Path | str = ".",
@@ -160,6 +168,60 @@ def build_debian_package(
         artifacts=artifacts_all,
         build_log=build_log,
         web_artifact=web_artifact,
+    )
+
+
+def validate_release_artifacts(
+    *,
+    output_dir: Path | str,
+    require_changelog: bool = True,
+) -> ReleaseArtifactValidationResult:
+    destination = Path(output_dir).resolve()
+    if not destination.is_dir():
+        raise ValueError(f"Release artifact validation failed: output directory does not exist: {destination}")
+
+    debian_artifacts = tuple(
+        sorted(
+            path
+            for path in destination.iterdir()
+            if path.is_file() and path.name.endswith(".deb")
+        )
+    )
+    web_artifacts = tuple(
+        sorted(
+            path
+            for path in destination.iterdir()
+            if path.is_file() and path.name.endswith(WEB_DEPLOYABLE_SUFFIX)
+        )
+    )
+
+    changelog_expected = (
+        destination / "changelog.release.md",
+        destination / "changelog.raw.md",
+        destination / "changelog.payload.json",
+    )
+    changelog_artifacts = tuple(path for path in changelog_expected if path.is_file())
+
+    missing: list[str] = []
+    if not debian_artifacts:
+        missing.append("Debian package artifact (*.deb)")
+    if not web_artifacts:
+        missing.append(f"web standalone artifact (*{WEB_DEPLOYABLE_SUFFIX})")
+    if require_changelog and len(changelog_artifacts) != len(changelog_expected):
+        missing.extend(str(path) for path in changelog_expected if not path.is_file())
+
+    if missing:
+        rendered = "\n".join(f"- {item}" for item in missing)
+        raise ValueError(
+            "Release artifact validation failed. Missing expected outputs:\n"
+            f"{rendered}"
+        )
+
+    return ReleaseArtifactValidationResult(
+        output_dir=destination,
+        debian_artifacts=debian_artifacts,
+        web_artifacts=web_artifacts,
+        changelog_artifacts=changelog_artifacts,
     )
 
 

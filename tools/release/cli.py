@@ -4,7 +4,15 @@ import argparse
 import sys
 from pathlib import Path
 
-from tools.release.changelog.ai.config import AIProviderConfig, DEFAULT_AI_DRAFT_MODEL, DEFAULT_AI_PROVIDER_KIND
+from tools.release.changelog.ai.config import (
+    AIPipelineCLIOverrides,
+    AIPipelineConfig,
+    AIProviderConfig,
+    AIStageName,
+    DEFAULT_AI_DRAFT_MODEL,
+    DEFAULT_AI_PROVIDER_KIND,
+    resolve_ai_pipeline_config,
+)
 from tools.release.changelog.ai.contracts.polish import AIPolishResult
 from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
 from tools.release.changelog.ai.providers import (
@@ -174,15 +182,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate AI provider connectivity and model availability.",
     )
     changelog_ai_check_parser.add_argument(
+        "--ai-profile",
+        default=None,
+        help="Named AI profile slug from .vaulthalla/ai.yml.",
+    )
+    changelog_ai_check_parser.add_argument(
         "--model",
-        default=DEFAULT_AI_DRAFT_MODEL,
-        help=f"Model to verify against provider model discovery (default: {DEFAULT_AI_DRAFT_MODEL}).",
+        default=None,
+        help=(
+            "Override model for this check (defaults resolved from built-ins/profile; "
+            f"legacy default: {DEFAULT_AI_DRAFT_MODEL})."
+        ),
     )
     changelog_ai_check_parser.add_argument(
         "--provider",
         choices=("openai", "openai-compatible"),
-        default=DEFAULT_AI_PROVIDER_KIND,
-        help="AI provider transport to use (default: openai).",
+        default=None,
+        help=f"AI provider transport override (default resolved from config; legacy: {DEFAULT_AI_PROVIDER_KIND}).",
     )
     changelog_ai_check_parser.add_argument(
         "--base-url",
@@ -211,15 +227,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to save the validated structured AI draft JSON.",
     )
     changelog_ai_draft_parser.add_argument(
+        "--ai-profile",
+        default=None,
+        help="Named AI profile slug from .vaulthalla/ai.yml.",
+    )
+    changelog_ai_draft_parser.add_argument(
         "--model",
-        default=DEFAULT_AI_DRAFT_MODEL,
-        help=f"OpenAI model to use (default: {DEFAULT_AI_DRAFT_MODEL}).",
+        default=None,
+        help=(
+            "Global model override for all AI stages (triage/draft/polish). "
+            f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
+        ),
     )
     changelog_ai_draft_parser.add_argument(
         "--provider",
         choices=("openai", "openai-compatible"),
-        default=DEFAULT_AI_PROVIDER_KIND,
-        help="AI provider transport to use (default: openai).",
+        default=None,
+        help=f"AI provider transport override (default resolved from config; legacy: {DEFAULT_AI_PROVIDER_KIND}).",
     )
     changelog_ai_draft_parser.add_argument(
         "--base-url",
@@ -450,18 +474,25 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
     payload = build_ai_payload(context)
-    provider_config = build_ai_provider_config_from_args(args)
-    provider = build_ai_provider_from_args(args)
+    pipeline_config = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
+    draft_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="draft")
 
     # Local-compatible runs should fail early with explicit endpoint/model diagnostics.
-    if provider_config.kind == "openai-compatible":
-        _ = run_provider_preflight(provider_config, provider=provider, require_model=True)
+    if pipeline_config.provider == "openai-compatible":
+        _run_stage_preflight(
+            args=args,
+            repo_root=repo_root,
+            draft_provider=draft_provider,
+            include_triage=args.use_triage,
+            include_polish=args.polish,
+        )
 
     draft_input: dict = payload
     source_kind = "payload"
 
     if args.use_triage:
-        triage_result = run_triage_stage(payload, provider=provider)
+        triage_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="triage")
+        triage_result = run_triage_stage(payload, provider=triage_provider)
         draft_input = build_triage_ir_payload(triage_result)
         source_kind = "triage"
 
@@ -469,11 +500,12 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             write_output(render_triage_result_json(triage_result), args.save_triage_json)
             print(f"Wrote AI triage JSON to {Path(args.save_triage_json).resolve()}")
 
-    draft = generate_draft_from_payload(draft_input, provider=provider, source_kind=source_kind)
+    draft = generate_draft_from_payload(draft_input, provider=draft_provider, source_kind=source_kind)
     polish_result: AIPolishResult | None = None
 
     if args.polish:
-        polish_result = run_polish_stage(draft, provider=provider)
+        polish_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="polish")
+        polish_result = run_polish_stage(draft, provider=polish_provider)
         final_markdown = render_polish_markdown(polish_result)
 
         if args.save_polish_json:
@@ -582,20 +614,77 @@ def build_changelog_context(repo_root: Path, since_tag: str | None):
     )
 
 
-def build_ai_provider_config_from_args(args: argparse.Namespace) -> AIProviderConfig:
-    return AIProviderConfig(
-        kind=args.provider,
-        model=args.model,
-        base_url=args.base_url,
+def build_ai_pipeline_config_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+) -> AIPipelineConfig:
+    active_repo_root = repo_root if repo_root is not None else Path(args.repo_root).resolve()
+    overrides = AIPipelineCLIOverrides(
+        provider=getattr(args, "provider", None),
+        base_url=getattr(args, "base_url", None),
+        model=getattr(args, "model", None),
     )
+    return resolve_ai_pipeline_config(
+        repo_root=active_repo_root,
+        profile_slug=getattr(args, "ai_profile", None),
+        cli_overrides=overrides,
+    )
+
+
+def build_ai_provider_config_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+    stage: AIStageName = "draft",
+) -> AIProviderConfig:
+    pipeline = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
+    return pipeline.provider_config_for_stage(stage)
 
 
 def build_ai_provider_from_config(config: AIProviderConfig) -> StructuredJSONProvider:
     return build_structured_json_provider(config)
 
 
-def build_ai_provider_from_args(args: argparse.Namespace) -> StructuredJSONProvider:
-    return build_ai_provider_from_config(build_ai_provider_config_from_args(args))
+def build_ai_provider_from_args(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path | None = None,
+    stage: AIStageName = "draft",
+) -> StructuredJSONProvider:
+    return build_ai_provider_from_config(
+        build_ai_provider_config_from_args(args, repo_root=repo_root, stage=stage)
+    )
+
+
+def _run_stage_preflight(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    draft_provider: StructuredJSONProvider,
+    include_triage: bool,
+    include_polish: bool,
+) -> None:
+    seen: set[tuple[str, str | None]] = set()
+    stage_order: list[AIStageName] = ["draft"]
+    if include_triage:
+        stage_order.append("triage")
+    if include_polish:
+        stage_order.append("polish")
+
+    for stage in stage_order:
+        stage_config = build_ai_provider_config_from_args(args, repo_root=repo_root, stage=stage)
+        fingerprint = (stage_config.model, stage_config.base_url)
+        if fingerprint in seen:
+            continue
+
+        provider = (
+            draft_provider
+            if stage == "draft"
+            else build_ai_provider_from_args(args, repo_root=repo_root, stage=stage)
+        )
+        _ = run_provider_preflight(stage_config, provider=provider, require_model=True)
+        seen.add(fingerprint)
 
 
 def print_provider_preflight_result(result: ProviderPreflightResult) -> None:

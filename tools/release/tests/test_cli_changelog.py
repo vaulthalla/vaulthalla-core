@@ -133,6 +133,30 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_payload.since_tag, "v0.1.0")
         self.assertEqual(parsed_payload.output, "/tmp/payload.json")
 
+        parsed_release = parser.parse_args(
+            [
+                "changelog",
+                "release",
+                "--since-tag",
+                "v0.1.0",
+                "--output",
+                "/tmp/release.md",
+                "--raw-output",
+                "/tmp/raw.md",
+                "--payload-output",
+                "/tmp/release-payload.json",
+                "--manual-changelog-path",
+                "debian/changelog",
+            ]
+        )
+        self.assertEqual(parsed_release.command, "changelog")
+        self.assertEqual(parsed_release.changelog_command, "release")
+        self.assertEqual(parsed_release.since_tag, "v0.1.0")
+        self.assertEqual(parsed_release.output, "/tmp/release.md")
+        self.assertEqual(parsed_release.raw_output, "/tmp/raw.md")
+        self.assertEqual(parsed_release.payload_output, "/tmp/release-payload.json")
+        self.assertEqual(parsed_release.manual_changelog_path, "debian/changelog")
+
         parsed_ai_check = parser.parse_args(
             [
                 "changelog",
@@ -245,6 +269,66 @@ class CliChangelogPayloadTests(unittest.TestCase):
             self.assertTrue(target.is_file())
             self.assertEqual(target.read_text(encoding="utf-8"), '{"schema_version":"x"}\n')
             self.assertIn("Wrote changelog payload to", out.getvalue())
+
+
+class CliChangelogReleaseTests(unittest.TestCase):
+    def _args(
+        self,
+        *,
+        repo_root: str = ".",
+        since_tag: str | None = None,
+        output: str = "release/changelog.release.md",
+        raw_output: str = "release/changelog.raw.md",
+        payload_output: str = "release/changelog.payload.json",
+        manual_changelog_path: str = "debian/changelog",
+    ) -> argparse.Namespace:
+        return argparse.Namespace(
+            repo_root=repo_root,
+            since_tag=since_tag,
+            output=output,
+            raw_output=raw_output,
+            payload_output=payload_output,
+            manual_changelog_path=manual_changelog_path,
+        )
+
+    def test_release_command_writes_evidence_and_selected_changelog(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "release.md"
+            raw_target = Path(temp_dir) / "raw.md"
+            payload_target = Path(temp_dir) / "payload.json"
+            args = self._args(
+                output=str(target),
+                raw_output=str(raw_target),
+                payload_output=str(payload_target),
+            )
+            out = StringIO()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch("tools.release.cli.parse_release_ai_settings", return_value=object()),
+                patch(
+                    "tools.release.cli.resolve_release_changelog",
+                    return_value=type(
+                        "_Selection",
+                        (),
+                        {"path": "manual", "content": "# Manual Changelog\n", "local_base_url_overrode_profile": False},
+                    )(),
+                ),
+                redirect_stdout(out),
+            ):
+                rc = cli.cmd_changelog_release(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(target.read_text(encoding="utf-8"), "# Manual Changelog\n")
+            self.assertEqual(raw_target.read_text(encoding="utf-8"), "# Raw Draft\n")
+            self.assertEqual(payload_target.read_text(encoding="utf-8"), '{"schema_version":"x"}\n')
+            rendered = out.getvalue()
+            self.assertIn("Wrote changelog raw evidence to", rendered)
+            self.assertIn("Wrote changelog payload evidence to", rendered)
+            self.assertIn("Wrote release changelog to", rendered)
 
 
 class CliChangelogAICheckTests(unittest.TestCase):

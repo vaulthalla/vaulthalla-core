@@ -1,0 +1,172 @@
+from __future__ import annotations
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+from unittest.mock import patch
+
+from tools.release.changelog.release_workflow import (
+    parse_release_ai_settings,
+    resolve_local_release_pipeline_config,
+    resolve_release_changelog,
+    validate_manual_changelog_current,
+)
+
+
+def _write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _make_debian_changelog(path: Path, full_version: str) -> None:
+    _write(
+        path,
+        (
+            f"vaulthalla ({full_version}) unstable; urgency=medium\n\n"
+            "  * test entry\n\n"
+            " -- Test User <test@example.com>  Sun, 19 Apr 2026 00:00:00 +0000\n"
+        ),
+    )
+
+
+class ReleaseWorkflowSelectionTests(unittest.TestCase):
+    def test_auto_mode_prefers_openai_before_local(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "1.2.3\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "1.2.3-1")
+            settings = parse_release_ai_settings(
+                {
+                    "RELEASE_AI_MODE": "auto",
+                    "OPENAI_API_KEY": "secret",
+                    "RELEASE_AI_PROFILE_OPENAI": "openai-balanced",
+                    "RELEASE_LOCAL_LLM_ENABLED": "true",
+                    "RELEASE_LOCAL_LLM_PROFILE": "local-gemma",
+                }
+            )
+
+            with (
+                patch(
+                    "tools.release.changelog.release_workflow._generate_openai_release_changelog",
+                    return_value="# OpenAI Draft\n",
+                ) as openai_path,
+                patch("tools.release.changelog.release_workflow._generate_local_release_changelog") as local_path,
+                patch("tools.release.changelog.release_workflow.validate_manual_changelog_current") as manual_path,
+            ):
+                result = resolve_release_changelog(
+                    repo_root=repo_root,
+                    payload={"schema_version": "x"},
+                    settings=settings,
+                    logger=lambda _line: None,
+                )
+
+            self.assertEqual(result.path, "openai")
+            self.assertEqual(result.content, "# OpenAI Draft\n")
+            openai_path.assert_called_once()
+            local_path.assert_not_called()
+            manual_path.assert_not_called()
+
+    def test_local_path_requires_explicit_enable_flag(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "1.2.3\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "1.2.3-1")
+            settings = parse_release_ai_settings(
+                {
+                    "RELEASE_AI_MODE": "auto",
+                    "RELEASE_LOCAL_LLM_ENABLED": "false",
+                    "RELEASE_LOCAL_LLM_PROFILE": "local-gemma",
+                    "RELEASE_LOCAL_LLM_BASE_URL": "http://127.0.0.1:8888/v1",
+                }
+            )
+
+            with (
+                patch("tools.release.changelog.release_workflow._generate_openai_release_changelog") as openai_path,
+                patch("tools.release.changelog.release_workflow._generate_local_release_changelog") as local_path,
+            ):
+                result = resolve_release_changelog(
+                    repo_root=repo_root,
+                    payload={"schema_version": "x"},
+                    settings=settings,
+                    logger=lambda _line: None,
+                )
+
+            self.assertEqual(result.path, "manual")
+            self.assertIn("vaulthalla (1.2.3-1)", result.content)
+            openai_path.assert_not_called()
+            local_path.assert_not_called()
+
+    def test_manual_mode_passes_when_changelog_current(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "2.0.0\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "2.0.0-3")
+            settings = parse_release_ai_settings({"RELEASE_AI_MODE": "disabled"})
+
+            result = resolve_release_changelog(
+                repo_root=repo_root,
+                payload={"schema_version": "x"},
+                settings=settings,
+                logger=lambda _line: None,
+            )
+
+            self.assertEqual(result.path, "manual")
+            self.assertIn("2.0.0-3", result.content)
+
+    def test_manual_mode_fails_when_changelog_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "2.0.0\n")
+            settings = parse_release_ai_settings({"RELEASE_AI_MODE": "disabled"})
+
+            with self.assertRaisesRegex(ValueError, "required file is missing"):
+                _ = resolve_release_changelog(
+                    repo_root=repo_root,
+                    payload={"schema_version": "x"},
+                    settings=settings,
+                    logger=lambda _line: None,
+                )
+
+
+class ReleaseWorkflowConfigTests(unittest.TestCase):
+    def test_local_base_url_env_override_replaces_profile_base_url(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(
+                repo_root / "ai.yml",
+                """
+profiles:
+  local-gemma:
+    provider: openai-compatible
+    base_url: http://127.0.0.1:7777/v1
+    stages:
+      draft:
+        model: Gemma-4-31B
+""",
+            )
+
+            pipeline, profile_base_url, override_applied = resolve_local_release_pipeline_config(
+                repo_root=repo_root,
+                profile_slug="local-gemma",
+                base_url_override="http://10.0.0.20:11434/v1",
+            )
+
+            self.assertEqual(profile_base_url, "http://127.0.0.1:7777/v1")
+            self.assertEqual(pipeline.base_url, "http://10.0.0.20:11434/v1")
+            self.assertTrue(override_applied)
+
+    def test_manual_stale_validation_fails_for_mismatched_version(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "1.2.3\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "1.2.2-1")
+
+            with self.assertRaisesRegex(ValueError, "stale changelog"):
+                _ = validate_manual_changelog_current(
+                    repo_root=repo_root,
+                    changelog_path="debian/changelog",
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()

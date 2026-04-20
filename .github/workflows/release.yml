@@ -18,6 +18,14 @@ jobs:
       - X64
       - ubuntu-latest-lts
     environment: Production
+    env:
+      RELEASE_AI_MODE: ${{ vars.RELEASE_AI_MODE || 'auto' }}
+      RELEASE_AI_PROFILE_OPENAI: ${{ vars.RELEASE_AI_PROFILE_OPENAI || 'openai-balanced' }}
+      RELEASE_LOCAL_LLM_ENABLED: ${{ vars.RELEASE_LOCAL_LLM_ENABLED || 'false' }}
+      RELEASE_LOCAL_LLM_PROFILE: ${{ vars.RELEASE_LOCAL_LLM_PROFILE || '' }}
+      RELEASE_LOCAL_LLM_BASE_URL: ${{ vars.RELEASE_LOCAL_LLM_BASE_URL || '' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || '' }}
+      RELEASE_LOCAL_LLM_API_KEY: ${{ secrets.RELEASE_LOCAL_LLM_API_KEY || '' }}
 
     steps:
       - name: Checkout
@@ -47,13 +55,6 @@ jobs:
 
       - name: Run web checks
         uses: ./.github/actions/test_web
-
-      - name: Generate changelog evidence artifacts
-        shell: bash
-        run: |
-          mkdir -p release
-          python3 -m tools.release changelog draft --format raw --output release/changelog.raw.md
-          python3 -m tools.release changelog payload --output release/changelog.payload.json
 
       - name: Build release artifacts (Debian + web deployable)
         id: package

@@ -15,6 +15,15 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Resolve release changelog (AI or manual fallback)
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m tools.release changelog release \
+          --output "${{ inputs.output_dir }}/changelog.release.md" \
+          --raw-output "${{ inputs.output_dir }}/changelog.raw.md" \
+          --payload-output "${{ inputs.output_dir }}/changelog.payload.json"
+
     - name: Build Debian + web release artifacts
       id: package
       shell: bash

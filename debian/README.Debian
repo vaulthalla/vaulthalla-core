@@ -48,6 +48,15 @@ and installs the unit:
 The service is configured to run Node in production mode on localhost port
 `36968`.
 
+SQL deploy payload
+==================
+
+The package installs SQL schema/migration assets to:
+
+- `/usr/share/vaulthalla/psql`
+
+Core runtime initialization reads this directory on startup.
+
 Nginx integration (conservative mode)
 =====================================
 
@@ -107,6 +116,8 @@ On a clean Debian/Ubuntu test VM:
 3. Verify runtime payload:
    - `test -f /usr/share/vaulthalla-web/server.js`
    - `test -d /usr/share/vaulthalla-web/.next/static`
+   - `test -d /usr/share/vaulthalla/psql`
+   - `test -f /usr/share/vaulthalla/psql/000_schema.sql`
 4. Verify nginx decision:
    - If auto-config applied: `test -L /etc/nginx/sites-enabled/vaulthalla`
    - If skipped: check `/var/log/dpkg.log` or install output for skip reason.

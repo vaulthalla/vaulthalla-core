@@ -34,6 +34,7 @@ Key package-managed paths:
 - Units: `/lib/systemd/system/vaulthalla.service`, `vaulthalla-cli.service`, `vaulthalla-cli.socket`, `vaulthalla-web.service`
 - Web runtime: `/usr/share/vaulthalla-web` (Next standalone payload + static assets)
 - Nginx template: `/usr/share/vaulthalla/nginx/vaulthalla.conf`
+- SQL deploy assets: `/usr/share/vaulthalla/psql`
 - TPM/tmpfiles: `/usr/lib/*/udev/rules.d/60-vaulthalla-tpm.rules`, `/usr/lib/*/tmpfiles.d/vaulthalla.conf`
 - Docs: `/usr/share/doc/vaulthalla/LICENSE`, `/usr/share/doc/vaulthalla/copyright`
 

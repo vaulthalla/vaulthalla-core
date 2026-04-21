@@ -19,7 +19,11 @@ DB_USER="vaulthalla"
 DB_NAME="vaulthalla"
 PENDING_SUPERADMIN_UID_FILE="/run/vaulthalla/superadmin_uid"
 PENDING_DB_PASS_FILE="/run/vaulthalla/db_password"
+CORE_SYSTEMD_UNIT="vaulthalla.service"
+CLI_SYSTEMD_UNIT="vaulthalla-cli.service"
+CLI_SOCKET_SYSTEMD_UNIT="vaulthalla-cli.socket"
 WEB_SYSTEMD_UNIT="vaulthalla-web.service"
+PSQL_DEPLOY_DIR="/usr/share/vaulthalla/psql"
 NGINX_TEMPLATE="/usr/share/vaulthalla/nginx/vaulthalla.conf"
 NGINX_SITE_AVAIL="/etc/nginx/sites-available/vaulthalla"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/vaulthalla"
@@ -115,6 +119,61 @@ seed_superadmin_uid() {
     printf '%s\n' "$RESOLVED_UID" > "$PENDING_SUPERADMIN_UID_FILE"
     chown "$DB_USER:$DB_USER" "$PENDING_SUPERADMIN_UID_FILE"
     echo "[${PKG}] Seeded super-admin UID to ${PENDING_SUPERADMIN_UID_FILE} (uid=${RESOLVED_UID})."
+}
+
+ensure_superadmin_user_in_group() {
+    if [ ! -f "$PENDING_SUPERADMIN_UID_FILE" ]; then
+        return 0
+    fi
+
+    SUPERADMIN_UID="$(cat "$PENDING_SUPERADMIN_UID_FILE" 2>/dev/null || true)"
+    if ! printf '%s' "$SUPERADMIN_UID" | grep -Eq '^[0-9]+$'; then
+        return 0
+    fi
+
+    SUPERADMIN_USER="$(getent passwd "$SUPERADMIN_UID" | cut -d: -f1)"
+    if [ -z "$SUPERADMIN_USER" ] || [ "$SUPERADMIN_USER" = "root" ] || [ "$SUPERADMIN_USER" = "$DB_USER" ]; then
+        return 0
+    fi
+
+    if id -nG "$SUPERADMIN_USER" 2>/dev/null | tr ' ' '\n' | grep -qx "$DB_USER"; then
+        return 0
+    fi
+
+    if adduser "$SUPERADMIN_USER" "$DB_USER" >/dev/null 2>&1; then
+        echo "[${PKG}] Added '${SUPERADMIN_USER}' to '${DB_USER}' group."
+    else
+        echo "[${PKG}] WARNING: Failed to add '${SUPERADMIN_USER}' to '${DB_USER}' group."
+    fi
+}
+
+align_config_file_permissions() {
+    target="$1"
+    if [ ! -f "$target" ]; then
+        return 0
+    fi
+    chown "$DB_USER:$DB_USER" "$target"
+    chmod 0640 "$target"
+}
+
+require_runtime_assets() {
+    if [ ! -d "$PSQL_DEPLOY_DIR" ]; then
+        echo "[${PKG}] ERROR: Required SQL deploy directory is missing: ${PSQL_DEPLOY_DIR}" >&2
+        exit 1
+    fi
+
+    if ! find "$PSQL_DEPLOY_DIR" -maxdepth 1 -type f -name '*.sql' | grep -q .; then
+        echo "[${PKG}] ERROR: SQL deploy directory is empty: ${PSQL_DEPLOY_DIR}" >&2
+        exit 1
+    fi
+}
+
+refresh_tpm_udev_rules() {
+    if ! has_command udevadm; then
+        return 0
+    fi
+    udevadm control --reload-rules >/dev/null 2>&1 || true
+    udevadm trigger --subsystem-match=tpm >/dev/null 2>&1 || true
 }
 
 nginx_installed() {
@@ -235,14 +294,19 @@ case "$1" in
     systemd-tmpfiles --create /usr/lib/tmpfiles.d/vaulthalla.conf || true
 
     ensure_tss_group_and_user_added
+    refresh_tpm_udev_rules
 
     # Runtime/state dirs
-    create_dir /var/lib/vaulthalla 0755 "$DB_USER" "$DB_USER"
+    create_dir /var/lib/vaulthalla 0700 "$DB_USER" "$DB_USER"
     create_dir /var/log/vaulthalla 0750 "$DB_USER" "$DB_USER"
-    create_dir /run/vaulthalla     0700 "$DB_USER" "$DB_USER"
+    create_dir /run/vaulthalla     0750 "$DB_USER" "$DB_USER"
     install -d -m 0755 /etc/vaulthalla
     [ -d /mnt/vaulthalla ] || create_dir /mnt/vaulthalla 0755 "$DB_USER" "$DB_USER"
+    align_config_file_permissions /etc/vaulthalla/config.yaml
+    align_config_file_permissions /etc/vaulthalla/config_template.yaml.in
+    require_runtime_assets
     seed_superadmin_uid
+    ensure_superadmin_user_in_group
 
     # --- Debconf: initialize database? ---
     db_get vaulthalla/init-db || true
@@ -308,10 +372,13 @@ EOF
 
     safe_systemctl daemon-reexec
     safe_systemctl daemon-reload
-    safe_systemctl preset vaulthalla.service
-    safe_systemctl preset vaulthalla-cli.socket
-    safe_systemctl preset vaulthalla-cli.service
+    safe_systemctl preset "$CORE_SYSTEMD_UNIT"
+    safe_systemctl preset "$CLI_SOCKET_SYSTEMD_UNIT"
+    safe_systemctl preset "$CLI_SYSTEMD_UNIT"
     safe_systemctl preset "$WEB_SYSTEMD_UNIT"
+    safe_systemctl enable --now "$CORE_SYSTEMD_UNIT"
+    safe_systemctl enable --now "$CLI_SOCKET_SYSTEMD_UNIT"
+    safe_systemctl enable --now "$CLI_SYSTEMD_UNIT"
     safe_systemctl enable --now "$WEB_SYSTEMD_UNIT"
 
     configure_nginx_if_safe

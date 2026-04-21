@@ -68,8 +68,11 @@ case "$1" in
         reload_nginx_if_safe
 
         deluser --system --quiet vaulthalla || true
+        delgroup --system --quiet vaulthalla || true
         rm -rf /var/lib/vaulthalla /var/log/vaulthalla
+        rmdir /run/vaulthalla >/dev/null 2>&1 || true
         rmdir /mnt/vaulthalla >/dev/null 2>&1 || true
+        rmdir /etc/vaulthalla >/dev/null 2>&1 || true
 
         echo "[${PKG}] Purging debconf settings for vaulthalla..."
         db_purge || true

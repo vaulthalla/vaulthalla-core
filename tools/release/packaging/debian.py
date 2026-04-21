@@ -50,6 +50,7 @@ REQUIRED_DEBIAN_PACKAGE_PATHS: tuple[str, ...] = (
     "lib/systemd/system/vaulthalla-web.service",
     "usr/share/doc/vaulthalla/copyright",
     "usr/share/vaulthalla/nginx/vaulthalla.conf",
+    "usr/share/vaulthalla/psql/000_schema.sql",
     "usr/share/vaulthalla-web/server.js",
 )
 ALTERNATE_DEBIAN_PACKAGE_PATH_GROUPS: tuple[tuple[str, ...], ...] = (

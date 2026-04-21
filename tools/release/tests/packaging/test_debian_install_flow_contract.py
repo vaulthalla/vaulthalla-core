@@ -26,7 +26,9 @@ class DebianInstallFlowContractTests(unittest.TestCase):
         required_fragments = (
             "PENDING_SUPERADMIN_UID_FILE=\"/run/vaulthalla/superadmin_uid\"",
             "WEB_SYSTEMD_UNIT=\"vaulthalla-web.service\"",
+            "PSQL_DEPLOY_DIR=\"/usr/share/vaulthalla/psql\"",
             "NGINX_MANAGED_MARKER=\"/var/lib/vaulthalla/nginx_site_managed\"",
+            "require_runtime_assets",
             "db_get vaulthalla/configure-nginx",
             "has_non_nginx_listener_on_web_ports",
             "has_custom_nginx_sites_enabled",
@@ -34,6 +36,7 @@ class DebianInstallFlowContractTests(unittest.TestCase):
             "printf '%s\\n' \"managed-by=${PKG}\" > \"$NGINX_MANAGED_MARKER\"",
             "ROLE_CREATED=\"false\"",
             "Role already existed; preserving current DB password seed state.",
+            "safe_systemctl enable --now \"$CORE_SYSTEMD_UNIT\"",
             "safe_systemctl enable --now \"$WEB_SYSTEMD_UNIT\"",
             "install -m 0644 \"$NGINX_TEMPLATE\" \"$NGINX_SITE_AVAIL\"",
         )

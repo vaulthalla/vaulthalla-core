@@ -30,6 +30,8 @@ Multi-Arch: foreign
 Depends:
  adduser,
  nodejs,
+ postgresql,
+ openssl,
  ${shlibs:Depends},
  ${misc:Depends}
 Recommends:

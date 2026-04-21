@@ -103,4 +103,33 @@ Validation flows
    - `systemctl status vaulthalla-cli.socket`
    - `systemctl status vaulthalla-web.service`
 
+CLI integration follow-up (Phase 3)
+===================================
+
+If package-time automation skipped optional integration steps, admins can run:
+
+- `vh setup db`
+- `vh setup nginx`
+- `vh teardown nginx`
+
+These commands are explicit integration actions and are intended for controlled
+operator use. They are conservative and fail with actionable errors on
+conflicts/unusable local state.
+
+For local PostgreSQL bootstrap, `vh setup db` now:
+
+- validates packaged SQL assets under `/usr/share/vaulthalla/psql`
+- creates/reuses local `vaulthalla` role and database
+- applies packaged SQL migrations and records hashes in `schema_migrations`
+- seeds `/run/vaulthalla/db_password` only when the role is newly created
+
+For nginx integration, `vh setup nginx` and `vh teardown nginx` only manage the
+Vaulthalla site path and marker:
+
+- `/etc/nginx/sites-available/vaulthalla`
+- `/etc/nginx/sites-enabled/vaulthalla`
+- `/var/lib/vaulthalla/nginx_site_managed`
+
+They do not claim ownership over unrelated nginx site configuration.
+
  -- Cooper Larson <cooper@valkyrianlabs.com>  Tue, 21 Apr 2026 00:00:00 +0000

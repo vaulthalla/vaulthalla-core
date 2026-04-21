@@ -52,6 +52,34 @@ class DebianInstallFlowContractTests(unittest.TestCase):
         self.assertIn("Recommends:\n postgresql,\n nginx", control)
         self.assertNotIn("Depends:\n adduser,\n nodejs,\n postgresql,", control)
 
+    def test_readme_documents_phase3_cli_integration_followups(self) -> None:
+        readme = (self._repo_root() / "debian" / "README.Debian").read_text(encoding="utf-8")
+        required = (
+            "vh setup db",
+            "vh setup nginx",
+            "vh teardown nginx",
+            "/usr/share/vaulthalla/psql",
+            "/var/lib/vaulthalla/nginx_site_managed",
+        )
+        for fragment in required:
+            self.assertIn(fragment, readme)
+
+    def test_shell_usage_and_command_registry_include_setup_and_teardown(self) -> None:
+        repo = self._repo_root()
+        usages_hpp = (repo / "core" / "usage" / "include" / "usages.hpp").read_text(encoding="utf-8")
+        usage_manager = (repo / "core" / "usage" / "src" / "UsageManager.cpp").read_text(encoding="utf-8")
+        commands_hpp = (repo / "core" / "include" / "protocols" / "shell" / "commands" / "all.hpp").read_text(encoding="utf-8")
+        commands_cpp = (repo / "core" / "src" / "protocols" / "shell" / "commands" / "all.cpp").read_text(encoding="utf-8")
+
+        self.assertIn("namespace setup", usages_hpp)
+        self.assertIn("namespace teardown", usages_hpp)
+        self.assertIn("registerBook(setup::get", usage_manager)
+        self.assertIn("registerBook(teardown::get", usage_manager)
+        self.assertIn("registerSetupCommands", commands_hpp)
+        self.assertIn("registerTeardownCommands", commands_hpp)
+        self.assertIn("registerSetupCommands(r);", commands_cpp)
+        self.assertIn("registerTeardownCommands(r);", commands_cpp)
+
 
 if __name__ == "__main__":
     unittest.main()

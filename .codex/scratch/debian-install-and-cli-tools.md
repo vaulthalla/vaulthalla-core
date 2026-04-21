@@ -283,7 +283,7 @@ Remote DB should be treated as an explicit advanced configuration workflow, not 
 * `vh setup nginx --certbot`
 
   * may install/configure certbot explicitly because the admin asked for it
-* `vh doctor`
+* `vh doctor` (were gonna hold off on this feature for now)
 
   * report DB status, proxy status, service health, initial super-admin state, missing assets, etc.
 * `vh setup remote-db`

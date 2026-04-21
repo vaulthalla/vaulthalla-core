@@ -144,6 +144,15 @@ Vaulthalla site path and marker:
 
 They do not claim ownership over unrelated nginx site configuration.
 
+`vh setup nginx` is the canonical final deployment path for Vaulthalla-managed
+nginx configuration. It regenerates `/etc/nginx/sites-available/vaulthalla`
+from canonical runtime configuration (`/etc/vaulthalla/config.yaml`) and
+runtime conventions, then validates/reloads nginx conservatively.
+
+The packaged artifact at `/usr/share/vaulthalla/nginx/vaulthalla.conf` is only a
+staged baseline; operators should run `vh setup nginx` for final deterministic
+deployment after install.
+
 For explicit certbot-backed nginx handling, `vh setup nginx --certbot --domain <fqdn>`:
 
 - validates root-run managed nginx state and certbot prerequisites

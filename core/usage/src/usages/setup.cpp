@@ -47,11 +47,11 @@ static std::shared_ptr<CommandUsage> remote_db(const std::weak_ptr<CommandUsage>
 static std::shared_ptr<CommandUsage> nginx(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"nginx", "proxy"};
-    cmd->description = "Install and enable Vaulthalla nginx site integration conservatively.";
+    cmd->description = "Generate/deploy Vaulthalla-managed nginx config from canonical runtime config, then validate and reload conservatively.";
     cmd->optional = {nginxDomainOpt};
     cmd->optional_flags = {nginxCertbotFlag};
     cmd->examples = {
-        {"vh setup nginx", "Install/enable Vaulthalla nginx site config and reload nginx when safe."},
+        {"vh setup nginx", "Regenerate and apply canonical Vaulthalla-managed nginx config, then validate/reload when safe."},
         {"vh setup nginx --certbot --domain vault.example.com", "Configure Vaulthalla nginx integration and run deterministic certbot issue/renew flow for the domain."}
     };
     return cmd;

@@ -10,7 +10,7 @@ set -e
 # - Optionally enables conservative nginx reverse-proxy integration
 # - Does NOT write secrets to /etc/vaulthalla/config.yaml
 #
-# Depends (in debian/control): postgresql, openssl, nodejs
+# Depends (in debian/control): openssl, nodejs
 
 . /usr/share/debconf/confmodule
 
@@ -79,11 +79,19 @@ run_as_postgres() {
 
 seed_superadmin_uid() {
     db_get vaulthalla/superadmin-uid || true
-    REQUESTED_UID="${RET:-auto}"
+    REQUESTED_UID="${RET:-}"
     RESOLVED_UID=""
 
     case "$REQUESTED_UID" in
-        ""|auto)
+        "")
+            echo "[${PKG}] No super-admin UID pre-seeded by debconf; skipping UID seed."
+            return 0
+            ;;
+        auto)
+            if [ "${DEBIAN_FRONTEND:-}" = "noninteractive" ]; then
+                echo "[${PKG}] Noninteractive install with superadmin-uid=auto; skipping UID auto-detection."
+                return 0
+            fi
             if [ -n "${SUDO_UID:-}" ]; then
                 RESOLVED_UID="$SUDO_UID"
             elif [ -n "${PKEXEC_UID:-}" ]; then
@@ -119,6 +127,21 @@ seed_superadmin_uid() {
     printf '%s\n' "$RESOLVED_UID" > "$PENDING_SUPERADMIN_UID_FILE"
     chown "$DB_USER:$DB_USER" "$PENDING_SUPERADMIN_UID_FILE"
     echo "[${PKG}] Seeded super-admin UID to ${PENDING_SUPERADMIN_UID_FILE} (uid=${RESOLVED_UID})."
+}
+
+fail_init_db() {
+    echo "[${PKG}] ERROR: $1" >&2
+    echo "[${PKG}] ERROR: Re-run with vaulthalla/init-db=false to skip automatic local PostgreSQL setup." >&2
+    exit 1
+}
+
+postgresql_server_ready() {
+    if has_command pg_isready; then
+        run_as_postgres pg_isready -q >/dev/null 2>&1
+        return $?
+    fi
+
+    run_as_postgres psql -X -v ON_ERROR_STOP=1 -d postgres -tAc 'SELECT 1' >/dev/null 2>&1
 }
 
 ensure_superadmin_user_in_group() {
@@ -215,7 +238,7 @@ has_custom_nginx_sites_enabled() {
 
 configure_nginx_if_safe() {
     db_get vaulthalla/configure-nginx || true
-    CONFIGURE_NGINX="${RET:-true}"
+    CONFIGURE_NGINX="${RET:-false}"
     if [ "$CONFIGURE_NGINX" != "true" ]; then
         echo "[${PKG}] Skipping nginx integration per user choice."
         return 0
@@ -310,20 +333,23 @@ case "$1" in
 
     # --- Debconf: initialize database? ---
     db_get vaulthalla/init-db || true
-    INIT_DB="${RET:-true}"
+    INIT_DB="${RET:-false}"
 
     if [ "$INIT_DB" = "true" ]; then
         if ! has_command psql; then
-            echo "[${PKG}] WARNING: psql not found; skipping PostgreSQL initialization."
-            INIT_DB="false"
+            fail_init_db "PostgreSQL client (psql) is not installed."
         fi
-        if [ "$INIT_DB" = "true" ] && ! id postgres >/dev/null 2>&1; then
-            echo "[${PKG}] WARNING: postgres system user not found; skipping PostgreSQL initialization."
-            INIT_DB="false"
+        if ! has_command openssl; then
+            fail_init_db "OpenSSL CLI is required to generate a database password seed."
         fi
-        if [ "$INIT_DB" = "true" ] && ! run_as_postgres true >/dev/null 2>&1; then
-            echo "[${PKG}] WARNING: unable to execute commands as postgres user; skipping PostgreSQL initialization."
-            INIT_DB="false"
+        if ! id postgres >/dev/null 2>&1; then
+            fail_init_db "Local postgres system user is missing. Install/configure a local PostgreSQL server first."
+        fi
+        if ! run_as_postgres true >/dev/null 2>&1; then
+            fail_init_db "Unable to execute commands as postgres user."
+        fi
+        if ! postgresql_server_ready; then
+            fail_init_db "Local PostgreSQL server is not accepting connections."
         fi
     fi
 

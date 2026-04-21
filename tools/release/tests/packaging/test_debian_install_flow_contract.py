@@ -13,6 +13,8 @@ class DebianInstallFlowContractTests(unittest.TestCase):
         self.assertIn("Template: vaulthalla/init-db", templates)
         self.assertIn("Template: vaulthalla/superadmin-uid", templates)
         self.assertIn("Template: vaulthalla/configure-nginx", templates)
+        self.assertIn("Template: vaulthalla/init-db\nType: boolean\nDefault: false", templates)
+        self.assertIn("Template: vaulthalla/configure-nginx\nType: boolean\nDefault: false", templates)
 
     def test_debian_config_prompts_all_supported_debconf_questions(self) -> None:
         config = (self._repo_root() / "debian" / "config").read_text(encoding="utf-8")
@@ -29,7 +31,12 @@ class DebianInstallFlowContractTests(unittest.TestCase):
             "PSQL_DEPLOY_DIR=\"/usr/share/vaulthalla/psql\"",
             "NGINX_MANAGED_MARKER=\"/var/lib/vaulthalla/nginx_site_managed\"",
             "require_runtime_assets",
+            "fail_init_db()",
+            "postgresql_server_ready()",
             "db_get vaulthalla/configure-nginx",
+            "CONFIGURE_NGINX=\"${RET:-false}\"",
+            "INIT_DB=\"${RET:-false}\"",
+            "fail_init_db \"Local PostgreSQL server is not accepting connections.\"",
             "has_non_nginx_listener_on_web_ports",
             "has_custom_nginx_sites_enabled",
             "nginx -t >/dev/null 2>&1",

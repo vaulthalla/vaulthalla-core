@@ -80,9 +80,9 @@ class DebianRulesContractTests(unittest.TestCase):
         control = (repo_root / "debian" / "control").read_text(encoding="utf-8")
 
         self.assertIn("nodejs,", control)
-        self.assertIn("postgresql,", control)
         self.assertIn("openssl,", control)
-        self.assertIn("Recommends:\n nginx", control)
+        self.assertIn("Recommends:\n postgresql,\n nginx", control)
+        self.assertIn("Depends:\n adduser,\n nodejs,\n openssl,", control)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ Primary build/runtime sources: `core/`, `web/`, `deploy/`, `/debian` maintainer 
 
 | File | Responsibility |
 | --- | --- |
-| `debian/control` | Package metadata, deps (`adduser`, `nodejs`), nginx as `Recommends`. |
+| `debian/control` | Package metadata, deps (`adduser`, `nodejs`, `openssl`), PostgreSQL/nginx as `Recommends`. |
 | `debian/rules` | Meson build from `core/`; stages non-Meson payloads into `debian/tmp` (config, systemd units, nginx template, docs, web standalone payload, udev/tmpfiles, CLI symlinks). |
 | `debian/install` | Final install manifest mapping staged files into package paths. Includes multiarch mappings for libs/udev/tmpfiles. |
 | `debian/templates` | Debconf prompts: `init-db`, `superadmin-uid`, `configure-nginx`. |
@@ -42,10 +42,11 @@ Key package-managed paths:
 
 1. `debian/config` asks all three prompts.
 2. `debian/postinst configure` consumes answers via `db_get`.
+   - Note: `dpkg -i` does not run preconfiguration prompts; defaults apply unless values were preseeded/reconfigured.
 3. Prompt effects:
-- `vaulthalla/init-db`: gates role/database bootstrap attempt.
-- `vaulthalla/superadmin-uid`: seeds `/run/vaulthalla/superadmin_uid` (auto-detect or explicit numeric UID).
-- `vaulthalla/configure-nginx`: gates conservative nginx integration path.
+- `vaulthalla/init-db` (default `false`): gates local role/database bootstrap attempt. `true` is strict and fails if local PostgreSQL is unavailable.
+- `vaulthalla/superadmin-uid` (default blank): seeds `/run/vaulthalla/superadmin_uid` only when numeric UID (or interactive `auto`) resolves.
+- `vaulthalla/configure-nginx` (default `false`): gates conservative nginx integration path.
 
 ## Lifecycle Semantics
 
@@ -53,14 +54,14 @@ Key package-managed paths:
 
 - Ensures `vaulthalla` system user/group and `tss` group membership.
 - Creates runtime/state dirs and `/mnt/vaulthalla` when missing.
-- Optionally initializes PostgreSQL role/db.
+- Optionally initializes local PostgreSQL role/db (strict failure when explicitly requested but unavailable).
 - Seeds `/run/vaulthalla/db_password` only when a new DB role password was generated.
 - Presets core/cli/web units; explicitly enables `vaulthalla-web.service`.
 - Applies nginx integration only under safety checks.
 
 `prerm remove|deconfigure`:
 
-- Stops/disables `vaulthalla-web.service`.
+- Stops/disables core/cli/web units.
 - Removes pending run-seed files.
 - Removes nginx enabled symlink only when it points to package site path.
 

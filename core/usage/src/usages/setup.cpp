@@ -10,11 +10,11 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
     return cmd;
 }
 
-static const auto dbHostReq = Option::ManyToOne("host", "Remote PostgreSQL host", {"host"}, "hostname");
+static const auto dbHostReq = Option::Single("host", "Remote PostgreSQL host", "host", "hostname");
 static const auto dbPortOpt = Optional::ManyToOne("port", "Remote PostgreSQL port", {"port", "p"}, "port", "5432");
-static const auto dbUserReq = Option::ManyToOne("user", "Remote PostgreSQL user", {"user", "u"}, "username");
-static const auto dbNameReq = Option::ManyToOne("database", "Remote PostgreSQL database name", {"database", "db", "name"}, "database");
-static const auto dbPassFileReq = Option::ManyToOne("password_file", "Path to file containing remote DB password", {"password-file", "password-path", "pw-file"}, "path");
+static const auto dbUserReq = Option::Multi("user", "Remote PostgreSQL user", {"user", "u"}, {"username"});
+static const auto dbNameReq = Option::Multi("database", "Remote PostgreSQL database name", {"database", "db", "name"}, {"database"});
+static const auto dbPassFileReq = Option::Multi("password_file", "Path to file containing remote DB password", {"password-file", "password-path", "pw-file"}, {"path"});
 static const auto dbPoolSizeOpt = Optional::ManyToOne("pool_size", "Database pool size", {"pool-size"}, "size");
 static const auto interactiveFlag = Flag::WithAliases("interactive_mode", "Prompt for missing remote DB values", {"interactive", "i"});
 static const auto nginxDomainOpt = Optional::ManyToOne("domain", "Domain to configure for Vaulthalla nginx integration", {"domain", "d"}, "domain");

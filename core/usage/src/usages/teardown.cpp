@@ -1,0 +1,43 @@
+#include "usages.hpp"
+
+using namespace vh::protocols::shell;
+
+namespace vh::protocols::shell::teardown {
+
+static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = std::make_shared<CommandUsage>();
+    cmd->parent = parent;
+    return cmd;
+}
+
+static std::shared_ptr<CommandUsage> nginx(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"nginx", "proxy"};
+    cmd->description = "Disable/remove Vaulthalla-managed nginx site integration only.";
+    cmd->examples = {
+        {"vh teardown nginx", "Disable Vaulthalla nginx site integration without touching unrelated nginx config."}
+    };
+    return cmd;
+}
+
+static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"teardown"};
+    cmd->description = "Perform explicit Vaulthalla integration teardown tasks.";
+    cmd->examples = {
+        {"vh teardown nginx", "Disable/remove Vaulthalla-managed nginx site integration."}
+    };
+    cmd->subcommands = {
+        nginx(cmd->weak_from_this())
+    };
+    return cmd;
+}
+
+std::shared_ptr<CommandBook> get(const std::weak_ptr<CommandUsage>& parent) {
+    const auto book = std::make_shared<CommandBook>();
+    book->title = "Teardown Commands";
+    book->root = base(parent);
+    return book;
+}
+
+}

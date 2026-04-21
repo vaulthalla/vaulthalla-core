@@ -8,69 +8,108 @@ class DebianInstallFlowContractTests(unittest.TestCase):
     def _repo_root(self) -> Path:
         return Path(__file__).resolve().parents[4]
 
-    def test_debian_templates_include_nginx_prompt(self) -> None:
-        templates = (self._repo_root() / "debian" / "templates").read_text(encoding="utf-8")
-        self.assertIn("Template: vaulthalla/init-db", templates)
-        self.assertIn("Template: vaulthalla/superadmin-uid", templates)
-        self.assertIn("Template: vaulthalla/configure-nginx", templates)
+    def test_phase2_removes_routine_debconf_scaffolding(self) -> None:
+        repo = self._repo_root()
+        self.assertFalse((repo / "debian" / "templates").exists())
+        self.assertFalse((repo / "debian" / "config").exists())
 
-    def test_debian_config_prompts_all_supported_debconf_questions(self) -> None:
-        config = (self._repo_root() / "debian" / "config").read_text(encoding="utf-8")
-        self.assertIn("db_input high vaulthalla/init-db", config)
-        self.assertIn("db_input medium vaulthalla/superadmin-uid", config)
-        self.assertIn("db_input medium vaulthalla/configure-nginx", config)
-        self.assertIn("db_go", config)
-
-    def test_postinst_contains_web_and_conservative_nginx_flow(self) -> None:
+    def test_postinst_uses_env_overrides_and_no_db_get_prompts(self) -> None:
         postinst = (self._repo_root() / "debian" / "postinst").read_text(encoding="utf-8")
         required_fragments = (
-            "PENDING_SUPERADMIN_UID_FILE=\"/run/vaulthalla/superadmin_uid\"",
-            "WEB_SYSTEMD_UNIT=\"vaulthalla-web.service\"",
-            "NGINX_MANAGED_MARKER=\"/var/lib/vaulthalla/nginx_site_managed\"",
-            "db_get vaulthalla/configure-nginx",
-            "has_non_nginx_listener_on_web_ports",
-            "has_custom_nginx_sites_enabled",
-            "nginx -t >/dev/null 2>&1",
-            "printf '%s\\n' \"managed-by=${PKG}\" > \"$NGINX_MANAGED_MARKER\"",
-            "ROLE_CREATED=\"false\"",
-            "Role already existed; preserving current DB password seed state.",
-            "safe_systemctl enable --now \"$WEB_SYSTEMD_UNIT\"",
-            "install -m 0644 \"$NGINX_TEMPLATE\" \"$NGINX_SITE_AVAIL\"",
+            "VH_SKIP_DB_BOOTSTRAP",
+            "VH_SKIP_NGINX_CONFIG",
+            "bootstrap_db_if_safe()",
+            "configure_nginx_if_safe()",
+            "DB_BOOTSTRAP_STATUS=",
+            "NGINX_CONFIG_STATUS=",
+            "skipped (psql not installed; install PostgreSQL or configure remote DB)",
+            "Super-admin ownership: deferred to first CLI use",
         )
         for fragment in required_fragments:
             self.assertIn(fragment, postinst)
 
-    def test_prerm_handles_remove_and_nginx_symlink_cleanup_conservatively(self) -> None:
-        prerm = (self._repo_root() / "debian" / "prerm").read_text(encoding="utf-8")
-        required_fragments = (
-            "WEB_SYSTEMD_UNIT=\"vaulthalla-web.service\"",
-            "NGINX_SITE_AVAIL=\"/etc/nginx/sites-available/vaulthalla\"",
-            "NGINX_SITE_ENABLED=\"/etc/nginx/sites-enabled/vaulthalla\"",
-            "case \"$1\" in",
-            "remove|deconfigure)",
-            "safe_systemctl stop \"$WEB_SYSTEMD_UNIT\"",
-            "safe_systemctl disable \"$WEB_SYSTEMD_UNIT\"",
-            "disable_nginx_site_link_if_package_path",
-            "#DEBHELPER#",
+        forbidden_fragments = (
+            "db_get ",
+            "Template:",
+            "seed_superadmin_uid",
+            "ensure_superadmin_user_in_group",
         )
-        for fragment in required_fragments:
-            self.assertIn(fragment, prerm)
+        for fragment in forbidden_fragments:
+            self.assertNotIn(fragment, postinst)
 
-    def test_postrm_distinguishes_remove_and_purge_cleanup_boundaries(self) -> None:
-        postrm = (self._repo_root() / "debian" / "postrm").read_text(encoding="utf-8")
-        required_fragments = (
-            "NGINX_MANAGED_MARKER=\"/var/lib/vaulthalla/nginx_site_managed\"",
-            "remove)",
-            "purge)",
-            "cleanup_nginx_site_link_if_package_path",
-            "Preserving nginx site file on purge; no package-managed marker present.",
-            "rm -rf /var/lib/vaulthalla /var/log/vaulthalla",
-            "rmdir /mnt/vaulthalla >/dev/null 2>&1 || true",
-            "db_purge || true",
-            "#DEBHELPER#",
+    def test_prerm_and_postrm_cleanup_legacy_superadmin_seed_only_as_legacy(self) -> None:
+        repo = self._repo_root()
+        prerm = (repo / "debian" / "prerm").read_text(encoding="utf-8")
+        postrm = (repo / "debian" / "postrm").read_text(encoding="utf-8")
+        self.assertIn("LEGACY_PENDING_SUPERADMIN_UID_FILE", prerm)
+        self.assertIn("LEGACY_PENDING_SUPERADMIN_UID_FILE", postrm)
+        self.assertNotIn("/usr/share/debconf/confmodule", postrm)
+        self.assertNotIn("db_purge", postrm)
+
+    def test_control_uses_recommends_for_postgresql_and_nginx(self) -> None:
+        control = (self._repo_root() / "debian" / "control").read_text(encoding="utf-8")
+        self.assertIn("Depends:\n adduser,\n nodejs,\n openssl,", control)
+        self.assertIn("Recommends:\n postgresql,\n nginx", control)
+        self.assertNotIn("Depends:\n adduser,\n nodejs,\n postgresql,", control)
+
+    def test_readme_documents_phase3_cli_integration_followups(self) -> None:
+        readme = (self._repo_root() / "debian" / "README.Debian").read_text(encoding="utf-8")
+        required = (
+            "apt install vaulthalla",
+            "apt install --no-install-recommends vaulthalla",
+            "VH_SKIP_DB_BOOTSTRAP=1 sudo -E apt install vaulthalla",
+            "VH_SKIP_NGINX_CONFIG=1 sudo -E apt install vaulthalla",
+            "vh setup db",
+            "vh setup remote-db",
+            "vh setup nginx",
+            "vh setup nginx --certbot --domain",
+            "vh teardown nginx",
+            "canonical final deployment path",
+            "/usr/share/vaulthalla/psql",
+            "/var/lib/vaulthalla/nginx_site_managed",
         )
-        for fragment in required_fragments:
-            self.assertIn(fragment, postrm)
+        for fragment in required:
+            self.assertIn(fragment, readme)
+
+    def test_top_level_readme_matches_low_prompt_install_contract(self) -> None:
+        readme = (self._repo_root() / "README.md").read_text(encoding="utf-8")
+        required = (
+            "sudo apt install vaulthalla",
+            "sudo apt install --no-install-recommends vaulthalla",
+            "VH_SKIP_DB_BOOTSTRAP=1 sudo -E apt install vaulthalla",
+            "VH_SKIP_NGINX_CONFIG=1 sudo -E apt install vaulthalla",
+            "vh setup db",
+            "vh setup remote-db",
+            "vh setup nginx",
+            "vh setup nginx --certbot --domain <domain>",
+            "vh teardown nginx",
+            "Schema/migration ownership remains with runtime startup (`SqlDeployer`)",
+        )
+        forbidden = (
+            "Debian Install Prompts",
+            "Initialize PostgreSQL database?",
+            "Super-admin Linux UID",
+        )
+        for fragment in required:
+            self.assertIn(fragment, readme)
+        for fragment in forbidden:
+            self.assertNotIn(fragment, readme)
+
+    def test_shell_usage_and_command_registry_include_setup_and_teardown(self) -> None:
+        repo = self._repo_root()
+        usages_hpp = (repo / "core" / "usage" / "include" / "usages.hpp").read_text(encoding="utf-8")
+        usage_manager = (repo / "core" / "usage" / "src" / "UsageManager.cpp").read_text(encoding="utf-8")
+        commands_hpp = (repo / "core" / "include" / "protocols" / "shell" / "commands" / "all.hpp").read_text(encoding="utf-8")
+        commands_cpp = (repo / "core" / "src" / "protocols" / "shell" / "commands" / "all.cpp").read_text(encoding="utf-8")
+
+        self.assertIn("namespace setup", usages_hpp)
+        self.assertIn("namespace teardown", usages_hpp)
+        self.assertIn("registerBook(setup::get", usage_manager)
+        self.assertIn("registerBook(teardown::get", usage_manager)
+        self.assertIn("registerSetupCommands", commands_hpp)
+        self.assertIn("registerTeardownCommands", commands_hpp)
+        self.assertIn("registerSetupCommands(r);", commands_cpp)
+        self.assertIn("registerTeardownCommands(r);", commands_cpp)
 
 
 if __name__ == "__main__":

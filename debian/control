@@ -30,9 +30,11 @@ Multi-Arch: foreign
 Depends:
  adduser,
  nodejs,
+ openssl,
  ${shlibs:Depends},
  ${misc:Depends}
 Recommends:
+ postgresql,
  nginx
 Description: Self-hosted cloud platform with native FUSE and S3 sync
  Vaulthalla is a modern self-hosted cloud storage platform designed as

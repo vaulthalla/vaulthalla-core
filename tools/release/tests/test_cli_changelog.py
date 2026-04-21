@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from contextlib import redirect_stdout
 from io import StringIO
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -156,6 +157,27 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_release.raw_output, "/tmp/raw.md")
         self.assertEqual(parsed_release.payload_output, "/tmp/release-payload.json")
         self.assertEqual(parsed_release.manual_changelog_path, "debian/changelog")
+        self.assertEqual(parsed_release.cached_draft_path, ".changelog_scratch/changelog.draft.md")
+        self.assertIsNone(parsed_release.debian_distribution)
+        self.assertIsNone(parsed_release.debian_urgency)
+
+        parsed_ai_release = parser.parse_args(
+            [
+                "changelog",
+                "ai-release",
+                "--ai-profile",
+                "openai-balanced",
+                "--draft-output",
+                "/tmp/draft.md",
+                "--output",
+                "/tmp/release.md",
+            ]
+        )
+        self.assertEqual(parsed_ai_release.command, "changelog")
+        self.assertEqual(parsed_ai_release.changelog_command, "ai-release")
+        self.assertEqual(parsed_ai_release.ai_profile, "openai-balanced")
+        self.assertEqual(parsed_ai_release.draft_output, "/tmp/draft.md")
+        self.assertEqual(parsed_ai_release.output, "/tmp/release.md")
 
         parsed_ai_check = parser.parse_args(
             [
@@ -277,10 +299,13 @@ class CliChangelogReleaseTests(unittest.TestCase):
         *,
         repo_root: str = ".",
         since_tag: str | None = None,
-        output: str = "release/changelog.release.md",
-        raw_output: str = "release/changelog.raw.md",
-        payload_output: str = "release/changelog.payload.json",
+        output: str = ".changelog_scratch/changelog.release.md",
+        raw_output: str = ".changelog_scratch/changelog.raw.md",
+        payload_output: str = ".changelog_scratch/changelog.payload.json",
         manual_changelog_path: str = "debian/changelog",
+        cached_draft_path: str = ".changelog_scratch/changelog.draft.md",
+        debian_distribution: str | None = None,
+        debian_urgency: str | None = None,
     ) -> argparse.Namespace:
         return argparse.Namespace(
             repo_root=repo_root,
@@ -289,6 +314,9 @@ class CliChangelogReleaseTests(unittest.TestCase):
             raw_output=raw_output,
             payload_output=payload_output,
             manual_changelog_path=manual_changelog_path,
+            cached_draft_path=cached_draft_path,
+            debian_distribution=debian_distribution,
+            debian_urgency=debian_urgency,
         )
 
     def test_release_command_writes_evidence_and_selected_changelog(self) -> None:
@@ -344,6 +372,198 @@ class CliChangelogReleaseTests(unittest.TestCase):
             self.assertIn("Wrote changelog raw evidence to", rendered)
             self.assertIn("Wrote changelog payload evidence to", rendered)
             self.assertIn("Wrote release changelog to", rendered)
+            self.assertIn("Debian changelog entry update skipped", rendered)
+
+    def test_release_command_refreshes_debian_changelog_for_generated_selection(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "release.md"
+            raw_target = Path(temp_dir) / "raw.md"
+            payload_target = Path(temp_dir) / "payload.json"
+            args = self._args(
+                output=str(target),
+                raw_output=str(raw_target),
+                payload_output=str(payload_target),
+                debian_distribution="stable",
+                debian_urgency="high",
+            )
+            out = StringIO()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch(
+                    "tools.release.cli.parse_release_ai_settings",
+                    return_value=type(
+                        "_ReleaseSettings",
+                        (),
+                        {
+                            "mode": "auto",
+                            "openai_profile": "openai-balanced",
+                            "openai_api_key_present": True,
+                            "local_enabled": False,
+                            "local_profile": None,
+                            "local_base_url_override": None,
+                            "local_api_key": None,
+                        },
+                    )(),
+                ),
+                patch(
+                    "tools.release.cli.resolve_release_changelog",
+                    return_value=type(
+                        "_Selection",
+                        (),
+                        {"path": "openai", "content": "# Release\n- change one\n", "local_base_url_overrode_profile": False},
+                    )(),
+                ),
+                patch(
+                    "tools.release.cli.refresh_debian_changelog_entry",
+                    return_value=type(
+                        "_DebianUpdate",
+                        (),
+                        {
+                            "path": Path(temp_dir) / "debian" / "changelog",
+                            "package": "vaulthalla",
+                            "full_version": "1.2.3-1",
+                            "distribution": "stable",
+                            "urgency": "high",
+                            "maintainer": "Test User <test@example.com>",
+                            "timestamp": "Tue, 21 Apr 2026 20:00:00 +0000",
+                        },
+                    )(),
+                ) as refresh_entry,
+                redirect_stdout(out),
+            ):
+                rc = cli.cmd_changelog_release(args)
+
+            self.assertEqual(rc, 0)
+            refresh_entry.assert_called_once()
+            self.assertEqual(refresh_entry.call_args.kwargs["release_markdown"], "# Release\n- change one\n")
+            self.assertEqual(refresh_entry.call_args.kwargs["distribution"], "stable")
+            self.assertEqual(refresh_entry.call_args.kwargs["urgency"], "high")
+
+
+class CliChangelogAIReleaseTests(unittest.TestCase):
+    def _args(self) -> argparse.Namespace:
+        return argparse.Namespace(
+            repo_root=".",
+            since_tag=None,
+            draft_output=".changelog_scratch/changelog.draft.md",
+            output=".changelog_scratch/changelog.release.md",
+            raw_output=".changelog_scratch/changelog.raw.md",
+            payload_output=".changelog_scratch/changelog.payload.json",
+            manual_changelog_path="debian/changelog",
+            debian_distribution=None,
+            debian_urgency=None,
+            save_json=None,
+            ai_profile="openai-balanced",
+            model=None,
+            provider="openai",
+            base_url=None,
+            use_triage=False,
+            save_triage_json=None,
+            polish=False,
+            save_polish_json=None,
+        )
+
+    def test_ai_release_runs_ai_draft_then_forced_cached_release(self) -> None:
+        args = self._args()
+        out = StringIO()
+        observed_modes: list[str | None] = []
+
+        with (
+            patch("tools.release.cli.cmd_changelog_ai_draft", return_value=0) as run_ai_draft,
+            patch(
+                "tools.release.cli.cmd_changelog_release",
+                side_effect=lambda _release_args: observed_modes.append(os.environ.get("RELEASE_AI_MODE")) or 0,
+            ) as run_release,
+            patch.dict("os.environ", {"RELEASE_AI_MODE": "auto"}, clear=False),
+            redirect_stdout(out),
+        ):
+            rc = cli.cmd_changelog_ai_release(args)
+            self.assertEqual(os.environ.get("RELEASE_AI_MODE"), "auto")
+
+        self.assertEqual(rc, 0)
+        run_ai_draft.assert_called_once()
+        run_release.assert_called_once()
+        self.assertEqual(observed_modes, ["disabled"])
+        expected_cached_path = str((Path(".").resolve() / ".changelog_scratch/changelog.draft.md").resolve())
+        self.assertEqual(run_ai_draft.call_args.args[0].output, expected_cached_path)
+        self.assertEqual(run_release.call_args.args[0].cached_draft_path, expected_cached_path)
+
+    def test_ai_release_skips_release_stage_when_draft_returns_nonzero(self) -> None:
+        args = self._args()
+        with (
+            patch("tools.release.cli.cmd_changelog_ai_draft", return_value=2) as run_ai_draft,
+            patch("tools.release.cli.cmd_changelog_release", return_value=0) as run_release,
+        ):
+            rc = cli.cmd_changelog_ai_release(args)
+
+        self.assertEqual(rc, 2)
+        run_ai_draft.assert_called_once()
+        run_release.assert_not_called()
+
+    def test_ai_release_refreshes_debian_from_fresh_draft_under_repo_root(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir).resolve()
+            changelog_path = repo_root / "debian" / "changelog"
+            changelog_path.parent.mkdir(parents=True, exist_ok=True)
+            changelog_path.write_text(
+                (
+                    "vaulthalla (1.2.3-1) unstable; urgency=medium\n\n"
+                    "  - existing line\n\n"
+                    " -- Test User <test@example.com>  Sun, 19 Apr 2026 00:00:00 +0000\n"
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+
+            stale_cached = cli.render_cached_draft_markdown(version="1.2.3", content="# Old\n- stale body\n")
+            stale_cached_path = repo_root / ".changelog_scratch" / "changelog.draft.md"
+            stale_cached_path.parent.mkdir(parents=True, exist_ok=True)
+            stale_cached_path.write_text(stale_cached, encoding="utf-8")
+
+            fresh_cached = cli.render_cached_draft_markdown(version="1.2.3", content="# Fresh\n- fresh body\n")
+
+            def _fake_ai_draft(draft_args: argparse.Namespace) -> int:
+                cli.write_output(fresh_cached, draft_args.output)
+                return 0
+
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                draft_output=".changelog_scratch/changelog.draft.md",
+                output=str(repo_root / ".changelog_scratch" / "changelog.release.md"),
+                raw_output=str(repo_root / ".changelog_scratch" / "changelog.raw.md"),
+                payload_output=str(repo_root / ".changelog_scratch" / "changelog.payload.json"),
+                manual_changelog_path="debian/changelog",
+                debian_distribution=None,
+                debian_urgency=None,
+                save_json=None,
+                ai_profile="openai-balanced",
+                model=None,
+                provider="openai",
+                base_url=None,
+                use_triage=False,
+                save_triage_json=None,
+                polish=False,
+                save_polish_json=None,
+            )
+
+            with (
+                patch("tools.release.cli.cmd_changelog_ai_draft", side_effect=_fake_ai_draft),
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
+                patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+            ):
+                rc = cli.cmd_changelog_ai_release(args)
+
+            self.assertEqual(rc, 0)
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertIn("  - fresh body", rendered)
+            self.assertNotIn("  - stale body", rendered)
 
 
 class CliChangelogAICheckTests(unittest.TestCase):
@@ -529,7 +749,9 @@ class CliChangelogAIDraftTests(unittest.TestCase):
                 result = cli.cmd_changelog_ai_draft(args)
 
             self.assertEqual(result, 0)
-            self.assertEqual(markdown_target.read_text(encoding="utf-8"), "# AI Draft\n")
+            rendered_markdown = markdown_target.read_text(encoding="utf-8")
+            self.assertIn("<!-- vaulthalla-release-version:", rendered_markdown)
+            self.assertIn("# AI Draft", rendered_markdown)
             self.assertEqual(json_target.read_text(encoding="utf-8"), '{"title":"x"}\n')
             run_triage.assert_called_once_with(
                 {"schema_version": "x"},
@@ -630,7 +852,9 @@ class CliChangelogAIDraftTests(unittest.TestCase):
                 result = cli.cmd_changelog_ai_draft(args)
 
             self.assertEqual(result, 0)
-            self.assertEqual(markdown_target.read_text(encoding="utf-8"), "# AI Polished\n")
+            rendered_markdown = markdown_target.read_text(encoding="utf-8")
+            self.assertIn("<!-- vaulthalla-release-version:", rendered_markdown)
+            self.assertIn("# AI Polished", rendered_markdown)
             self.assertEqual(json_target.read_text(encoding="utf-8"), '{"schema_version":"polish"}\n')
             self.assertEqual(polish_target.read_text(encoding="utf-8"), '{"schema_version":"polish"}\n')
             generate_draft.assert_called_once_with(
@@ -733,6 +957,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             profile_cfg = repo_root / "ai.yml"
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
             profile_cfg.write_text(
                 """
 profiles:
@@ -814,6 +1039,7 @@ profiles:
     def test_ai_draft_profile_defined_stages_run_without_cli_flags(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
             (repo_root / "ai.yml").write_text(
                 """
 profiles:

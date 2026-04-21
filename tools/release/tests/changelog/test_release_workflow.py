@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -7,6 +9,8 @@ from unittest.mock import patch
 
 from tools.release.changelog.release_workflow import (
     parse_release_ai_settings,
+    refresh_debian_changelog_entry,
+    render_cached_draft_markdown,
     resolve_local_release_pipeline_config,
     resolve_release_changelog,
     validate_manual_changelog_current,
@@ -127,6 +131,45 @@ class ReleaseWorkflowSelectionTests(unittest.TestCase):
                     logger=lambda _line: None,
                 )
 
+    def test_auto_mode_uses_cached_draft_before_manual_fallback(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "2.0.0\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "2.0.0-3")
+            cached = render_cached_draft_markdown(version="2.0.0", content="# AI Draft\n- from cache\n")
+            _write(repo_root / ".changelog_scratch" / "changelog.draft.md", cached)
+            settings = parse_release_ai_settings({"RELEASE_AI_MODE": "disabled"})
+
+            result = resolve_release_changelog(
+                repo_root=repo_root,
+                payload={"schema_version": "x"},
+                settings=settings,
+                logger=lambda _line: None,
+            )
+
+            self.assertEqual(result.path, "cached-draft")
+            self.assertIn("- from cache", result.content)
+            self.assertIsNotNone(result.source_path)
+
+    def test_auto_mode_skips_stale_cached_draft_and_falls_back_to_manual(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write(repo_root / "VERSION", "2.0.0\n")
+            _make_debian_changelog(repo_root / "debian" / "changelog", "2.0.0-3")
+            cached = render_cached_draft_markdown(version="1.9.9", content="# AI Draft\n- stale cache\n")
+            _write(repo_root / ".changelog_scratch" / "changelog.draft.md", cached)
+            settings = parse_release_ai_settings({"RELEASE_AI_MODE": "disabled"})
+
+            result = resolve_release_changelog(
+                repo_root=repo_root,
+                payload={"schema_version": "x"},
+                settings=settings,
+                logger=lambda _line: None,
+            )
+
+            self.assertEqual(result.path, "manual")
+            self.assertIn("2.0.0-3", result.content)
+
 
 class ReleaseWorkflowConfigTests(unittest.TestCase):
     def test_local_base_url_env_override_replaces_profile_base_url(self) -> None:
@@ -166,6 +209,112 @@ profiles:
                     repo_root=repo_root,
                     changelog_path="debian/changelog",
                 )
+
+    def test_refresh_debian_changelog_entry_rewrites_full_top_entry(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _write(
+                changelog_path,
+                (
+                    "vaulthalla (1.2.3-2) unstable; urgency=medium\n\n"
+                    "  - previous line\n\n"
+                    " -- Test User <test@example.com>  Sun, 19 Apr 2026 00:00:00 +0000\n\n"
+                    "vaulthalla (1.2.2-1) unstable; urgency=medium\n\n"
+                    "  - older entry\n\n"
+                    " -- Test User <test@example.com>  Sat, 18 Apr 2026 00:00:00 +0000\n"
+                ),
+            )
+
+            result = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown="# Release\n- alpha change\n- beta change\n",
+                now=datetime(2026, 4, 21, 18, 30, 0, tzinfo=timezone.utc),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertEqual(result.package, "vaulthalla")
+            self.assertEqual(result.full_version, "1.2.3-2")
+            self.assertEqual(result.distribution, "unstable")
+            self.assertEqual(result.urgency, "medium")
+            self.assertIn("vaulthalla (1.2.3-2) unstable; urgency=medium", rendered)
+            self.assertIn("  - alpha change", rendered)
+            self.assertIn("  - beta change", rendered)
+            self.assertIn(" -- Test User <test@example.com>  Tue, 21 Apr 2026 18:30:00 +0000", rendered)
+            self.assertIn("vaulthalla (1.2.2-1) unstable; urgency=medium", rendered)
+
+    def test_refresh_debian_changelog_entry_honors_distribution_urgency_override(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            result = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown="- release note one\n",
+                distribution="stable",
+                urgency="high",
+                now=datetime(2026, 4, 21, 19, 0, 0, tzinfo=timezone.utc),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertEqual(result.distribution, "stable")
+            self.assertEqual(result.urgency, "high")
+            self.assertIn("vaulthalla (2.1.0-1) stable; urgency=high", rendered)
+
+    def test_refresh_debian_changelog_entry_honors_env_distribution_urgency_and_maintainer(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            result = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown="- release note one\n",
+                environ={
+                    "RELEASE_DEBIAN_DISTRIBUTION": "stable",
+                    "RELEASE_DEBIAN_URGENCY": "low",
+                    "DEBFULLNAME": "Release Bot",
+                    "DEBEMAIL": "release@example.com",
+                },
+                now=datetime(2026, 4, 21, 19, 30, 0, tzinfo=timezone.utc),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertEqual(result.distribution, "stable")
+            self.assertEqual(result.urgency, "low")
+            self.assertEqual(result.maintainer, "Release Bot <release@example.com>")
+            self.assertIn("vaulthalla (2.1.0-1) stable; urgency=low", rendered)
+            self.assertIn(" -- Release Bot <release@example.com>  Tue, 21 Apr 2026 19:30:00 +0000", rendered)
+
+    def test_refresh_debian_changelog_entry_rejects_invalid_distribution(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            with self.assertRaisesRegex(ValueError, "invalid distribution"):
+                _ = refresh_debian_changelog_entry(
+                    changelog_path=changelog_path,
+                    release_markdown="- release note\n",
+                    distribution="invalid token",
+                )
+
+    def test_refresh_debian_changelog_entry_uses_rfc2822_timestamp_format(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            _ = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown="- note\n",
+                now=datetime(2026, 4, 21, 20, 45, 0, tzinfo=timezone.utc),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            signature_line = next(line for line in rendered.splitlines() if line.startswith(" -- "))
+            self.assertRegex(signature_line, re.compile(r"^ -- .+  [A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$"))
 
 
 if __name__ == "__main__":

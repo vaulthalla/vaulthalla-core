@@ -43,9 +43,33 @@ Deterministic provider order:
 
 - hosted OpenAI
 - local OpenAI-compatible endpoint (explicitly gated by `RELEASE_LOCAL_LLM_ENABLED=true`)
+- cached local draft (`.changelog_scratch/changelog.draft.md`)
 - manual/no-AI path with changelog stale check against `VERSION`
 
 When set, `RELEASE_LOCAL_LLM_BASE_URL` explicitly overrides the local profile `base_url` and is logged.
+
+Debian changelog generation contract:
+
+- `python3 -m tools.release changelog release` writes release evidence artifacts and the selected release markdown.
+- `python3 -m tools.release changelog ai-draft` writes a cached draft artifact under `.changelog_scratch` by default.
+- `python3 -m tools.release changelog ai-release` runs AI draft generation and then finalizes Debian changelog from the freshly cached draft path (no manual copy/paste handoff).
+- For generated paths (`openai` or `local`), it also refreshes the top `debian/changelog` entry as a full Debian record:
+  - package name + full Debian version
+  - distribution token
+  - urgency token
+  - summary bullet body
+  - maintainer signature line
+  - RFC-2822 timestamp
+- Distribution/urgency resolution is explicit and validated:
+  - CLI flags: `--debian-distribution`, `--debian-urgency`
+  - env fallbacks: `RELEASE_DEBIAN_DISTRIBUTION`, `RELEASE_DEBIAN_URGENCY`
+  - final fallback: existing top-entry values
+- Manual/no-AI path (`debian/changelog` fallback) is stale-checked, explicitly logged as fallback, and does not blindly rewrite the changelog.
+
+Scratch artifact policy:
+
+- `.changelog_scratch/` is volatile local generation state, not canonical release truth.
+- Scratch artifacts are cleared on version transitions driven by `set-version`, `bump`, and `sync` when upstream version alignment changes.
 
 ## Artifact/Packaging Contract
 
@@ -58,7 +82,8 @@ This contract validates more than "build completed": it checks shipped output co
 
 - Web runtime is installed under `/usr/share/vaulthalla-web`.
 - `vaulthalla-web.service` and runtime paths are aligned with packaged layout.
-- Debconf prompt path via `debian/templates` is part of install behavior.
+- Routine debconf prompt scaffolding is intentionally removed for default installs.
+- Package install supports low-prompt default, lean `--no-install-recommends`, and explicit env-var opt-out overrides.
 - Nginx integration is conservative and safe-skip oriented.
 - Maintainer scripts now enforce explicit remove vs purge semantics and idempotent lifecycle handling.
 

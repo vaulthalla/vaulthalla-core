@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -28,7 +29,11 @@ from tools.release.changelog.ai.stages.draft import generate_draft_from_payload,
 from tools.release.changelog.ai.stages.polish import render_polish_result_json, run_polish_stage
 from tools.release.changelog.ai.stages.triage import render_triage_result_json, run_triage_stage
 from tools.release.changelog.release_workflow import (
+    DEFAULT_CACHED_DRAFT_PATH,
+    DEFAULT_CHANGELOG_SCRATCH_DIR,
     parse_release_ai_settings,
+    render_cached_draft_markdown,
+    refresh_debian_changelog_entry,
     resolve_release_changelog,
 )
 from tools.release.changelog.context_builder import build_release_context
@@ -49,6 +54,11 @@ from tools.release.version.validate import (
     require_release_files,
     require_synced_release_state,
 )
+
+DEFAULT_CHANGELOG_DRAFT_OUTPUT = str(DEFAULT_CACHED_DRAFT_PATH)
+DEFAULT_CHANGELOG_RELEASE_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.release.md")
+DEFAULT_CHANGELOG_RAW_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.raw.md")
+DEFAULT_CHANGELOG_PAYLOAD_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.payload.json")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -256,23 +266,44 @@ def build_parser() -> argparse.ArgumentParser:
     )
     changelog_release_parser.add_argument(
         "--output",
-        default="release/changelog.release.md",
+        default=DEFAULT_CHANGELOG_RELEASE_OUTPUT,
         help="Output markdown path for the selected release changelog path.",
     )
     changelog_release_parser.add_argument(
         "--raw-output",
-        default="release/changelog.raw.md",
+        default=DEFAULT_CHANGELOG_RAW_OUTPUT,
         help="Output path for deterministic raw changelog evidence.",
     )
     changelog_release_parser.add_argument(
         "--payload-output",
-        default="release/changelog.payload.json",
+        default=DEFAULT_CHANGELOG_PAYLOAD_OUTPUT,
         help="Output path for deterministic AI payload evidence JSON.",
     )
     changelog_release_parser.add_argument(
         "--manual-changelog-path",
         default="debian/changelog",
-        help="Manual changelog file used when AI is disabled/unavailable.",
+        help="Debian changelog file used for manual fallback and release entry updates.",
+    )
+    changelog_release_parser.add_argument(
+        "--cached-draft-path",
+        default=DEFAULT_CHANGELOG_DRAFT_OUTPUT,
+        help="Cached draft markdown source path used when live AI providers are unavailable.",
+    )
+    changelog_release_parser.add_argument(
+        "--debian-distribution",
+        default=None,
+        help=(
+            "Override Debian changelog distribution token (e.g. unstable/stable). "
+            "Defaults to RELEASE_DEBIAN_DISTRIBUTION env or current top-entry distribution."
+        ),
+    )
+    changelog_release_parser.add_argument(
+        "--debian-urgency",
+        default=None,
+        help=(
+            "Override Debian changelog urgency token (e.g. low/medium/high). "
+            "Defaults to RELEASE_DEBIAN_URGENCY env or current top-entry urgency."
+        ),
     )
     changelog_release_parser.set_defaults(func=cmd_changelog_release)
 
@@ -318,7 +349,10 @@ def build_parser() -> argparse.ArgumentParser:
     changelog_ai_draft_parser.add_argument(
         "--output",
         default=None,
-        help="Write rendered markdown draft to a file path instead of stdout.",
+        help=(
+            "Write rendered markdown draft to a file path. "
+            "When omitted, draft still persists to .changelog_scratch/changelog.draft.md."
+        ),
     )
     changelog_ai_draft_parser.add_argument(
         "--save-json",
@@ -370,6 +404,101 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to save validated structured polish JSON when --polish is enabled.",
     )
     changelog_ai_draft_parser.set_defaults(func=cmd_changelog_ai_draft)
+
+    changelog_ai_release_parser = changelog_subparsers.add_parser(
+        "ai-release",
+        help="Generate AI changelog draft and deterministically finalize Debian changelog in one flow.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--since-tag",
+        default=None,
+        help="Optional tag to use as lower bound (overrides latest-tag auto-detection).",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--draft-output",
+        default=DEFAULT_CHANGELOG_DRAFT_OUTPUT,
+        help="Path where AI draft markdown is persisted before release finalization.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--output",
+        default=DEFAULT_CHANGELOG_RELEASE_OUTPUT,
+        help="Output markdown path for the selected release changelog path.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--raw-output",
+        default=DEFAULT_CHANGELOG_RAW_OUTPUT,
+        help="Output path for deterministic raw changelog evidence.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--payload-output",
+        default=DEFAULT_CHANGELOG_PAYLOAD_OUTPUT,
+        help="Output path for deterministic AI payload evidence JSON.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--manual-changelog-path",
+        default="debian/changelog",
+        help="Debian changelog file used for manual fallback and release entry updates.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--debian-distribution",
+        default=None,
+        help="Override Debian changelog distribution token (e.g. unstable/stable).",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--debian-urgency",
+        default=None,
+        help="Override Debian changelog urgency token (e.g. low/medium/high).",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--save-json",
+        default=None,
+        help="Optional path to save validated structured AI draft JSON.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--ai-profile",
+        default=None,
+        help="Named AI profile slug from ai.yml at repo root.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Global model override for all AI stages (triage/draft/polish). "
+            f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
+        ),
+    )
+    changelog_ai_release_parser.add_argument(
+        "--provider",
+        choices=("openai", "openai-compatible"),
+        default=None,
+        help=f"AI provider transport override (default resolved from config; legacy: {DEFAULT_AI_PROVIDER_KIND}).",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible endpoint base URL (for --provider openai-compatible).",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--use-triage",
+        action="store_true",
+        help="Run optional AI triage stage before draft generation.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--save-triage-json",
+        default=None,
+        help="Optional path to save validated structured triage JSON when --use-triage is enabled.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--polish",
+        action="store_true",
+        help="Run optional editorial polish stage after draft generation.",
+    )
+    changelog_ai_release_parser.add_argument(
+        "--save-polish-json",
+        default=None,
+        help="Optional path to save validated structured polish JSON when --polish is enabled.",
+    )
+    changelog_ai_release_parser.set_defaults(func=cmd_changelog_ai_release)
 
     return parser
 
@@ -432,12 +561,17 @@ def cmd_sync(args: argparse.Namespace) -> int:
         print("\nDry run only. No files were modified.")
         return 0
 
+    should_clear_scratch = (
+        state.versions.debian is not None and state.versions.debian.upstream != canonical
+    )
     apply_version_update(
         paths=paths,
         version=canonical,
         debian_revision=debian_revision,
         write_canonical=False,
     )
+    if should_clear_scratch:
+        clear_changelog_scratch(repo_root, reason=f"VERSION transition to {canonical} via sync")
     # Enforce that sync leaves the repo in a fully consistent release state.
     _ = require_synced_release_state(repo_root)
 
@@ -471,12 +605,15 @@ def cmd_set_version(args: argparse.Namespace) -> int:
         print("\nDry run only. No files were modified.")
         return 0
 
+    previous_canonical = state.versions.canonical
     apply_version_update(
         paths=paths,
         version=target_version,
         debian_revision=debian_revision,
         write_canonical=True,
     )
+    if previous_canonical is not None and previous_canonical != target_version:
+        clear_changelog_scratch(repo_root, reason=f"VERSION bump {previous_canonical} -> {target_version}")
 
     print("\nVersion update complete.")
     return 0
@@ -634,50 +771,63 @@ def cmd_changelog_payload(args: argparse.Namespace) -> int:
 
 def cmd_changelog_release(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
-    try:
-        print("Changelog release stage: build deterministic context + payload")
-        context = build_changelog_context(repo_root, args.since_tag)
-        payload = build_ai_payload(context)
-        raw_markdown = render_release_changelog(context)
-        payload_json = render_ai_payload_json(payload)
-    except Exception as exc:
-        raise ValueError(f"Changelog release failed during context/payload generation: {exc}") from exc
+    env_settings = parse_release_ai_settings(os.environ)
+    _log_release_ai_preflight(env_settings)
+    return _run_changelog_release_with_settings(
+        args,
+        repo_root=repo_root,
+        env_settings=env_settings,
+    )
 
-    try:
-        print("Changelog release stage: write evidence artifacts")
-        write_output(raw_markdown, args.raw_output)
-        print(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
-        write_output(payload_json, args.payload_output)
-        print(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
-    except Exception as exc:
-        raise ValueError(f"Changelog release failed while writing evidence artifacts: {exc}") from exc
 
-    try:
-        print("Changelog release stage: resolve AI/manual changelog path")
-        env_settings = parse_release_ai_settings(os.environ)
-        _log_release_ai_preflight(env_settings)
-        selection = resolve_release_changelog(
-            repo_root=repo_root,
-            payload=payload,
-            settings=env_settings,
-            manual_changelog_path=args.manual_changelog_path,
-            logger=print,
-        )
-    except Exception as exc:
-        raise ValueError(f"Changelog release failed during path selection/generation: {exc}") from exc
+def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    draft_output_path = Path(args.draft_output)
+    if not draft_output_path.is_absolute():
+        draft_output_path = (repo_root / draft_output_path).resolve()
+    draft_output = str(draft_output_path)
 
+    _print_status("Changelog ai-release stage: generate AI draft artifact")
+    draft_args = argparse.Namespace(
+        repo_root=args.repo_root,
+        since_tag=args.since_tag,
+        output=draft_output,
+        save_json=args.save_json,
+        model=args.model,
+        provider=args.provider,
+        base_url=args.base_url,
+        ai_profile=args.ai_profile,
+        use_triage=args.use_triage,
+        save_triage_json=args.save_triage_json,
+        polish=args.polish,
+        save_polish_json=args.save_polish_json,
+    )
+    draft_rc = cmd_changelog_ai_draft(draft_args)
+    if draft_rc != 0:
+        return int(draft_rc)
+
+    _print_status("Changelog ai-release stage: finalize release using freshly cached draft source")
+    release_args = argparse.Namespace(
+        repo_root=args.repo_root,
+        since_tag=args.since_tag,
+        output=args.output,
+        raw_output=args.raw_output,
+        payload_output=args.payload_output,
+        manual_changelog_path=args.manual_changelog_path,
+        cached_draft_path=draft_output,
+        debian_distribution=args.debian_distribution,
+        debian_urgency=args.debian_urgency,
+    )
+
+    previous_mode = os.environ.get("RELEASE_AI_MODE")
+    os.environ["RELEASE_AI_MODE"] = "disabled"
     try:
-        print("Changelog release stage: write selected release changelog")
-        write_output(selection.content, args.output)
-        print(f"Wrote release changelog to {Path(args.output).resolve()}")
-        if selection.path == "local" and env_settings.local_base_url_override:
-            if selection.local_base_url_overrode_profile:
-                print("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
-            else:
-                print("Local base_url override status: set but not applied.")
-    except Exception as exc:
-        raise ValueError(f"Changelog release failed while writing selected output: {exc}") from exc
-    return 0
+        return cmd_changelog_release(release_args)
+    finally:
+        if previous_mode is None:
+            os.environ.pop("RELEASE_AI_MODE", None)
+        else:
+            os.environ["RELEASE_AI_MODE"] = previous_mode
 
 
 def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
@@ -767,9 +917,16 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
     else:
         final_markdown = render_draft_markdown(draft)
 
-    write_output(final_markdown, args.output)
+    version = read_version_file(repo_root / "VERSION")
+    cached_markdown = render_cached_draft_markdown(version=str(version), content=final_markdown)
+    cached_target = args.output
+    if cached_target is None or cached_target == "-":
+        cached_target = DEFAULT_CHANGELOG_DRAFT_OUTPUT
+    write_output(cached_markdown, cached_target)
 
-    if args.output:
+    if args.output is None or args.output == "-":
+        write_output(final_markdown, None)
+    else:
         print(f"Wrote AI changelog draft to {Path(args.output).resolve()}")
 
     if args.save_json:
@@ -787,6 +944,90 @@ def cmd_changelog_ai_check(args: argparse.Namespace) -> int:
     provider = build_ai_provider_from_config(provider_config)
     result = run_provider_preflight(provider_config, provider=provider, require_model=True)
     print_provider_preflight_result(result)
+    return 0
+
+
+def _run_changelog_release_with_settings(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path,
+    env_settings,
+) -> int:
+    try:
+        _print_status("Changelog release stage: build deterministic context + payload")
+        context = build_changelog_context(repo_root, args.since_tag)
+        payload = build_ai_payload(context)
+        raw_markdown = render_release_changelog(context)
+        payload_json = render_ai_payload_json(payload)
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during context/payload generation: {exc}") from exc
+
+    try:
+        _print_status("Changelog release stage: write evidence artifacts")
+        write_output(raw_markdown, args.raw_output)
+        _print_status(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
+        write_output(payload_json, args.payload_output)
+        _print_status(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing evidence artifacts: {exc}") from exc
+
+    try:
+        _print_status("Changelog release stage: resolve changelog source")
+        selection = resolve_release_changelog(
+            repo_root=repo_root,
+            payload=payload,
+            settings=env_settings,
+            manual_changelog_path=args.manual_changelog_path,
+            cached_draft_path=getattr(args, "cached_draft_path", DEFAULT_CHANGELOG_DRAFT_OUTPUT),
+            logger=_print_status,
+        )
+        selected_source = selection.path
+        source_path = getattr(selection, "source_path", None)
+        source_suffix = f" ({source_path})" if source_path is not None else ""
+        _print_status(f"Selected changelog source: {selected_source}{source_suffix}")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed during source selection/generation: {exc}") from exc
+
+    try:
+        _print_status("Changelog release stage: write selected release changelog")
+        write_output(selection.content, args.output)
+        _print_status(f"Wrote release changelog to {Path(args.output).resolve()}")
+        if selection.path == "local" and env_settings.local_base_url_override:
+            if selection.local_base_url_overrode_profile:
+                _print_status("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
+            else:
+                _print_status("Local base_url override status: set but not applied.")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while writing selected output: {exc}") from exc
+
+    if selection.path == "manual":
+        _print_status(
+            "Changelog release stage: Debian changelog entry update skipped "
+            "(manual/no-AI fallback source selected)."
+        )
+        return 0
+
+    try:
+        _print_status("Changelog release stage: refresh Debian changelog top entry metadata + summary")
+        updated = refresh_debian_changelog_entry(
+            changelog_path=Path(args.manual_changelog_path)
+            if Path(args.manual_changelog_path).is_absolute()
+            else (repo_root / args.manual_changelog_path),
+            release_markdown=selection.content,
+            distribution=args.debian_distribution,
+            urgency=args.debian_urgency,
+            environ=os.environ,
+        )
+        _print_status(f"Updated Debian changelog entry at {updated.path}")
+        _print_status(
+            "Debian entry metadata: "
+            f"{updated.package} ({updated.full_version}) {updated.distribution}; urgency={updated.urgency}"
+        )
+        _print_status(f"Debian entry maintainer: {updated.maintainer}")
+        _print_status(f"Debian entry timestamp:  {updated.timestamp}")
+    except Exception as exc:
+        raise ValueError(f"Changelog release failed while updating Debian changelog: {exc}") from exc
+
     return 0
 
 
@@ -840,9 +1081,21 @@ def format_value(value) -> str:
     return str(value) if value is not None else "<unavailable>"
 
 
+def clear_changelog_scratch(repo_root: Path, *, reason: str) -> None:
+    scratch_dir = (repo_root / DEFAULT_CHANGELOG_SCRATCH_DIR).resolve()
+    if not scratch_dir.exists():
+        return
+    if not scratch_dir.is_dir():
+        raise ValueError(f"Expected changelog scratch path to be a directory: {scratch_dir}")
+    shutil.rmtree(scratch_dir)
+    print(f"Cleared changelog scratch artifacts at {scratch_dir} ({reason}).")
+
+
 def write_output(content: str, output_path: str | None) -> None:
-    if output_path is None:
-        print(content, end="" if content.endswith("\n") else "\n")
+    if output_path is None or output_path == "-":
+        line = content if content.endswith("\n") else f"{content}\n"
+        sys.stdout.write(line)
+        sys.stdout.flush()
         return
 
     target = Path(output_path)
@@ -985,24 +1238,29 @@ def _extract_missing_field(message: str) -> str | None:
 
 
 def _log_release_ai_preflight(settings) -> None:
-    print("Release AI preflight")
-    print("--------------------")
-    print(f"RELEASE_AI_MODE:               {settings.mode}")
-    print(f"RELEASE_AI_PROFILE_OPENAI:     {settings.openai_profile}")
-    print(f"OPENAI_API_KEY configured:     {'yes' if settings.openai_api_key_present else 'no'}")
-    print(f"RELEASE_LOCAL_LLM_ENABLED:     {'true' if settings.local_enabled else 'false'}")
-    print(
+    _print_status("Release AI preflight")
+    _print_status("--------------------")
+    _print_status(f"RELEASE_AI_MODE:               {settings.mode}")
+    _print_status(f"RELEASE_AI_PROFILE_OPENAI:     {settings.openai_profile}")
+    _print_status(f"OPENAI_API_KEY configured:     {'yes' if settings.openai_api_key_present else 'no'}")
+    _print_status(f"RELEASE_LOCAL_LLM_ENABLED:     {'true' if settings.local_enabled else 'false'}")
+    _print_status(
         f"RELEASE_LOCAL_LLM_PROFILE:     "
         f"{settings.local_profile if settings.local_profile else '<unset>'}"
     )
-    print(
+    _print_status(
         f"RELEASE_LOCAL_LLM_BASE_URL:    "
         f"{settings.local_base_url_override if settings.local_base_url_override else '<unset>'}"
     )
     if settings.mode == "openai-only" and not settings.openai_api_key_present:
-        print("Preflight note: openai-only requested but OPENAI_API_KEY is missing; manual fallback may be used.")
+        _print_status("Preflight note: openai-only requested but OPENAI_API_KEY is missing; manual fallback may be used.")
     if settings.mode == "local-only" and (not settings.local_enabled or not settings.local_profile):
-        print(
+        _print_status(
             "Preflight note: local-only requested but local fallback is not fully configured; "
             "manual fallback may be used."
         )
+
+
+def _print_status(line: str) -> None:
+    sys.stdout.write(f"{line}\n")
+    sys.stdout.flush()

@@ -25,6 +25,8 @@ runs:
         echo "[preflight] RELEASE_LOCAL_LLM_ENABLED=${RELEASE_LOCAL_LLM_ENABLED:-<unset>}"
         echo "[preflight] RELEASE_LOCAL_LLM_PROFILE=${RELEASE_LOCAL_LLM_PROFILE:-<unset>}"
         echo "[preflight] RELEASE_LOCAL_LLM_BASE_URL=${RELEASE_LOCAL_LLM_BASE_URL:-<unset>}"
+        echo "[preflight] RELEASE_DEBIAN_DISTRIBUTION=${RELEASE_DEBIAN_DISTRIBUTION:-<unset>}"
+        echo "[preflight] RELEASE_DEBIAN_URGENCY=${RELEASE_DEBIAN_URGENCY:-<unset>}"
         if [ -n "${OPENAI_API_KEY:-}" ]; then
           echo "[preflight] OPENAI_API_KEY configured: yes"
         else
@@ -55,6 +57,16 @@ runs:
           fi
         fi
 
+        debian_token_regex='^[A-Za-z0-9][A-Za-z0-9+.-]*$'
+        if [ -n "${RELEASE_DEBIAN_DISTRIBUTION:-}" ] && ! [[ "${RELEASE_DEBIAN_DISTRIBUTION}" =~ $debian_token_regex ]]; then
+          echo "::error::Release preflight failed: RELEASE_DEBIAN_DISTRIBUTION must be a Debian token (example: unstable)."
+          exit 1
+        fi
+        if [ -n "${RELEASE_DEBIAN_URGENCY:-}" ] && ! [[ "${RELEASE_DEBIAN_URGENCY}" =~ $debian_token_regex ]]; then
+          echo "::error::Release preflight failed: RELEASE_DEBIAN_URGENCY must be a Debian token (example: medium)."
+          exit 1
+        fi
+
         if [ ! -f VERSION ]; then
           echo "::error::Release preflight failed: VERSION is missing in workspace."
           exit 1
@@ -78,6 +90,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        scratch_dir=".changelog_scratch"
+        artifact_dir="${{ inputs.output_dir }}"
+        if [ -z "$artifact_dir" ] || [ "$artifact_dir" = "/" ] || [ "$artifact_dir" = "." ]; then
+          echo "::error::Unsafe or empty output_dir for package action changelog stage: '$artifact_dir'"
+          exit 1
+        fi
+        echo "[changelog] clearing volatile changelog scratch + staged changelog outputs"
+        rm -rf "$scratch_dir" "$artifact_dir"
+        mkdir -p "$artifact_dir"
         echo "[changelog] starting changelog generation/validation"
         if ! python3 -m tools.release changelog release \
           --output "${{ inputs.output_dir }}/changelog.release.md" \

@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import sys
-from dataclasses import replace
 from pathlib import Path
 
 from tools.release.changelog.ai.config import (
@@ -783,11 +782,16 @@ def cmd_changelog_release(args: argparse.Namespace) -> int:
 
 def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
+    draft_output_path = Path(args.draft_output)
+    if not draft_output_path.is_absolute():
+        draft_output_path = (repo_root / draft_output_path).resolve()
+    draft_output = str(draft_output_path)
+
     print("Changelog ai-release stage: generate AI draft artifact")
     draft_args = argparse.Namespace(
         repo_root=args.repo_root,
         since_tag=args.since_tag,
-        output=args.draft_output,
+        output=draft_output,
         save_json=args.save_json,
         model=args.model,
         provider=args.provider,
@@ -798,7 +802,9 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
         polish=args.polish,
         save_polish_json=args.save_polish_json,
     )
-    _ = cmd_changelog_ai_draft(draft_args)
+    draft_rc = cmd_changelog_ai_draft(draft_args)
+    if draft_rc != 0:
+        return int(draft_rc)
 
     print("Changelog ai-release stage: finalize release using freshly cached draft source")
     release_args = argparse.Namespace(
@@ -808,17 +814,20 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
         raw_output=args.raw_output,
         payload_output=args.payload_output,
         manual_changelog_path=args.manual_changelog_path,
-        cached_draft_path=args.draft_output,
+        cached_draft_path=draft_output,
         debian_distribution=args.debian_distribution,
         debian_urgency=args.debian_urgency,
     )
-    forced_settings = replace(parse_release_ai_settings(os.environ), mode="disabled")
-    _log_release_ai_preflight(forced_settings)
-    return _run_changelog_release_with_settings(
-        release_args,
-        repo_root=repo_root,
-        env_settings=forced_settings,
-    )
+
+    previous_mode = os.environ.get("RELEASE_AI_MODE")
+    os.environ["RELEASE_AI_MODE"] = "disabled"
+    try:
+        return cmd_changelog_release(release_args)
+    finally:
+        if previous_mode is None:
+            os.environ.pop("RELEASE_AI_MODE", None)
+        else:
+            os.environ["RELEASE_AI_MODE"] = previous_mode
 
 
 def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:

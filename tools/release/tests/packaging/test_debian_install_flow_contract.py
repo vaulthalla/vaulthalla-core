@@ -56,6 +56,7 @@ class DebianInstallFlowContractTests(unittest.TestCase):
         readme = (self._repo_root() / "debian" / "README.Debian").read_text(encoding="utf-8")
         required = (
             "vh setup db",
+            "vh setup remote-db",
             "vh setup nginx",
             "vh teardown nginx",
             "/usr/share/vaulthalla/psql",

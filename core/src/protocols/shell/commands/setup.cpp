@@ -2,6 +2,7 @@
 #include "protocols/shell/commands/helpers.hpp"
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
+#include "config/Config.hpp"
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 #include "CommandUsage.hpp"
@@ -269,6 +270,81 @@ static std::optional<std::string> restartOrStartService(std::string& actionTaken
     return std::nullopt;
 }
 
+static std::optional<std::string> requiredOptionValue(const CommandCall& call,
+                                                      const std::shared_ptr<CommandUsage>& usage,
+                                                      const std::string& label,
+                                                      const std::string& prompt,
+                                                      const bool interactive) {
+    const auto required = usage->resolveRequired(label);
+    if (!required) return std::nullopt;
+
+    if (const auto value = optVal(call, required->option_tokens); value && !value->empty())
+        return value;
+
+    if (interactive && call.io) {
+        const auto prompted = call.io->prompt(prompt);
+        if (!prompted.empty()) return prompted;
+    }
+
+    return std::nullopt;
+}
+
+static std::optional<std::string> optionalOptionValue(const CommandCall& call,
+                                                      const std::shared_ptr<CommandUsage>& usage,
+                                                      const std::string& label,
+                                                      const std::string& prompt,
+                                                      const std::string& defValue,
+                                                      const bool interactive) {
+    const auto optional = usage->resolveOptional(label);
+    if (!optional) return std::nullopt;
+
+    if (const auto value = optVal(call, optional->option_tokens); value && !value->empty())
+        return value;
+
+    if (interactive && call.io) {
+        const auto prompted = call.io->prompt(prompt, defValue);
+        if (!prompted.empty()) return prompted;
+    }
+
+    if (!defValue.empty()) return defValue;
+    return std::nullopt;
+}
+
+static std::optional<std::string> parsePortValue(const std::string& raw, uint16_t& port) {
+    const auto parsed = parseUInt(raw);
+    if (!parsed || *parsed == 0 || *parsed > 65535)
+        return "invalid port '" + raw + "' (expected integer 1-65535)";
+    port = static_cast<uint16_t>(*parsed);
+    return std::nullopt;
+}
+
+static std::optional<std::string> parsePoolSizeValue(const std::optional<std::string>& raw, int& poolSize) {
+    if (!raw || raw->empty()) return std::nullopt;
+    const auto parsed = parseUInt(*raw);
+    if (!parsed || *parsed == 0)
+        return "invalid pool size '" + *raw + "' (expected positive integer)";
+    poolSize = static_cast<int>(*parsed);
+    return std::nullopt;
+}
+
+static std::optional<std::string> loadPasswordFromFile(const std::string& filePath, std::string& password) {
+    const fs::path sourcePath{filePath};
+    std::error_code ec;
+    if (!fs::exists(sourcePath, ec))
+        return "password file does not exist: " + sourcePath.string();
+    if (!fs::is_regular_file(sourcePath, ec))
+        return "password file is not a regular file: " + sourcePath.string();
+
+    std::ifstream in(sourcePath);
+    if (!in.is_open())
+        return "failed opening password file: " + sourcePath.string();
+
+    if (!(in >> password) || password.empty())
+        return "password file is empty or invalid: " + sourcePath.string();
+
+    return std::nullopt;
+}
+
 static bool hasNonNginxListenersOnWebPorts() {
     if (!commandExists("ss")) return false;
 
@@ -436,6 +512,105 @@ static CommandResult handle_setup_db(const CommandCall& call) {
     return ok(out.str());
 }
 
+static CommandResult handle_setup_remote_db(const CommandCall& call) {
+    const auto usage = resolveUsage({"setup", "remote-db"});
+    validatePositionals(call, usage);
+
+    if (!call.user->isSuperAdmin())
+        return invalid("setup remote-db: requires super_admin role");
+
+    if (!hasEffectiveRoot())
+        return invalid("setup remote-db: must run as root to update config and seed runtime credentials");
+
+    const auto interactiveFlag = usage->resolveFlag("interactive_mode");
+    const bool interactive = interactiveFlag ? hasFlag(call, interactiveFlag->aliases) : hasFlag(call, "interactive");
+
+    const auto host = requiredOptionValue(
+        call, usage, "host", "Remote DB host (required):", interactive);
+    if (!host || host->empty())
+        return invalid("setup remote-db: missing required option --host");
+
+    const auto user = requiredOptionValue(
+        call, usage, "user", "Remote DB user (required):", interactive);
+    if (!user || user->empty())
+        return invalid("setup remote-db: missing required option --user");
+
+    const auto database = requiredOptionValue(
+        call, usage, "database", "Remote DB database name (required):", interactive);
+    if (!database || database->empty())
+        return invalid("setup remote-db: missing required option --database");
+
+    const auto passwordFile = requiredOptionValue(
+        call, usage, "password_file", "Remote DB password file path (required):", interactive);
+    if (!passwordFile || passwordFile->empty())
+        return invalid("setup remote-db: missing required option --password-file");
+
+    const auto portRaw = optionalOptionValue(
+        call, usage, "port", "Remote DB port [5432]:", "5432", interactive);
+    if (!portRaw)
+        return invalid("setup remote-db: missing port value");
+
+    uint16_t port = 5432;
+    if (const auto portErr = parsePortValue(*portRaw, port))
+        return invalid("setup remote-db: " + *portErr);
+
+    const auto poolRaw = optionalOptionValue(
+        call, usage, "pool_size", "DB pool size (leave blank to keep current):", "", interactive);
+    int parsedPoolSize = 0;
+    if (const auto poolErr = parsePoolSizeValue(poolRaw, parsedPoolSize))
+        return invalid("setup remote-db: " + *poolErr);
+
+    std::string remotePassword;
+    if (const auto passErr = loadPasswordFromFile(*passwordFile, remotePassword))
+        return invalid("setup remote-db: " + *passErr);
+
+    const fs::path configPath = vh::paths::getConfigPath();
+    config::Config cfg;
+    try {
+        cfg = config::loadConfig(configPath.string());
+    } catch (const std::exception& e) {
+        return invalid("setup remote-db: failed loading config '" + configPath.string() + "': " + e.what());
+    }
+
+    cfg.database.host = *host;
+    cfg.database.port = port;
+    cfg.database.user = *user;
+    cfg.database.name = *database;
+    if (poolRaw && !poolRaw->empty()) cfg.database.pool_size = parsedPoolSize;
+
+    try {
+        cfg.save();
+    } catch (const std::exception& e) {
+        return invalid("setup remote-db: failed saving config '" + configPath.string() + "': " + e.what());
+    }
+
+    if (const auto passSeedError = writePendingDbPassword(remotePassword))
+        return invalid(
+            "setup remote-db: config updated but failed preparing pending DB password handoff file: " + *passSeedError);
+
+    std::string serviceAction;
+    if (const auto serviceError = restartOrStartService(serviceAction)) {
+        std::ostringstream error;
+        error << "setup remote-db: config updated but service handoff failed: " << *serviceError;
+        error << ". Pending password remains at " << kPendingDbPasswordFile
+              << " for next successful service startup.";
+        return invalid(error.str());
+    }
+
+    std::ostringstream out;
+    out << "setup remote-db: remote PostgreSQL configuration applied\n";
+    out << "  config file: " << configPath.string() << "\n";
+    out << "  database.host: " << cfg.database.host << "\n";
+    out << "  database.port: " << cfg.database.port << "\n";
+    out << "  database.user: " << cfg.database.user << "\n";
+    out << "  database.name: " << cfg.database.name << "\n";
+    out << "  database.pool_size: " << cfg.database.pool_size << "\n";
+    out << "  seeded runtime DB password: " << kPendingDbPasswordFile << " (owner/mode verified)\n";
+    out << "  service: " << kServiceUnit << " " << serviceAction << "\n";
+    out << "  migrations: delegated to normal runtime startup flow (SqlDeployer)";
+    return ok(out.str());
+}
+
 static CommandResult handle_setup_nginx(const CommandCall& call) {
     const auto usage = resolveUsage({"setup", "nginx"});
     validatePositionals(call, usage);
@@ -560,6 +735,7 @@ static CommandResult handle_setup(const CommandCall& call) {
     const auto [sub, subcall] = descend(call);
 
     if (isSetupMatch("db", sub)) return handle_setup_db(subcall);
+    if (isSetupMatch("remote-db", sub)) return handle_setup_remote_db(subcall);
     if (isSetupMatch("nginx", sub)) return handle_setup_nginx(subcall);
 
     return invalid(call.constructFullArgs(), "Unknown setup subcommand: '" + std::string(sub) + "'");

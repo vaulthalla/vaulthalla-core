@@ -109,6 +109,7 @@ CLI integration follow-up (Phase 3)
 If package-time automation skipped optional integration steps, admins can run:
 
 - `vh setup db`
+- `vh setup remote-db --host <host> --user <user> --database <name> --password-file <path>`
 - `vh setup nginx`
 - `vh teardown nginx`
 
@@ -124,6 +125,14 @@ For local PostgreSQL bootstrap, `vh setup db` now:
 - starts/restarts `vaulthalla.service` so normal runtime startup can consume the
   pending DB password and run canonical schema/migration deployment via
   `SqlDeployer`
+
+For explicit remote PostgreSQL configuration, `vh setup remote-db`:
+
+- updates canonical `config.yaml` database host/port/user/name settings via
+  existing config helpers
+- seeds runtime-consumed DB password handoff to `/run/vaulthalla/db_password`
+- starts/restarts `vaulthalla.service` so runtime picks up config + password
+- leaves schema/migration deployment to normal runtime startup (`SqlDeployer`)
 
 For nginx integration, `vh setup nginx` and `vh teardown nginx` only manage the
 Vaulthalla site path and marker:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly KEY_URL="${VH_APT_KEY_URL:-https://apt.vaulthalla.sh/pubkey.gpg}"
+readonly KEY_URL="${VH_APT_KEY_URL:-https://apt.vaulthalla.sh/pubkey.asc}"
 readonly REPO_URL="${VH_APT_REPO_URL:-https://apt.vaulthalla.sh}"
 readonly REPO_DIST="${VH_APT_DIST:-stable}"
 readonly REPO_COMPONENT="${VH_APT_COMPONENT:-main}"
@@ -224,32 +224,27 @@ resolve_operator_user() {
 }
 
 ensure_repo_bootstrap() {
+    need_cmd gpg
+
     local tmp_key
     tmp_key="$(mktemp)"
-    trap "rm -f '$tmp_key'" EXIT
+    local tmp_keyring
+    tmp_keyring="$(mktemp)"
+    trap "rm -f '$tmp_key' '$tmp_keyring'" EXIT
 
     log "Ensuring Vaulthalla apt key and source are configured."
     curl -fsSL "$KEY_URL" -o "$tmp_key"
     [[ -s "$tmp_key" ]] || die "Downloaded key is empty: ${KEY_URL}"
 
-    run_priv install -d -m 0755 /etc/apt/trusted.gpg.d /etc/apt/sources.list.d
+    gpg --dearmor < "$tmp_key" > "$tmp_keyring"
 
-    if [[ -f "$KEY_FILE" ]] && cmp -s "$tmp_key" "$KEY_FILE"; then
+    run_priv install -d -m 0755 /usr/share/keyrings /etc/apt/sources.list.d
+
+    if [[ -f "$KEY_FILE" ]] && cmp -s "$tmp_keyring" "$KEY_FILE"; then
         REPO_KEY_STATUS="already configured"
     else
-        run_priv install -m 0644 -o root -g root "$tmp_key" "$KEY_FILE"
+        run_priv install -m 0644 -o root -g root "$tmp_keyring" "$KEY_FILE"
         REPO_KEY_STATUS="updated"
-    fi
-
-    local tmp_source
-    tmp_source="$(mktemp)"
-    printf '%s\n' "$SOURCE_LINE" > "$tmp_source"
-
-    if [[ -f "$SOURCE_FILE" ]] && cmp -s "$tmp_source" "$SOURCE_FILE"; then
-        REPO_SOURCE_STATUS="already configured"
-    else
-        run_priv install -m 0644 -o root -g root "$tmp_source" "$SOURCE_FILE"
-        REPO_SOURCE_STATUS="updated"
     fi
 }
 

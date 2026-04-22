@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <paths.h>
+#include <utility>
 
 namespace vh::runtime {
 
@@ -138,6 +139,40 @@ bool Manager::allRunning() const {
             return false;
 
     return true;
+}
+
+Manager::Status Manager::status() const {
+    const auto entries = [&] {
+        std::scoped_lock lock(mutex_);
+        return serviceEntries();
+    }();
+
+    Status out;
+    out.allRunning = true;
+    out.services.reserve(entries.size());
+
+    for (const auto& entry : entries) {
+        ServiceStatus s{};
+        s.entryName = entry.name;
+
+        if (entry.service) {
+            const auto base = entry.service->status();
+            s.serviceName = base.name;
+            s.running = base.running;
+            s.interrupted = base.interrupted;
+            if (!base.running) out.allRunning = false;
+        } else {
+            s.serviceName = "uninitialized";
+            s.running = false;
+            s.interrupted = false;
+            out.allRunning = false;
+        }
+
+        out.services.push_back(std::move(s));
+    }
+
+    if (out.services.empty()) out.allRunning = false;
+    return out;
 }
 
 void Manager::tryStart(const ServiceEntry& entry) {

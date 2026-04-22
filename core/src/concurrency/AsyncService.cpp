@@ -10,6 +10,14 @@ AsyncService::~AsyncService() {
     stop();
 }
 
+AsyncService::Status AsyncService::status() const {
+    return {
+        .name = serviceName_,
+        .running = running_.load(std::memory_order_acquire),
+        .interrupted = interruptFlag_.load(std::memory_order_acquire)
+    };
+}
+
 void AsyncService::start() {
     if (isRunning()) return;
 

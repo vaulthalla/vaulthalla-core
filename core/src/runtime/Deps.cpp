@@ -46,4 +46,19 @@ namespace vh::runtime {
         get().syncController = std::move(controller);
     }
 
+    Deps::SanityStatus Deps::sanityStatus() const {
+        return {
+            .storageManager = static_cast<bool>(storageManager),
+            .apiKeyManager = static_cast<bool>(apiKeyManager),
+            .authManager = static_cast<bool>(authManager),
+            .sessionManager = static_cast<bool>(sessionManager),
+            .secretsManager = static_cast<bool>(secretsManager),
+            .syncController = static_cast<bool>(syncController),
+            .fsCache = static_cast<bool>(fsCache),
+            .shellUsageManager = static_cast<bool>(shellUsageManager),
+            .httpCacheStats = static_cast<bool>(httpCacheStats),
+            .fuseSession = fuseSession != nullptr
+        };
+    }
+
 }

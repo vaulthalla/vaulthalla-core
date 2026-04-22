@@ -134,18 +134,25 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
 void Service::stop() {
     if (!isRunning()) return;
     log::Registry::fuse()->info("[FUSE] Stopping FUSE connection...");
-    interruptFlag_.store(true);
+    interruptFlag_.store(true, std::memory_order_release);
 
-    if (paths::testMode) lazyUmount(paths::mountPath);
+    // Proactively detach the mountpoint to unblock fuse_session_receive_buf().
+    // This is required in production as well, not only in tests.
+    const auto mountPath = paths::getMountPath();
+    lazyUmount(mountPath);
+    waitUnmounted(mountPath);
+    if (isMountedOrStale(mountPath))
+        log::Registry::fuse()->warn("[FUSE] Mountpoint {} still appears mounted/stale during stop",
+                                     mountPath.string());
 
-    // Only wake the loop. Do NOT unmount/destroy here.
+    // Wake the loop as an additional unblock path.
     if (session_) fuse_session_exit(session_);
 
     if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id())
         worker_.join();
 
-    running_.store(false);
-    interruptFlag_.store(false);
+    running_.store(false, std::memory_order_release);
+    // Leave interruptFlag_ true until next start() resets it.
     log::Registry::fuse()->info("[FUSE] FUSE service stopped");
 }
 

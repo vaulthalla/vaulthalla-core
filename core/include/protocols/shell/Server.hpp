@@ -23,7 +23,7 @@ public:
 
 protected:
     void runLoop() override;
-    void onStop(); // close listener to break accept()
+    void onStop() override;
 
 private:
     static constexpr std::string_view kAddAdminCmd = "usermod -aG vaulthalla {}";

@@ -34,6 +34,8 @@ protected:
     std::thread worker_;
 
     virtual void runLoop() = 0;
+    // Optional stop hook for derived services to unblock blocking syscalls before join().
+    virtual void onStop() {}
 
     [[nodiscard]] bool shouldStop() const {
         return interruptFlag_.load(std::memory_order_relaxed) ||

@@ -40,10 +40,19 @@ void AsyncService::start() {
 }
 
 void AsyncService::stop() {
-    if (!isRunning()) return;
+    const bool wasRunning = isRunning();
+    if (!wasRunning && !worker_.joinable()) return;
 
-    log::Registry::runtime()->info("[{}] Stopping service...", serviceName_);
+    if (wasRunning) log::Registry::runtime()->info("[{}] Stopping service...", serviceName_);
     interruptFlag_.store(true, std::memory_order_release);
+
+    try {
+        onStop();
+    } catch (const std::exception& e) {
+        log::Registry::runtime()->error("[{}] onStop() failed: {}", serviceName_, e.what());
+    } catch (...) {
+        log::Registry::runtime()->error("[{}] onStop() failed: unknown exception", serviceName_);
+    }
 
     if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id()) {
         worker_.join();
@@ -51,7 +60,7 @@ void AsyncService::stop() {
 
     running_.store(false, std::memory_order_release);
     // Leave interruptFlag_ true until next start() resets it
-    log::Registry::runtime()->info("[{}] Service stopped.", serviceName_);
+    if (wasRunning) log::Registry::runtime()->info("[{}] Service stopped.", serviceName_);
 }
 
 void AsyncService::restart() {

@@ -34,16 +34,25 @@ void ProtocolService::runLoop() {
 
         while (!shouldStop()) std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        ioContext_->stop();
+        if (ioContext_) ioContext_->stop();
         if (ioThread_.joinable()) ioThread_.join();
-
-        exit(EXIT_SUCCESS);
+        websocketReady_.store(false, std::memory_order_release);
+        httpPreviewReady_.store(false, std::memory_order_release);
+        ioContextInitialized_.store(false, std::memory_order_release);
     } catch (const std::exception& e) {
         log::Registry::runtime()->error("[ProtocolService] Exception in run loop: {}", e.what());
-        exit(EXIT_FAILURE);
+        if (ioContext_) ioContext_->stop();
+        if (ioThread_.joinable()) ioThread_.join();
+        websocketReady_.store(false, std::memory_order_release);
+        httpPreviewReady_.store(false, std::memory_order_release);
+        ioContextInitialized_.store(false, std::memory_order_release);
     } catch (...) {
         log::Registry::runtime()->error("[ProtocolService] Unknown exception in run loop");
-        exit(EXIT_FAILURE);
+        if (ioContext_) ioContext_->stop();
+        if (ioThread_.joinable()) ioThread_.join();
+        websocketReady_.store(false, std::memory_order_release);
+        httpPreviewReady_.store(false, std::memory_order_release);
+        ioContextInitialized_.store(false, std::memory_order_release);
     }
 }
 

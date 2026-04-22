@@ -193,12 +193,13 @@ void Manager::tryStart(const ServiceEntry& entry) {
 }
 
 void Manager::stopService(const ServiceEntry& entry, const int signal) {
-    if (!entry.service || !entry.service->isRunning()) return;
+    if (!entry.service) return;
 
     log::Registry::runtime()->debug("[ServiceManager] Stopping service: {}", entry.name);
 
     try {
         entry.service->stop();
+        log::Registry::runtime()->debug("[ServiceManager] Service stopped: {}", entry.name);
     } catch (...) {
         log::Registry::runtime()->error(
             "[ServiceManager] Failed to stop {} gracefully, escalating with signal {}.",

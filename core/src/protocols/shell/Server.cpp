@@ -111,7 +111,7 @@ void Server::closeListener() {
 }
 
 void Server::onStop() {
-    // Called by AsyncService::stop() before join; close to break accept()
+    // Close listener before AsyncService::join() so accept4() is unblocked.
     closeListener();
 }
 
@@ -201,10 +201,10 @@ void Server::runLoop() {
     if (::listen(listenFd_, 16) != 0) throw std::runtime_error("listen()");
 
     // Accept loop
-    while (running_) {
+    while (!shouldStop()) {
         int cfd = ::accept4(listenFd_, nullptr, nullptr, SOCK_CLOEXEC);
         if (cfd < 0) {
-            if (!running_) break; // listener closed during stop
+            if (shouldStop()) break;
             continue;
         }
 

@@ -2,7 +2,6 @@
 #include "protocols/shell/Router.hpp"
 #include "protocols/shell/Server.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
-#include "protocols/shell/util/commandHelpers.hpp"
 #include "protocols/ProtocolService.hpp"
 #include "runtime/Manager.hpp"
 #include "runtime/Deps.hpp"
@@ -17,8 +16,6 @@
 #include <string_view>
 
 namespace vh::protocols::shell::commands {
-
-namespace system_cmd_util = vh::protocols::shell::util;
 
 namespace {
 
@@ -49,13 +46,6 @@ std::string renderDepsCoreReady(const runtime::Deps::SanityStatus& deps, size_t&
     std::ostringstream out;
     out << ready << "/" << total << " ready";
     return out.str();
-}
-
-std::string systemdUnitState(const std::string& unit) {
-    const auto state = system_cmd_util::runCapture("systemctl is-active " + system_cmd_util::shellQuote(unit));
-    if (state.code == 0 && !state.output.empty()) return state.output;
-    if (!state.output.empty()) return state.output;
-    return "unknown (exit " + std::to_string(state.code) + ")";
 }
 
 CommandResult handleStatus(const CommandCall& call) {

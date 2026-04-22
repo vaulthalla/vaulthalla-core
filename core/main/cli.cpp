@@ -1,15 +1,21 @@
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 #include <nlohmann/json.hpp>
 #include <arpa/inet.h>
 #include <cstring>
 #include <fmt/core.h>
 #include <algorithm>
 #include <ranges>
+#include <cctype>
+#include <sstream>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 
 static bool readn(const int fd, void* b, size_t n) {
@@ -150,6 +156,148 @@ static std::string read_line_from_stdin() {
     return line;
 }
 
+static bool command_is(const std::vector<std::string>& argv_norm, std::string_view cmd, std::string_view subcmd) {
+    return argv_norm.size() >= 2 && argv_norm[0] == cmd && argv_norm[1] == subcmd;
+}
+
+static bool is_lifecycle_command(const std::vector<std::string>& argv_norm) {
+    return command_is(argv_norm, "setup", "db")
+        || command_is(argv_norm, "setup", "remote-db")
+        || command_is(argv_norm, "setup", "nginx")
+        || command_is(argv_norm, "teardown", "db")
+        || command_is(argv_norm, "teardown", "nginx");
+}
+
+static std::string lifecycle_binary_path() {
+    if (const char* env = std::getenv("VAULTHALLA_LIFECYCLE_BIN"); env && *env)
+        return env;
+    return "/usr/lib/vaulthalla/lifecycle";
+}
+
+static int run_lifecycle_command(const std::vector<std::string>& argv_norm) {
+    const auto lifecycleBin = lifecycle_binary_path();
+    std::vector<std::string> args;
+    args.reserve(argv_norm.size() + 1);
+    args.push_back(lifecycleBin);
+    args.insert(args.end(), argv_norm.begin(), argv_norm.end());
+
+    std::vector<char*> execArgv;
+    execArgv.reserve(args.size() + 1);
+    for (auto& arg : args) execArgv.push_back(arg.data());
+    execArgv.push_back(nullptr);
+
+    const pid_t pid = ::fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) {
+        ::execv(execArgv[0], execArgv.data());
+        if (::access(execArgv[0], R_OK) == 0) {
+            std::vector<char*> pyArgv;
+            pyArgv.reserve(execArgv.size() + 1);
+            pyArgv.push_back(const_cast<char*>("python3"));
+            pyArgv.insert(pyArgv.end(), execArgv.begin(), execArgv.end() - 1);
+            pyArgv.push_back(nullptr);
+            ::execvp("python3", pyArgv.data());
+        }
+        perror("exec");
+        _exit(127);
+    }
+
+    int status = 0;
+    if (::waitpid(pid, &status, 0) < 0) {
+        perror("waitpid");
+        return 1;
+    }
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+    return 1;
+}
+
+static bool should_append_status_systemd_summary(const std::vector<std::string>& argv_norm) {
+    if (argv_norm.empty() || argv_norm[0] != "status") return false;
+    if (::geteuid() != 0) return false;
+    const auto hasHelpFlag = has_flag(argv_norm, "--help")
+                          || has_flag(argv_norm, "--h")
+                          || has_flag(argv_norm, "-h")
+                          || has_flag(argv_norm, "?");
+    return !hasHelpFlag;
+}
+
+static std::string shell_quote(const std::string& s) {
+    std::string out{"'"};
+    for (const char c : s) {
+        if (c == '\'') out += "'\"'\"'";
+        else out.push_back(c);
+    }
+    out.push_back('\'');
+    return out;
+}
+
+static std::string trim_copy(std::string s) {
+    const auto ws = [](const unsigned char c) { return std::isspace(c) != 0; };
+    s.erase(s.begin(), std::ranges::find_if(s.begin(), s.end(), [&](const unsigned char c) { return !ws(c); }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [&](const unsigned char c) { return !ws(c); }).base(), s.end());
+    return s;
+}
+
+struct CaptureResult {
+    int code = 0;
+    std::string output;
+};
+
+static CaptureResult run_capture(const std::string& command) {
+    const auto wrapped = command + " 2>&1";
+    std::array<char, 4096> buf{};
+    std::string output;
+
+    FILE* pipe = ::popen(wrapped.c_str(), "r");
+    if (!pipe) return {.code = 1, .output = "failed to execute command"};
+
+    while (fgets(buf.data(), static_cast<int>(buf.size()), pipe) != nullptr)
+        output += buf.data();
+
+    const int status = ::pclose(pipe);
+    int code = status;
+    if (WIFEXITED(status)) code = WEXITSTATUS(status);
+    else if (WIFSIGNALED(status)) code = 128 + WTERMSIG(status);
+
+    return {.code = code, .output = output};
+}
+
+static bool command_exists(const std::string& command) {
+    return run_capture("command -v " + shell_quote(command) + " >/dev/null").code == 0;
+}
+
+static std::string systemd_unit_state(const std::string& unit) {
+    const auto state = run_capture("systemctl is-active " + shell_quote(unit));
+    const auto trimmed = trim_copy(state.output);
+    if (state.code == 0 && !trimmed.empty()) return trimmed;
+    if (!trimmed.empty()) return trimmed;
+    return "unknown (exit " + std::to_string(state.code) + ")";
+}
+
+static void append_status_systemd_summary_if_needed(const std::vector<std::string>& argv_norm, const int exitCode) {
+    if (exitCode != 0 || !should_append_status_systemd_summary(argv_norm))
+        return;
+    if (!command_exists("systemctl")) return;
+
+    std::ostringstream out;
+    out << "systemd summary (supplemental):\n";
+    constexpr std::array<std::string_view, 4> units{
+        "vaulthalla.service",
+        "vaulthalla-cli.service",
+        "vaulthalla-cli.socket",
+        "vaulthalla-web.service"
+    };
+    for (const auto unit : units)
+        out << "  " << unit << ": " << systemd_unit_state(std::string(unit)) << "\n";
+
+    fmt::print("{}", ensureNewLine(out.str()));
+}
+
 /* ----------------------------------------------------------------- */
 
 int main(const int argc, char** argv) {
@@ -166,6 +314,9 @@ int main(const int argc, char** argv) {
         auto tail = normalize_args(argc, argv);
         argv_norm.insert(argv_norm.end(), tail.begin(), tail.end());
     }
+
+    if (is_lifecycle_command(argv_norm))
+        return run_lifecycle_command(argv_norm);
 
     // Quoted line for legacy servers
     std::string line = build_line_from_tokens(argv_norm);
@@ -215,6 +366,7 @@ int main(const int argc, char** argv) {
             if (frame.contains("stdout")) fmt::print("{}", ensureNewLine(frame["stdout"].get<std::string>()));
             if (frame.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(frame["stderr"].get<std::string>()));
             const int ec = frame.value("exit_code", 0);
+            append_status_systemd_summary_if_needed(argv_norm, ec);
             ::close(s);
             return ec;
         }
@@ -274,6 +426,7 @@ int main(const int argc, char** argv) {
             if (frame.contains("stdout")) fmt::print("{}", ensureNewLine(frame["stdout"].get<std::string>()));
             if (frame.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(frame["stderr"].get<std::string>()));
             const int ec = frame.value("exit_code", 0);
+            append_status_systemd_summary_if_needed(argv_norm, ec);
             ::close(s);
             return ec;
         }

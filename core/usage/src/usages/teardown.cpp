@@ -20,15 +20,27 @@ static std::shared_ptr<CommandUsage> nginx(const std::weak_ptr<CommandUsage>& pa
     return cmd;
 }
 
+static std::shared_ptr<CommandUsage> db(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"db", "database", "postgres"};
+    cmd->description = "Disable/remove Vaulthalla local PostgreSQL integration (role/database).";
+    cmd->examples = {
+        {"vh teardown db", "Drop Vaulthalla local PostgreSQL role/database integration."}
+    };
+    return cmd;
+}
+
 static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"teardown"};
     cmd->description = "Perform explicit Vaulthalla integration teardown tasks.";
     cmd->examples = {
-        {"vh teardown nginx", "Disable/remove Vaulthalla-managed nginx site integration."}
+        {"vh teardown nginx", "Disable/remove Vaulthalla-managed nginx site integration."},
+        {"vh teardown db", "Disable/remove Vaulthalla local PostgreSQL integration."}
     };
     cmd->subcommands = {
-        nginx(cmd->weak_from_this())
+        nginx(cmd->weak_from_this()),
+        db(cmd->weak_from_this())
     };
     return cmd;
 }

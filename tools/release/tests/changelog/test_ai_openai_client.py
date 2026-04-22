@@ -50,12 +50,14 @@ class _FakeSDKClient:
 class _FakeResponses:
     def __init__(
         self,
-        output_text: str,
+        output_text: str | None,
         *,
+        response_payload: dict | None = None,
         recoverable_error_formats: set[str] | None = None,
         hard_error: Exception | None = None,
     ):
         self.output_text = output_text
+        self.response_payload = response_payload
         self.recoverable_error_formats = recoverable_error_formats or set()
         self.hard_error = hard_error
         self.calls: list[dict] = []
@@ -71,31 +73,37 @@ class _FakeResponses:
                 fmt_type = fmt_cfg.get("type")
                 if isinstance(fmt_type, str) and fmt_type in self.recoverable_error_formats:
                     raise RuntimeError(f"{fmt_type} unsupported")
+        if self.response_payload is not None:
+            return self.response_payload
         return {"output_text": self.output_text}
 
 
 class _FakeSDKWithResponses:
     def __init__(
         self,
-        output_text: str,
+        output_text: str | None,
         *,
+        response_payload: dict | None = None,
         recoverable_error_formats: set[str] | None = None,
         hard_error: Exception | None = None,
     ):
         self.responses = _FakeResponses(
             output_text,
+            response_payload=response_payload,
             recoverable_error_formats=recoverable_error_formats,
             hard_error=hard_error,
         )
-        self.chat = _FakeChat(_FakeCompletions(_FakeResponse(output_text)))
+        self.chat = _FakeChat(_FakeCompletions(_FakeResponse(output_text or "{}")))
         self.models = type("FakeModels", (), {"list": lambda self: {"data": []}})()
 
 
 class OpenAIProviderTests(unittest.TestCase):
+    _VALID_JSON = (
+        '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
+    )
+
     def test_structured_request_uses_json_schema_response_format(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         result = client.generate_structured_json(
@@ -115,9 +123,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertNotIn("reasoning", call)
 
     def test_reasoning_effort_is_forwarded_when_requested(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -131,9 +137,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["reasoning"]["effort"], "high")
 
     def test_temperature_and_max_tokens_are_forwarded_when_requested(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -149,9 +153,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["max_output_tokens"], 1024)
 
     def test_hosted_gpt5_omits_temperature_but_keeps_max_tokens(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-5-mini")
 
         _ = client.generate_structured_json(
@@ -167,9 +169,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["max_output_tokens"], 1024)
 
     def test_json_object_mode_uses_json_object_response_format(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -183,9 +183,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["text"]["format"]["type"], "json_object")
 
     def test_prompt_json_mode_omits_response_format(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -207,9 +205,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertTrue(caps.supports_strict_schema)
 
     def test_responses_api_is_used_for_hosted_openai_when_available(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}'
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -231,10 +227,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(request["max_output_tokens"], 777)
 
     def test_fallback_order_is_deterministic_when_structured_modes_fail(self) -> None:
-        sdk = _FakeSDKWithResponses(
-            '{"title":"x","summary":"y","sections":[{"category":"core","overview":"z","bullets":["a"]}]}',
-            recoverable_error_formats={"json_schema", "json_object"},
-        )
+        sdk = _FakeSDKWithResponses(self._VALID_JSON, recoverable_error_formats={"json_schema", "json_object"})
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
 
         _ = client.generate_structured_json(
@@ -327,6 +320,142 @@ class OpenAIProviderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Model discovery request failed"):
             client.list_models()
+
+    def test_responses_output_parser_accepts_text_value_wrappers(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": {"value": self._VALID_JSON},
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        parsed = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="json_object",
+        )
+        self.assertEqual(parsed["title"], "x")
+
+    def test_responses_output_parser_accepts_summary_text_content(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "output": [
+                    {
+                        "type": "reasoning",
+                        "content": [
+                            {
+                                "type": "summary_text",
+                                "text": {"value": self._VALID_JSON},
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        parsed = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="json_object",
+        )
+        self.assertEqual(parsed["summary"], "y")
+
+    def test_responses_output_parser_accepts_structured_json_field(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_json",
+                                "json": {
+                                    "title": "x",
+                                    "summary": "y",
+                                    "sections": [{"category": "core", "overview": "z", "bullets": ["a"]}],
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        parsed = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="json_object",
+        )
+        self.assertEqual(parsed["sections"][0]["category"], "core")
+
+    def test_responses_output_refusal_surfaces_as_provider_refusal(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "output": [
+                    {
+                        "type": "refusal",
+                        "refusal": {"text": "policy_refusal"},
+                    }
+                ]
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        with self.assertRaisesRegex(ValueError, "AI provider refusal: policy_refusal"):
+            client.generate_structured_json(
+                system_prompt="sys",
+                user_prompt="usr",
+                json_schema={"type": "object"},
+                structured_mode="json_object",
+            )
+
+    def test_responses_parse_error_reports_item_and_content_types(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_image",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        with self.assertRaises(ValueError) as exc:
+            client.generate_structured_json(
+                system_prompt="sys",
+                user_prompt="usr",
+                json_schema={"type": "object"},
+                structured_mode="prompt_json",
+            )
+        message = str(exc.exception)
+        self.assertIn("item_types=message", message)
+        self.assertIn("content_types=output_image", message)
 
 
 if __name__ == "__main__":

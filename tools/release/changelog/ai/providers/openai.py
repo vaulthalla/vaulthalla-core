@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
@@ -32,6 +33,19 @@ _MODE_RECOVERABLE_ERROR_MARKERS = (
     "unknown parameter",
     "unrecognized",
     "does not support",
+)
+_RESPONSES_TEXT_CONTENT_TYPES = frozenset(
+    {
+        "output_text",
+        "text",
+        "summary_text",
+        "reasoning_text",
+    }
+)
+_RESPONSES_JSON_CONTENT_FIELDS = (
+    "json",
+    "parsed",
+    "output_json",
 )
 
 
@@ -398,40 +412,223 @@ def _extract_message_content(response: Any) -> str:
 
 
 def _extract_responses_output_text(response: Any) -> str:
-    output_text = response.get("output_text") if isinstance(response, dict) else getattr(response, "output_text", None)
-    if isinstance(output_text, str) and output_text.strip():
+    output_text = _extract_text_candidate(_read_response_field(response, "output_text"))
+    if output_text is not None:
         return output_text
 
-    output_items = response.get("output") if isinstance(response, dict) else getattr(response, "output", None)
-    if isinstance(output_items, list):
-        chunks: list[str] = []
-        for item in output_items:
-            item_type = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
-            if item_type == "refusal":
-                refusal_text = item.get("refusal") if isinstance(item, dict) else getattr(item, "refusal", None)
-                raise ValueError(f"AI provider refusal: {refusal_text or 'request refused'}")
+    output_items = _as_response_items(_read_response_field(response, "output"))
+    text_chunks: list[str] = []
+    text_seen: set[str] = set()
+    json_chunks: list[str] = []
+    json_seen: set[str] = set()
+    refusal_chunks: list[str] = []
+    item_types: set[str] = set()
+    content_types: set[str] = set()
 
-            content = item.get("content") if isinstance(item, dict) else getattr(item, "content", None)
-            if not isinstance(content, list):
-                continue
-            for content_item in content:
-                content_type = (
-                    content_item.get("type")
-                    if isinstance(content_item, dict)
-                    else getattr(content_item, "type", None)
+    for item in output_items:
+        item_type = _response_type_label(_read_response_field(item, "type"))
+        if item_type is not None:
+            item_types.add(item_type)
+
+        item_refusal = _extract_text_candidate(_read_response_field(item, "refusal"))
+        if item_type == "refusal" or item_refusal is not None:
+            refusal_chunks.append(item_refusal or "request refused")
+
+        _append_unique(
+            text_chunks,
+            text_seen,
+            _extract_text_candidate(_read_response_field(item, "text")),
+        )
+        _append_unique(
+            text_chunks,
+            text_seen,
+            _extract_text_candidate(_read_response_field(item, "output_text")),
+        )
+        for field in _RESPONSES_JSON_CONTENT_FIELDS:
+            _append_unique(
+                json_chunks,
+                json_seen,
+                _extract_json_candidate(_read_response_field(item, field)),
+            )
+
+        for content_item in _as_response_items(_read_response_field(item, "content")):
+            content_type = _response_type_label(_read_response_field(content_item, "type"))
+            if content_type is not None:
+                content_types.add(content_type)
+
+            content_refusal = _extract_text_candidate(_read_response_field(content_item, "refusal"))
+            if content_type == "refusal" or content_refusal is not None:
+                refusal_chunks.append(content_refusal or "request refused")
+
+            _append_unique(
+                text_chunks,
+                text_seen,
+                _extract_text_candidate(_read_response_field(content_item, "text")),
+            )
+            _append_unique(
+                text_chunks,
+                text_seen,
+                _extract_text_candidate(_read_response_field(content_item, "output_text")),
+            )
+            _append_unique(
+                text_chunks,
+                text_seen,
+                _extract_text_candidate(_read_response_field(content_item, "summary")),
+            )
+            _append_unique(
+                text_chunks,
+                text_seen,
+                _extract_text_candidate(_read_response_field(content_item, "reasoning")),
+            )
+            if content_type in _RESPONSES_TEXT_CONTENT_TYPES:
+                _append_unique(
+                    text_chunks,
+                    text_seen,
+                    _extract_text_candidate(content_item),
                 )
-                if content_type in {"output_text", "text"}:
-                    text = (
-                        content_item.get("text")
-                        if isinstance(content_item, dict)
-                        else getattr(content_item, "text", None)
-                    )
-                    if isinstance(text, str) and text.strip():
-                        chunks.append(text)
+
+            for field in _RESPONSES_JSON_CONTENT_FIELDS:
+                _append_unique(
+                    json_chunks,
+                    json_seen,
+                    _extract_json_candidate(_read_response_field(content_item, field)),
+                )
+
+    if text_chunks:
+        return "".join(text_chunks)
+    if json_chunks:
+        return json_chunks[0]
+
+    refusal_only = bool(refusal_chunks)
+    if refusal_only:
+        refusal_text = " | ".join(chunk for chunk in refusal_chunks if chunk.strip())
+        raise ValueError(f"AI provider refusal: {refusal_text or 'request refused'}")
+
+    raise ValueError(
+        _format_responses_parse_error(
+            item_types=item_types,
+            content_types=content_types,
+            saw_refusal=bool(refusal_chunks),
+            saw_output=bool(output_items),
+        )
+    )
+
+
+def _read_response_field(obj: Any, key: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def _as_response_items(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def _response_type_label(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        label = value.strip()
+        return label or None
+    return str(value)
+
+
+def _extract_text_candidate(value: Any, *, depth: int = 0) -> str | None:
+    if value is None or depth > 5:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text if text else None
+    if isinstance(value, (list, tuple)):
+        chunks = [
+            chunk
+            for chunk in (_extract_text_candidate(item, depth=depth + 1) for item in value)
+            if chunk is not None
+        ]
         if chunks:
             return "".join(chunks)
+        return None
+    if isinstance(value, dict):
+        for key in (
+            "value",
+            "text",
+            "output_text",
+            "summary_text",
+            "reasoning_text",
+            "summary",
+            "reasoning",
+            "content",
+            "message",
+        ):
+            nested = value.get(key)
+            extracted = _extract_text_candidate(nested, depth=depth + 1)
+            if extracted is not None:
+                return extracted
+        return None
 
-    raise ValueError("AI parse error: Responses API output contained no text content.")
+    for attr in (
+        "value",
+        "text",
+        "output_text",
+        "summary_text",
+        "reasoning_text",
+        "summary",
+        "reasoning",
+        "content",
+        "message",
+    ):
+        nested = getattr(value, attr, None)
+        if nested is None:
+            continue
+        extracted = _extract_text_candidate(nested, depth=depth + 1)
+        if extracted is not None:
+            return extracted
+    return None
+
+
+def _extract_json_candidate(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        try:
+            dumped = model_dump(exclude_none=True)
+        except TypeError:
+            dumped = model_dump()
+        if isinstance(dumped, (dict, list)):
+            return json.dumps(dumped, ensure_ascii=False)
+    return None
+
+
+def _append_unique(buffer: list[str], seen: set[str], value: str | None) -> None:
+    if value is None:
+        return
+    if value in seen:
+        return
+    seen.add(value)
+    buffer.append(value)
+
+
+def _format_responses_parse_error(
+    *,
+    item_types: set[str],
+    content_types: set[str],
+    saw_refusal: bool,
+    saw_output: bool,
+) -> str:
+    item_types_label = ", ".join(sorted(item_types)) if item_types else "<none>"
+    content_types_label = ", ".join(sorted(content_types)) if content_types else "<none>"
+    return (
+        "AI parse error: Responses API output had no extractable text or JSON content "
+        f"(saw_output={saw_output}, item_types={item_types_label}, "
+        f"content_types={content_types_label}, saw_refusal={saw_refusal})."
+    )
 
 
 def _is_mode_recoverable_error(message: str) -> bool:

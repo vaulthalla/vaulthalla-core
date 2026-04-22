@@ -18,6 +18,11 @@ from tools.release.changelog.ai.config import (
 )
 from tools.release.changelog.ai.contracts.polish import AIPolishResult
 from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
+from tools.release.changelog.ai.failure_artifacts import (
+    collect_provider_failure_evidence,
+    provider_response_observed,
+    write_failure_artifact,
+)
 from tools.release.changelog.ai.providers import (
     ProviderPreflightResult,
     build_structured_json_provider,
@@ -790,6 +795,7 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
     _print_status("Changelog ai-release stage: generate AI draft artifact")
     draft_args = argparse.Namespace(
         repo_root=args.repo_root,
+        changelog_command="ai-release",
         since_tag=args.since_tag,
         output=draft_output,
         save_json=args.save_json,
@@ -872,6 +878,20 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
                 max_output_tokens_policy=triage_stage_cfg.max_output_tokens,
             )
         except Exception as exc:
+            _capture_stage_failure_artifact(
+                repo_root=repo_root,
+                args=args,
+                stage="triage",
+                pipeline_config=pipeline_config,
+                provider=triage_provider,
+                exc=exc,
+                stage_settings={
+                    "structured_mode": triage_stage_cfg.structured_mode,
+                    "reasoning_effort": triage_stage_cfg.reasoning_effort,
+                    "temperature": triage_stage_cfg.temperature,
+                    "max_output_tokens_policy": str(triage_stage_cfg.max_output_tokens),
+                },
+            )
             raise _stage_failure("Triage", exc) from exc
         draft_input = build_triage_ir_payload(triage_result)
         source_kind = "triage"
@@ -892,6 +912,21 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             max_output_tokens_policy=draft_stage_cfg.max_output_tokens,
         )
     except Exception as exc:
+        _capture_stage_failure_artifact(
+            repo_root=repo_root,
+            args=args,
+            stage="draft",
+            pipeline_config=pipeline_config,
+            provider=draft_provider,
+            exc=exc,
+            stage_settings={
+                "structured_mode": draft_stage_cfg.structured_mode,
+                "reasoning_effort": draft_stage_cfg.reasoning_effort,
+                "temperature": draft_stage_cfg.temperature,
+                "max_output_tokens_policy": str(draft_stage_cfg.max_output_tokens),
+                "source_kind": source_kind,
+            },
+        )
         raise _stage_failure("Draft", exc) from exc
     polish_result: AIPolishResult | None = None
 
@@ -908,6 +943,20 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
                 max_output_tokens_policy=polish_stage_cfg.max_output_tokens,
             )
         except Exception as exc:
+            _capture_stage_failure_artifact(
+                repo_root=repo_root,
+                args=args,
+                stage="polish",
+                pipeline_config=pipeline_config,
+                provider=polish_provider,
+                exc=exc,
+                stage_settings={
+                    "structured_mode": polish_stage_cfg.structured_mode,
+                    "reasoning_effort": polish_stage_cfg.reasoning_effort,
+                    "temperature": polish_stage_cfg.temperature,
+                    "max_output_tokens_policy": str(polish_stage_cfg.max_output_tokens),
+                },
+            )
             raise _stage_failure("Polish", exc) from exc
         final_markdown = render_polish_markdown(polish_result)
 
@@ -1219,6 +1268,48 @@ def _stage_failure(stage: str, exc: Exception) -> ValueError:
     if field is not None:
         return ValueError(f"{stage} stage failed: missing required field `{field}`. {message}")
     return ValueError(f"{stage} stage failed: {message}")
+
+
+def _capture_stage_failure_artifact(
+    *,
+    repo_root: Path,
+    args: argparse.Namespace,
+    stage: AIStageName,
+    pipeline_config: AIPipelineConfig,
+    provider: StructuredJSONProvider,
+    exc: Exception,
+    stage_settings: dict[str, object],
+) -> None:
+    provider_evidence = collect_provider_failure_evidence(provider)
+    if not provider_response_observed(provider_evidence):
+        return
+    stage_provider_cfg = pipeline_config.provider_config_for_stage(stage)
+    mode_value = stage_settings.get("structured_mode")
+    if mode_value is None and isinstance(provider_evidence, dict):
+        resolved = provider_evidence.get("resolved_settings")
+        if isinstance(resolved, dict):
+            mode_value = resolved.get("structured_mode")
+    try:
+        artifact = write_failure_artifact(
+            repo_root=repo_root,
+            command=getattr(args, "changelog_command", None),
+            stage=stage,
+            ai_profile=getattr(args, "ai_profile", None),
+            provider_key=stage_provider_cfg.kind,
+            model=stage_provider_cfg.model,
+            structured_mode=str(mode_value or "unknown-mode"),
+            normalized_request_settings={
+                "stage": stage,
+                "provider_kind": stage_provider_cfg.kind,
+                "model": stage_provider_cfg.model,
+                **stage_settings,
+            },
+            error=exc,
+            provider_evidence=provider_evidence,
+        )
+    except Exception:
+        return
+    _print_status(f"Wrote AI failure evidence to {artifact}")
 
 
 def _extract_missing_field(message: str) -> str | None:

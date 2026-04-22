@@ -17,6 +17,11 @@ from tools.release.changelog.ai.config import (
 )
 from tools.release.changelog.ai.contracts.polish import AIPolishResult
 from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
+from tools.release.changelog.ai.failure_artifacts import (
+    collect_provider_failure_evidence,
+    provider_response_observed,
+    write_failure_artifact,
+)
 from tools.release.changelog.ai.providers import build_structured_json_provider, run_provider_preflight
 from tools.release.changelog.ai.providers.base import StructuredJSONProvider
 from tools.release.changelog.ai.render.markdown import render_draft_markdown, render_polish_markdown
@@ -420,6 +425,7 @@ def _generate_openai_release_changelog(
     )
     logger(f"Attempting OpenAI profile `{settings.openai_profile}`.")
     return _run_release_ai_pipeline(
+        repo_root=repo_root,
         payload=payload,
         pipeline=pipeline,
         logger=logger,
@@ -451,6 +457,7 @@ def _generate_local_release_changelog(
         logger("Using RELEASE_LOCAL_LLM_API_KEY for local OpenAI-compatible gateway authentication.")
     logger(f"Attempting local profile `{settings.local_profile}`.")
     content = _run_release_ai_pipeline(
+        repo_root=repo_root,
         payload=payload,
         pipeline=pipeline,
         local_api_key=settings.local_api_key,
@@ -461,6 +468,7 @@ def _generate_local_release_changelog(
 
 def _run_release_ai_pipeline(
     *,
+    repo_root: Path,
     payload: dict,
     pipeline: AIPipelineConfig,
     local_api_key: str | None = None,
@@ -495,6 +503,19 @@ def _run_release_ai_pipeline(
                 max_output_tokens_policy=triage_cfg.max_output_tokens,
             )
         except Exception as exc:
+            _capture_release_stage_failure_artifact(
+                repo_root=repo_root,
+                pipeline=pipeline,
+                stage="triage",
+                provider=providers["triage"],
+                exc=exc,
+                stage_settings={
+                    "structured_mode": triage_cfg.structured_mode,
+                    "reasoning_effort": triage_cfg.reasoning_effort,
+                    "temperature": triage_cfg.temperature,
+                    "max_output_tokens_policy": str(triage_cfg.max_output_tokens),
+                },
+            )
             raise ValueError(f"Triage stage failed: {exc}") from exc
         draft_input = build_triage_ir_payload(triage_result)
         source_kind = "triage"
@@ -511,6 +532,20 @@ def _run_release_ai_pipeline(
             max_output_tokens_policy=draft_cfg.max_output_tokens,
         )
     except Exception as exc:
+        _capture_release_stage_failure_artifact(
+            repo_root=repo_root,
+            pipeline=pipeline,
+            stage="draft",
+            provider=providers["draft"],
+            exc=exc,
+            stage_settings={
+                "structured_mode": draft_cfg.structured_mode,
+                "reasoning_effort": draft_cfg.reasoning_effort,
+                "temperature": draft_cfg.temperature,
+                "max_output_tokens_policy": str(draft_cfg.max_output_tokens),
+                "source_kind": source_kind,
+            },
+        )
         raise ValueError(f"Draft stage failed: {exc}") from exc
 
     polish_result: AIPolishResult | None = None
@@ -526,6 +561,19 @@ def _run_release_ai_pipeline(
                 max_output_tokens_policy=polish_cfg.max_output_tokens,
             )
         except Exception as exc:
+            _capture_release_stage_failure_artifact(
+                repo_root=repo_root,
+                pipeline=pipeline,
+                stage="polish",
+                provider=providers["polish"],
+                exc=exc,
+                stage_settings={
+                    "structured_mode": polish_cfg.structured_mode,
+                    "reasoning_effort": polish_cfg.reasoning_effort,
+                    "temperature": polish_cfg.temperature,
+                    "max_output_tokens_policy": str(polish_cfg.max_output_tokens),
+                },
+            )
             raise ValueError(f"Polish stage failed: {exc}") from exc
 
     if polish_result is not None:
@@ -578,6 +626,46 @@ def _build_stage_providers(
         stage_providers[stage] = provider
 
     return stage_providers
+
+
+def _capture_release_stage_failure_artifact(
+    *,
+    repo_root: Path,
+    pipeline: AIPipelineConfig,
+    stage: AIStageName,
+    provider: StructuredJSONProvider,
+    exc: Exception,
+    stage_settings: dict[str, object],
+) -> None:
+    provider_evidence = collect_provider_failure_evidence(provider)
+    if not provider_response_observed(provider_evidence):
+        return
+    provider_cfg = pipeline.provider_config_for_stage(stage)
+    mode_value = stage_settings.get("structured_mode")
+    if mode_value is None and isinstance(provider_evidence, dict):
+        resolved = provider_evidence.get("resolved_settings")
+        if isinstance(resolved, dict):
+            mode_value = resolved.get("structured_mode")
+    try:
+        _ = write_failure_artifact(
+            repo_root=repo_root,
+            command="release",
+            stage=stage,
+            ai_profile=pipeline.profile_slug,
+            provider_key=provider_cfg.kind,
+            model=provider_cfg.model,
+            structured_mode=str(mode_value or "unknown-mode"),
+            normalized_request_settings={
+                "stage": stage,
+                "provider_kind": provider_cfg.kind,
+                "model": provider_cfg.model,
+                **stage_settings,
+            },
+            error=exc,
+            provider_evidence=provider_evidence,
+        )
+    except Exception:
+        return
 
 
 def _parse_release_ai_mode(raw: str | None) -> ReleaseAIMode:

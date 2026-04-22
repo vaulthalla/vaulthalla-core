@@ -243,6 +243,85 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertNotIn("text", sdk.responses.calls[2])
         self.assertEqual(client.last_structured_mode_used, "prompt_json")
 
+    def test_hosted_gpt5_skips_json_object_fallback_and_uses_prompt_json(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON, recoverable_error_formats={"json_schema"})
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-5-nano")
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="strict_json_schema",
+            reasoning_effort="low",
+            max_output_tokens=600,
+        )
+
+        self.assertEqual(len(sdk.responses.calls), 2)
+        self.assertEqual(sdk.responses.calls[0]["text"]["format"]["type"], "json_schema")
+        self.assertIn("reasoning", sdk.responses.calls[0])
+        self.assertNotIn("text", sdk.responses.calls[1])
+        self.assertNotIn("reasoning", sdk.responses.calls[1])
+        self.assertEqual(sdk.responses.calls[1]["max_output_tokens"], 1200)
+        self.assertEqual(client.last_structured_mode_used, "prompt_json")
+
+    def test_hosted_gpt5_explicit_json_object_mode_is_demoted_to_prompt_json(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-5-mini")
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="json_object",
+            reasoning_effort="low",
+            max_output_tokens=450,
+        )
+
+        self.assertEqual(len(sdk.responses.calls), 1)
+        call = sdk.responses.calls[0]
+        self.assertNotIn("text", call)
+        self.assertNotIn("reasoning", call)
+        self.assertEqual(call["max_output_tokens"], 1200)
+        self.assertEqual(client.last_structured_mode_used, "prompt_json")
+
+    def test_hosted_gpt5_triage_prefers_prompt_json_with_low_reasoning_and_higher_floor(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-5-nano")
+
+        _ = client.generate_structured_json(
+            stage="triage",
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="strict_json_schema",
+            reasoning_effort="low",
+            max_output_tokens=600,
+        )
+
+        self.assertEqual(len(sdk.responses.calls), 1)
+        call = sdk.responses.calls[0]
+        self.assertNotIn("text", call)
+        self.assertEqual(call["reasoning"]["effort"], "low")
+        self.assertEqual(call["max_output_tokens"], 1800)
+        self.assertEqual(client.last_structured_mode_used, "prompt_json")
+
+    def test_hosted_gpt5_triage_defaults_reasoning_to_low_when_unset(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-5-nano")
+
+        _ = client.generate_structured_json(
+            stage="triage",
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="prompt_json",
+            max_output_tokens=500,
+        )
+
+        call = sdk.responses.calls[0]
+        self.assertEqual(call["reasoning"]["effort"], "low")
+        self.assertEqual(call["max_output_tokens"], 1800)
+
     def test_non_recoverable_transport_error_does_not_fallback(self) -> None:
         sdk = _FakeSDKWithResponses("{}", hard_error=RuntimeError("network timeout"))
         client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
@@ -456,6 +535,28 @@ class OpenAIProviderTests(unittest.TestCase):
         message = str(exc.exception)
         self.assertIn("item_types=message", message)
         self.assertIn("content_types=output_image", message)
+
+    def test_responses_parse_error_reports_incomplete_reason(self) -> None:
+        sdk = _FakeSDKWithResponses(
+            None,
+            response_payload={
+                "status": "incomplete",
+                "incomplete_details": {"reason": "max_output_tokens"},
+                "output": [{"type": "reasoning"}],
+            },
+        )
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        with self.assertRaises(ValueError) as exc:
+            client.generate_structured_json(
+                system_prompt="sys",
+                user_prompt="usr",
+                json_schema={"type": "object"},
+                structured_mode="prompt_json",
+            )
+        message = str(exc.exception)
+        self.assertIn("response_status=incomplete", message)
+        self.assertIn("incomplete_reason=max_output_tokens", message)
 
 
 if __name__ == "__main__":

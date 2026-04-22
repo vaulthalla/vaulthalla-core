@@ -44,6 +44,7 @@ def run_triage_stage(
         input_size=estimate_input_size_units(system_prompt, user_prompt),
     )
     structured = active_provider.generate_structured_json(
+        stage="triage",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         json_schema=AI_TRIAGE_RESPONSE_JSON_SCHEMA,

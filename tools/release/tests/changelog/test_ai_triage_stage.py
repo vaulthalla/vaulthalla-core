@@ -39,8 +39,9 @@ class AITriageStageTests(unittest.TestCase):
         self.assertEqual(triage.version, "2.4.0")
         self.assertEqual(len(fake.calls), 1)
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "triage")
         self.assertIn("json_schema", call)
-        self.assertIn("Release payload", call["user_prompt"])
+        self.assertIn("Release payload (compact projection)", call["user_prompt"])
         self.assertIn("vaulthalla.release.ai_payload.v1", call["user_prompt"])
 
     def test_run_triage_stage_rejects_invalid_response(self) -> None:
@@ -70,6 +71,7 @@ class AITriageStageTests(unittest.TestCase):
             max_output_tokens_policy=123,
         )
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "triage")
         self.assertEqual(call["reasoning_effort"], "low")
         self.assertEqual(call["structured_mode"], "prompt_json")
         self.assertEqual(call["temperature"], 0.0)

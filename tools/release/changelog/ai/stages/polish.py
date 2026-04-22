@@ -47,6 +47,7 @@ def run_polish_stage(
         input_size=estimate_input_size_units(system_prompt, user_prompt),
     )
     structured = active_provider.generate_structured_json(
+        stage="polish",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         json_schema=AI_POLISH_RESPONSE_JSON_SCHEMA,

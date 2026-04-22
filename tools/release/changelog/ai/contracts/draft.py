@@ -7,7 +7,7 @@ from typing import Any
 AI_DRAFT_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["title", "summary", "sections"],
+    "required": ["title", "summary", "sections", "notes"],
     "properties": {
         "title": {
             "type": "string",

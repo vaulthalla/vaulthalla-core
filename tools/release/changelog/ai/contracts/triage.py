@@ -11,7 +11,14 @@ _OPTIONAL_CATEGORY_STRING_ARRAY_FIELDS = ("important_files", "retained_snippets"
 AI_TRIAGE_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["schema_version", "version", "summary_points", "categories"],
+    "required": [
+        "schema_version",
+        "version",
+        "summary_points",
+        "categories",
+        "dropped_noise",
+        "caution_notes",
+    ],
     "properties": {
         "schema_version": {"type": "string", "const": AI_TRIAGE_SCHEMA_VERSION},
         "version": {"type": "string", "minLength": 1, "maxLength": 80},
@@ -35,6 +42,7 @@ AI_TRIAGE_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
                     "key_points",
                     "important_files",
                     "retained_snippets",
+                    "caution_notes",
                 ],
                 "properties": {
                     "name": {"type": "string", "minLength": 1, "maxLength": 60},

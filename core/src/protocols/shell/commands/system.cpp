@@ -6,7 +6,7 @@
 #include "runtime/Manager.hpp"
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
-#include "protocols/shell/types.hpp"
+#include "protocols/shell/ExecResult.hpp"
 
 #include <version.h>
 
@@ -47,7 +47,7 @@ static std::string shellQuote(const std::string& s) {
     return out;
 }
 
-static vh::protocols::shell::ExecResult runCapture(const std::string& command) {
+static ExecResult runCapture(const std::string& command) {
     const auto wrapped = command + " 2>&1";
     std::array<char, 4096> buf{};
     std::string output;

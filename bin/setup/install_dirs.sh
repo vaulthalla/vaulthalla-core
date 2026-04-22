@@ -75,6 +75,9 @@ if [[ -d "$ROOT_DIR/deploy/psql" ]]; then
   sudo rsync -a "$ROOT_DIR/deploy/psql/" "$DATA_DIR/psql/"
 fi
 
+echo "🌐 Installing nginx template payload..."
+install_file "$ROOT_DIR/deploy/nginx/vaulthalla.conf" "$DATA_DIR/nginx/vaulthalla" 0644
+
 echo "🧰 Installing lifecycle utility..."
 install_file "$ROOT_DIR/deploy/lifecycle/main.py" "$LIBEXEC_DIR/lifecycle" 0755
 

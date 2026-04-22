@@ -21,7 +21,7 @@ PENDING_DB_PASSWORD_FILE = Path("/run/vaulthalla/db_password")
 
 DEFAULT_CONFIG_PATH = Path("/etc/vaulthalla/config.yaml")
 DEFAULT_SCHEMA_DIR = Path("/usr/share/vaulthalla/psql")
-DEFAULT_NGINX_TEMPLATE = Path("/usr/share/vaulthalla/nginx/vaulthalla.conf")
+DEFAULT_NGINX_TEMPLATE = Path("/usr/share/vaulthalla/nginx/vaulthalla")
 
 NGINX_SITE_AVAILABLE = Path("/etc/nginx/sites-available/vaulthalla")
 NGINX_SITE_ENABLED = Path("/etc/nginx/sites-enabled/vaulthalla")

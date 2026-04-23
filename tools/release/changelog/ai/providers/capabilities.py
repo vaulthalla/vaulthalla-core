@@ -119,9 +119,10 @@ def resolve_request_parameter_capabilities(
     provider_kind: AIProviderKind,
     model: str,
 ) -> RequestParameterCapabilities:
-    normalized_model = model.strip().lower()
     supports_temperature = True
+    normalized_model = model.strip().lower()
     if provider_kind == "openai" and normalized_model.startswith("gpt-5"):
+        # GPT-5 reasoning flows are tuned via `reasoning` controls, not `temperature`.
         supports_temperature = False
     return RequestParameterCapabilities(
         provider_kind=provider_kind,

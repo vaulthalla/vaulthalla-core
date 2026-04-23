@@ -1,12 +1,12 @@
 vaulthalla (0.34.0-1) unstable; urgency=medium
 
-  - Added buffer release logic and improved exception management in FUSE service.
-  - Implemented active client closure and improved the shutdown process.
-  - Expanded system command implementation in shell protocols.
-  - Enhanced install script with temporary source file handling and improved repository configuration.
-  - Updated key file URL to .asc format and improved key handling.
-  - Added new build and release badges to README.md.
-  - Added CLI setup instructions and convenience scripts to installation documentation.
-  - Removed unchanged Debian examples and scripts (prerm.ex, preinst.ex).
+  - update nginx template path
+  - enhance installation scripts
+  - refactor command argument handling
+  - Important files: debian/rules; debian/install; debian/prerm.ex
+  - Retained snippet: debian/prerm.ex
+  - Caution: packaging changes require verification
+  - add raw payload capture for artifacts
+  - update output structure for hosted schema
 
- -- Cooper Larson <cooper@valkyrianlabs.com>  Wed, 22 Apr 2026 17:04:26 +0000
+ -- Cooper Larson <cooper@valkyrianlabs.com>  Thu, 23 Apr 2026 15:40:45 +0000

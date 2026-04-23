@@ -118,8 +118,10 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["text"]["format"]["type"], "json_schema")
         self.assertTrue(call["text"]["format"]["strict"])
         self.assertEqual(call["text"]["format"]["schema"], {"type": "object"})
-        self.assertEqual(call["input"][0]["role"], "system")
-        self.assertEqual(call["input"][1]["role"], "user")
+        self.assertEqual(call["instructions"], "sys")
+        self.assertEqual(call["input"][0]["role"], "user")
+        self.assertIn("extra_headers", call)
+        self.assertIn("X-Client-Request-Id", call["extra_headers"])
         self.assertNotIn("reasoning", call)
 
     def test_reasoning_effort_is_forwarded_when_requested(self) -> None:
@@ -152,7 +154,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["temperature"], 0.25)
         self.assertEqual(call["max_output_tokens"], 1024)
 
-    def test_hosted_gpt5_omits_temperature_but_keeps_max_tokens(self) -> None:
+    def test_hosted_gpt5_omits_temperature_and_keeps_max_tokens(self) -> None:
         sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-5-mini")
 
@@ -195,7 +197,7 @@ class OpenAIProviderTests(unittest.TestCase):
 
         call = sdk.responses.calls[0]
         self.assertNotIn("text", call)
-        self.assertIn("valid JSON object", call["input"][0]["content"][0]["text"])
+        self.assertIn("valid JSON object", call["instructions"])
 
     def test_provider_exposes_capabilities(self) -> None:
         sdk = _FakeSDKClient(_FakeResponse("{}"))
@@ -225,6 +227,32 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(request["reasoning"]["effort"], "medium")
         self.assertEqual(request["temperature"], 0.1)
         self.assertEqual(request["max_output_tokens"], 777)
+
+    def test_failure_evidence_snapshot_includes_request_diagnostics(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-test-mini")
+
+        _ = client.generate_structured_json(
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            reasoning_effort="medium",
+            structured_mode="strict_json_schema",
+            temperature=0.1,
+            max_output_tokens=777,
+        )
+        evidence = client.failure_evidence_snapshot()
+        self.assertIsNotNone(evidence)
+        assert evidence is not None
+        attempt = evidence["attempts"][0]
+        diagnostics = attempt["request_diagnostics"]
+        self.assertEqual(diagnostics["endpoint_path"], "/v1/responses")
+        self.assertEqual(diagnostics["instruction_channel"], "instructions")
+        self.assertTrue(diagnostics["reasoning_present"])
+        self.assertTrue(diagnostics["temperature_present"])
+        self.assertEqual(diagnostics["request_body"]["temperature"], 0.1)
+        self.assertEqual(diagnostics["request_body"]["reasoning"]["effort"], "medium")
+        self.assertIn("x_client_request_id", attempt["response_diagnostics"])
 
     def test_fallback_order_is_deterministic_when_structured_modes_fail(self) -> None:
         sdk = _FakeSDKWithResponses(self._VALID_JSON, recoverable_error_formats={"json_schema", "json_object"})
@@ -260,7 +288,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(sdk.responses.calls[0]["text"]["format"]["type"], "json_schema")
         self.assertIn("reasoning", sdk.responses.calls[0])
         self.assertNotIn("text", sdk.responses.calls[1])
-        self.assertNotIn("reasoning", sdk.responses.calls[1])
+        self.assertEqual(sdk.responses.calls[1]["reasoning"]["effort"], "low")
         self.assertEqual(sdk.responses.calls[1]["max_output_tokens"], 1200)
         self.assertEqual(client.last_structured_mode_used, "prompt_json")
 
@@ -280,7 +308,7 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(len(sdk.responses.calls), 1)
         call = sdk.responses.calls[0]
         self.assertNotIn("text", call)
-        self.assertNotIn("reasoning", call)
+        self.assertEqual(call["reasoning"]["effort"], "low")
         self.assertEqual(call["max_output_tokens"], 1200)
         self.assertEqual(client.last_structured_mode_used, "prompt_json")
 

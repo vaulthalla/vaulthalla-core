@@ -217,6 +217,18 @@ def _reduce_provider_evidence(
                     list_limit=_JSON_LIST_LIMIT,
                     string_limit=_JSON_STRING_LIMIT,
                 ),
+                "request_diagnostics": _sanitize_for_json(
+                    item.get("request_diagnostics"),
+                    depth_limit=_JSON_MAX_DEPTH,
+                    list_limit=_JSON_LIST_LIMIT,
+                    string_limit=_JSON_STRING_LIMIT,
+                ),
+                "response_diagnostics": _sanitize_for_json(
+                    item.get("response_diagnostics"),
+                    depth_limit=_JSON_MAX_DEPTH,
+                    list_limit=_JSON_LIST_LIMIT,
+                    string_limit=_JSON_STRING_LIMIT,
+                ),
                 "content_preview": _sanitize_for_json(
                     item.get("content_preview"),
                     depth_limit=_JSON_MAX_DEPTH,

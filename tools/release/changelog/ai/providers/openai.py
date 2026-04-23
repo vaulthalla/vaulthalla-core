@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from typing import Any
+from uuid import uuid4
 
 from tools.release.changelog.ai.config import (
     AIProviderKind,
@@ -53,6 +54,9 @@ _EVIDENCE_LIST_LIMIT = 12
 _HOSTED_PROMPT_JSON_MIN_OUTPUT_TOKENS = 1200
 _HOSTED_TRIAGE_STRICT_MIN_OUTPUT_TOKENS = 1400
 _HOSTED_TRIAGE_PROMPT_JSON_MIN_OUTPUT_TOKENS = 2200
+_DEFAULT_OPENAI_BASE_URL = "https://api.openai.com"
+_RESPONSES_ENDPOINT_PATH = "/v1/responses"
+_CHAT_COMPLETIONS_ENDPOINT_PATH = "/v1/chat/completions"
 _SECRET_KEY_EXACT_NAMES = {
     "api_key",
     "authorization",
@@ -89,6 +93,8 @@ class _AttemptFailure(Exception):
         response_payload_debug: Any | None = None,
         request_payload_raw: Any | None = None,
         response_payload_raw: Any | None = None,
+        request_diagnostics: dict[str, Any] | None = None,
+        response_diagnostics: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.transport = transport
@@ -99,6 +105,8 @@ class _AttemptFailure(Exception):
         self.response_payload_debug = response_payload_debug
         self.request_payload_raw = request_payload_raw
         self.response_payload_raw = response_payload_raw
+        self.request_diagnostics = request_diagnostics
+        self.response_diagnostics = response_diagnostics
 
 
 class _GenerationOutcome:
@@ -113,6 +121,8 @@ class _GenerationOutcome:
         response_payload_debug: Any,
         request_payload_raw: Any,
         response_payload_raw: Any,
+        request_diagnostics: dict[str, Any],
+        response_diagnostics: dict[str, Any] | None,
     ) -> None:
         self.transport = transport
         self.request_payload = request_payload
@@ -122,6 +132,8 @@ class _GenerationOutcome:
         self.response_payload_debug = response_payload_debug
         self.request_payload_raw = request_payload_raw
         self.response_payload_raw = response_payload_raw
+        self.request_diagnostics = request_diagnostics
+        self.response_diagnostics = response_diagnostics
 
 
 class OpenAIProvider:
@@ -291,6 +303,8 @@ class OpenAIProvider:
                 attempt["request_payload_debug"] = outcome.request_payload_debug
                 attempt["request_payload_raw"] = outcome.request_payload_raw
                 attempt["response_payload_raw"] = outcome.response_payload_raw
+                attempt["request_diagnostics"] = outcome.request_diagnostics
+                attempt["response_diagnostics"] = outcome.response_diagnostics
                 attempt["content_preview"] = _truncate_text(outcome.content)
                 attempt["content_length"] = len(outcome.content)
                 try:
@@ -337,6 +351,8 @@ class OpenAIProvider:
                 attempt["request_payload_debug"] = exc.request_payload_debug
                 attempt["request_payload_raw"] = exc.request_payload_raw
                 attempt["response_payload_raw"] = exc.response_payload_raw
+                attempt["request_diagnostics"] = exc.request_diagnostics
+                attempt["response_diagnostics"] = exc.response_diagnostics
             except Exception as exc:
                 message = str(exc)
                 attempt["error"] = message
@@ -424,6 +440,7 @@ class OpenAIProvider:
             raise ValueError(
                 "AI transport error: Hosted OpenAI provider requires Responses API support on the active OpenAI SDK/client."
             )
+        client_request_id = _new_client_request_id()
         parameter_capabilities = resolve_request_parameter_capabilities(
             provider_kind="openai",
             model=self.model,
@@ -439,9 +456,40 @@ class OpenAIProvider:
             max_output_tokens=max_output_tokens,
             include_temperature=parameter_capabilities.supports_temperature,
         )
+        request_payload["extra_headers"] = {"X-Client-Request-Id": client_request_id}
+        request_diagnostics = _build_request_diagnostics(
+            transport="responses",
+            endpoint_path=_RESPONSES_ENDPOINT_PATH,
+            base_url=self.base_url,
+            request_payload=request_payload,
+            instruction_channel="instructions",
+            instruction_role=None,
+            client_request_id=client_request_id,
+            response_parser="responses_output_text",
+        )
         request_payload_raw = _serialize_payload_for_failure_capture(request_payload)
+        raw_create = _resolve_raw_create(responses)
+        response_diagnostics: dict[str, Any] | None = None
         try:
-            response = create(**request_payload)
+            if callable(raw_create):
+                raw_response = raw_create(**request_payload)
+                response = _parse_raw_response(raw_response)
+                response_diagnostics = _extract_response_diagnostics(
+                    transport="responses",
+                    endpoint_path=_RESPONSES_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    raw_response=raw_response,
+                    client_request_id=client_request_id,
+                )
+            else:
+                response = create(**request_payload)
+                response_diagnostics = _extract_response_diagnostics(
+                    transport="responses",
+                    endpoint_path=_RESPONSES_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    raw_response=response,
+                    client_request_id=client_request_id,
+                )
         except Exception as exc:
             raise _AttemptFailure(
                 f"AI transport error: Responses API request failed: {exc}",
@@ -450,6 +498,14 @@ class OpenAIProvider:
                 response_received=False,
                 request_payload_debug=_sanitize_for_evidence(request_payload),
                 request_payload_raw=request_payload_raw,
+                request_diagnostics=request_diagnostics,
+                response_diagnostics=_extract_response_diagnostics_from_exception(
+                    exc=exc,
+                    transport="responses",
+                    endpoint_path=_RESPONSES_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    client_request_id=client_request_id,
+                ),
             ) from exc
 
         response_summary = _summarize_responses_response(response)
@@ -467,6 +523,8 @@ class OpenAIProvider:
                 response_payload_debug=_sanitize_for_evidence(response),
                 request_payload_raw=request_payload_raw,
                 response_payload_raw=response_payload_raw,
+                request_diagnostics=request_diagnostics,
+                response_diagnostics=response_diagnostics,
             ) from exc
         return _GenerationOutcome(
             transport="responses",
@@ -477,6 +535,8 @@ class OpenAIProvider:
             response_payload_debug=_sanitize_for_evidence(response),
             request_payload_raw=request_payload_raw,
             response_payload_raw=response_payload_raw,
+            request_diagnostics=request_diagnostics,
+            response_diagnostics=response_diagnostics,
         )
 
     def _generate_openai_compatible_output(
@@ -490,6 +550,7 @@ class OpenAIProvider:
         temperature: float | None,
         max_output_tokens: int | None,
     ) -> _GenerationOutcome:
+        client_request_id = _new_client_request_id()
         request_payload = self._build_chat_request(
             model=self.model,
             system_prompt=system_prompt,
@@ -500,9 +561,49 @@ class OpenAIProvider:
             temperature=temperature,
             max_output_tokens=max_output_tokens,
         )
+        instruction_role = None
+        messages = request_payload.get("messages")
+        if isinstance(messages, list) and messages:
+            first_message = messages[0]
+            if isinstance(first_message, dict):
+                role = first_message.get("role")
+                if isinstance(role, str):
+                    instruction_role = role
+        request_payload["extra_headers"] = {"X-Client-Request-Id": client_request_id}
+        request_diagnostics = _build_request_diagnostics(
+            transport="chat_completions",
+            endpoint_path=_CHAT_COMPLETIONS_ENDPOINT_PATH,
+            base_url=self.base_url,
+            request_payload=request_payload,
+            instruction_channel="messages",
+            instruction_role=instruction_role,
+            client_request_id=client_request_id,
+            response_parser="chat_message_content",
+        )
         request_payload_raw = _serialize_payload_for_failure_capture(request_payload)
+        completions = getattr(getattr(self._client, "chat", None), "completions", None)
+        raw_create = _resolve_raw_create(completions)
+        response_diagnostics: dict[str, Any] | None = None
         try:
-            response = self._client.chat.completions.create(**request_payload)
+            if callable(raw_create):
+                raw_response = raw_create(**request_payload)
+                response = _parse_raw_response(raw_response)
+                response_diagnostics = _extract_response_diagnostics(
+                    transport="chat_completions",
+                    endpoint_path=_CHAT_COMPLETIONS_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    raw_response=raw_response,
+                    client_request_id=client_request_id,
+                )
+            else:
+                response = self._client.chat.completions.create(**request_payload)
+                response_diagnostics = _extract_response_diagnostics(
+                    transport="chat_completions",
+                    endpoint_path=_CHAT_COMPLETIONS_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    raw_response=response,
+                    client_request_id=client_request_id,
+                )
         except Exception as exc:
             raise _AttemptFailure(
                 f"AI transport error: Chat Completions request failed: {exc}",
@@ -511,6 +612,14 @@ class OpenAIProvider:
                 response_received=False,
                 request_payload_debug=_sanitize_for_evidence(request_payload),
                 request_payload_raw=request_payload_raw,
+                request_diagnostics=request_diagnostics,
+                response_diagnostics=_extract_response_diagnostics_from_exception(
+                    exc=exc,
+                    transport="chat_completions",
+                    endpoint_path=_CHAT_COMPLETIONS_ENDPOINT_PATH,
+                    base_url=self.base_url,
+                    client_request_id=client_request_id,
+                ),
             ) from exc
 
         response_summary = _summarize_chat_response(response)
@@ -528,6 +637,8 @@ class OpenAIProvider:
                 response_payload_debug=_sanitize_for_evidence(response),
                 request_payload_raw=request_payload_raw,
                 response_payload_raw=response_payload_raw,
+                request_diagnostics=request_diagnostics,
+                response_diagnostics=response_diagnostics,
             ) from exc
         return _GenerationOutcome(
             transport="chat_completions",
@@ -538,6 +649,8 @@ class OpenAIProvider:
             response_payload_debug=_sanitize_for_evidence(response),
             request_payload_raw=request_payload_raw,
             response_payload_raw=response_payload_raw,
+            request_diagnostics=request_diagnostics,
+            response_diagnostics=response_diagnostics,
         )
 
     @staticmethod
@@ -552,8 +665,9 @@ class OpenAIProvider:
         temperature: float | None,
         max_output_tokens: int | None,
     ) -> dict[str, Any]:
+        instruction_role = _resolve_chat_instruction_role(model=model)
         messages = [
-            {"role": "system", "content": system_prompt},
+            {"role": instruction_role, "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
         request: dict[str, Any] = {
@@ -607,11 +721,8 @@ class OpenAIProvider:
 
         request: dict[str, Any] = {
             "model": model,
+            "instructions": effective_system_prompt,
             "input": [
-                {
-                    "role": "developer",
-                    "content": [{"type": "input_text", "text": effective_system_prompt}],
-                },
                 {
                     "role": "user",
                     "content": [{"type": "input_text", "text": user_prompt}],
@@ -961,14 +1072,6 @@ def _resolve_attempt_reasoning_effort(
     if _is_hosted_gpt5_model(provider_kind=provider_kind, model=model) and stage == "triage":
         # For hosted GPT-5 triage, enforce explicit low reasoning to avoid opaque default effort.
         return requested_reasoning_effort or "low"
-    if requested_reasoning_effort is None:
-        return None
-    if (
-        _is_hosted_gpt5_model(provider_kind=provider_kind, model=model)
-        and structured_mode in {"json_object", "prompt_json"}
-    ):
-        # For hosted GPT-5 fallback modes, disabling reasoning prioritizes final answer tokens.
-        return None
     return requested_reasoning_effort
 
 
@@ -1199,6 +1302,183 @@ def _is_sensitive_key(key: str) -> bool:
     if normalized in _SECRET_KEY_EXACT_NAMES:
         return True
     return any(normalized.endswith(suffix) for suffix in _SECRET_KEY_SUFFIXES)
+
+
+def _resolve_chat_instruction_role(*, model: str) -> str:
+    normalized = model.strip().lower()
+    if normalized.startswith("o"):
+        return "developer"
+    if normalized.startswith("gpt-"):
+        return "developer"
+    return "system"
+
+
+def _new_client_request_id() -> str:
+    return f"vaulthalla-{uuid4()}"
+
+
+def _resolve_endpoint_url(*, base_url: str | None, endpoint_path: str) -> str:
+    if not base_url:
+        return f"{_DEFAULT_OPENAI_BASE_URL}{endpoint_path}"
+    normalized = base_url.strip().rstrip("/")
+    suffix = endpoint_path
+    if normalized.endswith("/v1") and endpoint_path.startswith("/v1/"):
+        suffix = endpoint_path[len("/v1") :]
+    return f"{normalized}{suffix}"
+
+
+def _resolve_raw_create(resource: Any) -> Any | None:
+    with_raw_response = getattr(resource, "with_raw_response", None)
+    if with_raw_response is None:
+        return None
+    create = getattr(with_raw_response, "create", None)
+    if callable(create):
+        return create
+    return None
+
+
+def _parse_raw_response(raw_response: Any) -> Any:
+    parse = getattr(raw_response, "parse", None)
+    if callable(parse):
+        return parse()
+    return raw_response
+
+
+def _header_value(headers: Any, name: str) -> str | None:
+    if headers is None:
+        return None
+    if hasattr(headers, "get"):
+        value = headers.get(name)
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped if stripped else None
+    if isinstance(headers, dict):
+        for key, value in headers.items():
+            if str(key).lower() == name.lower():
+                if isinstance(value, str):
+                    stripped = value.strip()
+                    return stripped if stripped else None
+                return str(value)
+    return None
+
+
+def _build_request_diagnostics(
+    *,
+    transport: str,
+    endpoint_path: str,
+    base_url: str | None,
+    request_payload: dict[str, Any],
+    instruction_channel: str,
+    instruction_role: str | None,
+    client_request_id: str,
+    response_parser: str,
+) -> dict[str, Any]:
+    return {
+        "transport": transport,
+        "endpoint_path": endpoint_path,
+        "endpoint_url": _resolve_endpoint_url(base_url=base_url, endpoint_path=endpoint_path),
+        "model": request_payload.get("model"),
+        "instruction_channel": instruction_channel,
+        "instruction_role": instruction_role,
+        "response_parser": response_parser,
+        "reasoning_present": isinstance(request_payload.get("reasoning"), dict),
+        "temperature_present": "temperature" in request_payload,
+        "max_output_tokens_present": (
+            "max_output_tokens" in request_payload or "max_completion_tokens" in request_payload
+        ),
+        "client_request_id": client_request_id,
+        "request_body": _sanitize_for_evidence(request_payload),
+    }
+
+
+def _extract_response_diagnostics(
+    *,
+    transport: str,
+    endpoint_path: str,
+    base_url: str | None,
+    raw_response: Any,
+    client_request_id: str,
+) -> dict[str, Any]:
+    status_code_raw = getattr(raw_response, "status_code", None)
+    status_code = status_code_raw if isinstance(status_code_raw, int) else None
+    headers = getattr(raw_response, "headers", None)
+    x_request_id = _header_value(headers, "x-request-id")
+    x_client_request_id = _header_value(headers, "x-client-request-id")
+    body: Any | None = None
+    if status_code is not None and status_code >= 400:
+        body = _extract_http_body(raw_response)
+    return {
+        "transport": transport,
+        "endpoint_path": endpoint_path,
+        "endpoint_url": _resolve_endpoint_url(base_url=base_url, endpoint_path=endpoint_path),
+        "http_status": status_code,
+        "x_request_id": x_request_id,
+        "x_client_request_id": x_client_request_id or client_request_id,
+        "response_body_non_2xx": _sanitize_for_evidence(body) if body is not None else None,
+    }
+
+
+def _extract_response_diagnostics_from_exception(
+    *,
+    exc: Exception,
+    transport: str,
+    endpoint_path: str,
+    base_url: str | None,
+    client_request_id: str,
+) -> dict[str, Any]:
+    status_code_raw = getattr(exc, "status_code", None)
+    status_code = status_code_raw if isinstance(status_code_raw, int) else None
+    request_id_raw = getattr(exc, "request_id", None)
+    request_id = request_id_raw if isinstance(request_id_raw, str) else None
+    body = getattr(exc, "body", None)
+    response = getattr(exc, "response", None)
+    x_client_request_id: str | None = client_request_id
+
+    if response is not None:
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int):
+            status_code = response_status
+        headers = getattr(response, "headers", None)
+        response_request_id = _header_value(headers, "x-request-id")
+        if response_request_id is not None:
+            request_id = response_request_id
+        response_client_request_id = _header_value(headers, "x-client-request-id")
+        if response_client_request_id is not None:
+            x_client_request_id = response_client_request_id
+        if body is None:
+            body = _extract_http_body(response)
+
+    return {
+        "transport": transport,
+        "endpoint_path": endpoint_path,
+        "endpoint_url": _resolve_endpoint_url(base_url=base_url, endpoint_path=endpoint_path),
+        "http_status": status_code,
+        "x_request_id": request_id,
+        "x_client_request_id": x_client_request_id,
+        "response_body_non_2xx": _sanitize_for_evidence(body) if body is not None else None,
+        "exception_type": exc.__class__.__name__,
+    }
+
+
+def _extract_http_body(response: Any) -> Any | None:
+    json_method = getattr(response, "json", None)
+    if callable(json_method):
+        try:
+            return json_method()
+        except Exception:
+            pass
+
+    text_attr = getattr(response, "text", None)
+    if isinstance(text_attr, str):
+        return text_attr
+    if callable(text_attr):
+        try:
+            value = text_attr()
+            if isinstance(value, str):
+                return value
+        except Exception:
+            return None
+    return None
 
 
 def _serialize_payload_for_failure_capture(value: Any, *, depth: int = 0) -> Any:

@@ -53,7 +53,7 @@ class AIDraftMiniStageTests(unittest.TestCase):
 
     def test_generate_draft_can_use_triage_input_label(self) -> None:
         triage_ir = {
-            "schema_version": "vaulthalla.release.ai_triage.v1",
+            "schema_version": "vaulthalla.release.ai_triage.v2",
             "version": "2.4.0",
             "summary_points": ["Core work dominates."],
             "categories": [],

@@ -40,6 +40,15 @@ DEFAULT_CHANGELOG_SCRATCH_DIR = Path(".changelog_scratch")
 DEFAULT_CACHED_DRAFT_PATH = DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.draft.md"
 DEBIAN_CHANGELOG_SIGNATURE_PATTERN = re.compile(r"^ -- (?P<maintainer>.+?)  (?P<timestamp>.+)$")
 DEBIAN_CHANGELOG_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+.-]*$")
+_DEBIAN_REPO_PATH_RE = re.compile(r"\b(?:core|tools|web|debian|deploy|bin)/[a-z0-9_./-]+\b", re.IGNORECASE)
+_DEBIAN_FILE_PATH_RE = re.compile(
+    r"\b[a-z0-9_.-]+(?:/[a-z0-9_.-]+)+\.(?:py|cpp|c|h|hpp|md|yaml|yml|json|toml|ini|sh|sql)\b",
+    re.IGNORECASE,
+)
+_DEBIAN_KIND_REF_RE = re.compile(
+    r"#(?:api-contract|command-surface|schema-change|prompt-contract|config-surface|error-handling|"
+    r"filesystem-lifecycle|packaging-script|output-artifact|tests-contract|implementation-change)\b"
+)
 
 
 @dataclass(frozen=True)
@@ -850,6 +859,8 @@ def _extract_debian_bullets(markdown: str) -> list[str]:
             continue
 
         normalized = _normalize_bullet_text(bullet_match.group("item"))
+        if _is_low_value_debian_bullet(normalized):
+            continue
         if normalized and normalized not in bullets:
             bullets.append(normalized)
         if len(bullets) >= 8:
@@ -867,6 +878,8 @@ def _extract_debian_bullets(markdown: str) -> list[str]:
         if stripped.startswith("#") or stripped.startswith(">") or stripped.startswith("```"):
             continue
         normalized = _normalize_bullet_text(stripped)
+        if _is_low_value_debian_bullet(normalized):
+            continue
         if normalized and normalized not in fallback:
             fallback.append(normalized)
         if len(fallback) >= 4:
@@ -885,6 +898,37 @@ def _normalize_bullet_text(text: str) -> str:
     normalized = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
     return normalized
+
+
+def _is_low_value_debian_bullet(text: str) -> bool:
+    normalized = text.strip()
+    if not normalized:
+        return True
+    lower = normalized.lower()
+
+    classifier_residue_markers = (
+        "important files",
+        "retained snippet",
+        "retained snippets",
+        "evidence ref",
+        "evidence refs",
+        "grounded claim",
+        "grounded claims",
+        "priority rank",
+        "signal strength",
+        "category:",
+        "theme:",
+        "overview:",
+    )
+    if any(marker in lower for marker in classifier_residue_markers):
+        return True
+    if _DEBIAN_KIND_REF_RE.search(lower):
+        return True
+    if _DEBIAN_REPO_PATH_RE.search(normalized) or _DEBIAN_FILE_PATH_RE.search(normalized):
+        return True
+    if re.match(r"^(low-signal|meta(?:\s+only)?|formatting(?:\s+only)?)\b", lower):
+        return True
+    return False
 
 
 def _render_debian_entry(

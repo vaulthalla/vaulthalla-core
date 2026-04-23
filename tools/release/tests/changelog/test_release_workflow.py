@@ -316,6 +316,44 @@ profiles:
             signature_line = next(line for line in rendered.splitlines() if line.startswith(" -- "))
             self.assertRegex(signature_line, re.compile(r"^ -- .+  [A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$"))
 
+    def test_refresh_debian_changelog_entry_filters_classifier_residue_bullets(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            _ = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown=(
+                    "# Release\n"
+                    "- important files: tools/release/changelog/payload.py\n"
+                    "- evidence_refs: core/protocols/websocket/server.cpp#error-handling\n"
+                    "- Hardened OpenAI request/response validation paths for release generation.\n"
+                ),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertIn("Hardened OpenAI request/response validation paths for release generation.", rendered)
+            self.assertNotIn("important files", rendered)
+            self.assertNotIn("evidence_refs", rendered)
+            self.assertNotIn("tools/release/changelog/payload.py", rendered)
+
+    def test_refresh_debian_changelog_entry_rejects_when_only_low_value_bullets_remain(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            with self.assertRaisesRegex(ValueError, "no usable summary lines"):
+                _ = refresh_debian_changelog_entry(
+                    changelog_path=changelog_path,
+                    release_markdown=(
+                        "# Release\n"
+                        "- important files: tools/release/changelog/payload.py\n"
+                        "- evidence_refs: core/fuse/mount_service.cpp#filesystem-lifecycle\n"
+                    ),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

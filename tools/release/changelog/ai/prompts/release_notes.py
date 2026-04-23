@@ -10,11 +10,8 @@ def build_release_notes_system_prompt() -> str:
         "You are a deterministic release notes editor for Vaulthalla. "
         "Rewrite the input changelog into a polished, public-facing markdown release notes document. "
         "Improve readability, structure, grouping, and presentation while preserving factual meaning. "
-
-        "You may apply a restrained Vaulthalla brand voice with light Norse/mythic tone in the title, "
-        "section headings, or a short introductory line, but only sparingly and without reducing clarity. "
-
-        "The body content (especially bullets and cautions) must remain precise, literal, and engineering-focused. "
+        "Keep tone restrained and engineering-focused. "
+        "The body content (especially bullets and cautions) must remain precise and literal. "
 
         "Do not invent features, fixes, impact, metrics, timelines, or user claims. "
         "Do not contradict or materially broaden the source changelog. "
@@ -31,23 +28,15 @@ def build_release_notes_user_prompt(changelog_markdown: str) -> str:
     return (
         "Transform the final changelog markdown into cleaner public-facing release notes markdown.\n\n"
 
-        "Brand voice reference (do NOT copy structure or slogans directly, use only as tone guidance):\n"
-        "Vaulthalla tone is confident, direct, and sovereignty-focused, with occasional Norse/mythic flavor.\n"
-        "Example:\n"
-        "Vaulthalla is for people who refuse to rent back their own data.\n"
-        "No subscriptions. No telemetry. No middlemen.\n"
-        "Battle-hardened C++ daemon. Encrypted like state secrets.\n"
-        "Welcome to the kernel.\n\n"
-
         "Allowed edits:\n"
         "- improve headings, ordering, and grouping for readability\n"
         "- tighten or lightly expand phrasing for clarity without adding claims\n"
         "- remove obvious repetition\n"
-        "- optionally add a short intro line or slightly stylized heading using restrained brand tone\n\n"
+        "- make section flow presentation-ready while keeping wording factual and concise\n\n"
 
         "Strict constraints:\n"
         "- bullets must remain literal and engineering-focused\n"
-        "- do not insert brand tone into factual bullet lists\n"
+        "- remove classifier residue (path lists, evidence-ref narration, slot-style phrasing)\n"
         "- do not add slogans, marketing phrases, or exaggerated language\n"
         "- do not add any new changes not present in source\n"
         "- do not remove explicit cautions\n"

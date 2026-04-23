@@ -27,6 +27,8 @@ def build_polish_user_prompt(draft_payload: dict[str, Any]) -> str:
         "- merge repetitive phrasing across summary/overview/bullets when factual meaning is unchanged\n"
         "- remove redundancy between section overviews and bullets\n"
         "- reorder sentences or bullet order for readability only when factual emphasis is preserved\n"
+        "- remove classifier/audit residue (evidence-ref narration, path-heavy recap, mechanical slot phrasing)\n"
+        "- collapse unnecessary caution boilerplate when no concrete caution is present\n"
         "Forbidden edits:\n"
         "- adding new changes or claims not present in the draft\n"
         "- introducing new sections or categories that are not in the draft\n"

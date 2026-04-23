@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.release.changelog.models import CategoryContext, FileChange
-from tools.release.changelog.snippets import extract_relevant_snippets
+from tools.release.changelog.snippets import UNIDIFF_AVAILABLE, extract_relevant_snippets
 
 
 def _file(path: str, *, score: float = 10.0, insertions: int = 20, deletions: int = 4) -> FileChange:
@@ -107,6 +107,47 @@ class SnippetHarvestTests(unittest.TestCase):
         harvested = snippets["tools"]
         self.assertTrue(harvested)
         self.assertTrue(all(item.path == "tools/release/cli.py" for item in harvested))
+
+    @unittest.skipUnless(UNIDIFF_AVAILABLE, "unidiff not available in this environment")
+    def test_extract_relevant_snippets_groups_adjacent_unified_hunks(self) -> None:
+        context = CategoryContext(
+            name="tools",
+            commit_count=2,
+            insertions=80,
+            deletions=18,
+            commits=[],
+            files=[_file("tools/release/cli.py", score=20.0, insertions=80, deletions=18)],
+            snippets=[],
+            detected_themes=["release-automation"],
+        )
+
+        patch_text = (
+            "diff --git a/tools/release/cli.py b/tools/release/cli.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/tools/release/cli.py\n"
+            "+++ b/tools/release/cli.py\n"
+            "@@ -40,6 +40,9 @@ def add_compare_command(subparsers):\n"
+            "+compare.add_argument(\"--ai-profiles\", required=True)\n"
+            "+compare.add_argument(\"--output-name\")\n"
+            "@@ -47,5 +50,8 @@ def add_compare_command(subparsers):\n"
+            "+compare.add_argument(\"--show-config\", action=\"store_true\")\n"
+            "+compare.add_argument(\"--keep-artifacts\", action=\"store_true\")\n"
+        )
+
+        with patch("tools.release.changelog.snippets.get_file_patch", return_value=patch_text):
+            snippets = extract_relevant_snippets(
+                repo_root=".",
+                previous_tag="v0.1.0",
+                category_contexts={"tools": context},
+                max_files_per_category=2,
+                max_hunks_per_file=1,
+            )
+
+        harvested = snippets["tools"]
+        self.assertEqual(len(harvested), 1)
+        self.assertIn("--ai-profiles", harvested[0].patch)
+        self.assertIn("--keep-artifacts", harvested[0].patch)
+        self.assertIn("grouped", harvested[0].reason)
 
 
 if __name__ == "__main__":

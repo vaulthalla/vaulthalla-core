@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from tools.release.changelog.categorize import CATEGORY_ORDER
+from tools.release.changelog.categorize import CATEGORY_ORDER, categorize_path, detect_themes_for_paths
 from tools.release.changelog.models import (
     CategoryContext,
     CategorySemanticPacket,
@@ -113,6 +113,7 @@ _SEMANTIC_IDENTIFIER_RE = re.compile(
 _SEMANTIC_CLI_FLAG_RE = re.compile(r"--[a-z0-9][a-z0-9_-]*")
 _SEMANTIC_ENDPOINT_RE = re.compile(r"/v1/[a-z0-9/_-]+")
 _SEMANTIC_CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+_CATEGORY_ORDER_INDEX: dict[str, int] = {name: index for index, name in enumerate(CATEGORY_ORDER)}
 
 
 @dataclass(frozen=True)
@@ -283,7 +284,11 @@ def _default_semantic_payload_config() -> PayloadBuildConfig:
 
 def _collect_semantic_commit_candidates(context: ReleaseContext) -> list[SemanticCommitCandidate]:
     ordered_commits = _ordered_commits(context)
-    return [_build_semantic_commit_candidate(commit) for commit in ordered_commits]
+    return [
+        _build_semantic_commit_candidate(commit)
+        for commit in ordered_commits
+        if _is_semantic_commit_candidate(commit)
+    ]
 
 
 def _ordered_commits(context: ReleaseContext) -> list[CommitInfo]:
@@ -387,10 +392,11 @@ def _build_category_semantic_packet(
     limits: PayloadLimits,
 ) -> CategorySemanticPacket:
     selected_semantic_snippets = _select_semantic_snippets(category.snippets, limits)
-    category_commit_candidates = tuple(_build_semantic_commit_candidate(commit) for commit in category.commits)
+    category_commits = _select_category_semantic_commits(name, category.commits, limits)
+    category_commit_candidates = tuple(_build_semantic_commit_candidate(commit) for commit in category_commits)
     commit_subjects = tuple(
         _truncate_text(commit.subject.strip(), limits.max_commit_subject_chars)[0]
-        for commit in category.commits
+        for commit in category_commits
         if commit.subject.strip()
     )
     supporting_files = _build_semantic_supporting_files(
@@ -417,7 +423,7 @@ def _build_category_semantic_packet(
     return CategorySemanticPacket(
         name=name,
         signal_strength=signal_strength,
-        summary_hint=_build_category_summary_hint(name, category, semantic_hunks),
+        summary_hint=_build_category_summary_hint(name, category, semantic_hunks, supporting_files),
         key_commits=commit_subjects,
         candidate_commits=category_commit_candidates,
         supporting_files=supporting_files,
@@ -430,6 +436,7 @@ def _build_category_summary_hint(
     category_name: str,
     category: CategoryContext,
     semantic_hunks: list[SemanticHunk],
+    supporting_files: tuple[str, ...],
 ) -> str:
     prefix = _CATEGORY_SUMMARY_PREFIX.get(category_name, f"{category_name.title()} updates")
     topics: Counter[str] = Counter()
@@ -439,7 +446,10 @@ def _build_category_summary_hint(
         if topic:
             topics[topic] += 2
 
-    for theme in category.detected_themes:
+    semantic_theme_paths = list(supporting_files) or [
+        file_change.path for file_change in category.files if not is_semantic_noise_path(file_change.path)
+    ]
+    for theme in detect_themes_for_paths(semantic_theme_paths):
         topic = _SEMANTIC_THEME_TOPICS.get(theme)
         if topic:
             topics[topic] += 1
@@ -499,6 +509,50 @@ def _build_semantic_supporting_files(
             break
 
     return tuple(selected)
+
+
+def _select_category_semantic_commits(
+    category_name: str,
+    commits: list[CommitInfo],
+    limits: PayloadLimits,
+) -> list[CommitInfo]:
+    eligible = [commit for commit in commits if _is_semantic_commit_candidate(commit)]
+    if not eligible:
+        return []
+
+    primary = [commit for commit in eligible if _semantic_primary_category(commit) == category_name]
+    ordered = primary if primary else eligible
+    cap = max(limits.max_commits_per_category, min(len(ordered), limits.max_commits_per_category * 2))
+    return ordered[:cap]
+
+
+def _is_semantic_commit_candidate(commit: CommitInfo) -> bool:
+    cleaned_paths = [path.strip() for path in commit.files if path.strip()]
+    if not cleaned_paths:
+        return True
+    return any(not is_semantic_noise_path(path) for path in cleaned_paths)
+
+
+def _semantic_primary_category(commit: CommitInfo) -> str:
+    counts: Counter[str] = Counter()
+    for path in commit.files:
+        cleaned = path.strip()
+        if not cleaned or is_semantic_noise_path(cleaned):
+            continue
+        counts[categorize_path(cleaned)] += 1
+
+    if counts:
+        ordered = sorted(
+            counts.items(),
+            key=lambda item: (-item[1], _CATEGORY_ORDER_INDEX.get(item[0], 999), item[0]),
+        )
+        return ordered[0][0]
+
+    categories = [category for category in commit.categories if category]
+    if not categories:
+        return "meta"
+    categories.sort(key=lambda category: (_CATEGORY_ORDER_INDEX.get(category, 999), category))
+    return categories[0]
 
 
 def _semantic_supporting_files_cap(category: CategoryContext, limits: PayloadLimits) -> int:

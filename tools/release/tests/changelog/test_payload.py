@@ -505,6 +505,148 @@ def _semantic_selection_context() -> ReleaseContext:
     )
 
 
+def _derived_artifact_contamination_context() -> ReleaseContext:
+    derived_commit = CommitInfo(
+        sha="abc1111111111111",
+        subject="Generate release artifacts for 0.34.0",
+        body="Refresh generated changelog outputs for previous release 0.34.0.",
+        files=[
+            "debian/changelog",
+            ".changelog_scratch/comparisons/0.34.0-openai-comparison.md",
+        ],
+        insertions=240,
+        deletions=20,
+        categories=["debian", "tools"],
+    )
+    semantic_commit = CommitInfo(
+        sha="def2222222222222",
+        subject="Tighten OpenAI triage schema validation for compare runs",
+        body="Align compare path triage parsing with current categories contract.",
+        files=["tools/release/changelog/ai/stages/triage.py"],
+        insertions=28,
+        deletions=8,
+        categories=["tools"],
+    )
+    tools = CategoryContext(
+        name="tools",
+        commit_count=2,
+        insertions=268,
+        deletions=28,
+        commits=[derived_commit, semantic_commit],
+        files=[
+            FileChange(
+                path=".changelog_scratch/comparisons/0.34.0-openai-comparison.md",
+                category="tools",
+                subscopes=("comparisons",),
+                insertions=240,
+                deletions=20,
+                commit_count=1,
+                score=6.0,
+                flags=("release-tooling",),
+            ),
+            FileChange(
+                path="tools/release/changelog/ai/stages/triage.py",
+                category="tools",
+                subscopes=("release", "changelog"),
+                insertions=28,
+                deletions=8,
+                commit_count=1,
+                score=18.0,
+                flags=("release-tooling",),
+            ),
+        ],
+        snippets=[
+            DiffSnippet(
+                path="debian/changelog",
+                category="tools",
+                subscopes=("debian",),
+                score=12.0,
+                reason="Generated artifact hunk that should be excluded",
+                patch="@@ -1,2 +1,4 @@\n+vaulthalla (0.34.0) unstable; urgency=medium",
+                flags=("packaging",),
+            ),
+            DiffSnippet(
+                path="tools/release/changelog/ai/stages/triage.py",
+                category="tools",
+                subscopes=("release", "changelog"),
+                score=16.0,
+                reason="Schema contract update",
+                patch="@@ -10,6 +10,10 @@\n+if not categories:\n+    raise ValueError(\"missing categories\")",
+                flags=("release-tooling",),
+            ),
+        ],
+        detected_themes=["release-automation", "packaging"],
+    )
+    return ReleaseContext(
+        version="0.34.1",
+        previous_tag="v0.34.0",
+        head_sha="beadbeadbeadbead",
+        commit_count=2,
+        categories={"tools": tools},
+        commits=[derived_commit, semantic_commit],
+        cross_cutting_notes=[],
+    )
+
+
+def _cross_category_overlap_context() -> ReleaseContext:
+    shared = CommitInfo(
+        sha="aaaabbbbccccdddd",
+        subject="Add ai-compare workflow capture and deploy helper updates",
+        body="Coordinates compare command output capture and deploy helper cleanup.",
+        files=["tools/release/cli.py", "deploy/bin/install.sh"],
+        insertions=34,
+        deletions=9,
+        categories=["deploy", "tools"],
+    )
+    tools_only = CommitInfo(
+        sha="eeeeffff00001111",
+        subject="Refine triage projection fields for semantic payload",
+        body="",
+        files=["tools/release/changelog/ai/prompts/triage.py"],
+        insertions=14,
+        deletions=4,
+        categories=["tools"],
+    )
+    deploy_only = CommitInfo(
+        sha="2222333344445555",
+        subject="Harden teardown cleanup ordering",
+        body="",
+        files=["deploy/bin/teardown.sh"],
+        insertions=10,
+        deletions=3,
+        categories=["deploy"],
+    )
+    tools = CategoryContext(
+        name="tools",
+        commit_count=2,
+        insertions=48,
+        deletions=13,
+        commits=[shared, tools_only],
+        files=[],
+        snippets=[],
+        detected_themes=["release-automation"],
+    )
+    deploy = CategoryContext(
+        name="deploy",
+        commit_count=2,
+        insertions=44,
+        deletions=12,
+        commits=[shared, deploy_only],
+        files=[],
+        snippets=[],
+        detected_themes=["service-management"],
+    )
+    return ReleaseContext(
+        version="0.34.1",
+        previous_tag="v0.34.0",
+        head_sha="facefacefaceface",
+        commit_count=3,
+        categories={"tools": tools, "deploy": deploy},
+        commits=[shared, tools_only, deploy_only],
+        cross_cutting_notes=[],
+    )
+
+
 class PayloadContractTests(unittest.TestCase):
     maxDiff = None
 
@@ -674,6 +816,24 @@ class PayloadContractTests(unittest.TestCase):
         payload = build_semantic_ai_payload(context)
         all_commits = payload["all_commits"]
         self.assertTrue(any(item.get("body") for item in all_commits))
+
+    def test_semantic_payload_excludes_generated_artifacts_and_stale_release_commit(self) -> None:
+        payload = build_semantic_ai_payload(_derived_artifact_contamination_context())
+        category = payload["categories"][0]
+
+        self.assertNotIn("Generate release artifacts for 0.34.0", category["key_commits"])
+        self.assertTrue(all(item["sha"] != "abc1111111111111" for item in payload["all_commits"]))
+        self.assertTrue(all(path != "debian/changelog" for path in category["supporting_files"]))
+        self.assertTrue(all(hunk["path"] != "debian/changelog" for hunk in category["semantic_hunks"]))
+
+    def test_semantic_category_commit_candidates_reduce_cross_category_duplicate_bleed(self) -> None:
+        payload = build_semantic_ai_payload(_cross_category_overlap_context())
+        categories = {item["name"]: item for item in payload["categories"]}
+        tools_candidates = [item["sha"] for item in categories["tools"]["candidate_commits"]]
+        deploy_candidates = [item["sha"] for item in categories["deploy"]["candidate_commits"]]
+
+        self.assertIn("aaaabbbbccccdddd", tools_candidates)
+        self.assertNotIn("aaaabbbbccccdddd", deploy_candidates)
 
 
 if __name__ == "__main__":

@@ -914,6 +914,64 @@ class PayloadContractTests(unittest.TestCase):
         self.assertIn("compare.set_defaults(handler=run_ai_compare)", excerpt)
         self.assertIn("+compare.add_argument(\"--ai-profiles\", required=True)", excerpt)
 
+    def test_semantic_kind_declaration_region_not_mislabeled_config(self) -> None:
+        context = _semantic_selection_context()
+        context.categories["tools"].snippets[1] = DiffSnippet(
+            path="core/include/command_registry.hpp",
+            category="tools",
+            subscopes=("core", "include"),
+            score=9.2,
+            reason="Data-structure declaration updates for command usage registry",
+            patch=(
+                "@@ -10,4 +10,10 @@ class CommandRegistry {\n"
+                "+struct CommandUsageEntry {\n"
+                "+    std::string name;\n"
+                "+    std::string summary;\n"
+                "+};\n"
+                "+void RegisterUsageEntries(const std::vector<CommandUsageEntry>& entries);\n"
+            ),
+            flags=("api-surface",),
+            region_kind="declaration",
+            region_label="struct CommandUsageEntry",
+            hunk_count=1,
+            changed_lines=6,
+            meaningful_lines=6,
+        )
+        config = PayloadBuildConfig(limits=PayloadLimits(max_snippets_per_category=1))
+        payload = build_semantic_ai_payload(context, config=config)
+        selected = payload["categories"][0]["semantic_hunks"][0]
+        self.assertEqual(selected["kind"], "implementation-change")
+        self.assertEqual(selected["region_type"], "declaration")
+
+    def test_semantic_kind_deletion_heavy_command_setup_not_tests_contract(self) -> None:
+        context = _semantic_selection_context()
+        context.categories["tools"].snippets[1] = DiffSnippet(
+            path="tools/release/tests/test_cli_changelog.py",
+            category="tools",
+            subscopes=("release", "tests"),
+            score=8.8,
+            reason="Delete legacy compare parser setup in test fixture",
+            patch=(
+                "@@ -40,20 +40,3 @@ def configure_parser_fixture(parser):\n"
+                "-subparsers = parser.add_subparsers(dest=\"cmd\")\n"
+                "-compare = subparsers.add_parser(\"ai-compare\")\n"
+                "-compare.add_argument(\"--ai-profiles\", required=True)\n"
+                "-compare.add_argument(\"--output-name\")\n"
+                "-compare.set_defaults(handler=run_ai_compare)\n"
+                "+return parser\n"
+            ),
+            flags=("release-tooling",),
+            region_kind="test",
+            region_label="configure_parser_fixture",
+            hunk_count=1,
+            changed_lines=6,
+            meaningful_lines=6,
+        )
+        config = PayloadBuildConfig(limits=PayloadLimits(max_snippets_per_category=1))
+        payload = build_semantic_ai_payload(context, config=config)
+        selected = payload["categories"][0]["semantic_hunks"][0]
+        self.assertEqual(selected["kind"], "command-surface")
+
     def test_semantic_payload_json_is_byte_stable(self) -> None:
         context = _multi_category_context()
         first = render_semantic_ai_payload_json(build_semantic_ai_payload(context))

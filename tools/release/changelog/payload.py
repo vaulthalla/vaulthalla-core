@@ -698,14 +698,26 @@ def _classify_semantic_hunk_kind(snippet: DiffSnippet) -> str:
     lower_patch = snippet.patch.lower()
     flags = {flag.lower() for flag in snippet.flags}
     merged = f"{lower_path}\n{lower_patch}\n{' '.join(sorted(flags))}"
+    deletion_heavy = _is_deletion_heavy_patch(snippet.patch)
     if snippet.region_kind == "test":
+        if deletion_heavy and any(token in merged for token in ("argparse", "subparsers", "add_parser(", "--", "usage")):
+            return "command-surface"
         return "tests-contract"
     if snippet.region_kind == "command":
         return "command-surface"
+    if snippet.region_kind == "usage":
+        return "command-surface"
+    if snippet.region_kind == "declaration":
+        if "schema" in merged or "json_schema" in merged or "schema_version" in merged:
+            return "schema-change"
+        return "implementation-change"
     if snippet.region_kind == "config":
         return "config-surface"
 
-    if "/tests/" in f"/{lower_path}" or lower_path.startswith("test_") or "/test_" in lower_path:
+    if (
+        ("/tests/" in f"/{lower_path}" or lower_path.startswith("test_") or "/test_" in lower_path)
+        and not deletion_heavy
+    ):
         return "tests-contract"
     if "/prompts/" in f"/{lower_path}" or "prompt" in merged:
         return "prompt-contract"
@@ -755,6 +767,21 @@ def _classify_semantic_hunk_kind(snippet: DiffSnippet) -> str:
     ) or "filesystem" in flags:
         return "filesystem-lifecycle"
     return "implementation-change"
+
+
+def _is_deletion_heavy_patch(patch: str) -> bool:
+    added = 0
+    removed = 0
+    for line in patch.splitlines():
+        if line.startswith("+++ ") or line.startswith("--- ") or line.startswith("@@"):
+            continue
+        if line.startswith("+"):
+            added += 1
+        elif line.startswith("-"):
+            removed += 1
+    if removed == 0:
+        return False
+    return removed >= max(added * 2, added + 4)
 
 
 def _build_semantic_excerpt(patch: str, limits: PayloadLimits) -> str:

@@ -25,6 +25,7 @@ _FUNCTION_SIGNATURE_RE = re.compile(
     re.IGNORECASE,
 )
 _COMMAND_SURFACE_RE = re.compile(r"\b(add_parser|add_argument|subparsers|argparse)\b")
+_USAGE_SURFACE_RE = re.compile(r"\b(usage|help|command book|usage manager|register_command|register handler)\b")
 _CONFIG_KEY_RE = re.compile(r"^[+-]\s*[\"']?[a-zA-Z_][a-zA-Z0-9_.-]*[\"']?\s*[:=]", re.MULTILINE)
 _MAX_ADJACENT_HUNK_GAP = 24
 _MAX_SAME_REGION_GAP = 320
@@ -593,14 +594,22 @@ def _normalize_region_label(label: str | None) -> str | None:
 
 def _infer_region_kind(path: str, text: str, region_label: str | None) -> str:
     merged = f"{path}\n{region_label or ''}\n{text}".lower()
-    if "/tests/" in f"/{path.lower()}" or merged.find("test ") >= 0 or "assert" in merged:
-        return "test"
+    lower_path = path.lower()
+    is_test_path = "/tests/" in f"/{lower_path}" or lower_path.startswith("test_")
+    deletion_heavy = _is_deletion_heavy_text(text)
+
+    if _has_usage_signals(merged):
+        return "usage"
     if _COMMAND_SURFACE_RE.search(merged) is not None or "--" in merged:
         return "command"
+    if _is_declaration_region(path, text):
+        return "declaration"
+    if is_test_path and not deletion_heavy:
+        return "test"
+    if (merged.find("test ") >= 0 or "assert" in merged) and not deletion_heavy:
+        return "test"
     if _has_config_key_changes(text) or path.lower().endswith((".yml", ".yaml", ".toml", ".ini", ".json")):
         return "config"
-    if "usage" in merged or "help" in merged:
-        return "usage"
     if "class " in merged:
         return "class"
     if "struct " in merged:
@@ -615,6 +624,8 @@ def _is_region_anchor_line(line: str, path: str) -> bool:
     if _FUNCTION_SIGNATURE_RE.search(line) is not None:
         return True
     if _COMMAND_SURFACE_RE.search(lower) is not None:
+        return True
+    if _USAGE_SURFACE_RE.search(lower) is not None:
         return True
     if _CONFIG_KEY_RE.match(f"+{line}") is not None:
         return True
@@ -650,3 +661,53 @@ def _is_config_key_line(line: str) -> bool:
         "except",
     )
     return not lower.startswith(control_prefixes)
+
+
+def _has_usage_signals(merged: str) -> bool:
+    if _USAGE_SURFACE_RE.search(merged) is not None:
+        return True
+    return any(token in merged for token in ("--help", "usage:", "help_text", "usage_text"))
+
+
+def _is_declaration_region(path: str, text: str) -> bool:
+    lower_path = path.lower()
+    declaration_suffixes = (".h", ".hpp", ".hh", ".hxx", ".d.ts")
+    declaration_lines = 0
+    meaningful_lines = 0
+    for line in text.splitlines():
+        if line.startswith(("+++", "---", "@@")):
+            continue
+        if not line.startswith(("+", "-")):
+            continue
+        payload = line[1:].strip()
+        if not payload:
+            continue
+        meaningful_lines += 1
+        lower = payload.lower()
+        if (
+            lower.startswith(("class ", "struct ", "enum ", "typedef ", "using ", "template<", "namespace "))
+            or lower.endswith(";")
+            or "(" in lower and ")" in lower and lower.endswith(";")
+        ):
+            declaration_lines += 1
+
+    if meaningful_lines == 0:
+        return False
+    if lower_path.endswith(declaration_suffixes):
+        return declaration_lines >= max(1, meaningful_lines // 3)
+    return declaration_lines >= max(2, (meaningful_lines * 2) // 3)
+
+
+def _is_deletion_heavy_text(text: str) -> bool:
+    added = 0
+    removed = 0
+    for line in text.splitlines():
+        if line.startswith("+++ ") or line.startswith("--- ") or line.startswith("@@"):
+            continue
+        if line.startswith("+"):
+            added += 1
+        elif line.startswith("-"):
+            removed += 1
+    if removed == 0:
+        return False
+    return removed >= max(added * 2, added + 4)

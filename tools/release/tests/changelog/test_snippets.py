@@ -248,6 +248,111 @@ class SnippetHarvestTests(unittest.TestCase):
         self.assertTrue(all(item.changed_lines <= 220 for item in harvested))
         self.assertTrue(all(item.region_kind in {"function", "block", "command"} for item in harvested))
 
+    def test_extract_relevant_snippets_marks_declaration_region(self) -> None:
+        context = CategoryContext(
+            name="core",
+            commit_count=1,
+            insertions=14,
+            deletions=2,
+            commits=[],
+            files=[
+                FileChange(
+                    path="core/include/command_registry.hpp",
+                    category="core",
+                    subscopes=("include",),
+                    insertions=14,
+                    deletions=2,
+                    commit_count=1,
+                    score=12.0,
+                    flags=("api-surface",),
+                )
+            ],
+            snippets=[],
+            detected_themes=["core"],
+        )
+        patch_text = (
+            "@@ -10,6 +10,12 @@ class CommandRegistry {\n"
+            "+struct CommandUsageEntry {\n"
+            "+    std::string name;\n"
+            "+    std::string summary;\n"
+            "+};\n"
+            "+void RegisterUsageEntries(const std::vector<CommandUsageEntry>& entries);\n"
+        )
+        with patch("tools.release.changelog.snippets.get_file_patch", return_value=patch_text):
+            snippets = extract_relevant_snippets(
+                repo_root=".",
+                previous_tag="v0.1.0",
+                category_contexts={"core": context},
+                max_files_per_category=2,
+                max_hunks_per_file=2,
+            )
+        harvested = snippets["core"]
+        self.assertEqual(len(harvested), 1)
+        self.assertEqual(harvested[0].region_kind, "declaration")
+
+    def test_extract_relevant_snippets_marks_usage_region(self) -> None:
+        context = CategoryContext(
+            name="tools",
+            commit_count=1,
+            insertions=8,
+            deletions=1,
+            commits=[],
+            files=[_file("tools/release/cli.py", score=11.0, insertions=8, deletions=1)],
+            snippets=[],
+            detected_themes=["release-automation"],
+        )
+        patch_text = (
+            "@@ -50,4 +50,9 @@ def build_parser(subparsers):\n"
+            "+usage_text = \"Usage: vh changelog ai-compare --ai-profiles=<profiles>\"\n"
+            "+compare.help = \"Generate side-by-side profile output\"\n"
+            "+compare.epilog = usage_text\n"
+        )
+        with patch("tools.release.changelog.snippets.get_file_patch", return_value=patch_text):
+            snippets = extract_relevant_snippets(
+                repo_root=".",
+                previous_tag="v0.1.0",
+                category_contexts={"tools": context},
+                max_files_per_category=2,
+                max_hunks_per_file=2,
+            )
+        harvested = snippets["tools"]
+        self.assertEqual(len(harvested), 1)
+        self.assertEqual(harvested[0].region_kind, "usage")
+
+    def test_extract_relevant_snippets_deletion_heavy_setup_not_test_region(self) -> None:
+        context = CategoryContext(
+            name="tools",
+            commit_count=2,
+            insertions=3,
+            deletions=20,
+            commits=[],
+            files=[_file("tools/release/tests/test_cli_changelog.py", score=13.0, insertions=3, deletions=20)],
+            snippets=[],
+            detected_themes=["release-automation"],
+        )
+        patch_text = (
+            "@@ -40,20 +40,3 @@ def configure_parser_fixture(parser):\n"
+            "-subparsers = parser.add_subparsers(dest=\"cmd\")\n"
+            "-compare = subparsers.add_parser(\"ai-compare\")\n"
+            "-compare.add_argument(\"--ai-profiles\", required=True)\n"
+            "-compare.add_argument(\"--output-name\")\n"
+            "-compare.add_argument(\"--show-config\", action=\"store_true\")\n"
+            "-compare.add_argument(\"--keep-artifacts\", action=\"store_true\")\n"
+            "-compare.set_defaults(handler=run_ai_compare)\n"
+            "+return parser\n"
+        )
+        with patch("tools.release.changelog.snippets.get_file_patch", return_value=patch_text):
+            snippets = extract_relevant_snippets(
+                repo_root=".",
+                previous_tag="v0.1.0",
+                category_contexts={"tools": context},
+                max_files_per_category=2,
+                max_hunks_per_file=2,
+            )
+        harvested = snippets["tools"]
+        self.assertEqual(len(harvested), 1)
+        self.assertEqual(harvested[0].region_kind, "command")
+
 
 if __name__ == "__main__":
     unittest.main()

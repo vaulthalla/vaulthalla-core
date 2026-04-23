@@ -1003,6 +1003,8 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             include_release_notes=run_release_notes,
         )
 
+    semantic_payload: dict | None = build_semantic_ai_payload(context) if run_triage else None
+
     draft_input: dict = payload
     source_kind = "payload"
     triage_stage_cfg = pipeline_config.stages["triage"]
@@ -1014,7 +1016,7 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
         triage_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="triage")
         try:
             triage_result = run_triage_stage(
-                payload,
+                semantic_payload if semantic_payload is not None else payload,
                 provider=triage_provider,
                 provider_kind=pipeline_config.provider,
                 reasoning_effort=triage_stage_cfg.reasoning_effort,
@@ -1208,6 +1210,7 @@ def _run_changelog_release_with_settings(
         selection = resolve_release_changelog(
             repo_root=repo_root,
             payload=payload,
+            semantic_payload=semantic_payload,
             settings=env_settings,
             manual_changelog_path=args.manual_changelog_path,
             cached_draft_path=getattr(args, "cached_draft_path", DEFAULT_CHANGELOG_DRAFT_OUTPUT),

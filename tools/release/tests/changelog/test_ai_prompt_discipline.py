@@ -55,7 +55,7 @@ class AIPromptDisciplineTests(unittest.TestCase):
         triage_user = build_triage_user_prompt({"schema_version": "x"})
         draft_user = build_draft_user_prompt({"schema_version": "x"}, source_kind="triage")
         polish_user = build_polish_user_prompt({"title": "t"})
-        self.assertIn("Release payload", triage_user)
+        self.assertIn("Semantic payload", triage_user)
         self.assertIn("Triage IR", draft_user)
         self.assertIn("Draft input", polish_user)
 
@@ -66,8 +66,8 @@ class AIPromptDisciplineTests(unittest.TestCase):
         self.assertIn("top-category distinctions", system)
         self.assertIn("compression mode (hosted)", user)
         self.assertIn("top category distinctions", user)
-        self.assertIn("retained_snippets", user)
-        self.assertIn("no rationale prose", user)
+        self.assertIn("grounded_claims", user)
+        self.assertIn("evidence_refs", user)
 
     def test_release_notes_prompt_enforces_no_invention(self) -> None:
         system = build_release_notes_system_prompt().lower()

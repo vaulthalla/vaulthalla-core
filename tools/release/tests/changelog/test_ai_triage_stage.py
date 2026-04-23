@@ -28,8 +28,8 @@ class _FakeProvider:
 class AITriageStageTests(unittest.TestCase):
     def test_run_triage_stage_uses_schema_and_payload_in_prompt(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -41,8 +41,8 @@ class AITriageStageTests(unittest.TestCase):
         call = fake.calls[0]
         self.assertEqual(call["stage"], "triage")
         self.assertIn("json_schema", call)
-        self.assertIn("Release payload (compact projection)", call["user_prompt"])
-        self.assertIn("vaulthalla.release.ai_payload.v1", call["user_prompt"])
+        self.assertIn("Semantic payload (compact projection)", call["user_prompt"])
+        self.assertIn("vaulthalla.release.semantic_payload.v1", call["user_prompt"])
 
     def test_run_triage_stage_rejects_invalid_response(self) -> None:
         invalid = _load_json_fixture("ai_triage_valid.json")
@@ -56,8 +56,8 @@ class AITriageStageTests(unittest.TestCase):
 
     def test_run_triage_stage_passes_reasoning_and_structured_mode(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -79,8 +79,8 @@ class AITriageStageTests(unittest.TestCase):
 
     def test_run_triage_stage_hosted_gpt5_uses_compact_schema_and_prompt(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -97,8 +97,8 @@ class AITriageStageTests(unittest.TestCase):
 
     def test_run_triage_stage_local_provider_keeps_default_schema_limits(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -121,12 +121,12 @@ class AITriageStageTests(unittest.TestCase):
         first = render_triage_result_json(triage)
         second = render_triage_result_json(triage)
         self.assertEqual(first, second)
-        self.assertIn('"schema_version": "vaulthalla.release.ai_triage.v1"', first)
+        self.assertIn('"schema_version": "vaulthalla.release.ai_triage.v2"', first)
 
     def test_run_triage_stage_normalizes_qwen_like_optional_array_noise(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         response = {
@@ -138,22 +138,19 @@ class AITriageStageTests(unittest.TestCase):
                     "name": "core",
                     "signal_strength": "strong",
                     "priority_rank": 1,
-                    "key_points": ["Service hardening work."],
-                    "important_files": [" service.py ", None, ""],
-                    "retained_snippets": ["", "   ", None, 1, "kept snippet"],
-                    "caution_notes": [None, "weak signal", ""],
+                    "theme": "Core runtime hardening",
+                    "grounded_claims": ["Service hardening work."],
+                    "evidence_refs": [" service.py#error-handling ", None, ""],
+                    "operator_note": 1,
                 }
             ],
-            "dropped_noise": [None, "", "minor refactors"],
-            "caution_notes": [None, "verify benchmarks"],
+            "operator_note": None,
         }
         triage = run_triage_stage(payload, provider=_FakeProvider(response))
         category = triage.categories[0]
-        self.assertEqual(category.important_files, ("service.py",))
-        self.assertEqual(category.retained_snippets, ("kept snippet",))
-        self.assertEqual(category.caution_notes, ("weak signal",))
-        self.assertEqual(triage.dropped_noise, ("minor refactors",))
-        self.assertEqual(triage.caution_notes, ("verify benchmarks",))
+        self.assertEqual(category.evidence_refs, ("service.py#error-handling",))
+        self.assertIsNone(category.operator_note)
+        self.assertIsNone(triage.operator_note)
 
 
 if __name__ == "__main__":

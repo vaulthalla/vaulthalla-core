@@ -805,6 +805,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
                 patch("tools.release.cli.run_triage_stage", return_value=triage_obj) as run_triage,
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}) as build_triage,
@@ -825,7 +826,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             self.assertIn("# AI Draft", rendered_markdown)
             self.assertEqual(json_target.read_text(encoding="utf-8"), '{"title":"x"}\n')
             run_triage.assert_called_once_with(
-                {"schema_version": "x"},
+                {"schema_version": "semantic-x"},
                 provider=provider_obj,
                 provider_kind="openai",
                 reasoning_effort=None,
@@ -866,6 +867,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
                 patch("tools.release.cli.run_triage_stage", return_value=object()),
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
@@ -1034,6 +1036,7 @@ profiles:
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
             patch("tools.release.cli.run_triage_stage", return_value=triage_obj) as run_triage,
             patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}) as build_triage,
@@ -1057,7 +1060,7 @@ profiles:
             ]
         )
         run_triage.assert_called_once_with(
-            {"schema_version": "x"},
+            {"schema_version": "semantic-x"},
             provider=provider_obj,
             provider_kind="openai",
             reasoning_effort=None,
@@ -1126,6 +1129,7 @@ profiles:
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
                 patch("tools.release.cli.run_triage_stage", return_value=object()) as run_triage,
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
@@ -1141,7 +1145,7 @@ profiles:
 
             self.assertEqual(result, 0)
             run_triage.assert_called_once_with(
-                {"schema_version": "x"},
+                {"schema_version": "semantic-x"},
                 provider=provider_obj,
                 provider_kind="openai",
                 reasoning_effort="low",
@@ -1202,6 +1206,7 @@ profiles:
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
                 patch(
@@ -1232,6 +1237,7 @@ profiles:
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=object()),
             patch(
                 "tools.release.cli.run_triage_stage",
@@ -1250,6 +1256,7 @@ profiles:
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=object()),
             patch(
                 "tools.release.cli.run_triage_stage",

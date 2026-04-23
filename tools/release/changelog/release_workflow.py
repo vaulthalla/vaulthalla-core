@@ -119,6 +119,7 @@ def resolve_release_changelog(
     *,
     repo_root: Path,
     payload: dict,
+    semantic_payload: dict | None = None,
     settings: ReleaseAISettings,
     manual_changelog_path: Path | str = Path("debian/changelog"),
     cached_draft_path: Path | str = DEFAULT_CACHED_DRAFT_PATH,
@@ -144,6 +145,7 @@ def resolve_release_changelog(
                 content = _generate_openai_release_changelog(
                     repo_root=repo_root,
                     payload=payload,
+                    semantic_payload=semantic_payload,
                     settings=settings,
                     logger=emit,
                 )
@@ -162,6 +164,7 @@ def resolve_release_changelog(
                 content, used_override = _generate_local_release_changelog(
                     repo_root=repo_root,
                     payload=payload,
+                    semantic_payload=semantic_payload,
                     settings=settings,
                     logger=emit,
                 )
@@ -415,6 +418,7 @@ def _generate_openai_release_changelog(
     *,
     repo_root: Path,
     payload: dict,
+    semantic_payload: dict | None,
     settings: ReleaseAISettings,
     logger: Callable[[str], None],
 ) -> str:
@@ -427,6 +431,7 @@ def _generate_openai_release_changelog(
     return _run_release_ai_pipeline(
         repo_root=repo_root,
         payload=payload,
+        semantic_payload=semantic_payload,
         pipeline=pipeline,
         logger=logger,
     )
@@ -436,6 +441,7 @@ def _generate_local_release_changelog(
     *,
     repo_root: Path,
     payload: dict,
+    semantic_payload: dict | None,
     settings: ReleaseAISettings,
     logger: Callable[[str], None],
 ) -> tuple[str, bool]:
@@ -459,6 +465,7 @@ def _generate_local_release_changelog(
     content = _run_release_ai_pipeline(
         repo_root=repo_root,
         payload=payload,
+        semantic_payload=semantic_payload,
         pipeline=pipeline,
         local_api_key=settings.local_api_key,
         logger=logger,
@@ -470,6 +477,7 @@ def _run_release_ai_pipeline(
     *,
     repo_root: Path,
     payload: dict,
+    semantic_payload: dict | None,
     pipeline: AIPipelineConfig,
     local_api_key: str | None = None,
     logger: Callable[[str], None],
@@ -492,9 +500,10 @@ def _run_release_ai_pipeline(
     polish_cfg = pipeline.stages["polish"]
 
     if run_triage:
+        triage_input = semantic_payload if isinstance(semantic_payload, dict) else payload
         try:
             triage_result = run_triage_stage(
-                payload,
+                triage_input,
                 provider=providers["triage"],
                 provider_kind=pipeline.provider,
                 reasoning_effort=triage_cfg.reasoning_effort,

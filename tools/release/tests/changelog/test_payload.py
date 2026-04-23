@@ -647,6 +647,110 @@ def _cross_category_overlap_context() -> ReleaseContext:
     )
 
 
+def _version_only_web_context() -> ReleaseContext:
+    version_only_commit = CommitInfo(
+        sha="9999aaaabbbbcccc",
+        subject="bump version to 0.34.0; update changelog",
+        body="bump version 0.34.0",
+        files=["web/package.json"],
+        insertions=1,
+        deletions=1,
+        categories=["web"],
+    )
+    web = CategoryContext(
+        name="web",
+        commit_count=1,
+        insertions=1,
+        deletions=1,
+        commits=[version_only_commit],
+        files=[
+            FileChange(
+                path="web/package.json",
+                category="web",
+                subscopes=("package.json",),
+                insertions=1,
+                deletions=1,
+                commit_count=1,
+                score=4.0,
+                flags=("frontend",),
+            )
+        ],
+        snippets=[
+            DiffSnippet(
+                path="web/package.json",
+                category="web",
+                subscopes=("package.json",),
+                score=5.0,
+                reason="version bump",
+                patch='@@ -1,3 +1,3 @@\n-  "version": "0.33.0"\n+  "version": "0.34.1"',
+                flags=("frontend",),
+            )
+        ],
+        detected_themes=["web"],
+    )
+    return ReleaseContext(
+        version="0.34.1",
+        previous_tag="v0.34.0",
+        head_sha="1234123412341234",
+        commit_count=1,
+        categories={"web": web},
+        commits=[version_only_commit],
+        cross_cutting_notes=[],
+    )
+
+
+def _packaging_with_meaningful_remainder_context() -> ReleaseContext:
+    commit = CommitInfo(
+        sha="abcdabcd11112222",
+        subject="bump version to 0.34.0; update changelog and improve package metadata",
+        body="update changelog; ensure package metadata includes architecture constraints",
+        files=["debian/control"],
+        insertions=8,
+        deletions=2,
+        categories=["debian"],
+    )
+    debian = CategoryContext(
+        name="debian",
+        commit_count=1,
+        insertions=8,
+        deletions=2,
+        commits=[commit],
+        files=[
+            FileChange(
+                path="debian/control",
+                category="debian",
+                subscopes=("control",),
+                insertions=8,
+                deletions=2,
+                commit_count=1,
+                score=9.0,
+                flags=("packaging",),
+            )
+        ],
+        snippets=[
+            DiffSnippet(
+                path="debian/control",
+                category="debian",
+                subscopes=("control",),
+                score=9.0,
+                reason="package metadata change",
+                patch="@@ -8,6 +8,8 @@\n+Architecture: amd64 arm64\n+Depends: python3 (>= 3.11)",
+                flags=("packaging",),
+            )
+        ],
+        detected_themes=["packaging"],
+    )
+    return ReleaseContext(
+        version="0.34.1",
+        previous_tag="v0.34.0",
+        head_sha="9999888877776666",
+        commit_count=1,
+        categories={"debian": debian},
+        commits=[commit],
+        cross_cutting_notes=[],
+    )
+
+
 class PayloadContractTests(unittest.TestCase):
     maxDiff = None
 
@@ -834,6 +938,20 @@ class PayloadContractTests(unittest.TestCase):
 
         self.assertIn("aaaabbbbccccdddd", tools_candidates)
         self.assertNotIn("aaaabbbbccccdddd", deploy_candidates)
+
+    def test_semantic_commit_text_cleanup_preserves_meaningful_remainder(self) -> None:
+        payload = build_semantic_ai_payload(_packaging_with_meaningful_remainder_context())
+        category = payload["categories"][0]
+
+        self.assertIn("improve package metadata", category["key_commits"][0].lower())
+        self.assertNotIn("bump version", category["key_commits"][0].lower())
+        self.assertNotIn("update changelog", category["key_commits"][0].lower())
+
+    def test_semantic_version_only_hunks_and_boilerplate_category_is_omitted(self) -> None:
+        payload = build_semantic_ai_payload(_version_only_web_context())
+
+        self.assertEqual(len(payload["categories"]), 0)
+        self.assertEqual(len(payload["all_commits"]), 0)
 
 
 if __name__ == "__main__":

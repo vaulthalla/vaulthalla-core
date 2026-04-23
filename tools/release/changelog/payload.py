@@ -114,6 +114,36 @@ _SEMANTIC_CLI_FLAG_RE = re.compile(r"--[a-z0-9][a-z0-9_-]*")
 _SEMANTIC_ENDPOINT_RE = re.compile(r"/v1/[a-z0-9/_-]+")
 _SEMANTIC_CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 _CATEGORY_ORDER_INDEX: dict[str, int] = {name: index for index, name in enumerate(CATEGORY_ORDER)}
+_SEMVER_RE = re.compile(r"\bv?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\b")
+_BUMP_VERSION_CLAUSE_RE = re.compile(
+    r"\b(?:bump|bumped|bumping)\s+version(?:\s+to)?\s+v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\b",
+    re.IGNORECASE,
+)
+_VERSION_ONLY_CLAUSE_RE = re.compile(
+    r"^(?:v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?|version\s+v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$",
+    re.IGNORECASE,
+)
+_CHANGELOG_BOILERPLATE_RE = re.compile(
+    r"^(?:update|updated|refresh|refreshed)\s+(?:the\s+)?changelog(?:\s+for\s+release)?(?:\s+v?\d+\.\d+\.\d+)?$",
+    re.IGNORECASE,
+)
+_CLAUSE_SPLIT_RE = re.compile(r"\s*(?:;|,|\band\b|\n)+\s*", re.IGNORECASE)
+_VERSION_HUNK_KEY_RE = re.compile(
+    r"(?:^|[\s\"'])("
+    r"version"
+    r"|__version__"
+    r"|versionname"
+    r"|appversion"
+    r"|pkgver"
+    r")(?=[\s\"']*[:=])",
+    re.IGNORECASE,
+)
+_VERSION_METADATA_BASENAMES = {
+    "package.json",
+    "package-lock.json",
+    "version",
+    "version.txt",
+}
 
 
 @dataclass(frozen=True)
@@ -237,14 +267,15 @@ def build_semantic_ai_payload(
         signal_strength = classify_signal_strength(category)
         if signal_strength == "weak" and not cfg.include_weak_categories:
             continue
-        selected.append(
-            _build_category_semantic_packet(
-                name=name,
-                category=category,
-                signal_strength=signal_strength,
-                limits=cfg.limits,
-            )
+        packet = _build_category_semantic_packet(
+            name=name,
+            category=category,
+            signal_strength=signal_strength,
+            limits=cfg.limits,
         )
+        if not _semantic_category_has_meaningful_evidence(packet):
+            continue
+        selected.append(packet)
         if cfg.limits.max_categories is not None and len(selected) >= cfg.limits.max_categories:
             break
 
@@ -313,8 +344,9 @@ def _ordered_commits(context: ReleaseContext) -> list[CommitInfo]:
 
 
 def _build_semantic_commit_candidate(commit: CommitInfo) -> SemanticCommitCandidate:
-    subject = _truncate_text(commit.subject.strip(), _SEMANTIC_COMMIT_SUBJECT_MAX_CHARS)[0]
-    body = commit.body.strip()
+    cleaned_subject = _clean_semantic_commit_text(commit.subject)
+    subject = _truncate_text(cleaned_subject, _SEMANTIC_COMMIT_SUBJECT_MAX_CHARS)[0] if cleaned_subject else ""
+    body = _clean_semantic_commit_text(commit.body)
     body_value: str | None = None
     if body:
         body_value = _truncate_text(body, _SEMANTIC_COMMIT_BODY_MAX_CHARS)[0]
@@ -395,9 +427,9 @@ def _build_category_semantic_packet(
     category_commits = _select_category_semantic_commits(name, category.commits, limits)
     category_commit_candidates = tuple(_build_semantic_commit_candidate(commit) for commit in category_commits)
     commit_subjects = tuple(
-        _truncate_text(commit.subject.strip(), limits.max_commit_subject_chars)[0]
+        _truncate_text(_clean_semantic_commit_text(commit.subject), limits.max_commit_subject_chars)[0]
         for commit in category_commits
-        if commit.subject.strip()
+        if _clean_semantic_commit_text(commit.subject)
     )
     supporting_files = _build_semantic_supporting_files(
         category,
@@ -528,9 +560,18 @@ def _select_category_semantic_commits(
 
 def _is_semantic_commit_candidate(commit: CommitInfo) -> bool:
     cleaned_paths = [path.strip() for path in commit.files if path.strip()]
+    has_meaningful_text = bool(_clean_semantic_commit_text(commit.subject) or _clean_semantic_commit_text(commit.body))
     if not cleaned_paths:
+        return has_meaningful_text
+
+    non_noise_paths = [path for path in cleaned_paths if not is_semantic_noise_path(path)]
+    if not non_noise_paths:
+        return False
+    if has_meaningful_text:
         return True
-    return any(not is_semantic_noise_path(path) for path in cleaned_paths)
+    if _is_version_metadata_only_paths(non_noise_paths):
+        return False
+    return True
 
 
 def _semantic_primary_category(commit: CommitInfo) -> str:
@@ -555,6 +596,18 @@ def _semantic_primary_category(commit: CommitInfo) -> str:
     return categories[0]
 
 
+def _is_version_metadata_only_paths(paths: list[str]) -> bool:
+    normalized = [path.strip().replace("\\", "/").lower().lstrip("./") for path in paths if path.strip()]
+    if not normalized:
+        return False
+    for path in normalized:
+        basename = path.rsplit("/", 1)[-1]
+        if basename in _VERSION_METADATA_BASENAMES:
+            continue
+        return False
+    return True
+
+
 def _semantic_supporting_files_cap(category: CategoryContext, limits: PayloadLimits) -> int:
     change_total = category.insertions + category.deletions
     heaviness = 0
@@ -572,7 +625,11 @@ def _select_semantic_snippets(
     if not snippets:
         return []
 
-    eligible_snippets = [snippet for snippet in snippets if not is_semantic_noise_path(snippet.path)]
+    eligible_snippets = [
+        snippet
+        for snippet in snippets
+        if not is_semantic_noise_path(snippet.path) and not _is_version_only_semantic_hunk(snippet)
+    ]
     if not eligible_snippets:
         return []
 
@@ -830,6 +887,70 @@ def _is_noise_change_line(line: str) -> bool:
         return True
     if re.fullmatch(r"[{}\[\](),.;:]+", payload):
         return True
+    return False
+
+
+def _clean_semantic_commit_text(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        return ""
+
+    clauses = [part.strip(" -:\t") for part in _CLAUSE_SPLIT_RE.split(stripped) if part.strip(" -:\t")]
+    if not clauses:
+        return ""
+
+    has_bump_clause = any(_BUMP_VERSION_CLAUSE_RE.search(clause) for clause in clauses)
+    kept: list[str] = []
+    for clause in clauses:
+        lower = clause.lower().strip()
+        if _BUMP_VERSION_CLAUSE_RE.search(clause):
+            continue
+        if _VERSION_ONLY_CLAUSE_RE.fullmatch(lower):
+            continue
+        if has_bump_clause and _CHANGELOG_BOILERPLATE_RE.fullmatch(lower):
+            continue
+        if _SEMVER_RE.fullmatch(lower):
+            continue
+        kept.append(clause)
+
+    if not kept:
+        return ""
+
+    cleaned = "; ".join(kept)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -;,:")
+    return cleaned
+
+
+def _is_version_only_semantic_hunk(snippet: DiffSnippet) -> bool:
+    changed_lines = _semantic_changed_lines(snippet.patch)
+    if not changed_lines:
+        return False
+
+    meaningful_lines = [line for line in changed_lines if not _is_noise_change_line(line)]
+    if not meaningful_lines:
+        return False
+
+    version_lines = 0
+    for line in meaningful_lines:
+        payload = line[1:].strip() if line.startswith(("+", "-")) else line.strip()
+        lower = payload.lower()
+        if not _SEMVER_RE.search(lower):
+            return False
+        if _VERSION_HUNK_KEY_RE.search(lower) is None:
+            return False
+        version_lines += 1
+
+    return version_lines > 0
+
+
+def _semantic_category_has_meaningful_evidence(packet: CategorySemanticPacket) -> bool:
+    if packet.semantic_hunks:
+        return True
+    for commit in packet.candidate_commits:
+        if commit.subject.strip():
+            return True
+        if commit.body is not None and commit.body.strip():
+            return True
     return False
 
 

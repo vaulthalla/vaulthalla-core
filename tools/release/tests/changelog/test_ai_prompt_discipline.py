@@ -50,6 +50,14 @@ class AIPromptDisciplineTests(unittest.TestCase):
         self.assertIn("Triage IR", draft_user)
         self.assertIn("Draft input", polish_user)
 
+    def test_hosted_compact_triage_prompt_enforces_compression(self) -> None:
+        system = build_triage_system_prompt(hosted_compact_mode=True).lower()
+        user = build_triage_user_prompt({"schema_version": "x"}, hosted_compact_mode=True).lower()
+        self.assertIn("compression stage", system)
+        self.assertIn("compression mode (hosted)", user)
+        self.assertIn("retained_snippets", user)
+        self.assertIn("no rationale prose", user)
+
 
 if __name__ == "__main__":
     unittest.main()

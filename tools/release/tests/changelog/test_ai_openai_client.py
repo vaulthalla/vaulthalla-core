@@ -302,7 +302,7 @@ class OpenAIProviderTests(unittest.TestCase):
         call = sdk.responses.calls[0]
         self.assertNotIn("text", call)
         self.assertEqual(call["reasoning"]["effort"], "low")
-        self.assertEqual(call["max_output_tokens"], 1800)
+        self.assertEqual(call["max_output_tokens"], 2200)
         self.assertEqual(client.last_structured_mode_used, "prompt_json")
 
     def test_hosted_gpt5_triage_defaults_reasoning_to_low_when_unset(self) -> None:
@@ -320,7 +320,7 @@ class OpenAIProviderTests(unittest.TestCase):
 
         call = sdk.responses.calls[0]
         self.assertEqual(call["reasoning"]["effort"], "low")
-        self.assertEqual(call["max_output_tokens"], 1800)
+        self.assertEqual(call["max_output_tokens"], 2200)
 
     def test_non_recoverable_transport_error_does_not_fallback(self) -> None:
         sdk = _FakeSDKWithResponses("{}", hard_error=RuntimeError("network timeout"))

@@ -6,8 +6,8 @@ from typing import Any
 from tools.release.changelog.ai.contracts.triage import AI_TRIAGE_SCHEMA_VERSION
 
 
-def build_triage_system_prompt() -> str:
-    return (
+def build_triage_system_prompt(*, hosted_compact_mode: bool = False) -> str:
+    base = (
         "You are a deterministic release triage classifier for Vaulthalla. "
         "Use only explicit input evidence. "
         "Never invent features, fixes, behavior, impact, or categories. "
@@ -15,20 +15,55 @@ def build_triage_system_prompt() -> str:
         "If evidence is weak, state that briefly in caution fields. "
         "Return JSON only that matches the schema."
     )
+    if not hosted_compact_mode:
+        return base
+    return (
+        f"{base} "
+        "This is a compression stage: produce the smallest valid high-signal object, "
+        "not a comprehensive narrative."
+    )
 
 
-def build_triage_user_prompt(payload: dict[str, Any]) -> str:
-    payload_json = json.dumps(_build_compact_payload_projection(payload), indent=2, sort_keys=False)
+def build_triage_user_prompt(
+    payload: dict[str, Any],
+    *,
+    hosted_compact_mode: bool = False,
+) -> str:
+    payload_json = json.dumps(
+        _build_compact_payload_projection(payload, hosted_compact_mode=hosted_compact_mode),
+        indent=2,
+        sort_keys=False,
+    )
+    summary_max_items = 4 if hosted_compact_mode else 8
+    category_max_items = 5 if hosted_compact_mode else 10
+    key_points_max_items = 3 if hosted_compact_mode else 6
+    important_files_max_items = 3 if hosted_compact_mode else 6
+    retained_snippets_max_items = 1 if hosted_compact_mode else 4
+    dropped_noise_max_items = 6 if hosted_compact_mode else 12
+    caution_notes_max_items = 4 if hosted_compact_mode else 8
+    category_caution_notes_max_items = 2 if hosted_compact_mode else 4
+    compression_directive = (
+        "- Compression mode (hosted): prefer shorter arrays and denser phrasing; do not expand rationale text.\n"
+        if hosted_compact_mode
+        else ""
+    )
     return (
         "Build a compact triage intermediate representation from the release payload.\n"
         "Requirements:\n"
         "- Keep only evidence required for downstream drafting.\n"
         "- Create a category only when at least one concrete supporting item exists.\n"
         "- Rank categories by `priority_rank` (1 is highest).\n"
-        "- Keep `summary_points` to 2-5 concise evidence-bound bullets.\n"
-        "- Keep category `key_points` concise and evidence-bound (prefer <=3 items).\n"
+        f"- Keep `summary_points` concise and evidence-bound (max {summary_max_items}).\n"
+        f"- Keep category `key_points` concise and evidence-bound (max {key_points_max_items}).\n"
         "- No filler prose, no intro/outro text, no repetition.\n"
-        "- Record dropped low-signal details in `dropped_noise`.\n"
+        f"- Keep `categories` short and discriminating (max {category_max_items}).\n"
+        f"- Keep `important_files` to most relevant paths only (max {important_files_max_items}).\n"
+        f"- Keep `retained_snippets` short path-like identifiers only (max {retained_snippets_max_items}); no rationale prose.\n"
+        f"- Record dropped low-signal details in `dropped_noise` (max {dropped_noise_max_items}).\n"
+        f"- Keep top-level `caution_notes` short and sparse (max {caution_notes_max_items}).\n"
+        f"- Keep category `caution_notes` short and sparse (max {category_caution_notes_max_items}).\n"
+        "- Use `[]` for caution/noise arrays when there is no concrete signal.\n"
+        f"{compression_directive}"
         "- Required top-level output fields: `schema_version`, `version`, `summary_points`, `categories`, "
         "`dropped_noise`, `caution_notes`.\n"
         f"- Set `schema_version` exactly to `{AI_TRIAGE_SCHEMA_VERSION}`.\n"
@@ -41,11 +76,18 @@ def build_triage_user_prompt(payload: dict[str, Any]) -> str:
     )
 
 
-def _build_compact_payload_projection(payload: dict[str, Any]) -> dict[str, Any]:
+def _build_compact_payload_projection(
+    payload: dict[str, Any],
+    *,
+    hosted_compact_mode: bool,
+) -> dict[str, Any]:
     metadata = payload.get("metadata")
     generation = payload.get("generation")
     categories_raw = payload.get("categories")
     notes_raw = payload.get("notes")
+    selected_category_order_limit = 12 if hosted_compact_mode else 20
+    category_limit = 8 if hosted_compact_mode else 10
+    notes_limit = 8 if hosted_compact_mode else 12
 
     compact: dict[str, Any] = {
         "schema_version": payload.get("schema_version"),
@@ -56,23 +98,27 @@ def _build_compact_payload_projection(payload: dict[str, Any]) -> dict[str, Any]
             "commit_count": _read_nested_int(metadata, "commit_count"),
         },
         "generation": {
-            "selected_category_order": _read_nested_list(generation, "selected_category_order", limit=20),
+            "selected_category_order": _read_nested_list(
+                generation,
+                "selected_category_order",
+                limit=selected_category_order_limit,
+            ),
             "truncation": {
                 "any_truncation": _read_nested_bool(generation, "truncation", "any_truncation"),
                 "categories_with_evidence_truncated": _read_nested_list(
                     _read_nested_mapping(generation, "truncation"),
                     "categories_with_evidence_truncated",
-                    limit=20,
+                    limit=selected_category_order_limit,
                 ),
             },
         },
         "categories": [],
-        "notes": _normalize_string_list(notes_raw, limit=12),
+        "notes": _normalize_string_list(notes_raw, limit=notes_limit),
     }
 
     categories: list[dict[str, Any]] = []
     if isinstance(categories_raw, list):
-        for category in categories_raw[:10]:
+        for category in categories_raw[:category_limit]:
             if not isinstance(category, dict):
                 continue
             summary = category.get("summary")
@@ -87,12 +133,21 @@ def _build_compact_payload_projection(payload: dict[str, Any]) -> dict[str, Any]
                         "snippet_count": _read_nested_int(summary, "snippet_count"),
                         "insertions": _read_nested_int(summary, "insertions"),
                         "deletions": _read_nested_int(summary, "deletions"),
-                        "themes": _read_nested_list(summary, "themes", limit=10),
+                        "themes": _read_nested_list(summary, "themes", limit=6 if hosted_compact_mode else 10),
                     },
                     "evidence": {
-                        "top_commits": _compact_commits(_read_nested_list(evidence, "top_commits", limit=3)),
-                        "top_files": _compact_files(_read_nested_list(evidence, "top_files", limit=3)),
-                        "top_snippets": _compact_snippets(_read_nested_list(evidence, "top_snippets", limit=2)),
+                        "top_commits": _compact_commits(
+                            _read_nested_list(evidence, "top_commits", limit=3),
+                            hosted_compact_mode=hosted_compact_mode,
+                        ),
+                        "top_files": _compact_files(
+                            _read_nested_list(evidence, "top_files", limit=3),
+                            hosted_compact_mode=hosted_compact_mode,
+                        ),
+                        "top_snippet_paths": _compact_snippet_paths(
+                            _read_nested_list(evidence, "top_snippets", limit=2),
+                            hosted_compact_mode=hosted_compact_mode,
+                        ),
                     },
                 }
             )
@@ -100,7 +155,8 @@ def _build_compact_payload_projection(payload: dict[str, Any]) -> dict[str, Any]
     return compact
 
 
-def _compact_commits(items: list[Any]) -> list[dict[str, Any]]:
+def _compact_commits(items: list[Any], *, hosted_compact_mode: bool) -> list[dict[str, Any]]:
+    subject_limit = 96 if hosted_compact_mode else 120
     compact: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -108,40 +164,43 @@ def _compact_commits(items: list[Any]) -> list[dict[str, Any]]:
         compact.append(
             {
                 "sha": _read_nested_string(item, "sha"),
-                "subject": _truncate(_read_nested_string(item, "subject"), limit=120),
+                "subject": _truncate(_read_nested_string(item, "subject"), limit=subject_limit),
             }
         )
     return compact
 
 
-def _compact_files(items: list[Any]) -> list[dict[str, Any]]:
+def _compact_files(items: list[Any], *, hosted_compact_mode: bool) -> list[dict[str, Any]]:
     compact: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        compact.append(
-            {
-                "path": _read_nested_string(item, "path"),
-                "insertions": _read_nested_int(item, "insertions"),
-                "deletions": _read_nested_int(item, "deletions"),
-                "flags": _normalize_string_list(item.get("flags"), limit=6),
-            }
-        )
+        if hosted_compact_mode:
+            compact.append({"path": _read_nested_string(item, "path")})
+        else:
+            compact.append(
+                {
+                    "path": _read_nested_string(item, "path"),
+                    "insertions": _read_nested_int(item, "insertions"),
+                    "deletions": _read_nested_int(item, "deletions"),
+                    "flags": _normalize_string_list(item.get("flags"), limit=6),
+                }
+            )
     return compact
 
 
-def _compact_snippets(items: list[Any]) -> list[dict[str, Any]]:
-    compact: list[dict[str, Any]] = []
+def _compact_snippet_paths(items: list[Any], *, hosted_compact_mode: bool) -> list[str]:
+    path_limit = 1 if hosted_compact_mode else 2
+    compact: list[str] = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        compact.append(
-            {
-                "path": _read_nested_string(item, "path"),
-                "reason": _truncate(_read_nested_string(item, "reason"), limit=180),
-                "flags": _normalize_string_list(item.get("flags"), limit=6),
-            }
-        )
+        path = _read_nested_string(item, "path")
+        if path is None:
+            continue
+        compact.append(path)
+        if len(compact) >= path_limit:
+            break
     return compact
 
 

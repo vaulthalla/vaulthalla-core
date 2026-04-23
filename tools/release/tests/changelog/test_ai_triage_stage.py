@@ -77,6 +77,42 @@ class AITriageStageTests(unittest.TestCase):
         self.assertEqual(call["temperature"], 0.0)
         self.assertEqual(call["max_output_tokens"], 123)
 
+    def test_run_triage_stage_hosted_gpt5_uses_compact_schema_and_prompt(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.ai_payload.v1",
+            "metadata": {"version": "2.4.0"},
+            "categories": [],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(
+            payload,
+            provider=fake,
+            provider_kind="openai",
+            model="gpt-5-nano",
+        )
+        call = fake.calls[0]
+        self.assertEqual(call["json_schema"]["properties"]["categories"]["maxItems"], 5)
+        self.assertIn("Compression mode (hosted)", call["user_prompt"])
+
+    def test_run_triage_stage_local_provider_keeps_default_schema_limits(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.ai_payload.v1",
+            "metadata": {"version": "2.4.0"},
+            "categories": [],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(
+            payload,
+            provider=fake,
+            provider_kind="openai-compatible",
+            model="gpt-5-nano",
+        )
+        call = fake.calls[0]
+        self.assertEqual(call["json_schema"]["properties"]["categories"]["maxItems"], 10)
+        self.assertNotIn("Compression mode (hosted)", call["user_prompt"])
+
     def test_render_triage_json_is_stable(self) -> None:
         triage = run_triage_stage(
             {"schema_version": "x", "metadata": {}, "categories": []},

@@ -3,87 +3,176 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from tools.release.changelog.ai.config import AIProviderKind
 
 AI_TRIAGE_SCHEMA_VERSION = "vaulthalla.release.ai_triage.v1"
 _OPTIONAL_TOP_LEVEL_STRING_ARRAY_FIELDS = ("dropped_noise", "caution_notes")
 _OPTIONAL_CATEGORY_STRING_ARRAY_FIELDS = ("important_files", "retained_snippets", "caution_notes")
 
-AI_TRIAGE_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": [
-        "schema_version",
-        "version",
-        "summary_points",
-        "categories",
-        "dropped_noise",
-        "caution_notes",
-    ],
-    "properties": {
-        "schema_version": {"type": "string", "const": AI_TRIAGE_SCHEMA_VERSION},
-        "version": {"type": "string", "minLength": 1, "maxLength": 80},
-        "summary_points": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 8,
-            "items": {"type": "string", "minLength": 1, "maxLength": 260},
-        },
-        "categories": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 10,
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "name",
-                    "signal_strength",
-                    "priority_rank",
-                    "key_points",
-                    "important_files",
-                    "retained_snippets",
-                    "caution_notes",
-                ],
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "maxLength": 60},
-                    "signal_strength": {"type": "string", "enum": ["strong", "moderate", "weak"]},
-                    "priority_rank": {"type": "integer", "minimum": 1, "maximum": 20},
-                    "key_points": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 6,
-                        "items": {"type": "string", "minLength": 1, "maxLength": 260},
-                    },
-                    "important_files": {
-                        "type": "array",
-                        "maxItems": 6,
-                        "items": {"type": "string", "minLength": 1, "maxLength": 240},
-                    },
-                    "retained_snippets": {
-                        "type": "array",
-                        "maxItems": 4,
-                        "items": {"type": "string", "minLength": 1, "maxLength": 420},
-                    },
-                    "caution_notes": {
-                        "type": "array",
-                        "maxItems": 4,
-                        "items": {"type": "string", "minLength": 1, "maxLength": 240},
+@dataclass(frozen=True)
+class _TriageSchemaLimits:
+    version_max_length: int
+    summary_points_max_items: int
+    summary_point_max_length: int
+    categories_max_items: int
+    category_name_max_length: int
+    priority_rank_maximum: int
+    key_points_max_items: int
+    key_point_max_length: int
+    important_files_max_items: int
+    important_file_max_length: int
+    retained_snippets_max_items: int
+    retained_snippet_max_length: int
+    category_caution_notes_max_items: int
+    category_caution_note_max_length: int
+    dropped_noise_max_items: int
+    dropped_noise_max_length: int
+    caution_notes_max_items: int
+    caution_note_max_length: int
+
+
+_DEFAULT_TRIAGE_SCHEMA_LIMITS = _TriageSchemaLimits(
+    version_max_length=80,
+    summary_points_max_items=8,
+    summary_point_max_length=260,
+    categories_max_items=10,
+    category_name_max_length=60,
+    priority_rank_maximum=20,
+    key_points_max_items=6,
+    key_point_max_length=260,
+    important_files_max_items=6,
+    important_file_max_length=240,
+    retained_snippets_max_items=4,
+    retained_snippet_max_length=420,
+    category_caution_notes_max_items=4,
+    category_caution_note_max_length=240,
+    dropped_noise_max_items=12,
+    dropped_noise_max_length=260,
+    caution_notes_max_items=8,
+    caution_note_max_length=260,
+)
+
+_HOSTED_COMPACT_TRIAGE_SCHEMA_LIMITS = _TriageSchemaLimits(
+    version_max_length=40,
+    summary_points_max_items=4,
+    summary_point_max_length=180,
+    categories_max_items=5,
+    category_name_max_length=50,
+    priority_rank_maximum=12,
+    key_points_max_items=3,
+    key_point_max_length=180,
+    important_files_max_items=3,
+    important_file_max_length=200,
+    retained_snippets_max_items=1,
+    retained_snippet_max_length=140,
+    category_caution_notes_max_items=2,
+    category_caution_note_max_length=180,
+    dropped_noise_max_items=6,
+    dropped_noise_max_length=180,
+    caution_notes_max_items=4,
+    caution_note_max_length=180,
+)
+
+
+def _build_triage_response_json_schema(limits: _TriageSchemaLimits) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "schema_version",
+            "version",
+            "summary_points",
+            "categories",
+            "dropped_noise",
+            "caution_notes",
+        ],
+        "properties": {
+            "schema_version": {"type": "string", "const": AI_TRIAGE_SCHEMA_VERSION},
+            "version": {"type": "string", "minLength": 1, "maxLength": limits.version_max_length},
+            "summary_points": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": limits.summary_points_max_items,
+                "items": {"type": "string", "minLength": 1, "maxLength": limits.summary_point_max_length},
+            },
+            "categories": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": limits.categories_max_items,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "name",
+                        "signal_strength",
+                        "priority_rank",
+                        "key_points",
+                        "important_files",
+                        "retained_snippets",
+                        "caution_notes",
+                    ],
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1, "maxLength": limits.category_name_max_length},
+                        "signal_strength": {"type": "string", "enum": ["strong", "moderate", "weak"]},
+                        "priority_rank": {"type": "integer", "minimum": 1, "maximum": limits.priority_rank_maximum},
+                        "key_points": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": limits.key_points_max_items,
+                            "items": {"type": "string", "minLength": 1, "maxLength": limits.key_point_max_length},
+                        },
+                        "important_files": {
+                            "type": "array",
+                            "maxItems": limits.important_files_max_items,
+                            "items": {"type": "string", "minLength": 1, "maxLength": limits.important_file_max_length},
+                        },
+                        "retained_snippets": {
+                            "type": "array",
+                            "maxItems": limits.retained_snippets_max_items,
+                            "items": {"type": "string", "minLength": 1, "maxLength": limits.retained_snippet_max_length},
+                        },
+                        "caution_notes": {
+                            "type": "array",
+                            "maxItems": limits.category_caution_notes_max_items,
+                            "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": limits.category_caution_note_max_length,
+                            },
+                        },
                     },
                 },
             },
+            "dropped_noise": {
+                "type": "array",
+                "maxItems": limits.dropped_noise_max_items,
+                "items": {"type": "string", "minLength": 1, "maxLength": limits.dropped_noise_max_length},
+            },
+            "caution_notes": {
+                "type": "array",
+                "maxItems": limits.caution_notes_max_items,
+                "items": {"type": "string", "minLength": 1, "maxLength": limits.caution_note_max_length},
+            },
         },
-        "dropped_noise": {
-            "type": "array",
-            "maxItems": 12,
-            "items": {"type": "string", "minLength": 1, "maxLength": 260},
-        },
-        "caution_notes": {
-            "type": "array",
-            "maxItems": 8,
-            "items": {"type": "string", "minLength": 1, "maxLength": 260},
-        },
-    },
-}
+    }
+
+
+AI_TRIAGE_RESPONSE_JSON_SCHEMA: dict[str, Any] = _build_triage_response_json_schema(
+    _DEFAULT_TRIAGE_SCHEMA_LIMITS
+)
+AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA: dict[str, Any] = _build_triage_response_json_schema(
+    _HOSTED_COMPACT_TRIAGE_SCHEMA_LIMITS
+)
+
+
+def resolve_triage_response_json_schema(
+    *,
+    provider_kind: AIProviderKind,
+    model: str | None,
+) -> dict[str, Any]:
+    if provider_kind == "openai" and isinstance(model, str) and model.strip().lower().startswith("gpt-5"):
+        return AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA
+    return AI_TRIAGE_RESPONSE_JSON_SCHEMA
 
 
 @dataclass(frozen=True)

@@ -5,12 +5,14 @@ from pathlib import Path
 import unittest
 
 from tools.release.changelog.ai.contracts.triage import (
+    AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA,
     AITriageResult,
     AI_TRIAGE_RESPONSE_JSON_SCHEMA,
     AI_TRIAGE_SCHEMA_VERSION,
     ai_triage_result_to_dict,
     build_triage_ir_payload,
     parse_ai_triage_response,
+    resolve_triage_response_json_schema,
 )
 from tools.release.changelog.ai.providers.parsing import parse_json_object_from_text
 
@@ -37,6 +39,31 @@ class AITriageContractsTests(unittest.TestCase):
                 "dropped_noise",
                 "caution_notes",
             ],
+        )
+
+    def test_hosted_compact_schema_is_smaller_for_triage(self) -> None:
+        default_categories_max = AI_TRIAGE_RESPONSE_JSON_SCHEMA["properties"]["categories"]["maxItems"]
+        hosted_categories_max = AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA["properties"]["categories"]["maxItems"]
+        default_summary_max = AI_TRIAGE_RESPONSE_JSON_SCHEMA["properties"]["summary_points"]["maxItems"]
+        hosted_summary_max = AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA["properties"]["summary_points"]["maxItems"]
+        self.assertLess(hosted_categories_max, default_categories_max)
+        self.assertLess(hosted_summary_max, default_summary_max)
+
+    def test_schema_resolver_uses_hosted_compact_for_hosted_gpt5(self) -> None:
+        resolved = resolve_triage_response_json_schema(provider_kind="openai", model="gpt-5-nano")
+        self.assertEqual(
+            resolved["properties"]["categories"]["maxItems"],
+            AI_TRIAGE_HOSTED_COMPACT_RESPONSE_JSON_SCHEMA["properties"]["categories"]["maxItems"],
+        )
+
+    def test_schema_resolver_keeps_default_for_local_compatible(self) -> None:
+        resolved = resolve_triage_response_json_schema(
+            provider_kind="openai-compatible",
+            model="gpt-5-nano",
+        )
+        self.assertEqual(
+            resolved["properties"]["categories"]["maxItems"],
+            AI_TRIAGE_RESPONSE_JSON_SCHEMA["properties"]["categories"]["maxItems"],
         )
 
     def test_parse_valid_response_fixture(self) -> None:

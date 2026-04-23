@@ -65,7 +65,6 @@ def _build_triage_response_json_schema(limits: _TriageSchemaLimits) -> dict[str,
         "required": [
             "schema_version",
             "version",
-            "summary_points",
             "categories",
         ],
         "properties": {
@@ -174,7 +173,7 @@ def parse_ai_triage_response(data: Any) -> AITriageResult:
         )
 
     version = _read_non_empty_string(normalized_data, "version")
-    summary_points = _read_non_empty_string_list(normalized_data, "summary_points", required=True)
+    summary_points = _read_non_empty_string_list(normalized_data, "summary_points")
     categories_raw = normalized_data.get("categories")
     if not isinstance(categories_raw, list) or not categories_raw:
         raise ValueError("AI triage response must include non-empty `categories` list.")

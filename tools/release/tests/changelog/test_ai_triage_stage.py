@@ -152,6 +152,18 @@ class AITriageStageTests(unittest.TestCase):
         self.assertIsNone(category.operator_note)
         self.assertIsNone(triage.operator_note)
 
+    def test_run_triage_stage_allows_missing_summary_points(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
+            "categories": [],
+        }
+        response = _load_json_fixture("ai_triage_valid.json")
+        response.pop("summary_points", None)
+
+        triage = run_triage_stage(payload, provider=_FakeProvider(response))
+        self.assertEqual(triage.summary_points, ())
+
 
 if __name__ == "__main__":
     unittest.main()

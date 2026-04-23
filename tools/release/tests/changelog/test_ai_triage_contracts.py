@@ -34,7 +34,6 @@ class AITriageContractsTests(unittest.TestCase):
             [
                 "schema_version",
                 "version",
-                "summary_points",
                 "categories",
             ],
         )
@@ -94,6 +93,12 @@ class AITriageContractsTests(unittest.TestCase):
         raw["categories"][0]["evidence_refs"] = ["", "  ", None, 1, "core/path#kind"]
         parsed = parse_ai_triage_response(raw)
         self.assertEqual(parsed.categories[0].evidence_refs, ("core/path#kind",))
+
+    def test_parse_allows_missing_summary_points(self) -> None:
+        raw = _load_json_fixture("ai_triage_valid.json")
+        raw.pop("summary_points", None)
+        parsed = parse_ai_triage_response(raw)
+        self.assertEqual(parsed.summary_points, ())
 
     def test_required_grounded_claims_still_rejects_non_string(self) -> None:
         raw = _load_json_fixture("ai_triage_valid.json")

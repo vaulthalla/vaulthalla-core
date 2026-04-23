@@ -1025,6 +1025,76 @@ profiles:
             self.assertEqual(notes_target.read_text(encoding="utf-8"), "# Public Notes\n- polished item\n")
             self.assertIn("Wrote AI release notes to", out.getvalue())
 
+    def test_ai_draft_release_notes_uses_draft_input_even_when_polish_enabled(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      draft:
+        model: gpt-5-mini
+      polish:
+        model: gpt-5.4
+      release_notes:
+        model: gpt-5.4
+""",
+                encoding="utf-8",
+            )
+            output_target = repo_root / ".changelog_scratch" / "changelog.release.md"
+            notes_target = repo_root / ".changelog_scratch" / "release_notes.md"
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+                output=str(output_target),
+                release_notes_output=str(notes_target),
+            )
+            provider_obj = object()
+            draft_obj = object()
+            polish_obj = object()
+            release_notes_obj = SimpleNamespace(markdown="# Public Notes\n- from draft\n")
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=draft_obj),
+                patch("tools.release.cli.render_draft_markdown", return_value="# Draft Output\n- d\n"),
+                patch("tools.release.cli.run_polish_stage", return_value=polish_obj) as run_polish,
+                patch("tools.release.cli.render_polish_markdown", return_value="# Polished Output\n- p\n"),
+                patch("tools.release.cli.run_release_notes_stage", return_value=release_notes_obj) as run_release_notes,
+                patch("tools.release.cli.run_triage_stage"),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+            run_polish.assert_called_once_with(
+                draft_obj,
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=800,
+            )
+            run_release_notes.assert_called_once_with(
+                "# Draft Output\n- d\n",
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=1200,
+            )
+            rendered_changelog = output_target.read_text(encoding="utf-8")
+            self.assertIn("# Polished Output", rendered_changelog)
+            self.assertEqual(notes_target.read_text(encoding="utf-8"), "# Public Notes\n- from draft\n")
+
     def test_ai_draft_triage_and_polish_pipeline_order(self) -> None:
         triage_obj = object()
         draft_obj = object()

@@ -1075,6 +1075,7 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             },
         )
         raise _stage_failure("Draft", exc) from exc
+    draft_markdown: str | None = None
     polish_result: AIPolishResult | None = None
 
     if run_polish:
@@ -1106,18 +1107,23 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             )
             raise _stage_failure("Polish", exc) from exc
         final_markdown = render_polish_markdown(polish_result)
+        if run_release_notes:
+            draft_markdown = render_draft_markdown(draft)
 
         if args.save_polish_json:
             write_output(render_polish_result_json(polish_result), args.save_polish_json)
             print(f"Wrote AI polish JSON to {Path(args.save_polish_json).resolve()}")
     else:
         final_markdown = render_draft_markdown(draft)
+        draft_markdown = final_markdown
 
     if run_release_notes:
+        if draft_markdown is None:
+            draft_markdown = render_draft_markdown(draft)
         release_notes_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="release_notes")
         try:
             release_notes = run_release_notes_stage(
-                final_markdown,
+                draft_markdown,
                 provider=release_notes_provider,
                 provider_kind=pipeline_config.provider,
                 reasoning_effort=release_notes_stage_cfg.reasoning_effort,

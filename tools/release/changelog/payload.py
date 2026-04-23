@@ -14,12 +14,18 @@ from tools.release.changelog.models import (
     DiffSnippet,
     FileChange,
     ReleaseContext,
+    SemanticCommitCandidate,
     SemanticHunk,
     SemanticReleasePayload,
 )
+from tools.release.changelog.scoring import is_semantic_noise_path
 
 AI_PAYLOAD_SCHEMA_VERSION = "vaulthalla.release.ai_payload.v1"
 AI_SEMANTIC_PAYLOAD_SCHEMA_VERSION = "vaulthalla.release.semantic_payload.v1"
+
+_SEMANTIC_COMMIT_SUBJECT_MAX_CHARS = 220
+_SEMANTIC_COMMIT_BODY_MAX_CHARS = 900
+_SEMANTIC_COMMIT_SAMPLE_PATHS_CAP = 8
 
 _SEMANTIC_KIND_PRIORITY: dict[str, int] = {
     "api-contract": 10,
@@ -221,9 +227,10 @@ def build_semantic_ai_payload(
     config: PayloadBuildConfig | None = None,
 ) -> dict[str, Any]:
     """Build deterministic semantic-first payload in parallel to forensic payload."""
-    cfg = config if config is not None else PayloadBuildConfig()
+    cfg = config if config is not None else _default_semantic_payload_config()
     ordered_categories = _ordered_categories(context)
     selected: list[CategorySemanticPacket] = []
+    all_commits = tuple(_collect_semantic_commit_candidates(context))
 
     for name, category in ordered_categories:
         signal_strength = classify_signal_strength(category)
@@ -248,6 +255,7 @@ def build_semantic_ai_payload(
         head_sha=context.head_sha,
         commit_count=context.commit_count,
         categories=tuple(selected),
+        all_commits=all_commits,
         notes=notes,
     )
     return asdict(semantic)
@@ -255,6 +263,108 @@ def build_semantic_ai_payload(
 
 def render_semantic_ai_payload_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, sort_keys=False) + "\n"
+
+
+def _default_semantic_payload_config() -> PayloadBuildConfig:
+    return PayloadBuildConfig(
+        limits=PayloadLimits(
+            max_categories=None,
+            max_commits_per_category=16,
+            max_files_per_category=10,
+            max_snippets_per_category=20,
+            max_snippet_lines=28,
+            max_snippet_chars=1400,
+            max_commit_subject_chars=220,
+            max_snippet_reason_chars=320,
+        ),
+        include_weak_categories=True,
+    )
+
+
+def _collect_semantic_commit_candidates(context: ReleaseContext) -> list[SemanticCommitCandidate]:
+    ordered_commits = _ordered_commits(context)
+    return [_build_semantic_commit_candidate(commit) for commit in ordered_commits]
+
+
+def _ordered_commits(context: ReleaseContext) -> list[CommitInfo]:
+    if context.commits:
+        return list(context.commits)
+
+    ordered: list[CommitInfo] = []
+    seen: set[str] = set()
+    for category_name, category in _ordered_categories(context):
+        _ = category_name
+        for commit in category.commits:
+            if commit.sha in seen:
+                continue
+            seen.add(commit.sha)
+            ordered.append(commit)
+    for commit in context.uncategorized_commits:
+        if commit.sha in seen:
+            continue
+        seen.add(commit.sha)
+        ordered.append(commit)
+    return ordered
+
+
+def _build_semantic_commit_candidate(commit: CommitInfo) -> SemanticCommitCandidate:
+    subject = _truncate_text(commit.subject.strip(), _SEMANTIC_COMMIT_SUBJECT_MAX_CHARS)[0]
+    body = commit.body.strip()
+    body_value: str | None = None
+    if body:
+        body_value = _truncate_text(body, _SEMANTIC_COMMIT_BODY_MAX_CHARS)[0]
+    sample_paths = _semantic_commit_sample_paths(commit.files)
+    weight_score = _commit_weight_score(commit)
+    return SemanticCommitCandidate(
+        sha=commit.sha,
+        subject=subject,
+        body=body_value,
+        categories=tuple(commit.categories),
+        changed_files=len(commit.files),
+        insertions=commit.insertions,
+        deletions=commit.deletions,
+        weight_score=weight_score,
+        weight=_commit_weight_bucket(weight_score),
+        sample_paths=sample_paths,
+    )
+
+
+def _semantic_commit_sample_paths(paths: list[str]) -> tuple[str, ...]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        cleaned = path.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        if is_semantic_noise_path(cleaned):
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+        if len(out) >= _SEMANTIC_COMMIT_SAMPLE_PATHS_CAP:
+            break
+    return tuple(out)
+
+
+def _commit_weight_score(commit: CommitInfo) -> int:
+    churn = commit.insertions + commit.deletions
+    file_count = len(commit.files)
+    body_weight = min(len(commit.body.strip()), 600) // 40 if commit.body.strip() else 0
+    score = churn + (file_count * 18) + body_weight
+    if churn >= 400:
+        score += 140
+    elif churn >= 180:
+        score += 70
+    elif churn >= 80:
+        score += 30
+    return int(score)
+
+
+def _commit_weight_bucket(score: int) -> str:
+    if score >= 320:
+        return "heavy"
+    if score >= 120:
+        return "medium"
+    return "light"
 
 
 def classify_signal_strength(category: CategoryContext) -> str:
@@ -277,9 +387,11 @@ def _build_category_semantic_packet(
     limits: PayloadLimits,
 ) -> CategorySemanticPacket:
     selected_semantic_snippets = _select_semantic_snippets(category.snippets, limits)
+    category_commit_candidates = tuple(_build_semantic_commit_candidate(commit) for commit in category.commits)
     commit_subjects = tuple(
         _truncate_text(commit.subject.strip(), limits.max_commit_subject_chars)[0]
-        for commit in category.commits[: limits.max_commits_per_category]
+        for commit in category.commits
+        if commit.subject.strip()
     )
     supporting_files = _build_semantic_supporting_files(
         category,
@@ -307,6 +419,7 @@ def _build_category_semantic_packet(
         signal_strength=signal_strength,
         summary_hint=_build_category_summary_hint(name, category, semantic_hunks),
         key_commits=commit_subjects,
+        candidate_commits=category_commit_candidates,
         supporting_files=supporting_files,
         semantic_hunks=tuple(semantic_hunks),
         caution_notes=caution_notes,
@@ -361,11 +474,13 @@ def _build_semantic_supporting_files(
     selected_snippets: list[tuple[DiffSnippet, str]],
     limits: PayloadLimits,
 ) -> tuple[str, ...]:
-    cap = max(1, min(limits.max_files_per_category, 2))
+    cap = _semantic_supporting_files_cap(category, limits)
     selected: list[str] = []
     seen: set[str] = set()
 
     for snippet, _kind in selected_snippets:
+        if is_semantic_noise_path(snippet.path):
+            continue
         if snippet.path in seen:
             continue
         selected.append(snippet.path)
@@ -374,6 +489,8 @@ def _build_semantic_supporting_files(
             return tuple(selected)
 
     for file_change in category.files:
+        if is_semantic_noise_path(file_change.path):
+            continue
         if file_change.path in seen:
             continue
         selected.append(file_change.path)
@@ -384,6 +501,16 @@ def _build_semantic_supporting_files(
     return tuple(selected)
 
 
+def _semantic_supporting_files_cap(category: CategoryContext, limits: PayloadLimits) -> int:
+    change_total = category.insertions + category.deletions
+    heaviness = 0
+    heaviness += min(category.commit_count // 4, 4)
+    heaviness += min(change_total // 240, 4)
+    heaviness += min(len(category.files) // 8, 3)
+    dynamic_cap = 3 + (heaviness * 2)
+    return max(2, min(limits.max_files_per_category, dynamic_cap))
+
+
 def _select_semantic_snippets(
     snippets: list[DiffSnippet],
     limits: PayloadLimits,
@@ -391,15 +518,39 @@ def _select_semantic_snippets(
     if not snippets:
         return []
 
+    eligible_snippets = [snippet for snippet in snippets if not is_semantic_noise_path(snippet.path)]
+    if not eligible_snippets:
+        return []
+
     ranked: list[tuple[float, int, DiffSnippet, str]] = []
-    for index, snippet in enumerate(snippets):
+    for index, snippet in enumerate(eligible_snippets):
         kind = _classify_semantic_hunk_kind(snippet)
         semantic_score = _score_semantic_snippet(snippet, kind)
         ranked.append((semantic_score, index, snippet, kind))
 
     ranked.sort(key=lambda item: (-item[0], item[1], item[2].path))
-    selected = ranked[: limits.max_snippets_per_category]
+    selected_cap = _semantic_snippet_cap(eligible_snippets, limits)
+    selected = ranked[:selected_cap]
     return [(snippet, kind) for _score, _index, snippet, kind in selected]
+
+
+def _semantic_snippet_cap(snippets: list[DiffSnippet], limits: PayloadLimits) -> int:
+    if not snippets:
+        return 0
+    if limits.max_snippets_per_category <= 3:
+        return max(1, min(len(snippets), limits.max_snippets_per_category))
+    total_change = sum(
+        max(_count_changed_lines(snippet.patch), 1)
+        for snippet in snippets
+    )
+    heavy_snippet_count = sum(1 for snippet in snippets if _count_changed_lines(snippet.patch) >= 12)
+    dynamic_cap = (
+        limits.max_snippets_per_category
+        + min(len(snippets) // 3, 24)
+        + min(total_change // 140, 24)
+        + min(heavy_snippet_count // 2, 12)
+    )
+    return max(1, min(len(snippets), dynamic_cap))
 
 
 def _score_semantic_snippet(snippet: DiffSnippet, kind: str) -> float:
@@ -488,8 +639,8 @@ def _classify_semantic_hunk_kind(snippet: DiffSnippet) -> str:
 
 
 def _build_semantic_excerpt(patch: str, limits: PayloadLimits) -> str:
-    max_lines = min(limits.max_snippet_lines, 10)
-    max_chars = min(limits.max_snippet_chars, 500)
+    max_lines = min(limits.max_snippet_lines, 18)
+    max_chars = min(limits.max_snippet_chars, 900)
     raw_lines = patch.strip().splitlines() if patch.strip() else []
     if not raw_lines:
         return ""
@@ -596,6 +747,10 @@ def _semantic_changed_lines(patch: str) -> list[str]:
         if line.startswith("+") or line.startswith("-"):
             lines.append(line)
     return lines
+
+
+def _count_changed_lines(patch: str) -> int:
+    return len(_semantic_changed_lines(patch))
 
 
 def _is_import_only_hunk(lines: list[str]) -> bool:

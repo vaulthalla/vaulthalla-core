@@ -49,6 +49,7 @@ class ReleaseContext:
     head_sha: str
     commit_count: int
     categories: dict[str, CategoryContext]
+    commits: list[CommitInfo] = field(default_factory=list)
     uncategorized_commits: list[CommitInfo] = field(default_factory=list)
     cross_cutting_notes: list[str] = field(default_factory=list)
 
@@ -62,11 +63,26 @@ class SemanticHunk:
 
 
 @dataclass(frozen=True)
+class SemanticCommitCandidate:
+    sha: str
+    subject: str
+    body: str | None
+    categories: tuple[str, ...]
+    changed_files: int
+    insertions: int
+    deletions: int
+    weight_score: int
+    weight: str
+    sample_paths: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class CategorySemanticPacket:
     name: str
     signal_strength: str
     summary_hint: str
     key_commits: tuple[str, ...]
+    candidate_commits: tuple[SemanticCommitCandidate, ...]
     supporting_files: tuple[str, ...]
     semantic_hunks: tuple[SemanticHunk, ...]
     caution_notes: tuple[str, ...] = ()
@@ -80,4 +96,5 @@ class SemanticReleasePayload:
     head_sha: str
     commit_count: int
     categories: tuple[CategorySemanticPacket, ...]
+    all_commits: tuple[SemanticCommitCandidate, ...] = ()
     notes: tuple[str, ...] = ()

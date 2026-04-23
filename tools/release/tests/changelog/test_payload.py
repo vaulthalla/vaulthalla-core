@@ -577,9 +577,17 @@ class PayloadContractTests(unittest.TestCase):
         self.assertEqual(payload["schema_version"], AI_SEMANTIC_PAYLOAD_SCHEMA_VERSION)
         self.assertEqual(payload["version"], "2.4.0")
         self.assertEqual([item["name"] for item in payload["categories"]], ["debian", "tools", "core", "meta"])
+        self.assertEqual(len(payload["all_commits"]), 7)
+        self.assertIn("subject", payload["all_commits"][0])
+        self.assertIn("weight", payload["all_commits"][0])
+        self.assertIn("weight_score", payload["all_commits"][0])
         core = payload["categories"][2]
         self.assertIn("summary_hint", core)
         self.assertIn("key_commits", core)
+        self.assertEqual(len(core["key_commits"]), 3)
+        self.assertIn("candidate_commits", core)
+        self.assertEqual(len(core["candidate_commits"]), 3)
+        self.assertIn("changed_files", core["candidate_commits"][0])
         self.assertIn("supporting_files", core)
         self.assertIn("semantic_hunks", core)
         self.assertIn("kind", core["semantic_hunks"][0])
@@ -611,6 +619,61 @@ class PayloadContractTests(unittest.TestCase):
         first = render_semantic_ai_payload_json(build_semantic_ai_payload(context))
         second = render_semantic_ai_payload_json(build_semantic_ai_payload(context))
         self.assertEqual(first, second)
+
+    def test_semantic_payload_preserves_commit_body_in_candidate_corpus(self) -> None:
+        commit = CommitInfo(
+            sha="abcdabcdabcdabcd",
+            subject="Carry detailed commit body into semantic candidates",
+            body="Preserve detailed commit context for downstream triage.",
+            files=["tools/release/changelog/payload.py"],
+            insertions=12,
+            deletions=3,
+            categories=["tools"],
+        )
+        context = ReleaseContext(
+            version="2.5.1",
+            previous_tag="v2.5.0",
+            head_sha="abcd1234abcd1234",
+            commit_count=1,
+            categories={
+                "tools": CategoryContext(
+                    name="tools",
+                    commit_count=1,
+                    insertions=12,
+                    deletions=3,
+                    commits=[commit],
+                    files=[
+                        FileChange(
+                            path="tools/release/changelog/payload.py",
+                            category="tools",
+                            subscopes=("release", "changelog"),
+                            insertions=12,
+                            deletions=3,
+                            commit_count=1,
+                            score=9.8,
+                            flags=("release-tooling",),
+                        )
+                    ],
+                    snippets=[
+                        DiffSnippet(
+                            path="tools/release/changelog/payload.py",
+                            category="tools",
+                            subscopes=("release", "changelog"),
+                            score=7.2,
+                            reason="Selected semantic commit body preservation hunk",
+                            patch="@@ -1,2 +1,3 @@\n+candidate commit bodies are preserved",
+                            flags=("release-tooling",),
+                        )
+                    ],
+                    detected_themes=["release-automation"],
+                )
+            },
+            commits=[commit],
+            cross_cutting_notes=[],
+        )
+        payload = build_semantic_ai_payload(context)
+        all_commits = payload["all_commits"]
+        self.assertTrue(any(item.get("body") for item in all_commits))
 
 
 if __name__ == "__main__":

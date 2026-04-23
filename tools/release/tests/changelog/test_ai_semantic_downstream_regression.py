@@ -26,6 +26,8 @@ class AISemanticDownstreamRegressionTests(unittest.TestCase):
         self.assertIn("semantic payload (compact projection)", lower)
         self.assertIn("summary_hint", lower)
         self.assertIn("semantic_hunks", lower)
+        self.assertIn("candidate_commits", lower)
+        self.assertIn("all_commits", lower)
         self.assertIn("kind", lower)
         self.assertIn("why_selected", lower)
         self.assertIn("grounded_claims", lower)

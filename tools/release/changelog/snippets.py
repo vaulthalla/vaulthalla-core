@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tools.release.changelog.git_collect import get_file_patch
 from tools.release.changelog.models import CategoryContext, DiffSnippet, FileChange
-from tools.release.changelog.scoring import score_patch_hunk
+from tools.release.changelog.scoring import is_semantic_noise_path, score_patch_hunk
 
 HUNK_HEADER_RE = re.compile(r"^@@ .* @@.*$", re.MULTILINE)
 
@@ -50,7 +50,16 @@ def extract_relevant_snippets(
 
     for category_name, context in category_contexts.items():
         snippets: list[DiffSnippet] = []
-        candidate_files = context.files[:max_files_per_category]
+        max_files, base_hunks_per_file, max_total_snippets = _category_snippet_budget(
+            context,
+            max_files_per_category=max_files_per_category,
+            max_hunks_per_file=max_hunks_per_file,
+        )
+        candidate_files = [
+            file_change
+            for file_change in context.files
+            if not is_semantic_noise_path(file_change.path)
+        ][:max_files]
 
         for file_change in candidate_files:
             patch = get_file_patch(repo_root, file_change.path, previous_tag)
@@ -67,7 +76,15 @@ def extract_relevant_snippets(
                 reverse=True,
             )
 
-            for hunk in ranked_hunks[:max_hunks_per_file]:
+            file_hunk_cap = _file_hunk_cap(
+                file_change,
+                base_hunks_per_file=base_hunks_per_file,
+                remaining=max_total_snippets - len(snippets),
+            )
+            if file_hunk_cap <= 0:
+                break
+
+            for hunk in ranked_hunks[:file_hunk_cap]:
                 snippet_score = score_patch_hunk(hunk, category_name, file_change.path)
                 reason = build_snippet_reason(file_change, hunk, category_name)
                 snippets.append(
@@ -81,8 +98,45 @@ def extract_relevant_snippets(
                         flags=file_change.flags,
                     )
                 )
+                if len(snippets) >= max_total_snippets:
+                    break
+            if len(snippets) >= max_total_snippets:
+                break
 
         snippets.sort(key=lambda item: item.score, reverse=True)
         results[category_name] = snippets
 
     return results
+
+
+def _category_snippet_budget(
+    context: CategoryContext,
+    *,
+    max_files_per_category: int,
+    max_hunks_per_file: int,
+) -> tuple[int, int, int]:
+    change_total = context.insertions + context.deletions
+    heaviness = 0
+    heaviness += min(context.commit_count // 3, 5)
+    heaviness += min(change_total // 220, 5)
+    heaviness += min(len(context.files) // 8, 4)
+
+    file_cap = min(36, max_files_per_category + (heaviness * 3))
+    hunk_cap = min(10, max_hunks_per_file + min(heaviness, 5))
+    total_snippet_cap = min(260, 18 + (context.commit_count * 5) + (heaviness * 12))
+    return file_cap, hunk_cap, total_snippet_cap
+
+
+def _file_hunk_cap(
+    file_change: FileChange,
+    *,
+    base_hunks_per_file: int,
+    remaining: int,
+) -> int:
+    if remaining <= 0:
+        return 0
+    change_total = file_change.insertions + file_change.deletions
+    commit_touch_bonus = min(file_change.commit_count, 4) - 1 if file_change.commit_count > 1 else 0
+    change_bonus = min(change_total // 140, 4)
+    cap = base_hunks_per_file + max(commit_touch_bonus, 0) + change_bonus
+    return max(1, min(cap, remaining))

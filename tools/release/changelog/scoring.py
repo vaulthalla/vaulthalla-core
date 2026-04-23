@@ -176,4 +176,21 @@ def _is_noise_path(path: str) -> bool:
         "/coverage/",
         "/test-assets/",
     )
-    return any(part in f"/{path}" for part in noisy_parts)
+    if any(part in f"/{path}" for part in noisy_parts):
+        return True
+
+    return is_semantic_noise_path(path)
+
+
+def is_semantic_noise_path(path: str) -> bool:
+    normalized = path.strip().replace("\\", "/").lower()
+    if not normalized:
+        return True
+    if normalized == "debian/changelog":
+        return True
+    derived_prefixes = (
+        ".changelog_scratch/",
+        ".codex/context/",
+        ".codex/scratch/",
+    )
+    return any(normalized.startswith(prefix) for prefix in derived_prefixes)

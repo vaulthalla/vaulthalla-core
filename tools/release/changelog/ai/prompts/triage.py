@@ -51,6 +51,8 @@ def build_triage_user_prompt(
         "- Keep only evidence needed for downstream drafting.\n"
         "- Create a category only when at least one concrete supporting item exists.\n"
         "- Rank categories by `priority_rank` (1 is highest).\n"
+        "- Use semantic hunk excerpts plus commit candidates (`candidate_commits`, `all_commits`) as primary evidence.\n"
+        "- Preserve major commit themes; do not collapse commit evidence to path-only summaries.\n"
         f"- When `summary_points` is present, keep it concise and evidence-bound (max {summary_max_items}).\n"
         f"- Keep category `grounded_claims` concise and evidence-bound (max {grounded_claims_max_items}).\n"
         "- Use category `theme` as a compact meaning-first descriptor of what changed.\n"
@@ -80,19 +82,29 @@ def _build_compact_payload_projection(
 ) -> dict[str, Any]:
     categories_raw = _as_sequence(payload.get("categories"))
     notes_raw = payload.get("notes")
-    category_limit = 6 if hosted_compact_mode else 10
-    notes_limit = 4 if hosted_compact_mode else 8
-    commit_limit = 2 if hosted_compact_mode else 3
-    hunk_limit = 2 if hosted_compact_mode else 3
-    files_limit = 1 if hosted_compact_mode else 2
+    release_commit_count = _read_nested_int(payload, "commit_count") or 0
+    category_limit = _category_projection_limit(release_commit_count, hosted_compact_mode=hosted_compact_mode)
+    notes_limit = 8 if hosted_compact_mode else 14
+    key_commit_limit = _key_commit_projection_limit(release_commit_count, hosted_compact_mode=hosted_compact_mode)
+    hunk_limit = _hunk_projection_limit(release_commit_count, hosted_compact_mode=hosted_compact_mode)
+    files_limit = 3 if hosted_compact_mode else 6
+    commit_candidate_limit = _commit_candidate_projection_limit(
+        release_commit_count,
+        hosted_compact_mode=hosted_compact_mode,
+    )
 
     compact: dict[str, Any] = {
         "schema_version": payload.get("schema_version"),
         "version": _read_nested_string(payload, "version"),
         "previous_tag": _read_nested_string(payload, "previous_tag"),
         "head_sha": _read_nested_string(payload, "head_sha"),
-        "commit_count": _read_nested_int(payload, "commit_count"),
+        "commit_count": release_commit_count if release_commit_count > 0 else None,
         "categories": [],
+        "all_commits": _compact_commit_candidates(
+            payload.get("all_commits"),
+            limit=commit_candidate_limit,
+            include_body=not hosted_compact_mode,
+        ),
         "notes": _normalize_string_list(notes_raw, limit=notes_limit),
     }
 
@@ -100,12 +112,22 @@ def _build_compact_payload_projection(
     for category in categories_raw[:category_limit]:
         if not isinstance(category, dict):
             continue
+        category_commit_count = len(_as_sequence(category.get("candidate_commits")))
+        category_commit_limit = _commit_candidate_projection_limit(
+            category_commit_count if category_commit_count > 0 else release_commit_count,
+            hosted_compact_mode=hosted_compact_mode,
+        )
         categories.append(
             {
                 "name": _read_nested_string(category, "name"),
                 "signal_strength": _read_nested_string(category, "signal_strength"),
                 "summary_hint": _truncate(_read_nested_string(category, "summary_hint"), limit=220),
-                "key_commits": _normalize_string_list(category.get("key_commits"), limit=commit_limit),
+                "key_commits": _normalize_string_list(category.get("key_commits"), limit=key_commit_limit),
+                "candidate_commits": _compact_commit_candidates(
+                    category.get("candidate_commits"),
+                    limit=category_commit_limit,
+                    include_body=not hosted_compact_mode,
+                ),
                 "semantic_hunks": _compact_semantic_hunks(
                     category.get("semantic_hunks"),
                     hosted_compact_mode=hosted_compact_mode,
@@ -194,3 +216,62 @@ def _as_sequence(raw: Any) -> list[Any]:
     if isinstance(raw, tuple):
         return list(raw)
     return []
+
+
+def _category_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:
+    if hosted_compact_mode:
+        return max(8, min(20, release_commit_count + 6))
+    return max(12, min(36, release_commit_count + 12))
+
+
+def _key_commit_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:
+    if hosted_compact_mode:
+        return max(6, min(24, (release_commit_count * 2) + 4))
+    return max(12, min(64, (release_commit_count * 3) + 8))
+
+
+def _hunk_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:
+    if hosted_compact_mode:
+        return max(4, min(14, (release_commit_count // 2) + 4))
+    return max(8, min(24, release_commit_count + 6))
+
+
+def _commit_candidate_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:
+    if hosted_compact_mode:
+        return max(24, min(220, (release_commit_count * 4) + 20))
+    return max(40, min(400, (release_commit_count * 6) + 32))
+
+
+def _compact_commit_candidates(
+    raw: Any,
+    *,
+    limit: int,
+    include_body: bool,
+) -> list[dict[str, Any]]:
+    items = _as_sequence(raw)
+    compact: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        subject = _truncate(_read_nested_string(item, "subject"), limit=220)
+        if not subject:
+            continue
+        candidate: dict[str, Any] = {
+            "sha": _truncate(_read_nested_string(item, "sha"), limit=16),
+            "subject": subject,
+            "categories": _normalize_string_list(item.get("categories"), limit=8),
+            "weight": _read_nested_string(item, "weight"),
+            "weight_score": _read_nested_int(item, "weight_score"),
+            "changed_files": _read_nested_int(item, "changed_files"),
+            "insertions": _read_nested_int(item, "insertions"),
+            "deletions": _read_nested_int(item, "deletions"),
+            "sample_paths": _normalize_string_list(item.get("sample_paths"), limit=6),
+        }
+        if include_body:
+            body = _truncate(_read_nested_string(item, "body"), limit=300)
+            if body:
+                candidate["body"] = body
+        compact.append(candidate)
+        if len(compact) >= limit:
+            break
+    return compact

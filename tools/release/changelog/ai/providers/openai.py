@@ -246,9 +246,12 @@ class OpenAIProvider:
             "attempts": [],
         }
         if mode_chain != initial_mode_chain:
-            if _is_hosted_gpt5_model(provider_kind=self.provider_kind, model=self.model) and stage == "triage":
+            if _is_hosted_gpt5_model(provider_kind=self.provider_kind, model=self.model) and stage in {
+                "triage",
+                "emergency_triage",
+            }:
                 trace["resolved_settings"]["degradations"].append(
-                    "Hosted OpenAI GPT-5 triage prefers answer-first `prompt_json` before strict schema and skips `json_object` fallback."
+                    "Hosted OpenAI GPT-5 triage lanes prefer answer-first `prompt_json` before strict schema and skip `json_object` fallback."
                 )
             else:
                 trace["resolved_settings"]["degradations"].append(
@@ -1049,10 +1052,10 @@ def _resolve_runtime_mode_chain(
     filtered = tuple(mode for mode in mode_chain if mode != "json_object")
     if not filtered:
         return mode_chain
-    if stage != "triage":
+    if stage not in {"triage", "emergency_triage"}:
         return filtered
 
-    # For hosted GPT-5 triage, lead with prompt_json to maximize answer-start probability.
+    # For hosted GPT-5 triage/emergency_triage, lead with prompt_json to maximize answer-start probability.
     ordered: list[AIStructuredMode] = []
     if "prompt_json" in filtered:
         ordered.append("prompt_json")
@@ -1069,8 +1072,8 @@ def _resolve_attempt_reasoning_effort(
     structured_mode: AIStructuredMode,
     requested_reasoning_effort: AIReasoningEffort | None,
 ) -> AIReasoningEffort | None:
-    if _is_hosted_gpt5_model(provider_kind=provider_kind, model=model) and stage == "triage":
-        # For hosted GPT-5 triage, enforce explicit low reasoning to avoid opaque default effort.
+    if _is_hosted_gpt5_model(provider_kind=provider_kind, model=model) and stage in {"triage", "emergency_triage"}:
+        # For hosted GPT-5 triage lanes, enforce explicit low reasoning to avoid opaque default effort.
         return requested_reasoning_effort or "low"
     return requested_reasoning_effort
 
@@ -1085,7 +1088,7 @@ def _resolve_attempt_max_output_tokens(
 ) -> int | None:
     if requested_max_output_tokens is None:
         return None
-    if _is_hosted_gpt5_model(provider_kind=provider_kind, model=model) and stage == "triage":
+    if _is_hosted_gpt5_model(provider_kind=provider_kind, model=model) and stage in {"triage", "emergency_triage"}:
         if structured_mode == "strict_json_schema":
             return max(requested_max_output_tokens, _HOSTED_TRIAGE_STRICT_MIN_OUTPUT_TOKENS)
         if structured_mode == "prompt_json":

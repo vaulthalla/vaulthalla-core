@@ -836,6 +836,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
                 structured_mode=None,
                 temperature=0.0,
                 max_output_tokens_policy=300,
+                input_mode="raw_semantic",
             )
             build_provider.assert_has_calls(
                 [
@@ -894,6 +895,106 @@ class CliChangelogAIDraftTests(unittest.TestCase):
                 ]
             )
             self.assertIn("Wrote AI triage JSON to", out.getvalue())
+
+    def test_ai_draft_emergency_triage_routes_triage_to_synthesized_mode_and_writes_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-mini
+""",
+                encoding="utf-8",
+            )
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+                use_triage=False,
+            )
+            out = StringIO()
+            provider_obj = object()
+            emergency_obj = object()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch(
+                    "tools.release.cli.build_semantic_ai_payload",
+                    return_value={
+                        "schema_version": "vaulthalla.release.semantic_payload.v1",
+                        "version": "1.2.3",
+                        "categories": [],
+                    },
+                ),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.run_emergency_triage_stage", return_value=emergency_obj) as run_emergency,
+                patch(
+                    "tools.release.cli.render_emergency_triage_result_json",
+                    return_value='{"schema_version":"vaulthalla.release.ai_emergency_triage.v1","version":"1.2.3","items":[]}\n',
+                ),
+                patch(
+                    "tools.release.cli.build_triage_input_from_emergency_result",
+                    return_value={"schema_version": "vaulthalla.release.triage_input.synthesized.v1", "categories": []},
+                ) as build_triage_input,
+                patch("tools.release.cli.run_triage_stage", return_value=object()) as run_triage,
+                patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=object()),
+                patch("tools.release.cli.render_draft_markdown", return_value="# AI Draft\n"),
+                patch("tools.release.cli.render_draft_result_json"),
+                patch("tools.release.cli.render_triage_result_json"),
+                patch("tools.release.cli.run_polish_stage"),
+                patch("tools.release.cli.render_polish_result_json"),
+                patch("tools.release.cli.render_polish_markdown"),
+                redirect_stdout(out),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+            run_emergency.assert_called_once_with(
+                {
+                    "schema_version": "vaulthalla.release.semantic_payload.v1",
+                    "version": "1.2.3",
+                    "categories": [],
+                },
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=AIDynamicRatioTokenBudget(mode="dynamic_ratio", ratio=0.55, min=1200, max=12000),
+            )
+            build_triage_input.assert_called_once_with(
+                {
+                    "schema_version": "vaulthalla.release.semantic_payload.v1",
+                    "version": "1.2.3",
+                    "categories": [],
+                },
+                emergency_obj,
+            )
+            run_triage.assert_called_once_with(
+                {"schema_version": "vaulthalla.release.triage_input.synthesized.v1", "categories": []},
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=300,
+                input_mode="synthesized_semantic",
+            )
+            emergency_artifact = repo_root / ".changelog_scratch" / "emergency_triage.json"
+            self.assertTrue(emergency_artifact.is_file())
+            self.assertIn("vaulthalla.release.ai_emergency_triage.v1", emergency_artifact.read_text(encoding="utf-8"))
 
     def test_ai_draft_polish_stage_output_and_json(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -1244,6 +1345,7 @@ profiles:
             structured_mode=None,
             temperature=0.0,
             max_output_tokens_policy=300,
+            input_mode="raw_semantic",
         )
         build_triage.assert_called_once_with(triage_obj)
         generate_draft.assert_called_once_with(
@@ -1329,6 +1431,7 @@ profiles:
                 structured_mode="json_object",
                 temperature=0.0,
                 max_output_tokens_policy=300,
+                input_mode="raw_semantic",
             )
             generate_draft.assert_called_once_with(
                 {"schema_version": "triage-x"},
@@ -1632,6 +1735,12 @@ class CliChangelogAICompareTests(unittest.TestCase):
                     profile_slug=None,
                     enabled_stages=("triage", "draft", "polish"),
                     stages={
+                        "emergency_triage": SimpleNamespace(
+                            model="gpt-5-nano",
+                            reasoning_effort="low",
+                            structured_mode="strict_json_schema",
+                            max_output_tokens=SimpleNamespace(mode="dynamic_ratio", ratio=0.55, min=1200, max=12000),
+                        ),
                         "triage": SimpleNamespace(
                             model="gpt-5-nano",
                             reasoning_effort="low",

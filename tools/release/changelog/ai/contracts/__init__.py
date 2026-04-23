@@ -5,6 +5,14 @@ from tools.release.changelog.ai.contracts.draft import (
     ai_draft_result_to_dict,
     parse_ai_draft_response,
 )
+from tools.release.changelog.ai.contracts.emergency_triage import (
+    AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA,
+    AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
+    AIEmergencyTriageItem,
+    AIEmergencyTriageResult,
+    ai_emergency_triage_result_to_dict,
+    parse_ai_emergency_triage_response,
+)
 from tools.release.changelog.ai.contracts.polish import (
     AI_POLISH_RESPONSE_JSON_SCHEMA,
     AI_POLISH_SCHEMA_VERSION,
@@ -37,6 +45,12 @@ __all__ = [
     "AI_DRAFT_RESPONSE_JSON_SCHEMA",
     "parse_ai_draft_response",
     "ai_draft_result_to_dict",
+    "AI_EMERGENCY_TRIAGE_SCHEMA_VERSION",
+    "AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA",
+    "AIEmergencyTriageItem",
+    "AIEmergencyTriageResult",
+    "parse_ai_emergency_triage_response",
+    "ai_emergency_triage_result_to_dict",
     "AI_TRIAGE_SCHEMA_VERSION",
     "AI_TRIAGE_RESPONSE_JSON_SCHEMA",
     "AITriageCategory",

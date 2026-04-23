@@ -73,6 +73,17 @@ class AIPromptDisciplineTests(unittest.TestCase):
         self.assertIn("grounded_claims", user)
         self.assertIn("evidence_refs", user)
 
+    def test_synthesized_triage_mode_uses_distinct_input_contract_language(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.triage_input.synthesized.v1",
+            "categories": [],
+        }
+        system = build_triage_system_prompt(input_mode="synthesized_semantic").lower()
+        user = build_triage_user_prompt(payload, input_mode="synthesized_semantic").lower()
+        self.assertIn("pre-synthesized unit summaries", system)
+        self.assertIn("synthesized_units", user)
+        self.assertIn("synthesized semantic payload", user)
+
     def test_release_notes_prompt_enforces_no_invention(self) -> None:
         system = build_release_notes_system_prompt().lower()
         user = build_release_notes_user_prompt("# Changelog\n- fix\n").lower()

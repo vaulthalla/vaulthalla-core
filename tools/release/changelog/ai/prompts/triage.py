@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from tools.release.changelog.ai.contracts.triage import AI_TRIAGE_SCHEMA_VERSION
 
+TriageInputMode = Literal["raw_semantic", "synthesized_semantic"]
 
-def build_triage_system_prompt(*, hosted_compact_mode: bool = False) -> str:
+
+def build_triage_system_prompt(
+    *,
+    hosted_compact_mode: bool = False,
+    input_mode: TriageInputMode = "raw_semantic",
+) -> str:
     base = (
         "You are a deterministic release triage classifier for Vaulthalla. "
         "Use only explicit input evidence. "
@@ -20,6 +26,18 @@ def build_triage_system_prompt(*, hosted_compact_mode: bool = False) -> str:
         "Emit caution-style notes only when evidence is weak, conflicting, or requires operator verification. "
         "Return JSON only that matches the schema."
     )
+    if input_mode == "synthesized_semantic":
+        base = (
+            f"{base} "
+            "Input evidence is pre-synthesized unit summaries with source anchors; "
+            "treat those synthesized units as primary and use source anchors as support."
+        )
+    else:
+        base = (
+            f"{base} "
+            "Input evidence includes raw semantic hunks and commit evidence; "
+            "interpret hunk meaning directly and avoid collapsing to path-only recap."
+        )
     if not hosted_compact_mode:
         return base
     return (
@@ -34,9 +52,14 @@ def build_triage_user_prompt(
     payload: dict[str, Any],
     *,
     hosted_compact_mode: bool = False,
+    input_mode: TriageInputMode = "raw_semantic",
 ) -> str:
     payload_json = json.dumps(
-        _build_compact_payload_projection(payload, hosted_compact_mode=hosted_compact_mode),
+        _build_compact_payload_projection(
+            payload,
+            hosted_compact_mode=hosted_compact_mode,
+            input_mode=input_mode,
+        ),
         indent=2,
         sort_keys=False,
     )
@@ -44,6 +67,18 @@ def build_triage_user_prompt(
     category_max_items = 5 if hosted_compact_mode else 10
     grounded_claims_max_items = 4 if hosted_compact_mode else 6
     evidence_refs_max_items = 2 if hosted_compact_mode else 4
+    mode_requirements = (
+        "- Use synthesized unit summaries (`synthesized_units`) as the primary meaning substrate.\n"
+        "- Preserve source anchors (`id`, `source_*`, `evidence_refs`) only as support evidence.\n"
+        "- Do not assume raw code context beyond what synthesized units and source anchors state.\n"
+        if input_mode == "synthesized_semantic"
+        else "- Use semantic hunk excerpts plus commit candidates (`candidate_commits`, `all_commits`) as primary evidence.\n"
+    )
+    payload_label = (
+        "Synthesized semantic payload (compact projection)"
+        if input_mode == "synthesized_semantic"
+        else "Semantic payload (compact projection)"
+    )
     compression_directive = (
         "- Compression mode (hosted): prefer shorter arrays and denser phrasing; avoid rationale expansion.\n"
         "- Compression mode (hosted): keep top category distinctions and strongest grounded claims.\n"
@@ -56,7 +91,7 @@ def build_triage_user_prompt(
         "- Keep only evidence needed for downstream drafting.\n"
         "- Create a category only when at least one concrete supporting item exists.\n"
         "- Rank categories by `priority_rank` (1 is highest).\n"
-        "- Use semantic hunk excerpts plus commit candidates (`candidate_commits`, `all_commits`) as primary evidence.\n"
+        f"{mode_requirements}"
         "- Preserve major commit themes; do not collapse commit evidence to path-only summaries.\n"
         "- Prefer concrete behavior, workflow, contract, lifecycle, configuration, API, or packaging changes over generic 'surface updated' phrasing.\n"
         "- Treat file paths and evidence refs as support anchors only; do not let them dominate the output.\n"
@@ -81,12 +116,23 @@ def build_triage_user_prompt(
         "- Optional category fields: `evidence_refs`, `operator_note`.\n"
         "- Never emit empty placeholders in arrays (no `\"\"`, whitespace-only items, nulls, or other non-string placeholders); omit blank items.\n"
         "- Return JSON only.\n\n"
-        "Semantic payload (compact projection):\n"
+        f"{payload_label}:\n"
         f"{payload_json}"
     )
 
 
 def _build_compact_payload_projection(
+    payload: dict[str, Any],
+    *,
+    hosted_compact_mode: bool,
+    input_mode: TriageInputMode,
+) -> dict[str, Any]:
+    if input_mode == "synthesized_semantic":
+        return _build_compact_synthesized_payload_projection(payload, hosted_compact_mode=hosted_compact_mode)
+    return _build_compact_raw_payload_projection(payload, hosted_compact_mode=hosted_compact_mode)
+
+
+def _build_compact_raw_payload_projection(
     payload: dict[str, Any],
     *,
     hosted_compact_mode: bool,
@@ -154,6 +200,77 @@ def _build_compact_payload_projection(
     return compact
 
 
+def _build_compact_synthesized_payload_projection(
+    payload: dict[str, Any],
+    *,
+    hosted_compact_mode: bool,
+) -> dict[str, Any]:
+    categories_raw = _as_sequence(payload.get("categories"))
+    notes_raw = payload.get("notes")
+    release_commit_count = _read_nested_int(payload, "commit_count") or 0
+    category_limit = _category_projection_limit(release_commit_count, hosted_compact_mode=hosted_compact_mode)
+    notes_limit = 8 if hosted_compact_mode else 14
+    key_commit_limit = _key_commit_projection_limit(release_commit_count, hosted_compact_mode=hosted_compact_mode)
+    files_limit = 3 if hosted_compact_mode else 6
+    commit_candidate_limit = _commit_candidate_projection_limit(
+        release_commit_count,
+        hosted_compact_mode=hosted_compact_mode,
+    )
+    unit_limit = _synthesized_unit_projection_limit(
+        release_commit_count,
+        hosted_compact_mode=hosted_compact_mode,
+    )
+
+    compact: dict[str, Any] = {
+        "schema_version": payload.get("schema_version"),
+        "version": _read_nested_string(payload, "version"),
+        "previous_tag": _read_nested_string(payload, "previous_tag"),
+        "head_sha": _read_nested_string(payload, "head_sha"),
+        "commit_count": release_commit_count if release_commit_count > 0 else None,
+        "categories": [],
+        "all_commits": _compact_commit_candidates(
+            payload.get("all_commits"),
+            limit=commit_candidate_limit,
+            include_body=not hosted_compact_mode,
+        ),
+        "notes": _normalize_string_list(notes_raw, limit=notes_limit),
+    }
+
+    categories: list[dict[str, Any]] = []
+    for category in categories_raw[:category_limit]:
+        if not isinstance(category, dict):
+            continue
+        category_commit_count = len(_as_sequence(category.get("candidate_commits")))
+        category_commit_limit = _commit_candidate_projection_limit(
+            category_commit_count if category_commit_count > 0 else release_commit_count,
+            hosted_compact_mode=hosted_compact_mode,
+        )
+        categories.append(
+            {
+                "name": _read_nested_string(category, "name"),
+                "signal_strength": _read_nested_string(category, "signal_strength"),
+                "summary_hint": _truncate(_read_nested_string(category, "summary_hint"), limit=220),
+                "key_commits": _normalize_string_list(category.get("key_commits"), limit=key_commit_limit),
+                "candidate_commits": _compact_commit_candidates(
+                    category.get("candidate_commits"),
+                    limit=category_commit_limit,
+                    include_body=not hosted_compact_mode,
+                ),
+                "synthesized_units": _compact_synthesized_units(
+                    category.get("synthesized_units"),
+                    hosted_compact_mode=hosted_compact_mode,
+                    limit=unit_limit,
+                ),
+                "supporting_files": _normalize_string_list(
+                    category.get("supporting_files"),
+                    limit=files_limit,
+                ),
+            }
+        )
+    compact["categories"] = categories
+    return compact
+
+
 def _compact_semantic_hunks(
     raw: Any,
     *,
@@ -172,6 +289,41 @@ def _compact_semantic_hunks(
                 "why_selected": _truncate(_read_nested_string(item, "why_selected"), limit=180),
                 "excerpt": _truncate(_read_nested_string(item, "excerpt"), limit=excerpt_limit),
                 "evidence_ref": _read_nested_string(item, "path"),
+            }
+        )
+        if len(compact) >= limit:
+            break
+    return compact
+
+
+def _compact_synthesized_units(
+    raw: Any,
+    *,
+    hosted_compact_mode: bool,
+    limit: int,
+) -> list[dict[str, Any]]:
+    items = _as_sequence(raw)
+    compact: list[dict[str, Any]] = []
+    summary_limit = 180 if hosted_compact_mode else 320
+    reason_limit = 120 if hosted_compact_mode else 200
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        compact.append(
+            {
+                "id": _read_nested_string(item, "id"),
+                "change_kind": _read_nested_string(item, "change_kind"),
+                "change_summary": _truncate(_read_nested_string(item, "change_summary"), limit=summary_limit),
+                "confidence": _read_nested_string(item, "confidence"),
+                "insufficient_context_reason": _truncate(
+                    _read_nested_string(item, "insufficient_context_reason"),
+                    limit=reason_limit,
+                ),
+                "evidence_refs": _normalize_string_list(item.get("evidence_refs"), limit=3 if hosted_compact_mode else 5),
+                "source_path": _read_nested_string(item, "source_path"),
+                "source_kind": _read_nested_string(item, "source_kind"),
+                "source_region_type": _read_nested_string(item, "source_region_type"),
+                "source_context_label": _truncate(_read_nested_string(item, "source_context_label"), limit=140),
             }
         )
         if len(compact) >= limit:
@@ -245,6 +397,12 @@ def _hunk_projection_limit(release_commit_count: int, *, hosted_compact_mode: bo
     if hosted_compact_mode:
         return max(4, min(14, (release_commit_count // 2) + 4))
     return max(8, min(24, release_commit_count + 6))
+
+
+def _synthesized_unit_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:
+    if hosted_compact_mode:
+        return max(6, min(18, (release_commit_count // 2) + 6))
+    return max(10, min(28, release_commit_count + 10))
 
 
 def _commit_candidate_projection_limit(release_commit_count: int, *, hosted_compact_mode: bool) -> int:

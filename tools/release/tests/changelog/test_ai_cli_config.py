@@ -41,6 +41,10 @@ profiles:
   openai-balanced:
     provider: openai
     stages:
+      emergency_triage:
+        model: gpt-5-nano
+        reasoning_effort: low
+        structured_mode: strict_json_schema
       triage:
         model: gpt-5-nano
         reasoning_effort: low
@@ -61,16 +65,20 @@ profiles:
             args = self._args(repo_root=str(repo_root), ai_profile="openai-balanced")
 
             triage_cfg = cli.build_ai_provider_config_from_args(args, stage="triage")
+            emergency_cfg = cli.build_ai_provider_config_from_args(args, stage="emergency_triage")
             draft_cfg = cli.build_ai_provider_config_from_args(args, stage="draft")
             polish_cfg = cli.build_ai_provider_config_from_args(args, stage="polish")
             release_notes_cfg = cli.build_ai_provider_config_from_args(args, stage="release_notes")
             pipeline = cli.build_ai_pipeline_config_from_args(args)
 
+        self.assertEqual(emergency_cfg.model, "gpt-5-nano")
         self.assertEqual(triage_cfg.model, "gpt-5-nano")
         self.assertEqual(draft_cfg.model, "gpt-5-mini")
         self.assertEqual(polish_cfg.model, "gpt-5.4")
         self.assertEqual(release_notes_cfg.model, "gpt-5.4")
         self.assertEqual(draft_cfg.kind, "openai")
+        self.assertEqual(pipeline.stages["emergency_triage"].reasoning_effort, "low")
+        self.assertEqual(pipeline.stages["emergency_triage"].structured_mode, "strict_json_schema")
         self.assertEqual(pipeline.stages["triage"].reasoning_effort, "low")
         self.assertEqual(pipeline.stages["triage"].structured_mode, "json_object")
         self.assertEqual(pipeline.stages["draft"].reasoning_effort, "medium")

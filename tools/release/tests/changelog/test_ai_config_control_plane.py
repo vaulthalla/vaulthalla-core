@@ -514,6 +514,58 @@ profiles:
         self.assertEqual(resolved.stage_model("release_notes"), "notes-x")
         self.assertEqual(resolved.stages["release_notes"].reasoning_effort, "high")
 
+    def test_emergency_triage_stage_is_optional_and_ordered_before_triage(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write_profile(
+                repo_root,
+                """
+profiles:
+  ordered:
+    provider: openai
+    stages:
+      triage:
+        model: triage-x
+      emergency_triage:
+        model: emergency-x
+      draft:
+        model: draft-x
+""",
+            )
+            resolved = resolve_ai_pipeline_config(
+                repo_root=repo_root,
+                profile_slug="ordered",
+                cli_overrides=AIPipelineCLIOverrides(),
+            )
+
+        self.assertEqual(resolved.enabled_stages, ("emergency_triage", "triage", "draft"))
+        self.assertEqual(resolved.stage_model("emergency_triage"), "emergency-x")
+
+    def test_emergency_triage_requires_triage_stage(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write_profile(
+                repo_root,
+                """
+profiles:
+  bad:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: emergency-x
+      draft:
+        model: draft-x
+""",
+            )
+            with self.assertRaises(ValueError) as ctx:
+                resolve_ai_pipeline_config(
+                    repo_root=repo_root,
+                    profile_slug="bad",
+                    cli_overrides=AIPipelineCLIOverrides(),
+                )
+
+        self.assertIn("`emergency_triage` requires stage `triage`", str(ctx.exception))
+
     def test_temperature_defaults_and_stage_override(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

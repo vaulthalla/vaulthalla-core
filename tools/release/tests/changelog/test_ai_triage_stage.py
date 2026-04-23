@@ -203,6 +203,43 @@ class AITriageStageTests(unittest.TestCase):
         self.assertEqual(tools["semantic_hunks"][0]["kind"], "prompt-contract")
         self.assertEqual(tools["supporting_files"], ["tools/release/changelog/ai/prompts/triage.py"])
 
+    def test_run_triage_stage_supports_synthesized_input_mode(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.triage_input.synthesized.v1",
+            "version": "2.4.0",
+            "categories": [
+                {
+                    "name": "tools",
+                    "signal_strength": "strong",
+                    "summary_hint": "Release tooling changes",
+                    "key_commits": ["Improve ai-compare output"],
+                    "synthesized_units": [
+                        {
+                            "id": "tools:1",
+                            "change_kind": "output-artifact",
+                            "change_summary": "Added profile comparison artifact generation.",
+                            "confidence": "high",
+                            "source_path": "tools/release/cli.py",
+                            "source_kind": "output-artifact",
+                        }
+                    ],
+                }
+            ],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(payload, provider=fake, input_mode="synthesized_semantic")
+        call = fake.calls[0]
+        marker = "Synthesized semantic payload (compact projection):\n"
+        projection_text = call["user_prompt"].split(marker, 1)[1]
+        projection = json.loads(projection_text)
+
+        self.assertIn("pre-synthesized unit summaries", call["system_prompt"])
+        self.assertEqual(len(projection["categories"]), 1)
+        units = projection["categories"][0]["synthesized_units"]
+        self.assertEqual(units[0]["id"], "tools:1")
+        self.assertEqual(units[0]["change_kind"], "output-artifact")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,11 @@ from tools.release.changelog.ai.providers import (
 from tools.release.changelog.ai.providers.base import StructuredJSONProvider
 from tools.release.changelog.ai.render.markdown import render_draft_markdown, render_polish_markdown
 from tools.release.changelog.ai.stages.draft import generate_draft_from_payload, render_draft_result_json
+from tools.release.changelog.ai.stages.emergency_triage import (
+    build_triage_input_from_emergency_result,
+    render_emergency_triage_result_json,
+    run_emergency_triage_stage,
+)
 from tools.release.changelog.ai.stages.polish import render_polish_result_json, run_polish_stage
 from tools.release.changelog.ai.stages.release_notes import run_release_notes_stage
 from tools.release.changelog.ai.stages.triage import render_triage_result_json, run_triage_stage
@@ -389,7 +394,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Global model override for all AI stages (triage/draft/polish). "
+            "Global model override for all AI stages (emergency_triage/triage/draft/polish/release_notes). "
             f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
         ),
     )
@@ -494,7 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Global model override for all AI stages (triage/draft/polish). "
+            "Global model override for all AI stages (emergency_triage/triage/draft/polish/release_notes). "
             f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
         ),
     )
@@ -985,8 +990,11 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
     payload = build_ai_payload(context)
     pipeline_config = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
     run_triage = bool(args.use_triage) or pipeline_config.is_stage_enabled("triage")
+    run_emergency_triage = pipeline_config.is_stage_enabled("emergency_triage")
     run_polish = bool(args.polish) or pipeline_config.is_stage_enabled("polish")
     run_release_notes = pipeline_config.is_stage_enabled("release_notes")
+    if run_emergency_triage and not run_triage:
+        raise ValueError("`emergency_triage` stage requires triage stage to run.")
     if args.save_triage_json and not run_triage:
         raise ValueError("--save-triage-json requires triage stage to run.")
     if args.save_polish_json and not run_polish:
@@ -999,6 +1007,7 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             args=args,
             repo_root=repo_root,
             draft_provider=draft_provider,
+            include_emergency_triage=run_emergency_triage and run_triage,
             include_triage=run_triage,
             include_polish=run_polish,
             include_release_notes=run_release_notes,
@@ -1008,22 +1017,70 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
 
     draft_input: dict = payload
     source_kind = "payload"
+    triage_input_mode = "raw_semantic"
+    triage_input_payload: dict = semantic_payload if semantic_payload is not None else payload
+    emergency_triage_stage_cfg = pipeline_config.stages["emergency_triage"]
     triage_stage_cfg = pipeline_config.stages["triage"]
     draft_stage_cfg = pipeline_config.stages["draft"]
     polish_stage_cfg = pipeline_config.stages["polish"]
     release_notes_stage_cfg = pipeline_config.stages["release_notes"]
 
     if run_triage:
+        if run_emergency_triage:
+            emergency_provider = build_ai_provider_from_args(
+                args,
+                repo_root=repo_root,
+                stage="emergency_triage",
+            )
+            try:
+                emergency_result = run_emergency_triage_stage(
+                    semantic_payload if semantic_payload is not None else payload,
+                    provider=emergency_provider,
+                    provider_kind=pipeline_config.provider,
+                    reasoning_effort=emergency_triage_stage_cfg.reasoning_effort,
+                    structured_mode=emergency_triage_stage_cfg.structured_mode,
+                    temperature=emergency_triage_stage_cfg.temperature,
+                    max_output_tokens_policy=emergency_triage_stage_cfg.max_output_tokens,
+                )
+            except Exception as exc:
+                _capture_stage_failure_artifact(
+                    repo_root=repo_root,
+                    args=args,
+                    stage="emergency_triage",
+                    pipeline_config=pipeline_config,
+                    provider=emergency_provider,
+                    exc=exc,
+                    stage_settings={
+                        "structured_mode": emergency_triage_stage_cfg.structured_mode,
+                        "reasoning_effort": emergency_triage_stage_cfg.reasoning_effort,
+                        "temperature": emergency_triage_stage_cfg.temperature,
+                        "max_output_tokens_policy": str(emergency_triage_stage_cfg.max_output_tokens),
+                    },
+                )
+                raise _stage_failure("Emergency triage", exc) from exc
+
+            emergency_output = str((repo_root / DEFAULT_CHANGELOG_SCRATCH_DIR / "emergency_triage.json").resolve())
+            write_output(render_emergency_triage_result_json(emergency_result), emergency_output)
+            if emergency_output != "-":
+                print(f"Wrote emergency triage artifact to {Path(emergency_output).resolve()}")
+            if semantic_payload is not None:
+                triage_input_payload = build_triage_input_from_emergency_result(
+                    semantic_payload,
+                    emergency_result,
+                )
+                triage_input_mode = "synthesized_semantic"
+
         triage_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="triage")
         try:
             triage_result = run_triage_stage(
-                semantic_payload if semantic_payload is not None else payload,
+                triage_input_payload,
                 provider=triage_provider,
                 provider_kind=pipeline_config.provider,
                 reasoning_effort=triage_stage_cfg.reasoning_effort,
                 structured_mode=triage_stage_cfg.structured_mode,
                 temperature=triage_stage_cfg.temperature,
                 max_output_tokens_policy=triage_stage_cfg.max_output_tokens,
+                input_mode=triage_input_mode,
             )
         except Exception as exc:
             _capture_stage_failure_artifact(
@@ -1469,12 +1526,12 @@ def _render_ai_compare_profile_config_yaml(pipeline: AIPipelineConfig) -> str:
         lines.append(f"  - {stage}")
 
     lines.append("default_max_output_tokens:")
-    for stage in ("triage", "draft", "polish", "release_notes"):
+    for stage in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
         token_policy = pipeline.stages[stage].max_output_tokens
         lines.extend(_render_ai_compare_token_policy(stage, token_policy))
 
     lines.append("stages:")
-    for stage in ("triage", "draft", "polish", "release_notes"):
+    for stage in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
         stage_cfg = pipeline.stages[stage]
         lines.append(f"  {stage}:")
         lines.append(f"    model: {stage_cfg.model}")
@@ -1544,12 +1601,15 @@ def _run_stage_preflight(
     args: argparse.Namespace,
     repo_root: Path,
     draft_provider: StructuredJSONProvider,
+    include_emergency_triage: bool,
     include_triage: bool,
     include_polish: bool,
     include_release_notes: bool,
 ) -> None:
     seen: set[tuple[str, str | None]] = set()
     stage_order: list[AIStageName] = []
+    if include_emergency_triage:
+        stage_order.append("emergency_triage")
     if include_triage:
         stage_order.append("triage")
     stage_order.append("draft")

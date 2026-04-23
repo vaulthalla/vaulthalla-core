@@ -9,13 +9,21 @@ import yaml
 OPENAI_API_KEY_ENV_VAR = "OPENAI_API_KEY"
 DEFAULT_AI_DRAFT_MODEL = "gpt-5.4-mini"
 DEFAULT_AI_TRIAGE_MODEL = DEFAULT_AI_DRAFT_MODEL
+DEFAULT_AI_EMERGENCY_TRIAGE_MODEL = DEFAULT_AI_TRIAGE_MODEL
 DEFAULT_AI_POLISH_MODEL = DEFAULT_AI_DRAFT_MODEL
 DEFAULT_AI_RELEASE_NOTES_MODEL = DEFAULT_AI_DRAFT_MODEL
 DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "http://localhost:8888/v1"
 DEFAULT_AI_PROVIDER_KIND = "openai"
 AI_PROFILE_SCHEMA_VERSION = "vaulthalla.release.ai_profile.v1"
-STAGE_EXECUTION_ORDER: tuple["AIStageName", ...] = ("triage", "draft", "polish", "release_notes")
+STAGE_EXECUTION_ORDER: tuple["AIStageName", ...] = (
+    "emergency_triage",
+    "triage",
+    "draft",
+    "polish",
+    "release_notes",
+)
 DEFAULT_STAGE_TEMPERATURES: dict["AIStageName", float] = {
+    "emergency_triage": 0.0,
     "triage": 0.0,
     "draft": 0.2,
     "polish": 0.0,
@@ -40,6 +48,7 @@ class AIDynamicRatioTokenBudget:
 
 AIMaxOutputTokensPolicy = int | AIDynamicRatioTokenBudget
 DEFAULT_STAGE_MAX_OUTPUT_TOKENS: dict["AIStageName", AIMaxOutputTokensPolicy] = {
+    "emergency_triage": AIDynamicRatioTokenBudget(mode="dynamic_ratio", ratio=0.55, min=1200, max=12000),
     "triage": 300,
     "draft": AIDynamicRatioTokenBudget(mode="dynamic_ratio", ratio=0.35, min=800, max=4000),
     "polish": 800,
@@ -60,6 +69,12 @@ class AITriageStageConfig:
 
 
 @dataclass(frozen=True)
+class AIEmergencyTriageStageConfig:
+    model: str = DEFAULT_AI_EMERGENCY_TRIAGE_MODEL
+    api_key_env_var: str = OPENAI_API_KEY_ENV_VAR
+
+
+@dataclass(frozen=True)
 class AIPolishStageConfig:
     model: str = DEFAULT_AI_POLISH_MODEL
     api_key_env_var: str = OPENAI_API_KEY_ENV_VAR
@@ -75,7 +90,7 @@ class AIProviderConfig:
     timeout_seconds: float | None = None
 
 
-AIStageName = Literal["triage", "draft", "polish", "release_notes"]
+AIStageName = Literal["emergency_triage", "triage", "draft", "polish", "release_notes"]
 
 
 @dataclass(frozen=True)
@@ -130,18 +145,21 @@ def resolve_ai_pipeline_config(
     base_url: str | None = None
     fallback_model = DEFAULT_AI_DRAFT_MODEL
     stage_models: dict[AIStageName, str | None] = {
+        "emergency_triage": DEFAULT_AI_EMERGENCY_TRIAGE_MODEL,
         "triage": DEFAULT_AI_TRIAGE_MODEL,
         "draft": DEFAULT_AI_DRAFT_MODEL,
         "polish": DEFAULT_AI_POLISH_MODEL,
         "release_notes": DEFAULT_AI_RELEASE_NOTES_MODEL,
     }
     stage_reasoning: dict[AIStageName, AIReasoningEffort | None] = {
+        "emergency_triage": None,
         "triage": None,
         "draft": None,
         "polish": None,
         "release_notes": None,
     }
     stage_structured_modes: dict[AIStageName, AIStructuredMode | None] = {
+        "emergency_triage": None,
         "triage": None,
         "draft": None,
         "polish": None,
@@ -187,7 +205,7 @@ def resolve_ai_pipeline_config(
                     f"Invalid AI profile `profiles.{profile_slug}.stages`: required stage `draft` is missing."
                 )
             for stage_name, stage_cfg in stages.items():
-                if stage_name not in {"triage", "draft", "polish", "release_notes"}:
+                if stage_name not in {"emergency_triage", "triage", "draft", "polish", "release_notes"}:
                     raise ValueError(
                         f"Invalid AI profile `profiles.{profile_slug}.stages.{stage_name}`: unknown stage."
                     )
@@ -224,16 +242,21 @@ def resolve_ai_pipeline_config(
                 if stage_budget is not None:
                     stage_max_output_tokens[stage_name] = stage_budget
 
+        if "emergency_triage" in enabled_stages and "triage" not in enabled_stages:
+            raise ValueError(
+                f"Invalid AI profile `profiles.{profile_slug}.stages`: `emergency_triage` requires stage `triage`."
+            )
+
         if profile_fallback is not None:
-            for stage_name in ("triage", "draft", "polish", "release_notes"):
+            for stage_name in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
                 if stage_name not in explicitly_configured_stages:
                     stage_models[stage_name] = profile_fallback
         if profile_reasoning_fallback is not None:
-            for stage_name in ("triage", "draft", "polish", "release_notes"):
+            for stage_name in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
                 if stage_reasoning[stage_name] is None:
                     stage_reasoning[stage_name] = profile_reasoning_fallback
         if profile_structured_mode_fallback is not None:
-            for stage_name in ("triage", "draft", "polish", "release_notes"):
+            for stage_name in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
                 if stage_structured_modes[stage_name] is None:
                     stage_structured_modes[stage_name] = profile_structured_mode_fallback
 
@@ -246,12 +269,20 @@ def resolve_ai_pipeline_config(
     cli_model = _read_optional_non_empty_string(cli_overrides.model, path="cli.model")
     if cli_model is not None:
         fallback_model = cli_model
+        stage_models["emergency_triage"] = cli_model
         stage_models["triage"] = cli_model
         stage_models["draft"] = cli_model
         stage_models["polish"] = cli_model
         stage_models["release_notes"] = cli_model
 
     resolved_stages: dict[AIStageName, AIPipelineStageConfig] = {
+        "emergency_triage": AIPipelineStageConfig(
+            model=stage_models["emergency_triage"] or fallback_model,
+            reasoning_effort=stage_reasoning["emergency_triage"],
+            structured_mode=stage_structured_modes["emergency_triage"],
+            temperature=stage_temperatures["emergency_triage"],
+            max_output_tokens=stage_max_output_tokens["emergency_triage"],
+        ),
         "triage": AIPipelineStageConfig(
             model=stage_models["triage"] or fallback_model,
             reasoning_effort=stage_reasoning["triage"],
@@ -430,7 +461,7 @@ def _parse_stage_name(raw: object, *, path: str) -> AIStageName:
     if not isinstance(raw, str):
         raise ValueError(f"Invalid `{path}`: unknown stage.")
     stage = raw.strip()
-    if stage not in {"triage", "draft", "polish", "release_notes"}:
+    if stage not in {"emergency_triage", "triage", "draft", "polish", "release_notes"}:
         raise ValueError(f"Invalid `{path}`: unknown stage.")
     return stage  # type: ignore[return-value]
 

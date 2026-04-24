@@ -38,6 +38,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Python release-tooling dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install -r requirements.txt
+
+      - name: Verify Python release-tooling environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c "import openai"
+
       - name: Validate release state
         shell: bash
         run: |

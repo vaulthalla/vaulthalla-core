@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tools.release.changelog.categorize import categorize_path, infer_categories_from_text, normalize_path
 from tools.release.changelog.models import CommitInfo
+from tools.release.version.models import Version
 
 FIELD_SEP = "\x1f"
 RECORD_SEP = "\x1e"
@@ -20,6 +21,37 @@ def get_latest_tag(repo_root: Path | str = ".") -> str | None:
         return result or None
     except RuntimeError:
         return None
+
+
+def get_previous_release_tag_before(repo_root: Path | str, target: Version) -> str | None:
+    """Return nearest lower release tag (< target) merged into HEAD.
+
+    Tags must parse as strict semver (optionally prefixed with `v`).
+    """
+    try:
+        output = _run_git(["tag", "--merged", "HEAD", "--list"], repo_root)
+    except RuntimeError:
+        return None
+
+    parsed: list[tuple[Version, str]] = []
+    for raw_tag in output.splitlines():
+        tag = raw_tag.strip()
+        if not tag:
+            continue
+        normalized = tag[1:] if tag.startswith("v") else tag
+        try:
+            tag_version = Version.parse(normalized)
+        except ValueError:
+            continue
+        if tag_version >= target:
+            continue
+        parsed.append((tag_version, tag))
+
+    if not parsed:
+        return None
+
+    parsed.sort(key=lambda item: item[0], reverse=True)
+    return parsed[0][1]
 
 
 def get_commits_since_tag(

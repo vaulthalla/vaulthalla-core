@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from tools.release.changelog.git_collect import get_commits_since_tag
+from tools.release.changelog.git_collect import get_commits_since_tag, get_previous_release_tag_before
+from tools.release.version.models import Version
 
 
 class GitCollectTests(unittest.TestCase):
@@ -43,6 +44,18 @@ class GitCollectTests(unittest.TestCase):
         self.assertIn("meta", commits[0].categories)
         self.assertIn("debian", commits[0].categories)
         self.assertIn("tools", commits[0].categories)
+
+    def test_previous_release_tag_before_base_prefers_nearest_lower_tag(self) -> None:
+        tags = "\n".join(["v0.33.0", "v0.32.1", "v0.34.1", "v0.35.0"])
+        with patch("tools.release.changelog.git_collect._run_git", return_value=tags):
+            resolved = get_previous_release_tag_before(".", Version(0, 34, 0))
+        self.assertEqual(resolved, "v0.33.0")
+
+    def test_previous_release_tag_before_handles_sparse_history(self) -> None:
+        tags = "\n".join(["v0.33.0", "v0.58.7", "v0.58.8"])
+        with patch("tools.release.changelog.git_collect._run_git", return_value=tags):
+            resolved = get_previous_release_tag_before(".", Version(0, 58, 0))
+        self.assertEqual(resolved, "v0.33.0")
 
 
 if __name__ == "__main__":

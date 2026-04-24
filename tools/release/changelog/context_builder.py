@@ -14,11 +14,13 @@ from tools.release.changelog.git_collect import (
     get_commits_since_tag,
     get_head_sha,
     get_latest_tag,
+    get_previous_release_tag_before,
     get_release_file_stats,
 )
 from tools.release.changelog.models import CategoryContext, CommitInfo, FileChange, ReleaseContext
 from tools.release.changelog.scoring import score_file_change
 from tools.release.changelog.snippets import extract_relevant_snippets
+from tools.release.version.models import Version
 
 
 def build_release_context(
@@ -27,7 +29,10 @@ def build_release_context(
     previous_tag: str | None = None,
 ) -> ReleaseContext:
     repo_root = Path(repo_root).resolve()
-    previous_tag = previous_tag if previous_tag is not None else get_latest_tag(repo_root)
+    previous_tag = previous_tag if previous_tag is not None else _resolve_default_previous_tag(
+        repo_root,
+        version,
+    )
     head_sha = get_head_sha(repo_root)
 
     commits = get_commits_since_tag(repo_root, previous_tag)
@@ -76,6 +81,19 @@ def build_release_context(
         uncategorized_commits=uncategorized_commits,
         cross_cutting_notes=cross_cutting_notes,
     )
+
+
+def _resolve_default_previous_tag(repo_root: Path, version: str) -> str | None:
+    latest_tag = get_latest_tag(repo_root)
+    try:
+        parsed_version = Version.parse(version)
+    except ValueError:
+        return latest_tag
+    if parsed_version.patch <= 0:
+        return latest_tag
+    line_base = Version(parsed_version.major, parsed_version.minor, 0)
+    lower_release_tag = get_previous_release_tag_before(repo_root, line_base)
+    return lower_release_tag or latest_tag
 
 
 def get_file_commit_counts(commits: list[CommitInfo]) -> dict[str, int]:

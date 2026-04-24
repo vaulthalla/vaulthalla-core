@@ -135,7 +135,7 @@ namespace vh::crypto::secrets {
 
     static void ensure_tpm_started(ESYS_CONTEXT *ctx) {
         log::Registry::crypto()->info("[TPMKeyProvider] attempting TPM2_Startup(TPM2_SU_CLEAR)");
-        const TSS2_RC rc = Esys_Startup(ctx, TPM2_SU_CLEAR, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE);
+        const TSS2_RC rc = Esys_Startup(ctx, TPM2_SU_CLEAR);
         if (rc == TSS2_RC_SUCCESS) {
             log::Registry::crypto()->info("[TPMKeyProvider] TPM2_Startup succeeded");
             return;

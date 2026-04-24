@@ -20,6 +20,8 @@ class DebianInstallFlowContractTests(unittest.TestCase):
             "VH_SKIP_NGINX_CONFIG",
             "bootstrap_db_if_safe()",
             "configure_nginx_if_safe()",
+            "ensure_fuse_allow_other()",
+            "FUSE config: enabled user_allow_other in /etc/fuse.conf",
             "configure_swtpm_apparmor_override_if_possible",
             "SWTPM_BASE_DIR=\"/var/lib/swtpm\"",
             "SWTPM_STATE_DIR=\"${SWTPM_BASE_DIR}/vaulthalla\"",

@@ -28,7 +28,7 @@ class ReleaseArtifactValidationTests(unittest.TestCase):
             "lib/systemd/system/vaulthalla-web.service",
             "usr/share/doc/vaulthalla/LICENSE.gz",
             "usr/share/doc/vaulthalla/copyright",
-            "usr/share/vaulthalla/nginx/vaulthalla.conf",
+            "usr/share/vaulthalla/nginx/vaulthalla",
             "usr/share/vaulthalla/psql/000_schema.sql",
             "usr/share/vaulthalla-web/server.js",
             "usr/share/vaulthalla-web/.next/static/chunks/main.js",

@@ -30,7 +30,7 @@ class DebianRulesContractTests(unittest.TestCase):
             "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-cli.service.in > debian/tmp/lib/systemd/system/vaulthalla-cli.service",
             "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-web.service.in > debian/tmp/lib/systemd/system/vaulthalla-web.service",
             "install -m 0644 deploy/systemd/vaulthalla-cli.socket debian/tmp/lib/systemd/system/vaulthalla-cli.socket",
-            "install -m 0644 deploy/nginx/vaulthalla.conf debian/tmp/usr/share/vaulthalla/nginx/vaulthalla.conf",
+            "install -m 0644 deploy/nginx/vaulthalla.conf debian/tmp/usr/share/vaulthalla/nginx/vaulthalla",
             "cp -a deploy/psql/. debian/tmp/usr/share/vaulthalla/psql/",
             "install -m 0644 LICENSE debian/tmp/usr/share/doc/vaulthalla/LICENSE",
             "install -m 0644 debian/copyright debian/tmp/usr/share/doc/vaulthalla/copyright",
@@ -63,7 +63,7 @@ class DebianRulesContractTests(unittest.TestCase):
             install_manifest,
         )
         self.assertIn(
-            "usr/share/vaulthalla/nginx/vaulthalla.conf",
+            "usr/share/vaulthalla/nginx/vaulthalla",
             install_manifest,
         )
         self.assertIn(

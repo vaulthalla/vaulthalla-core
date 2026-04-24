@@ -330,14 +330,122 @@ def has_non_nginx_listeners_on_web_ports() -> bool:
     return False
 
 
-def has_custom_nginx_sites_enabled() -> bool:
-    sites_enabled = Path("/etc/nginx/sites-enabled")
-    if not sites_enabled.is_dir():
+def strip_nginx_comment(line: str) -> str:
+    out: list[str] = []
+    in_single = False
+    in_double = False
+    escaped = False
+    for ch in line:
+        if escaped:
+            out.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            out.append(ch)
+            escaped = True
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            out.append(ch)
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            out.append(ch)
+            continue
+        if ch == "#" and not in_single and not in_double:
+            break
+        out.append(ch)
+    return "".join(out)
+
+
+def extract_server_names_from_nginx_dump(text: str) -> list[tuple[str, str]]:
+    names: list[tuple[str, str]] = []
+    current_file = "<unknown active config>"
+    collecting = False
+    pending = ""
+
+    for raw in text.splitlines():
+        marker = re.match(r"^\s*#\s*configuration file\s+(.+):\s*$", raw)
+        if marker:
+            current_file = trim(marker.group(1))
+            continue
+
+        line = trim(strip_nginx_comment(raw))
+        if not line:
+            continue
+
+        if collecting:
+            pending = f"{pending} {line}".strip()
+        elif re.match(r"^server_name(?:\s|$)", line):
+            pending = trim(line[len("server_name") :])
+        else:
+            continue
+
+        if ";" not in pending:
+            collecting = True
+            continue
+
+        collecting = False
+        directive = trim(pending.split(";", 1)[0])
+        pending = ""
+        if not directive:
+            continue
+        for token in directive.split():
+            names.append((token, current_file))
+
+    return names
+
+
+def server_name_matches_domain(server_name: str, domain: str) -> bool:
+    name = server_name.lower()
+    target = domain.lower()
+    if not name or name == "_":
         return False
-    for entry in sites_enabled.iterdir():
-        if entry.name not in ("default", "vaulthalla"):
-            return True
+    if name == target:
+        return True
+    if name.startswith("*."):
+        suffix = name[1:]
+        return target.endswith(suffix) and target != name[2:]
+    if name.endswith(".*"):
+        prefix = name[:-1]
+        return target.startswith(prefix)
+    if name.startswith("."):
+        return target == name[1:] or target.endswith(name)
+    if name.startswith("~"):
+        return False
     return False
+
+
+def is_managed_nginx_path(raw_path: str) -> bool:
+    managed_paths: set[str] = set()
+    for path in (NGINX_SITE_AVAILABLE, NGINX_SITE_ENABLED):
+        managed_paths.add(str(path))
+        try:
+            managed_paths.add(str(path.resolve(strict=False)))
+        except OSError:
+            pass
+
+    candidate = Path(raw_path)
+    if str(candidate) in managed_paths:
+        return True
+    try:
+        return str(candidate.resolve(strict=False)) in managed_paths
+    except OSError:
+        return False
+
+
+def active_nginx_domain_conflict_source(domain: str) -> str | None:
+    dump = run_capture(["nginx", "-T"])
+    if dump.returncode != 0:
+        raise LifecycleError(format_failure("failed inspecting active nginx config via 'nginx -T'", dump))
+
+    for name, source in extract_server_names_from_nginx_dump(combined_output(dump)):
+        if not server_name_matches_domain(name, domain):
+            continue
+        if is_managed_nginx_path(source):
+            continue
+        return source
+    return None
 
 
 def normalize_local_upstream_host(host: str) -> str:
@@ -571,8 +679,10 @@ def setup_nginx(args: argparse.Namespace) -> int:
         raise LifecycleError("nginx is not installed or /etc/nginx is missing")
     if has_non_nginx_listeners_on_web_ports():
         raise LifecycleError("detected non-nginx listeners on :80/:443; refusing automatic integration")
-    if has_custom_nginx_sites_enabled() and not NGINX_SITE_ENABLED.exists():
-        raise LifecycleError("custom nginx site layout detected; refusing automatic integration")
+    if requested_domain:
+        conflict = active_nginx_domain_conflict_source(domain or "")
+        if conflict:
+            raise LifecycleError(f"domain {domain} is already configured in nginx; refusing to overwrite")
 
     template_path = nginx_template_path()
     projection = load_config_projection(config_path())

@@ -1,4 +1,5 @@
 import unittest
+import subprocess
 from unittest import mock
 
 from deploy.lifecycle import main
@@ -75,6 +76,47 @@ class DispatchTests(unittest.TestCase):
             rc = main.dispatch(args)
         self.assertEqual(rc, 0)
         handler.assert_called_once_with(args)
+
+
+class NginxDomainConflictTests(unittest.TestCase):
+    def test_extract_server_names_from_nginx_dump_tracks_active_source_file(self) -> None:
+        dump = """
+# configuration file /etc/nginx/sites-enabled/default:
+server {
+    server_name default.example.net www.default.example.net;
+}
+# configuration file /etc/nginx/sites-enabled/vaulthalla:
+server {
+    server_name demo.vaulthalla.io;
+}
+"""
+        names = main.extract_server_names_from_nginx_dump(dump)
+        self.assertIn(("default.example.net", "/etc/nginx/sites-enabled/default"), names)
+        self.assertIn(("www.default.example.net", "/etc/nginx/sites-enabled/default"), names)
+        self.assertIn(("demo.vaulthalla.io", "/etc/nginx/sites-enabled/vaulthalla"), names)
+
+    def test_active_nginx_domain_conflict_source_ignores_managed_site(self) -> None:
+        dump = """
+# configuration file /etc/nginx/sites-enabled/vaulthalla:
+server {
+    server_name demo.vaulthalla.io;
+}
+# configuration file /etc/nginx/sites-enabled/custom-site:
+server {
+    server_name demo.vaulthalla.io;
+}
+"""
+        cp = subprocess.CompletedProcess(["nginx", "-T"], 0, stdout=dump, stderr="")
+        with mock.patch.object(main, "run_capture", return_value=cp):
+            with mock.patch.object(main, "is_managed_nginx_path", side_effect=lambda p: p.endswith("/vaulthalla")):
+                conflict = main.active_nginx_domain_conflict_source("demo.vaulthalla.io")
+        self.assertEqual(conflict, "/etc/nginx/sites-enabled/custom-site")
+
+    def test_server_name_matches_domain_handles_exact_and_wildcard(self) -> None:
+        self.assertTrue(main.server_name_matches_domain("demo.vaulthalla.io", "demo.vaulthalla.io"))
+        self.assertTrue(main.server_name_matches_domain("*.vaulthalla.io", "demo.vaulthalla.io"))
+        self.assertFalse(main.server_name_matches_domain("*.vaulthalla.io", "vaulthalla.io"))
+        self.assertFalse(main.server_name_matches_domain("_", "demo.vaulthalla.io"))
 
 
 if __name__ == "__main__":

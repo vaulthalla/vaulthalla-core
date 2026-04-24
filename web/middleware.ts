@@ -12,26 +12,34 @@ const getInternalAuthOrigin = (req: NextRequest) => {
   )
 }
 
+const redirectToLogin = (req: NextRequest) => {
+  const redir = req.nextUrl.clone()
+  redir.pathname = '/login'
+  redir.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search)
+  return NextResponse.redirect(redir)
+}
+
 export async function middleware(req: NextRequest) {
-  const url = new URL('/api/auth/session', getInternalAuthOrigin(req))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2500)
 
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      cookie: req.headers.get('cookie') ?? '',
-      host: req.headers.get('host') ?? '',
-      'x-forwarded-proto': req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', ''),
-      'x-forwarded-host': req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? '',
-    },
-    cache: 'no-store',
-  })
+  try {
+    const url = new URL('/api/auth/session', getInternalAuthOrigin(req))
 
-  if (!res.ok) {
-    const redir = req.nextUrl.clone()
-    redir.pathname = '/login'
-    redir.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search)
-    return NextResponse.redirect(redir)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        cookie: req.headers.get('cookie') ?? '',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+
+    if (!res.ok) return redirectToLogin(req)
+    return NextResponse.next()
+  } catch {
+    return redirectToLogin(req)
+  } finally {
+    clearTimeout(timeout)
   }
-
-  return NextResponse.next()
 }

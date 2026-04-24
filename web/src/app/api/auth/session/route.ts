@@ -1,31 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PREVIEW_ORIGIN = process.env.NEXT_PUBLIC_SERVER_ADDR
+const AUTH_ORIGIN =
+  process.env.VAULTHALLA_AUTH_ORIGIN ??
+  process.env.VAULTHALLA_PREVIEW_ORIGIN ??
+  'http://127.0.0.1:36970'
+
+const FETCH_TIMEOUT_MS = 2500
 
 export async function GET(req: NextRequest) {
-  if (!PREVIEW_ORIGIN) {
-    return NextResponse.json({ ok: false, error: 'Missing PREVIEW_ORIGIN' }, { status: 500 })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  try {
+    const upstream = await fetch(`${AUTH_ORIGIN}/auth/session`, {
+      method: 'GET',
+      headers: {
+        cookie: req.headers.get('cookie') ?? '',
+        authorization: req.headers.get('authorization') ?? '',
+        'x-forwarded-host':
+          req.headers.get('x-forwarded-host') ??
+          req.headers.get('host') ??
+          '',
+        'x-forwarded-proto':
+          req.headers.get('x-forwarded-proto') ??
+          req.nextUrl.protocol.replace(':', ''),
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+
+    const contentType = upstream.headers.get('content-type') ?? 'text/plain'
+    const body = await upstream.text()
+
+    if (!upstream.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          status: upstream.status,
+          error: body || 'session unavailable',
+        },
+        { status: 401 },
+      )
+    }
+
+    return new NextResponse(body, {
+      status: 200,
+      headers: { 'content-type': contentType },
+    })
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: 'session check timed out or failed' },
+      { status: 401 },
+    )
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const cookieHeader = req.headers.get('cookie') ?? ''
-
-  const upstream = await fetch(`${PREVIEW_ORIGIN}/auth/session`, {
-    method: 'GET',
-    headers: {
-      cookie: cookieHeader,
-      // optional but helps if you later gate based on origin/host
-      'x-forwarded-host': req.headers.get('host') ?? '',
-      'x-forwarded-proto': req.nextUrl.protocol.replace(':', ''),
-    },
-    cache: 'no-store',
-  })
-
-  if (!upstream.ok) {
-    return NextResponse.json({ ok: false }, { status: 401 })
-  }
-
-  const contentType = upstream.headers.get('content-type') ?? 'application/json'
-  const body = await upstream.text()
-
-  return new NextResponse(body, { status: 200, headers: { 'content-type': contentType } })
 }

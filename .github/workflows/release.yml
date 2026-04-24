@@ -71,17 +71,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m venv .venv
+          python -m venv --copies .venv
+          if [ ! -x ".venv/bin/python" ]; then
+            echo "::error::Venv creation failed; missing executable: ${GITHUB_WORKSPACE}/.venv/bin/python"
+            ls -la .venv || true
+            ls -la .venv/bin || true
+            exit 1
+          fi
           .venv/bin/python --version
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/python -m pip install -r requirements.txt
-          echo "RELEASE_PYTHON=${GITHUB_WORKSPACE}/.venv/bin/python" >> "$GITHUB_ENV"
+          RELEASE_PYTHON_PATH="${GITHUB_WORKSPACE}/.venv/bin/python"
+          if [ ! -x "${RELEASE_PYTHON_PATH}" ]; then
+            echo "::error::Resolved RELEASE_PYTHON path is not executable: ${RELEASE_PYTHON_PATH}"
+            exit 1
+          fi
+          echo "RELEASE_PYTHON=${RELEASE_PYTHON_PATH}" >> "$GITHUB_ENV"
 
       - name: Verify release-tooling interpreter and SDK imports
         shell: bash
         run: |
           set -euo pipefail
           echo "Using OS venv package: ${RELEASE_VENV_OS_PACKAGE:-<unset>}"
+          if [ -z "${RELEASE_PYTHON:-}" ]; then
+            echo "::error::RELEASE_PYTHON is empty."
+            exit 1
+          fi
+          if [ ! -x "${RELEASE_PYTHON}" ]; then
+            echo "::error::RELEASE_PYTHON does not exist or is not executable: ${RELEASE_PYTHON}"
+            ls -la "${GITHUB_WORKSPACE}/.venv" || true
+            ls -la "${GITHUB_WORKSPACE}/.venv/bin" || true
+            exit 1
+          fi
           "${RELEASE_PYTHON}" --version
           "${RELEASE_PYTHON}" -m pip --version
           "${RELEASE_PYTHON}" -c "import openai"
@@ -96,6 +117,23 @@ jobs:
 
       - name: Run core tests
         uses: ./.github/actions/test
+
+      - name: Verify release-tooling interpreter path before release stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_PYTHON:-}" ]; then
+            echo "::error::RELEASE_PYTHON is empty before release-tooling tests."
+            exit 1
+          fi
+          if [ ! -x "${RELEASE_PYTHON}" ]; then
+            echo "::error::RELEASE_PYTHON became invalid before release-tooling tests: ${RELEASE_PYTHON}"
+            ls -la "${GITHUB_WORKSPACE}/.venv" || true
+            ls -la "${GITHUB_WORKSPACE}/.venv/bin" || true
+            exit 1
+          fi
+          "${RELEASE_PYTHON}" --version
+          "${RELEASE_PYTHON}" -m pip --version
 
       - name: Run release tooling tests
         shell: bash

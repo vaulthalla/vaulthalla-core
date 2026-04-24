@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import os
 import re
 import shutil
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from tools.release.changelog.ai.config import (
     AIPipelineCLIOverrides,
@@ -18,6 +20,11 @@ from tools.release.changelog.ai.config import (
 )
 from tools.release.changelog.ai.contracts.polish import AIPolishResult
 from tools.release.changelog.ai.contracts.triage import build_triage_ir_payload
+from tools.release.changelog.ai.failure_artifacts import (
+    collect_provider_failure_evidence,
+    provider_response_observed,
+    write_failure_artifact,
+)
 from tools.release.changelog.ai.providers import (
     ProviderPreflightResult,
     build_structured_json_provider,
@@ -26,7 +33,13 @@ from tools.release.changelog.ai.providers import (
 from tools.release.changelog.ai.providers.base import StructuredJSONProvider
 from tools.release.changelog.ai.render.markdown import render_draft_markdown, render_polish_markdown
 from tools.release.changelog.ai.stages.draft import generate_draft_from_payload, render_draft_result_json
+from tools.release.changelog.ai.stages.emergency_triage import (
+    build_triage_input_from_emergency_result,
+    render_emergency_triage_result_json,
+    run_emergency_triage_stage,
+)
 from tools.release.changelog.ai.stages.polish import render_polish_result_json, run_polish_stage
+from tools.release.changelog.ai.stages.release_notes import run_release_notes_stage
 from tools.release.changelog.ai.stages.triage import render_triage_result_json, run_triage_stage
 from tools.release.changelog.release_workflow import (
     DEFAULT_CACHED_DRAFT_PATH,
@@ -37,7 +50,12 @@ from tools.release.changelog.release_workflow import (
     resolve_release_changelog,
 )
 from tools.release.changelog.context_builder import build_release_context
-from tools.release.changelog.payload import build_ai_payload, render_ai_payload_json
+from tools.release.changelog.payload import (
+    build_ai_payload,
+    build_semantic_ai_payload,
+    render_ai_payload_json,
+    render_semantic_ai_payload_json,
+)
 from tools.release.changelog.render_raw import render_debug_json, render_release_changelog
 from tools.release.packaging import (
     build_debian_package,
@@ -59,6 +77,9 @@ DEFAULT_CHANGELOG_DRAFT_OUTPUT = str(DEFAULT_CACHED_DRAFT_PATH)
 DEFAULT_CHANGELOG_RELEASE_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.release.md")
 DEFAULT_CHANGELOG_RAW_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.raw.md")
 DEFAULT_CHANGELOG_PAYLOAD_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.payload.json")
+DEFAULT_CHANGELOG_SEMANTIC_PAYLOAD_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "changelog.semantic_payload.json")
+DEFAULT_RELEASE_NOTES_OUTPUT = str(DEFAULT_CHANGELOG_SCRATCH_DIR / "release_notes.md")
+DEFAULT_CHANGELOG_COMPARISON_DIR = DEFAULT_CHANGELOG_SCRATCH_DIR / "comparisons"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -280,6 +301,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output path for deterministic AI payload evidence JSON.",
     )
     changelog_release_parser.add_argument(
+        "--semantic-payload-output",
+        default=DEFAULT_CHANGELOG_SEMANTIC_PAYLOAD_OUTPUT,
+        help="Output path for deterministic semantic payload evidence JSON.",
+    )
+    changelog_release_parser.add_argument(
+        "--release-notes-output",
+        default=DEFAULT_RELEASE_NOTES_OUTPUT,
+        help="Output path for optional release_notes markdown when AI path and profile stage enable it.",
+    )
+    changelog_release_parser.add_argument(
         "--manual-changelog-path",
         default="debian/changelog",
         help="Debian changelog file used for manual fallback and release entry updates.",
@@ -368,7 +399,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Global model override for all AI stages (triage/draft/polish). "
+            "Global model override for all AI stages (emergency_triage/triage/draft/polish/release_notes). "
             f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
         ),
     )
@@ -402,6 +433,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-polish-json",
         default=None,
         help="Optional path to save validated structured polish JSON when --polish is enabled.",
+    )
+    changelog_ai_draft_parser.add_argument(
+        "--release-notes-output",
+        default=DEFAULT_RELEASE_NOTES_OUTPUT,
+        help="Output path for optional release_notes markdown when stage is enabled by profile.",
     )
     changelog_ai_draft_parser.set_defaults(func=cmd_changelog_ai_draft)
 
@@ -435,6 +471,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output path for deterministic AI payload evidence JSON.",
     )
     changelog_ai_release_parser.add_argument(
+        "--semantic-payload-output",
+        default=DEFAULT_CHANGELOG_SEMANTIC_PAYLOAD_OUTPUT,
+        help="Output path for deterministic semantic payload evidence JSON.",
+    )
+    changelog_ai_release_parser.add_argument(
         "--manual-changelog-path",
         default="debian/changelog",
         help="Debian changelog file used for manual fallback and release entry updates.",
@@ -463,7 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Global model override for all AI stages (triage/draft/polish). "
+            "Global model override for all AI stages (emergency_triage/triage/draft/polish/release_notes). "
             f"Legacy default: {DEFAULT_AI_DRAFT_MODEL}."
         ),
     )
@@ -498,7 +539,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional path to save validated structured polish JSON when --polish is enabled.",
     )
+    changelog_ai_release_parser.add_argument(
+        "--release-notes-output",
+        default=DEFAULT_RELEASE_NOTES_OUTPUT,
+        help="Output path for optional release_notes markdown when stage is enabled by profile.",
+    )
     changelog_ai_release_parser.set_defaults(func=cmd_changelog_ai_release)
+
+    changelog_ai_compare_parser = changelog_subparsers.add_parser(
+        "ai-compare",
+        help="Generate one comparison artifact by running AI changelog generation across profiles.",
+    )
+    changelog_ai_compare_parser.add_argument(
+        "--since-tag",
+        default=None,
+        help="Optional tag to use as lower bound (overrides latest-tag auto-detection).",
+    )
+    changelog_ai_compare_parser.add_argument(
+        "--ai-profiles",
+        default=None,
+        help="Comma-separated AI profile slugs to compare (e.g. openai-cheap,openai-balanced).",
+    )
+    changelog_ai_compare_parser.add_argument(
+        "--output-name",
+        default=None,
+        help="Output file name under .changelog_scratch/comparisons/.",
+    )
+    changelog_ai_compare_parser.set_defaults(func=cmd_changelog_ai_compare)
 
     return parser
 
@@ -790,6 +857,7 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
     _print_status("Changelog ai-release stage: generate AI draft artifact")
     draft_args = argparse.Namespace(
         repo_root=args.repo_root,
+        changelog_command="ai-release",
         since_tag=args.since_tag,
         output=draft_output,
         save_json=args.save_json,
@@ -801,6 +869,7 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
         save_triage_json=args.save_triage_json,
         polish=args.polish,
         save_polish_json=args.save_polish_json,
+        release_notes_output=args.release_notes_output,
     )
     draft_rc = cmd_changelog_ai_draft(draft_args)
     if draft_rc != 0:
@@ -813,6 +882,8 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
         output=args.output,
         raw_output=args.raw_output,
         payload_output=args.payload_output,
+        semantic_payload_output=args.semantic_payload_output,
+        release_notes_output=args.release_notes_output,
         manual_changelog_path=args.manual_changelog_path,
         cached_draft_path=draft_output,
         debian_distribution=args.debian_distribution,
@@ -830,13 +901,106 @@ def cmd_changelog_ai_release(args: argparse.Namespace) -> int:
             os.environ["RELEASE_AI_MODE"] = previous_mode
 
 
+def cmd_changelog_ai_compare(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    profiles = _parse_ai_compare_profiles(args.ai_profiles)
+    version = str(read_version_file(repo_root / "VERSION"))
+    output_name = _resolve_ai_compare_output_name(args.output_name, version=version)
+
+    comparisons_dir = (repo_root / DEFAULT_CHANGELOG_COMPARISON_DIR).resolve()
+    comparisons_dir.mkdir(parents=True, exist_ok=True)
+    output_path = (comparisons_dir / output_name).resolve()
+
+    manual_changelog_path = (repo_root / "debian" / "changelog").resolve()
+    if not manual_changelog_path.is_file():
+        raise ValueError(f"Debian changelog file not found: {manual_changelog_path}")
+    original_debian_changelog = manual_changelog_path.read_text(encoding="utf-8")
+
+    sections: list[str] = [f"# AI Changelog Comparison — {version}"]
+    with TemporaryDirectory(prefix="ai-compare-") as temp_dir:
+        temp_root = Path(temp_dir)
+        for profile in profiles:
+            compare_args = argparse.Namespace(
+                repo_root=str(repo_root),
+                changelog_command="ai-compare",
+                since_tag=args.since_tag,
+                output=str(temp_root / f"{profile}.draft.md"),
+                save_json=None,
+                ai_profile=profile,
+                model=None,
+                provider=None,
+                base_url=None,
+                use_triage=False,
+                save_triage_json=None,
+                polish=False,
+                save_polish_json=None,
+                release_notes_output=str(temp_root / f"{profile}.release_notes.md"),
+            )
+            pipeline_config = build_ai_pipeline_config_from_args(compare_args, repo_root=repo_root)
+            run_rc = cmd_changelog_ai_draft(compare_args)
+            if run_rc != 0:
+                raise ValueError(f"AI compare run failed for profile `{profile}` (exit code {run_rc}).")
+
+            cached_draft = Path(compare_args.output).read_text(encoding="utf-8")
+            release_markdown = _strip_cached_draft_marker(cached_draft)
+            if not release_markdown.strip():
+                raise ValueError(f"AI compare produced empty markdown for profile `{profile}`.")
+
+            profile_debian = temp_root / f"{profile}.debian.changelog"
+            profile_debian.write_text(original_debian_changelog, encoding="utf-8")
+            _ = refresh_debian_changelog_entry(
+                changelog_path=profile_debian,
+                release_markdown=release_markdown,
+                environ=os.environ,
+            )
+            debian_output = profile_debian.read_text(encoding="utf-8")
+
+            sections.extend(
+                [
+                    "",
+                    f"## Profile: {profile}",
+                    "",
+                    "### Effective profile config",
+                    "```yaml",
+                    _render_ai_compare_profile_config_yaml(pipeline_config).rstrip(),
+                    "```",
+                    "",
+                    "### changelog.release.md",
+                    "```markdown",
+                    release_markdown.rstrip(),
+                    "```",
+                    "",
+                    "### release_notes.md",
+                    "```markdown",
+                    _read_release_notes_for_compare(compare_args.release_notes_output),
+                    "```",
+                    "",
+                    "### debian/changelog",
+                    "```text",
+                    debian_output.rstrip(),
+                    "```",
+                    "",
+                    "---",
+                ]
+            )
+
+    rendered = "\n".join(sections).rstrip() + "\n"
+    write_output(rendered, str(output_path))
+    print(f"Wrote AI comparison artifact to {output_path}")
+    return 0
+
+
 def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     context = build_changelog_context(repo_root, args.since_tag)
     payload = build_ai_payload(context)
     pipeline_config = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
     run_triage = bool(args.use_triage) or pipeline_config.is_stage_enabled("triage")
+    run_emergency_triage = pipeline_config.is_stage_enabled("emergency_triage")
     run_polish = bool(args.polish) or pipeline_config.is_stage_enabled("polish")
+    run_release_notes = pipeline_config.is_stage_enabled("release_notes")
+    if run_emergency_triage and not run_triage:
+        raise ValueError("`emergency_triage` stage requires triage stage to run.")
     if args.save_triage_json and not run_triage:
         raise ValueError("--save-triage-json requires triage stage to run.")
     if args.save_polish_json and not run_polish:
@@ -849,29 +1013,101 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             args=args,
             repo_root=repo_root,
             draft_provider=draft_provider,
+            include_emergency_triage=run_emergency_triage and run_triage,
             include_triage=run_triage,
             include_polish=run_polish,
+            include_release_notes=run_release_notes,
         )
+
+    semantic_payload: dict | None = build_semantic_ai_payload(context) if run_triage else None
 
     draft_input: dict = payload
     source_kind = "payload"
+    triage_input_mode = "raw_semantic"
+    triage_input_payload: dict = semantic_payload if semantic_payload is not None else payload
+    emergency_triage_stage_cfg = pipeline_config.stages["emergency_triage"]
     triage_stage_cfg = pipeline_config.stages["triage"]
     draft_stage_cfg = pipeline_config.stages["draft"]
     polish_stage_cfg = pipeline_config.stages["polish"]
+    release_notes_stage_cfg = pipeline_config.stages["release_notes"]
 
     if run_triage:
+        if run_emergency_triage:
+            emergency_provider = build_ai_provider_from_args(
+                args,
+                repo_root=repo_root,
+                stage="emergency_triage",
+            )
+            try:
+                print("Emergency triage: batch aggregation start")
+                emergency_result = run_emergency_triage_stage(
+                    semantic_payload if semantic_payload is not None else payload,
+                    provider=emergency_provider,
+                    provider_kind=pipeline_config.provider,
+                    reasoning_effort=emergency_triage_stage_cfg.reasoning_effort,
+                    structured_mode=emergency_triage_stage_cfg.structured_mode,
+                    temperature=emergency_triage_stage_cfg.temperature,
+                    max_output_tokens_policy=emergency_triage_stage_cfg.max_output_tokens,
+                    progress_logger=print,
+                )
+                print("Emergency triage: batch aggregation end")
+            except Exception as exc:
+                _capture_stage_failure_artifact(
+                    repo_root=repo_root,
+                    args=args,
+                    stage="emergency_triage",
+                    pipeline_config=pipeline_config,
+                    provider=emergency_provider,
+                    exc=exc,
+                    stage_settings={
+                        "structured_mode": emergency_triage_stage_cfg.structured_mode,
+                        "reasoning_effort": emergency_triage_stage_cfg.reasoning_effort,
+                        "temperature": emergency_triage_stage_cfg.temperature,
+                        "max_output_tokens_policy": str(emergency_triage_stage_cfg.max_output_tokens),
+                    },
+                )
+                raise _stage_failure("Emergency triage", exc) from exc
+
+            emergency_output = str((repo_root / DEFAULT_CHANGELOG_SCRATCH_DIR / "emergency_triage.json").resolve())
+            print("Emergency triage: artifact write start")
+            write_output(render_emergency_triage_result_json(emergency_result), emergency_output)
+            print("Emergency triage: artifact write end")
+            if emergency_output != "-":
+                print(f"Wrote emergency triage artifact to {Path(emergency_output).resolve()}")
+            if semantic_payload is not None:
+                triage_input_payload = build_triage_input_from_emergency_result(
+                    semantic_payload,
+                    emergency_result,
+                )
+                triage_input_mode = "synthesized_semantic"
+
         triage_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="triage")
         try:
             triage_result = run_triage_stage(
-                payload,
+                triage_input_payload,
                 provider=triage_provider,
                 provider_kind=pipeline_config.provider,
                 reasoning_effort=triage_stage_cfg.reasoning_effort,
                 structured_mode=triage_stage_cfg.structured_mode,
                 temperature=triage_stage_cfg.temperature,
                 max_output_tokens_policy=triage_stage_cfg.max_output_tokens,
+                input_mode=triage_input_mode,
             )
         except Exception as exc:
+            _capture_stage_failure_artifact(
+                repo_root=repo_root,
+                args=args,
+                stage="triage",
+                pipeline_config=pipeline_config,
+                provider=triage_provider,
+                exc=exc,
+                stage_settings={
+                    "structured_mode": triage_stage_cfg.structured_mode,
+                    "reasoning_effort": triage_stage_cfg.reasoning_effort,
+                    "temperature": triage_stage_cfg.temperature,
+                    "max_output_tokens_policy": str(triage_stage_cfg.max_output_tokens),
+                },
+            )
             raise _stage_failure("Triage", exc) from exc
         draft_input = build_triage_ir_payload(triage_result)
         source_kind = "triage"
@@ -892,13 +1128,39 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
             max_output_tokens_policy=draft_stage_cfg.max_output_tokens,
         )
     except Exception as exc:
+        _capture_stage_failure_artifact(
+            repo_root=repo_root,
+            args=args,
+            stage="draft",
+            pipeline_config=pipeline_config,
+            provider=draft_provider,
+            exc=exc,
+            stage_settings={
+                "structured_mode": draft_stage_cfg.structured_mode,
+                "reasoning_effort": draft_stage_cfg.reasoning_effort,
+                "temperature": draft_stage_cfg.temperature,
+                "max_output_tokens_policy": str(draft_stage_cfg.max_output_tokens),
+                "source_kind": source_kind,
+            },
+        )
         raise _stage_failure("Draft", exc) from exc
+    draft_markdown: str | None = None
+    if run_release_notes or not run_polish:
+        draft_markdown = render_draft_markdown(draft)
     polish_result: AIPolishResult | None = None
+    release_notes_result = None
+    polish_provider: StructuredJSONProvider | None = None
+    release_notes_provider: StructuredJSONProvider | None = None
 
     if run_polish:
         polish_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="polish")
+    if run_release_notes:
+        release_notes_provider = build_ai_provider_from_args(args, repo_root=repo_root, stage="release_notes")
+
+    def _run_polish() -> AIPolishResult:
+        assert polish_provider is not None
         try:
-            polish_result = run_polish_stage(
+            return run_polish_stage(
                 draft,
                 provider=polish_provider,
                 provider_kind=pipeline_config.provider,
@@ -908,14 +1170,92 @@ def cmd_changelog_ai_draft(args: argparse.Namespace) -> int:
                 max_output_tokens_policy=polish_stage_cfg.max_output_tokens,
             )
         except Exception as exc:
+            _capture_stage_failure_artifact(
+                repo_root=repo_root,
+                args=args,
+                stage="polish",
+                pipeline_config=pipeline_config,
+                provider=polish_provider,
+                exc=exc,
+                stage_settings={
+                    "structured_mode": polish_stage_cfg.structured_mode,
+                    "reasoning_effort": polish_stage_cfg.reasoning_effort,
+                    "temperature": polish_stage_cfg.temperature,
+                    "max_output_tokens_policy": str(polish_stage_cfg.max_output_tokens),
+                },
+            )
             raise _stage_failure("Polish", exc) from exc
-        final_markdown = render_polish_markdown(polish_result)
 
-        if args.save_polish_json:
-            write_output(render_polish_result_json(polish_result), args.save_polish_json)
-            print(f"Wrote AI polish JSON to {Path(args.save_polish_json).resolve()}")
+    def _run_release_notes():
+        assert release_notes_provider is not None
+        assert draft_markdown is not None
+        try:
+            return run_release_notes_stage(
+                draft_markdown,
+                provider=release_notes_provider,
+                provider_kind=pipeline_config.provider,
+                reasoning_effort=release_notes_stage_cfg.reasoning_effort,
+                structured_mode=release_notes_stage_cfg.structured_mode,
+                temperature=release_notes_stage_cfg.temperature,
+                max_output_tokens_policy=release_notes_stage_cfg.max_output_tokens,
+            )
+        except Exception as exc:
+            _capture_stage_failure_artifact(
+                repo_root=repo_root,
+                args=args,
+                stage="release_notes",
+                pipeline_config=pipeline_config,
+                provider=release_notes_provider,
+                exc=exc,
+                stage_settings={
+                    "structured_mode": release_notes_stage_cfg.structured_mode,
+                    "reasoning_effort": release_notes_stage_cfg.reasoning_effort,
+                    "temperature": release_notes_stage_cfg.temperature,
+                    "max_output_tokens_policy": str(release_notes_stage_cfg.max_output_tokens),
+                },
+            )
+            raise _stage_failure("Release notes", exc) from exc
+
+    if run_polish and run_release_notes:
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="vh-ai-final") as executor:
+            futures = {
+                "polish": executor.submit(_run_polish),
+                "release_notes": executor.submit(_run_release_notes),
+            }
+            stage_errors: dict[str, Exception] = {}
+            for stage_name in ("polish", "release_notes"):
+                try:
+                    result = futures[stage_name].result()
+                except Exception as exc:  # pragma: no cover - exercised by stage failure tests.
+                    stage_errors[stage_name] = exc if isinstance(exc, Exception) else RuntimeError(str(exc))
+                    continue
+                if stage_name == "polish":
+                    polish_result = result
+                else:
+                    release_notes_result = result
+            if stage_errors:
+                first_failed_stage = "polish" if "polish" in stage_errors else "release_notes"
+                raise stage_errors[first_failed_stage]
+    elif run_polish:
+        polish_result = _run_polish()
+    elif run_release_notes:
+        release_notes_result = _run_release_notes()
+
+    if polish_result is not None and args.save_polish_json:
+        write_output(render_polish_result_json(polish_result), args.save_polish_json)
+        print(f"Wrote AI polish JSON to {Path(args.save_polish_json).resolve()}")
+
+    if release_notes_result is not None:
+        release_notes_output = getattr(args, "release_notes_output", DEFAULT_RELEASE_NOTES_OUTPUT)
+        write_output(release_notes_result.markdown, release_notes_output)
+        if release_notes_output != "-":
+            print(f"Wrote AI release notes to {Path(release_notes_output).resolve()}")
+
+    if polish_result is not None:
+        final_markdown = render_polish_markdown(polish_result)
     else:
-        final_markdown = render_draft_markdown(draft)
+        assert draft_markdown is not None
+        final_markdown = draft_markdown
 
     version = read_version_file(repo_root / "VERSION")
     cached_markdown = render_cached_draft_markdown(version=str(version), content=final_markdown)
@@ -957,8 +1297,10 @@ def _run_changelog_release_with_settings(
         _print_status("Changelog release stage: build deterministic context + payload")
         context = build_changelog_context(repo_root, args.since_tag)
         payload = build_ai_payload(context)
+        semantic_payload = build_semantic_ai_payload(context)
         raw_markdown = render_release_changelog(context)
         payload_json = render_ai_payload_json(payload)
+        semantic_payload_json = render_semantic_ai_payload_json(semantic_payload)
     except Exception as exc:
         raise ValueError(f"Changelog release failed during context/payload generation: {exc}") from exc
 
@@ -968,6 +1310,9 @@ def _run_changelog_release_with_settings(
         _print_status(f"Wrote changelog raw evidence to {Path(args.raw_output).resolve()}")
         write_output(payload_json, args.payload_output)
         _print_status(f"Wrote changelog payload evidence to {Path(args.payload_output).resolve()}")
+        semantic_target = getattr(args, "semantic_payload_output", DEFAULT_CHANGELOG_SEMANTIC_PAYLOAD_OUTPUT)
+        write_output(semantic_payload_json, semantic_target)
+        _print_status(f"Wrote changelog semantic payload evidence to {Path(semantic_target).resolve()}")
     except Exception as exc:
         raise ValueError(f"Changelog release failed while writing evidence artifacts: {exc}") from exc
 
@@ -976,6 +1321,7 @@ def _run_changelog_release_with_settings(
         selection = resolve_release_changelog(
             repo_root=repo_root,
             payload=payload,
+            semantic_payload=semantic_payload,
             settings=env_settings,
             manual_changelog_path=args.manual_changelog_path,
             cached_draft_path=getattr(args, "cached_draft_path", DEFAULT_CHANGELOG_DRAFT_OUTPUT),
@@ -992,6 +1338,11 @@ def _run_changelog_release_with_settings(
         _print_status("Changelog release stage: write selected release changelog")
         write_output(selection.content, args.output)
         _print_status(f"Wrote release changelog to {Path(args.output).resolve()}")
+        release_notes_output = getattr(args, "release_notes_output", DEFAULT_RELEASE_NOTES_OUTPUT)
+        release_notes_content = getattr(selection, "release_notes_content", None)
+        if release_notes_content is not None:
+            write_output(release_notes_content, release_notes_output)
+            _print_status(f"Wrote release notes artifact to {Path(release_notes_output).resolve()}")
         if selection.path == "local" and env_settings.local_base_url_override:
             if selection.local_base_url_overrode_profile:
                 _print_status("Local base_url override status: applied from RELEASE_LOCAL_LLM_BASE_URL.")
@@ -1141,6 +1492,101 @@ def build_ai_pipeline_config_from_args(
     )
 
 
+def _parse_ai_compare_profiles(raw: str | None) -> list[str]:
+    if raw is None:
+        raise ValueError("--ai-profiles is required.")
+    parsed = [value.strip() for value in raw.split(",") if value.strip()]
+    if not parsed:
+        raise ValueError("--ai-profiles must include at least one profile slug.")
+    ordered_unique: list[str] = []
+    seen: set[str] = set()
+    for profile in parsed:
+        if profile in seen:
+            continue
+        seen.add(profile)
+        ordered_unique.append(profile)
+    return ordered_unique
+
+
+def _resolve_ai_compare_output_name(raw: str | None, *, version: str) -> str:
+    candidate = raw.strip() if isinstance(raw, str) else ""
+    if not candidate:
+        return f"ai-comparison-{version}.md"
+    if candidate in {".", ".."}:
+        raise ValueError("--output-name must be a file name, not a directory marker.")
+    if "/" in candidate or "\\" in candidate:
+        raise ValueError("--output-name must be a file name without path separators.")
+    if Path(candidate).name != candidate:
+        raise ValueError("--output-name must be a plain file name.")
+    return candidate
+
+
+def _strip_cached_draft_marker(content: str) -> str:
+    lines = content.splitlines()
+    if not lines:
+        return ""
+    if re.fullmatch(r"\s*<!--\s*vaulthalla-release-version:\s*[0-9]+\.[0-9]+\.[0-9]+\s*-->\s*", lines[0]):
+        return ("\n".join(lines[1:])).lstrip("\n")
+    return content
+
+
+def _render_ai_compare_profile_config_yaml(pipeline: AIPipelineConfig) -> str:
+    lines: list[str] = [
+        f"provider: {pipeline.provider}",
+        f"profile_slug: {pipeline.profile_slug or '<none>'}",
+    ]
+    if pipeline.base_url:
+        lines.append(f"base_url: {pipeline.base_url}")
+    lines.append("enabled_stages:")
+    for stage in pipeline.enabled_stages:
+        lines.append(f"  - {stage}")
+
+    lines.append("default_max_output_tokens:")
+    for stage in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
+        token_policy = pipeline.stages[stage].max_output_tokens
+        lines.extend(_render_ai_compare_token_policy(stage, token_policy))
+
+    lines.append("stages:")
+    for stage in ("emergency_triage", "triage", "draft", "polish", "release_notes"):
+        stage_cfg = pipeline.stages[stage]
+        lines.append(f"  {stage}:")
+        lines.append(f"    model: {stage_cfg.model}")
+        lines.append(f"    reasoning_effort: {stage_cfg.reasoning_effort or '<none>'}")
+        lines.append(f"    structured_mode: {stage_cfg.structured_mode or '<none>'}")
+
+    return "\n".join(lines) + "\n"
+
+
+def _render_ai_compare_token_policy(stage: str, policy: object) -> list[str]:
+    if isinstance(policy, int):
+        return [f"  {stage}: {policy}"]
+    mode = getattr(policy, "mode", None)
+    ratio = getattr(policy, "ratio", None)
+    minimum = getattr(policy, "min", None)
+    maximum = getattr(policy, "max", None)
+    if mode == "dynamic_ratio" and isinstance(ratio, (int, float)) and isinstance(minimum, int) and isinstance(maximum, int):
+        return [
+            f"  {stage}:",
+            "    mode: dynamic_ratio",
+            f"    ratio: {ratio}",
+            f"    min: {minimum}",
+            f"    max: {maximum}",
+        ]
+    return [f"  {stage}: {policy!r}"]
+
+
+def _read_release_notes_for_compare(path: str | None) -> str:
+    if not path:
+        return "_not generated_"
+    candidate = Path(path)
+    if not candidate.is_file():
+        return "_not generated_"
+    content = candidate.read_text(encoding="utf-8").strip()
+    if not content:
+        return "_not generated_"
+    return content
+
+
 def build_ai_provider_config_from_args(
     args: argparse.Namespace,
     *,
@@ -1148,7 +1594,18 @@ def build_ai_provider_config_from_args(
     stage: AIStageName = "draft",
 ) -> AIProviderConfig:
     pipeline = build_ai_pipeline_config_from_args(args, repo_root=repo_root)
-    return pipeline.provider_config_for_stage(stage)
+    base = pipeline.provider_config_for_stage(stage)
+    timeout_seconds = _resolve_stage_provider_timeout_seconds(stage)
+    if timeout_seconds is None:
+        return base
+    return AIProviderConfig(
+        kind=base.kind,
+        model=base.model,
+        base_url=base.base_url,
+        api_key_env_var=base.api_key_env_var,
+        api_key=base.api_key,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def build_ai_provider_from_config(config: AIProviderConfig) -> StructuredJSONProvider:
@@ -1166,21 +1623,42 @@ def build_ai_provider_from_args(
     )
 
 
+def _resolve_stage_provider_timeout_seconds(stage: AIStageName) -> float | None:
+    if stage != "emergency_triage":
+        return None
+    raw = os.getenv("RELEASE_AI_EMERGENCY_TRIAGE_PROVIDER_TIMEOUT_SECONDS", "45").strip()
+    if not raw:
+        return 45.0
+    try:
+        value = float(raw)
+    except ValueError:
+        return 45.0
+    if value <= 0:
+        return 45.0
+    return value
+
+
 def _run_stage_preflight(
     *,
     args: argparse.Namespace,
     repo_root: Path,
     draft_provider: StructuredJSONProvider,
+    include_emergency_triage: bool,
     include_triage: bool,
     include_polish: bool,
+    include_release_notes: bool,
 ) -> None:
     seen: set[tuple[str, str | None]] = set()
     stage_order: list[AIStageName] = []
+    if include_emergency_triage:
+        stage_order.append("emergency_triage")
     if include_triage:
         stage_order.append("triage")
     stage_order.append("draft")
     if include_polish:
         stage_order.append("polish")
+    if include_release_notes:
+        stage_order.append("release_notes")
 
     for stage in stage_order:
         stage_config = build_ai_provider_config_from_args(args, repo_root=repo_root, stage=stage)
@@ -1219,6 +1697,48 @@ def _stage_failure(stage: str, exc: Exception) -> ValueError:
     if field is not None:
         return ValueError(f"{stage} stage failed: missing required field `{field}`. {message}")
     return ValueError(f"{stage} stage failed: {message}")
+
+
+def _capture_stage_failure_artifact(
+    *,
+    repo_root: Path,
+    args: argparse.Namespace,
+    stage: AIStageName,
+    pipeline_config: AIPipelineConfig,
+    provider: StructuredJSONProvider,
+    exc: Exception,
+    stage_settings: dict[str, object],
+) -> None:
+    provider_evidence = collect_provider_failure_evidence(provider)
+    if not provider_response_observed(provider_evidence):
+        return
+    stage_provider_cfg = pipeline_config.provider_config_for_stage(stage)
+    mode_value = stage_settings.get("structured_mode")
+    if mode_value is None and isinstance(provider_evidence, dict):
+        resolved = provider_evidence.get("resolved_settings")
+        if isinstance(resolved, dict):
+            mode_value = resolved.get("structured_mode")
+    try:
+        artifact = write_failure_artifact(
+            repo_root=repo_root,
+            command=getattr(args, "changelog_command", None),
+            stage=stage,
+            ai_profile=getattr(args, "ai_profile", None),
+            provider_key=stage_provider_cfg.kind,
+            model=stage_provider_cfg.model,
+            structured_mode=str(mode_value or "unknown-mode"),
+            normalized_request_settings={
+                "stage": stage,
+                "provider_kind": stage_provider_cfg.kind,
+                "model": stage_provider_cfg.model,
+                **stage_settings,
+            },
+            error=exc,
+            provider_evidence=provider_evidence,
+        )
+    except Exception:
+        return
+    _print_status(f"Wrote AI failure evidence to {artifact}")
 
 
 def _extract_missing_field(message: str) -> str | None:

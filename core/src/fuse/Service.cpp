@@ -13,8 +13,10 @@
 #include <paths.h>
 #include <sys/mount.h>    // umount2, MNT_DETACH
 #include <sys/stat.h>     // lstat
+#include <unistd.h>       // close
 #include <chrono>
 #include <thread>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 using namespace vh::concurrency;
@@ -55,6 +57,20 @@ static void waitUnmounted(const fs::path& p, std::chrono::milliseconds timeout =
         if (!isMountedOrStale(p)) return;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+}
+
+static void releaseReceivedBuf(fuse_buf& buf) {
+    if ((buf.flags & FUSE_BUF_IS_FD) != 0) {
+        if (buf.fd >= 0) ::close(buf.fd);
+    } else if (buf.mem) {
+        std::free(buf.mem);
+    }
+
+    buf.mem = nullptr;
+    buf.size = 0;
+    buf.fd = -1;
+    buf.pos = 0;
+    buf.flags = static_cast<fuse_buf_flags>(0);
 }
 
 static void ensureFreshMountpoint() {
@@ -134,18 +150,25 @@ void fuse_ll_init(void* userdata, fuse_conn_info* conn) {
 void Service::stop() {
     if (!isRunning()) return;
     log::Registry::fuse()->info("[FUSE] Stopping FUSE connection...");
-    interruptFlag_.store(true);
+    interruptFlag_.store(true, std::memory_order_release);
 
-    if (paths::testMode) lazyUmount(paths::mountPath);
+    // Proactively detach the mountpoint to unblock fuse_session_receive_buf().
+    // This is required in production as well, not only in tests.
+    const auto mountPath = paths::getMountPath();
+    lazyUmount(mountPath);
+    waitUnmounted(mountPath);
+    if (isMountedOrStale(mountPath))
+        log::Registry::fuse()->warn("[FUSE] Mountpoint {} still appears mounted/stale during stop",
+                                     mountPath.string());
 
-    // Only wake the loop. Do NOT unmount/destroy here.
+    // Wake the loop as an additional unblock path.
     if (session_) fuse_session_exit(session_);
 
     if (worker_.joinable() && std::this_thread::get_id() != worker_.get_id())
         worker_.join();
 
-    running_.store(false);
-    interruptFlag_.store(false);
+    running_.store(false, std::memory_order_release);
+    // Leave interruptFlag_ true until next start() resets it.
     log::Registry::fuse()->info("[FUSE] FUSE service stopped");
 }
 
@@ -217,10 +240,26 @@ void Service::runLoop() {
     while (!fuse_session_exited(session_) && !shouldStop()) {
         fuse_buf buf{};
         const int res = fuse_session_receive_buf(session_, &buf);
-        if (res == -EINTR) continue;
-        if (res <= 0) break;
+        if (res == -EINTR) {
+            releaseReceivedBuf(buf);
+            continue;
+        }
+        if (res <= 0) {
+            releaseReceivedBuf(buf);
+            break;
+        }
 
-        ThreadPoolManager::instance().fusePool()->submit(std::make_shared<task::Request>(session_, buf));
+        try {
+            ThreadPoolManager::instance().fusePool()->submit(std::make_shared<task::Request>(session_, buf));
+        } catch (const std::exception& e) {
+            releaseReceivedBuf(buf);
+            log::Registry::fuse()->error("[FUSE] Failed to dispatch request task: {}", e.what());
+            break;
+        } catch (...) {
+            releaseReceivedBuf(buf);
+            log::Registry::fuse()->error("[FUSE] Failed to dispatch request task: unknown error");
+            break;
+        }
     }
 
     log::Registry::fuse()->info("[FUSE] FUSE service loop exiting");

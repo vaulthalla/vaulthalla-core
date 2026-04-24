@@ -3,13 +3,17 @@ from __future__ import annotations
 import argparse
 from contextlib import redirect_stdout
 from io import StringIO
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import call, patch
 
 from tools.release import cli
+from tools.release.changelog.models import CategoryContext, CommitInfo, DiffSnippet, FileChange, ReleaseContext
 from tools.release.changelog.ai.config import AIDynamicRatioTokenBudget, DEFAULT_AI_DRAFT_MODEL
 from tools.release.changelog.ai.providers import ProviderPreflightResult
 from tools.release.version.models import Version
@@ -146,6 +150,8 @@ class CliChangelogDraftTests(unittest.TestCase):
                 "/tmp/raw.md",
                 "--payload-output",
                 "/tmp/release-payload.json",
+                "--semantic-payload-output",
+                "/tmp/release-semantic-payload.json",
                 "--manual-changelog-path",
                 "debian/changelog",
             ]
@@ -156,6 +162,7 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_release.output, "/tmp/release.md")
         self.assertEqual(parsed_release.raw_output, "/tmp/raw.md")
         self.assertEqual(parsed_release.payload_output, "/tmp/release-payload.json")
+        self.assertEqual(parsed_release.semantic_payload_output, "/tmp/release-semantic-payload.json")
         self.assertEqual(parsed_release.manual_changelog_path, "debian/changelog")
         self.assertEqual(parsed_release.cached_draft_path, ".changelog_scratch/changelog.draft.md")
         self.assertIsNone(parsed_release.debian_distribution)
@@ -178,6 +185,10 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_ai_release.ai_profile, "openai-balanced")
         self.assertEqual(parsed_ai_release.draft_output, "/tmp/draft.md")
         self.assertEqual(parsed_ai_release.output, "/tmp/release.md")
+        self.assertEqual(
+            parsed_ai_release.semantic_payload_output,
+            ".changelog_scratch/changelog.semantic_payload.json",
+        )
 
         parsed_ai_check = parser.parse_args(
             [
@@ -239,6 +250,27 @@ class CliChangelogDraftTests(unittest.TestCase):
         self.assertEqual(parsed_ai.save_triage_json, "/tmp/triage.json")
         self.assertTrue(parsed_ai.polish)
         self.assertEqual(parsed_ai.save_polish_json, "/tmp/polish.json")
+
+        parsed_ai_compare = parser.parse_args(
+            [
+                "changelog",
+                "ai-compare",
+                "--since-tag",
+                "v0.1.0",
+                "--ai-profiles",
+                "openai-cheap,openai-balanced,openai-premium",
+                "--output-name",
+                "0.34.0-openai-comparison.md",
+            ]
+        )
+        self.assertEqual(parsed_ai_compare.command, "changelog")
+        self.assertEqual(parsed_ai_compare.changelog_command, "ai-compare")
+        self.assertEqual(parsed_ai_compare.since_tag, "v0.1.0")
+        self.assertEqual(
+            parsed_ai_compare.ai_profiles,
+            "openai-cheap,openai-balanced,openai-premium",
+        )
+        self.assertEqual(parsed_ai_compare.output_name, "0.34.0-openai-comparison.md")
 
 
 class CliChangelogPayloadTests(unittest.TestCase):
@@ -302,6 +334,8 @@ class CliChangelogReleaseTests(unittest.TestCase):
         output: str = ".changelog_scratch/changelog.release.md",
         raw_output: str = ".changelog_scratch/changelog.raw.md",
         payload_output: str = ".changelog_scratch/changelog.payload.json",
+        semantic_payload_output: str = ".changelog_scratch/changelog.semantic_payload.json",
+        release_notes_output: str = ".changelog_scratch/release_notes.md",
         manual_changelog_path: str = "debian/changelog",
         cached_draft_path: str = ".changelog_scratch/changelog.draft.md",
         debian_distribution: str | None = None,
@@ -313,6 +347,8 @@ class CliChangelogReleaseTests(unittest.TestCase):
             output=output,
             raw_output=raw_output,
             payload_output=payload_output,
+            semantic_payload_output=semantic_payload_output,
+            release_notes_output=release_notes_output,
             manual_changelog_path=manual_changelog_path,
             cached_draft_path=cached_draft_path,
             debian_distribution=debian_distribution,
@@ -324,10 +360,12 @@ class CliChangelogReleaseTests(unittest.TestCase):
             target = Path(temp_dir) / "release.md"
             raw_target = Path(temp_dir) / "raw.md"
             payload_target = Path(temp_dir) / "payload.json"
+            semantic_payload_target = Path(temp_dir) / "semantic-payload.json"
             args = self._args(
                 output=str(target),
                 raw_output=str(raw_target),
                 payload_output=str(payload_target),
+                semantic_payload_output=str(semantic_payload_target),
             )
             out = StringIO()
 
@@ -336,6 +374,11 @@ class CliChangelogReleaseTests(unittest.TestCase):
                 patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
                 patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
+                patch(
+                    "tools.release.cli.render_semantic_ai_payload_json",
+                    return_value='{"schema_version":"semantic-x"}\n',
+                ),
                 patch(
                     "tools.release.cli.parse_release_ai_settings",
                     return_value=type(
@@ -368,21 +411,93 @@ class CliChangelogReleaseTests(unittest.TestCase):
             self.assertEqual(target.read_text(encoding="utf-8"), "# Manual Changelog\n")
             self.assertEqual(raw_target.read_text(encoding="utf-8"), "# Raw Draft\n")
             self.assertEqual(payload_target.read_text(encoding="utf-8"), '{"schema_version":"x"}\n')
+            self.assertEqual(
+                semantic_payload_target.read_text(encoding="utf-8"),
+                '{"schema_version":"semantic-x"}\n',
+            )
             rendered = out.getvalue()
             self.assertIn("Wrote changelog raw evidence to", rendered)
             self.assertIn("Wrote changelog payload evidence to", rendered)
+            self.assertIn("Wrote changelog semantic payload evidence to", rendered)
             self.assertIn("Wrote release changelog to", rendered)
             self.assertIn("Debian changelog entry update skipped", rendered)
+
+    def test_release_command_writes_release_notes_artifact_when_selection_includes_it(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "release.md"
+            raw_target = Path(temp_dir) / "raw.md"
+            payload_target = Path(temp_dir) / "payload.json"
+            semantic_payload_target = Path(temp_dir) / "semantic-payload.json"
+            release_notes_target = Path(temp_dir) / "release-notes.md"
+            args = self._args(
+                output=str(target),
+                raw_output=str(raw_target),
+                payload_output=str(payload_target),
+                semantic_payload_output=str(semantic_payload_target),
+                release_notes_output=str(release_notes_target),
+            )
+            out = StringIO()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
+                patch(
+                    "tools.release.cli.render_semantic_ai_payload_json",
+                    return_value='{"schema_version":"semantic-x"}\n',
+                ),
+                patch(
+                    "tools.release.cli.parse_release_ai_settings",
+                    return_value=type(
+                        "_ReleaseSettings",
+                        (),
+                        {
+                            "mode": "auto",
+                            "openai_profile": "openai-balanced",
+                            "openai_api_key_present": True,
+                            "local_enabled": False,
+                            "local_profile": None,
+                            "local_base_url_override": None,
+                            "local_api_key": None,
+                        },
+                    )(),
+                ),
+                patch(
+                    "tools.release.cli.resolve_release_changelog",
+                    return_value=type(
+                        "_Selection",
+                        (),
+                        {
+                            "path": "openai",
+                            "content": "# Final Changelog\n",
+                            "release_notes_content": "# Public Notes\n",
+                            "local_base_url_overrode_profile": False,
+                        },
+                    )(),
+                ),
+                patch("tools.release.cli.refresh_debian_changelog_entry") as refresh,
+                redirect_stdout(out),
+            ):
+                rc = cli.cmd_changelog_release(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(release_notes_target.read_text(encoding="utf-8"), "# Public Notes\n")
+            refresh.assert_called_once()
+            self.assertIn("Wrote release notes artifact to", out.getvalue())
 
     def test_release_command_refreshes_debian_changelog_for_generated_selection(self) -> None:
         with TemporaryDirectory() as temp_dir:
             target = Path(temp_dir) / "release.md"
             raw_target = Path(temp_dir) / "raw.md"
             payload_target = Path(temp_dir) / "payload.json"
+            semantic_payload_target = Path(temp_dir) / "semantic-payload.json"
             args = self._args(
                 output=str(target),
                 raw_output=str(raw_target),
                 payload_output=str(payload_target),
+                semantic_payload_output=str(semantic_payload_target),
                 debian_distribution="stable",
                 debian_urgency="high",
             )
@@ -393,6 +508,11 @@ class CliChangelogReleaseTests(unittest.TestCase):
                 patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
                 patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
+                patch(
+                    "tools.release.cli.render_semantic_ai_payload_json",
+                    return_value='{"schema_version":"semantic-x"}\n',
+                ),
                 patch(
                     "tools.release.cli.parse_release_ai_settings",
                     return_value=type(
@@ -438,6 +558,10 @@ class CliChangelogReleaseTests(unittest.TestCase):
                 rc = cli.cmd_changelog_release(args)
 
             self.assertEqual(rc, 0)
+            self.assertEqual(
+                semantic_payload_target.read_text(encoding="utf-8"),
+                '{"schema_version":"semantic-x"}\n',
+            )
             refresh_entry.assert_called_once()
             self.assertEqual(refresh_entry.call_args.kwargs["release_markdown"], "# Release\n- change one\n")
             self.assertEqual(refresh_entry.call_args.kwargs["distribution"], "stable")
@@ -453,6 +577,7 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
             output=".changelog_scratch/changelog.release.md",
             raw_output=".changelog_scratch/changelog.raw.md",
             payload_output=".changelog_scratch/changelog.payload.json",
+            semantic_payload_output=".changelog_scratch/changelog.semantic_payload.json",
             manual_changelog_path="debian/changelog",
             debian_distribution=None,
             debian_urgency=None,
@@ -465,6 +590,7 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
             save_triage_json=None,
             polish=False,
             save_polish_json=None,
+            release_notes_output=".changelog_scratch/release_notes.md",
         )
 
     def test_ai_release_runs_ai_draft_then_forced_cached_release(self) -> None:
@@ -491,6 +617,10 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
         expected_cached_path = str((Path(".").resolve() / ".changelog_scratch/changelog.draft.md").resolve())
         self.assertEqual(run_ai_draft.call_args.args[0].output, expected_cached_path)
         self.assertEqual(run_release.call_args.args[0].cached_draft_path, expected_cached_path)
+        self.assertEqual(
+            run_release.call_args.args[0].semantic_payload_output,
+            ".changelog_scratch/changelog.semantic_payload.json",
+        )
 
     def test_ai_release_skips_release_stage_when_draft_returns_nonzero(self) -> None:
         args = self._args()
@@ -537,6 +667,9 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
                 output=str(repo_root / ".changelog_scratch" / "changelog.release.md"),
                 raw_output=str(repo_root / ".changelog_scratch" / "changelog.raw.md"),
                 payload_output=str(repo_root / ".changelog_scratch" / "changelog.payload.json"),
+                semantic_payload_output=str(
+                    repo_root / ".changelog_scratch" / "changelog.semantic_payload.json"
+                ),
                 manual_changelog_path="debian/changelog",
                 debian_distribution=None,
                 debian_urgency=None,
@@ -549,6 +682,7 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
                 save_triage_json=None,
                 polish=False,
                 save_polish_json=None,
+                release_notes_output=str(repo_root / ".changelog_scratch" / "release_notes.md"),
             )
 
             with (
@@ -557,6 +691,11 @@ class CliChangelogAIReleaseTests(unittest.TestCase):
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
                 patch("tools.release.cli.render_release_changelog", return_value="# Raw Draft\n"),
                 patch("tools.release.cli.render_ai_payload_json", return_value='{"schema_version":"x"}\n'),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
+                patch(
+                    "tools.release.cli.render_semantic_ai_payload_json",
+                    return_value='{"schema_version":"semantic-x"}\n',
+                ),
             ):
                 rc = cli.cmd_changelog_ai_release(args)
 
@@ -655,6 +794,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
         save_triage_json: str | None = None,
         polish: bool = False,
         save_polish_json: str | None = None,
+        release_notes_output: str = ".changelog_scratch/release_notes.md",
     ) -> argparse.Namespace:
         return argparse.Namespace(
             repo_root=repo_root,
@@ -669,6 +809,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             save_triage_json=save_triage_json,
             polish=polish,
             save_polish_json=save_polish_json,
+            release_notes_output=release_notes_output,
         )
 
     def test_ai_draft_to_stdout(self) -> None:
@@ -734,6 +875,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
                 patch("tools.release.cli.run_triage_stage", return_value=triage_obj) as run_triage,
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}) as build_triage,
@@ -754,13 +896,14 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             self.assertIn("# AI Draft", rendered_markdown)
             self.assertEqual(json_target.read_text(encoding="utf-8"), '{"title":"x"}\n')
             run_triage.assert_called_once_with(
-                {"schema_version": "x"},
+                {"schema_version": "semantic-x"},
                 provider=provider_obj,
                 provider_kind="openai",
                 reasoning_effort=None,
                 structured_mode=None,
                 temperature=0.0,
                 max_output_tokens_policy=300,
+                input_mode="raw_semantic",
             )
             build_provider.assert_has_calls(
                 [
@@ -795,6 +938,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
                 patch("tools.release.cli.run_triage_stage", return_value=object()),
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
@@ -818,6 +962,106 @@ class CliChangelogAIDraftTests(unittest.TestCase):
                 ]
             )
             self.assertIn("Wrote AI triage JSON to", out.getvalue())
+
+    def test_ai_draft_emergency_triage_routes_triage_to_synthesized_mode_and_writes_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-mini
+""",
+                encoding="utf-8",
+            )
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+                use_triage=False,
+            )
+            out = StringIO()
+            provider_obj = object()
+            emergency_obj = object()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch(
+                    "tools.release.cli.build_semantic_ai_payload",
+                    return_value={
+                        "schema_version": "vaulthalla.release.semantic_payload.v1",
+                        "version": "1.2.3",
+                        "categories": [],
+                    },
+                ),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.run_emergency_triage_stage", return_value=emergency_obj) as run_emergency,
+                patch(
+                    "tools.release.cli.render_emergency_triage_result_json",
+                    return_value='{"schema_version":"vaulthalla.release.ai_emergency_triage.v1","version":"1.2.3","items":[]}\n',
+                ),
+                patch(
+                    "tools.release.cli.build_triage_input_from_emergency_result",
+                    return_value={"schema_version": "vaulthalla.release.triage_input.synthesized.v1", "categories": []},
+                ) as build_triage_input,
+                patch("tools.release.cli.run_triage_stage", return_value=object()) as run_triage,
+                patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=object()),
+                patch("tools.release.cli.render_draft_markdown", return_value="# AI Draft\n"),
+                patch("tools.release.cli.render_draft_result_json"),
+                patch("tools.release.cli.render_triage_result_json"),
+                patch("tools.release.cli.run_polish_stage"),
+                patch("tools.release.cli.render_polish_result_json"),
+                patch("tools.release.cli.render_polish_markdown"),
+                redirect_stdout(out),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+            run_emergency.assert_called_once_with(
+                {
+                    "schema_version": "vaulthalla.release.semantic_payload.v1",
+                    "version": "1.2.3",
+                    "categories": [],
+                },
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=AIDynamicRatioTokenBudget(mode="dynamic_ratio", ratio=0.55, min=1200, max=12000),
+            )
+            build_triage_input.assert_called_once_with(
+                {
+                    "schema_version": "vaulthalla.release.semantic_payload.v1",
+                    "version": "1.2.3",
+                    "categories": [],
+                },
+                emergency_obj,
+            )
+            run_triage.assert_called_once_with(
+                {"schema_version": "vaulthalla.release.triage_input.synthesized.v1", "categories": []},
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=300,
+                input_mode="synthesized_semantic",
+            )
+            emergency_artifact = repo_root / ".changelog_scratch" / "emergency_triage.json"
+            self.assertTrue(emergency_artifact.is_file())
+            self.assertIn("vaulthalla.release.ai_emergency_triage.v1", emergency_artifact.read_text(encoding="utf-8"))
 
     def test_ai_draft_polish_stage_output_and_json(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -890,6 +1134,242 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             render_triage_json.assert_not_called()
             self.assertIn("Wrote AI polish JSON to", out.getvalue())
 
+    def test_ai_draft_release_notes_stage_writes_artifact_when_profile_enables_it(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      draft:
+        model: gpt-5-mini
+      release_notes:
+        model: gpt-5.4
+        reasoning_effort: high
+""",
+                encoding="utf-8",
+            )
+            notes_target = repo_root / ".changelog_scratch" / "release_notes.md"
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+                release_notes_output=str(notes_target),
+            )
+            out = StringIO()
+            provider_obj = object()
+            release_notes_obj = SimpleNamespace(markdown="# Public Notes\n- polished item\n")
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
+                patch("tools.release.cli.generate_draft_from_payload", return_value=object()),
+                patch("tools.release.cli.render_draft_markdown", return_value="# Final Changelog\n- item\n"),
+                patch("tools.release.cli.run_release_notes_stage", return_value=release_notes_obj) as run_release_notes,
+                patch("tools.release.cli.run_triage_stage"),
+                patch("tools.release.cli.run_polish_stage"),
+                patch("tools.release.cli.render_polish_markdown"),
+                redirect_stdout(out),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+            run_release_notes.assert_called_once_with(
+                "# Final Changelog\n- item\n",
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort="high",
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=1200,
+            )
+            self.assertIn(
+                call(args, repo_root=repo_root.resolve(), stage="release_notes"),
+                build_provider.call_args_list,
+            )
+            self.assertTrue(notes_target.is_file())
+            self.assertEqual(notes_target.read_text(encoding="utf-8"), "# Public Notes\n- polished item\n")
+            self.assertIn("Wrote AI release notes to", out.getvalue())
+
+    def test_ai_draft_release_notes_uses_draft_input_even_when_polish_enabled(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      draft:
+        model: gpt-5-mini
+      polish:
+        model: gpt-5.4
+      release_notes:
+        model: gpt-5.4
+""",
+                encoding="utf-8",
+            )
+            output_target = repo_root / ".changelog_scratch" / "changelog.release.md"
+            notes_target = repo_root / ".changelog_scratch" / "release_notes.md"
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+                output=str(output_target),
+                release_notes_output=str(notes_target),
+            )
+            provider_obj = object()
+            draft_obj = object()
+            polish_obj = object()
+            release_notes_obj = SimpleNamespace(markdown="# Public Notes\n- from draft\n")
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=draft_obj),
+                patch("tools.release.cli.render_draft_markdown", return_value="# Draft Output\n- d\n"),
+                patch("tools.release.cli.run_polish_stage", return_value=polish_obj) as run_polish,
+                patch("tools.release.cli.render_polish_markdown", return_value="# Polished Output\n- p\n"),
+                patch("tools.release.cli.run_release_notes_stage", return_value=release_notes_obj) as run_release_notes,
+                patch("tools.release.cli.run_triage_stage"),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+            run_polish.assert_called_once_with(
+                draft_obj,
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=800,
+            )
+            run_release_notes.assert_called_once_with(
+                "# Draft Output\n- d\n",
+                provider=provider_obj,
+                provider_kind="openai",
+                reasoning_effort=None,
+                structured_mode=None,
+                temperature=0.0,
+                max_output_tokens_policy=1200,
+            )
+            rendered_changelog = output_target.read_text(encoding="utf-8")
+            self.assertIn("# Polished Output", rendered_changelog)
+            self.assertEqual(notes_target.read_text(encoding="utf-8"), "# Public Notes\n- from draft\n")
+
+    def test_ai_draft_runs_polish_and_release_notes_concurrently(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      draft:
+        model: gpt-5-mini
+      polish:
+        model: gpt-5.4
+      release_notes:
+        model: gpt-5.4
+""",
+                encoding="utf-8",
+            )
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+            )
+            provider_obj = object()
+            draft_obj = object()
+            polish_obj = object()
+            release_notes_obj = SimpleNamespace(markdown="# Public Notes\n- concurrent\n")
+            polish_started = threading.Event()
+            release_notes_started = threading.Event()
+
+            def _run_polish(*_args, **_kwargs):
+                polish_started.set()
+                self.assertTrue(
+                    release_notes_started.wait(timeout=1.0),
+                    "release_notes did not start while polish was running",
+                )
+                return polish_obj
+
+            def _run_release_notes(*_args, **_kwargs):
+                release_notes_started.set()
+                self.assertTrue(
+                    polish_started.wait(timeout=1.0),
+                    "polish did not start while release_notes was running",
+                )
+                return release_notes_obj
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=draft_obj),
+                patch("tools.release.cli.render_draft_markdown", return_value="# Draft Output\n- d\n"),
+                patch("tools.release.cli.run_polish_stage", side_effect=_run_polish),
+                patch("tools.release.cli.render_polish_markdown", return_value="# Polished Output\n- p\n"),
+                patch("tools.release.cli.run_release_notes_stage", side_effect=_run_release_notes),
+                patch("tools.release.cli.run_triage_stage"),
+            ):
+                result = cli.cmd_changelog_ai_draft(args)
+
+            self.assertEqual(result, 0)
+
+    def test_ai_draft_fails_when_release_notes_sibling_stage_fails(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-balanced:
+    provider: openai
+    stages:
+      draft:
+        model: gpt-5-mini
+      polish:
+        model: gpt-5.4
+      release_notes:
+        model: gpt-5.4
+""",
+                encoding="utf-8",
+            )
+            args = self._args(
+                repo_root=str(repo_root),
+                ai_profile="openai-balanced",
+                provider=None,
+                model=None,
+            )
+            provider_obj = object()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=object()),
+                patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
+                patch("tools.release.cli.generate_draft_from_payload", return_value=object()),
+                patch("tools.release.cli.render_draft_markdown", return_value="# Draft Output\n- d\n"),
+                patch("tools.release.cli.run_polish_stage", return_value=object()),
+                patch("tools.release.cli.render_polish_markdown", return_value="# Polished Output\n- p\n"),
+                patch("tools.release.cli.run_release_notes_stage", side_effect=ValueError("notes parse failure")),
+                patch("tools.release.cli.run_triage_stage"),
+            ):
+                with self.assertRaisesRegex(ValueError, "Release notes stage failed: notes parse failure"):
+                    _ = cli.cmd_changelog_ai_draft(args)
+
     def test_ai_draft_triage_and_polish_pipeline_order(self) -> None:
         triage_obj = object()
         draft_obj = object()
@@ -901,6 +1381,7 @@ class CliChangelogAIDraftTests(unittest.TestCase):
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj) as build_provider,
             patch("tools.release.cli.run_triage_stage", return_value=triage_obj) as run_triage,
             patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}) as build_triage,
@@ -924,13 +1405,14 @@ class CliChangelogAIDraftTests(unittest.TestCase):
             ]
         )
         run_triage.assert_called_once_with(
-            {"schema_version": "x"},
+            {"schema_version": "semantic-x"},
             provider=provider_obj,
             provider_kind="openai",
             reasoning_effort=None,
             structured_mode=None,
             temperature=0.0,
             max_output_tokens_policy=300,
+            input_mode="raw_semantic",
         )
         build_triage.assert_called_once_with(triage_obj)
         generate_draft.assert_called_once_with(
@@ -993,6 +1475,7 @@ profiles:
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
                 patch("tools.release.cli.run_triage_stage", return_value=object()) as run_triage,
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
@@ -1008,13 +1491,14 @@ profiles:
 
             self.assertEqual(result, 0)
             run_triage.assert_called_once_with(
-                {"schema_version": "x"},
+                {"schema_version": "semantic-x"},
                 provider=provider_obj,
                 provider_kind="openai",
                 reasoning_effort="low",
                 structured_mode="json_object",
                 temperature=0.0,
                 max_output_tokens_policy=300,
+                input_mode="raw_semantic",
             )
             generate_draft.assert_called_once_with(
                 {"schema_version": "triage-x"},
@@ -1069,6 +1553,7 @@ profiles:
             with (
                 patch("tools.release.cli.build_changelog_context", return_value=object()),
                 patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+                patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
                 patch("tools.release.cli.build_ai_provider_from_args", return_value=provider_obj),
                 patch("tools.release.cli.build_triage_ir_payload", return_value={"schema_version": "triage-x"}),
                 patch(
@@ -1099,6 +1584,7 @@ profiles:
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=object()),
             patch(
                 "tools.release.cli.run_triage_stage",
@@ -1117,6 +1603,7 @@ profiles:
         with (
             patch("tools.release.cli.build_changelog_context", return_value=object()),
             patch("tools.release.cli.build_ai_payload", return_value={"schema_version": "x"}),
+            patch("tools.release.cli.build_semantic_ai_payload", return_value={"schema_version": "semantic-x"}),
             patch("tools.release.cli.build_ai_provider_from_args", return_value=object()),
             patch(
                 "tools.release.cli.run_triage_stage",
@@ -1274,6 +1761,616 @@ profiles:
         self.assertEqual(call.args[0].kind, "openai-compatible")
         self.assertEqual(call.args[0].base_url, "http://localhost:8888/v1")
         self.assertEqual(call.args[0].model, "Qwen3.5-122B")
+
+
+class CliChangelogAICompareTests(unittest.TestCase):
+    def _write_repo_basics(self, repo_root: Path) -> str:
+        original_debian = (
+            "vaulthalla (0.34.0-1) unstable; urgency=medium\n\n"
+            "  - existing line\n\n"
+            " -- Test User <test@example.com>  Sun, 19 Apr 2026 00:00:00 +0000\n"
+        )
+        (repo_root / "VERSION").write_text("0.34.0\n", encoding="utf-8")
+        debian_path = repo_root / "debian" / "changelog"
+        debian_path.parent.mkdir(parents=True, exist_ok=True)
+        debian_path.write_text(original_debian, encoding="utf-8")
+        return original_debian
+
+    def test_ai_compare_writes_combined_markdown_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            original_debian = self._write_repo_basics(repo_root)
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap,openai-balanced",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            def _fake_draft(draft_args: argparse.Namespace) -> int:
+                cached = cli.render_cached_draft_markdown(
+                    version="0.34.0",
+                    content=f"# {draft_args.ai_profile}\n- {draft_args.ai_profile} summary",
+                )
+                Path(draft_args.output).write_text(cached, encoding="utf-8")
+                return 0
+
+            def _fake_pipeline(_draft_args: argparse.Namespace, *, repo_root: Path | None = None):
+                return SimpleNamespace(
+                    provider="openai",
+                    base_url=None,
+                    profile_slug=None,
+                    enabled_stages=("triage", "draft", "polish"),
+                    stages={
+                        "emergency_triage": SimpleNamespace(
+                            model="gpt-5-nano",
+                            reasoning_effort="low",
+                            structured_mode="strict_json_schema",
+                            max_output_tokens=SimpleNamespace(mode="dynamic_ratio", ratio=0.55, min=1200, max=12000),
+                        ),
+                        "triage": SimpleNamespace(
+                            model="gpt-5-nano",
+                            reasoning_effort="low",
+                            structured_mode=None,
+                            max_output_tokens=300,
+                        ),
+                        "draft": SimpleNamespace(
+                            model="gpt-5-mini",
+                            reasoning_effort="medium",
+                            structured_mode="strict_json_schema",
+                            max_output_tokens=SimpleNamespace(mode="dynamic_ratio", ratio=0.35, min=800, max=4000),
+                        ),
+                        "polish": SimpleNamespace(
+                            model="gpt-5.4",
+                            reasoning_effort="medium",
+                            structured_mode=None,
+                            max_output_tokens=800,
+                        ),
+                        "release_notes": SimpleNamespace(
+                            model="gpt-5.4",
+                            reasoning_effort="high",
+                            structured_mode=None,
+                            max_output_tokens=1200,
+                        ),
+                    },
+                    is_stage_enabled=lambda stage: stage in {"triage", "draft", "polish"},
+                )
+
+            def _fake_refresh(**kwargs):
+                changelog_path = Path(kwargs["changelog_path"])
+                heading = kwargs["release_markdown"].splitlines()[0].strip()
+                changelog_path.write_text(f"effective debian from {heading}\n", encoding="utf-8")
+                return SimpleNamespace(path=changelog_path)
+
+            with (
+                patch("tools.release.cli.cmd_changelog_ai_draft", side_effect=_fake_draft) as run_draft,
+                patch("tools.release.cli.build_ai_pipeline_config_from_args", side_effect=_fake_pipeline),
+                patch("tools.release.cli.refresh_debian_changelog_entry", side_effect=_fake_refresh) as refresh_entry,
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            artifact = (
+                repo_root / ".changelog_scratch" / "comparisons" / "0.34.0-openai-comparison.md"
+            )
+            self.assertTrue(artifact.is_file())
+            rendered = artifact.read_text(encoding="utf-8")
+            self.assertIn("# AI Changelog Comparison — 0.34.0", rendered)
+            self.assertIn("## Profile: openai-cheap", rendered)
+            self.assertIn("## Profile: openai-balanced", rendered)
+            self.assertIn("### changelog.release.md", rendered)
+            self.assertIn("### Effective profile config", rendered)
+            self.assertIn("```yaml", rendered)
+            self.assertIn("# openai-cheap", rendered)
+            self.assertIn("# openai-balanced", rendered)
+            self.assertIn("### debian/changelog", rendered)
+            self.assertIn("### release_notes.md", rendered)
+            self.assertIn("_not generated_", rendered)
+            self.assertIn("effective debian from # openai-cheap", rendered)
+            self.assertIn("effective debian from # openai-balanced", rendered)
+            self.assertIn("provider: openai", rendered)
+            self.assertIn("profile_slug: <none>", rendered)
+            self.assertIn("enabled_stages:", rendered)
+            self.assertIn("default_max_output_tokens:", rendered)
+            self.assertIn("mode: dynamic_ratio", rendered)
+            self.assertIn("ratio: 0.35", rendered)
+            self.assertIn("stages:", rendered)
+            self.assertIn("reasoning_effort: medium", rendered)
+            self.assertIn("structured_mode: strict_json_schema", rendered)
+            self.assertEqual(run_draft.call_count, 2)
+            self.assertEqual(refresh_entry.call_count, 2)
+            for call_ in refresh_entry.call_args_list:
+                self.assertNotEqual(
+                    Path(call_.kwargs["changelog_path"]).resolve(),
+                    (repo_root / "debian" / "changelog").resolve(),
+                )
+            self.assertEqual((repo_root / "debian" / "changelog").read_text(encoding="utf-8"), original_debian)
+
+    def test_ai_compare_rejects_invalid_output_name(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "VERSION").write_text("0.34.0\n", encoding="utf-8")
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="../bad.md",
+            )
+            with self.assertRaisesRegex(ValueError, "--output-name must be a file name"):
+                _ = cli.cmd_changelog_ai_compare(args)
+
+    def test_ai_compare_real_triage_path_handles_semantic_tuple_projection(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _ = self._write_repo_basics(repo_root)
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-cheap:
+    provider: openai
+    stages:
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-nano
+      polish:
+        model: gpt-5-mini
+      release_notes:
+        model: gpt-5-mini
+""",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            context = ReleaseContext(
+                version="0.34.0",
+                previous_tag="v0.33.0",
+                head_sha="abc123",
+                commit_count=1,
+                categories={
+                    "tools": CategoryContext(
+                        name="tools",
+                        commit_count=1,
+                        insertions=10,
+                        deletions=1,
+                        commits=[
+                            CommitInfo(
+                                sha="abcd1234",
+                                subject="Refine ai-compare profile projection",
+                                body="",
+                                files=["tools/release/cli.py"],
+                                insertions=10,
+                                deletions=1,
+                                categories=["tools"],
+                            )
+                        ],
+                        files=[
+                            FileChange(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                insertions=10,
+                                deletions=1,
+                                commit_count=1,
+                                score=10.0,
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        snippets=[
+                            DiffSnippet(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                score=8.0,
+                                reason="Selected from high-scoring tools file; flags: release-tooling",
+                                patch="@@ -1,2 +1,2 @@\n+compare wiring update",
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        detected_themes=["release-automation"],
+                    )
+                },
+                cross_cutting_notes=[],
+            )
+
+            class _StageAwareProvider:
+                def __init__(self) -> None:
+                    self.triage_projection_categories = 0
+
+                def generate_structured_json(self, **kwargs):
+                    stage = kwargs["stage"]
+                    if stage == "triage":
+                        marker = "Semantic payload (compact projection):\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        self.triage_projection_categories = len(projection.get("categories", []))
+                        if self.triage_projection_categories <= 0:
+                            raise AssertionError("triage projection categories unexpectedly empty")
+                        return {
+                            "schema_version": "vaulthalla.release.ai_triage.v2",
+                            "version": "0.34.0",
+                            "categories": [
+                                {
+                                    "name": "tools",
+                                    "signal_strength": "strong",
+                                    "priority_rank": 1,
+                                    "theme": "Release tooling updates",
+                                    "grounded_claims": ["AI compare output and contract flow were updated."],
+                                }
+                            ],
+                        }
+                    if stage == "draft":
+                        return {
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["AI compare output and contract flow were updated."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    if stage == "polish":
+                        return {
+                            "schema_version": "vaulthalla.release.ai_polish.v1",
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["AI compare output and contract flow were updated."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    if stage == "release_notes":
+                        return {
+                            "schema_version": "vaulthalla.release.ai_release_notes.v1",
+                            "markdown": "# Public Notes\n- AI compare output and contract flow were updated.\n",
+                        }
+                    raise AssertionError(f"Unexpected stage: {stage}")
+
+            provider = _StageAwareProvider()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=context),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider),
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            self.assertGreater(provider.triage_projection_categories, 0)
+            artifact = repo_root / ".changelog_scratch" / "comparisons" / "0.34.0-openai-comparison.md"
+            self.assertTrue(artifact.is_file())
+            self.assertIn("## Profile: openai-cheap", artifact.read_text(encoding="utf-8"))
+
+    def test_ai_compare_emergency_triage_batches_and_preserves_batch_identity(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _ = self._write_repo_basics(repo_root)
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-cheap:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-nano
+""",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            snippets = [
+                DiffSnippet(
+                    path="tools/release/cli.py",
+                    category="tools",
+                    subscopes=("release", "cli"),
+                    score=8.0 - (index * 0.1),
+                    reason=f"Selected snippet {index}",
+                    patch=f"@@ -{index + 1},2 +{index + 1},2 @@\n+batch update {index}",
+                    flags=("release-tooling",),
+                    region_kind="function",
+                    region_label=f"ctx_{index}",
+                    hunk_count=1,
+                    changed_lines=6,
+                    meaningful_lines=6,
+                )
+                for index in range(5)
+            ]
+            context = ReleaseContext(
+                version="0.34.0",
+                previous_tag="v0.33.0",
+                head_sha="abc123",
+                commit_count=1,
+                categories={
+                    "tools": CategoryContext(
+                        name="tools",
+                        commit_count=1,
+                        insertions=10,
+                        deletions=1,
+                        commits=[
+                            CommitInfo(
+                                sha="abcd1234",
+                                subject="Refine emergency triage batching",
+                                body="",
+                                files=["tools/release/cli.py"],
+                                insertions=10,
+                                deletions=1,
+                                categories=["tools"],
+                            )
+                        ],
+                        files=[
+                            FileChange(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                insertions=10,
+                                deletions=1,
+                                commit_count=1,
+                                score=10.0,
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        snippets=snippets,
+                        detected_themes=["release-automation"],
+                    )
+                },
+                cross_cutting_notes=[],
+            )
+
+            class _StageAwareProvider:
+                def __init__(self) -> None:
+                    self.emergency_batch_sizes: list[int] = []
+                    self.emergency_schema_id_enums: list[list[str]] = []
+
+                def generate_structured_json(self, **kwargs):
+                    stage = kwargs["stage"]
+                    if stage == "emergency_triage":
+                        marker = "Emergency triage input payload:\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        items = projection.get("items", [])
+                        self.emergency_batch_sizes.append(len(items))
+                        schema = kwargs["json_schema"]
+                        enum_ids = schema["properties"]["items"]["items"]["properties"]["id"]["enum"]
+                        self.emergency_schema_id_enums.append(list(enum_ids))
+                        return {
+                            "schema_version": "vaulthalla.release.ai_emergency_triage.v1",
+                            "version": "0.34.0",
+                            "items": [
+                                {
+                                    "id": item["id"],
+                                    "category": item["category"],
+                                    "change_kind": "implementation-change",
+                                    "change_summary": f"Summarized {item['id']}.",
+                                    "confidence": "medium",
+                                    "insufficient_context_reason": None,
+                                    "evidence_refs": [],
+                                }
+                                for item in items
+                            ],
+                        }
+                    if stage == "triage":
+                        marker = "Synthesized semantic payload (compact projection):\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        categories = projection.get("categories", [])
+                        if not categories:
+                            raise AssertionError("expected synthesized triage categories")
+                        units = categories[0].get("synthesized_units", [])
+                        if len(units) != 5:
+                            raise AssertionError(f"expected 5 synthesized units, got {len(units)}")
+                        return {
+                            "schema_version": "vaulthalla.release.ai_triage.v2",
+                            "version": "0.34.0",
+                            "categories": [
+                                {
+                                    "name": "tools",
+                                    "signal_strength": "strong",
+                                    "priority_rank": 1,
+                                    "theme": "Release tooling updates",
+                                    "grounded_claims": ["Emergency triage batched unit synthesis preserved identity."],
+                                }
+                            ],
+                        }
+                    if stage == "draft":
+                        return {
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["Emergency triage batched unit synthesis preserved identity."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    raise AssertionError(f"Unexpected stage: {stage}")
+
+            provider = _StageAwareProvider()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=context),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider),
+                patch("tools.release.changelog.ai.stages.emergency_triage._EMERGENCY_TRIAGE_BATCH_SIZE", 2),
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(provider.emergency_batch_sizes, [2, 2, 1])
+            self.assertEqual(
+                provider.emergency_schema_id_enums,
+                [["tools:1", "tools:2"], ["tools:3", "tools:4"], ["tools:5"]],
+            )
+            artifact = repo_root / ".changelog_scratch" / "comparisons" / "0.34.0-openai-comparison.md"
+            self.assertTrue(artifact.is_file())
+            self.assertIn("## Profile: openai-cheap", artifact.read_text(encoding="utf-8"))
+
+    def test_ai_compare_emergency_triage_defaults_to_bounded_scope(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _ = self._write_repo_basics(repo_root)
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-cheap:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-nano
+""",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            snippets = [
+                DiffSnippet(
+                    path="tools/release/cli.py",
+                    category="tools",
+                    subscopes=("release", "cli"),
+                    score=8.0 - (index * 0.1),
+                    reason=f"Selected snippet {index}",
+                    patch=f"@@ -{index + 1},2 +{index + 1},2 @@\n+batch update {index}",
+                    flags=("release-tooling",),
+                    region_kind="function",
+                    region_label=f"ctx_{index}",
+                    hunk_count=1,
+                    changed_lines=6,
+                    meaningful_lines=6,
+                )
+                for index in range(3)
+            ]
+            context = ReleaseContext(
+                version="0.34.0",
+                previous_tag="v0.33.0",
+                head_sha="abc123",
+                commit_count=1,
+                categories={
+                    "tools": CategoryContext(
+                        name="tools",
+                        commit_count=1,
+                        insertions=10,
+                        deletions=1,
+                        commits=[
+                            CommitInfo(
+                                sha="abcd1234",
+                                subject="Refine emergency triage request scope",
+                                body="",
+                                files=["tools/release/cli.py"],
+                                insertions=10,
+                                deletions=1,
+                                categories=["tools"],
+                            )
+                        ],
+                        files=[
+                            FileChange(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                insertions=10,
+                                deletions=1,
+                                commit_count=1,
+                                score=10.0,
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        snippets=snippets,
+                        detected_themes=["release-automation"],
+                    )
+                },
+                cross_cutting_notes=[],
+            )
+
+            class _StageAwareProvider:
+                def __init__(self) -> None:
+                    self.emergency_batch_sizes: list[int] = []
+
+                def generate_structured_json(self, **kwargs):
+                    stage = kwargs["stage"]
+                    if stage == "emergency_triage":
+                        marker = "Emergency triage input payload:\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        items = projection.get("items", [])
+                        self.emergency_batch_sizes.append(len(items))
+                        return {
+                            "schema_version": "vaulthalla.release.ai_emergency_triage.v1",
+                            "version": "0.34.0",
+                            "items": [
+                                {
+                                    "id": item["id"],
+                                    "category": item["category"],
+                                    "change_kind": "implementation-change",
+                                    "change_summary": f"Summarized {item['id']}.",
+                                    "confidence": "medium",
+                                    "insufficient_context_reason": None,
+                                    "evidence_refs": [],
+                                }
+                                for item in items
+                            ],
+                        }
+                    if stage == "triage":
+                        return {
+                            "schema_version": "vaulthalla.release.ai_triage.v2",
+                            "version": "0.34.0",
+                            "categories": [
+                                {
+                                    "name": "tools",
+                                    "signal_strength": "strong",
+                                    "priority_rank": 1,
+                                    "theme": "Release tooling updates",
+                                    "grounded_claims": ["Per-item emergency triage preserved unit identity."],
+                                }
+                            ],
+                        }
+                    if stage == "draft":
+                        return {
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["Per-item emergency triage preserved unit identity."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    raise AssertionError(f"Unexpected stage: {stage}")
+
+            provider = _StageAwareProvider()
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=context),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider),
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(provider.emergency_batch_sizes, [3])
 
 
 class CliChangelogContextHelperTests(unittest.TestCase):

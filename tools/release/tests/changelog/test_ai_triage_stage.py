@@ -28,8 +28,8 @@ class _FakeProvider:
 class AITriageStageTests(unittest.TestCase):
     def test_run_triage_stage_uses_schema_and_payload_in_prompt(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -39,9 +39,10 @@ class AITriageStageTests(unittest.TestCase):
         self.assertEqual(triage.version, "2.4.0")
         self.assertEqual(len(fake.calls), 1)
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "triage")
         self.assertIn("json_schema", call)
-        self.assertIn("Release payload", call["user_prompt"])
-        self.assertIn("vaulthalla.release.ai_payload.v1", call["user_prompt"])
+        self.assertIn("Semantic payload (compact projection)", call["user_prompt"])
+        self.assertIn("vaulthalla.release.semantic_payload.v1", call["user_prompt"])
 
     def test_run_triage_stage_rejects_invalid_response(self) -> None:
         invalid = _load_json_fixture("ai_triage_valid.json")
@@ -55,8 +56,8 @@ class AITriageStageTests(unittest.TestCase):
 
     def test_run_triage_stage_passes_reasoning_and_structured_mode(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
@@ -70,10 +71,47 @@ class AITriageStageTests(unittest.TestCase):
             max_output_tokens_policy=123,
         )
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "triage")
         self.assertEqual(call["reasoning_effort"], "low")
         self.assertEqual(call["structured_mode"], "prompt_json")
         self.assertEqual(call["temperature"], 0.0)
         self.assertEqual(call["max_output_tokens"], 123)
+
+    def test_run_triage_stage_hosted_gpt5_uses_compact_schema_and_prompt(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
+            "categories": [],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(
+            payload,
+            provider=fake,
+            provider_kind="openai",
+            model="gpt-5-nano",
+        )
+        call = fake.calls[0]
+        self.assertEqual(call["json_schema"]["properties"]["categories"]["maxItems"], 5)
+        self.assertIn("Compression mode (hosted)", call["user_prompt"])
+
+    def test_run_triage_stage_local_provider_keeps_default_schema_limits(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
+            "categories": [],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(
+            payload,
+            provider=fake,
+            provider_kind="openai-compatible",
+            model="gpt-5-nano",
+        )
+        call = fake.calls[0]
+        self.assertEqual(call["json_schema"]["properties"]["categories"]["maxItems"], 10)
+        self.assertNotIn("Compression mode (hosted)", call["user_prompt"])
 
     def test_render_triage_json_is_stable(self) -> None:
         triage = run_triage_stage(
@@ -83,12 +121,12 @@ class AITriageStageTests(unittest.TestCase):
         first = render_triage_result_json(triage)
         second = render_triage_result_json(triage)
         self.assertEqual(first, second)
-        self.assertIn('"schema_version": "vaulthalla.release.ai_triage.v1"', first)
+        self.assertIn('"schema_version": "vaulthalla.release.ai_triage.v2"', first)
 
     def test_run_triage_stage_normalizes_qwen_like_optional_array_noise(self) -> None:
         payload = {
-            "schema_version": "vaulthalla.release.ai_payload.v1",
-            "metadata": {"version": "2.4.0"},
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
             "categories": [],
         }
         response = {
@@ -100,22 +138,107 @@ class AITriageStageTests(unittest.TestCase):
                     "name": "core",
                     "signal_strength": "strong",
                     "priority_rank": 1,
-                    "key_points": ["Service hardening work."],
-                    "important_files": [" service.py ", None, ""],
-                    "retained_snippets": ["", "   ", None, 1, "kept snippet"],
-                    "caution_notes": [None, "weak signal", ""],
+                    "theme": "Core runtime hardening",
+                    "grounded_claims": ["Service hardening work."],
+                    "evidence_refs": [" service.py#error-handling ", None, ""],
+                    "operator_note": 1,
                 }
             ],
-            "dropped_noise": [None, "", "minor refactors"],
-            "caution_notes": [None, "verify benchmarks"],
+            "operator_note": None,
         }
         triage = run_triage_stage(payload, provider=_FakeProvider(response))
         category = triage.categories[0]
-        self.assertEqual(category.important_files, ("service.py",))
-        self.assertEqual(category.retained_snippets, ("kept snippet",))
-        self.assertEqual(category.caution_notes, ("weak signal",))
-        self.assertEqual(triage.dropped_noise, ("minor refactors",))
-        self.assertEqual(triage.caution_notes, ("verify benchmarks",))
+        self.assertEqual(category.evidence_refs, ("service.py#error-handling",))
+        self.assertIsNone(category.operator_note)
+        self.assertIsNone(triage.operator_note)
+
+    def test_run_triage_stage_allows_missing_summary_points(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
+            "categories": [],
+        }
+        response = _load_json_fixture("ai_triage_valid.json")
+        response.pop("summary_points", None)
+
+        triage = run_triage_stage(payload, provider=_FakeProvider(response))
+        self.assertEqual(triage.summary_points, ())
+
+    def test_run_triage_stage_compact_projection_accepts_tuple_payload_arrays(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.semantic_payload.v1",
+            "version": "2.4.0",
+            "categories": (
+                {
+                    "name": "tools",
+                    "signal_strength": "strong",
+                    "summary_hint": "Release tooling contract updates",
+                    "key_commits": ("Switch triage to semantic payload",),
+                    "semantic_hunks": (
+                        {
+                            "kind": "prompt-contract",
+                            "why_selected": "changed triage prompt contract text",
+                            "excerpt": "@@ -1,2 +1,3 @@\n+required categories",
+                            "path": "tools/release/changelog/ai/prompts/triage.py",
+                        },
+                    ),
+                    "supporting_files": ("tools/release/changelog/ai/prompts/triage.py",),
+                },
+            ),
+            "notes": ("note a",),
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(payload, provider=fake)
+        call = fake.calls[0]
+        marker = "Semantic payload (compact projection):\n"
+        projection_text = call["user_prompt"].split(marker, 1)[1]
+        projection = json.loads(projection_text)
+
+        self.assertEqual(len(projection["categories"]), 1)
+        tools = projection["categories"][0]
+        self.assertEqual(tools["name"], "tools")
+        self.assertEqual(tools["key_commits"], ["Switch triage to semantic payload"])
+        self.assertEqual(len(tools["semantic_hunks"]), 1)
+        self.assertEqual(tools["semantic_hunks"][0]["kind"], "prompt-contract")
+        self.assertEqual(tools["supporting_files"], ["tools/release/changelog/ai/prompts/triage.py"])
+
+    def test_run_triage_stage_supports_synthesized_input_mode(self) -> None:
+        payload = {
+            "schema_version": "vaulthalla.release.triage_input.synthesized.v1",
+            "version": "2.4.0",
+            "categories": [
+                {
+                    "name": "tools",
+                    "signal_strength": "strong",
+                    "summary_hint": "Release tooling changes",
+                    "key_commits": ["Improve ai-compare output"],
+                    "synthesized_units": [
+                        {
+                            "id": "tools:1",
+                            "change_kind": "output-artifact",
+                            "change_summary": "Added profile comparison artifact generation.",
+                            "confidence": "high",
+                            "source_path": "tools/release/cli.py",
+                            "source_kind": "output-artifact",
+                        }
+                    ],
+                }
+            ],
+        }
+        fake = _FakeProvider(_load_json_fixture("ai_triage_valid.json"))
+
+        _ = run_triage_stage(payload, provider=fake, input_mode="synthesized_semantic")
+        call = fake.calls[0]
+        marker = "Synthesized semantic payload (compact projection):\n"
+        projection_text = call["user_prompt"].split(marker, 1)[1]
+        projection = json.loads(projection_text)
+
+        self.assertIn("pre-synthesized unit summaries", call["system_prompt"])
+        self.assertEqual(len(projection["categories"]), 1)
+        units = projection["categories"][0]["synthesized_units"]
+        self.assertEqual(units[0]["id"], "tools:1")
+        self.assertEqual(units[0]["change_kind"], "output-artifact")
 
 
 if __name__ == "__main__":

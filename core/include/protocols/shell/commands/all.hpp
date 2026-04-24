@@ -15,5 +15,6 @@ void registerGroupCommands(const std::shared_ptr<Router>& r);
 void registerSecretsCommands(const std::shared_ptr<Router>& r);
 void registerSetupCommands(const std::shared_ptr<Router>& r);
 void registerTeardownCommands(const std::shared_ptr<Router>& r);
+void registerStatusCommands(const std::shared_ptr<Router>& r);
 
 }

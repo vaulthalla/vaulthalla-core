@@ -12,10 +12,30 @@ class JSONParseFailure:
     sample: str
 
 
+@dataclass(frozen=True)
+class JSONParseDiagnostics:
+    normalized_input: str
+    candidates: tuple[str, ...]
+    failures: tuple[JSONParseFailure, ...]
+
+
+class JSONParseError(ValueError):
+    def __init__(self, message: str, *, diagnostics: JSONParseDiagnostics) -> None:
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+
 def parse_json_object_from_text(text: str) -> dict[str, Any]:
     normalized = text.strip()
     if not normalized:
-        raise ValueError("AI parse error: provider returned empty output.")
+        raise JSONParseError(
+            "AI parse error: provider returned empty output.",
+            diagnostics=JSONParseDiagnostics(
+                normalized_input="",
+                candidates=tuple(),
+                failures=tuple(),
+            ),
+        )
 
     candidates = _candidate_json_strings(normalized)
     failures: list[JSONParseFailure] = []
@@ -44,7 +64,14 @@ def parse_json_object_from_text(text: str) -> dict[str, Any]:
         return _unwrap_common_object_envelope(parsed)
 
     details = "; ".join(f"{item.reason}: {item.sample}" for item in failures[:2])
-    raise ValueError(f"AI parse error: could not recover valid JSON object. {details}".strip())
+    raise JSONParseError(
+        f"AI parse error: could not recover valid JSON object. {details}".strip(),
+        diagnostics=JSONParseDiagnostics(
+            normalized_input=normalized,
+            candidates=tuple(candidates),
+            failures=tuple(failures),
+        ),
+    )
 
 
 def _candidate_json_strings(text: str) -> list[str]:

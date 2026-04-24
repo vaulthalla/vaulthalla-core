@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from tools.release.changelog.ai.config import (
     AIReasoningEffort,
+    AIStageName,
     AIStructuredMode,
     DEFAULT_AI_DRAFT_MODEL,
     OPENAI_API_KEY_ENV_VAR,
@@ -51,6 +52,7 @@ class OpenAICompatibleProvider(StructuredJSONProvider):
     def generate_structured_json(
         self,
         *,
+        stage: AIStageName | None = None,
         system_prompt: str,
         user_prompt: str,
         json_schema: dict[str, Any],
@@ -60,6 +62,7 @@ class OpenAICompatibleProvider(StructuredJSONProvider):
         max_output_tokens: int | None = None,
     ) -> dict[str, Any]:
         return self._delegate.generate_structured_json(
+            stage=stage,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             json_schema=json_schema,
@@ -74,3 +77,6 @@ class OpenAICompatibleProvider(StructuredJSONProvider):
 
     def capabilities(self) -> ProviderCapabilities:
         return get_provider_capabilities("openai-compatible")
+
+    def failure_evidence_snapshot(self) -> dict[str, Any] | None:
+        return self._delegate.failure_evidence_snapshot()

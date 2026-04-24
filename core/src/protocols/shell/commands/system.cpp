@@ -1,22 +1,116 @@
 #include "protocols/shell/commands/all.hpp"
 #include "protocols/shell/Router.hpp"
+#include "protocols/shell/Server.hpp"
 #include "protocols/shell/util/argsHelpers.hpp"
+#include "protocols/ProtocolService.hpp"
+#include "runtime/Manager.hpp"
 #include "runtime/Deps.hpp"
 #include "usage/include/UsageManager.hpp"
 
 #include <version.h>
 
-using namespace vh;
-using namespace vh::protocols::shell;
+#include <algorithm>
+#include <array>
+#include <sstream>
+#include <string>
+#include <string_view>
 
-static CommandResult handle_help(const CommandCall&) { return usage(); }
+namespace vh::protocols::shell::commands {
 
-static CommandResult handle_version(const CommandCall&) {
+namespace {
+
+CommandResult handleHelp(const CommandCall&) { return usage(); }
+
+CommandResult handleVersion(const CommandCall&) {
     return {0, "Vaulthalla v" + std::string(VH_VERSION), ""};
 }
 
-void commands::registerSystemCommands(const std::shared_ptr<Router>& r) {
+std::string yesNo(const bool value) {
+    return value ? "yes" : "no";
+}
+
+std::string renderDepsCoreReady(const runtime::Deps::SanityStatus& deps, size_t& ready, size_t& total) {
+    const std::array<bool, 9> checks{
+        deps.storageManager,
+        deps.apiKeyManager,
+        deps.authManager,
+        deps.sessionManager,
+        deps.secretsManager,
+        deps.syncController,
+        deps.fsCache,
+        deps.shellUsageManager,
+        deps.httpCacheStats
+    };
+    total = checks.size();
+    ready = static_cast<size_t>(std::ranges::count(checks, true));
+    std::ostringstream out;
+    out << ready << "/" << total << " ready";
+    return out.str();
+}
+
+CommandResult handleStatus(const CommandCall& call) {
+    if (hasKey(call, "help") || hasKey(call, "h"))
+        return usage(call.constructFullArgs());
+
+    const auto& manager = runtime::Manager::instance();
+    const auto runtimeStatus = manager.status();
+    const auto protocolService = manager.getProtocolService();
+    const auto shellServer = manager.getShellServer();
+    const auto protocolStatus = protocolService ? protocolService->protocolStatus() : protocols::ProtocolService::RuntimeStatus{};
+    const auto depsStatus = runtime::Deps::get().sanityStatus();
+
+    size_t depsReady = 0;
+    size_t depsTotal = 0;
+    const auto depsReadySummary = renderDepsCoreReady(depsStatus, depsReady, depsTotal);
+
+    const bool protocolHealthy = !protocolService
+        ? false
+        : (!protocolStatus.websocketConfigured || protocolStatus.websocketReady) &&
+          (!protocolStatus.httpPreviewConfigured || protocolStatus.httpPreviewReady);
+
+    const bool depsHealthy = depsReady == depsTotal;
+    const bool overallHealthy = runtimeStatus.allRunning && protocolHealthy && depsHealthy;
+
+    std::ostringstream out;
+    out << "vh status: " << (overallHealthy ? "healthy" : "degraded") << "\n";
+    out << "runtime manager:\n";
+    out << "  all services running: " << yesNo(runtimeStatus.allRunning) << "\n";
+    out << "  service count: " << runtimeStatus.services.size() << "\n";
+    for (const auto& s : runtimeStatus.services) {
+        out << "  - " << s.entryName << " (" << s.serviceName << "): "
+            << (s.running ? "running" : "stopped");
+        if (s.interrupted) out << " [interrupt requested]";
+        out << "\n";
+    }
+
+    out << "protocol service:\n";
+    out << "  running: " << yesNo(protocolStatus.running) << "\n";
+    out << "  io context initialized: " << yesNo(protocolStatus.ioContextInitialized) << "\n";
+    out << "  websocket: configured=" << yesNo(protocolStatus.websocketConfigured)
+        << ", ready=" << yesNo(protocolStatus.websocketReady) << "\n";
+    out << "  http preview: configured=" << yesNo(protocolStatus.httpPreviewConfigured)
+        << ", ready=" << yesNo(protocolStatus.httpPreviewReady) << "\n";
+
+    out << "deps sanity:\n";
+    out << "  core deps: " << depsReadySummary << "\n";
+    out << "  fuse session: " << (depsStatus.fuseSession ? "present" : "missing") << "\n";
+    if (shellServer)
+        out << "  shell admin uid bound: " << yesNo(shellServer->adminUIDSet()) << "\n";
+
+    return ok(out.str());
+}
+
+}
+
+void registerSystemCommands(const std::shared_ptr<Router>& r) {
     const auto usageManager = runtime::Deps::get().shellUsageManager;
-    r->registerCommand(usageManager->resolve("help"), handle_help);
-    r->registerCommand(usageManager->resolve("version"), handle_version);
+    r->registerCommand(usageManager->resolve("help"), handleHelp);
+    r->registerCommand(usageManager->resolve("version"), handleVersion);
+}
+
+void registerStatusCommands(const std::shared_ptr<Router>& r) {
+    const auto usageManager = runtime::Deps::get().shellUsageManager;
+    r->registerCommand(usageManager->resolve("status"), handleStatus);
+}
+
 }

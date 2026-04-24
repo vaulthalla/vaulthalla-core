@@ -2,6 +2,7 @@
 
 #include "concurrency/AsyncService.hpp"
 
+#include <mutex>
 #include <memory>
 #include <string>
 
@@ -23,7 +24,7 @@ public:
 
 protected:
     void runLoop() override;
-    void onStop(); // close listener to break accept()
+    void onStop() override;
 
 private:
     static constexpr std::string_view kAddAdminCmd = "usermod -aG vaulthalla {}";
@@ -32,10 +33,14 @@ private:
     std::shared_ptr<Router> router_;
     std::string socketPath_;
     unsigned adminGid_;
+    mutable std::mutex fdMutex_;
     int listenFd_ = -1;
+    int activeClientFd_ = -1;
     std::atomic<bool> adminUIDSet_;
 
     void closeListener();
+    void closeActiveClient();
+    void closeClient(int fd);
     void initAdminUid(int cfd, uid_t uid);
 };
 

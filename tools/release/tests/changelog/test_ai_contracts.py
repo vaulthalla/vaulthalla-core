@@ -24,7 +24,7 @@ class AIDraftContractsTests(unittest.TestCase):
         self.assertEqual(AI_DRAFT_RESPONSE_JSON_SCHEMA["type"], "object")
         self.assertEqual(
             AI_DRAFT_RESPONSE_JSON_SCHEMA["required"],
-            ["title", "summary", "sections"],
+            ["title", "summary", "sections", "notes"],
         )
 
     def test_parse_valid_response_fixture(self) -> None:

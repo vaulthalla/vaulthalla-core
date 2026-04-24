@@ -45,6 +45,7 @@ class AIPolishStageTests(unittest.TestCase):
         self.assertEqual(polish.schema_version, "vaulthalla.release.ai_polish.v1")
         self.assertEqual(len(fake.calls), 1)
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "polish")
         self.assertIn("json_schema", call)
         self.assertIn("Draft input", call["user_prompt"])
         self.assertIn("Release 2.4.0 Draft", call["user_prompt"])
@@ -70,6 +71,7 @@ class AIPolishStageTests(unittest.TestCase):
             max_output_tokens_policy=789,
         )
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "polish")
         self.assertEqual(call["reasoning_effort"], "high")
         self.assertEqual(call["structured_mode"], "json_object")
         self.assertEqual(call["temperature"], 0.0)

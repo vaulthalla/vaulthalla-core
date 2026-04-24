@@ -10,6 +10,12 @@ namespace vh::concurrency {
 
 class AsyncService {
 public:
+    struct Status {
+        std::string name;
+        bool running = false;
+        bool interrupted = false;
+    };
+
     explicit AsyncService(const std::string& serviceName);
     virtual ~AsyncService();
 
@@ -18,6 +24,8 @@ public:
     virtual void restart();
 
     [[nodiscard]] bool isRunning() const { return running_.load(std::memory_order_acquire); }
+    [[nodiscard]] virtual Status status() const;
+    [[nodiscard]] const std::string& serviceName() const noexcept { return serviceName_; }
 
 protected:
     std::string serviceName_;
@@ -26,6 +34,8 @@ protected:
     std::thread worker_;
 
     virtual void runLoop() = 0;
+    // Optional stop hook for derived services to unblock blocking syscalls before join().
+    virtual void onStop() {}
 
     [[nodiscard]] bool shouldStop() const {
         return interruptFlag_.load(std::memory_order_relaxed) ||

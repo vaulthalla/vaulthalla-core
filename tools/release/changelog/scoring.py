@@ -176,4 +176,55 @@ def _is_noise_path(path: str) -> bool:
         "/coverage/",
         "/test-assets/",
     )
-    return any(part in f"/{path}" for part in noisy_parts)
+    if any(part in f"/{path}" for part in noisy_parts):
+        return True
+
+    return is_semantic_noise_path(path)
+
+
+def is_semantic_noise_path(path: str) -> bool:
+    normalized = path.strip().replace("\\", "/").lower()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if not normalized:
+        return True
+    normalized = normalized.lstrip("/")
+    basename = normalized.rsplit("/", 1)[-1]
+
+    derived_exact_paths = {
+        "debian/changelog",
+        "changelog.release.md",
+        "release_notes.md",
+        "changelog.raw.md",
+        "changelog.payload.json",
+        "changelog.semantic_payload.json",
+        "changelog.draft.md",
+    }
+    if normalized in derived_exact_paths:
+        return True
+
+    derived_basenames = {
+        "changelog.release.md",
+        "release_notes.md",
+        "changelog.raw.md",
+        "changelog.payload.json",
+        "changelog.semantic_payload.json",
+        "changelog.draft.md",
+    }
+    if basename in derived_basenames:
+        return True
+
+    derived_exact_dirs = {
+        ".changelog_scratch",
+        ".codex/context",
+        ".codex/scratch",
+    }
+    if normalized in derived_exact_dirs:
+        return True
+
+    derived_prefixes = (
+        ".changelog_scratch/",
+        ".codex/context/",
+        ".codex/scratch/",
+    )
+    return any(normalized.startswith(prefix) for prefix in derived_prefixes)

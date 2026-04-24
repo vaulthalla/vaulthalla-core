@@ -13,9 +13,19 @@ static std::shared_ptr<CommandUsage> buildBaseUsage(const std::weak_ptr<CommandU
 static std::shared_ptr<CommandUsage> nginx(const std::weak_ptr<CommandUsage>& parent) {
     const auto cmd = buildBaseUsage(parent);
     cmd->aliases = {"nginx", "proxy"};
-    cmd->description = "Disable/remove Vaulthalla-managed nginx site integration only.";
+    cmd->description = "Disable/remove Vaulthalla-managed nginx site integration only. Requires sudo.";
     cmd->examples = {
-        {"vh teardown nginx", "Disable Vaulthalla nginx site integration without touching unrelated nginx config."}
+        {"sudo vh teardown nginx", "Disable Vaulthalla nginx site integration without touching unrelated nginx config."}
+    };
+    return cmd;
+}
+
+static std::shared_ptr<CommandUsage> db(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = buildBaseUsage(parent);
+    cmd->aliases = {"db", "database", "postgres"};
+    cmd->description = "Disable/remove Vaulthalla local PostgreSQL integration (role/database). Requires sudo.";
+    cmd->examples = {
+        {"sudo vh teardown db", "Drop Vaulthalla local PostgreSQL role/database integration."}
     };
     return cmd;
 }
@@ -25,10 +35,12 @@ static std::shared_ptr<CommandUsage> base(const std::weak_ptr<CommandUsage>& par
     cmd->aliases = {"teardown"};
     cmd->description = "Perform explicit Vaulthalla integration teardown tasks.";
     cmd->examples = {
-        {"vh teardown nginx", "Disable/remove Vaulthalla-managed nginx site integration."}
+        {"sudo vh teardown nginx", "Disable/remove Vaulthalla-managed nginx site integration."},
+        {"sudo vh teardown db", "Disable/remove Vaulthalla local PostgreSQL integration."}
     };
     cmd->subcommands = {
-        nginx(cmd->weak_from_this())
+        nginx(cmd->weak_from_this()),
+        db(cmd->weak_from_this())
     };
     return cmd;
 }

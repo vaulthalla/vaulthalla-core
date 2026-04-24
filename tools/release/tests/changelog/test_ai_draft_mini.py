@@ -45,6 +45,7 @@ class AIDraftMiniStageTests(unittest.TestCase):
         self.assertEqual(draft.title, "Release 2.4.0 Draft")
         self.assertEqual(len(fake.calls), 1)
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "draft")
         self.assertIn("json_schema", call)
         self.assertIn("schema_version", call["user_prompt"])
         self.assertIn("vaulthalla.release.ai_payload.v1", call["user_prompt"])
@@ -52,7 +53,7 @@ class AIDraftMiniStageTests(unittest.TestCase):
 
     def test_generate_draft_can_use_triage_input_label(self) -> None:
         triage_ir = {
-            "schema_version": "vaulthalla.release.ai_triage.v1",
+            "schema_version": "vaulthalla.release.ai_triage.v2",
             "version": "2.4.0",
             "summary_points": ["Core work dominates."],
             "categories": [],
@@ -61,6 +62,7 @@ class AIDraftMiniStageTests(unittest.TestCase):
 
         _ = generate_draft_from_payload(triage_ir, provider=fake, source_kind="triage")
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "draft")
         self.assertIn("Triage IR", call["user_prompt"])
 
     def test_generate_draft_passes_reasoning_and_structured_mode(self) -> None:
@@ -76,6 +78,7 @@ class AIDraftMiniStageTests(unittest.TestCase):
             max_output_tokens_policy=456,
         )
         call = fake.calls[0]
+        self.assertEqual(call["stage"], "draft")
         self.assertEqual(call["reasoning_effort"], "medium")
         self.assertEqual(call["structured_mode"], "json_object")
         self.assertEqual(call["temperature"], 0.3)

@@ -1,16 +1,23 @@
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 #include <nlohmann/json.hpp>
 #include <arpa/inet.h>
 #include <cstring>
 #include <fmt/core.h>
 #include <algorithm>
 #include <ranges>
+#include <cctype>
+#include <sstream>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <cerrno>
 
 static bool readn(const int fd, void* b, size_t n) {
     auto* p = static_cast<uint8_t*>(b);
@@ -81,13 +88,11 @@ static bool looks_glued_value(std::string_view tail) {
     });
 }
 
-// Normalize argv: split --key=value and -Xvalue (heuristic), keep -abc bundles as-is
-static std::vector<std::string> normalize_args(const int argc, char** argv) {
-    constexpr int start_index = 2; // skip argv[0] (program) and argv[1] (command)
+// Normalize argv tokens: split --key=value and -Xvalue (heuristic), keep -abc bundles as-is
+static std::vector<std::string> normalize_tokens(const std::vector<std::string>& in) {
     std::vector<std::string> out;
-    out.reserve(static_cast<size_t>(argc) - start_index + 4);
-    for (int i = start_index; i < argc; ++i) {
-        std::string a = argv[i];
+    out.reserve(in.size() + 4);
+    for (auto a : in) {
 
         if (a == "--") { out.emplace_back("--"); continue; }
 
@@ -120,6 +125,24 @@ static std::vector<std::string> normalize_args(const int argc, char** argv) {
     return out;
 }
 
+static bool is_root_command_token(const std::string& token) {
+    return token == "vh" || token == "vaulthalla" || token == "vaulthalla-cli";
+}
+
+static std::vector<std::string> canonicalize_argv_norm(const int argc, char** argv) {
+    std::vector<std::string> raw;
+    raw.reserve(argc > 1 ? static_cast<size_t>(argc) - 1 : 1);
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i]) raw.emplace_back(argv[i]);
+    }
+
+    while (!raw.empty() && is_root_command_token(raw.front()))
+        raw.erase(raw.begin());
+
+    if (raw.empty()) raw.emplace_back("help");
+    return normalize_tokens(raw);
+}
+
 static std::string build_line_from_tokens(const std::vector<std::string>& tokens) {
     std::string line;
     for (const auto& t : tokens) {
@@ -150,21 +173,169 @@ static std::string read_line_from_stdin() {
     return line;
 }
 
+static bool command_is(const std::vector<std::string>& argv_norm, std::string_view cmd, std::string_view subcmd) {
+    return argv_norm.size() >= 2 && argv_norm[0] == cmd && argv_norm[1] == subcmd;
+}
+
+static bool is_lifecycle_command(const std::vector<std::string>& argv_norm) {
+    return command_is(argv_norm, "setup", "db")
+        || command_is(argv_norm, "setup", "remote-db")
+        || command_is(argv_norm, "setup", "nginx")
+        || command_is(argv_norm, "teardown", "db")
+        || command_is(argv_norm, "teardown", "nginx");
+}
+
+static int lifecycle_sudo_required(const std::vector<std::string>& argv_norm) {
+    std::ostringstream out;
+    out << "This lifecycle command must be run with elevated privileges.\n";
+    out << "Re-run with sudo:\n";
+    out << "  sudo vh";
+    for (const auto& token : argv_norm)
+        out << " " << (needs_quotes(token) ? dq_quote(token) : token);
+    out << "\n";
+    fmt::print(stderr, "{}", out.str());
+    return 2;
+}
+
+static std::string lifecycle_binary_path() {
+    if (const char* env = std::getenv("VAULTHALLA_LIFECYCLE_BIN"); env && *env)
+        return env;
+    return "/usr/lib/vaulthalla/lifecycle";
+}
+
+static int run_lifecycle_command(const std::vector<std::string>& argv_norm) {
+    const auto lifecycleBin = lifecycle_binary_path();
+    if (::access(lifecycleBin.c_str(), F_OK) != 0) {
+        fmt::print(
+            stderr,
+            "Lifecycle utility not found: {}\n"
+            "Install Vaulthalla lifecycle payload or set VAULTHALLA_LIFECYCLE_BIN to the utility path.\n",
+            lifecycleBin
+        );
+        return 127;
+    }
+    if (::access(lifecycleBin.c_str(), X_OK) != 0) {
+        fmt::print(
+            stderr,
+            "Lifecycle utility is not executable: {}\n"
+            "Expected an executable script/binary. Reinstall Vaulthalla or fix file permissions.\n",
+            lifecycleBin
+        );
+        return 126;
+    }
+
+    std::vector<std::string> args;
+    args.reserve(argv_norm.size() + 1);
+    args.push_back(lifecycleBin);
+    args.insert(args.end(), argv_norm.begin(), argv_norm.end());
+
+    std::vector<char*> execArgv;
+    execArgv.reserve(args.size() + 1);
+    for (auto& arg : args) execArgv.push_back(arg.data());
+    execArgv.push_back(nullptr);
+
+    ::execv(execArgv[0], execArgv.data());
+    const auto err = errno;
+    fmt::print(
+        stderr,
+        "Failed to execute lifecycle utility '{}': {}\n",
+        lifecycleBin,
+        std::strerror(err)
+    );
+    return err == ENOENT ? 127 : 126;
+}
+
+static bool should_append_status_systemd_summary(const std::vector<std::string>& argv_norm) {
+    if (argv_norm.empty() || argv_norm[0] != "status") return false;
+    if (::geteuid() != 0) return false;
+    const auto hasHelpFlag = has_flag(argv_norm, "--help")
+                          || has_flag(argv_norm, "--h")
+                          || has_flag(argv_norm, "-h")
+                          || has_flag(argv_norm, "?");
+    return !hasHelpFlag;
+}
+
+static std::string shell_quote(const std::string& s) {
+    std::string out{"'"};
+    for (const char c : s) {
+        if (c == '\'') out += "'\"'\"'";
+        else out.push_back(c);
+    }
+    out.push_back('\'');
+    return out;
+}
+
+static std::string trim_copy(std::string s) {
+    const auto ws = [](const unsigned char c) { return std::isspace(c) != 0; };
+    s.erase(s.begin(), std::ranges::find_if(s.begin(), s.end(), [&](const unsigned char c) { return !ws(c); }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [&](const unsigned char c) { return !ws(c); }).base(), s.end());
+    return s;
+}
+
+struct CaptureResult {
+    int code = 0;
+    std::string output;
+};
+
+static CaptureResult run_capture(const std::string& command) {
+    const auto wrapped = command + " 2>&1";
+    std::array<char, 4096> buf{};
+    std::string output;
+
+    FILE* pipe = ::popen(wrapped.c_str(), "r");
+    if (!pipe) return {.code = 1, .output = "failed to execute command"};
+
+    while (fgets(buf.data(), static_cast<int>(buf.size()), pipe) != nullptr)
+        output += buf.data();
+
+    const int status = ::pclose(pipe);
+    int code = status;
+    if (WIFEXITED(status)) code = WEXITSTATUS(status);
+    else if (WIFSIGNALED(status)) code = 128 + WTERMSIG(status);
+
+    return {.code = code, .output = output};
+}
+
+static bool command_exists(const std::string& command) {
+    return run_capture("command -v " + shell_quote(command) + " >/dev/null").code == 0;
+}
+
+static std::string systemd_unit_state(const std::string& unit) {
+    const auto state = run_capture("systemctl is-active " + shell_quote(unit));
+    const auto trimmed = trim_copy(state.output);
+    if (state.code == 0 && !trimmed.empty()) return trimmed;
+    if (!trimmed.empty()) return trimmed;
+    return "unknown (exit " + std::to_string(state.code) + ")";
+}
+
+static void append_status_systemd_summary_if_needed(const std::vector<std::string>& argv_norm, const int exitCode) {
+    if (exitCode != 0 || !should_append_status_systemd_summary(argv_norm))
+        return;
+    if (!command_exists("systemctl")) return;
+
+    std::ostringstream out;
+    out << "systemd summary (supplemental):\n";
+    constexpr std::array<std::string_view, 4> units{
+        "vaulthalla.service",
+        "vaulthalla-cli.service",
+        "vaulthalla-cli.socket",
+        "vaulthalla-web.service"
+    };
+    for (const auto unit : units)
+        out << "  " << unit << ": " << systemd_unit_state(std::string(unit)) << "\n";
+
+    fmt::print("{}", ensureNewLine(out.str()));
+}
+
 /* ----------------------------------------------------------------- */
 
 int main(const int argc, char** argv) {
-    // Decide the "command" token up front (safe even if argv[1] is nullptr)
-    const std::string cmd = (argc >= 2 && argv[1] && argv[1][0] != '\0')
-                            ? std::string(argv[1])
-                            : std::string("help");
+    std::vector<std::string> argv_norm = canonicalize_argv_norm(argc, argv);
 
-    // Build normalized argv: [cmd, args...], with --key=value and -Xvalue split
-    std::vector<std::string> argv_norm;
-    argv_norm.emplace_back(cmd);
-
-    if (argc >= 3) {
-        auto tail = normalize_args(argc, argv);
-        argv_norm.insert(argv_norm.end(), tail.begin(), tail.end());
+    if (is_lifecycle_command(argv_norm)) {
+        if (::geteuid() != 0)
+            return lifecycle_sudo_required(argv_norm);
+        return run_lifecycle_command(argv_norm);
     }
 
     // Quoted line for legacy servers
@@ -215,6 +386,7 @@ int main(const int argc, char** argv) {
             if (frame.contains("stdout")) fmt::print("{}", ensureNewLine(frame["stdout"].get<std::string>()));
             if (frame.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(frame["stderr"].get<std::string>()));
             const int ec = frame.value("exit_code", 0);
+            append_status_systemd_summary_if_needed(argv_norm, ec);
             ::close(s);
             return ec;
         }
@@ -274,6 +446,7 @@ int main(const int argc, char** argv) {
             if (frame.contains("stdout")) fmt::print("{}", ensureNewLine(frame["stdout"].get<std::string>()));
             if (frame.contains("stderr")) fmt::print(stderr, "{}", ensureNewLine(frame["stderr"].get<std::string>()));
             const int ec = frame.value("exit_code", 0);
+            append_status_systemd_summary_if_needed(argv_norm, ec);
             ::close(s);
             return ec;
         }

@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <paths.h>
+#include <utility>
 
 namespace vh::runtime {
 
@@ -140,6 +141,40 @@ bool Manager::allRunning() const {
     return true;
 }
 
+Manager::Status Manager::status() const {
+    const auto entries = [&] {
+        std::scoped_lock lock(mutex_);
+        return serviceEntries();
+    }();
+
+    Status out;
+    out.allRunning = true;
+    out.services.reserve(entries.size());
+
+    for (const auto& entry : entries) {
+        ServiceStatus s{};
+        s.entryName = entry.name;
+
+        if (entry.service) {
+            const auto base = entry.service->status();
+            s.serviceName = base.name;
+            s.running = base.running;
+            s.interrupted = base.interrupted;
+            if (!base.running) out.allRunning = false;
+        } else {
+            s.serviceName = "uninitialized";
+            s.running = false;
+            s.interrupted = false;
+            out.allRunning = false;
+        }
+
+        out.services.push_back(std::move(s));
+    }
+
+    if (out.services.empty()) out.allRunning = false;
+    return out;
+}
+
 void Manager::tryStart(const ServiceEntry& entry) {
     if (!entry.service) return;
 
@@ -158,12 +193,13 @@ void Manager::tryStart(const ServiceEntry& entry) {
 }
 
 void Manager::stopService(const ServiceEntry& entry, const int signal) {
-    if (!entry.service || !entry.service->isRunning()) return;
+    if (!entry.service) return;
 
     log::Registry::runtime()->debug("[ServiceManager] Stopping service: {}", entry.name);
 
     try {
         entry.service->stop();
+        log::Registry::runtime()->debug("[ServiceManager] Service stopped: {}", entry.name);
     } catch (...) {
         log::Registry::runtime()->error(
             "[ServiceManager] Failed to stop {} gracefully, escalating with signal {}.",

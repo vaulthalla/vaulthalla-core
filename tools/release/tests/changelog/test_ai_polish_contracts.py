@@ -25,7 +25,7 @@ class AIPolishContractsTests(unittest.TestCase):
         self.assertEqual(AI_POLISH_RESPONSE_JSON_SCHEMA["type"], "object")
         self.assertEqual(
             AI_POLISH_RESPONSE_JSON_SCHEMA["required"],
-            ["schema_version", "title", "summary", "sections"],
+            ["schema_version", "title", "summary", "sections", "notes"],
         )
 
     def test_parse_valid_response_fixture(self) -> None:

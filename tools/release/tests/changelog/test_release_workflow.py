@@ -52,7 +52,7 @@ class ReleaseWorkflowSelectionTests(unittest.TestCase):
             with (
                 patch(
                     "tools.release.changelog.release_workflow._generate_openai_release_changelog",
-                    return_value="# OpenAI Draft\n",
+                    return_value=("# OpenAI Draft\n", "# OpenAI Release Notes\n"),
                 ) as openai_path,
                 patch("tools.release.changelog.release_workflow._generate_local_release_changelog") as local_path,
                 patch("tools.release.changelog.release_workflow.validate_manual_changelog_current") as manual_path,
@@ -66,6 +66,7 @@ class ReleaseWorkflowSelectionTests(unittest.TestCase):
 
             self.assertEqual(result.path, "openai")
             self.assertEqual(result.content, "# OpenAI Draft\n")
+            self.assertEqual(result.release_notes_content, "# OpenAI Release Notes\n")
             openai_path.assert_called_once()
             local_path.assert_not_called()
             manual_path.assert_not_called()
@@ -315,6 +316,44 @@ profiles:
             rendered = changelog_path.read_text(encoding="utf-8")
             signature_line = next(line for line in rendered.splitlines() if line.startswith(" -- "))
             self.assertRegex(signature_line, re.compile(r"^ -- .+  [A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$"))
+
+    def test_refresh_debian_changelog_entry_filters_classifier_residue_bullets(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            _ = refresh_debian_changelog_entry(
+                changelog_path=changelog_path,
+                release_markdown=(
+                    "# Release\n"
+                    "- important files: tools/release/changelog/payload.py\n"
+                    "- evidence_refs: core/protocols/websocket/server.cpp#error-handling\n"
+                    "- Hardened OpenAI request/response validation paths for release generation.\n"
+                ),
+            )
+
+            rendered = changelog_path.read_text(encoding="utf-8")
+            self.assertIn("Hardened OpenAI request/response validation paths for release generation.", rendered)
+            self.assertNotIn("important files", rendered)
+            self.assertNotIn("evidence_refs", rendered)
+            self.assertNotIn("tools/release/changelog/payload.py", rendered)
+
+    def test_refresh_debian_changelog_entry_rejects_when_only_low_value_bullets_remain(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            changelog_path = repo_root / "debian" / "changelog"
+            _make_debian_changelog(changelog_path, "2.1.0-1")
+
+            with self.assertRaisesRegex(ValueError, "no usable summary lines"):
+                _ = refresh_debian_changelog_entry(
+                    changelog_path=changelog_path,
+                    release_markdown=(
+                        "# Release\n"
+                        "- important files: tools/release/changelog/payload.py\n"
+                        "- evidence_refs: core/fuse/mount_service.cpp#filesystem-lifecycle\n"
+                    ),
+                )
 
 
 if __name__ == "__main__":

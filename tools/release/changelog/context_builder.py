@@ -72,6 +72,7 @@ def build_release_context(
         head_sha=head_sha,
         commit_count=len(commits),
         categories=final_categories,
+        commits=commits,
         uncategorized_commits=uncategorized_commits,
         cross_cutting_notes=cross_cutting_notes,
     )

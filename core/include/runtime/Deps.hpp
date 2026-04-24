@@ -20,6 +20,19 @@ namespace vh::crypto::secrets { class Manager; }
 namespace vh::runtime {
 
     struct Deps {
+        struct SanityStatus {
+            bool storageManager = false;
+            bool apiKeyManager = false;
+            bool authManager = false;
+            bool sessionManager = false;
+            bool secretsManager = false;
+            bool syncController = false;
+            bool fsCache = false;
+            bool shellUsageManager = false;
+            bool httpCacheStats = false;
+            bool fuseSession = false;
+        };
+
         std::shared_ptr<storage::Manager> storageManager;
         std::shared_ptr<vault::APIKeyManager> apiKeyManager;
         std::shared_ptr<auth::Manager> authManager;
@@ -39,6 +52,7 @@ namespace vh::runtime {
         static void setSyncController(std::shared_ptr<sync::Controller> controller);
 
         void setFuseSession(fuse_session* session) { fuseSession = session; }
+        [[nodiscard]] SanityStatus sanityStatus() const;
 
     private:
         Deps() = default;

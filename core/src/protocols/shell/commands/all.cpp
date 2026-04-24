@@ -14,4 +14,5 @@ void vh::protocols::shell::commands::registerAllCommands(const std::shared_ptr<R
     registerSecretsCommands(r);
     registerSetupCommands(r);
     registerTeardownCommands(r);
+    registerStatusCommands(r);
 }

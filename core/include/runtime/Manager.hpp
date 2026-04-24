@@ -27,6 +27,18 @@ namespace vh::runtime {
 
 class Manager {
 public:
+    struct ServiceStatus {
+        std::string entryName;
+        std::string serviceName;
+        bool running = false;
+        bool interrupted = false;
+    };
+
+    struct Status {
+        bool allRunning = false;
+        std::vector<ServiceStatus> services;
+    };
+
     static Manager& instance();
 
     void startAll();
@@ -35,7 +47,10 @@ public:
     void startTestServices();
 
     [[nodiscard]] bool allRunning() const;
+    [[nodiscard]] Status status() const;
     [[nodiscard]] std::shared_ptr<sync::Controller> getSyncController() const { return syncController; }
+    [[nodiscard]] std::shared_ptr<protocols::ProtocolService> getProtocolService() const { return protocolService; }
+    [[nodiscard]] std::shared_ptr<protocols::shell::Server> getShellServer() const { return shellServer; }
 
     Manager(const Manager&) = delete;
     Manager& operator=(const Manager&) = delete;

@@ -26,6 +26,17 @@ static std::shared_ptr<CommandUsage> version_base(const std::weak_ptr<CommandUsa
     return cmd;
 }
 
+static std::shared_ptr<CommandUsage> status_base(const std::weak_ptr<CommandUsage>& parent) {
+    const auto cmd = std::make_shared<CommandUsage>();
+    cmd->parent = parent;
+    cmd->aliases = {"status"};
+    cmd->description = "Show a concise Vaulthalla runtime status snapshot.";
+    cmd->examples = {
+        {"vh status", "Show runtime service state, protocol readiness, deps sanity, and optional systemd summary when elevated."}
+    };
+    return cmd;
+}
+
 std::shared_ptr<CommandBook> help::get(const std::weak_ptr<CommandUsage>& parent) {
     const auto book = std::make_shared<CommandBook>();
     book->title = "Help Command";
@@ -37,6 +48,13 @@ std::shared_ptr<CommandBook> version::get(const std::weak_ptr<CommandUsage>& par
     const auto book = std::make_shared<CommandBook>();
     book->title = "Version Command";
     book->root = version_base(parent);
+    return book;
+}
+
+std::shared_ptr<CommandBook> status::get(const std::weak_ptr<CommandUsage>& parent) {
+    const auto book = std::make_shared<CommandBook>();
+    book->title = "Status Command";
+    book->root = status_base(parent);
     return book;
 }
 

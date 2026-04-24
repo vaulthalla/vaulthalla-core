@@ -56,7 +56,7 @@ conditions hold:
 - nginx is installed and active
 - no non-nginx listeners are detected on `:80`/`:443`
 - no custom nginx site layout is detected
-- packaged template exists at `/usr/share/vaulthalla/nginx/vaulthalla.conf`
+- packaged template exists at `/usr/share/vaulthalla/nginx/vaulthalla`
 
 If checks pass, postinst installs/enables:
 
@@ -69,7 +69,9 @@ Super-admin bootstrap policy
 ============================
 
 Package install does not prompt for or pre-seed super-admin Linux UID mapping.
-Initial ownership claim is deferred to first CLI use (`vh` / `vaulthalla`).
+Initial ownership claim is handled in CLI flow; operators should run:
+
+- `vh setup assign-admin`
 
 Advanced overrides
 ==================
@@ -112,6 +114,7 @@ CLI integration follow-up (Phase 3)
 
 If package-time automation skipped optional integration steps, admins can run:
 
+- `vh setup assign-admin`
 - `vh setup db`
 - `vh setup remote-db --host <host> --user <user> --database <name> --password-file <path>`
 - `vh setup nginx`
@@ -153,7 +156,7 @@ nginx configuration. It regenerates `/etc/nginx/sites-available/vaulthalla`
 from canonical runtime configuration (`/etc/vaulthalla/config.yaml`) and
 runtime conventions, then validates/reloads nginx conservatively.
 
-The packaged artifact at `/usr/share/vaulthalla/nginx/vaulthalla.conf` is only a
+The packaged artifact at `/usr/share/vaulthalla/nginx/vaulthalla` is only a
 staged baseline; operators should run `vh setup nginx` for final deterministic
 deployment after install.
 

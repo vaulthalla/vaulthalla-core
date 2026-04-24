@@ -11,7 +11,7 @@ AI_POLISH_SCHEMA_VERSION = "vaulthalla.release.ai_polish.v1"
 AI_POLISH_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["schema_version", "title", "summary", "sections"],
+    "required": ["schema_version", "title", "summary", "sections", "notes"],
     "properties": {
         "schema_version": {"type": "string", "const": AI_POLISH_SCHEMA_VERSION},
         "title": {"type": "string", "minLength": 1, "maxLength": 140},

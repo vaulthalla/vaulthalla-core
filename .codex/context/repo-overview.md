@@ -34,7 +34,7 @@ python3 -m tools.release build-deb --dry-run
 ## Build + Install Entry Surface
 
 - `Makefile` wraps install/test/deb/release flows.
-- `bin/install.sh` orchestrates dependency/user/dir/core install and systemd wiring.
+- `bin/install.sh` orchestrates dependency/user/dir/core/web install and systemd wiring.
 - `bin/uninstall.sh` orchestrates unmount/systemd removal and optional DB/user/deps purge.
 - `bin/setup/install_dirs.sh` creates symlinks:
   - `/usr/bin/vaulthalla -> /usr/bin/vaulthalla-cli`

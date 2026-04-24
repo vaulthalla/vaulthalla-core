@@ -118,6 +118,7 @@ sudo journalctl -fu vaulthalla.service
 - State directory: `/var/lib/vaulthalla`
 - Log directory: `/var/log/vaulthalla`
 - SQL deploy assets: `/usr/share/vaulthalla/psql`
+- Web runtime payload: `/usr/share/vaulthalla-web`
 - Packaged nginx template: `/usr/share/vaulthalla/nginx/vaulthalla.conf`
 
 ## Build from Source (Development Preview)

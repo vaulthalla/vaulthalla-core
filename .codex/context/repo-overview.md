@@ -36,6 +36,8 @@ python3 -m tools.release build-deb --dry-run
 - `Makefile` wraps install/test/deb/release flows.
 - `bin/install.sh` orchestrates dependency/user/dir/core/web install and systemd wiring.
 - `bin/uninstall.sh` orchestrates unmount/systemd removal and optional DB/user/deps purge.
+- `web/bin/install_web.sh` owns web dependency install/build + runtime payload install at `/usr/share/vaulthalla-web`.
+- `web/bin/teardown_web.sh` removes the installed web runtime payload.
 - `bin/setup/install_dirs.sh` creates symlinks:
   - `/usr/bin/vaulthalla -> /usr/bin/vaulthalla-cli`
   - `/usr/bin/vh -> /usr/bin/vaulthalla-cli`

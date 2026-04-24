@@ -45,6 +45,6 @@ done
 "$ROOT_DIR/bin/setup/install_users.sh"
 "$ROOT_DIR/bin/setup/install_dirs.sh"
 "$CORE_DIR/bin/install.sh" "${CORE_ARGS[@]}"
-"$ROOT_DIR/bin/setup/install_web.sh"
+"$ROOT_DIR/web/bin/install_web.sh"
 "$ROOT_DIR/bin/setup/install_db.sh"
 "$ROOT_DIR/bin/setup/install_systemd.sh"

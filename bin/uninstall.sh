@@ -72,7 +72,7 @@ done
 
 # 3) Remove installed binaries/artifacts
 "$ROOT_DIR/bin/teardown/uninstall_binaries.sh"
-"$ROOT_DIR/bin/teardown/uninstall_web.sh"
+"$ROOT_DIR/web/bin/teardown_web.sh"
 
 # 4) Remove runtime/config dirs
 "$ROOT_DIR/bin/teardown/uninstall_dirs.sh"

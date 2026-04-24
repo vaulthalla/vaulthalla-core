@@ -6,6 +6,6 @@ set -euo pipefail
 
 WEB_INSTALL_DIR="$DATADIR/vaulthalla-web"
 
-echo "[uninstall_web] Removing web runtime payload at '$WEB_INSTALL_DIR'..."
+echo "[teardown_web] removing web runtime payload at '$WEB_INSTALL_DIR'..."
 sudo rm -rf "$WEB_INSTALL_DIR"
-echo "[uninstall_web] Web runtime payload removed."
+echo "[teardown_web] complete"

@@ -57,8 +57,11 @@ CommandResult Router::executeLine(const std::string& line, const std::shared_ptr
 
     const auto canonical = canonicalFor(call.name);
 
-    if (call.user->name == "system" && call.user->isSuperAdmin() && canonical != "status")
-        return invalid(call.constructFullArgs(), "System user can only execute 'status' command.");
+    if (call.user->name == "system" && call.user->isSuperAdmin() && canonical != "status") {
+        static const std::unordered_set<std::string> allowed{ "status", "setup", "teardown" };
+        if (!allowed.contains(canonical))
+            return invalid(call.constructFullArgs(), fmt::format("[Router] System user cannot execute command: {}", canonical));
+    }
 
     if (call.positionals.empty() && pluralMap_.contains(call.name)) {
         call.name = canonical;

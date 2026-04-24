@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import re
 from typing import Any
 
@@ -30,6 +31,9 @@ from tools.release.changelog.ai.providers.openai import OpenAIProvider
 
 AI_TRIAGE_SYNTHESIZED_INPUT_SCHEMA_VERSION = "vaulthalla.release.triage_input.synthesized.v1"
 _ID_SLUG_RE = re.compile(r"[^a-z0-9]+")
+# Keep emergency triage unit-scoped in v1 so request scope and identity invariants
+# are trivially aligned (one input evidence unit -> one synthesized output unit).
+_EMERGENCY_TRIAGE_BATCH_SIZE = 1
 
 
 def run_emergency_triage_stage(
@@ -59,23 +63,59 @@ def run_emergency_triage_stage(
         )
 
     system_prompt = build_emergency_triage_system_prompt()
-    user_prompt = build_emergency_triage_user_prompt(projection)
     policy = max_output_tokens_policy or DEFAULT_STAGE_MAX_OUTPUT_TOKENS["emergency_triage"]
-    max_output_tokens = compute_max_output_tokens(
-        policy,
-        input_size=estimate_input_size_units(system_prompt, user_prompt),
+    collected_items: list[Any] = []
+    resolved_version = payload_version or None
+
+    all_items = _as_sequence(projection.get("items"))
+    for start in range(0, len(all_items), _EMERGENCY_TRIAGE_BATCH_SIZE):
+        batch_items = all_items[start : start + _EMERGENCY_TRIAGE_BATCH_SIZE]
+        batch_payload = _build_emergency_triage_batch_payload(projection, batch_items=batch_items)
+        # Batch identity source of truth: expected ids are read from the exact payload
+        # object serialized into this request, not from a parallel slice/view.
+        batch_expected_ids = tuple(
+            item_id
+            for item_id in (
+                _read_nested_string(item, "id") or "" for item in _as_sequence(batch_payload.get("items"))
+            )
+            if item_id
+        )
+        if not batch_expected_ids:
+            continue
+        batch_schema = _build_emergency_triage_batch_response_schema(expected_item_ids=batch_expected_ids)
+        user_prompt = build_emergency_triage_user_prompt(batch_payload)
+        max_output_tokens = compute_max_output_tokens(
+            policy,
+            input_size=estimate_input_size_units(system_prompt, user_prompt),
+        )
+        structured = active_provider.generate_structured_json(
+            stage="emergency_triage",
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            json_schema=batch_schema,
+            reasoning_effort=reasoning_effort,
+            structured_mode=structured_mode,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+        )
+        parsed_batch = parse_ai_emergency_triage_response(
+            structured,
+            expected_item_ids=batch_expected_ids,
+        )
+        if payload_version and parsed_batch.version != payload_version:
+            raise ValueError(
+                "AI emergency_triage response version mismatch: "
+                f"expected `{payload_version}`, got `{parsed_batch.version}`."
+            )
+        if resolved_version is None:
+            resolved_version = parsed_batch.version
+        collected_items.extend(parsed_batch.items)
+
+    return AIEmergencyTriageResult(
+        schema_version=AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
+        version=resolved_version or "unknown",
+        items=tuple(collected_items),
     )
-    structured = active_provider.generate_structured_json(
-        stage="emergency_triage",
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        json_schema=AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA,
-        reasoning_effort=reasoning_effort,
-        structured_mode=structured_mode,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
-    )
-    return parse_ai_emergency_triage_response(structured, expected_item_ids=expected_item_ids)
 
 
 def render_emergency_triage_result_json(result: AIEmergencyTriageResult) -> str:
@@ -135,6 +175,62 @@ def build_emergency_triage_input_payload(semantic_payload: dict[str, Any]) -> di
         "all_commits": _compact_candidate_commits(semantic_payload.get("all_commits"), limit=64),
         "notes": _normalize_string_list(semantic_payload.get("notes"), limit=20, max_chars=220),
     }
+
+
+def _build_emergency_triage_batch_payload(
+    projection: dict[str, Any],
+    *,
+    batch_items: list[Any],
+) -> dict[str, Any]:
+    category_names: list[str] = []
+    for item in batch_items:
+        name = _read_nested_string(item, "category")
+        if not name or name in category_names:
+            continue
+        category_names.append(name)
+
+    category_lookup: dict[str, dict[str, Any]] = {}
+    for raw_category in _as_sequence(projection.get("categories")):
+        if not isinstance(raw_category, dict):
+            continue
+        name = _read_nested_string(raw_category, "name")
+        if not name:
+            continue
+        category_lookup[name] = raw_category
+
+    scoped_categories: list[dict[str, Any]] = []
+    for name in category_names:
+        category = category_lookup.get(name)
+        if category is not None:
+            scoped_categories.append(category)
+
+    return {
+        "schema_version": projection.get("schema_version"),
+        "version": _read_nested_string(projection, "version"),
+        "previous_tag": _read_nested_string(projection, "previous_tag"),
+        "head_sha": _read_nested_string(projection, "head_sha"),
+        "commit_count": _read_nested_int(projection, "commit_count"),
+        "categories": scoped_categories,
+        "items": list(batch_items),
+    }
+
+
+def _build_emergency_triage_batch_response_schema(
+    *,
+    expected_item_ids: tuple[str, ...],
+) -> dict[str, Any]:
+    schema = deepcopy(AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA)
+    if not expected_item_ids:
+        return schema
+    items_schema = schema["properties"]["items"]
+    items_schema["minItems"] = len(expected_item_ids)
+    items_schema["maxItems"] = len(expected_item_ids)
+    item_schema = items_schema["items"]
+    item_schema["properties"]["id"] = {
+        "type": "string",
+        "enum": list(expected_item_ids),
+    }
+    return schema
 
 
 def build_triage_input_from_emergency_result(

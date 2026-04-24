@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tools.release.changelog.ai.contracts.emergency_triage import (
+    AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA,
     AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
     AIEmergencyTriageResult,
     ai_emergency_triage_result_to_dict,
@@ -78,6 +79,12 @@ class AIEmergencyTriageContractsTests(unittest.TestCase):
         rendered = ai_emergency_triage_result_to_dict(parsed)
         self.assertNotIn("insufficient_context_reason", rendered["items"][0])
         self.assertNotIn("evidence_refs", rendered["items"][0])
+
+    def test_strict_schema_item_required_matches_item_properties(self) -> None:
+        item_schema = AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA["properties"]["items"]["items"]
+        required = set(item_schema["required"])
+        properties = set(item_schema["properties"].keys())
+        self.assertSetEqual(required, properties)
 
 
 if __name__ == "__main__":

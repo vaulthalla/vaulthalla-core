@@ -19,14 +19,26 @@ AI_EMERGENCY_TRIAGE_RESPONSE_JSON_SCHEMA: dict[str, Any] = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["id", "category", "change_kind", "change_summary", "confidence"],
+                "required": [
+                    "id",
+                    "category",
+                    "change_kind",
+                    "change_summary",
+                    "confidence",
+                    "insufficient_context_reason",
+                    "evidence_refs",
+                ],
                 "properties": {
                     "id": {"type": "string", "minLength": 1, "maxLength": 120},
                     "category": {"type": "string", "minLength": 1, "maxLength": 60},
                     "change_kind": {"type": "string", "minLength": 1, "maxLength": 80},
                     "change_summary": {"type": "string", "minLength": 1, "maxLength": 360},
                     "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-                    "insufficient_context_reason": {"type": "string", "minLength": 1, "maxLength": 240},
+                    "insufficient_context_reason": {
+                        "type": ["string", "null"],
+                        "minLength": 1,
+                        "maxLength": 240,
+                    },
                     "evidence_refs": {
                         "type": "array",
                         "maxItems": 6,

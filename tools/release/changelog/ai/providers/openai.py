@@ -246,10 +246,7 @@ class OpenAIProvider:
             "attempts": [],
         }
         if mode_chain != initial_mode_chain:
-            if _is_hosted_gpt5_model(provider_kind=self.provider_kind, model=self.model) and stage in {
-                "triage",
-                "emergency_triage",
-            }:
+            if _is_hosted_gpt5_model(provider_kind=self.provider_kind, model=self.model) and stage == "triage":
                 trace["resolved_settings"]["degradations"].append(
                     "Hosted OpenAI GPT-5 triage lanes prefer answer-first `prompt_json` before strict schema and skip `json_object` fallback."
                 )
@@ -1052,16 +1049,26 @@ def _resolve_runtime_mode_chain(
     filtered = tuple(mode for mode in mode_chain if mode != "json_object")
     if not filtered:
         return mode_chain
+    if stage == "triage":
+        # For hosted GPT-5 triage, lead with prompt_json to maximize answer-start probability.
+        ordered: list[AIStructuredMode] = []
+        if "prompt_json" in filtered:
+            ordered.append("prompt_json")
+        if "strict_json_schema" in filtered:
+            ordered.append("strict_json_schema")
+        return tuple(ordered) if ordered else filtered
+    if stage == "emergency_triage":
+        # Emergency triage depends on strict 1:1 schema conformance (version + per-unit items),
+        # so keep strict_json_schema first and only fall back to prompt_json on recoverable failure.
+        ordered: list[AIStructuredMode] = []
+        if "strict_json_schema" in filtered:
+            ordered.append("strict_json_schema")
+        if "prompt_json" in filtered:
+            ordered.append("prompt_json")
+        return tuple(ordered) if ordered else filtered
     if stage not in {"triage", "emergency_triage"}:
         return filtered
-
-    # For hosted GPT-5 triage/emergency_triage, lead with prompt_json to maximize answer-start probability.
-    ordered: list[AIStructuredMode] = []
-    if "prompt_json" in filtered:
-        ordered.append("prompt_json")
-    if "strict_json_schema" in filtered:
-        ordered.append("strict_json_schema")
-    return tuple(ordered) if ordered else filtered
+    return filtered
 
 
 def _resolve_attempt_reasoning_effort(

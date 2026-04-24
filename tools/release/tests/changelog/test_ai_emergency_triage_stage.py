@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from unittest.mock import patch
 
 from tools.release.changelog.ai.contracts.emergency_triage import (
     AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
@@ -23,6 +25,87 @@ class _FakeProvider:
     def generate_structured_json(self, **kwargs):
         self.calls.append(kwargs)
         return self._response
+
+
+class _BatchEchoProvider:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def generate_structured_json(self, **kwargs):
+        self.calls.append(kwargs)
+        marker = "Emergency triage input payload:\n"
+        payload = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+        items = payload.get("items", [])
+        return {
+            "schema_version": AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
+            "version": payload.get("version", "unknown"),
+            "items": [
+                {
+                    "id": item["id"],
+                    "category": item["category"],
+                    "change_kind": item.get("kind") or "implementation-change",
+                    "change_summary": f"Summarized {item['id']}.",
+                    "confidence": "medium",
+                    "insufficient_context_reason": None,
+                    "evidence_refs": [],
+                }
+                for item in items
+            ],
+        }
+
+
+class _BatchDriftProvider:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def generate_structured_json(self, **kwargs):
+        self.calls.append(kwargs)
+        marker = "Emergency triage input payload:\n"
+        payload = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+        items = payload.get("items", [])
+        if len(self.calls) == 1:
+            return {
+                "schema_version": AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
+                "version": payload.get("version", "unknown"),
+                "items": [
+                    {
+                        "id": item["id"],
+                        "category": item["category"],
+                        "change_kind": "implementation-change",
+                        "change_summary": f"Summarized {item['id']}.",
+                        "confidence": "high",
+                        "insufficient_context_reason": None,
+                        "evidence_refs": [],
+                    }
+                    for item in items
+                ],
+            }
+        # Deliberate second-batch identity drift.
+        kept = items[0]
+        return {
+            "schema_version": AI_EMERGENCY_TRIAGE_SCHEMA_VERSION,
+            "version": payload.get("version", "unknown"),
+            "items": [
+                {
+                    "id": kept["id"],
+                    "category": kept["category"],
+                    "change_kind": "implementation-change",
+                    "change_summary": f"Summarized {kept['id']}.",
+                    "confidence": "high",
+                    "insufficient_context_reason": None,
+                    "evidence_refs": [],
+                },
+                {
+                    "id": "bogus:1",
+                    "category": kept["category"],
+                    "change_kind": "implementation-change",
+                    "change_summary": "wrong id",
+                    "confidence": "low",
+                    "insufficient_context_reason": "bad mapping",
+                    "evidence_refs": [],
+                },
+            ],
+        }
 
 
 def _sample_semantic_payload() -> dict:
@@ -78,6 +161,24 @@ def _sample_semantic_payload() -> dict:
     }
 
 
+def _sample_semantic_payload_with_hunks(count: int) -> dict:
+    payload = _sample_semantic_payload()
+    hunks: list[dict[str, str]] = []
+    for index in range(count):
+        hunks.append(
+            {
+                "path": "tools/release/cli.py",
+                "kind": "output-artifact",
+                "why_selected": f"captures flow {index}",
+                "excerpt": f"@@ hunk {index}",
+                "region_type": "function",
+                "context_label": f"ctx_{index}",
+            }
+        )
+    payload["categories"][0]["semantic_hunks"] = hunks
+    return payload
+
+
 class AIEmergencyTriageStageTests(unittest.TestCase):
     def test_run_stage_enforces_one_item_per_input_unit_id(self) -> None:
         payload = _sample_semantic_payload()
@@ -105,12 +206,63 @@ class AIEmergencyTriageStageTests(unittest.TestCase):
                 ],
             }
         )
-        result = run_emergency_triage_stage(payload, provider=fake)
+        with patch("tools.release.changelog.ai.stages.emergency_triage._EMERGENCY_TRIAGE_BATCH_SIZE", 2):
+            result = run_emergency_triage_stage(payload, provider=fake)
         self.assertEqual(result.schema_version, AI_EMERGENCY_TRIAGE_SCHEMA_VERSION)
         self.assertEqual(len(result.items), 2)
         call = fake.calls[0]
         self.assertEqual(call["stage"], "emergency_triage")
         self.assertIn("one item per input", call["user_prompt"])
+
+    def test_run_stage_batches_requests_and_preserves_per_batch_identity(self) -> None:
+        payload = _sample_semantic_payload_with_hunks(5)
+        provider = _BatchEchoProvider()
+        with patch("tools.release.changelog.ai.stages.emergency_triage._EMERGENCY_TRIAGE_BATCH_SIZE", 2):
+            result = run_emergency_triage_stage(payload, provider=provider)
+
+        self.assertEqual(result.version, "0.34.1")
+        self.assertEqual(len(result.items), 5)
+        self.assertEqual(len(provider.calls), 3)
+        self.assertEqual([item.id for item in result.items], ["tools:1", "tools:2", "tools:3", "tools:4", "tools:5"])
+        marker = "Emergency triage input payload:\n"
+        call_scopes = [
+            [entry["id"] for entry in json.loads(call["user_prompt"].split(marker, 1)[1])["items"]]
+            for call in provider.calls
+        ]
+        self.assertEqual(call_scopes, [["tools:1", "tools:2"], ["tools:3", "tools:4"], ["tools:5"]])
+        for call, expected_ids in zip(provider.calls, call_scopes, strict=True):
+            schema = call["json_schema"]
+            items_schema = schema["properties"]["items"]
+            self.assertEqual(items_schema["minItems"], len(expected_ids))
+            self.assertEqual(items_schema["maxItems"], len(expected_ids))
+            self.assertEqual(
+                items_schema["items"]["properties"]["id"]["enum"],
+                expected_ids,
+            )
+
+    def test_run_stage_fails_when_single_batch_has_identity_drift(self) -> None:
+        payload = _sample_semantic_payload_with_hunks(4)
+        provider = _BatchDriftProvider()
+        with patch("tools.release.changelog.ai.stages.emergency_triage._EMERGENCY_TRIAGE_BATCH_SIZE", 2):
+            with self.assertRaisesRegex(
+                ValueError,
+                r"preserve 1:1 item identity.*missing ids: tools:4.*unexpected ids: bogus:1",
+            ):
+                _ = run_emergency_triage_stage(payload, provider=provider)
+
+    def test_run_stage_defaults_to_per_item_requests_for_identity_safety(self) -> None:
+        payload = _sample_semantic_payload_with_hunks(3)
+        provider = _BatchEchoProvider()
+        result = run_emergency_triage_stage(payload, provider=provider)
+
+        self.assertEqual(len(result.items), 3)
+        self.assertEqual(len(provider.calls), 3)
+        marker = "Emergency triage input payload:\n"
+        scoped_ids = [
+            [entry["id"] for entry in json.loads(call["user_prompt"].split(marker, 1)[1])["items"]]
+            for call in provider.calls
+        ]
+        self.assertEqual(scoped_ids, [["tools:1"], ["tools:2"], ["tools:3"]])
 
     def test_build_synthesized_triage_input_payload(self) -> None:
         payload = _sample_semantic_payload()

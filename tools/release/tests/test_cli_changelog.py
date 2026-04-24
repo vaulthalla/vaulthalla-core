@@ -1984,6 +1984,327 @@ profiles:
             self.assertTrue(artifact.is_file())
             self.assertIn("## Profile: openai-cheap", artifact.read_text(encoding="utf-8"))
 
+    def test_ai_compare_emergency_triage_batches_and_preserves_batch_identity(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _ = self._write_repo_basics(repo_root)
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-cheap:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-nano
+""",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            snippets = [
+                DiffSnippet(
+                    path="tools/release/cli.py",
+                    category="tools",
+                    subscopes=("release", "cli"),
+                    score=8.0 - (index * 0.1),
+                    reason=f"Selected snippet {index}",
+                    patch=f"@@ -{index + 1},2 +{index + 1},2 @@\n+batch update {index}",
+                    flags=("release-tooling",),
+                    region_kind="function",
+                    region_label=f"ctx_{index}",
+                    hunk_count=1,
+                    changed_lines=6,
+                    meaningful_lines=6,
+                )
+                for index in range(5)
+            ]
+            context = ReleaseContext(
+                version="0.34.0",
+                previous_tag="v0.33.0",
+                head_sha="abc123",
+                commit_count=1,
+                categories={
+                    "tools": CategoryContext(
+                        name="tools",
+                        commit_count=1,
+                        insertions=10,
+                        deletions=1,
+                        commits=[
+                            CommitInfo(
+                                sha="abcd1234",
+                                subject="Refine emergency triage batching",
+                                body="",
+                                files=["tools/release/cli.py"],
+                                insertions=10,
+                                deletions=1,
+                                categories=["tools"],
+                            )
+                        ],
+                        files=[
+                            FileChange(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                insertions=10,
+                                deletions=1,
+                                commit_count=1,
+                                score=10.0,
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        snippets=snippets,
+                        detected_themes=["release-automation"],
+                    )
+                },
+                cross_cutting_notes=[],
+            )
+
+            class _StageAwareProvider:
+                def __init__(self) -> None:
+                    self.emergency_batch_sizes: list[int] = []
+                    self.emergency_schema_id_enums: list[list[str]] = []
+
+                def generate_structured_json(self, **kwargs):
+                    stage = kwargs["stage"]
+                    if stage == "emergency_triage":
+                        marker = "Emergency triage input payload:\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        items = projection.get("items", [])
+                        self.emergency_batch_sizes.append(len(items))
+                        schema = kwargs["json_schema"]
+                        enum_ids = schema["properties"]["items"]["items"]["properties"]["id"]["enum"]
+                        self.emergency_schema_id_enums.append(list(enum_ids))
+                        return {
+                            "schema_version": "vaulthalla.release.ai_emergency_triage.v1",
+                            "version": "0.34.0",
+                            "items": [
+                                {
+                                    "id": item["id"],
+                                    "category": item["category"],
+                                    "change_kind": "implementation-change",
+                                    "change_summary": f"Summarized {item['id']}.",
+                                    "confidence": "medium",
+                                    "insufficient_context_reason": None,
+                                    "evidence_refs": [],
+                                }
+                                for item in items
+                            ],
+                        }
+                    if stage == "triage":
+                        marker = "Synthesized semantic payload (compact projection):\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        categories = projection.get("categories", [])
+                        if not categories:
+                            raise AssertionError("expected synthesized triage categories")
+                        units = categories[0].get("synthesized_units", [])
+                        if len(units) != 5:
+                            raise AssertionError(f"expected 5 synthesized units, got {len(units)}")
+                        return {
+                            "schema_version": "vaulthalla.release.ai_triage.v2",
+                            "version": "0.34.0",
+                            "categories": [
+                                {
+                                    "name": "tools",
+                                    "signal_strength": "strong",
+                                    "priority_rank": 1,
+                                    "theme": "Release tooling updates",
+                                    "grounded_claims": ["Emergency triage batched unit synthesis preserved identity."],
+                                }
+                            ],
+                        }
+                    if stage == "draft":
+                        return {
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["Emergency triage batched unit synthesis preserved identity."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    raise AssertionError(f"Unexpected stage: {stage}")
+
+            provider = _StageAwareProvider()
+
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=context),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider),
+                patch("tools.release.changelog.ai.stages.emergency_triage._EMERGENCY_TRIAGE_BATCH_SIZE", 2),
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(provider.emergency_batch_sizes, [2, 2, 1])
+            self.assertEqual(
+                provider.emergency_schema_id_enums,
+                [["tools:1", "tools:2"], ["tools:3", "tools:4"], ["tools:5"]],
+            )
+            artifact = repo_root / ".changelog_scratch" / "comparisons" / "0.34.0-openai-comparison.md"
+            self.assertTrue(artifact.is_file())
+            self.assertIn("## Profile: openai-cheap", artifact.read_text(encoding="utf-8"))
+
+    def test_ai_compare_emergency_triage_defaults_to_per_item_scope(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _ = self._write_repo_basics(repo_root)
+            (repo_root / "ai.yml").write_text(
+                """
+profiles:
+  openai-cheap:
+    provider: openai
+    stages:
+      emergency_triage:
+        model: gpt-5-nano
+      triage:
+        model: gpt-5-nano
+      draft:
+        model: gpt-5-nano
+""",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                repo_root=str(repo_root),
+                since_tag=None,
+                ai_profiles="openai-cheap",
+                output_name="0.34.0-openai-comparison.md",
+            )
+
+            snippets = [
+                DiffSnippet(
+                    path="tools/release/cli.py",
+                    category="tools",
+                    subscopes=("release", "cli"),
+                    score=8.0 - (index * 0.1),
+                    reason=f"Selected snippet {index}",
+                    patch=f"@@ -{index + 1},2 +{index + 1},2 @@\n+batch update {index}",
+                    flags=("release-tooling",),
+                    region_kind="function",
+                    region_label=f"ctx_{index}",
+                    hunk_count=1,
+                    changed_lines=6,
+                    meaningful_lines=6,
+                )
+                for index in range(3)
+            ]
+            context = ReleaseContext(
+                version="0.34.0",
+                previous_tag="v0.33.0",
+                head_sha="abc123",
+                commit_count=1,
+                categories={
+                    "tools": CategoryContext(
+                        name="tools",
+                        commit_count=1,
+                        insertions=10,
+                        deletions=1,
+                        commits=[
+                            CommitInfo(
+                                sha="abcd1234",
+                                subject="Refine emergency triage request scope",
+                                body="",
+                                files=["tools/release/cli.py"],
+                                insertions=10,
+                                deletions=1,
+                                categories=["tools"],
+                            )
+                        ],
+                        files=[
+                            FileChange(
+                                path="tools/release/cli.py",
+                                category="tools",
+                                subscopes=("release", "cli"),
+                                insertions=10,
+                                deletions=1,
+                                commit_count=1,
+                                score=10.0,
+                                flags=("release-tooling",),
+                            )
+                        ],
+                        snippets=snippets,
+                        detected_themes=["release-automation"],
+                    )
+                },
+                cross_cutting_notes=[],
+            )
+
+            class _StageAwareProvider:
+                def __init__(self) -> None:
+                    self.emergency_batch_sizes: list[int] = []
+
+                def generate_structured_json(self, **kwargs):
+                    stage = kwargs["stage"]
+                    if stage == "emergency_triage":
+                        marker = "Emergency triage input payload:\n"
+                        projection = json.loads(kwargs["user_prompt"].split(marker, 1)[1])
+                        items = projection.get("items", [])
+                        self.emergency_batch_sizes.append(len(items))
+                        item = items[0]
+                        return {
+                            "schema_version": "vaulthalla.release.ai_emergency_triage.v1",
+                            "version": "0.34.0",
+                            "items": [
+                                {
+                                    "id": item["id"],
+                                    "category": item["category"],
+                                    "change_kind": "implementation-change",
+                                    "change_summary": f"Summarized {item['id']}.",
+                                    "confidence": "medium",
+                                    "insufficient_context_reason": None,
+                                    "evidence_refs": [],
+                                }
+                            ],
+                        }
+                    if stage == "triage":
+                        return {
+                            "schema_version": "vaulthalla.release.ai_triage.v2",
+                            "version": "0.34.0",
+                            "categories": [
+                                {
+                                    "name": "tools",
+                                    "signal_strength": "strong",
+                                    "priority_rank": 1,
+                                    "theme": "Release tooling updates",
+                                    "grounded_claims": ["Per-item emergency triage preserved unit identity."],
+                                }
+                            ],
+                        }
+                    if stage == "draft":
+                        return {
+                            "title": "Release 0.34.0",
+                            "summary": "Release tooling updates.",
+                            "sections": [
+                                {
+                                    "category": "tools",
+                                    "overview": "Release tooling changed.",
+                                    "bullets": ["Per-item emergency triage preserved unit identity."],
+                                }
+                            ],
+                            "notes": [],
+                        }
+                    raise AssertionError(f"Unexpected stage: {stage}")
+
+            provider = _StageAwareProvider()
+            with (
+                patch("tools.release.cli.build_changelog_context", return_value=context),
+                patch("tools.release.cli.build_ai_provider_from_args", return_value=provider),
+            ):
+                rc = cli.cmd_changelog_ai_compare(args)
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(provider.emergency_batch_sizes, [1, 1, 1])
+
 
 class CliChangelogContextHelperTests(unittest.TestCase):
     def test_build_changelog_context_reads_version_and_passes_since_tag(self) -> None:

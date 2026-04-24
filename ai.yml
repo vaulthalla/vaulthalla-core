@@ -3,10 +3,10 @@ profiles:
     provider: openai
 
     default_max_output_tokens:
-      emergency_triage: 4000
-      triage: 3500
-      draft: 2800
-      polish: 2400
+      emergency_triage: 5000
+      triage: 4000
+      draft: 3000
+      polish: 3200
       release_notes: 4000
 
     stages:

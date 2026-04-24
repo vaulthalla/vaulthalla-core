@@ -333,6 +333,27 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(call["max_output_tokens"], 2200)
         self.assertEqual(client.last_structured_mode_used, "prompt_json")
 
+    def test_hosted_gpt5_emergency_triage_prefers_strict_schema_before_prompt_json(self) -> None:
+        sdk = _FakeSDKWithResponses(self._VALID_JSON)
+        client = OpenAIProvider(sdk_client=sdk, model="gpt-5-nano")
+
+        _ = client.generate_structured_json(
+            stage="emergency_triage",
+            system_prompt="sys",
+            user_prompt="usr",
+            json_schema={"type": "object"},
+            structured_mode="strict_json_schema",
+            reasoning_effort="low",
+            max_output_tokens=600,
+        )
+
+        self.assertEqual(len(sdk.responses.calls), 1)
+        call = sdk.responses.calls[0]
+        self.assertEqual(call["text"]["format"]["type"], "json_schema")
+        self.assertEqual(call["reasoning"]["effort"], "low")
+        self.assertEqual(call["max_output_tokens"], 1400)
+        self.assertEqual(client.last_structured_mode_used, "strict_json_schema")
+
     def test_hosted_gpt5_triage_defaults_reasoning_to_low_when_unset(self) -> None:
         sdk = _FakeSDKWithResponses(self._VALID_JSON)
         client = OpenAIProvider(sdk_client=sdk, model="gpt-5-nano")

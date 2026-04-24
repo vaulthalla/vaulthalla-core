@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tools.release.changelog.ai.prompts.draft import build_draft_system_prompt, build_draft_user_prompt
+from tools.release.changelog.ai.prompts.emergency_triage import build_emergency_triage_user_prompt
 from tools.release.changelog.ai.prompts.polish import build_polish_system_prompt, build_polish_user_prompt
 from tools.release.changelog.ai.prompts.release_notes import (
     build_release_notes_system_prompt,
@@ -95,6 +96,13 @@ class AIPromptDisciplineTests(unittest.TestCase):
         self.assertIn("remove classifier residue", user)
         self.assertIn("schema_version", user)
         self.assertIn("return markdown in `markdown`", user)
+
+    def test_emergency_triage_prompt_requires_version_and_non_empty_items(self) -> None:
+        user = build_emergency_triage_user_prompt({"schema_version": "x", "version": "1.2.3", "items": []}).lower()
+        self.assertIn("required top-level output fields", user)
+        self.assertIn("`schema_version`, `version`, `items`", user)
+        self.assertIn("set top-level `version` exactly", user)
+        self.assertIn("non-empty array", user)
 
 
 if __name__ == "__main__":

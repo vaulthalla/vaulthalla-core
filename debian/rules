@@ -27,6 +27,7 @@ override_dh_auto_install:
 	sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla.service.in > debian/tmp/lib/systemd/system/vaulthalla.service
 	sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-cli.service.in > debian/tmp/lib/systemd/system/vaulthalla-cli.service
 	sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-web.service.in > debian/tmp/lib/systemd/system/vaulthalla-web.service
+	sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-swtpm.service.in > debian/tmp/lib/systemd/system/vaulthalla-swtpm.service
 	install -m 0644 deploy/systemd/vaulthalla-cli.socket debian/tmp/lib/systemd/system/vaulthalla-cli.socket
 	install -m 0644 deploy/nginx/vaulthalla.conf debian/tmp/usr/share/vaulthalla/nginx/vaulthalla
 	cp -a deploy/psql/. debian/tmp/usr/share/vaulthalla/psql/

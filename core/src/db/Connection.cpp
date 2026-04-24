@@ -32,14 +32,19 @@ static std::optional<std::string> getFirstInitDBPass() {
         return std::nullopt;
     }
 
+    return pass;
+}
+
+static void clearPendingDBPassIfPresent() {
+    const std::filesystem::path f{"/run/vaulthalla/db_password"};
+    if (!std::filesystem::exists(f)) return;
+
     try {
         std::filesystem::remove(f);
         log::Registry::runtime()->debug("[seed] Consumed and removed pending db_password file {}", f.string());
     } catch (const std::exception& e) {
         log::Registry::runtime()->warn("[seed] Failed to remove {}: {}", f.string(), e.what());
     }
-
-    return pass;
 }
 
 Connection::Connection() : tpmKeyProvider_(
@@ -67,19 +72,20 @@ Connection::Connection() : tpmKeyProvider_(
         }
     }
 
-    if (tpmKeyProvider_->sealedExists()) tpmKeyProvider_->init();
-    else {
-        const auto initPass = getFirstInitDBPass();
-        if (!initPass) {
-            if (std::filesystem::exists("/run/vaulthalla/db_password")) {
-                std::filesystem::remove_all("/run/vaulthalla/db_password");
-                if (std::filesystem::exists("/run/vaulthalla/db_password"))
-                    throw std::runtime_error(
-                        "Failed to remove stale /run/vaulthalla/db_password file");
-            }
-            throw std::runtime_error("Database password failed to initialize. See logs for details.");
+    const auto initPass = getFirstInitDBPass();
+    if (tpmKeyProvider_->sealedExists()) {
+        tpmKeyProvider_->init();
+        if (initPass) {
+            const auto replacement = std::vector<uint8_t>(initPass->begin(), initPass->end());
+            tpmKeyProvider_->updateMasterKey(replacement);
+            clearPendingDBPassIfPresent();
+            log::Registry::runtime()->info("[seed] Reseeded TPM-stored DB password from pending handoff file");
         }
+    } else {
+        if (!initPass)
+            throw std::runtime_error("Database password failed to initialize. See logs for details.");
         tpmKeyProvider_->init(*initPass);
+        clearPendingDBPassIfPresent();
     }
 
     const auto& key = tpmKeyProvider_->getMasterKey();

@@ -29,6 +29,7 @@ class DebianRulesContractTests(unittest.TestCase):
             "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla.service.in > debian/tmp/lib/systemd/system/vaulthalla.service",
             "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-cli.service.in > debian/tmp/lib/systemd/system/vaulthalla-cli.service",
             "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-web.service.in > debian/tmp/lib/systemd/system/vaulthalla-web.service",
+            "sed 's|@BINDIR@|/usr/bin|g' deploy/systemd/vaulthalla-swtpm.service.in > debian/tmp/lib/systemd/system/vaulthalla-swtpm.service",
             "install -m 0644 deploy/systemd/vaulthalla-cli.socket debian/tmp/lib/systemd/system/vaulthalla-cli.socket",
             "install -m 0644 deploy/nginx/vaulthalla.conf debian/tmp/usr/share/vaulthalla/nginx/vaulthalla",
             "cp -a deploy/psql/. debian/tmp/usr/share/vaulthalla/psql/",
@@ -63,6 +64,10 @@ class DebianRulesContractTests(unittest.TestCase):
             install_manifest,
         )
         self.assertIn(
+            "lib/systemd/system/vaulthalla-swtpm.service",
+            install_manifest,
+        )
+        self.assertIn(
             "usr/share/vaulthalla/nginx/vaulthalla",
             install_manifest,
         )
@@ -82,6 +87,8 @@ class DebianRulesContractTests(unittest.TestCase):
         self.assertIn("nodejs,", control)
         self.assertIn("openssl,", control)
         self.assertIn("Recommends:\n postgresql,\n nginx", control)
+        self.assertIn("swtpm,", control)
+        self.assertIn("swtpm-tools", control)
         self.assertIn("Depends:\n adduser,\n nodejs,\n openssl,", control)
 
 

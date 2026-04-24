@@ -50,6 +50,8 @@ class DebianInstallFlowContractTests(unittest.TestCase):
         control = (self._repo_root() / "debian" / "control").read_text(encoding="utf-8")
         self.assertIn("Depends:\n adduser,\n nodejs,\n openssl,", control)
         self.assertIn("Recommends:\n postgresql,\n nginx", control)
+        self.assertIn("swtpm,", control)
+        self.assertIn("swtpm-tools", control)
         self.assertNotIn("Depends:\n adduser,\n nodejs,\n postgresql,", control)
 
     def test_readme_documents_phase3_cli_integration_followups(self) -> None:
@@ -67,6 +69,8 @@ class DebianInstallFlowContractTests(unittest.TestCase):
             "canonical final deployment path",
             "/usr/share/vaulthalla/psql",
             "/var/lib/vaulthalla/nginx_site_managed",
+            "TPM backend behavior",
+            "systemctl status vaulthalla-swtpm.service",
         )
         for fragment in required:
             self.assertIn(fragment, readme)

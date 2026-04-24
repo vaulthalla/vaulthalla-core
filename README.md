@@ -75,6 +75,14 @@ VH_SKIP_DB_BOOTSTRAP=1 sudo -E apt install vaulthalla
 VH_SKIP_NGINX_CONFIG=1 sudo -E apt install vaulthalla
 ```
 
+TPM backend behavior during install:
+
+- Hardware TPM hosts (`/dev/tpmrm0` or `/dev/tpm0`) use hardware TPM.
+- Hosts without hardware TPM use managed `swtpm` fallback (`vaulthalla-swtpm.service`).
+- If neither backend is available, install fails with actionable TPM setup logs.
+- Lean installs (`--no-install-recommends`) on TPM-less hosts should install
+  `swtpm` and `swtpm-tools` before retrying configure.
+
 Removal behavior:
 
 - `sudo apt remove vaulthalla` preserves local PostgreSQL role/database data.
@@ -127,6 +135,7 @@ sudo systemctl status vaulthalla.service
 sudo systemctl status vaulthalla-cli.service
 sudo systemctl status vaulthalla-cli.socket
 sudo systemctl status vaulthalla-web.service
+sudo systemctl status vaulthalla-swtpm.service
 sudo journalctl -fu vaulthalla.service
 ```
 
@@ -135,6 +144,7 @@ sudo journalctl -fu vaulthalla.service
 - Main config: `/etc/vaulthalla/config.yaml`
 - Runtime directory: `/run/vaulthalla`
 - State directory: `/var/lib/vaulthalla`
+- Software TPM state directory: `/var/lib/vaulthalla/swtpm` (when swtpm fallback is active)
 - Log directory: `/var/log/vaulthalla`
 - SQL deploy assets: `/usr/share/vaulthalla/psql`
 - Web runtime payload: `/usr/share/vaulthalla-web`

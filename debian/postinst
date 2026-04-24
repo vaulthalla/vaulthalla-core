@@ -21,14 +21,19 @@ CORE_SYSTEMD_UNIT="vaulthalla.service"
 CLI_SYSTEMD_UNIT="vaulthalla-cli.service"
 CLI_SOCKET_SYSTEMD_UNIT="vaulthalla-cli.socket"
 WEB_SYSTEMD_UNIT="vaulthalla-web.service"
+SWTPM_SYSTEMD_UNIT="vaulthalla-swtpm.service"
 PSQL_DEPLOY_DIR="/usr/share/vaulthalla/psql"
 NGINX_TEMPLATE="/usr/share/vaulthalla/nginx/vaulthalla"
 NGINX_SITE_AVAIL="/etc/nginx/sites-available/vaulthalla"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/vaulthalla"
 NGINX_MANAGED_MARKER="/var/lib/vaulthalla/nginx_site_managed"
+SWTPM_STATE_DIR="/var/lib/vaulthalla/swtpm"
+TPM_BACKEND_OVERRIDE_DIR="/etc/systemd/system/vaulthalla.service.d"
+TPM_BACKEND_OVERRIDE_FILE="${TPM_BACKEND_OVERRIDE_DIR}/tpm-backend.conf"
 
 DB_BOOTSTRAP_STATUS="skipped"
 NGINX_CONFIG_STATUS="skipped"
+TPM_BACKEND_STATUS="unknown"
 
 create_dir() {
     # create_dir path mode owner group
@@ -122,6 +127,91 @@ refresh_tpm_udev_rules() {
     fi
     udevadm control --reload-rules >/dev/null 2>&1 || true
     udevadm trigger --subsystem-match=tpm >/dev/null 2>&1 || true
+}
+
+has_hardware_tpm() {
+    [ -c /dev/tpmrm0 ] || [ -c /dev/tpm0 ]
+}
+
+swtpm_listening_locally() {
+    if ! has_command ss; then
+        return 0
+    fi
+    ss -H -ltn '( sport = :2321 )' 2>/dev/null | grep -q '127.0.0.1:2321'
+}
+
+clear_tpm_backend_override() {
+    rm -f "$TPM_BACKEND_OVERRIDE_FILE"
+}
+
+write_swtpm_tcti_override() {
+    install -d -m 0755 "$TPM_BACKEND_OVERRIDE_DIR"
+    cat > "$TPM_BACKEND_OVERRIDE_FILE" <<EOF
+[Service]
+Environment=TSS2_TCTI=swtpm:host=127.0.0.1,port=2321
+EOF
+    chmod 0644 "$TPM_BACKEND_OVERRIDE_FILE"
+}
+
+configure_tpm_backend_if_safe() {
+    if has_hardware_tpm; then
+        TPM_BACKEND_STATUS="hardware (device-backed TPM detected)"
+        echo "[${PKG}] TPM backend: hardware TPM detected (/dev/tpmrm0 or /dev/tpm0)."
+        clear_tpm_backend_override
+        safe_systemctl stop "$SWTPM_SYSTEMD_UNIT"
+        safe_systemctl disable "$SWTPM_SYSTEMD_UNIT"
+        return 0
+    fi
+
+    echo "[${PKG}] TPM backend: no hardware TPM detected; provisioning Vaulthalla swtpm backend."
+
+    if ! has_command swtpm; then
+        TPM_BACKEND_STATUS="error (no hardware TPM and swtpm not installed)"
+        echo "[${PKG}] ERROR: No hardware TPM device was detected and 'swtpm' is not installed." >&2
+        echo "[${PKG}] ERROR: Install swtpm backend packages and re-run configure:" >&2
+        echo "[${PKG}] ERROR:   sudo apt install swtpm swtpm-tools" >&2
+        return 1
+    fi
+
+    create_dir "$SWTPM_STATE_DIR" 700 "$DB_USER" "$DB_USER"
+    write_swtpm_tcti_override
+
+    if ! has_command systemctl; then
+        TPM_BACKEND_STATUS="swtpm configured (systemctl unavailable; runtime activation not verified)"
+        echo "[${PKG}] WARNING: systemctl unavailable; cannot verify ${SWTPM_SYSTEMD_UNIT} runtime state."
+        return 0
+    fi
+
+    if ! systemctl --system daemon-reload >/dev/null 2>&1; then
+        TPM_BACKEND_STATUS="error (failed daemon-reload for swtpm backend)"
+        echo "[${PKG}] ERROR: Failed to reload systemd while configuring swtpm backend." >&2
+        return 1
+    fi
+
+    if ! systemctl --system enable --now "$SWTPM_SYSTEMD_UNIT" >/dev/null 2>&1; then
+        TPM_BACKEND_STATUS="error (failed to start ${SWTPM_SYSTEMD_UNIT})"
+        echo "[${PKG}] ERROR: Failed to start ${SWTPM_SYSTEMD_UNIT}." >&2
+        echo "[${PKG}] ERROR: Check logs with: journalctl -u ${SWTPM_SYSTEMD_UNIT}" >&2
+        return 1
+    fi
+
+    if ! systemctl --system --quiet is-active "$SWTPM_SYSTEMD_UNIT" >/dev/null 2>&1; then
+        TPM_BACKEND_STATUS="error (${SWTPM_SYSTEMD_UNIT} is not active)"
+        echo "[${PKG}] ERROR: ${SWTPM_SYSTEMD_UNIT} is not active after startup." >&2
+        echo "[${PKG}] ERROR: Check logs with: journalctl -u ${SWTPM_SYSTEMD_UNIT}" >&2
+        return 1
+    fi
+
+    if ! swtpm_listening_locally; then
+        TPM_BACKEND_STATUS="error (swtpm listener not detected on 127.0.0.1:2321)"
+        echo "[${PKG}] ERROR: swtpm did not expose expected local TPM socket on 127.0.0.1:2321." >&2
+        echo "[${PKG}] ERROR: Check logs with: journalctl -u ${SWTPM_SYSTEMD_UNIT}" >&2
+        return 1
+    fi
+
+    TPM_BACKEND_STATUS="swtpm (managed fallback active)"
+    echo "[${PKG}] TPM backend: managed swtpm fallback active."
+    return 0
 }
 
 is_noninteractive_context() {
@@ -531,6 +621,7 @@ case "$1" in
     align_config_file_permissions /etc/vaulthalla/config.yaml
     align_config_file_permissions /etc/vaulthalla/config_template.yaml.in
     require_runtime_assets
+    configure_tpm_backend_if_safe
 
     # Remove any stale super-admin seed from older package revisions.
     rm -f "$LEGACY_PENDING_SUPERADMIN_UID_FILE"
@@ -543,6 +634,7 @@ case "$1" in
     safe_systemctl preset "$CLI_SOCKET_SYSTEMD_UNIT"
     safe_systemctl preset "$CLI_SYSTEMD_UNIT"
     safe_systemctl preset "$WEB_SYSTEMD_UNIT"
+    safe_systemctl preset "$SWTPM_SYSTEMD_UNIT"
     safe_systemctl enable --now "$CORE_SYSTEMD_UNIT"
     safe_systemctl enable --now "$CLI_SOCKET_SYSTEMD_UNIT"
     safe_systemctl enable --now "$CLI_SYSTEMD_UNIT"
@@ -552,6 +644,7 @@ case "$1" in
 
     echo "[${PKG}] Install summary:"
     echo "[${PKG}]   DB bootstrap: ${DB_BOOTSTRAP_STATUS}"
+    echo "[${PKG}]   TPM backend: ${TPM_BACKEND_STATUS}"
     echo "[${PKG}]   nginx config: ${NGINX_CONFIG_STATUS}"
     echo "[${PKG}]   Super-admin ownership: deferred to first CLI use ('vh' or 'vaulthalla')."
 

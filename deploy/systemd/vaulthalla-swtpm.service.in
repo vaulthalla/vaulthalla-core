@@ -1,0 +1,23 @@
+[Unit]
+Description=Vaulthalla managed software TPM
+ConditionPathExists=!/dev/tpmrm0
+ConditionPathExists=!/dev/tpm0
+After=network.target
+Before=vaulthalla.service
+
+[Service]
+Type=simple
+User=vaulthalla
+Group=vaulthalla
+ExecStart=/usr/bin/swtpm socket --tpm2 --tpmstate dir=/var/lib/vaulthalla/swtpm --server type=tcp,host=127.0.0.1,port=2321 --ctrl type=tcp,host=127.0.0.1,port=2322 --flags not-need-init
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vaulthalla/swtpm
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

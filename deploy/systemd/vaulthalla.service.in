@@ -1,7 +1,8 @@
 [Unit]
 Description=Vaulthalla Service - The Final Cloud
-After=network.target
+After=network.target postgresql.service vaulthalla-swtpm.service
 Requires=postgresql.service
+Wants=vaulthalla-swtpm.service
 
 [Service]
 User=vaulthalla

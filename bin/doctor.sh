@@ -36,6 +36,17 @@ check_path() {
   echo
 }
 
+has_hardware_tpm() {
+  [[ -c /dev/tpmrm0 || -c /dev/tpm0 ]]
+}
+
+swtpm_listening_locally() {
+  if ! command -v ss >/dev/null 2>&1; then
+    return 0
+  fi
+  ss -H -ltn '( sport = :2321 )' 2>/dev/null | grep -q '127.0.0.1:2321'
+}
+
 echo "---- 📦 Binaries ----"
 check_path "$BINDIR/vaulthalla-server"
 check_path "$BINDIR/vaulthalla-cli"
@@ -52,6 +63,25 @@ check_path "$RUNTIME_DIR"
 check_path "$STATE_DIR"
 check_path "$LOG_DIR"
 check_path "$MOUNT_DIR"
+
+echo "---- 🔐 TPM Backend ----"
+if has_hardware_tpm; then
+  echo "TPM backend: hardware"
+  [[ -c /dev/tpmrm0 ]] && echo "  detected: /dev/tpmrm0"
+  [[ -c /dev/tpm0 ]] && echo "  detected: /dev/tpm0"
+elif systemctl --quiet is-active vaulthalla-swtpm.service 2>/dev/null; then
+  echo "TPM backend: swtpm"
+  if swtpm_listening_locally; then
+    echo "  listener: 127.0.0.1:2321"
+  else
+    echo "  listener: not detected on 127.0.0.1:2321"
+  fi
+else
+  echo "TPM backend: unavailable"
+  echo "  no hardware TPM device found and vaulthalla-swtpm.service is not active"
+fi
+
+echo
 
 echo "---- 🗄️ Data ----"
 check_path "$DATA_DIR"

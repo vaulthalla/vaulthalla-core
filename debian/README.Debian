@@ -20,9 +20,30 @@ Package metadata policy
 - integration components are `Recommends`:
   - `postgresql`
   - `nginx`
+  - `swtpm`
+  - `swtpm-tools`
 
 This keeps `apt install vaulthalla` helpful by default while preserving lean
 installs via `--no-install-recommends`.
+
+On hosts without hardware TPM, `--no-install-recommends` installs should add
+`swtpm`/`swtpm-tools` manually before re-running configure.
+
+TPM backend behavior
+====================
+
+During postinst, Vaulthalla selects a TPM backend deterministically:
+
+- if `/dev/tpmrm0` or `/dev/tpm0` exists, hardware TPM is used
+- if no hardware TPM exists, postinst provisions/starts managed `swtpm`
+  (`vaulthalla-swtpm.service`) and configures `TSS2_TCTI` for
+  `vaulthalla.service`
+- if neither hardware TPM nor `swtpm` is available, configure fails with a
+  clear install-time error and remediation steps
+
+Managed `swtpm` state path:
+
+- `/var/lib/vaulthalla/swtpm` (owner `vaulthalla:vaulthalla`, mode `0700`)
 
 Automatic DB behavior
 =====================
@@ -140,6 +161,7 @@ Validation flows
    - `systemctl status vaulthalla.service`
    - `systemctl status vaulthalla-cli.socket`
    - `systemctl status vaulthalla-web.service`
+   - `systemctl status vaulthalla-swtpm.service` (expected active only when no hardware TPM is present)
 
 If testing local package files directly, replace package names above with:
 

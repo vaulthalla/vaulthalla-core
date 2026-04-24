@@ -22,6 +22,7 @@ RUNTIME_DIR="/run/$PROJECT_NAME"
 STATE_DIR="/var/lib/$PROJECT_NAME"
 LOG_DIR="/var/log/$PROJECT_NAME"
 MOUNT_DIR="/mnt/$PROJECT_NAME"
+SWTPM_STATE_DIR="$STATE_DIR/swtpm"
 
 install_dir() {
   local dir="$1"
@@ -44,6 +45,7 @@ echo "📁 Installing Vaulthalla runtime/data directories..."
 
 install_dir "$RUNTIME_DIR" 750
 install_dir "$STATE_DIR" 700
+install_dir "$SWTPM_STATE_DIR" 700
 install_dir "$LOG_DIR" 750
 install_dir "$MOUNT_DIR" 755
 

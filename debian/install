@@ -10,6 +10,7 @@ lib/systemd/system/vaulthalla.service
 lib/systemd/system/vaulthalla-cli.service
 lib/systemd/system/vaulthalla-cli.socket
 lib/systemd/system/vaulthalla-web.service
+lib/systemd/system/vaulthalla-swtpm.service
 usr/share/doc/vaulthalla/LICENSE
 usr/share/doc/vaulthalla/copyright
 usr/share/man/man1/vh.1

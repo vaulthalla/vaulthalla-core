@@ -48,6 +48,7 @@ REQUIRED_DEBIAN_PACKAGE_PATHS: tuple[str, ...] = (
     "lib/systemd/system/vaulthalla-cli.service",
     "lib/systemd/system/vaulthalla-cli.socket",
     "lib/systemd/system/vaulthalla-web.service",
+    "lib/systemd/system/vaulthalla-swtpm.service",
     "usr/share/doc/vaulthalla/copyright",
     "usr/share/vaulthalla/nginx/vaulthalla",
     "usr/share/vaulthalla/psql/000_schema.sql",

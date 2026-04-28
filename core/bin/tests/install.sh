@@ -53,7 +53,7 @@ MESON_ARGS=(
   "-Db_sanitize=address,undefined"
 )
 
-BUILD_DIR="$CORE_DIR/build"
+BUILD_DIR="$ROOT_DIR/build"
 
 if [[ "$CLEAN_BUILD" == true && -d "$BUILD_DIR" ]]; then
   echo "🧹 Cleaning previous build artifacts..."
@@ -62,11 +62,15 @@ fi
 
 mkdir -p "$BUILD_DIR"
 
-meson setup "$BUILD_DIR" "$CORE_DIR" "${MESON_ARGS[@]}" --reconfigure
+meson setup "$BUILD_DIR" "$ROOT_DIR" "${MESON_ARGS[@]}" --reconfigure
 meson compile -C "$BUILD_DIR"
 sudo meson install -C "$BUILD_DIR"
 sudo ldconfig
 
 if [[ "$RUN_TEST" == true ]]; then
-  sudo bash --rcfile "$ROOT_DIR/deploy/vaulthalla.env" -i -c "$BUILD_DIR/vh_integration_tests"
+  TEST_BIN="$BUILD_DIR/core/vh_integration_tests"
+  if [[ ! -x "$TEST_BIN" ]]; then
+    TEST_BIN="$BUILD_DIR/vh_integration_tests"
+  fi
+  sudo bash --rcfile "$ROOT_DIR/deploy/vaulthalla.env" -i -c "$TEST_BIN"
 fi

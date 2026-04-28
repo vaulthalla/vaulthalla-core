@@ -78,3 +78,9 @@ A better workflow is:
 5. Keep the PR narrow.
 
 The agent can help. It cannot be the maintainer.
+
+See also:
+
+- [Contributor Guide](./README.md)
+- [Contribution Boundaries](./contribution-boundaries.md)
+- [Validation Guide](./validation-guide.md)

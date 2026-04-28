@@ -50,6 +50,8 @@ If you believe you found a real vulnerability:
 
 This repository does not currently document a dedicated security mailbox in-tree. If no private contact route is published at the time you are reporting, open a minimal issue asking for a private channel without posting the vulnerability details themselves.
 
+Before broader external contribution, Vaulthalla should publish a dedicated `SECURITY.md` or enable a private vulnerability reporting route. Until then, do not post exploit details publicly; ask for a private channel first.
+
 ## Public Hardening Work
 
 The following can still be reasonable public contributions when handled carefully:

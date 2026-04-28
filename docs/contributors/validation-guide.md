@@ -31,6 +31,8 @@ For docs-only PRs, do this at minimum:
 
 If the change is truly docs-only, code tests are usually not required.
 
+A lightweight docs validation check for relative links and referenced paths would be useful future work, but it is not required for docs-only PRs today.
+
 ## Web And Frontend Changes
 
 Run:

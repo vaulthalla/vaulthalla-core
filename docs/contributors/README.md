@@ -10,8 +10,7 @@ Small, scoped PRs are much easier to review and merge than giant mystery rewrite
 
 1. Read [Contribution Boundaries](./contribution-boundaries.md) before choosing work.
 2. Skim the [Architecture Map](./architecture-map.md) so you know which subsystem you are touching.
-3. Use the GitHub Projects roadmap as the default task source for early contributions:
-   https://github.com/orgs/vaulthalla/projects/4
+3. Use the GitHub Projects roadmap linked from the repository or organization page as the default task source for early contributions.
 4. Follow [Development Setup](./development-setup.md) for your environment.
 5. Run the checks in the [Validation Guide](./validation-guide.md) before you open a PR.
 
@@ -35,8 +34,8 @@ That does not mean contributors should stay away. It means contributors should c
 
 For early contributors, the roadmap is the canonical source of tasks:
 
-- GitHub Projects roadmap: https://github.com/orgs/vaulthalla/projects/4
-- Issues: https://github.com/vaulthalla/vaulthalla/issues
+- GitHub Projects roadmap linked from the repository or organization page
+- the repository issue tracker for scoped follow-up or proposed new work
 
 If you want to work on something that is not already represented there, open an issue first before you start implementing it.
 

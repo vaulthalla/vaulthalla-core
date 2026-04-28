@@ -36,7 +36,7 @@ bash .codex/scripts/index.sh
 
 ### Streamlined local install via `Makefile`
 
-If you want the repo's higher-level entrypoints instead of driving the scripts manually, the top-level [Makefile](/Makefile) is the streamlined route.
+If you want the repo's higher-level entrypoints instead of driving the scripts manually, the top-level [`Makefile`](../../Makefile) is the streamlined route.
 
 Common targets:
 

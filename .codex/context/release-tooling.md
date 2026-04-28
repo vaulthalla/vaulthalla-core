@@ -1,108 +1,82 @@
-# Release Tooling Contract (`tools/release/`)
+# Release Tooling Contract
 
-## Mode
-
-- Release/changelog/build/publication pipeline is in maintenance mode.
-- Core implementation is established; current work is hardening and live-runtime validation.
+Persistent reference for `tools/release` + release CI behavior that future agents must preserve.
 
 ## Canonical Entrypoints
 
-- CLI: `python3 -m tools.release`
+- CLI module: `python3 -m tools.release`
 - CI packaging action: `.github/actions/package/action.yml`
-- CI orchestration workflow: `.github/workflows/release.yml`
+- End-to-end release workflow: `.github/workflows/release.yml`
 
-`package/action.yml` is the single packaging path; `release.yml` wraps upload/publication/release-asset policy.
+## Release Pipeline Shape
 
-## Release Spine (Current)
+1. Build deterministic changelog evidence from git context.
+2. Resolve changelog source by policy (`RELEASE_AI_MODE`).
+3. Write selected changelog + selection metadata artifacts.
+4. Refresh Debian changelog top entry when source is generated (not manual fallback).
+5. Build Debian/web artifacts and validate release artifact contract.
+6. Optionally publish Debian artifacts based on publication policy.
 
-1. `tools.release check` validates version/release state.
-2. Core + web build/test stages run.
-3. Changelog resolution runs and writes release artifacts.
-4. `build-deb` builds/stages Debian + web artifacts.
-5. `validate-release-artifacts` enforces artifact completeness.
-6. Workflow uploads staged artifacts.
-7. Publication policy resolves from `RELEASE_PUBLISH_REQUIRED=auto|true|false`.
-8. `publish-deb` performs Nexus publication (or explicit disabled skip).
-9. Tag runs attach deduped staged assets to GitHub Release.
+## Changelog Source Resolution (Stable)
 
-## Changelog Resolution Contract
+`resolve_release_changelog` candidate order is mode-specific:
 
-Provider order is deterministic:
+- `auto`: `openai` -> `local` -> `cached-draft` -> `manual`
+- `openai-only`: `openai` -> `cached-draft` -> `manual`
+- `local-only`: `local` -> `cached-draft` -> `manual`
+- `disabled`: `cached-draft` -> `manual`
 
-1. hosted OpenAI
-2. local OpenAI-compatible endpoint (`RELEASE_LOCAL_LLM_ENABLED=true`)
-3. cached local draft (`.changelog_scratch/changelog.draft.md`)
-4. manual/no-AI path with stale check against `VERSION`
+`manual` fallback is stale-checked against `VERSION` and must fail if stale.
 
-Primary controls:
+## AI + Semantic/Triage Contracts
 
-- `RELEASE_AI_MODE=auto|openai-only|local-only|disabled`
-- `OPENAI_API_KEY`
-- `RELEASE_AI_PROFILE_OPENAI`
-- `RELEASE_LOCAL_LLM_ENABLED`
-- `RELEASE_LOCAL_LLM_PROFILE`
-- `RELEASE_LOCAL_LLM_BASE_URL` (explicit override when set)
-- `RELEASE_LOCAL_LLM_API_KEY` (optional)
+- Forensic payload schema version: `vaulthalla.release.ai_payload.v1`.
+- Semantic payload schema version: `vaulthalla.release.semantic_payload.v1`.
+- Triage schema version: `vaulthalla.release.ai_triage.v2`.
+- `changelog ai-release` is a two-step path:
+  - generate cached draft via `ai-draft`
+  - finalize via `changelog release` with `RELEASE_AI_MODE=disabled` and cached draft source
+- Triage path is semantic-first (`raw_semantic` by default) with emergency synthesis fallback before draft/polish stages.
 
-Debian changelog behavior:
+## Artifact + Metadata Contract
 
-- `changelog release` writes evidence artifacts and selected release markdown.
-- `changelog ai-draft` writes cached AI draft under `.changelog_scratch/`.
-- `changelog ai-release` regenerates cached draft and rewrites Debian top entry from that draft (no manual copy path).
-- Generated (`openai`/`local`) paths rewrite a full Debian top entry (header, bullets, maintainer signature, timestamp).
-- Manual/no-AI fallback is stale-checked and does not blindly rewrite.
+Package action expects/produces:
 
-Scratch policy:
+- `changelog.release.md`
+- `changelog.raw.md`
+- `changelog.payload.json`
+- `changelog.semantic_payload.json`
+- `release_notes.md`
+- `changelog.selection.json`
 
-- `.changelog_scratch/` is volatile local generation state, not canonical release truth.
-- Scratch is expected to clear on upstream version sync/bump transitions.
+Selection metadata schema marker:
 
-## Classifier/Triage Architecture Contract
+- `vaulthalla.release.changelog_selection.v1`
 
-### Deterministic stages must remain deterministic
+If selected path is `manual`, Debian top-entry refresh is intentionally skipped.
 
-- Git evidence collection, category assignment, evidence selection, ordering, caps/truncation, and forensic artifacts.
-- Deterministic layers should select evidence, not narrate release meaning.
+## Publication Policy
 
-### Model stages own semantic interpretation
+- `RELEASE_PUBLISH_REQUIRED=auto` resolves to:
+  - `true` for tag refs (`refs/tags/*`)
+  - `false` otherwise
+- `publish-deb` with `--require-enabled` must fail when publication mode is disabled.
+- Supported publication modes: `disabled`, `nexus`.
 
-- Triage/draft/polish should interpret selected evidence and produce grounded claims.
-- Avoid schema pressure that forces path-heavy or caution-heavy boilerplate when evidence is thin.
+## Test Guardrails
 
-### Stable design guardrails
+High-signal tests future changes should keep green:
 
-- Keep a forensic/debug artifact separate from model-facing semantic payload shape.
-- Prevent semantic loss points where possible:
-  - payload over-truncation
-  - reducing snippet evidence to paths only
-  - forcing metadata-centric triage slots
-- Keep Debian changelog projection focused on meaningful change claims, not classifier internals.
+- `tools/release/tests/changelog/test_release_workflow.py`
+- `tools/release/tests/changelog/test_ai_semantic_downstream_regression.py`
+- `tools/release/tests/changelog/test_ai_provider_resolution.py`
+- `tools/release/tests/changelog/test_ai_openai_client.py`
+- `tools/release/tests/changelog/test_ai_openai_compatible_client.py`
+- `tools/release/tests/packaging/test_debian_install_flow_contract.py`
+- `tools/release/tests/packaging/test_release_artifact_validation.py`
 
-### Known quality hazards to watch
+## Safety/Determinism Expectations
 
-- Path-heavy summaries (`important files` style output).
-- Generic caution spam without real operator risk.
-- Diff snippet reduction that strips claim-bearing context.
-- Leakage of classifier bookkeeping into final changelog bullets.
-
-## Artifact + Publication Contract
-
-- `build-deb` produces staged Debian and web deliverables.
-- `validate-release-artifacts` checks staged output completeness, not just build success.
-- `publish-deb` uses:
-  - `RELEASE_PUBLISH_MODE=disabled|nexus`
-  - `NEXUS_REPO_URL`
-  - `NEXUS_USER`
-  - `NEXUS_PASS`
-
-Policy expectations:
-
-- Under `auto`, tag refs require publication by default.
-- Non-tag refs are optional publication by default.
-- Required publication fails on disabled/misconfigured publication or upload failure.
-
-## Deferred Work (Tracked)
-
-- Live install/upgrade validation via published APT/Nexus path.
-- Clean-host runtime verification of install/service/nginx behavior.
-- Promotion/orchestration beyond current Nexus publication boundary.
+- Unit tests must not require live OpenAI/local providers; provider calls are mocked/faked.
+- Release tooling must keep explicit stale-check failures for manual/cached draft inputs.
+- Changelog generation should remain deterministic-first: evidence artifacts are always written before source selection.

@@ -34,6 +34,29 @@ bash .codex/scripts/index.sh
 
 ## Toolchains
 
+### Streamlined local install via `Makefile`
+
+If you want the repo's higher-level entrypoints instead of driving the scripts manually, the top-level [Makefile](/Makefile) is the streamlined route.
+
+Common targets:
+
+```bash
+make install
+make dev
+make test
+make run_test
+make clean_test
+make clean
+```
+
+What they do at a high level:
+
+- `make install` runs the normal install guard, then `./bin/install.sh`
+- `make dev` runs `./bin/uninstall.sh`, then the install guard, then `./bin/install.sh`
+- `make test` and `make run_test` rebuild the integration-test environment through `bin/tests/*`
+
+Use these deliberately. They are host-mutating install workflows, not lightweight build aliases.
+
 ### Web/admin work
 
 The web client uses:
@@ -76,6 +99,48 @@ That script adds the Vaulthalla APT repository if needed and installs native dep
 
 Run it deliberately. It changes the host.
 
+## Preferred Dev Workflow
+
+The fastest rebuild-and-reinstall loop in this repo is the destructive dev workflow behind `make dev`.
+
+It is fast because it starts from a fresh local install every time.
+
+It is dangerous because `make dev` begins by running `./bin/uninstall.sh`, which can wipe Vaulthalla directories and local database state with no interactive warning path once dev mode is active.
+
+### Dev mode guardrails
+
+The repo requires two guardrails before the destructive dev workflow is considered valid:
+
+1. set `VH_BUILD_MODE=dev`
+2. create a repo-root sentinel file named `enable_dev_mode` whose contents are exactly `true`
+
+Example:
+
+```bash
+export VH_BUILD_MODE=dev
+printf 'true\n' > enable_dev_mode
+make dev
+```
+
+This behavior is enforced by `bin/lib/dev_mode.sh`. If `VH_BUILD_MODE=dev` is set without the sentinel, the scripts fail. If the sentinel exists but `VH_BUILD_MODE` is not `dev`, the scripts warn about the mismatch.
+
+If you use this workflow, do it on a machine or VM where destroying the local Vaulthalla install is acceptable.
+
+### Custom install path
+
+If you want the same install plumbing without using the `Makefile`, the equivalent lower-level path is:
+
+```bash
+./bin/install.sh
+```
+
+For destructive dev-mode reinstall behavior, the `Makefile` target is just wrapping:
+
+```bash
+./bin/uninstall.sh
+./bin/install.sh
+```
+
 ## Core Build Path
 
 The current CI-style core build path is Meson-based:
@@ -109,6 +174,25 @@ What that setup path does:
 
 This path depends on `sudo`, Linux, FUSE, PostgreSQL, and other host-level pieces. Use it when your change affects runtime behavior rather than simple docs or web copy.
 
+### Test database requirements
+
+For the integration test path and some DB-backed unit tests, you need the test database variables to resolve to the expected test database:
+
+```bash
+VH_TEST_DB_USER=vaulthalla_test
+VH_TEST_DB_HOST=127.0.0.1
+VH_TEST_DB_PORT=5432
+VH_TEST_DB_NAME=vh_cli_test
+```
+
+Current script behavior matters here:
+
+- the database name is hard-coded in the test setup scripts as `vh_cli_test`
+- the role is hard-coded as `vaulthalla_test`
+- `bin/tests/install_db.sh` generates `VH_TEST_DB_PASS` automatically during test-environment setup
+
+You should not assume the password is static. The current scripts generate it as part of the test setup flow.
+
 ## Local Config And Environment Notes
 
 - Default runtime config ships from `deploy/config/config.yaml`.
@@ -117,6 +201,39 @@ This path depends on `sudo`, Linux, FUSE, PostgreSQL, and other host-level piece
 - Some local scripts look for `deploy/vaulthalla.env`.
 
 The repo only ships `deploy/vaulthalla.env.example` as a public template. If you need real storage-backed test credentials or environment values, create your own local `deploy/vaulthalla.env` from that template and keep secrets out of commits.
+
+### R2/S3 test environment
+
+If you want the dev workflow to carry R2 test credentials into the installed environment:
+
+1. copy `deploy/vaulthalla.env.example` to `deploy/vaulthalla.env`
+2. uncomment and fill in the `VAULTHALLA_TEST_R2_*` variables
+
+The example variables are:
+
+```text
+# VAULTHALLA_TEST_R2_ACCESS_KEY=<your_access_key>
+# VAULTHALLA_TEST_R2_SECRET_ACCESS_KEY=<your_secret_key>
+# VAULTHALLA_TEST_R2_ENDPOINT=https://<your_unique_id>.r2.cloudflarestorage.com
+# VAULTHALLA_TEST_R2_REGION=auto
+# VAULTHALLA_TEST_R2_BUCKET=<your_bucket_name>
+```
+
+When `deploy/vaulthalla.env` exists, `bin/setup/install_dirs.sh` installs it as `/etc/vaulthalla/vaulthalla.env`.
+
+### Optional dev R2 test vault seeding
+
+`deploy/config/config.yaml` includes:
+
+```yaml
+dev:
+  enabled: false
+  init_r2_test_vault: false
+```
+
+If dev mode is enabled in config and `init_r2_test_vault` is set to `true`, the storage manager can seed an `R2 Test Vault` automatically during startup when the required `VAULTHALLA_TEST_R2_*` environment variables are present.
+
+Keep this workflow-specific and local. Do not commit real credentials.
 
 ## Known Practical Snags
 
@@ -136,6 +253,10 @@ The CI web build syncs private icons from `~/vaulthalla-web-icons` before `pnpm 
 ### Integration test scripts expecting `deploy/vaulthalla.env`
 
 Some scripts reference `deploy/vaulthalla.env`, while the repo only includes `deploy/vaulthalla.env.example`. If your test path needs environment values, create the local file explicitly.
+
+### `make dev` is not a safe default
+
+It is a rebuild convenience for contributors who intentionally want a fresh local install every time. It is not a normal "development server" command and it is not safe on a machine whose Vaulthalla state you care about keeping.
 
 ### Cross-platform false confidence
 

@@ -19,10 +19,10 @@
 #include "config/Registry.hpp"
 
 namespace {
-namespace beast     = boost::beast;
-namespace http      = beast::http;
-namespace websocket = beast::websocket;
-namespace asio      = boost::asio;
+namespace beast      = boost::beast;
+namespace beast_http = boost::beast::http;
+namespace websocket  = beast::websocket;
+namespace asio       = boost::asio;
 } // namespace
 
 using namespace vh::identities;
@@ -50,7 +50,7 @@ std::string Session::getIPAddress() const {
 }
 
 std::string Session::getUserAgent() const {
-    if (const auto it = handshakeRequest_.find(http::field::user_agent);
+    if (const auto it = handshakeRequest_.find(beast_http::field::user_agent);
         it != handshakeRequest_.end()) return std::string(it->value());
     return  "unknown";
 }
@@ -77,7 +77,7 @@ void Session::accept(tcp::socket&& socket) {
     auto req = std::make_shared<RequestType>();
     auto self = shared_from_this();
 
-    http::async_read(
+    beast_http::async_read(
         ws_->next_layer(),
         tmpBuffer_,
         *req,
@@ -134,7 +134,7 @@ void Session::installHandshakeDecorator() const {
     ws_->set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
     ws_->set_option(websocket::stream_base::decorator(
         [t](websocket::response_type& res) {
-            res.set(http::field::server, "Vaulthalla");
+            res.set(beast_http::field::server, "Vaulthalla");
 
             const bool isDev = config::Registry::get().dev.enabled;
             const std::string sameSite = isDev ? "Lax" : "Lax"; // keep Lax unless *need* Strict
@@ -148,7 +148,7 @@ void Session::installHandshakeDecorator() const {
             cookie += "; Secure";
 
             // IMPORTANT: use insert to avoid clobbering other Set-Cookie headers
-            res.insert(http::field::set_cookie, cookie);
+            res.insert(beast_http::field::set_cookie, cookie);
         }
     ));
 }

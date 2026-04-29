@@ -47,30 +47,29 @@ std::vector<uint8_t> load_or_create_pepper() {
     if (testing_pepper) return *testing_pepper;
     if (cached_pepper) return *cached_pepper;
 
-    if (vh::db::Transactions::dbPool_) {
-        try {
-            if (vh::db::query::crypto::Secret::secretExists(std::string(kPepperKey))) {
-                if (const auto secret = vh::db::query::crypto::Secret::getSecret(std::string(kPepperKey));
-                    secret && secret->value.size() >= crypto_generichash_KEYBYTES_MIN) {
-                    cached_pepper = secret->value;
-                    return *cached_pepper;
-                }
+    if (!vh::db::Transactions::dbPool_) throw std::runtime_error("Share token pepper unavailable");
+
+    try {
+        if (vh::db::query::crypto::Secret::secretExists(std::string(kPepperKey))) {
+            const auto secret = vh::db::query::crypto::Secret::getSecret(std::string(kPepperKey));
+            if (!secret || secret->value.size() < crypto_generichash_KEYBYTES_MIN) {
+                throw std::runtime_error("Share token pepper unavailable");
             }
 
-            auto secret = std::make_shared<vh::crypto::model::Secret>();
-            secret->key = std::string(kPepperKey);
-            secret->value = random_bytes(crypto_generichash_KEYBYTES);
-            secret->iv = random_bytes(12);
-            vh::db::query::crypto::Secret::upsertSecret(secret);
             cached_pepper = secret->value;
             return *cached_pepper;
-        } catch (...) {
-            // Unit tests and early startup can exercise token helpers before DB secrets are available.
         }
-    }
 
-    cached_pepper = random_bytes(crypto_generichash_KEYBYTES);
-    return *cached_pepper;
+        auto secret = std::make_shared<vh::crypto::model::Secret>();
+        secret->key = std::string(kPepperKey);
+        secret->value = random_bytes(crypto_generichash_KEYBYTES);
+        secret->iv = random_bytes(12);
+        vh::db::query::crypto::Secret::upsertSecret(secret);
+        cached_pepper = secret->value;
+        return *cached_pepper;
+    } catch (...) {
+        throw std::runtime_error("Share token pepper unavailable");
+    }
 }
 
 std::string prefix_for(const TokenKind kind) {

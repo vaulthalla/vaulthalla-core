@@ -6,6 +6,7 @@
 #include "fs/model/Directory.hpp"
 #include "fs/model/Entry.hpp"
 #include "fs/model/File.hpp"
+#include "rbac/fs/policy/Share.hpp"
 #include "share/Scope.hpp"
 
 #include <filesystem>
@@ -169,7 +170,7 @@ ResolvedTarget TargetResolver::resolve(const Principal& principal, TargetResolve
     if (request.operation == Operation::List && targetType != TargetType::Directory)
         throw std::runtime_error("Share filesystem list target is not a directory");
 
-    return {
+    ResolvedTarget resolved{
         .vault_id = vaultId,
         .root_entry_id = principal.root_entry_id,
         .root_path = Scope::normalizeVaultPath(principal.root_path),
@@ -181,6 +182,13 @@ ResolvedTarget TargetResolver::resolve(const Principal& principal, TargetResolve
         .root_entry = std::move(rootEntry),
         .entry = std::move(entry)
     };
+
+    const auto rbacDecision = rbac::fs::policy::Share::evaluate(principal, resolved);
+    if (!rbacDecision.allowed)
+        throw std::runtime_error(
+            "Share filesystem RBAC denied: " + rbac::fs::policy::reasonToString(rbacDecision.reason));
+
+    return resolved;
 }
 
 std::vector<std::shared_ptr<fs::model::Entry>> TargetResolver::listChildren(

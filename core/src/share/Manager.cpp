@@ -6,6 +6,7 @@
 #include "db/query/share/Session.hpp"
 #include "db/query/share/Upload.hpp"
 #include "identities/User.hpp"
+#include "rbac/fs/policy/Share.hpp"
 #include "rbac/permission/vault/Filesystem.hpp"
 #include "rbac/resolver/vault/all.hpp"
 #include "share/AuditEvent.hpp"
@@ -848,7 +849,26 @@ ScopeDecision Manager::authorize(
             .target_type = targetType
         });
         audit->target_path = decision.normalized_path;
-        if (!decision.allowed) setDenied(*audit, "share_scope_denied", decision.reason);
+        if (!decision.allowed) {
+            setDenied(*audit, "share_scope_denied", decision.reason);
+            store_->appendAuditEvent(audit);
+            return decision;
+        }
+
+        const auto rbacDecision = rbac::fs::policy::Share::evaluate(principal, {
+            .vault_id = vaultId.value_or(principal.vault_id),
+            .vault_path = decision.normalized_path,
+            .operation = operation,
+            .target_type = targetType.value_or(operation == Operation::List || operation == Operation::Mkdir
+                                                   ? TargetType::Directory
+                                                   : principal.grant.target_type),
+            .target_exists = operation != Operation::Upload && operation != Operation::Mkdir
+        });
+        if (!rbacDecision.allowed) {
+            decision.allowed = false;
+            decision.reason = "rbac_policy_denied:" + rbac::fs::policy::reasonToString(rbacDecision.reason);
+            setDenied(*audit, "share_rbac_denied", decision.reason);
+        }
         store_->appendAuditEvent(audit);
         return decision;
     } catch (...) {

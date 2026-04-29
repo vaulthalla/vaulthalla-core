@@ -1,5 +1,6 @@
 #include "identities/User.hpp"
 #include "rbac/Actor.hpp"
+#include "rbac/fs/policy/Share.hpp"
 #include "share/Link.hpp"
 #include "share/PrincipalResolver.hpp"
 #include "share/Scope.hpp"
@@ -11,6 +12,7 @@
 #include <ctime>
 #include <memory>
 #include <stdexcept>
+#include <typeindex>
 
 using namespace vh::share;
 
@@ -361,4 +363,159 @@ TEST(SharePrincipalRbacTest, ShareGrantHasNoDeleteRenameMoveOrCopyOperation) {
     EXPECT_THROW({ (void)operation_from_string("rename"); }, std::invalid_argument);
     EXPECT_THROW({ (void)operation_from_string("move"); }, std::invalid_argument);
     EXPECT_THROW({ (void)operation_from_string("copy"); }, std::invalid_argument);
+}
+
+TEST(SharePrincipalRbacTest, EffectiveShareVaultRoleIsInMemoryAndImplicitDenyBased) {
+    const auto principal = makePrincipal();
+
+    const auto role = vh::rbac::fs::policy::Share::effectiveVaultRole(*principal, Operation::Download);
+
+    ASSERT_TRUE(role.assignment.has_value());
+    EXPECT_EQ(role.assignment->subject_type, "share");
+    EXPECT_EQ(role.assignment->vault_id, principal->vault_id);
+    EXPECT_EQ(role.assignment->subject_id, principal->root_entry_id);
+    EXPECT_FALSE(role.fs.files.canDownload());
+    EXPECT_FALSE(role.fs.directories.canDownload());
+    EXPECT_FALSE(role.fs.overrides.empty());
+    for (const auto& override : role.fs.overrides) {
+        EXPECT_NE(override.permission.enumType, std::type_index(typeid(void)));
+        EXPECT_NE(override.permission.rawValue, 0u);
+        EXPECT_FALSE(override.permission.qualified_name.empty());
+        EXPECT_FALSE(override.permission.description.empty());
+    }
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyAllowsScopedGrantedOperation) {
+    const auto principal = makePrincipal();
+    const auto actor = vh::rbac::Actor::share(principal);
+
+    auto decision = vh::rbac::fs::policy::Share::evaluate(actor, {
+        .vault_id = 42,
+        .vault_path = "/reports/2026/summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_TRUE(decision.allowed);
+
+    decision = vh::rbac::fs::policy::Share::evaluate(actor, {
+        .vault_id = 42,
+        .vault_path = "/reports",
+        .operation = Operation::List,
+        .target_type = TargetType::Directory,
+        .target_exists = true
+    });
+    EXPECT_TRUE(decision.allowed);
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyDeniesOutsideRootAndPrefixTricks) {
+    const auto principal = makePrincipal();
+
+    auto decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/secret/summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+
+    auto sharedRoot = *principal;
+    sharedRoot.root_path = "/shared";
+    sharedRoot.grant.root_path = "/shared";
+
+    decision = vh::rbac::fs::policy::Share::evaluate(sharedRoot, {
+        .vault_id = 42,
+        .vault_path = "/shared_evil/summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyDoesNotLetMetadataGrantPreview) {
+    auto principal = makePrincipal();
+    principal->grant.allowed_ops = bit(Operation::Metadata);
+
+    auto decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/summary.pdf",
+        .operation = Operation::Metadata,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_TRUE(decision.allowed);
+
+    decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/summary.pdf",
+        .operation = Operation::Preview,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyKeepsUploadIndependentFromReadOperations) {
+    auto principal = makePrincipal();
+    principal->grant.allowed_ops = bit(Operation::Upload);
+
+    auto decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/incoming/new.pdf",
+        .operation = Operation::Upload,
+        .target_type = TargetType::File,
+        .target_exists = false
+    });
+    EXPECT_TRUE(decision.allowed);
+
+    decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/incoming",
+        .operation = Operation::List,
+        .target_type = TargetType::Directory,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+
+    decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/incoming/new.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyKeepsOverwriteDeferred) {
+    auto principal = makePrincipal();
+    principal->grant.allowed_ops |= bit(Operation::Overwrite);
+
+    const auto decision = vh::rbac::fs::policy::Share::evaluate(*principal, {
+        .vault_id = 42,
+        .vault_path = "/reports/summary.pdf",
+        .operation = Operation::Overwrite,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+    EXPECT_FALSE(decision.allowed);
+}
+
+TEST(SharePrincipalRbacTest, RbacSharePolicyRejectsHumanActors) {
+    auto user = std::make_shared<vh::identities::User>();
+    user->id = 123;
+    user->name = "human";
+
+    const auto actor = vh::rbac::Actor::human(user);
+    const auto decision = vh::rbac::fs::policy::Share::evaluate(actor, {
+        .vault_id = 42,
+        .vault_path = "/reports/summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File,
+        .target_exists = true
+    });
+
+    EXPECT_FALSE(decision.allowed);
 }

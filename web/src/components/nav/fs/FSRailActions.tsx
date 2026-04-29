@@ -6,6 +6,7 @@ import ShareIcon from '@/fa-duotone-regular/share-nodes.svg'
 import { ShareManagementModal } from '@/components/share/ShareManagementModal'
 import type { FilesystemRow } from '@/components/fs/types'
 import { useFSStore } from '@/stores/fsStore'
+import { Directory } from '@/models/directory'
 
 const joinPath = (base: string, name: string) => {
   const cleanName = name.trim().replace(/^\/+|\/+$/g, '')
@@ -13,8 +14,21 @@ const joinPath = (base: string, name: string) => {
   return `${prefix}/${cleanName}`
 }
 
+const normalizePath = (value: string) => {
+  if (!value) return '/'
+  const withSlash = value.startsWith('/') ? value : `/${value}`
+  const normalized = withSlash.replace(/\/+/g, '/')
+  return normalized.length > 1 ? normalized.replace(/\/+$/g, '') : '/'
+}
+
+const parentPath = (value: string) => {
+  const parts = normalizePath(value).split('/').filter(Boolean)
+  parts.pop()
+  return parts.length ? `/${parts.join('/')}` : '/'
+}
+
 export const FSRailActions = () => {
-  const { currVault, currentDirectory, fetchFiles, mkdir, mode, path } = useFSStore()
+  const { currVault, currentDirectory, fetchFiles, listDirectory, mkdir, mode, path } = useFSStore()
   const [shareOpen, setShareOpen] = useState(false)
   const [shareTarget, setShareTarget] = useState<FilesystemRow | null>(null)
   const isAuthenticatedFs = mode === 'authenticated'
@@ -26,6 +40,14 @@ export const FSRailActions = () => {
     if (!directory) {
       await fetchFiles().catch(() => undefined)
       directory = useFSStore.getState().currentDirectory
+    }
+    if (!directory?.id && normalizePath(path) !== '/') {
+      const normalizedPath = normalizePath(path)
+      const parentEntries = await listDirectory({ vault_id: currVault.id, path: parentPath(normalizedPath) }).catch(() => [])
+      const hydrated = parentEntries.find(
+        (entry): entry is Directory => entry instanceof Directory && normalizePath(entry.path || '') === normalizedPath,
+      ) as Directory | undefined
+      if (hydrated) directory = hydrated
     }
     if (!directory?.id) {
       window.alert('Current directory is still loading. Try again in a moment.')

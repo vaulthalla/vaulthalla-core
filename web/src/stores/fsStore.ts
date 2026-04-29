@@ -10,6 +10,7 @@ import { Directory } from '@/models/directory'
 import { useShareWebSocketStore } from '@/stores/useShareWebSocket'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
 import { ShareEntry, SharePreviewResponse } from '@/models/linkShare'
+import { hasShareOperation } from '@/util/shareOperations'
 
 type FsMode = 'authenticated' | 'share'
 type FsEntry = DBFile | Directory
@@ -118,6 +119,63 @@ const wireEntryToFsEntry = (entry: FsEntry): FsEntry => {
   if ('file_count' in entry || 'subdirectory_count' in entry || (entry as { type?: string }).type === 'directory')
     return new Directory(entry)
   return new DBFile(entry)
+}
+
+const normalizeAuthPath = (value?: string) => {
+  if (!value) return '/'
+  const withSlash = value.startsWith('/') ? value : `/${value}`
+  const trimmed = withSlash.replace(/\/+/g, '/')
+  return trimmed.length > 1 ? trimmed.replace(/\/+$/g, '') : '/'
+}
+
+const inferListedDirectory = (
+  path: string,
+  currVault: Vault | LocalDiskVault | S3Vault,
+  files: FsEntry[],
+): Directory | null => {
+  const inferredId = files.find(entry => entry.parent_id !== undefined)?.parent_id
+  if (!inferredId) return null
+
+  const normalizedPath = normalizeAuthPath(path)
+  const name = normalizedPath === '/' ? currVault.name : normalizedPath.split('/').filter(Boolean).at(-1) || currVault.name
+  const now = Math.floor(Date.now() / 1000)
+
+  return new Directory({
+    id: inferredId,
+    vault_id: currVault.id,
+    name,
+    path: normalizedPath,
+    created_by: currVault.owner_id,
+    created_at: now,
+    updated_at: now,
+    size_bytes: 0,
+    file_count: files.filter(entry => entry instanceof DBFile).length,
+    subdirectory_count: files.filter(entry => entry instanceof Directory).length,
+  })
+}
+
+const hydrateShareThumbnails = async (entries: FsEntry[]): Promise<FsEntry[]> => {
+  const share = useVaultShareStore.getState().share
+  if (!hasShareOperation(share?.allowed_ops, 'preview')) return entries
+
+  const ws = useShareWebSocketStore.getState()
+  let hydrated = 0
+  for (const entry of entries) {
+    if (!(entry instanceof DBFile)) continue
+    if (!entry.mime_type?.startsWith('image/')) continue
+    if (!entry.path) continue
+    if (hydrated >= 16) break
+
+    try {
+      const preview = await ws.sendCommand('share.preview.get', { path: normalizeSharePath(entry.path), size: 64 })
+      ;(entry as DBFile & { previewUrl?: string }).previewUrl = `data:${preview.mime_type};base64,${preview.data_base64}`
+      hydrated += 1
+    } catch {
+      // Thumbnail hydration is best-effort; row click still attempts a full share-authorized preview.
+    }
+  }
+
+  return entries
 }
 
 const shareUploadTarget = (targetPath: string | undefined, currentPath: string, filename: string) => {
@@ -285,7 +343,8 @@ export const useFSStore = create<FsStore>()(
           requireReadyShareSession()
           await ws.waitForConnection()
           const response = await ws.sendCommand('share.fs.list', { path: normalizeSharePath(path) })
-          set({ path: normalizeSharePath(response.path), currentDirectory: null, files: response.entries.map(shareEntryToFsEntry) })
+          const entries = await hydrateShareThumbnails(response.entries.map(shareEntryToFsEntry))
+          set({ path: normalizeSharePath(response.path), currentDirectory: null, files: entries })
           return
         }
 
@@ -300,7 +359,8 @@ export const useFSStore = create<FsStore>()(
         try {
           const response = await ws.sendCommand('fs.dir.list', { vault_id: currVault.id, path })
           const files = response.files.map(wireEntryToFsEntry)
-          set({ currentDirectory: response.entry ? new Directory(response.entry) : null, files })
+          const currentDirectory = response.entry ? new Directory(response.entry) : inferListedDirectory(path, currVault, files)
+          set({ currentDirectory, files })
         } catch (error) {
           console.error('Error fetching files:', error)
           throw error

@@ -79,10 +79,16 @@ export const useShareWebSocketStore = create<ShareWebSocketStore>()(
           isConnecting = false
         }
 
-        ws.onclose = () => {
+        ws.onerror = () => {
+          console.warn('[ShareWS] WebSocket error event')
+        }
+
+        ws.onclose = event => {
           isConnecting = false
           const pending = get().pending
-          console.warn(`[ShareWS] Disconnected with ${Object.keys(pending).length} pending request(s)`)
+          console.warn(
+            `[ShareWS] Disconnected with ${Object.keys(pending).length} pending request(s); code=${event.code}; clean=${event.wasClean}`,
+          )
           Object.values(pending).forEach(request => {
             clearTimeout(request.timeout)
             request.reject(new Error('Share WebSocket disconnected. Reopen the share link and try again.'))

@@ -62,7 +62,7 @@ public:
 
     void sendAccessTokenOnNextResponse() { sendAccessToken_ = true; }
 
-    std::shared_ptr<handler::fs::Upload> getUploadHandler() const { return uploadHandler_; }
+    std::shared_ptr<handler::fs::Upload> getUploadHandler();
     [[nodiscard]] SessionMode mode() const noexcept { return mode_; }
     [[nodiscard]] bool isSharePending() const noexcept { return mode_ == SessionMode::SharePending; }
     [[nodiscard]] bool isShareMode() const noexcept { return mode_ == SessionMode::Share; }

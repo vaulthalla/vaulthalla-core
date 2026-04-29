@@ -6,11 +6,13 @@
 #include "share/Principal.hpp"
 #include "share/Scope.hpp"
 #include "share/Session.hpp"
+#include "share/Upload.hpp"
 
 #include <ctime>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -54,6 +56,7 @@ public:
     ) = 0;
     virtual void touchLinkAccess(const std::string& id) = 0;
     virtual void incrementDownload(const std::string& id) = 0;
+    virtual void incrementUpload(const std::string&) { throw std::logic_error("Share upload store is unavailable"); }
 
     virtual std::shared_ptr<Session> createSession(const std::shared_ptr<Session>& session) = 0;
     virtual std::shared_ptr<Session> getSession(const std::string& id) = 0;
@@ -73,12 +76,39 @@ public:
     virtual void consumeEmailChallenge(const std::string& challengeId) = 0;
 
     virtual void appendAuditEvent(const std::shared_ptr<AuditEvent>& event) = 0;
+
+    virtual std::shared_ptr<Upload> createUpload(const std::shared_ptr<Upload>&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual std::shared_ptr<Upload> getUpload(const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual void addUploadReceivedBytes(const std::string&, uint64_t) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual void completeUpload(const std::string&, uint32_t, const std::string&, const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual void failUpload(const std::string&, const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual void cancelUpload(const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual uint64_t sumCompletedUploadBytes(const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
+    virtual uint64_t countCompletedUploadFiles(const std::string&) {
+        throw std::logic_error("Share upload store is unavailable");
+    }
 };
 
 struct ManagerOptions {
     std::time_t session_ttl_seconds{3600};
     std::time_t challenge_ttl_seconds{900};
     uint32_t challenge_max_attempts{6};
+    uint64_t default_max_upload_size_bytes{64u * 1024u * 1024u};
+    uint64_t max_upload_chunk_size_bytes{256u * 1024u};
     std::function<std::time_t()> clock{[] { return std::time(nullptr); }};
     std::function<std::string()> challenge_code_generator{};
 };
@@ -156,6 +186,31 @@ struct ShareAccessAuditRequest {
     std::optional<std::string> error_message;
 };
 
+struct StartUploadRequest {
+    Principal principal;
+    uint32_t target_parent_entry_id{};
+    std::string target_path;
+    std::string original_filename;
+    std::string resolved_filename;
+    uint64_t expected_size_bytes{};
+    std::optional<std::string> mime_type;
+};
+
+struct StartUploadResult {
+    std::shared_ptr<Upload> upload;
+    uint64_t max_chunk_size_bytes{};
+    uint64_t max_transfer_size_bytes{};
+    DuplicatePolicy duplicate_policy{DuplicatePolicy::Reject};
+};
+
+struct FinishUploadRequest {
+    Principal principal;
+    std::string upload_id;
+    uint32_t created_entry_id{};
+    std::string content_hash;
+    std::optional<std::string> mime_type;
+};
+
 class Manager {
 public:
     Manager();
@@ -201,6 +256,12 @@ public:
     );
     void appendAccessAuditEvent(const Principal& principal, ShareAccessAuditRequest request);
     void incrementDownloadCount(const Principal& principal);
+
+    [[nodiscard]] StartUploadResult startUpload(StartUploadRequest request);
+    void recordUploadChunk(const Principal& principal, const std::string& uploadId, uint64_t bytes);
+    void finishUpload(FinishUploadRequest request);
+    void cancelUpload(const Principal& principal, const std::string& uploadId);
+    void failUpload(const Principal& principal, const std::string& uploadId, std::string error);
 
 private:
     std::shared_ptr<ShareStore> store_;

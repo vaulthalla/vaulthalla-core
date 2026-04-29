@@ -59,11 +59,13 @@ public:
     std::unordered_map<std::string, std::shared_ptr<Session>> sessions;
     std::unordered_map<std::string, std::string> session_by_lookup;
     std::unordered_map<std::string, std::shared_ptr<EmailChallenge>> challenges;
+    std::unordered_map<std::string, std::shared_ptr<Upload>> uploads;
     std::vector<std::shared_ptr<AuditEvent>> audits;
 
     uint32_t next_link{100};
     uint32_t next_session{200};
     uint32_t next_challenge{300};
+    uint32_t next_upload{400};
 
     std::shared_ptr<Link> createLink(const std::shared_ptr<Link>& link) override {
         auto stored = std::make_shared<Link>(*link);
@@ -140,6 +142,12 @@ public:
         auto link = getLink(id);
         if (!link) throw std::runtime_error("missing link");
         ++link->download_count;
+    }
+
+    void incrementUpload(const std::string& id) override {
+        auto link = getLink(id);
+        if (!link) throw std::runtime_error("missing link");
+        ++link->upload_count;
     }
 
     std::shared_ptr<Session> createSession(const std::shared_ptr<Session>& session) override {
@@ -228,6 +236,75 @@ public:
 
     void appendAuditEvent(const std::shared_ptr<AuditEvent>& event) override {
         audits.push_back(std::make_shared<AuditEvent>(*event));
+    }
+
+    std::shared_ptr<Upload> createUpload(const std::shared_ptr<Upload>& upload) override {
+        auto stored = std::make_shared<Upload>(*upload);
+        if (stored->id.empty()) stored->id = uuidFor(next_upload++);
+        stored->started_at = kManagerNow;
+        uploads[stored->id] = stored;
+        return stored;
+    }
+
+    std::shared_ptr<Upload> getUpload(const std::string& uploadId) override {
+        if (!uploads.contains(uploadId)) return nullptr;
+        return uploads.at(uploadId);
+    }
+
+    void addUploadReceivedBytes(const std::string& uploadId, const uint64_t bytes) override {
+        auto upload = getUpload(uploadId);
+        if (!upload) throw std::runtime_error("missing upload");
+        if (upload->isTerminal()) throw std::runtime_error("terminal upload");
+        if (upload->exceedsExpectedSize(bytes)) throw std::runtime_error("upload too large");
+        upload->received_size_bytes += bytes;
+        upload->status = UploadStatus::Receiving;
+    }
+
+    void completeUpload(
+        const std::string& uploadId,
+        const uint32_t entryId,
+        const std::string& contentHash,
+        const std::string& mimeType
+    ) override {
+        auto upload = getUpload(uploadId);
+        if (!upload) throw std::runtime_error("missing upload");
+        if (upload->isTerminal()) throw std::runtime_error("terminal upload");
+        upload->created_entry_id = entryId;
+        upload->content_hash = contentHash;
+        upload->mime_type = mimeType;
+        upload->status = UploadStatus::Complete;
+        upload->completed_at = kManagerNow + 2;
+    }
+
+    void failUpload(const std::string& uploadId, const std::string& error) override {
+        auto upload = getUpload(uploadId);
+        if (!upload) throw std::runtime_error("missing upload");
+        upload->error = error;
+        upload->status = UploadStatus::Failed;
+        upload->completed_at = kManagerNow + 2;
+    }
+
+    void cancelUpload(const std::string& uploadId) override {
+        auto upload = getUpload(uploadId);
+        if (!upload) throw std::runtime_error("missing upload");
+        upload->status = UploadStatus::Cancelled;
+        upload->completed_at = kManagerNow + 2;
+    }
+
+    uint64_t sumCompletedUploadBytes(const std::string& shareId) override {
+        uint64_t total = 0;
+        for (const auto& [_, upload] : uploads)
+            if (upload->share_id == shareId && upload->status == UploadStatus::Complete)
+                total += upload->received_size_bytes;
+        return total;
+    }
+
+    uint64_t countCompletedUploadFiles(const std::string& shareId) override {
+        uint64_t total = 0;
+        for (const auto& [_, upload] : uploads)
+            if (upload->share_id == shareId && upload->status == UploadStatus::Complete)
+                ++total;
+        return total;
     }
 };
 
@@ -524,4 +601,187 @@ TEST_F(ShareManagerTest, ShareActorCannotUseManagementAuthorizationOrHumanPrivil
     const CreateLinkRequest request{.link = makeManagerLink()};
     EXPECT_THROW({ (void)manager->createLink(shareActor, request); }, std::runtime_error);
     EXPECT_THROW({ (void)manager->listLinksForUser(shareActor, {}); }, std::runtime_error);
+}
+
+TEST_F(ShareManagerTest, UploadLifecycleRecordsBytesCompletesAndIncrementsCounter) {
+    const auto created = create();
+    auto opened = manager->openPublicSession(created.public_token);
+    auto principal = manager->resolvePrincipal(opened.session_token);
+
+    auto started = manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.txt",
+        .original_filename = "new.txt",
+        .resolved_filename = "new.txt",
+        .expected_size_bytes = 11,
+        .mime_type = "text/plain"
+    });
+
+    ASSERT_NE(started.upload, nullptr);
+    EXPECT_EQ(started.upload->status, UploadStatus::Pending);
+    EXPECT_EQ(started.upload->target_path, "/reports/new.txt");
+    EXPECT_EQ(started.max_chunk_size_bytes, 256u * 1024u);
+
+    manager->recordUploadChunk(*principal, started.upload->id, 5);
+    manager->recordUploadChunk(*principal, started.upload->id, 6);
+    EXPECT_EQ(store->getUpload(started.upload->id)->received_size_bytes, 11u);
+    EXPECT_EQ(store->getUpload(started.upload->id)->status, UploadStatus::Receiving);
+    EXPECT_THROW({ manager->recordUploadChunk(*principal, started.upload->id, 1); }, std::runtime_error);
+
+    manager->finishUpload({
+        .principal = *principal,
+        .upload_id = started.upload->id,
+        .created_entry_id = 88,
+        .content_hash = "safe-created-content-hash",
+        .mime_type = "text/plain"
+    });
+
+    const auto upload = store->getUpload(started.upload->id);
+    EXPECT_EQ(upload->status, UploadStatus::Complete);
+    EXPECT_EQ(upload->created_entry_id, 88u);
+    EXPECT_EQ(created.link->upload_count, 1u);
+}
+
+TEST_F(ShareManagerTest, UploadStartFailsForMissingGrantFileTargetAndInactiveState) {
+    auto noUpload = makeManagerLink();
+    noUpload.allowed_ops = bit(Operation::Metadata);
+    const auto createdNoUpload = manager->createLink(humanActor(), {.link = noUpload});
+    auto openedNoUpload = manager->openPublicSession(createdNoUpload.public_token);
+    auto principalNoUpload = manager->resolvePrincipal(openedNoUpload.session_token);
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principalNoUpload,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.txt",
+        .original_filename = "new.txt",
+        .resolved_filename = "new.txt",
+        .expected_size_bytes = 1
+    }); }, std::runtime_error);
+
+    auto fileTarget = makeManagerLink();
+    fileTarget.target_type = TargetType::File;
+    fileTarget.allowed_ops = bit(Operation::Upload);
+    const auto createdFileTarget = manager->createLink(humanActor(), {.link = fileTarget});
+    auto openedFileTarget = manager->openPublicSession(createdFileTarget.public_token);
+    auto principalFileTarget = manager->resolvePrincipal(openedFileTarget.session_token);
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principalFileTarget,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.txt",
+        .original_filename = "new.txt",
+        .resolved_filename = "new.txt",
+        .expected_size_bytes = 1
+    }); }, std::runtime_error);
+
+    createdFileTarget.link->revoked_at = kManagerNow;
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principalFileTarget,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.txt",
+        .original_filename = "new.txt",
+        .resolved_filename = "new.txt",
+        .expected_size_bytes = 1
+    }); }, std::runtime_error);
+}
+
+TEST_F(ShareManagerTest, UploadStartEnforcesSizeCountTotalMimeAndExtensionLimits) {
+    auto limited = makeManagerLink();
+    limited.max_upload_size_bytes = 10;
+    limited.max_upload_files = 1;
+    limited.max_upload_total_bytes = 20;
+    limited.allowed_mime_types = {"text/plain"};
+    limited.blocked_extensions = {".exe"};
+    const auto created = manager->createLink(humanActor(), {.link = limited});
+    auto opened = manager->openPublicSession(created.public_token);
+    auto principal = manager->resolvePrincipal(opened.session_token);
+
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/large.txt",
+        .original_filename = "large.txt",
+        .resolved_filename = "large.txt",
+        .expected_size_bytes = 11,
+        .mime_type = "text/plain"
+    }); }, std::runtime_error);
+
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.exe",
+        .original_filename = "new.exe",
+        .resolved_filename = "new.exe",
+        .expected_size_bytes = 1,
+        .mime_type = "text/plain"
+    }); }, std::runtime_error);
+
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/new.txt",
+        .original_filename = "new.txt",
+        .resolved_filename = "new.txt",
+        .expected_size_bytes = 1,
+        .mime_type = "application/pdf"
+    }); }, std::runtime_error);
+
+    auto started = manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/ok.txt",
+        .original_filename = "ok.txt",
+        .resolved_filename = "ok.txt",
+        .expected_size_bytes = 10,
+        .mime_type = "text/plain"
+    });
+    manager->recordUploadChunk(*principal, started.upload->id, 10);
+    manager->finishUpload({
+        .principal = *principal,
+        .upload_id = started.upload->id,
+        .created_entry_id = 90,
+        .content_hash = "hash",
+        .mime_type = "text/plain"
+    });
+
+    EXPECT_THROW({ (void)manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/second.txt",
+        .original_filename = "second.txt",
+        .resolved_filename = "second.txt",
+        .expected_size_bytes = 1,
+        .mime_type = "text/plain"
+    }); }, std::runtime_error);
+}
+
+TEST_F(ShareManagerTest, UploadCancelAndFailRecordTerminalStatusWithoutLeakingSecrets) {
+    const auto created = create();
+    auto opened = manager->openPublicSession(created.public_token);
+    auto principal = manager->resolvePrincipal(opened.session_token);
+
+    auto cancelled = manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/cancel.txt",
+        .original_filename = "cancel.txt",
+        .resolved_filename = "cancel.txt",
+        .expected_size_bytes = 4,
+        .mime_type = "text/plain"
+    });
+    manager->cancelUpload(*principal, cancelled.upload->id);
+    EXPECT_EQ(store->getUpload(cancelled.upload->id)->status, UploadStatus::Cancelled);
+
+    auto failed = manager->startUpload({
+        .principal = *principal,
+        .target_parent_entry_id = 77,
+        .target_path = "/reports/fail.txt",
+        .original_filename = "fail.txt",
+        .resolved_filename = "fail.txt",
+        .expected_size_bytes = 4,
+        .mime_type = "text/plain"
+    });
+    manager->failUpload(*principal, failed.upload->id, "write_failed");
+    EXPECT_EQ(store->getUpload(failed.upload->id)->status, UploadStatus::Failed);
+    EXPECT_EQ(store->getUpload(failed.upload->id)->error, "write_failed");
+    EXPECT_FALSE(store->getUpload(failed.upload->id)->tmp_path.has_value());
 }

@@ -95,6 +95,11 @@ void Session::clearShareSession() {
 
 void Session::setHandshakeRequest(const RequestType& req) { handshakeRequest_ = req; }
 
+std::shared_ptr<handler::fs::Upload> Session::getUploadHandler() {
+    if (!uploadHandler_) uploadHandler_ = std::make_shared<handler::fs::Upload>(shared_from_this());
+    return uploadHandler_;
+}
+
 void Session::logFail(std::string_view where, const beast::error_code& ec) {
     if (!ec) return;
     log::Registry::ws()->debug("[ws::Session] {}: {}", where, ec.message());
@@ -321,8 +326,17 @@ void Session::onRead(const beast::error_code& ec, std::size_t) {
         return close();
     }
 
-    if (ws_->got_binary()) uploadHandler_->handleBinaryFrame(buffer_);
-    else {
+    if (ws_->got_binary()) {
+        try {
+            uploadHandler_->handleBinaryFrame(buffer_);
+        } catch (const std::exception& ex) {
+            log::Registry::ws()->debug("[ws::Session] Error processing binary upload frame: {}", ex.what());
+            sendInternalError();
+        } catch (...) {
+            log::Registry::ws()->debug("[ws::Session] Unknown error while processing binary upload frame");
+            sendInternalError();
+        }
+    } else {
         try {
             const auto text = beast::buffers_to_string(buffer_.data());
             router_->routeMessage(json::parse(text), shared_from_this());

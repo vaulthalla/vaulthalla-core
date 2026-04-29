@@ -4,6 +4,7 @@
 #include "db/query/share/EmailChallenge.hpp"
 #include "db/query/share/Link.hpp"
 #include "db/query/share/Session.hpp"
+#include "db/query/share/Upload.hpp"
 #include "identities/User.hpp"
 #include "rbac/permission/vault/Filesystem.hpp"
 #include "rbac/resolver/vault/all.hpp"
@@ -13,6 +14,7 @@
 #include "share/Token.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <stdexcept>
 #include <utility>
@@ -26,6 +28,11 @@ constexpr std::string_view kChallengeCreated = "share.email.challenge.created";
 constexpr std::string_view kChallengeConfirm = "share.email.challenge.confirm";
 constexpr std::string_view kPrincipalResolve = "share.principal.resolve";
 constexpr std::string_view kScopeAuthorize = "share.scope.authorize";
+constexpr std::string_view kUploadStart = "share.upload.start";
+constexpr std::string_view kUploadChunk = "share.upload.chunk";
+constexpr std::string_view kUploadFinish = "share.upload.finish";
+constexpr std::string_view kUploadCancel = "share.upload.cancel";
+constexpr std::string_view kUploadFail = "share.upload.fail";
 
 class QueryShareStore final : public ShareStore {
 public:
@@ -73,6 +80,8 @@ public:
     void touchLinkAccess(const std::string& id) override { db::query::share::Link::touchAccess(id); }
 
     void incrementDownload(const std::string& id) override { db::query::share::Link::incrementDownload(id); }
+
+    void incrementUpload(const std::string& id) override { db::query::share::Link::incrementUpload(id); }
 
     std::shared_ptr<Session> createSession(const std::shared_ptr<Session>& session) override {
         return db::query::share::Session::create(session);
@@ -125,6 +134,43 @@ public:
 
     void appendAuditEvent(const std::shared_ptr<AuditEvent>& event) override {
         db::query::share::AuditEvent::append(event);
+    }
+
+    std::shared_ptr<Upload> createUpload(const std::shared_ptr<Upload>& upload) override {
+        return db::query::share::Upload::create(upload);
+    }
+
+    std::shared_ptr<Upload> getUpload(const std::string& uploadId) override {
+        return db::query::share::Upload::get(uploadId);
+    }
+
+    void addUploadReceivedBytes(const std::string& uploadId, const uint64_t bytes) override {
+        db::query::share::Upload::addReceivedBytes(uploadId, bytes);
+    }
+
+    void completeUpload(
+        const std::string& uploadId,
+        const uint32_t entryId,
+        const std::string& contentHash,
+        const std::string& mimeType
+    ) override {
+        db::query::share::Upload::complete(uploadId, entryId, contentHash, mimeType);
+    }
+
+    void failUpload(const std::string& uploadId, const std::string& error) override {
+        db::query::share::Upload::fail(uploadId, error);
+    }
+
+    void cancelUpload(const std::string& uploadId) override {
+        db::query::share::Upload::cancel(uploadId);
+    }
+
+    uint64_t sumCompletedUploadBytes(const std::string& shareId) override {
+        return db::query::share::Upload::sumCompletedBytes(shareId);
+    }
+
+    uint64_t countCompletedUploadFiles(const std::string& shareId) override {
+        return db::query::share::Upload::countCompletedFiles(shareId);
     }
 };
 
@@ -325,6 +371,112 @@ template<typename T>
 void normalizeAndValidate(Link& link) {
     link.root_path = Scope::normalizeVaultPath(link.root_path);
     link.grant().requireValid();
+}
+
+[[nodiscard]] std::string toLower(std::string value) {
+    std::ranges::transform(value, value.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+[[nodiscard]] std::string normalizeExtension(std::string value) {
+    value = toLower(std::move(value));
+    if (value.empty()) return value;
+    if (value.front() != '.') value.insert(value.begin(), '.');
+    return value;
+}
+
+[[nodiscard]] bool containsInsensitive(const std::vector<std::string>& values, const std::string& needle) {
+    const auto normalizedNeedle = toLower(needle);
+    return std::ranges::any_of(values, [&](const std::string& item) {
+        return toLower(item) == normalizedNeedle;
+    });
+}
+
+[[nodiscard]] bool containsExtension(const std::vector<std::string>& values, const std::string& extension) {
+    const auto normalizedNeedle = normalizeExtension(extension);
+    return std::ranges::any_of(values, [&](const std::string& item) {
+        return normalizeExtension(item) == normalizedNeedle;
+    });
+}
+
+[[nodiscard]] std::string extensionOf(const std::string& filename) {
+    return normalizeExtension(std::filesystem::path(filename).extension().string());
+}
+
+[[nodiscard]] std::pair<std::shared_ptr<Link>, std::shared_ptr<Session>> requireActiveShareContext(
+    ShareStore& store,
+    const Principal& principal,
+    const ManagerOptions& options
+) {
+    if (!principal.isActive(now(options))) throw std::runtime_error("Share principal is inactive");
+
+    auto link = requirePtr(store.getLink(principal.share_id), "Share link not found");
+    if (!link->isActive(now(options))) throw std::runtime_error("Share link is inactive");
+    if (link->vault_id != principal.vault_id || link->root_entry_id != principal.root_entry_id)
+        throw std::runtime_error("Share principal link mismatch");
+
+    auto session = requirePtr(store.getSession(principal.share_session_id), "Share session not found");
+    if (!session->isActive(now(options))) throw std::runtime_error("Share session is inactive");
+    if (session->share_id != link->id) throw std::runtime_error("Share session link mismatch");
+
+    return {link, session};
+}
+
+void requireUploadAllowedByGrant(const Link& link, const StartUploadRequest& request, const ManagerOptions& options) {
+    if (!link.grant().allows(Operation::Upload)) throw std::runtime_error("Share upload denied: missing_upload_operation");
+    if (link.target_type != TargetType::Directory)
+        throw std::runtime_error("Share upload denied: target is not directory-compatible");
+    if (request.target_parent_entry_id == 0) throw std::invalid_argument("Share upload target parent is required");
+    if (request.target_path.empty() || request.target_path.front() != '/')
+        throw std::invalid_argument("Share upload target path must be absolute");
+    if (request.original_filename.empty()) throw std::invalid_argument("Share upload original filename is required");
+    if (request.resolved_filename.empty()) throw std::invalid_argument("Share upload resolved filename is required");
+
+    const auto maxSize = link.max_upload_size_bytes.value_or(options.default_max_upload_size_bytes);
+    if (request.expected_size_bytes > maxSize)
+        throw std::runtime_error("Share upload denied: file size exceeds maximum");
+
+    if (!request.mime_type && !link.allowed_mime_types.empty())
+        throw std::runtime_error("Share upload denied: MIME type is required");
+    if (request.mime_type && containsInsensitive(link.blocked_mime_types, *request.mime_type))
+        throw std::runtime_error("Share upload denied: MIME type is blocked");
+    if (request.mime_type && !link.allowed_mime_types.empty() &&
+        !containsInsensitive(link.allowed_mime_types, *request.mime_type))
+        throw std::runtime_error("Share upload denied: MIME type is not allowed");
+
+    const auto ext = extensionOf(request.resolved_filename);
+    if (!ext.empty() && containsExtension(link.blocked_extensions, ext))
+        throw std::runtime_error("Share upload denied: extension is blocked");
+    if (!link.allowed_extensions.empty()) {
+        if (ext.empty()) throw std::runtime_error("Share upload denied: extension is required");
+        if (!containsExtension(link.allowed_extensions, ext))
+            throw std::runtime_error("Share upload denied: extension is not allowed");
+    }
+}
+
+void requireUploadQuota(ShareStore& store, const Link& link, const uint64_t expectedSize) {
+    if (link.max_upload_files && store.countCompletedUploadFiles(link.id) >= *link.max_upload_files)
+        throw std::runtime_error("Share upload denied: file count limit reached");
+    if (link.max_upload_total_bytes) {
+        const auto completedBytes = store.sumCompletedUploadBytes(link.id);
+        if (expectedSize > *link.max_upload_total_bytes ||
+            completedBytes > *link.max_upload_total_bytes - expectedSize)
+            throw std::runtime_error("Share upload denied: total byte limit exceeded");
+    }
+}
+
+[[nodiscard]] std::shared_ptr<Upload> requireUploadForPrincipal(
+    ShareStore& store,
+    const Principal& principal,
+    const std::string& uploadId
+) {
+    if (uploadId.empty()) throw std::invalid_argument("Share upload id is required");
+    auto upload = requirePtr(store.getUpload(uploadId), "Share upload not found");
+    if (upload->share_id != principal.share_id || upload->share_session_id != principal.share_session_id)
+        throw std::runtime_error("Share upload does not belong to this share session");
+    return upload;
 }
 
 [[nodiscard]] std::shared_ptr<Link> linkFromPublicToken(
@@ -720,6 +872,132 @@ void Manager::appendAccessAuditEvent(const Principal& principal, ShareAccessAudi
 void Manager::incrementDownloadCount(const Principal& principal) {
     if (principal.share_id.empty()) throw std::runtime_error("Share principal has no share id");
     store_->incrementDownload(principal.share_id);
+}
+
+StartUploadResult Manager::startUpload(StartUploadRequest request) {
+    auto [link, session] = requireActiveShareContext(*store_, request.principal, options_);
+    auto audit = auditEvent(std::string(kUploadStart), AuditStatus::Success, link->id, session->id);
+    attachPrincipal(*audit, request.principal);
+    audit->target_entry_id = request.target_parent_entry_id;
+    audit->target_path = request.target_path;
+
+    try {
+        requireUploadAllowedByGrant(*link, request, options_);
+        requireUploadQuota(*store_, *link, request.expected_size_bytes);
+
+        auto upload = std::make_shared<Upload>();
+        upload->share_id = link->id;
+        upload->share_session_id = session->id;
+        upload->target_parent_entry_id = request.target_parent_entry_id;
+        upload->target_path = Scope::normalizeVaultPath(request.target_path);
+        upload->original_filename = std::move(request.original_filename);
+        upload->resolved_filename = std::move(request.resolved_filename);
+        upload->expected_size_bytes = request.expected_size_bytes;
+        upload->mime_type = std::move(request.mime_type);
+        upload->status = UploadStatus::Pending;
+
+        auto created = store_->createUpload(upload);
+        audit->target_path = created->target_path;
+        store_->appendAuditEvent(audit);
+
+        return {
+            .upload = created,
+            .max_chunk_size_bytes = options_.max_upload_chunk_size_bytes,
+            .max_transfer_size_bytes = link->max_upload_size_bytes.value_or(options_.default_max_upload_size_bytes),
+            .duplicate_policy = link->duplicate_policy
+        };
+    } catch (...) {
+        setDenied(*audit, "share_upload_start_denied");
+        store_->appendAuditEvent(audit);
+        throw;
+    }
+}
+
+void Manager::recordUploadChunk(const Principal& principal, const std::string& uploadId, const uint64_t bytes) {
+    if (bytes == 0) throw std::invalid_argument("Share upload chunk bytes are required");
+    auto [link, session] = requireActiveShareContext(*store_, principal, options_);
+    auto upload = requireUploadForPrincipal(*store_, principal, uploadId);
+    if (upload->isTerminal()) throw std::runtime_error("Share upload is already complete");
+    if (upload->exceedsExpectedSize(bytes)) throw std::runtime_error("Share upload exceeds expected size");
+
+    auto audit = auditEvent(std::string(kUploadChunk), AuditStatus::Success, link->id, session->id);
+    attachPrincipal(*audit, principal);
+    audit->target_entry_id = upload->target_parent_entry_id;
+    audit->target_path = upload->target_path;
+    audit->bytes_transferred = bytes;
+
+    try {
+        store_->addUploadReceivedBytes(uploadId, bytes);
+        store_->appendAuditEvent(audit);
+    } catch (...) {
+        setDenied(*audit, "share_upload_chunk_denied");
+        store_->appendAuditEvent(audit);
+        throw;
+    }
+}
+
+void Manager::finishUpload(FinishUploadRequest request) {
+    auto [link, session] = requireActiveShareContext(*store_, request.principal, options_);
+    auto upload = requireUploadForPrincipal(*store_, request.principal, request.upload_id);
+    if (upload->isTerminal()) throw std::runtime_error("Share upload is already complete");
+    if (upload->received_size_bytes != upload->expected_size_bytes)
+        throw std::runtime_error("Share upload size mismatch");
+    if (request.created_entry_id == 0) throw std::invalid_argument("Share upload created entry id is required");
+
+    auto audit = auditEvent(std::string(kUploadFinish), AuditStatus::Success, link->id, session->id);
+    attachPrincipal(*audit, request.principal);
+    audit->target_entry_id = request.created_entry_id;
+    audit->target_path = upload->target_path;
+    audit->bytes_transferred = upload->received_size_bytes;
+
+    try {
+        store_->completeUpload(
+            request.upload_id,
+            request.created_entry_id,
+            request.content_hash,
+            request.mime_type.value_or(upload->mime_type.value_or(""))
+        );
+        store_->incrementUpload(link->id);
+        store_->appendAuditEvent(audit);
+    } catch (...) {
+        setDenied(*audit, "share_upload_finish_denied");
+        store_->appendAuditEvent(audit);
+        throw;
+    }
+}
+
+void Manager::cancelUpload(const Principal& principal, const std::string& uploadId) {
+    auto [link, session] = requireActiveShareContext(*store_, principal, options_);
+    auto upload = requireUploadForPrincipal(*store_, principal, uploadId);
+
+    auto audit = auditEvent(std::string(kUploadCancel), AuditStatus::Success, link->id, session->id);
+    attachPrincipal(*audit, principal);
+    audit->target_entry_id = upload->target_parent_entry_id;
+    audit->target_path = upload->target_path;
+    audit->bytes_transferred = upload->received_size_bytes;
+
+    try {
+        store_->cancelUpload(uploadId);
+        store_->appendAuditEvent(audit);
+    } catch (...) {
+        setDenied(*audit, "share_upload_cancel_denied");
+        store_->appendAuditEvent(audit);
+        throw;
+    }
+}
+
+void Manager::failUpload(const Principal& principal, const std::string& uploadId, std::string error) {
+    auto upload = requireUploadForPrincipal(*store_, principal, uploadId);
+    auto audit = auditEvent(std::string(kUploadFail), AuditStatus::Failed, principal.share_id, principal.share_session_id);
+    attachPrincipal(*audit, principal);
+    audit->target_entry_id = upload->target_parent_entry_id;
+    audit->target_path = upload->target_path;
+    audit->bytes_transferred = upload->received_size_bytes;
+    audit->error_code = "share_upload_failed";
+    audit->error_message = error;
+
+    store_->failUpload(uploadId, std::move(error));
+    store_->appendAuditEvent(audit);
 }
 
 }

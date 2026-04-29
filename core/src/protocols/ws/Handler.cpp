@@ -14,6 +14,7 @@
 #include "protocols/ws/handler/share/Filesystem.hpp"
 #include "protocols/ws/handler/share/Links.hpp"
 #include "protocols/ws/handler/share/Sessions.hpp"
+#include "protocols/ws/handler/share/Upload.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::protocols::ws;
@@ -32,6 +33,7 @@ void Handler::registerAllHandlers(const std::shared_ptr<Router>& r) {
     registerShareSessionHandlers(r);
     registerShareFilesystemHandlers(r);
     registerShareDownloadHandlers(r);
+    registerShareUploadHandlers(r);
 
     log::Registry::ws()->debug("[WebSocketHandler] All handlers registered successfully.");
 }
@@ -151,4 +153,10 @@ void Handler::registerShareDownloadHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("share.download.start", &handler::share::Download::start);
     r->registerPayload("share.download.chunk", &handler::share::Download::chunk);
     r->registerPayload("share.download.cancel", &handler::share::Download::cancel);
+}
+
+void Handler::registerShareUploadHandlers(const std::shared_ptr<Router>& r) {
+    r->registerPayload("share.upload.start", &handler::share::Upload::start);
+    r->registerPayload("share.upload.finish", &handler::share::Upload::finish);
+    r->registerPayload("share.upload.cancel", &handler::share::Upload::cancel);
 }

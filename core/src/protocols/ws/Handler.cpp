@@ -10,6 +10,7 @@
 #include "protocols/ws/handler/rbac/roles/Vault.hpp"
 #include "protocols/ws/handler/vault/Vaults.hpp"
 #include "protocols/ws/handler/vault/APIKeys.hpp"
+#include "protocols/ws/handler/share/Filesystem.hpp"
 #include "protocols/ws/handler/share/Links.hpp"
 #include "protocols/ws/handler/share/Sessions.hpp"
 #include "log/Registry.hpp"
@@ -28,6 +29,7 @@ void Handler::registerAllHandlers(const std::shared_ptr<Router>& r) {
     registerStatHandlers(r);
     registerShareManagementHandlers(r);
     registerShareSessionHandlers(r);
+    registerShareFilesystemHandlers(r);
 
     log::Registry::ws()->debug("[WebSocketHandler] All handlers registered successfully.");
 }
@@ -136,4 +138,9 @@ void Handler::registerShareSessionHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("share.session.open", &handler::share::Sessions::open);
     r->registerPayload("share.email.challenge.start", &handler::share::Sessions::startEmailChallenge);
     r->registerPayload("share.email.challenge.confirm", &handler::share::Sessions::confirmEmailChallenge);
+}
+
+void Handler::registerShareFilesystemHandlers(const std::shared_ptr<Router>& r) {
+    r->registerPayload("share.fs.metadata", &handler::share::Filesystem::metadata);
+    r->registerPayload("share.fs.list", &handler::share::Filesystem::list);
 }

@@ -61,8 +61,16 @@ bool Router::isPublicShareCommand(const std::string_view command) {
     return containsCommand(commands, command);
 }
 
+bool Router::isShareFilesystemCommand(const std::string_view command) {
+    constexpr std::array commands{
+        std::string_view{"share.fs.metadata"},
+        std::string_view{"share.fs.list"}
+    };
+    return containsCommand(commands, command);
+}
+
 bool Router::isShareModeCommand(const std::string_view command) {
-    return isPublicShareCommand(command);
+    return isPublicShareCommand(command) || isShareFilesystemCommand(command);
 }
 
 bool Router::isAuthenticatedShareManagementCommand(const std::string_view command) {
@@ -78,12 +86,16 @@ bool Router::isAuthenticatedShareManagementCommand(const std::string_view comman
 }
 
 Router::CommandAuthDecision Router::classifyCommand(const std::string_view command, const Session& session) {
-    if (session.isShareSession()) {
+    if (session.isSharePending()) {
+        return isPublicShareCommand(command) ? CommandAuthDecision::Allow : CommandAuthDecision::Deny;
+    }
+
+    if (session.isShareMode()) {
         return isShareModeCommand(command) ? CommandAuthDecision::Allow : CommandAuthDecision::Deny;
     }
 
     if (session.user) {
-        if (isPublicShareCommand(command)) return CommandAuthDecision::Deny;
+        if (isPublicShareCommand(command) || isShareFilesystemCommand(command)) return CommandAuthDecision::Deny;
         if (isAuthCommand(command)) return CommandAuthDecision::Allow;
         return CommandAuthDecision::RequireHumanAuth;
     }

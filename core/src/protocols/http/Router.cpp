@@ -16,9 +16,13 @@
 #include "log/Registry.hpp"
 #include "protocols/cookie.hpp"
 #include "protocols/ws/Session.hpp"
+#include "auth/session/Manager.hpp"
+#include "share/Manager.hpp"
+#include "share/TargetResolver.hpp"
 #include "../../../include/identities/User.hpp"
 
 #include <nlohmann/json.hpp>
+#include <optional>
 
 using namespace vh::config;
 using namespace vh::stats::model;
@@ -75,6 +79,76 @@ static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const s
         vh::runtime::Deps::get().httpCacheStats->record_miss();
         }
     return {};
+}
+
+static std::unique_ptr<vh::protocols::http::model::preview::Request> preparePreviewRequest(
+    const std::unordered_map<std::string, std::string>& params
+) {
+    auto pr = std::make_unique<vh::protocols::http::model::preview::Request>(params);
+    pr->engine = vh::runtime::Deps::get().storageManager->getEngine(pr->vault_id);
+    if (!pr->engine)
+        throw std::runtime_error("No storage engine found for vault with id " + std::to_string(pr->vault_id));
+
+    const auto fusePath = pr->engine->paths->absRelToAbsRel(pr->rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
+    const auto entry = vh::runtime::Deps::get().fsCache->getEntry(fusePath);
+    if (!entry) throw std::runtime_error("File not found in cache");
+    if (entry->isDirectory()) throw std::runtime_error("Requested preview file is a directory");
+    pr->file = std::static_pointer_cast<File>(entry);
+    return pr;
+}
+
+static std::unique_ptr<vh::protocols::http::model::preview::Request> prepareSharePreviewRequest(
+    const std::unordered_map<std::string, std::string>& params,
+    const std::shared_ptr<vh::protocols::ws::Session>& session
+) {
+    if (!params.contains("share"))
+        throw std::runtime_error("Share preview requests must use the share preview lane");
+
+    vh::share::Manager manager;
+    auto principal = manager.resolvePrincipal(
+        session->shareSessionToken(),
+        session->ipAddress.empty() ? std::nullopt : std::make_optional(session->ipAddress),
+        session->userAgent.empty() ? std::nullopt : std::make_optional(session->userAgent)
+    );
+
+    vh::share::TargetResolver resolver;
+    const auto target = resolver.resolve(*principal, {
+        .path = params.contains("path") ? params.at("path") : std::string{"/"},
+        .operation = vh::share::Operation::Preview,
+        .path_mode = vh::share::TargetPathMode::ShareRelative,
+        .expected_target_type = vh::share::TargetType::File
+    });
+
+    std::unordered_map<std::string, std::string> scopedParams{
+        {"vault_id", std::to_string(target.vault_id)},
+        {"path", target.vault_path}
+    };
+    if (params.contains("size")) scopedParams["size"] = params.at("size");
+    if (params.contains("scale")) scopedParams["scale"] = params.at("scale");
+
+    auto pr = std::make_unique<vh::protocols::http::model::preview::Request>(scopedParams);
+    pr->engine = vh::runtime::Deps::get().storageManager->getEngine(pr->vault_id);
+    if (!pr->engine)
+        throw std::runtime_error("No storage engine found for scoped share preview");
+
+    const auto file = std::dynamic_pointer_cast<File>(target.entry);
+    if (!file) throw std::runtime_error("Share preview target is not a file");
+    pr->file = file;
+
+    manager.appendAccessAuditEvent(*principal, {
+        .event_type = "share.preview.http",
+        .target = {
+            .vault_id = target.vault_id,
+            .target_entry_id = target.entry ? target.entry->id : 0,
+            .target_path = target.vault_path
+        },
+        .status = vh::share::AuditStatus::Success,
+        .bytes_transferred = std::nullopt,
+        .error_code = std::nullopt,
+        .error_message = std::nullopt
+    });
+
+    return pr;
 }
 namespace vh::protocols::http {
 
@@ -135,26 +209,38 @@ Response Router::handlePreview(request&& req) {
         return makeErrorResponse(
             req, "Invalid request", status::bad_request);
 
-    if (const auto error = authenticateRequest(req); !error.empty())
-        return makeErrorResponse(
-            req, "Unauthorized: " + error, status::unauthorized);
+    std::shared_ptr<vh::protocols::ws::Session> session;
+    try {
+        const auto refresh = protocols::extractCookie(req, "refresh");
+        if (refresh.empty()) throw std::runtime_error("Refresh token not set");
+        try {
+            session = runtime::Deps::get().sessionManager->validateRawRefreshToken(refresh);
+        } catch (const std::exception& humanError) {
+            try {
+                session = runtime::Deps::get().sessionManager->validateRawShareRefreshToken(refresh);
+            } catch (const std::exception& shareError) {
+                throw std::runtime_error(
+                    std::string("human session rejected: ") + humanError.what() +
+                    "; share session rejected: " + shareError.what()
+                );
+            }
+        }
+    } catch (const std::exception& e) {
+        return makeErrorResponse(req, "Unauthorized: " + std::string(e.what()), status::unauthorized);
+    }
 
     std::unique_ptr<Request> pr;
-    try { pr = std::make_unique<Request>(parse_query_params(req.target())); } catch (const std::exception&
-        e) { return makeErrorResponse(req, e.what(), status::bad_request); }
-
-    pr->engine = runtime::Deps::get().storageManager->getEngine(pr->vault_id);
-    if (!pr->engine)
-        return makeErrorResponse(
-            req, "No storage engine found for vault with id " + std::to_string(pr->vault_id),
-            status::bad_request);
-
-    const auto fusePath = pr->engine->paths->absRelToAbsRel(pr->rel_path, PathType::VAULT_ROOT, PathType::FUSE_ROOT);
-    const auto entry = runtime::Deps::get().fsCache->getEntry(fusePath);
-    if (!entry) return makeErrorResponse(req, "File not found in cache");
-    if (entry->isDirectory())
-        return makeErrorResponse(req, "Requested preview file is a directory", status::bad_request);
-    pr->file = std::static_pointer_cast<File>(entry);
+    try {
+        const auto params = parse_query_params(req.target());
+        if (session && session->isShareMode()) pr = prepareSharePreviewRequest(params, session);
+        else {
+            if (!session || !session->user)
+                return makeErrorResponse(req, "Unauthorized: preview requires a user or ready share session", status::unauthorized);
+            pr = preparePreviewRequest(params);
+        }
+    } catch (const std::exception& e) {
+        return makeErrorResponse(req, e.what(), status::bad_request);
+    }
 
     if (!pr->file->mime_type)
         return makeErrorResponse(req, "File has no mime type.", status::unsupported_media_type);

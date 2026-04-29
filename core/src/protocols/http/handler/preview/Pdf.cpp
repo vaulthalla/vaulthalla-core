@@ -70,7 +70,7 @@ namespace vh::protocols::http::handler::preview {
             FPDF_ClosePage(page);
             FPDF_CloseDocument(doc);
 
-            return Router::makeResponse(req, std::move(jpeg_buf), *pr->file->mime_type);
+            return Router::makeResponse(req, std::move(jpeg_buf), mime_type);
         } catch (const std::exception &e) {
             log::Registry::http()->error("[PdfPreviewHandler] Error handling PDF preview for {}: {}",
                                          pr->rel_path.string(), e.what());

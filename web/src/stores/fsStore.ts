@@ -11,6 +11,7 @@ import { useShareWebSocketStore } from '@/stores/useShareWebSocket'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
 import { ShareEntry, SharePreviewResponse } from '@/models/linkShare'
 import { hasShareOperation } from '@/util/shareOperations'
+import { getPreviewUrl } from '@/util/getUrl'
 
 type FsMode = 'authenticated' | 'share'
 type FsEntry = DBFile | Directory
@@ -83,6 +84,11 @@ const baseName = (path: string, fallback: string) => {
   return parts.at(-1) || fallback
 }
 
+const shareHttpPreviewUrl = (path?: string, size = 64) => {
+  if (!path) return null
+  return `${getPreviewUrl()}?share=1&path=${encodeURIComponent(normalizeSharePath(path))}&size=${size}`
+}
+
 const timestampToEpoch = (value?: string) => {
   if (!value) return 0
   const parsed = Date.parse(value)
@@ -109,10 +115,18 @@ const shareEntryToFsEntry = (entry: ShareEntry): FsEntry => {
     })
   }
 
-  return new DBFile({
+  const file = new DBFile({
     ...common,
     mime_type: entry.mime_type ?? undefined,
   })
+
+  const share = useVaultShareStore.getState().share
+  if (hasShareOperation(share?.allowed_ops, 'preview') && entry.path && entry.mime_type &&
+    (entry.mime_type.startsWith('image/') || entry.mime_type === 'application/pdf')) {
+    ;(file as DBFile & { previewUrl?: string | null }).previewUrl = shareHttpPreviewUrl(entry.path, 64)
+  }
+
+  return file
 }
 
 const wireEntryToFsEntry = (entry: FsEntry): FsEntry => {
@@ -152,30 +166,6 @@ const inferListedDirectory = (
     file_count: files.filter(entry => entry instanceof DBFile).length,
     subdirectory_count: files.filter(entry => entry instanceof Directory).length,
   })
-}
-
-const hydrateShareThumbnails = async (entries: FsEntry[]): Promise<FsEntry[]> => {
-  const share = useVaultShareStore.getState().share
-  if (!hasShareOperation(share?.allowed_ops, 'preview')) return entries
-
-  const ws = useShareWebSocketStore.getState()
-  let hydrated = 0
-  for (const entry of entries) {
-    if (!(entry instanceof DBFile)) continue
-    if (!entry.mime_type?.startsWith('image/')) continue
-    if (!entry.path) continue
-    if (hydrated >= 16) break
-
-    try {
-      const preview = await ws.sendCommand('share.preview.get', { path: normalizeSharePath(entry.path), size: 64 })
-      ;(entry as DBFile & { previewUrl?: string }).previewUrl = `data:${preview.mime_type};base64,${preview.data_base64}`
-      hydrated += 1
-    } catch {
-      // Thumbnail hydration is best-effort; row click still attempts a full share-authorized preview.
-    }
-  }
-
-  return entries
 }
 
 const shareUploadTarget = (targetPath: string | undefined, currentPath: string, filename: string) => {
@@ -343,7 +333,7 @@ export const useFSStore = create<FsStore>()(
           requireReadyShareSession()
           await ws.waitForConnection()
           const response = await ws.sendCommand('share.fs.list', { path: normalizeSharePath(path) })
-          const entries = await hydrateShareThumbnails(response.entries.map(shareEntryToFsEntry))
+          const entries = response.entries.map(shareEntryToFsEntry)
           set({ path: normalizeSharePath(response.path), currentDirectory: null, files: entries })
           return
         }

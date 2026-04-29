@@ -5,6 +5,8 @@
 #include "share/Link.hpp"
 #include "share/Manager.hpp"
 #include "share/Principal.hpp"
+#include "runtime/Deps.hpp"
+#include "auth/session/Manager.hpp"
 
 #include <optional>
 #include <stdexcept>
@@ -106,6 +108,7 @@ json Sessions::open(const json& payload, const std::shared_ptr<Session>& session
     const auto ready = result.ready();
     if (ready) detail::attachReadyPrincipal(session, *mgr, result.session_token);
     else session->setPendingShareSession(result.session->id, result.session_token);
+    vh::runtime::Deps::get().sessionManager->cache(session);
 
     return {
         {"status", ready ? "ready" : "email_required"},
@@ -169,7 +172,10 @@ json Sessions::confirmEmailChallenge(const json& payload, const std::shared_ptr<
         .code = detail::requiredString(body, "code")
     });
 
-    if (result.verified) detail::attachReadyPrincipal(session, *mgr, sessionToken);
+    if (result.verified) {
+        detail::attachReadyPrincipal(session, *mgr, sessionToken);
+        vh::runtime::Deps::get().sessionManager->cache(session);
+    }
 
     return {
         {"status", result.verified ? "ready" : "email_required"},

@@ -23,6 +23,7 @@ public:
 
     bool validate(const std::shared_ptr<protocols::ws::Session>& session, const std::string& accessToken);
     std::shared_ptr<protocols::ws::Session> validateRawRefreshToken(const std::string& refreshToken);
+    std::shared_ptr<protocols::ws::Session> validateRawShareRefreshToken(const std::string& refreshToken);
     void invalidate(const std::string& token);
     void invalidate(const std::shared_ptr<protocols::ws::Session>& session);
 
@@ -35,6 +36,7 @@ public:
 private:
     std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> sessionsByUUID_;
     std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> sessionsByRefreshJti_;
+    std::unordered_map<std::string, std::shared_ptr<protocols::ws::Session>> shareSessionsByRefreshJti_;
     std::unordered_multimap<uint32_t, std::shared_ptr<protocols::ws::Session>> sessionsByUserId_;
     std::mutex sessionMutex_;
 };

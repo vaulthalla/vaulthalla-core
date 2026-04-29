@@ -20,5 +20,6 @@ echo "🧪 Installing Vaulthalla integration test directories..."
 
 install_dir "/tmp/vh_mount" 755
 install_dir "/tmp/vh_backing" 755
+install_dir "/tmp/vh_runtime" 755
 
 echo "✅ Integration test directories installed."

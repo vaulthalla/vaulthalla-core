@@ -19,3 +19,4 @@ echo "🗑️  Cleaning directories..."
 
 safe_rm_dir /tmp/vh_mount
 safe_rm_dir /tmp/vh_backing
+safe_rm_dir /tmp/vh_runtime

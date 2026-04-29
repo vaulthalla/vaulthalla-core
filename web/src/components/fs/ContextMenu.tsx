@@ -22,10 +22,11 @@ export function ContextMenu<
 >({ data, position, onClose, onDelete, onCopy, onRename }: ContextMenuProps<T>) {
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { copiedItem, pasteCopiedItem } = useFSStore()
+  const { copiedItem, pasteCopiedItem, mode } = useFSStore()
 
   const isDirectory = typeof data.file_count === 'number' || typeof data.subdirectory_count === 'number'
-  const canPaste = copiedItem && isDirectory
+  const isShareMode = mode === 'share'
+  const canPaste = !isShareMode && copiedItem && isDirectory
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -61,18 +62,22 @@ export function ContextMenu<
         style={{ top: position.y, left: position.x }}
         className="absolute rounded border border-gray-600 bg-gray-800 p-2 shadow-lg focus:outline-none">
         <div className="flex flex-col gap-1 text-lg">
-          <ContextButton onClick={() => onRename?.(data)}>
-            <EditIcon className="text-glow-orange my-1 fill-current" />
-            Rename
-          </ContextButton>
-          <ContextButton onClick={() => onCopy?.(data)}>
-            <CopyIcon className="text-primary my-1 fill-current" />
-            Copy
-          </ContextButton>
-          <ContextButton onClick={() => onDelete(data)}>
-            <TrashIcon className="text-destructive my-1 fill-current" />
-            Delete
-          </ContextButton>
+          {!isShareMode && (
+            <>
+              <ContextButton onClick={() => onRename?.(data)}>
+                <EditIcon className="text-glow-orange my-1 fill-current" />
+                Rename
+              </ContextButton>
+              <ContextButton onClick={() => onCopy?.(data)}>
+                <CopyIcon className="text-primary my-1 fill-current" />
+                Copy
+              </ContextButton>
+              <ContextButton onClick={() => onDelete(data)}>
+                <TrashIcon className="text-destructive my-1 fill-current" />
+                Delete
+              </ContextButton>
+            </>
+          )}
 
           {canPaste && copiedItem && (
             <ContextButton onClick={() => pasteCopiedItem(`${data.path ?? data.name}/${copiedItem.name}`)}>

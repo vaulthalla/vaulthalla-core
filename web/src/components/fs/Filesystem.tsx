@@ -29,7 +29,7 @@ function buildRows(files: FilesystemEntry[]): FilesystemRow[] {
       entryType: 'file',
       size: formatSize(f),
       modified: new Date(f.updated_at).toLocaleString(),
-      previewUrl: `${getPreviewUrl()}?vault_id=${f.vault_id}&path=${encodeURIComponent(f.path || f.name)}&size=64`,
+      previewUrl: f.vault_id ? `${getPreviewUrl()}?vault_id=${f.vault_id}&path=${encodeURIComponent(f.path || f.name)}&size=64` : null,
     }
   })
 }

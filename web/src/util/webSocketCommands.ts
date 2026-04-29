@@ -9,6 +9,24 @@ import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
+import {
+  ShareDownloadCancelResponse,
+  ShareDownloadChunkResponse,
+  ShareDownloadStartResponse,
+  ShareEmailChallengeConfirmResponse,
+  ShareEmailChallengeStartResponse,
+  ShareLinkCreatePayload,
+  ShareLinkListResponse,
+  ShareLinkResponse,
+  ShareLinkTokenResponse,
+  ShareLinkUpdatePayload,
+  ShareListResponse,
+  ShareMetadataResponse,
+  ShareSessionOpenResponse,
+  ShareUploadCancelResponse,
+  ShareUploadFinishResponse,
+  ShareUploadStartResponse,
+} from '@/models/linkShare'
 
 export interface WebSocketCommandMap {
   // Auth
@@ -163,6 +181,61 @@ export interface WebSocketCommandMap {
   'fs.entry.copy': { payload: { vault_id: number; from: string; to: string }; response: { from: string; to: string } }
 
   'fs.entry.rename': { payload: { vault_id: number; from: string; to: string }; response: { from: string; to: string } }
+
+  // Share management commands
+
+  'share.link.create': { payload: ShareLinkCreatePayload; response: ShareLinkTokenResponse }
+
+  'share.link.get': { payload: { id: string }; response: ShareLinkResponse }
+
+  'share.link.list': {
+    payload: { vault_id?: number | null; limit?: number; offset?: number; page?: number; sort?: string; direction?: 'asc' | 'desc' }
+    response: ShareLinkListResponse
+  }
+
+  'share.link.update': { payload: ShareLinkUpdatePayload; response: ShareLinkResponse }
+
+  'share.link.revoke': { payload: { id: string }; response: { revoked: boolean } }
+
+  'share.link.rotate_token': { payload: { id: string }; response: ShareLinkTokenResponse }
+
+  // Public/share session commands
+
+  'share.session.open': { payload: { public_token: string }; response: ShareSessionOpenResponse }
+
+  'share.email.challenge.start': {
+    payload: { email: string; public_token?: string; session_token?: string }
+    response: ShareEmailChallengeStartResponse
+  }
+
+  'share.email.challenge.confirm': {
+    payload: { challenge_id: string; code: string; session_id?: string; session_token?: string }
+    response: ShareEmailChallengeConfirmResponse
+  }
+
+  // Ready share-mode filesystem and transfer commands
+
+  'share.fs.metadata': { payload: { path?: string }; response: ShareMetadataResponse }
+
+  'share.fs.list': { payload: { path?: string }; response: ShareListResponse }
+
+  'share.download.start': { payload: { path?: string }; response: ShareDownloadStartResponse }
+
+  'share.download.chunk': {
+    payload: { transfer_id: string; offset: number; length?: number }
+    response: ShareDownloadChunkResponse
+  }
+
+  'share.download.cancel': { payload: { transfer_id: string }; response: ShareDownloadCancelResponse }
+
+  'share.upload.start': {
+    payload: { path?: string; filename: string; size_bytes: number; mime_type?: string | null; duplicate_policy?: 'reject' }
+    response: ShareUploadStartResponse
+  }
+
+  'share.upload.finish': { payload: { upload_id: string }; response: ShareUploadFinishResponse }
+
+  'share.upload.cancel': { payload: { upload_id: string }; response: ShareUploadCancelResponse }
 
   // stats
   'stats.vault': { payload: { vault_id: number }; response: { stats: VaultStats } }

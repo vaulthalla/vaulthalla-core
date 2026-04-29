@@ -17,6 +17,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClos
   if (!file) return null
 
   const previewUrl = `${getPreviewUrl()}?vault_id=${file.vault_id}&path=${encodeURIComponent(file.path || file.name)}&size=1024`
+  const canPreview = file.vault_id > 0
 
   const meta = [
     { label: 'Name', value: file.name },
@@ -49,15 +50,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClos
 
           <div className="grid grid-cols-1 gap-0 md:grid-cols-3">
             <div className="relative col-span-2 flex aspect-video h-75 items-center justify-center bg-gray-800 md:aspect-auto md:h-[500px]">
-              <Image
-                src={previewUrl}
-                alt={file.name}
-                fill
-                className="rounded-l-2xl object-contain"
-                sizes="(max-width: 768px) 100vw, 66vw"
-                priority
-                unoptimized
-              />
+              {canPreview ?
+                <Image
+                  src={previewUrl}
+                  alt={file.name}
+                  fill
+                  className="rounded-l-2xl object-contain"
+                  sizes="(max-width: 768px) 100vw, 66vw"
+                  priority
+                  unoptimized
+                />
+              : <div className="px-6 text-center text-sm text-gray-300">Preview is unavailable for public share files.</div>}
             </div>
             <div className="flex flex-col justify-center space-y-4 p-6 text-white">
               <h2 className="text-xl font-semibold">{file.name}</h2>

@@ -19,6 +19,11 @@ struct Principal {
     std::time_t expires_at{};
     std::optional<std::string> ip_address;
     std::optional<std::string> user_agent;
+
+    [[nodiscard]] bool isExpired(std::time_t now) const;
+    [[nodiscard]] bool isActive(std::time_t now) const;
+    [[nodiscard]] bool allows(Operation op) const;
+    [[nodiscard]] bool hasVault(uint32_t vaultId) const noexcept;
 };
 
 }

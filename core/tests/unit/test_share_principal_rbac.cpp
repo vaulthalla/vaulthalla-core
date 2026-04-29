@@ -158,6 +158,16 @@ TEST(SharePrincipalRbacTest, AuthorizesAllowedOperationsInsideScope) {
 
     EXPECT_TRUE(decision.allowed);
     EXPECT_EQ(decision.normalized_path, "/reports/2026");
+
+    decision = Scope::authorize(*principal, {
+        .vault_id = 42,
+        .path = "/reports",
+        .operation = Operation::Metadata,
+        .target_type = TargetType::Directory
+    });
+
+    EXPECT_TRUE(decision.allowed);
+    EXPECT_EQ(decision.normalized_path, "/reports");
 }
 
 TEST(SharePrincipalRbacTest, DeniesMissingOperationAndVaultMismatch) {
@@ -180,6 +190,21 @@ TEST(SharePrincipalRbacTest, DeniesMissingOperationAndVaultMismatch) {
     });
     EXPECT_FALSE(decision.allowed);
     EXPECT_EQ(decision.reason, "vault_mismatch");
+}
+
+TEST(SharePrincipalRbacTest, AuthorizesNormalizedDescendantPath) {
+    const auto principal = makePrincipal();
+
+    const auto decision = Scope::authorize(*principal, {
+        .vault_id = 42,
+        .path = "//reports//2026///summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File
+    });
+
+    EXPECT_TRUE(decision.allowed);
+    EXPECT_EQ(decision.reason, "allowed");
+    EXPECT_EQ(decision.normalized_path, "/reports/2026/summary.pdf");
 }
 
 TEST(SharePrincipalRbacTest, DeniesPathEscapeAndSiblingPrefix) {
@@ -207,6 +232,19 @@ TEST(SharePrincipalRbacTest, DeniesPathEscapeAndSiblingPrefix) {
     decision = Scope::authorize(*principal, {
         .vault_id = 42,
         .path = "/reports2/summary.pdf",
+        .operation = Operation::Download,
+        .target_type = TargetType::File
+    });
+    EXPECT_FALSE(decision.allowed);
+    EXPECT_EQ(decision.reason, "outside_scope");
+
+    auto sharedRoot = makePrincipal();
+    sharedRoot->root_path = "/shared";
+    sharedRoot->grant.root_path = "/shared";
+
+    decision = Scope::authorize(*sharedRoot, {
+        .vault_id = 42,
+        .path = "/shared_evil/summary.pdf",
         .operation = Operation::Download,
         .target_type = TargetType::File
     });
@@ -261,6 +299,38 @@ TEST(SharePrincipalRbacTest, EnforcesUploadOverwriteAndMkdirGrantRules) {
     EXPECT_EQ(decision.reason, "invalid_mkdir_target");
 }
 
+TEST(SharePrincipalRbacTest, ReadOperationsRequireMatchingGrantBits) {
+    auto principal = makePrincipal();
+
+    auto decision = Scope::authorize(*principal, {
+        .vault_id = 42,
+        .path = "/reports/2026/summary.pdf",
+        .operation = Operation::Preview,
+        .target_type = TargetType::File
+    });
+    EXPECT_FALSE(decision.allowed);
+    EXPECT_EQ(decision.reason, "operation_not_granted");
+
+    principal->grant.allowed_ops |= bit(Operation::Preview);
+    decision = Scope::authorize(*principal, {
+        .vault_id = 42,
+        .path = "/reports/2026/summary.pdf",
+        .operation = Operation::Preview,
+        .target_type = TargetType::File
+    });
+    EXPECT_TRUE(decision.allowed);
+
+    principal->grant.allowed_ops &= ~bit(Operation::List);
+    decision = Scope::authorize(*principal, {
+        .vault_id = 42,
+        .path = "/reports/2026",
+        .operation = Operation::List,
+        .target_type = TargetType::Directory
+    });
+    EXPECT_FALSE(decision.allowed);
+    EXPECT_EQ(decision.reason, "operation_not_granted");
+}
+
 TEST(SharePrincipalRbacTest, ShareActorDoesNotInheritHumanPrivileges) {
     const auto principal = makePrincipal();
     const auto actor = vh::rbac::Actor::share(principal);
@@ -287,8 +357,8 @@ TEST(SharePrincipalRbacTest, ShareActorDoesNotInheritHumanPrivileges) {
 }
 
 TEST(SharePrincipalRbacTest, ShareGrantHasNoDeleteRenameMoveOrCopyOperation) {
-    EXPECT_THROW(operation_from_string("delete"), std::invalid_argument);
-    EXPECT_THROW(operation_from_string("rename"), std::invalid_argument);
-    EXPECT_THROW(operation_from_string("move"), std::invalid_argument);
-    EXPECT_THROW(operation_from_string("copy"), std::invalid_argument);
+    EXPECT_THROW({ (void)operation_from_string("delete"); }, std::invalid_argument);
+    EXPECT_THROW({ (void)operation_from_string("rename"); }, std::invalid_argument);
+    EXPECT_THROW({ (void)operation_from_string("move"); }, std::invalid_argument);
+    EXPECT_THROW({ (void)operation_from_string("copy"); }, std::invalid_argument);
 }

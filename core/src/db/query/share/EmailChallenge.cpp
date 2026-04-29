@@ -53,6 +53,15 @@ std::shared_ptr<vh::share::EmailChallenge> EmailChallenge::create(const std::sha
     });
 }
 
+std::shared_ptr<vh::share::EmailChallenge> EmailChallenge::get(const std::string& id) {
+    email_challenge_query_detail::require_uuid(id, "id");
+    return Transactions::exec("share::EmailChallenge::get", [&](pqxx::work& txn) -> std::shared_ptr<vh::share::EmailChallenge> {
+        const auto res = txn.exec(pqxx::prepped{"share_email_challenge_get"}, id);
+        if (res.empty()) return nullptr;
+        return std::make_shared<vh::share::EmailChallenge>(res.one_row());
+    });
+}
+
 std::shared_ptr<vh::share::EmailChallenge> EmailChallenge::getActive(const std::string& share_id, const std::vector<uint8_t>& email_hash) {
     email_challenge_query_detail::require_uuid(share_id, "share id");
     if (email_hash.empty()) throw std::invalid_argument("Share email hash is required");

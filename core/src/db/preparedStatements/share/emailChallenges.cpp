@@ -10,6 +10,8 @@ void vh::db::Connection::initPreparedShareEmailChallenges() const {
         RETURNING *
     )SQL");
 
+    conn_->prepare("share_email_challenge_get", "SELECT * FROM share_email_challenge WHERE id = $1");
+
     conn_->prepare("share_email_challenge_get_active", R"SQL(
         SELECT *
         FROM share_email_challenge

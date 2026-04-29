@@ -10,6 +10,7 @@
 #include "protocols/ws/handler/rbac/roles/Vault.hpp"
 #include "protocols/ws/handler/vault/Vaults.hpp"
 #include "protocols/ws/handler/vault/APIKeys.hpp"
+#include "protocols/ws/handler/share/Links.hpp"
 #include "log/Registry.hpp"
 
 using namespace vh::protocols::ws;
@@ -24,6 +25,7 @@ void Handler::registerAllHandlers(const std::shared_ptr<Router>& r) {
     registerSettingsHandlers(r);
     registerGroupHandlers(r);
     registerStatHandlers(r);
+    registerShareManagementHandlers(r);
 
     log::Registry::ws()->debug("[WebSocketHandler] All handlers registered successfully.");
 }
@@ -117,4 +119,13 @@ void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("stats.vault", &handler::Stats::vault);
     r->registerSessionOnlyHandler("stats.fs.cache", &handler::Stats::fsCache);
     r->registerSessionOnlyHandler("stats.http.cache", &handler::Stats::httpCache);
+}
+
+void Handler::registerShareManagementHandlers(const std::shared_ptr<Router>& r) {
+    r->registerPayload("share.link.create", &handler::share::Links::create);
+    r->registerPayload("share.link.get", &handler::share::Links::get);
+    r->registerPayload("share.link.list", &handler::share::Links::list);
+    r->registerPayload("share.link.update", &handler::share::Links::update);
+    r->registerPayload("share.link.revoke", &handler::share::Links::revoke);
+    r->registerPayload("share.link.rotate_token", &handler::share::Links::rotateToken);
 }

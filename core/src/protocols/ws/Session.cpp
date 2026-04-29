@@ -204,6 +204,9 @@ void Session::startReadLoop() {
 void Session::close() {
     if (closing_.exchange(true)) return;
 
+    if (uploadHandler_)
+        uploadHandler_->abortActiveUpload("websocket_session_closed");
+
     auto ws = ws_;
     if (!ws) {
         buffer_.consume(buffer_.size());

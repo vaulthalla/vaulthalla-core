@@ -572,6 +572,21 @@ TEST_F(WsShareUploadTest, ChunkBoundsSessionBindingAndCancelAreEnforced) {
     EXPECT_THROW({ (void)WsShareUploadHandler::finish({{"upload_id", cancelId}}, session); }, std::runtime_error);
 }
 
+TEST_F(WsShareUploadTest, SessionCloseFailsAbandonedShareUpload) {
+    auto session = readySession();
+    const auto start = WsShareUploadHandler::start({{"path", "/reports"}, {"filename", "abandoned.txt"}, {"size_bytes", 2}}, session);
+    const auto uploadId = start.at("upload_id").get<std::string>();
+
+    EXPECT_TRUE(session->getUploadHandler()->shareUploadInProgress());
+    session->close();
+
+    EXPECT_FALSE(session->getUploadHandler()->shareUploadInProgress());
+    const auto upload = store->getUpload(uploadId);
+    ASSERT_NE(upload, nullptr);
+    EXPECT_EQ(upload->status, vh::share::UploadStatus::Failed);
+    EXPECT_EQ(upload->error, "websocket_session_closed");
+}
+
 TEST_F(WsShareUploadTest, RevokedSessionFailsClosedDuringChunkRevalidation) {
     auto session = readySession();
     const auto start = WsShareUploadHandler::start({{"path", "/reports"}, {"filename", "new.txt"}, {"size_bytes", 2}}, session);

@@ -69,6 +69,7 @@ public:
     void startShareUpload(const ShareUploadArgs& args);
 
     void handleBinaryFrame(boost::beast::flat_buffer& buffer);
+    void abortActiveUpload(const std::string& reason = "upload_aborted") noexcept;
 
     void finishUpload();
     [[nodiscard]] std::shared_ptr<vh::fs::model::File> finishShareUpload(
@@ -82,6 +83,9 @@ public:
     [[nodiscard]] std::optional<std::string> activeShareUploadId() const;
 
 private:
+    void abortHumanUpload(const std::string& reason) noexcept;
+    void abortShareUpload(const std::string& reason) noexcept;
+
     std::shared_ptr<Session> session_;
     std::optional<UploadContext> currentUpload_;
     std::optional<ShareUploadContext> currentShareUpload_;

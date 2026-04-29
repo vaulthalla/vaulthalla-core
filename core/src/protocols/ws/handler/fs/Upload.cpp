@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <stdexcept>
+#include <system_error>
 
 using namespace vh::storage;
 using namespace vh::identities;
@@ -66,9 +67,7 @@ namespace vh::protocols::ws::handler::fs {
                 buffer.consume(size);
                 return;
             } catch (const std::exception& e) {
-                const auto onFail = upload.onFail;
-                currentShareUpload_.reset();
-                if (onFail) onFail(e.what());
+                abortShareUpload(e.what());
                 throw;
             }
         }
@@ -77,13 +76,76 @@ namespace vh::protocols::ws::handler::fs {
 
         auto& upload = *currentUpload_;
         const auto data = static_cast<const char*>(buffer.data().data());
-        const auto size = buffer.size();
+        const auto size = static_cast<uint64_t>(buffer.size());
 
-        upload.file.write(data, static_cast<long>(size));
-        if (!upload.file) throw std::runtime_error("Write error during upload");
+        if (size == 0) throw std::runtime_error("Empty upload chunk");
+        if (upload.bytesReceived > upload.expectedSize ||
+            size > upload.expectedSize - upload.bytesReceived) {
+            abortHumanUpload("upload_chunk_exceeds_expected_size");
+            throw std::runtime_error("Upload chunk exceeds expected size");
+        }
 
-        upload.bytesReceived += size;
-        buffer.consume(size);
+        try {
+            upload.file.write(data, static_cast<long>(size));
+            if (!upload.file) throw std::runtime_error("Write error during upload");
+
+            upload.bytesReceived += size;
+            buffer.consume(size);
+        } catch (...) {
+            abortHumanUpload("upload_write_failed");
+            throw;
+        }
+    }
+
+    void Upload::abortActiveUpload(const std::string& reason) noexcept {
+        if (currentShareUpload_) abortShareUpload(reason);
+        if (currentUpload_) abortHumanUpload(reason);
+    }
+
+    void Upload::abortHumanUpload(const std::string& reason) noexcept {
+        if (!currentUpload_) return;
+
+        auto upload = std::move(*currentUpload_);
+        currentUpload_.reset();
+
+        try {
+            if (upload.file.is_open()) upload.file.close();
+        } catch (...) {
+            log::Registry::ws()->debug("[UploadHandler] Failed to close aborted upload file (uploadId: {}, reason: {})",
+                                      upload.uploadId, reason);
+        }
+
+        if (!upload.tmpPath.empty()) {
+            std::error_code ec;
+            std::filesystem::remove(upload.tmpPath, ec);
+            if (ec) {
+                log::Registry::ws()->debug("[UploadHandler] Failed to remove aborted upload temp file (uploadId: {}, tmpPath: {}, reason: {}, error: {})",
+                                          upload.uploadId, upload.tmpPath.string(), reason, ec.message());
+            }
+        }
+
+        log::Registry::ws()->debug("[UploadHandler] Aborted upload (uploadId: {}, reason: {})",
+                                  upload.uploadId, reason);
+    }
+
+    void Upload::abortShareUpload(const std::string& reason) noexcept {
+        if (!currentShareUpload_) return;
+
+        auto upload = std::move(*currentShareUpload_);
+        currentShareUpload_.reset();
+
+        try {
+            if (upload.onFail) upload.onFail(reason);
+        } catch (const std::exception& e) {
+            log::Registry::ws()->debug("[UploadHandler] Share upload fail callback failed (uploadId: {}, reason: {}, error: {})",
+                                      upload.uploadId, reason, e.what());
+        } catch (...) {
+            log::Registry::ws()->debug("[UploadHandler] Share upload fail callback failed with unknown error (uploadId: {}, reason: {})",
+                                      upload.uploadId, reason);
+        }
+
+        log::Registry::ws()->debug("[UploadHandler] Aborted share upload (uploadId: {}, shareSessionId: {}, reason: {})",
+                                  upload.uploadId, upload.shareSessionId, reason);
     }
 
     void Upload::finishUpload() {
@@ -93,7 +155,7 @@ namespace vh::protocols::ws::handler::fs {
         upload.file.close();
 
         if (upload.bytesReceived != upload.expectedSize) {
-            std::filesystem::remove(upload.tmpPath);
+            abortHumanUpload("upload_size_mismatch");
             throw std::runtime_error("Upload size mismatch");
         }
 
@@ -101,7 +163,7 @@ namespace vh::protocols::ws::handler::fs {
                                  upload.uploadId, upload.fuseFrom.string(), upload.fuseTo.string(), session_->user->id);
 
         if (const auto err = Filesystem::rename(upload.fuseFrom, upload.fuseTo, session_->user->id, upload.engine); err) {
-            std::filesystem::remove(upload.tmpPath);
+            abortHumanUpload("upload_finish_failed");
             throw std::runtime_error(std::string("Failed to move uploaded file to final location: ") + std::strerror(err));
         }
 

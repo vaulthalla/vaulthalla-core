@@ -17,14 +17,14 @@ export const FileDropOverlay: React.FC<FileDropOverlayProps> = ({ children, disa
   const [isDragging, setIsDragging] = useState(false)
   const dragCounter = useRef(0)
 
-  const { upload, fetchFiles } = useFSStore()
+  const { upload } = useFSStore()
 
   const processFiles = (files: FileWithRelativePath[]) => {
     if (disabled) return
     ;(async () => {
-      upload(files).catch(console.error)
-      await fetchFiles()
+      await upload(files)
     })()
+      .catch(console.error)
   }
 
   const dropRef = useFileDrop({

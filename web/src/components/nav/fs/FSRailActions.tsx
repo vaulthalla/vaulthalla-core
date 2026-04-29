@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import FolderPlus from '@/fa-duotone-regular/folder-plus.svg'
 import ShareIcon from '@/fa-duotone-regular/share-nodes.svg'
 import { ShareManagementModal } from '@/components/share/ShareManagementModal'
@@ -14,24 +14,37 @@ const joinPath = (base: string, name: string) => {
 }
 
 export const FSRailActions = () => {
-  const { currVault, currentDirectory, mkdir, path } = useFSStore()
+  const { currVault, currentDirectory, fetchFiles, mkdir, mode, path } = useFSStore()
   const [shareOpen, setShareOpen] = useState(false)
-  const canUseCurrentDirectory = Boolean(currVault && currentDirectory)
+  const [shareTarget, setShareTarget] = useState<FilesystemRow | null>(null)
+  const isAuthenticatedFs = mode === 'authenticated'
+  const canUseCurrentDirectory = Boolean(currVault && isAuthenticatedFs)
 
-  const shareTarget = useMemo<FilesystemRow | null>(() => {
-    if (!currentDirectory) return null
-    return {
-      ...currentDirectory,
-      key: `${currentDirectory.vault_id}:${currentDirectory.path ?? currentDirectory.name}`,
+  const openShareCurrentDirectory = async () => {
+    if (!currVault || !isAuthenticatedFs) return
+    let directory = useFSStore.getState().currentDirectory || currentDirectory
+    if (!directory) {
+      await fetchFiles().catch(() => undefined)
+      directory = useFSStore.getState().currentDirectory
+    }
+    if (!directory?.id) {
+      window.alert('Current directory is still loading. Try again in a moment.')
+      return
+    }
+
+    setShareTarget({
+      ...directory,
+      key: `${directory.vault_id}:${directory.path ?? directory.name}`,
       entryType: 'directory',
       size: 'Directory',
-      modified: new Date(currentDirectory.updated_at).toLocaleString(),
+      modified: new Date(directory.updated_at).toLocaleString(),
       previewUrl: null,
-    }
-  }, [currentDirectory])
+    })
+    setShareOpen(true)
+  }
 
   const createDirectory = async () => {
-    if (!currVault) return
+    if (!currVault || !isAuthenticatedFs) return
     const name = window.prompt('Directory name')
     if (!name?.trim()) return
     await mkdir({ vault_id: currVault.id, path: joinPath(path, name) }).catch(err => {
@@ -45,7 +58,7 @@ export const FSRailActions = () => {
         className="flex h-10 w-full items-center justify-center rounded-lg text-cyan-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
         title="Create Directory"
         aria-label="Create Directory"
-        disabled={!currVault}
+        disabled={!currVault || !isAuthenticatedFs}
         onClick={createDirectory}>
         <FolderPlus className="h-5 w-5 fill-current" />
       </button>
@@ -54,7 +67,7 @@ export const FSRailActions = () => {
         title="Share Current Directory"
         aria-label="Share Current Directory"
         disabled={!canUseCurrentDirectory}
-        onClick={() => setShareOpen(true)}>
+        onClick={openShareCurrentDirectory}>
         <ShareIcon className="h-5 w-5 fill-current" />
       </button>
 

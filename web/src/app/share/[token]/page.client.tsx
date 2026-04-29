@@ -70,6 +70,9 @@ const SharePageClient = ({ token }: { token: string }) => {
   const title = share?.public_label || share?.metadata?.label?.toString() || 'Shared files'
   const expiresAt = share?.expires_at ? formatShareDate(share.expires_at) : null
   const pathParts = useMemo(() => path.split('/').filter(Boolean), [path])
+  const previewDataUrl = sharePreview ? `data:${sharePreview.mime_type};base64,${sharePreview.data_base64}` : null
+  const previewIsImage = Boolean(sharePreview?.mime_type.startsWith('image/'))
+  const previewIsPdf = sharePreview?.mime_type === 'application/pdf'
 
   useEffect(() => {
     enterShareMode()
@@ -106,28 +109,34 @@ const SharePageClient = ({ token }: { token: string }) => {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-4 py-6 text-white sm:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5">
-        <header className="rounded border border-white/10 bg-gray-900/80 p-4 shadow-lg">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <main className="min-h-screen bg-gray-950 px-3 py-4 text-white sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <header className="rounded-lg border border-white/10 bg-gray-900/90 p-3 shadow-lg">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
-              <p className="text-sm text-cyan-300">Vaulthalla Share</p>
-              <h1 className="truncate text-2xl font-semibold">{title}</h1>
-              {share?.root_path && <p className="mt-1 truncate text-sm text-gray-400">{share.root_path}</p>}
-              {expiresAt && <p className="mt-1 text-xs text-gray-500">Expires {expiresAt}</p>}
+              <p className="text-xs font-medium uppercase tracking-wide text-cyan-300">Vaulthalla Share</p>
+              <h1 className="truncate text-xl font-semibold">{title}</h1>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+                {share?.root_path && <span className="truncate">{share.root_path}</span>}
+                {expiresAt && <span>Expires {expiresAt}</span>}
+              </div>
             </div>
 
             {share && (
-              <div className="max-w-sm text-sm text-gray-300 md:text-right">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Allowed actions</div>
-                <div className="mt-1">{shareOperationLabel(share.allowed_ops)}</div>
-                {share.access_mode === 'email_validated' && <div className="mt-1 text-cyan-200">Email verified</div>}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-300 md:justify-end">
+                {canList && <span className="rounded border border-white/10 bg-white/5 px-2 py-1">List</span>}
+                {canPreview && <span className="rounded border border-white/10 bg-white/5 px-2 py-1">Preview</span>}
+                {canDownload && <span className="rounded border border-white/10 bg-white/5 px-2 py-1">Download</span>}
+                {canUpload && <span className="rounded border border-white/10 bg-white/5 px-2 py-1">Upload</span>}
+                {share.access_mode === 'email_validated' && (
+                  <span className="rounded border border-cyan-500/30 bg-cyan-950/40 px-2 py-1 text-cyan-100">Email verified</span>
+                )}
               </div>
             )}
           </div>
 
           {status === 'ready' && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-sm text-gray-300">
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-sm text-gray-300">
               <button className="rounded border border-gray-700 px-2 py-1 text-cyan-300 hover:bg-white/10" onClick={() => setPath('/')}>
                 Root
               </button>
@@ -217,20 +226,20 @@ const SharePageClient = ({ token }: { token: string }) => {
 
         {status === 'ready' && (
           <>
-            <section className="grid gap-3 md:grid-cols-3">
-              <div className="rounded border border-white/10 bg-gray-900 p-3">
+            <section className="grid gap-2 md:grid-cols-3">
+              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
                 <div className="text-xs text-gray-500">Access</div>
                 <div className="mt-1 text-sm text-gray-200">{shareOperationLabel(share?.allowed_ops)}</div>
               </div>
-              <div className="rounded border border-white/10 bg-gray-900 p-3">
-                <div className="text-xs text-gray-500">Download</div>
+              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
+                <div className="text-xs text-gray-500">Files</div>
                 <div className="mt-1 text-sm text-gray-200">
                   {canPreview ? 'Click a file to preview it.'
                   : canDownload ? 'Click a file to download it.'
                   : 'Not allowed for this share.'}
                 </div>
               </div>
-              <div className="rounded border border-white/10 bg-gray-900 p-3">
+              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
                 <div className="text-xs text-gray-500">Upload</div>
                 <div className="mt-1 text-sm text-gray-200">
                   {canUpload && isDirectoryShare ? 'Drop files into this page to upload.' : 'Not allowed for this share.'}
@@ -257,33 +266,53 @@ const SharePageClient = ({ token }: { token: string }) => {
             )}
 
             {isFileShare && (
-              <section className="rounded border border-white/10 bg-gray-900 p-5">
-                <h2 className="text-lg font-semibold">Shared file</h2>
-                <p className="mt-2 text-sm text-gray-300">
-                  {canPreview ? 'Preview opens automatically when supported.' : 'Preview is not available for this share.'}
-                </p>
-                {sharePreview && (
-                  <div className="mt-4 overflow-hidden rounded border border-gray-800 bg-black/40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className="mx-auto max-h-[70vh] max-w-full object-contain"
-                      src={`data:${sharePreview.mime_type};base64,${sharePreview.data_base64}`}
-                      alt={sharePreview.filename}
-                    />
+              <section className="rounded-lg border border-white/10 bg-gray-900/90">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                  <div>
+                    <h2 className="text-base font-semibold">Shared file</h2>
+                    <p className="text-xs text-gray-400">
+                      {canPreview ? 'Preview opens automatically when supported.' : 'Preview is not available for this share.'}
+                    </p>
+                  </div>
+                  {canDownload && (
+                    <button
+                      className="rounded bg-cyan-500 px-3 py-1.5 text-sm font-medium text-gray-950 disabled:opacity-60"
+                      onClick={downloadRootFile}
+                      disabled={downloading}>
+                      Download File
+                    </button>
+                  )}
+                </div>
+
+                {sharePreview && previewDataUrl && (
+                  <div className="flex min-h-[18rem] items-center justify-center overflow-hidden bg-black/30 p-4">
+                    {previewIsImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="max-h-[52vh] max-w-full rounded object-contain shadow-2xl"
+                        src={previewDataUrl}
+                        alt={sharePreview.filename}
+                      />
+                    )}
+                    {!previewIsImage && previewIsPdf && (
+                      <object
+                        className="h-[52vh] w-full max-w-4xl rounded bg-white"
+                        data={previewDataUrl}
+                        type={sharePreview.mime_type}
+                        aria-label={sharePreview.filename}
+                      />
+                    )}
+                    {!previewIsImage && !previewIsPdf && (
+                      <div className="rounded border border-gray-800 bg-gray-950 p-6 text-sm text-gray-300">
+                        Preview is not available for this file type.
+                      </div>
+                    )}
                   </div>
                 )}
                 {!sharePreview && canPreview && !previewError && (
-                  <div className="mt-4 rounded border border-gray-800 bg-gray-950 p-6 text-sm text-gray-300">
+                  <div className="m-4 rounded border border-gray-800 bg-gray-950 p-6 text-sm text-gray-300">
                     {previewing ? 'Preparing preview...' : 'Preview will appear here when available.'}
                   </div>
-                )}
-                {canDownload && (
-                  <button
-                    className="mt-4 rounded bg-cyan-500 px-4 py-2 font-medium text-gray-950 disabled:opacity-60"
-                    onClick={downloadRootFile}
-                    disabled={downloading}>
-                    Download File
-                  </button>
                 )}
               </section>
             )}

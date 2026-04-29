@@ -171,7 +171,14 @@ const requireReadyShareSession = () => {
     throw new Error('Share session disconnected. Reopen the share link and try again.')
 }
 
-const waitForBufferedAmount = async (socket: WebSocket, maxBufferedBytes = 1024 * 1024) => {
+const currentShareSocket = () => {
+  requireReadyShareSession()
+  const socket = useShareWebSocketStore.getState().socket
+  if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error('Share upload connection is not open')
+  return socket
+}
+
+const waitForBufferedAmount = async (socket: WebSocket, maxBufferedBytes = 128 * 1024) => {
   while (socket.bufferedAmount > maxBufferedBytes) {
     await new Promise(resolve => window.setTimeout(resolve, 25))
     if (socket.readyState !== WebSocket.OPEN) throw new Error('Share upload connection closed')
@@ -425,14 +432,14 @@ export const useFSStore = create<FsStore>()(
             duplicate_policy: 'reject',
           })
 
-          const wsInstance = ws.socket
-          if (!wsInstance || wsInstance.readyState !== WebSocket.OPEN) throw new Error('Share WebSocket is not connected')
+          const wsInstance = currentShareSocket()
           const chunkSize = startResp.chunk_size || 256 * 1024
           let offset = 0
 
           try {
             while (offset < file.size) {
-              requireReadyShareSession()
+              if (currentShareSocket() !== wsInstance)
+                throw new Error('Share upload connection changed during upload. Reopen the share link and try again.')
               const slice = file.slice(offset, Math.min(offset + chunkSize, file.size))
               const arrayBuffer = await slice.arrayBuffer()
               if (wsInstance.readyState !== WebSocket.OPEN) throw new Error('Share upload connection closed')
@@ -443,7 +450,8 @@ export const useFSStore = create<FsStore>()(
               onProgress?.(slice.size)
             }
 
-            requireReadyShareSession()
+            if (currentShareSocket() !== wsInstance)
+              throw new Error('Share upload connection changed before finish. Reopen the share link and try again.')
             await ws.sendCommand('share.upload.finish', { upload_id: startResp.upload_id })
           } catch (error) {
             await ws.sendCommand('share.upload.cancel', { upload_id: startResp.upload_id }).catch(() => undefined)

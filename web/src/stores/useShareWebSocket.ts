@@ -82,6 +82,7 @@ export const useShareWebSocketStore = create<ShareWebSocketStore>()(
         ws.onclose = () => {
           isConnecting = false
           const pending = get().pending
+          console.warn(`[ShareWS] Disconnected with ${Object.keys(pending).length} pending request(s)`)
           Object.values(pending).forEach(request => {
             clearTimeout(request.timeout)
             request.reject(new Error('Share WebSocket disconnected. Reopen the share link and try again.'))
@@ -151,7 +152,15 @@ export const useShareWebSocketStore = create<ShareWebSocketStore>()(
             },
           }))
 
-          socket.send(JSON.stringify(message))
+          try {
+            socket.send(JSON.stringify(message))
+          } catch (error) {
+            clearTimeout(timeout)
+            const updated = { ...get().pending }
+            delete updated[requestId]
+            set({ pending: updated })
+            reject(error instanceof Error ? error : new Error('Unable to send share websocket command'))
+          }
         })
       },
     }

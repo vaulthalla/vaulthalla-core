@@ -23,23 +23,21 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
   const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number; row: FilesystemRow } | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
 
-  const {
-    setCopiedItem,
-    copiedItem,
-    pasteCopiedItem,
-    setPath,
-    fetchFiles,
-    delete: deleteItem,
-    currVault,
-    mode,
-    downloadFile,
-    downloading,
-    previewing,
-    previewError,
-    sharePreview,
-    clearSharePreview,
-  } = useFSStore()
-  const { share } = useVaultShareStore()
+  const setCopiedItem = useFSStore(state => state.setCopiedItem)
+  const copiedItem = useFSStore(state => state.copiedItem)
+  const pasteCopiedItem = useFSStore(state => state.pasteCopiedItem)
+  const setPath = useFSStore(state => state.setPath)
+  const fetchFiles = useFSStore(state => state.fetchFiles)
+  const deleteItem = useFSStore(state => state.delete)
+  const currVault = useFSStore(state => state.currVault)
+  const mode = useFSStore(state => state.mode)
+  const downloadFile = useFSStore(state => state.downloadFile)
+  const downloading = useFSStore(state => state.downloading)
+  const previewing = useFSStore(state => state.previewing)
+  const previewError = useFSStore(state => state.previewError)
+  const sharePreview = useFSStore(state => state.sharePreview)
+  const clearSharePreview = useFSStore(state => state.clearSharePreview)
+  const share = useVaultShareStore(state => state.share)
   const canSharePreview = hasShareOperation(share?.allowed_ops, 'preview')
   const canShareDownload = hasShareOperation(share?.allowed_ops, 'download')
 

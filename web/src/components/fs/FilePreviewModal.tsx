@@ -17,7 +17,7 @@ interface FilePreviewModalProps {
 }
 
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, sharePreview, onClose }) => {
-  const { mode } = useFSStore()
+  const mode = useFSStore(state => state.mode)
 
   if (!file && !sharePreview) return null
 

@@ -37,7 +37,7 @@ function buildRows(files: FilesystemEntry[]): FilesystemRow[] {
 }
 
 export const Filesystem = ({ files }: FileSystemProps) => {
-  const rows = buildRows(files)
+  const rows = React.useMemo(() => buildRows(files), [files])
   return <FilesystemClient rows={rows} />
 }
 

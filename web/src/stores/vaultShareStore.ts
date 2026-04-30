@@ -33,7 +33,15 @@ export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
   challengeStartedAt: null,
 
   async openSession(publicToken) {
+    const current = get()
     const ws = useShareWebSocketStore.getState()
+
+    if (current.publicToken === publicToken && current.status === 'ready' && current.share) return
+
+    if (current.publicToken && current.publicToken !== publicToken) {
+      ws.disconnect()
+    }
+
     set({
       status: 'opening',
       publicToken,

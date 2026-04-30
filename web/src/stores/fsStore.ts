@@ -193,6 +193,21 @@ const requireAuthenticatedMode = (mode: FsMode, action: string) => {
 
 const errorMessage = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback)
 
+const clearTransferState = () => ({
+  copiedItem: null,
+  uploadProgress: 0,
+  uploading: false,
+  uploadError: null,
+  uploadLabel: null,
+  downloadProgress: 0,
+  downloading: false,
+  downloadError: null,
+  downloadLabel: null,
+  previewing: false,
+  previewError: null,
+  sharePreview: null,
+})
+
 const decodeBase64 = (value: string): Uint8Array<ArrayBuffer> => {
   const binary = window.atob(value)
   const bytes = new Uint8Array(new ArrayBuffer(binary.length))
@@ -370,13 +385,43 @@ export const useFSStore = create<FsStore>()(
           return
         }
 
-        try {
-          const response = await ws.sendCommand('fs.dir.list', { vault_id: currVault.id, path })
+        const loadAuthenticatedDirectory = async (vault: Vault | LocalDiskVault | S3Vault, requestedPath: string) => {
+          const response = await ws.sendCommand('fs.dir.list', { vault_id: vault.id, path: requestedPath })
           const files = response.files.map(wireEntryToFsEntry)
-          const currentDirectory = response.entry ? new Directory(response.entry) : inferListedDirectory(path, currVault, files)
-          set({ currentDirectory, files })
+          const currentDirectory = response.entry ? new Directory(response.entry) : inferListedDirectory(requestedPath, vault, files)
+          set({ currentDirectory, files, path: response.path ?? requestedPath })
+        }
+
+        try {
+          await loadAuthenticatedDirectory(currVault, path)
         } catch (error) {
           console.error('Error fetching files:', error)
+
+          const normalizedPath = normalizeAuthPath(path)
+          if (normalizedPath !== '/') {
+            set({ path: '', currentDirectory: null, files: [], ...clearTransferState() })
+            try {
+              await loadAuthenticatedDirectory(currVault, '')
+              return
+            } catch (rootError) {
+              console.error('[FsStore] Root fallback after stale path failed:', rootError)
+            }
+          }
+
+          try {
+            const vaultStore = useVaultStore.getState()
+            await vaultStore.fetchVaults()
+            const localVault = await vaultStore.getLocalVault()
+            if (localVault) {
+              set({ currVault: localVault, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+              await loadAuthenticatedDirectory(localVault, '')
+              return
+            }
+          } catch (vaultError) {
+            console.error('[FsStore] Vault recovery after list failure failed:', vaultError)
+          }
+
+          set({ currentDirectory: null, files: [], ...clearTransferState() })
           throw error
         }
       },
@@ -402,8 +447,14 @@ export const useFSStore = create<FsStore>()(
             })
           }
 
-          if (get().mode === 'authenticated') await useVaultStore.getState().syncVault({ id: get().currVault?.id || 0 })
-          await fetchFiles()
+          if (get().mode === 'authenticated') {
+            await useVaultStore.getState().syncVault({ id: get().currVault?.id || 0 })
+            await fetchFiles()
+          } else {
+            const shareState = useVaultShareStore.getState()
+            if (hasShareOperation(shareState.share?.allowed_ops, 'list') || shareState.share?.target_type === 'file')
+              await fetchFiles()
+          }
         } catch (err) {
           console.error('[FsStore] upload() batch failed:', err)
           set({ uploadError: errorMessage(err, 'Upload failed') })
@@ -651,7 +702,7 @@ export const useFSStore = create<FsStore>()(
 
       async setCurrVault(vault) {
         requireAuthenticatedMode(get().mode, 'Vault selection')
-        set({ currVault: vault })
+        set({ currVault: vault, path: '', currentDirectory: null, files: [], ...clearTransferState() })
         await get().fetchFiles()
       },
 
@@ -687,25 +738,36 @@ export const useFSStore = create<FsStore>()(
         currVault: state.mode === 'authenticated' ? state.currVault : null,
         path: state.mode === 'authenticated' ? state.path : '',
       }),
-      onRehydrateStorage: state => {
-        if (isShareRoute()) return
-        console.log('[FsStore] Rehydrated from storage')
-        ;(async () => {
-          try {
-            await useWebSocketStore.getState().waitForConnection()
+      onRehydrateStorage: () => {
+        return hydratedState => {
+          if (!hydratedState || isShareRoute()) return
+          console.log('[FsStore] Rehydrated from storage')
+          ;(async () => {
+            try {
+              await useWebSocketStore.getState().waitForConnection()
 
-            const vaultStore = useVaultStore.getState()
-            if (!state.currVault) {
-              const localVault = await vaultStore.getLocalVault()
-              if (localVault) state.setCurrVault(localVault)
-              else console.warn('[FsStore] No local vault found during rehydration')
+              const vaultStore = useVaultStore.getState()
+              await vaultStore.fetchVaults()
+              const freshVault = hydratedState.currVault ?
+                useVaultStore.getState().vaults.find((v: Vault) => v.id === hydratedState.currVault?.id)
+              : undefined
+
+              if (freshVault) {
+                await hydratedState.setCurrVault(freshVault)
+              } else {
+                useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+                const localVault = await vaultStore.getLocalVault()
+                if (localVault) await hydratedState.setCurrVault(localVault)
+                else console.warn('[FsStore] No local vault found during rehydration')
+              }
+
+              if (!hydratedState.files || hydratedState.files.length === 0) await hydratedState.fetchFiles()
+            } catch (err) {
+              console.error('[FsStore] Rehydrate fetch failed:', err)
+              useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState() })
             }
-
-            if (!state.files || state.files.length === 0) await state.fetchFiles()
-          } catch (err) {
-            console.error('[FsStore] Rehydrate fetch failed:', err)
-          }
-        })()
+          })()
+        }
       },
     },
   ),

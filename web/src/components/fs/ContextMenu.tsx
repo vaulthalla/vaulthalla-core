@@ -29,8 +29,10 @@ export function ContextMenu<
 >({ data, position, onClose, onDelete, onCopy, onRename, onShare, onOpen, onPreview, onDownload }: ContextMenuProps<T>) {
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { copiedItem, pasteCopiedItem, mode } = useFSStore()
-  const { share } = useVaultShareStore()
+  const copiedItem = useFSStore(state => state.copiedItem)
+  const pasteCopiedItem = useFSStore(state => state.pasteCopiedItem)
+  const mode = useFSStore(state => state.mode)
+  const share = useVaultShareStore(state => state.share)
 
   const isDirectory = typeof data.file_count === 'number' || typeof data.subdirectory_count === 'number'
   const isShareMode = mode === 'share'

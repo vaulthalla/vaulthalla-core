@@ -21,33 +21,29 @@ const Alert = ({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success
 const SharePageClient = ({ token }: { token: string }) => {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
-  const {
-    status,
-    share,
-    error,
-    openSession,
-    startEmailChallenge,
-    confirmEmailChallenge,
-    clearShareSession,
-    challengeId,
-    emailSubmitting,
-    codeSubmitting,
-    challengeStartedAt,
-  } = useVaultShareStore()
-  const {
-    files,
-    fetchFiles,
-    enterShareMode,
-    exitShareMode,
-    uploadError,
-    uploadLabel,
-    uploading,
-    uploadProgress,
-    downloading,
-    downloadLabel,
-    downloadProgress,
-    downloadError,
-  } = useFSStore()
+  const status = useVaultShareStore(state => state.status)
+  const share = useVaultShareStore(state => state.share)
+  const error = useVaultShareStore(state => state.error)
+  const openSession = useVaultShareStore(state => state.openSession)
+  const startEmailChallenge = useVaultShareStore(state => state.startEmailChallenge)
+  const confirmEmailChallenge = useVaultShareStore(state => state.confirmEmailChallenge)
+  const clearShareSession = useVaultShareStore(state => state.clearShareSession)
+  const challengeId = useVaultShareStore(state => state.challengeId)
+  const emailSubmitting = useVaultShareStore(state => state.emailSubmitting)
+  const codeSubmitting = useVaultShareStore(state => state.codeSubmitting)
+  const challengeStartedAt = useVaultShareStore(state => state.challengeStartedAt)
+  const files = useFSStore(state => state.files)
+  const fetchFiles = useFSStore(state => state.fetchFiles)
+  const enterShareMode = useFSStore(state => state.enterShareMode)
+  const exitShareMode = useFSStore(state => state.exitShareMode)
+  const uploadError = useFSStore(state => state.uploadError)
+  const uploadLabel = useFSStore(state => state.uploadLabel)
+  const uploading = useFSStore(state => state.uploading)
+  const uploadProgress = useFSStore(state => state.uploadProgress)
+  const downloading = useFSStore(state => state.downloading)
+  const downloadLabel = useFSStore(state => state.downloadLabel)
+  const downloadProgress = useFSStore(state => state.downloadProgress)
+  const downloadError = useFSStore(state => state.downloadError)
 
   const canList = hasShareOperation(share?.allowed_ops, 'list')
   const canPreview = hasShareOperation(share?.allowed_ops, 'preview')
@@ -55,6 +51,7 @@ const SharePageClient = ({ token }: { token: string }) => {
   const canUpload = hasShareOperation(share?.allowed_ops, 'upload')
   const isFileShare = share?.target_type === 'file'
   const isDirectoryShare = share?.target_type === 'directory'
+  const canShowFileSurface = canList || isFileShare || (canUpload && isDirectoryShare)
   const title = share?.public_label || share?.metadata?.label?.toString() || 'Shared files'
   const expiresAt = share?.expires_at ? formatShareDate(share.expires_at) : null
 
@@ -192,7 +189,7 @@ const SharePageClient = ({ token }: { token: string }) => {
               </Alert>
             )}
 
-            {canList || isFileShare ? (
+            {canShowFileSurface ? (
               <FileDropOverlay disabled={!canUpload || !isDirectoryShare} disabledMessage="Upload is not available for this share">
                 <UploadProgress />
                 {files.length === 0 ? (

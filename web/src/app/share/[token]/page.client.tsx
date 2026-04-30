@@ -1,18 +1,13 @@
 'use client'
 
-import React, { FormEvent, useEffect, useMemo, useState } from 'react'
+import React, { FormEvent, useEffect, useState } from 'react'
 import { Filesystem } from '@/components/fs/Filesystem'
 import { FileDropOverlay } from '@/components/fs/FileDropOverlay'
+import { Breadcrumbs } from '@/components/fs/breadcrumbs/Breadcrumbs'
 import UploadProgress from '@/components/loading/UploadProgress'
 import { useFSStore } from '@/stores/fsStore'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
-import { formatShareDate, hasShareOperation, shareOperationLabel } from '@/util/shareOperations'
-
-const parentPath = (path: string) => {
-  const parts = path.split('/').filter(Boolean)
-  parts.pop()
-  return parts.length ? `/${parts.join('/')}` : '/'
-}
+import { formatShareDate, hasShareOperation } from '@/util/shareOperations'
 
 const Alert = ({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success'; children: React.ReactNode }) => {
   const styles =
@@ -41,8 +36,6 @@ const SharePageClient = ({ token }: { token: string }) => {
   } = useVaultShareStore()
   const {
     files,
-    path,
-    setPath,
     fetchFiles,
     enterShareMode,
     exitShareMode,
@@ -50,15 +43,10 @@ const SharePageClient = ({ token }: { token: string }) => {
     uploadLabel,
     uploading,
     uploadProgress,
-    previewing,
-    previewError,
-    sharePreview,
     downloading,
     downloadLabel,
     downloadProgress,
     downloadError,
-    downloadFile,
-    previewFile,
   } = useFSStore()
 
   const canList = hasShareOperation(share?.allowed_ops, 'list')
@@ -69,10 +57,6 @@ const SharePageClient = ({ token }: { token: string }) => {
   const isDirectoryShare = share?.target_type === 'directory'
   const title = share?.public_label || share?.metadata?.label?.toString() || 'Shared files'
   const expiresAt = share?.expires_at ? formatShareDate(share.expires_at) : null
-  const pathParts = useMemo(() => path.split('/').filter(Boolean), [path])
-  const previewDataUrl = sharePreview ? `data:${sharePreview.mime_type};base64,${sharePreview.data_base64}` : null
-  const previewIsImage = Boolean(sharePreview?.mime_type.startsWith('image/'))
-  const previewIsPdf = sharePreview?.mime_type === 'application/pdf'
 
   useEffect(() => {
     enterShareMode()
@@ -85,13 +69,8 @@ const SharePageClient = ({ token }: { token: string }) => {
   }, [clearShareSession, enterShareMode, exitShareMode, openSession, token])
 
   useEffect(() => {
-    if (status === 'ready' && canList) fetchFiles().catch(() => undefined)
-  }, [canList, fetchFiles, status])
-
-  useEffect(() => {
-    if (status !== 'ready' || !isFileShare || !canPreview || previewing || previewError || sharePreview) return
-    previewFile('/').catch(() => undefined)
-  }, [canPreview, isFileShare, previewError, previewFile, previewing, sharePreview, status])
+    if (status === 'ready' && (canList || isFileShare)) fetchFiles().catch(() => undefined)
+  }, [canList, fetchFiles, isFileShare, status])
 
   const submitEmail = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -101,11 +80,6 @@ const SharePageClient = ({ token }: { token: string }) => {
   const submitCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     await confirmEmailChallenge(code).catch(() => undefined)
-  }
-
-  const downloadRootFile = () => {
-    if (!canDownload || downloading) return
-    downloadFile('/').catch(() => undefined)
   }
 
   return (
@@ -134,30 +108,6 @@ const SharePageClient = ({ token }: { token: string }) => {
               </div>
             )}
           </div>
-
-          {status === 'ready' && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-sm text-gray-300">
-              <button className="rounded border border-gray-700 px-2 py-1 text-cyan-300 hover:bg-white/10" onClick={() => setPath('/')}>
-                Root
-              </button>
-              {pathParts.map((part, index, parts) => {
-                const fullPath = `/${parts.slice(0, index + 1).join('/')}`
-                return (
-                  <React.Fragment key={fullPath}>
-                    <span>/</span>
-                    <button className="text-cyan-300 hover:underline" onClick={() => setPath(fullPath)}>
-                      {part}
-                    </button>
-                  </React.Fragment>
-                )
-              })}
-              {path !== '/' && (
-                <button className="ml-auto rounded border border-gray-700 px-2 py-1 text-gray-200 hover:bg-white/10" onClick={() => setPath(parentPath(path))}>
-                  Up
-                </button>
-              )}
-            </div>
-          )}
         </header>
 
         {status === 'opening' || status === 'idle' ? (
@@ -226,36 +176,13 @@ const SharePageClient = ({ token }: { token: string }) => {
 
         {status === 'ready' && (
           <>
-            <section className="grid gap-2 md:grid-cols-3">
-              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
-                <div className="text-xs text-gray-500">Access</div>
-                <div className="mt-1 text-sm text-gray-200">{shareOperationLabel(share?.allowed_ops)}</div>
-              </div>
-              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
-                <div className="text-xs text-gray-500">Files</div>
-                <div className="mt-1 text-sm text-gray-200">
-                  {canPreview ? 'Click a file to preview it.'
-                  : canDownload ? 'Click a file to download it.'
-                  : 'Not allowed for this share.'}
-                </div>
-              </div>
-              <div className="rounded border border-white/10 bg-gray-900/80 p-3">
-                <div className="text-xs text-gray-500">Upload</div>
-                <div className="mt-1 text-sm text-gray-200">
-                  {canUpload && isDirectoryShare ? 'Drop files into this page to upload.' : 'Not allowed for this share.'}
-                </div>
-              </div>
-            </section>
+            <div className="rounded border border-white/10 bg-gray-900/80 px-3 py-2">
+              <Breadcrumbs />
+            </div>
 
             {(downloading || downloadError) && (
               <Alert tone={downloadError ? 'error' : 'info'}>
                 {downloadError || `Downloading ${downloadLabel || 'file'}... ${Math.round(downloadProgress)}%`}
-              </Alert>
-            )}
-
-            {(previewing || previewError) && (
-              <Alert tone={previewError ? 'error' : 'info'}>
-                {previewError || 'Preparing preview...'}
               </Alert>
             )}
 
@@ -265,59 +192,7 @@ const SharePageClient = ({ token }: { token: string }) => {
               </Alert>
             )}
 
-            {isFileShare && (
-              <section className="rounded-lg border border-white/10 bg-gray-900/90">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Shared file</h2>
-                    <p className="text-xs text-gray-400">
-                      {canPreview ? 'Preview opens automatically when supported.' : 'Preview is not available for this share.'}
-                    </p>
-                  </div>
-                  {canDownload && (
-                    <button
-                      className="rounded bg-cyan-500 px-3 py-1.5 text-sm font-medium text-gray-950 disabled:opacity-60"
-                      onClick={downloadRootFile}
-                      disabled={downloading}>
-                      Download File
-                    </button>
-                  )}
-                </div>
-
-                {sharePreview && previewDataUrl && (
-                  <div className="flex min-h-[18rem] items-center justify-center overflow-hidden bg-black/30 p-4">
-                    {previewIsImage && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        className="max-h-[52vh] max-w-full rounded object-contain shadow-2xl"
-                        src={previewDataUrl}
-                        alt={sharePreview.filename}
-                      />
-                    )}
-                    {!previewIsImage && previewIsPdf && (
-                      <object
-                        className="h-[52vh] w-full max-w-4xl rounded bg-white"
-                        data={previewDataUrl}
-                        type={sharePreview.mime_type}
-                        aria-label={sharePreview.filename}
-                      />
-                    )}
-                    {!previewIsImage && !previewIsPdf && (
-                      <div className="rounded border border-gray-800 bg-gray-950 p-6 text-sm text-gray-300">
-                        Preview is not available for this file type.
-                      </div>
-                    )}
-                  </div>
-                )}
-                {!sharePreview && canPreview && !previewError && (
-                  <div className="m-4 rounded border border-gray-800 bg-gray-950 p-6 text-sm text-gray-300">
-                    {previewing ? 'Preparing preview...' : 'Preview will appear here when available.'}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {canList ? (
+            {canList || isFileShare ? (
               <FileDropOverlay disabled={!canUpload || !isDirectoryShare} disabledMessage="Upload is not available for this share">
                 <UploadProgress />
                 {files.length === 0 ? (
@@ -330,16 +205,14 @@ const SharePageClient = ({ token }: { token: string }) => {
                 )}
               </FileDropOverlay>
             ) : (
-              !isFileShare && (
-                <Alert tone="info">
-                  Directory listing is not available for this share. Use a link with list access to browse contents.
-                </Alert>
-              )
+              <Alert tone="info">
+                Directory listing is not available for this share. Use a link with list access to browse contents.
+              </Alert>
             )}
           </>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'expired' || status === 'revoked') && (
           <section className="rounded border border-red-500/40 bg-red-950/40 p-6 text-red-100">
             <h2 className="text-xl font-semibold">Share unavailable</h2>
             <p className="mt-2 text-sm">{error || 'This share could not be opened. It may be expired, revoked, or disabled.'}</p>

@@ -3,8 +3,29 @@
 import React from 'react'
 import { useVaultStore } from '@/stores/vaultStore'
 import { useFSStore } from '@/stores/fsStore'
+import { useVaultShareStore } from '@/stores/vaultShareStore'
 
 export const VaultSelector = () => {
+  const { mode } = useFSStore()
+
+  if (mode === 'share') return <ShareRootSelector />
+
+  return <AuthenticatedVaultSelector />
+}
+
+const ShareRootSelector = () => {
+  const { share } = useVaultShareStore()
+  const { setPath } = useFSStore()
+  const label = share?.public_label || share?.metadata?.label?.toString() || 'Shared Files'
+
+  return (
+    <span className="cursor-pointer font-medium text-cyan-400 hover:underline" onClick={() => setPath('/')}>
+      {label}
+    </span>
+  )
+}
+
+const AuthenticatedVaultSelector = () => {
   const { currVault, setCurrVault, setPath } = useFSStore()
   const { vaults } = useVaultStore()
 

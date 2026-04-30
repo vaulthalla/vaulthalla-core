@@ -171,9 +171,35 @@ export interface WebSocketCommandMap {
     response: { vault: string; path: string; entry?: Directory; files: (File | Directory)[] }
   }
 
-  'fs.upload.start': { payload: IFileUpload; response: { upload_id: string } }
+  'fs.metadata': {
+    payload: { vault_id?: number | null; path?: string }
+    response: { vault?: string; path: string; entry: File | Directory | ShareMetadataResponse['entry'] }
+  }
 
-  'fs.upload.finish': { payload: Partial<IFileUpload>; response: { path: string } }
+  'fs.list': {
+    payload: { vault_id?: number | null; path?: string }
+    response: { vault?: string; path: string; entry?: File | Directory | ShareMetadataResponse['entry']; files: (File | Directory | ShareMetadataResponse['entry'])[] }
+  }
+
+  'fs.download.start': { payload: { path?: string; vault_id?: number | null }; response: ShareDownloadStartResponse }
+
+  'fs.download.chunk': {
+    payload: { transfer_id: string; offset: number; length?: number }
+    response: ShareDownloadChunkResponse
+  }
+
+  'fs.download.cancel': { payload: { transfer_id: string }; response: ShareDownloadCancelResponse }
+
+  'fs.upload.start': {
+    payload:
+      | IFileUpload
+      | { path?: string; filename?: string; size_bytes?: number; size?: number; mime_type?: string | null; duplicate_policy?: 'reject' }
+    response: { upload_id: string; transfer_id?: string; path?: string; filename?: string; size_bytes?: number; chunk_size?: number; duplicate_policy?: string }
+  }
+
+  'fs.upload.finish': { payload: Partial<IFileUpload> | { upload_id: string }; response: { path?: string } | ShareUploadFinishResponse }
+
+  'fs.upload.cancel': { payload: { upload_id?: string }; response: { cancelled: boolean; upload_id?: string } }
 
   'fs.entry.delete': { payload: { vault_id: number; path: string }; response: null }
 

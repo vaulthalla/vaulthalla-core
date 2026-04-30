@@ -29,8 +29,8 @@ const isErrorStatus = (status: unknown) => status === 'ERROR' || status === 'UNA
 const isBootstrapCommand = (command: keyof WebSocketCommandMap) =>
   command === 'share.session.open' || command === 'share.email.challenge.start' || command === 'share.email.challenge.confirm'
 const commandTimeoutMs = (command: keyof WebSocketCommandMap) => {
-  if (command === 'share.upload.finish') return 60000
-  if (command === 'share.upload.start' || command === 'share.preview.get') return 20000
+  if (command === 'share.upload.finish' || command === 'fs.upload.finish') return 60000
+  if (command === 'share.upload.start' || command === 'fs.upload.start' || command === 'share.preview.get') return 20000
   return 10000
 }
 

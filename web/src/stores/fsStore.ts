@@ -129,6 +129,12 @@ const shareEntryToFsEntry = (entry: ShareEntry): FsEntry => {
   return file
 }
 
+const isShareEntry = (entry: FsEntry | ShareEntry): entry is ShareEntry => 'type' in entry
+
+const nativeEntryToFsEntry = (entry: FsEntry | ShareEntry): FsEntry => (
+  isShareEntry(entry) ? shareEntryToFsEntry(entry) : wireEntryToFsEntry(entry)
+)
+
 const wireEntryToFsEntry = (entry: FsEntry): FsEntry => {
   if ('file_count' in entry || 'subdirectory_count' in entry || (entry as { type?: string }).type === 'directory')
     return new Directory(entry)
@@ -332,9 +338,26 @@ export const useFSStore = create<FsStore>()(
           const ws = useShareWebSocketStore.getState()
           requireReadyShareSession()
           await ws.waitForConnection()
-          const response = await ws.sendCommand('share.fs.list', { path: normalizeSharePath(path) })
-          const entries = response.entries.map(shareEntryToFsEntry)
-          set({ path: normalizeSharePath(response.path), currentDirectory: null, files: entries })
+          const normalizedPath = normalizeSharePath(path)
+
+          try {
+            const response = await ws.sendCommand('fs.list', { path: normalizedPath })
+            const entries = response.files.map(nativeEntryToFsEntry)
+            const currentDirectory = response.entry ? nativeEntryToFsEntry(response.entry) : null
+            set({
+              path: normalizeSharePath(response.path),
+              currentDirectory: currentDirectory instanceof Directory ? currentDirectory : null,
+              files: entries,
+            })
+          } catch (error) {
+            if (useVaultShareStore.getState().share?.target_type !== 'file') throw error
+            const response = await ws.sendCommand('fs.metadata', { path: normalizedPath })
+            set({
+              path: normalizeSharePath(response.path || normalizedPath),
+              currentDirectory: null,
+              files: [nativeEntryToFsEntry(response.entry)],
+            })
+          }
           return
         }
 
@@ -403,7 +426,7 @@ export const useFSStore = create<FsStore>()(
         set({ downloading: true, downloadProgress: 0, downloadError: null, downloadLabel: baseName(normalizedPath, 'download') })
 
         try {
-          const startResp = await ws.sendCommand('share.download.start', { path: normalizedPath })
+          const startResp = await ws.sendCommand('fs.download.start', { path: normalizedPath })
           transferId = startResp.transfer_id
           set({ downloadLabel: startResp.filename })
 
@@ -414,14 +437,14 @@ export const useFSStore = create<FsStore>()(
 
           if (totalSize === 0) {
             saveBrowserDownload(startResp.filename, [], startResp.mime_type)
-            await ws.sendCommand('share.download.cancel', { transfer_id: transferId }).catch(() => undefined)
+            await ws.sendCommand('fs.download.cancel', { transfer_id: transferId }).catch(() => undefined)
             set({ downloading: false, downloadProgress: 100 })
             return
           }
 
           while (offset < totalSize) {
             const length = Math.min(chunkSize, totalSize - offset)
-            const chunk = await ws.sendCommand('share.download.chunk', {
+            const chunk = await ws.sendCommand('fs.download.chunk', {
               transfer_id: startResp.transfer_id,
               offset,
               length,
@@ -437,7 +460,7 @@ export const useFSStore = create<FsStore>()(
           saveBrowserDownload(startResp.filename, chunks, startResp.mime_type)
           set({ downloading: false, downloadProgress: 100 })
         } catch (error) {
-          if (transferId) await ws.sendCommand('share.download.cancel', { transfer_id: transferId }).catch(() => undefined)
+          if (transferId) await ws.sendCommand('fs.download.cancel', { transfer_id: transferId }).catch(() => undefined)
           const message = errorMessage(error, 'Download failed')
           set({ downloading: false, downloadProgress: 0, downloadError: message })
           throw error
@@ -474,7 +497,7 @@ export const useFSStore = create<FsStore>()(
           await ws.waitForConnection()
 
           const target = shareUploadTarget(targetPath, get().path, file.name)
-          const startResp = await ws.sendCommand('share.upload.start', {
+          const startResp = await ws.sendCommand('fs.upload.start', {
             path: target.path,
             filename: target.filename,
             size_bytes: file.size,
@@ -502,9 +525,9 @@ export const useFSStore = create<FsStore>()(
 
             if (currentShareSocket() !== wsInstance)
               throw new Error('Share upload connection changed before finish. Reopen the share link and try again.')
-            await ws.sendCommand('share.upload.finish', { upload_id: startResp.upload_id })
+            await ws.sendCommand('fs.upload.finish', { upload_id: startResp.upload_id })
           } catch (error) {
-            await ws.sendCommand('share.upload.cancel', { upload_id: startResp.upload_id }).catch(() => undefined)
+            await ws.sendCommand('fs.upload.cancel', { upload_id: startResp.upload_id }).catch(() => undefined)
             throw error
           }
           return
@@ -641,8 +664,8 @@ export const useFSStore = create<FsStore>()(
         if (get().mode === 'share') {
           const ws = useShareWebSocketStore.getState()
           await ws.waitForConnection()
-          const response = await ws.sendCommand('share.fs.list', { path: normalizeSharePath(path) })
-          return response.entries.map(shareEntryToFsEntry)
+          const response = await ws.sendCommand('fs.list', { path: normalizeSharePath(path) })
+          return response.files.map(nativeEntryToFsEntry)
         }
 
         const ws = useWebSocketStore.getState()

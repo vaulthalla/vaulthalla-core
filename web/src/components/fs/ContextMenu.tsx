@@ -8,6 +8,8 @@ import CopyIcon from '@/fa-duotone/copy.svg'
 import PasteIcon from '@/fa-duotone/paste.svg'
 import ShareIcon from '@/fa-duotone/share-nodes.svg'
 import { useFSStore } from '@/stores/fsStore'
+import { useVaultShareStore } from '@/stores/vaultShareStore'
+import { hasShareOperation } from '@/util/shareOperations'
 
 interface ContextMenuProps<T extends { name: string }> {
   data: T
@@ -17,18 +19,25 @@ interface ContextMenuProps<T extends { name: string }> {
   onCopy?: (item: T) => void
   onRename?: (item: T) => void
   onShare?: (item: T) => void
+  onOpen?: (item: T) => void
+  onPreview?: (item: T) => void
+  onDownload?: (item: T) => void
 }
 
 export function ContextMenu<
-  T extends { name: string; path?: string; file_count?: number; subdirectory_count?: number },
->({ data, position, onClose, onDelete, onCopy, onRename, onShare }: ContextMenuProps<T>) {
+  T extends { name: string; path?: string; file_count?: number; subdirectory_count?: number; mime_type?: string },
+>({ data, position, onClose, onDelete, onCopy, onRename, onShare, onOpen, onPreview, onDownload }: ContextMenuProps<T>) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { copiedItem, pasteCopiedItem, mode } = useFSStore()
+  const { share } = useVaultShareStore()
 
   const isDirectory = typeof data.file_count === 'number' || typeof data.subdirectory_count === 'number'
   const isShareMode = mode === 'share'
   const canPaste = !isShareMode && copiedItem && isDirectory
+  const canPreview = hasShareOperation(share?.allowed_ops, 'preview')
+  const canDownload = hasShareOperation(share?.allowed_ops, 'download')
+  const isPreviewable = Boolean(data.mime_type?.startsWith('image/') || data.mime_type === 'application/pdf')
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -90,6 +99,32 @@ export function ContextMenu<
               <PasteIcon className="my-1 fill-current text-green-400" />
               Paste
             </ContextButton>
+          )}
+
+          {isShareMode && (
+            <>
+              {isDirectory && (
+                <ContextButton onClick={() => onOpen?.(data)}>
+                  <PasteIcon className="my-1 fill-current text-cyan-300" />
+                  Open
+                </ContextButton>
+              )}
+              {!isDirectory && canPreview && isPreviewable && (
+                <ContextButton onClick={() => onPreview?.(data)}>
+                  <CopyIcon className="text-primary my-1 fill-current" />
+                  Preview
+                </ContextButton>
+              )}
+              {!isDirectory && canDownload && (
+                <ContextButton onClick={() => onDownload?.(data)}>
+                  <ShareIcon className="text-primary my-1 fill-current" />
+                  Download
+                </ContextButton>
+              )}
+              {isDirectory || (canPreview && isPreviewable) || canDownload ? null : (
+                <div className="px-2 py-1 text-sm text-gray-400">No actions available</div>
+              )}
+            </>
           )}
         </div>
       </div>

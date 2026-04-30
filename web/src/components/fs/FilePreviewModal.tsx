@@ -7,6 +7,7 @@ import Image from 'next/image'
 import type { File as FileModel } from '@/models/file'
 import type { SharePreviewResponse } from '@/models/linkShare'
 import { getPreviewUrl } from '@/util/getUrl'
+import { useFSStore } from '@/stores/fsStore'
 import X from '@/fa-duotone/x.svg'
 
 interface FilePreviewModalProps {
@@ -16,11 +17,22 @@ interface FilePreviewModalProps {
 }
 
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, sharePreview, onClose }) => {
+  const { mode } = useFSStore()
+
   if (!file && !sharePreview) return null
 
-  const previewUrl = file ? `${getPreviewUrl()}?vault_id=${file.vault_id}&path=${encodeURIComponent(file.path || file.name)}&size=1024` : ''
+  const filePath = file?.path || file?.name || '/'
+  const previewUrl = file ?
+    mode === 'share' ?
+      `${getPreviewUrl()}?share=1&path=${encodeURIComponent(filePath)}&size=1024`
+    : `${getPreviewUrl()}?vault_id=${file.vault_id}&path=${encodeURIComponent(filePath)}&size=1024`
+  : ''
   const sharePreviewUrl = sharePreview ? `data:${sharePreview.mime_type};base64,${sharePreview.data_base64}` : ''
-  const canPreview = !!sharePreview || !!file?.vault_id
+  const sourceUrl = sharePreview ? sharePreviewUrl : previewUrl
+  const previewMime = sharePreview?.mime_type || file?.mime_type || ''
+  const isPdf = previewMime === 'application/pdf'
+  const isImage = !previewMime || previewMime.startsWith('image/')
+  const canPreview = !!sharePreview || mode === 'share' || !!file?.vault_id
 
   const meta = [
     { label: 'Name', value: sharePreview?.filename || file?.name || 'Preview' },
@@ -53,20 +65,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, shareP
 
           <div className="grid grid-cols-1 gap-0 md:grid-cols-3">
             <div className="relative col-span-2 flex aspect-video h-75 items-center justify-center bg-gray-800 md:aspect-auto md:h-[500px]">
-              {sharePreview ?
-                <Image
-                  src={sharePreviewUrl}
-                  alt={sharePreview.filename}
-                  fill
-                  className="rounded-l-2xl object-contain"
-                  sizes="(max-width: 768px) 100vw, 66vw"
-                  priority
-                  unoptimized
+              {canPreview && sourceUrl && isPdf ?
+                <object
+                  className="h-full w-full rounded-l-2xl bg-white"
+                  data={sourceUrl}
+                  type="application/pdf"
+                  aria-label={sharePreview?.filename || file?.name || 'Preview'}
                 />
-              : canPreview && file ?
+              : canPreview && sourceUrl && isImage ?
                 <Image
-                  src={previewUrl}
-                  alt={file.name}
+                  src={sourceUrl}
+                  alt={sharePreview?.filename || file?.name || 'Preview'}
                   fill
                   className="rounded-l-2xl object-contain"
                   sizes="(max-width: 768px) 100vw, 66vw"

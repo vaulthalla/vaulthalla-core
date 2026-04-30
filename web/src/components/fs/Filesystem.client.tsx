@@ -12,6 +12,8 @@ import { ContextMenu } from '@/components/fs/ContextMenu'
 import Row from '@/components/fs/Row'
 import type { FilesystemRow } from '@/components/fs/types'
 import { ShareManagementModal } from '@/components/share/ShareManagementModal'
+import { useVaultShareStore } from '@/stores/vaultShareStore'
+import { hasShareOperation } from '@/util/shareOperations'
 
 type FilesystemClientProps = { rows: FilesystemRow[] }
 
@@ -32,29 +34,39 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
     mode,
     downloadFile,
     downloading,
-    previewFile,
     previewing,
     previewError,
     sharePreview,
     clearSharePreview,
   } = useFSStore()
+  const { share } = useVaultShareStore()
+  const canSharePreview = hasShareOperation(share?.allowed_ops, 'preview')
+  const canShareDownload = hasShareOperation(share?.allowed_ops, 'download')
+
+  const sharePath = React.useCallback((row: { path?: string; name: string }) => row.path || row.name, [])
+  const isPreviewable = React.useCallback((file: FileModel) => Boolean(file.mime_type?.startsWith('image/') || file.mime_type === 'application/pdf'), [])
 
   const handleOpenFile = React.useCallback(
     (f: FileModel) => {
       if (mode === 'share') {
         if (downloading || previewing) return
-        const path = f.path || f.name
-        previewFile(path).catch(() => {
-          downloadFile(path)
-            .then(() => clearSharePreview())
-            .catch(err => console.error('Error downloading shared file:', err))
-        })
+        const path = sharePath(f)
+        clearSharePreview()
+        if (canSharePreview && isPreviewable(f)) {
+          setSelectedFile(f)
+          return
+        }
+        if (canShareDownload) {
+          downloadFile(path).catch(err => console.error('Error downloading shared file:', err))
+          return
+        }
+        window.alert('No available action for this file in the current share.')
         return
       }
 
       setSelectedFile(f)
     },
-    [clearSharePreview, downloadFile, downloading, mode, previewFile, previewing],
+    [canShareDownload, canSharePreview, clearSharePreview, downloadFile, downloading, isPreviewable, mode, previewing, sharePath],
   )
 
   const handleRowContextMenu = React.useCallback((e: React.MouseEvent, row: FilesystemRow) => {
@@ -69,6 +81,24 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
 
   const onNavigate = React.useCallback((path: string) => {
     setPath(path)
+  }, [setPath])
+
+  const handleShareDownload = React.useCallback(
+    (row: FilesystemRow) => {
+      downloadFile(sharePath(row)).catch(err => console.error('Error downloading shared file:', err))
+    },
+    [downloadFile, sharePath],
+  )
+
+  const handleSharePreview = React.useCallback((row: FilesystemRow) => {
+    if (row.entryType === 'file') {
+      clearSharePreview()
+      setSelectedFile(row)
+    }
+  }, [clearSharePreview])
+
+  const handleShareOpen = React.useCallback((row: FilesystemRow) => {
+    if (row.entryType === 'directory') setPath(row.path ?? row.name)
   }, [setPath])
 
   const handleTableClick = React.useCallback(
@@ -147,6 +177,9 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
           onDelete={row => handleDelete(row.name)}
           onCopy={row => setCopiedItem(row)}
           onShare={row => setShareTarget(row)}
+          onOpen={handleShareOpen}
+          onPreview={handleSharePreview}
+          onDownload={handleShareDownload}
         />
       )}
 

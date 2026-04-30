@@ -716,6 +716,10 @@ RotateLinkTokenResult Manager::rotateLinkToken(const rbac::Actor& actor, const s
     };
 }
 
+std::shared_ptr<Link> Manager::resolvePublicLink(const std::string_view publicToken) {
+    return linkFromPublicToken(*store_, publicToken, now(options_));
+}
+
 OpenSessionResult Manager::openPublicSession(
     const std::string_view publicToken,
     const std::optional<std::string> ipAddress,

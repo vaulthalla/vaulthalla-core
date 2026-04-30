@@ -60,12 +60,6 @@ namespace sessions_handler_detail {
     return value;
 }
 
-void requireUnauthenticatedBootstrap(const std::shared_ptr<Session>& session) {
-    if (!session) throw std::runtime_error("Share session requires websocket session");
-    if (session->user) throw std::runtime_error("Share session commands require a public websocket session");
-    if (session->isShareSession()) throw std::runtime_error("Share session is already open");
-}
-
 void requireNonHumanShareBootstrap(const std::shared_ptr<Session>& session) {
     if (!session) throw std::runtime_error("Share session requires websocket session");
     if (session->user) throw std::runtime_error("Share session commands require a public websocket session");
@@ -95,12 +89,26 @@ void attachReadyPrincipal(
 namespace detail = sessions_handler_detail;
 
 json Sessions::open(const json& payload, const std::shared_ptr<Session>& session) {
-    detail::requireUnauthenticatedBootstrap(session);
+    detail::requireNonHumanShareBootstrap(session);
     const auto& body = detail::objectPayload(payload);
+    const auto publicToken = detail::requiredString(body, "public_token");
     auto mgr = detail::manager();
+    auto requestedLink = mgr->resolvePublicLink(publicToken);
+
+    if (session->isShareMode() && session->sharePrincipal() &&
+        session->sharePrincipal()->share_id == requestedLink->id) {
+        return {
+            {"status", "ready"},
+            {"share", detail::publicLinkJson(requestedLink)},
+            {"session_id", session->shareSessionId()},
+            {"session_token", session->shareSessionToken()}
+        };
+    }
+
+    if (session->isShareSession()) session->clearShareSession();
 
     auto result = mgr->openPublicSession(
-        detail::requiredString(body, "public_token"),
+        publicToken,
         detail::optionalClientText(session->ipAddress),
         detail::optionalClientText(session->userAgent)
     );

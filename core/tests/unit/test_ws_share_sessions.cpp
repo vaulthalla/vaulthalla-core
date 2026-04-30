@@ -390,6 +390,78 @@ TEST_F(WsShareSessionsTest, ValidPublicTokenOpensReadyShareSession) {
     expectNoSecretFields(response);
 }
 
+TEST_F(WsShareSessionsTest, OpeningSameReadyPublicTokenIsIdempotent) {
+    const auto created = create();
+    auto session = publicSession();
+
+    const auto first = Sessions::open({{"public_token", created.public_token}}, session);
+    const auto firstSessionId = first.at("session_id").get<std::string>();
+    const auto firstSessionToken = first.at("session_token").get<std::string>();
+
+    const auto second = Sessions::open({{"public_token", created.public_token}}, session);
+
+    EXPECT_EQ("ready", second.at("status").get<std::string>());
+    EXPECT_EQ(firstSessionId, second.at("session_id").get<std::string>());
+    EXPECT_EQ(firstSessionToken, second.at("session_token").get<std::string>());
+    EXPECT_TRUE(session->isShareMode());
+    ASSERT_NE(session->sharePrincipal(), nullptr);
+    EXPECT_EQ(created.link->id, session->sharePrincipal()->share_id);
+    EXPECT_EQ(1u, store->sessions.size());
+    expectNoSecretFields(second);
+}
+
+TEST_F(WsShareSessionsTest, OpeningDifferentPublicTokenReplacesReadyShareSession) {
+    const auto firstLink = create();
+    auto secondLink = create();
+    secondLink.link->root_entry_id = 88;
+    secondLink.link->root_path = "/reports/child.txt";
+    secondLink.link->target_type = vh::share::TargetType::File;
+    secondLink.link->allowed_ops = vh::share::bit(vh::share::Operation::Download);
+
+    auto session = publicSession();
+    attachShareRefreshToken(session, "share-refresh-switch");
+    vh::runtime::Deps::get().sessionManager->cache(session);
+
+    const auto first = Sessions::open({{"public_token", firstLink.public_token}}, session);
+    ASSERT_EQ("ready", first.at("status").get<std::string>());
+    ASSERT_NE(session->sharePrincipal(), nullptr);
+    EXPECT_EQ(firstLink.link->id, session->sharePrincipal()->share_id);
+
+    const auto second = Sessions::open({{"public_token", secondLink.public_token}}, session);
+
+    EXPECT_EQ("ready", second.at("status").get<std::string>());
+    ASSERT_NE(session->sharePrincipal(), nullptr);
+    EXPECT_EQ(secondLink.link->id, session->sharePrincipal()->share_id);
+    EXPECT_EQ(secondLink.link->root_entry_id, session->sharePrincipal()->root_entry_id);
+    EXPECT_EQ(secondLink.link->root_path, session->sharePrincipal()->root_path);
+    EXPECT_NE(first.at("session_id").get<std::string>(), second.at("session_id").get<std::string>());
+    EXPECT_EQ(session, vh::runtime::Deps::get().sessionManager->getShareByRefreshJti("share-refresh-switch"));
+    expectNoSecretFields(second);
+}
+
+TEST_F(WsShareSessionsTest, OpeningEmailRequiredTokenReplacesReadyShareSessionWithPending) {
+    const auto readyLink = create();
+    const auto emailLink = create(vh::share::AccessMode::EmailValidated);
+    auto session = publicSession();
+    attachShareRefreshToken(session, "share-refresh-email-switch");
+    vh::runtime::Deps::get().sessionManager->cache(session);
+
+    const auto ready = Sessions::open({{"public_token", readyLink.public_token}}, session);
+    ASSERT_EQ("ready", ready.at("status").get<std::string>());
+    ASSERT_TRUE(session->isShareMode());
+    ASSERT_NE(session->sharePrincipal(), nullptr);
+    EXPECT_EQ(readyLink.link->id, session->sharePrincipal()->share_id);
+
+    const auto pending = Sessions::open({{"public_token", emailLink.public_token}}, session);
+
+    EXPECT_EQ("email_required", pending.at("status").get<std::string>());
+    EXPECT_TRUE(session->isSharePending());
+    EXPECT_EQ(nullptr, session->sharePrincipal());
+    EXPECT_EQ(pending.at("session_id").get<std::string>(), session->shareSessionId());
+    EXPECT_EQ(session, vh::runtime::Deps::get().sessionManager->getShareByRefreshJti("share-refresh-email-switch"));
+    expectNoSecretFields(pending);
+}
+
 TEST_F(WsShareSessionsTest, PublicOpenPromotesExistingShareRefreshJtiToReadyShareStorage) {
     const auto created = create();
     auto session = publicSession();

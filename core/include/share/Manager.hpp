@@ -256,6 +256,7 @@ public:
     void revokeLink(const rbac::Actor& actor, const std::string& id);
     [[nodiscard]] RotateLinkTokenResult rotateLinkToken(const rbac::Actor& actor, const std::string& id);
 
+    [[nodiscard]] std::shared_ptr<Link> resolvePublicLink(std::string_view publicToken);
     [[nodiscard]] OpenSessionResult openPublicSession(
         std::string_view publicToken,
         std::optional<std::string> ipAddress = std::nullopt,

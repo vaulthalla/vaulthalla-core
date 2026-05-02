@@ -18,7 +18,7 @@ namespace vh::protocols::http::handler::preview {
         try {
             std::string mime_type = "image/jpeg";
 
-            const auto tmpPath = decrypt_file_to_temp(pr->vault_id, pr->rel_path, pr->engine);
+            const auto tmpPath = decrypt_file_to_temp(pr->file, pr->engine);
 
             FPDF_DOCUMENT doc = FPDF_LoadDocument(tmpPath.c_str(), nullptr);
             if (!doc) throw std::runtime_error("Failed to load PDF");

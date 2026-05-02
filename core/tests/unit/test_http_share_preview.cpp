@@ -30,12 +30,27 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <variant>
 
 namespace vh::protocols::http::test_share_preview {
 constexpr std::time_t kNow = 1'800'000'000;
 constexpr uint32_t kVaultId = 42;
 constexpr uint32_t kRootEntryId = 10;
+
+std::vector<uint8_t> tinyPng() {
+    return {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x04, 0x00, 0x00, 0x00, 0xb5, 0x1c, 0x0c,
+        0x02, 0x00, 0x00, 0x00, 0x0b, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x1f, 0x00,
+        0x03, 0x03, 0x02, 0x00, 0xef, 0xbf, 0xa7, 0xdb,
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+        0xae, 0x42, 0x60, 0x82
+    };
+}
 
 class FakeAuthorizer final : public vh::share::ShareAuthorizer {
 public:
@@ -500,6 +515,26 @@ TEST_F(HttpSharePreviewTest, AllowsReadyShareSessionWithPreviewGrant) {
     EXPECT_TRUE(std::ranges::any_of(store->audits, [](const auto& audit) {
         return audit && audit->event_type == "share.preview.http";
     }));
+}
+
+TEST_F(HttpSharePreviewTest, SharePreviewRendersFallbackWhenThumbnailCacheIsMissing) {
+    auto session = readySession(vh::share::bit(vh::share::Operation::Preview));
+    installSharePreviewHooks(session);
+
+    std::filesystem::remove_all(engine->paths->thumbnailRoot / file->base32_alias);
+    file->mime_type = "image/png";
+    file->backing_path = testRoot / "backing" / "uploaded-image";
+    std::filesystem::create_directories(file->backing_path.parent_path());
+    const auto bytes = tinyPng();
+    std::ofstream(file->backing_path, std::ios::binary)
+        .write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+
+    auto response = Router::handlePreview(previewRequest(
+        "/preview?share=1&path=%2Freport.jpg&size=" + std::to_string(previewSize)));
+
+    EXPECT_EQ(status::ok, responseStatus(response));
+    EXPECT_FALSE(vectorBody(response).empty());
+    EXPECT_NE("cached-thumbnail", vectorBody(response));
 }
 
 TEST_F(HttpSharePreviewTest, DeniesReadyShareSessionWithoutPreviewGrant) {

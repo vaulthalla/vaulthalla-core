@@ -17,6 +17,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/asio.hpp>
+#include <cstddef>
 #include <string_view>
 
 #include "config/Registry.hpp"
@@ -26,6 +27,8 @@ namespace beast      = boost::beast;
 namespace beast_http = boost::beast::http;
 namespace websocket  = beast::websocket;
 namespace asio       = boost::asio;
+
+constexpr std::size_t kWebSocketReadBufferMaxBytes = 1024u * 1024u;
 
 bool isShareHandshakeTarget(const std::string_view target) {
     constexpr std::string_view sharePath{"/ws/share"};
@@ -41,7 +44,7 @@ namespace vh::protocols::ws {
 
 Session::Session(const std::shared_ptr<Router>& router)
     : tokens(std::make_shared<auth::model::TokenPair>()), router_(router) {
-    buffer_.max_size(65536);
+    buffer_.max_size(kWebSocketReadBufferMaxBytes);
 }
 
 Session::~Session() {

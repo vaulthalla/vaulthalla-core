@@ -20,6 +20,8 @@ interface VaultShareStore {
   clearShareSession: () => void
 }
 
+let shareOpenRequestId = 0
+
 export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
   status: 'idle',
   publicToken: null,
@@ -33,12 +35,14 @@ export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
   challengeStartedAt: null,
 
   async openSession(publicToken) {
+    const requestId = ++shareOpenRequestId
     const current = get()
     const ws = useShareWebSocketStore.getState()
+    const socketReady = ws.connected && ws.socket?.readyState === WebSocket.OPEN
 
-    if (current.publicToken === publicToken && current.status === 'ready' && current.share) return
+    if (current.publicToken === publicToken && current.status === 'ready' && current.share && socketReady) return
 
-    if (current.publicToken && current.publicToken !== publicToken) {
+    if ((current.publicToken && current.publicToken !== publicToken) || (current.publicToken === publicToken && current.status !== 'idle' && !socketReady)) {
       ws.disconnect()
     }
 
@@ -59,6 +63,7 @@ export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
       ws.connect()
       await ws.waitForConnection()
       const response = await ws.sendCommand('share.session.open', { public_token: publicToken })
+      if (get().publicToken !== publicToken || requestId !== shareOpenRequestId) return
       set({
         status: response.status,
         sessionId: response.session_id,
@@ -67,6 +72,7 @@ export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
         error: null,
       })
     } catch (error) {
+      if (get().publicToken !== publicToken || requestId !== shareOpenRequestId) throw error
       set({
         status: 'error',
         error: error instanceof Error ? error.message : 'Unable to open share',
@@ -140,6 +146,7 @@ export const useVaultShareStore = create<VaultShareStore>()((set, get) => ({
   },
 
   clearShareSession() {
+    shareOpenRequestId += 1
     useShareWebSocketStore.getState().disconnect()
     set({
       status: 'idle',

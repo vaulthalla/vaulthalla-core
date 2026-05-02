@@ -33,6 +33,7 @@ const commandTimeoutMs = (command: keyof WebSocketCommandMap) => {
   if (command === 'share.upload.start' || command === 'fs.upload.start' || command === 'share.preview.get') return 20000
   return 10000
 }
+const connectionTimeoutMs = 10000
 
 interface SharePendingRequest {
   resolve: <C extends keyof WebSocketCommandMap>(
@@ -52,18 +53,38 @@ export const useShareWebSocketStore = create<ShareWebSocketStore>()(
       pending: {},
 
       waitForConnection: async (): Promise<void> => {
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
           if (get().connected) return resolve()
+          if (!get().socket) return reject(new Error('Share WebSocket is not connected'))
+
+          const cleanupSubscriptions: Array<() => void> = []
+          let timeout: ReturnType<typeof setTimeout> | null = null
+          let settled = false
+
+          const finish = (error?: Error) => {
+            if (settled) return
+            settled = true
+            if (timeout) clearTimeout(timeout)
+            cleanupSubscriptions.forEach(cleanup => cleanup())
+            if (error) reject(error)
+            else resolve()
+          }
+
+          timeout = setTimeout(() => {
+            finish(new Error('Share WebSocket connection timed out. Try opening the share again.'))
+          }, connectionTimeoutMs)
 
           const unsubscribe = useShareWebSocketStore.subscribe(
-            state => state.connected,
-            connected => {
-              if (connected) {
-                unsubscribe()
-                resolve()
-              }
+            state => ({ connected: state.connected, socket: state.socket }),
+            state => {
+              if (state.connected) finish()
+              else if (!state.socket) finish(new Error('Share WebSocket disconnected. Try opening the share again.'))
             },
           )
+          cleanupSubscriptions.push(unsubscribe)
+          const current = get()
+          if (current.connected) finish()
+          else if (!current.socket) finish(new Error('Share WebSocket disconnected. Try opening the share again.'))
         })
       },
 

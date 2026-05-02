@@ -6,9 +6,10 @@ import { FileDropOverlay } from '@/components/fs/FileDropOverlay'
 import { Breadcrumbs } from '@/components/fs/breadcrumbs/Breadcrumbs'
 import { DownloadCurrentDirectoryButton } from '@/components/fs/DownloadCurrentDirectoryButton'
 import UploadProgress from '@/components/loading/UploadProgress'
+import CircleNotch from '@/fa-duotone/circle-notch.svg'
 import { useFSStore } from '@/stores/fsStore'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
-import { formatShareDate, hasShareOperation } from '@/util/shareOperations'
+import { hasShareOperation } from '@/util/shareOperations'
 
 const Alert = ({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success'; children: React.ReactNode }) => {
   const styles =
@@ -18,6 +19,20 @@ const Alert = ({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success
 
   return <div className={`rounded border p-3 text-sm ${styles}`}>{children}</div>
 }
+
+const ShareLoadingState = () => (
+  <section className="flex min-h-[calc(100vh-2rem)] items-center justify-center">
+    <div className="flex flex-col items-center gap-4 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-400/5 text-cyan-300 shadow-[0_0_40px_rgba(34,211,238,0.12)]">
+        <CircleNotch className="h-8 w-8 animate-spin fill-current" />
+      </div>
+      <div>
+        <p className="text-base font-medium text-cyan-100">Opening secure share session...</p>
+        <p className="mt-1 text-sm text-gray-400">Verifying link access</p>
+      </div>
+    </div>
+  </section>
+)
 
 const SharePageClient = ({ token }: { token: string }) => {
   const [email, setEmail] = useState('')
@@ -51,8 +66,6 @@ const SharePageClient = ({ token }: { token: string }) => {
   const isFileShare = share?.target_type === 'file'
   const isDirectoryShare = share?.target_type === 'directory'
   const canShowFileSurface = canList || isFileShare || (canUpload && isDirectoryShare)
-  const title = share?.public_label || share?.metadata?.label?.toString() || 'Shared files'
-  const expiresAt = share?.expires_at ? formatShareDate(share.expires_at) : null
 
   useEffect(() => {
     enterShareMode()
@@ -63,6 +76,36 @@ const SharePageClient = ({ token }: { token: string }) => {
       exitShareMode()
     }
   }, [clearShareSession, enterShareMode, exitShareMode, openSession, token])
+
+  useEffect(() => {
+    const reopenIfStale = () => {
+      const shareState = useVaultShareStore.getState()
+      if (
+        shareState.publicToken !== token ||
+        shareState.status === 'idle' ||
+        shareState.status === 'opening' ||
+        shareState.status === 'ready'
+      ) {
+        openSession(token).catch(() => undefined)
+      }
+    }
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reopenIfStale()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') reopenIfStale()
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [openSession, token])
 
   useEffect(() => {
     if (status === 'ready' && (canList || isFileShare)) fetchFiles().catch(() => undefined)
@@ -79,26 +122,10 @@ const SharePageClient = ({ token }: { token: string }) => {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-3 py-4 text-white sm:px-6">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <header className="rounded-lg border border-white/10 bg-gray-900/90 p-3 shadow-lg">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-cyan-300">Vaulthalla Share</p>
-            <h1 className="truncate text-xl font-semibold">{title}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
-              {share?.root_path && <span className="truncate">{share.root_path}</span>}
-              {expiresAt && <span>Expires {expiresAt}</span>}
-            </div>
-          </div>
-        </header>
-
+    <main className="min-h-screen bg-gray-950 px-3 py-3 text-white sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3">
         {status === 'opening' || status === 'idle' ? (
-          <section className="rounded border border-white/10 bg-gray-900 p-6">
-            <div className="h-2 w-full overflow-hidden rounded bg-gray-800">
-              <div className="h-full w-1/2 animate-pulse rounded bg-cyan-400" />
-            </div>
-            <p className="mt-4 text-gray-300">Opening secure share session...</p>
-          </section>
+          <ShareLoadingState />
         ) : null}
 
         {status === 'email_required' && (

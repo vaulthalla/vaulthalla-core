@@ -60,8 +60,10 @@ export const useAuthStore: UseBoundStore<StoreApi<AuthState>> = create<AuthState
           await useWebSocketStore.getState().waitForConnection()
           const sendCommand = useWebSocketStore.getState().sendCommand
           const response = await sendCommand('auth.login', { name, password })
+          const token = response.token ?? get().token
+          if (!token) throw new Error('Login response did not include an access token')
 
-          set({ token: response.token, user: response.user, status: 'authenticated', error: null })
+          set({ token, user: response.user, status: 'authenticated', error: null })
         } catch (err) {
           set({ error: getErrorMessage(err) || 'Login failed' })
           throw err
@@ -106,8 +108,10 @@ export const useAuthStore: UseBoundStore<StoreApi<AuthState>> = create<AuthState
           try {
             const sendCommand = useWebSocketStore.getState().sendCommand
             const response = await sendCommand('auth.refresh', null)
+            const token = response.token ?? get().token
+            if (!token) throw new Error('Refresh response did not include an access token')
 
-            set({ token: response.token, user: response.user, error: null, status: 'authenticated' })
+            set({ token, user: response.user ?? get().user, error: null, status: 'authenticated' })
             console.log('[Auth] Token refreshed')
           } catch (err) {
             const message = getErrorMessage(err) || 'Token refresh failed'

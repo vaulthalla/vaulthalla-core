@@ -13,6 +13,7 @@ import { ShareEntry, SharePreviewResponse } from '@/models/linkShare'
 import { hasShareOperation } from '@/util/shareOperations'
 import { buildPreviewUrl } from '@/util/previewUrl'
 import { parseTimestamp } from '@/util/formatTimestamp'
+import { buildDownloadUrl } from '@/util/downloadUrl'
 
 type FsMode = 'authenticated' | 'share'
 type FsEntry = DBFile | Directory
@@ -208,29 +209,13 @@ const clearTransferState = () => ({
   sharePreview: null,
 })
 
-const decodeBase64 = (value: string): Uint8Array<ArrayBuffer> => {
-  const binary = window.atob(value)
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length))
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-const safeDownloadName = (filename: string) => {
-  const cleaned = filename.replace(/[\/\\\u0000]/g, '_').trim()
-  return cleaned && cleaned !== '.' && cleaned !== '..' ? cleaned : 'download'
-}
-
-const saveBrowserDownload = (filename: string, chunks: Uint8Array<ArrayBuffer>[], mimeType?: string | null) => {
-  const blob = new Blob(chunks, { type: mimeType || 'application/octet-stream' })
-  const url = window.URL.createObjectURL(blob)
+const startBrowserDownload = (url: string) => {
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = safeDownloadName(filename)
   anchor.style.display = 'none'
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  window.URL.revokeObjectURL(url)
 }
 
 const requireReadyShareSession = () => {
@@ -465,54 +450,19 @@ export const useFSStore = create<FsStore>()(
       },
 
       async downloadFile(path) {
-        if (get().mode !== 'share') throw new Error('Authenticated downloads are not wired through fsStore')
-        if (get().downloading) throw new Error('A download is already running')
-
-        const ws = useShareWebSocketStore.getState()
-        requireReadyShareSession()
-        await ws.waitForConnection()
-
-        const normalizedPath = normalizeSharePath(path)
-        let transferId: string | null = null
-
-        set({ downloading: true, downloadProgress: 0, downloadError: null, downloadLabel: baseName(normalizedPath, 'download') })
+        const { currVault, mode } = get()
+        const downloadPath = mode === 'share' ? normalizeSharePath(path) : (path || '/')
+        const url = buildDownloadUrl({
+          mode,
+          path: downloadPath,
+          vaultId: mode === 'authenticated' ? currVault?.id : null,
+        })
+        if (!url) throw new Error('Download target is not ready')
 
         try {
-          const startResp = await ws.sendCommand('fs.download.start', { path: normalizedPath })
-          transferId = startResp.transfer_id
-          set({ downloadLabel: startResp.filename })
-
-          const chunkSize = startResp.chunk_size || 256 * 1024
-          const chunks: Uint8Array<ArrayBuffer>[] = []
-          let offset = 0
-          const totalSize = Math.max(0, startResp.size_bytes || 0)
-
-          if (totalSize === 0) {
-            saveBrowserDownload(startResp.filename, [], startResp.mime_type)
-            await ws.sendCommand('fs.download.cancel', { transfer_id: transferId }).catch(() => undefined)
-            set({ downloading: false, downloadProgress: 100 })
-            return
-          }
-
-          while (offset < totalSize) {
-            const length = Math.min(chunkSize, totalSize - offset)
-            const chunk = await ws.sendCommand('fs.download.chunk', {
-              transfer_id: startResp.transfer_id,
-              offset,
-              length,
-            })
-
-            chunks.push(decodeBase64(chunk.data_base64))
-            if (!chunk.complete && chunk.next_offset <= offset) throw new Error('Download did not advance')
-            offset = chunk.next_offset
-            const progress = Math.min(100, (offset / totalSize) * 100)
-            set({ downloadProgress: progress })
-          }
-
-          saveBrowserDownload(startResp.filename, chunks, startResp.mime_type)
-          set({ downloading: false, downloadProgress: 100 })
+          set({ downloadError: null, downloadProgress: 0, downloading: false, downloadLabel: null })
+          startBrowserDownload(url)
         } catch (error) {
-          if (transferId) await ws.sendCommand('fs.download.cancel', { transfer_id: transferId }).catch(() => undefined)
           const message = errorMessage(error, 'Download failed')
           set({ downloading: false, downloadProgress: 0, downloadError: message })
           throw error

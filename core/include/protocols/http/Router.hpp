@@ -44,6 +44,8 @@ namespace vh::protocols::http {
 
         static model::preview::Response handlePreview(request &&req);
 
+        static model::preview::Response handleDownload(request &&req);
+
         static model::preview::Response handleAuthSession(request &&req);
 
         static model::preview::Response makeResponse(const request &req,
@@ -62,6 +64,11 @@ namespace vh::protocols::http {
 
         static model::preview::Response makeJsonResponse(const request &req,
                                                          const nlohmann::json &j);
+
+        static model::preview::Response makeDownloadResponse(const request &req,
+                                                             std::vector<uint8_t> &&data,
+                                                             const std::string &mime_type,
+                                                             const std::string &filename);
 
         static std::string authenticateRequest(const request &req);
 

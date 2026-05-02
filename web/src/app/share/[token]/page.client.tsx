@@ -4,11 +4,11 @@ import React, { FormEvent, useEffect, useState } from 'react'
 import { Filesystem } from '@/components/fs/Filesystem'
 import { FileDropOverlay } from '@/components/fs/FileDropOverlay'
 import { Breadcrumbs } from '@/components/fs/breadcrumbs/Breadcrumbs'
+import { DownloadCurrentDirectoryButton } from '@/components/fs/DownloadCurrentDirectoryButton'
 import UploadProgress from '@/components/loading/UploadProgress'
 import { useFSStore } from '@/stores/fsStore'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
 import { formatShareDate, hasShareOperation } from '@/util/shareOperations'
-import DownloadIcon from '@/fa-duotone/download.svg'
 
 const Alert = ({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success'; children: React.ReactNode }) => {
   const styles =
@@ -47,7 +47,6 @@ const SharePageClient = ({ token }: { token: string }) => {
   const downloadError = useFSStore(state => state.downloadError)
 
   const canList = hasShareOperation(share?.allowed_ops, 'list')
-  const canDownload = hasShareOperation(share?.allowed_ops, 'download')
   const canUpload = hasShareOperation(share?.allowed_ops, 'upload')
   const isFileShare = share?.target_type === 'file'
   const isDirectoryShare = share?.target_type === 'directory'
@@ -161,16 +160,7 @@ const SharePageClient = ({ token }: { token: string }) => {
           <>
             <div className="flex items-center justify-between gap-3">
               <Breadcrumbs className="min-w-0 flex-1" />
-              {canDownload && isDirectoryShare && (
-                <button
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-cyan-200 opacity-45"
-                  type="button"
-                  title="Directory archive download is not available yet"
-                  aria-label="Directory archive download is not available yet"
-                  disabled>
-                  <DownloadIcon className="h-4 w-4 fill-current" />
-                </button>
-              )}
+              <DownloadCurrentDirectoryButton />
             </div>
 
             {(downloading || downloadError) && (

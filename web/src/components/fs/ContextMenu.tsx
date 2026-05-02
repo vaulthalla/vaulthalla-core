@@ -7,6 +7,7 @@ import EditIcon from '@/fa-duotone/pen-to-square.svg'
 import CopyIcon from '@/fa-duotone/copy.svg'
 import PasteIcon from '@/fa-duotone/paste.svg'
 import ShareIcon from '@/fa-duotone/share-nodes.svg'
+import DownloadIcon from '@/fa-duotone/download.svg'
 import { useFSStore } from '@/stores/fsStore'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
 import { hasShareOperation } from '@/util/shareOperations'
@@ -89,6 +90,10 @@ export function ContextMenu<
                 <ShareIcon className="text-primary my-1 fill-current" />
                 Share
               </ContextButton>
+              <ContextButton onClick={() => onDownload?.(data)}>
+                <DownloadIcon className="text-primary my-1 fill-current" />
+                Download
+              </ContextButton>
               <ContextButton onClick={() => onDelete(data)}>
                 <TrashIcon className="text-destructive my-1 fill-current" />
                 Delete
@@ -117,9 +122,9 @@ export function ContextMenu<
                   Preview
                 </ContextButton>
               )}
-              {!isDirectory && canDownload && (
+              {canDownload && (
                 <ContextButton onClick={() => onDownload?.(data)}>
-                  <ShareIcon className="text-primary my-1 fill-current" />
+                  <DownloadIcon className="text-primary my-1 fill-current" />
                   Download
                 </ContextButton>
               )}

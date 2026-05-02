@@ -161,6 +161,7 @@ class FakeTargetProvider final : public vh::share::TargetEntryProvider {
 public:
     std::unordered_map<uint32_t, std::shared_ptr<vh::fs::model::Entry>> byId;
     std::unordered_map<std::string, std::shared_ptr<vh::fs::model::Entry>> byPath;
+    std::unordered_map<uint32_t, std::vector<std::shared_ptr<vh::fs::model::Entry>>> children;
 
     std::shared_ptr<vh::fs::model::Entry> getEntryById(const uint32_t entryId) override {
         if (!byId.contains(entryId)) return nullptr;
@@ -176,7 +177,10 @@ public:
         return byPath.at(key);
     }
 
-    std::vector<std::shared_ptr<vh::fs::model::Entry>> listChildren(uint32_t) override { return {}; }
+    std::vector<std::shared_ptr<vh::fs::model::Entry>> listChildren(uint32_t parentEntryId) override {
+        if (!children.contains(parentEntryId)) return {};
+        return children.at(parentEntryId);
+    }
 };
 
 class HttpSharePreviewTest : public ::testing::Test {
@@ -242,6 +246,7 @@ protected:
         provider->byPath[root->path.string()] = root;
         provider->byId[file->id] = file;
         provider->byPath[file->path.string()] = file;
+        provider->children[root->id].push_back(file);
 
         const auto thumbDir = engine->paths->thumbnailRoot / file->base32_alias;
         std::filesystem::create_directories(thumbDir);
@@ -353,6 +358,16 @@ std::string vectorBody(const vh::protocols::http::model::preview::Response& resp
     const auto* res = std::get_if<vector_response>(&response);
     if (!res) return {};
     return {res->body().begin(), res->body().end()};
+}
+
+std::string responseHeader(
+    const vh::protocols::http::model::preview::Response& response,
+    const field header
+) {
+    return std::visit([header](const auto& res) -> std::string {
+        const auto it = res.find(header);
+        return it == res.end() ? std::string{} : std::string(it->value());
+    }, response);
 }
 
 TEST_F(HttpSharePreviewTest, RejectsMissingSessionCookie) {
@@ -509,6 +524,141 @@ TEST_F(HttpSharePreviewTest, DeniesTraversalOutsideShareScope) {
     EXPECT_EQ(status::bad_request, responseStatus(response));
     EXPECT_FALSE(session->user);
     EXPECT_NE(std::string::npos, stringBody(response).find("escapes share root"));
+}
+
+TEST_F(HttpSharePreviewTest, HumanDownloadRejectsMissingRefreshCookie) {
+    auto response = Router::handleDownload(previewRequest("/download?vault_id=42&path=%2Fshared%2Freport.jpg"));
+
+    EXPECT_EQ(status::unauthorized, responseStatus(response));
+    EXPECT_NE(std::string::npos, stringBody(response).find("Refresh token not set"));
+}
+
+TEST_F(HttpSharePreviewTest, ShareDownloadRejectsMissingShareRefreshCookie) {
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2Freport.jpg"));
+
+    EXPECT_EQ(status::unauthorized, responseStatus(response));
+    EXPECT_NE(std::string::npos, stringBody(response).find("Share refresh token not set"));
+}
+
+TEST_F(HttpSharePreviewTest, ShareFileDownloadReadsShareRefreshCookieAndIgnoresHumanRefreshCookie) {
+    file->size_bytes = 0;
+    auto session = readySession(vh::share::bit(vh::share::Operation::Download));
+    std::string shareRefresh;
+    try {
+        shareRefresh = issueShareRefresh(session);
+    } catch (const std::exception& ex) {
+        GTEST_SKIP() << "JWT secret store unavailable: " << ex.what();
+    }
+    installSharePreviewDependencies();
+
+    auto req = previewRequest("/download?share=1&path=%2Freport.jpg");
+    req.set(field::cookie, "refresh=not-a-share-token; share_refresh=" + shareRefresh);
+
+    auto response = Router::handleDownload(std::move(req));
+
+    EXPECT_EQ(status::ok, responseStatus(response));
+    EXPECT_EQ("", vectorBody(response));
+    EXPECT_EQ("attachment; filename=\"report.jpg\"", responseHeader(response, field::content_disposition));
+    EXPECT_FALSE(session->user);
+    ASSERT_FALSE(store->audits.empty());
+    EXPECT_TRUE(std::ranges::any_of(store->audits, [](const auto& audit) {
+        return audit && audit->event_type == "share.download.http";
+    }));
+}
+
+TEST_F(HttpSharePreviewTest, ShareFileDownloadDeniesMissingGrant) {
+    file->size_bytes = 0;
+    auto session = readySession(vh::share::bit(vh::share::Operation::Metadata));
+    installSharePreviewHooks(session);
+
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2Freport.jpg"));
+
+    EXPECT_EQ(status::forbidden, responseStatus(response));
+    EXPECT_FALSE(session->user);
+}
+
+TEST_F(HttpSharePreviewTest, ShareDownloadDeniesTraversalOutsideScope) {
+    auto session = readySession(vh::share::bit(vh::share::Operation::Download));
+    installSharePreviewHooks(session);
+
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2F..%2Fsecret.txt"));
+
+    EXPECT_EQ(status::bad_request, responseStatus(response));
+    EXPECT_FALSE(session->user);
+    EXPECT_NE(std::string::npos, stringBody(response).find("escapes share root"));
+}
+
+TEST_F(HttpSharePreviewTest, ShareDirectoryArchiveRequiresListGrant) {
+    auto session = readySession(vh::share::bit(vh::share::Operation::Download));
+    installSharePreviewHooks(session);
+
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2F"));
+
+    EXPECT_EQ(status::forbidden, responseStatus(response));
+    EXPECT_FALSE(session->user);
+}
+
+TEST_F(HttpSharePreviewTest, ShareDirectoryArchiveContainsScopedRelativeEntries) {
+    file->size_bytes = 0;
+
+    auto nested = std::make_shared<vh::fs::model::Directory>();
+    nested->id = 12;
+    nested->parent_id = static_cast<int32_t>(kRootEntryId);
+    nested->name = "nested";
+    nested->vault_id = static_cast<int32_t>(kVaultId);
+    nested->path = "/shared/nested";
+
+    auto nestedFile = std::make_shared<vh::fs::model::File>();
+    nestedFile->id = 13;
+    nestedFile->parent_id = static_cast<int32_t>(nested->id);
+    nestedFile->name = "empty.txt";
+    nestedFile->vault_id = static_cast<int32_t>(kVaultId);
+    nestedFile->path = "/shared/nested/empty.txt";
+    nestedFile->mime_type = "text/plain";
+    nestedFile->size_bytes = 0;
+
+    provider->byId[nested->id] = nested;
+    provider->byPath[nested->path.string()] = nested;
+    provider->byId[nestedFile->id] = nestedFile;
+    provider->byPath[nestedFile->path.string()] = nestedFile;
+    provider->children[kRootEntryId].push_back(nested);
+    provider->children[nested->id].push_back(nestedFile);
+
+    auto outside = std::make_shared<vh::fs::model::File>();
+    outside->id = 14;
+    outside->name = "secret.txt";
+    outside->vault_id = static_cast<int32_t>(kVaultId);
+    outside->path = "/secret.txt";
+    outside->size_bytes = 0;
+    provider->byId[outside->id] = outside;
+    provider->byPath[outside->path.string()] = outside;
+
+    auto session = readySession(vh::share::bit(vh::share::Operation::Download) | vh::share::bit(vh::share::Operation::List));
+    installSharePreviewHooks(session);
+
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2F"));
+    const auto archive = vectorBody(response);
+
+    EXPECT_EQ(status::ok, responseStatus(response));
+    EXPECT_EQ("application/zip", responseHeader(response, field::content_type));
+    EXPECT_NE(std::string::npos, archive.find("report.jpg"));
+    EXPECT_NE(std::string::npos, archive.find("nested/"));
+    EXPECT_NE(std::string::npos, archive.find("nested/empty.txt"));
+    EXPECT_EQ(std::string::npos, archive.find("/secret.txt"));
+    EXPECT_EQ(std::string::npos, archive.find(".."));
+    EXPECT_EQ("attachment; filename=\"shared.zip\"", responseHeader(response, field::content_disposition));
+}
+
+TEST_F(HttpSharePreviewTest, ShareDownloadSanitizesContentDispositionFilename) {
+    file->size_bytes = 0;
+    file->name = "bad\";name.txt";
+    auto session = readySession(vh::share::bit(vh::share::Operation::Download));
+    installSharePreviewHooks(session);
+
+    auto response = Router::handleDownload(previewRequest("/download?share=1&path=%2Freport.jpg"));
+
+    EXPECT_EQ(status::ok, responseStatus(response));
+    EXPECT_EQ("attachment; filename=\"bad__name.txt\"", responseHeader(response, field::content_disposition));
 }
 
 }

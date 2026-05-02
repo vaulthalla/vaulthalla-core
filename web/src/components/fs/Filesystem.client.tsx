@@ -81,11 +81,12 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
     setPath(path)
   }, [setPath])
 
-  const handleShareDownload = React.useCallback(
+  const handleDownload = React.useCallback(
     (row: FilesystemRow) => {
-      downloadFile(sharePath(row)).catch(err => console.error('Error downloading shared file:', err))
+      const path = mode === 'share' ? sharePath(row) : (row.path ?? row.name)
+      downloadFile(path).catch(err => console.error('Error downloading file:', err))
     },
-    [downloadFile, sharePath],
+    [downloadFile, mode, sharePath],
   )
 
   const handleSharePreview = React.useCallback((row: FilesystemRow) => {
@@ -177,7 +178,7 @@ export const FilesystemClient: React.FC<FilesystemClientProps> = memo(({ rows })
           onShare={row => setShareTarget(row)}
           onOpen={handleShareOpen}
           onPreview={handleSharePreview}
-          onDownload={handleShareDownload}
+          onDownload={handleDownload}
         />
       )}
 

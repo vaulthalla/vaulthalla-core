@@ -10,9 +10,10 @@
 #include <regex>
 #include <stdexcept>
 
-using namespace vh::db::encoding;
-
 namespace vh::db::query::share {
+
+using vh::db::encoding::to_hex_bytea;
+
 namespace session_query_detail {
 bool is_uuid(const std::string& value) {
     static const std::regex pattern("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");

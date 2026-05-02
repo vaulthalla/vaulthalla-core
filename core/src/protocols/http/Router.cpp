@@ -40,7 +40,6 @@
 #include <unordered_map>
 #include <utility>
 
-using namespace vh::config;
 using namespace vh::stats::model;
 using namespace vh::fs::model;
 using namespace vh::fs::ops;
@@ -140,7 +139,7 @@ static bool isShareModeRequestTarget(const std::string& target) {
 
 static std::vector<uint8_t> tryCacheRead(const std::shared_ptr<File>& f, const std::filesystem::path& thumbnailRoot,
                                          const unsigned int size) {
-    if (const auto thumbnail_sizes = Registry::get().caching.thumbnails.sizes;
+    if (const auto thumbnail_sizes = vh::config::Registry::get().caching.thumbnails.sizes;
         std::ranges::find(thumbnail_sizes.begin(), thumbnail_sizes.end(), size) != thumbnail_sizes.end()) {
 
         if (const auto pathToJpegCache = thumbnailRoot / f->base32_alias / std::string(std::to_string(size) + ".jpg");
@@ -769,7 +768,7 @@ Response Router::route(request&& req) {
 }
 
 Response Router::handleAuthSession(request&& req) {
-    if (Registry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
+    if (vh::config::Registry::get().dev.enabled) return makeJsonResponse(req, nlohmann::json{{"ok", true}});
 
     try {
         const auto refresh = protocols::extractCookie(req, "refresh");
@@ -795,7 +794,7 @@ Response Router::handleAuthSession(request&& req) {
 }
 
 std::string Router::authenticateRequest(const request& req) {
-    if (Registry::get().dev.enabled) return "";
+    if (vh::config::Registry::get().dev.enabled) return "";
     try {
         const auto refresh_token = protocols::extractCookie(req, "refresh");
         runtime::Deps::get().sessionManager->validateRawRefreshToken(refresh_token);

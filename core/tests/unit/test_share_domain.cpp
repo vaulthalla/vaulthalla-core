@@ -31,7 +31,7 @@ TEST_F(ShareDomainTest, EnumStringRoundTrips) {
     EXPECT_EQ(upload_status_from_string(to_string(UploadStatus::Receiving)), UploadStatus::Receiving);
     EXPECT_EQ(audit_actor_type_from_string(to_string(AuditActorType::SharePrincipal)), AuditActorType::SharePrincipal);
     EXPECT_EQ(audit_status_from_string(to_string(AuditStatus::RateLimited)), AuditStatus::RateLimited);
-    EXPECT_THROW(link_type_from_string("bogus"), std::invalid_argument);
+    EXPECT_THROW({ (void)link_type_from_string("bogus"); }, std::invalid_argument);
 }
 
 TEST_F(ShareDomainTest, GrantBitmaskAndValidation) {

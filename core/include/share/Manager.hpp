@@ -183,9 +183,9 @@ struct ManagerOptions {
 };
 
 struct RoleAssignmentRequest {
-    std::optional<uint32_t> vault_role_id;
-    std::optional<std::string> vault_role_name;
-    std::vector<rbac::permission::Override> overrides;
+    std::optional<uint32_t> vault_role_id{};
+    std::optional<std::string> vault_role_name{};
+    std::vector<rbac::permission::Override> overrides{};
 };
 
 struct RecipientRoleAssignmentRequest {
@@ -195,8 +195,8 @@ struct RecipientRoleAssignmentRequest {
 
 struct CreateLinkRequest {
     Link link;
-    std::optional<RoleAssignmentRequest> public_role;
-    std::vector<RecipientRoleAssignmentRequest> recipients;
+    std::optional<RoleAssignmentRequest> public_role{};
+    std::vector<RecipientRoleAssignmentRequest> recipients{};
 };
 
 struct CreateLinkResult {
@@ -277,7 +277,7 @@ struct StartUploadRequest {
     std::string original_filename;
     std::string resolved_filename;
     uint64_t expected_size_bytes{};
-    std::optional<std::string> mime_type;
+    std::optional<std::string> mime_type{};
 };
 
 struct StartUploadResult {

@@ -299,7 +299,7 @@ const SharePageClient = ({ token }: { token: string }) => {
                     {canUpload && isDirectoryShare && <div className="mt-2 text-sm text-cyan-200">Drop files here to add them.</div>}
                   </section>
                 ) : (
-                  <Filesystem files={files} />
+                  <Filesystem files={files} previewMode="share" />
                 )}
               </FileDropOverlay>
             ) : (

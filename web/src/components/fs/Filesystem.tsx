@@ -9,7 +9,7 @@ import { FilesystemClient } from './Filesystem.client'
 
 const isDirectory = (file: FileModel | Directory): file is Directory => (file as Directory).file_count !== undefined
 
-function buildRows(files: FilesystemEntry[]): FilesystemRow[] {
+function buildRows(files: FilesystemEntry[], mode: 'authenticated' | 'share'): FilesystemRow[] {
   return files.map(f => {
     const key = `${f.vault_id}:${f.path ?? f.name}`
 
@@ -32,13 +32,15 @@ function buildRows(files: FilesystemEntry[]): FilesystemRow[] {
       entryType: 'file',
       size: formatSize(f),
       modified: formatTimestamp(f.updated_at),
-      previewUrl: explicitPreviewUrl || buildPreviewUrl({ mode: 'authenticated', vaultId: f.vault_id, path: f.path || f.name, size: 64 }),
+      previewUrl: explicitPreviewUrl || (mode === 'authenticated' ?
+        buildPreviewUrl({ mode: 'authenticated', vaultId: f.vault_id, path: f.path || f.name, size: 64 })
+      : null),
     }
   })
 }
 
-export const Filesystem = ({ files }: FileSystemProps) => {
-  const rows = React.useMemo(() => buildRows(files), [files])
+export const Filesystem = ({ files, previewMode = 'authenticated' }: FileSystemProps) => {
+  const rows = React.useMemo(() => buildRows(files, previewMode), [files, previewMode])
   return <FilesystemClient rows={rows} />
 }
 

@@ -10,7 +10,7 @@ import ShareIcon from '@/fa-duotone/share-nodes.svg'
 import DownloadIcon from '@/fa-duotone/download.svg'
 import { useFSStore } from '@/stores/fsStore'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
-import { hasShareOperation } from '@/util/shareOperations'
+import { canRequestSharePreview, hasShareOperation } from '@/util/shareOperations'
 
 interface ContextMenuProps<T extends { name: string }> {
   data: T
@@ -38,7 +38,7 @@ export function ContextMenu<
   const isDirectory = typeof data.file_count === 'number' || typeof data.subdirectory_count === 'number'
   const isShareMode = mode === 'share'
   const canPaste = !isShareMode && copiedItem && isDirectory
-  const canPreview = hasShareOperation(share?.allowed_ops, 'preview')
+  const canPreview = canRequestSharePreview(share)
   const canDownload = hasShareOperation(share?.allowed_ops, 'download')
   const isPreviewable = Boolean(data.mime_type?.startsWith('image/') || data.mime_type === 'application/pdf')
 

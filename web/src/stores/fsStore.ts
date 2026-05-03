@@ -10,7 +10,7 @@ import { Directory } from '@/models/directory'
 import { useShareWebSocketStore } from '@/stores/useShareWebSocket'
 import { useVaultShareStore } from '@/stores/vaultShareStore'
 import { ShareEntry, SharePreviewResponse } from '@/models/linkShare'
-import { hasShareOperation } from '@/util/shareOperations'
+import { canRequestSharePreview, hasShareOperation } from '@/util/shareOperations'
 import { buildPreviewUrl } from '@/util/previewUrl'
 import { parseTimestamp } from '@/util/formatTimestamp'
 import { buildDownloadUrl } from '@/util/downloadUrl'
@@ -131,7 +131,7 @@ const shareEntryToFsEntry = (entry: ShareEntry): FsEntry => {
 
   const shareState = useVaultShareStore.getState()
   if (shareState.status === 'ready' && shareState.sessionToken &&
-    hasShareOperation(shareState.share?.allowed_ops, 'preview') && entry.path && entry.mime_type &&
+    canRequestSharePreview(shareState.share) && entry.path && entry.mime_type &&
     (entry.mime_type.startsWith('image/') || entry.mime_type === 'application/pdf')) {
     ;(file as DBFile & { previewUrl?: string | null }).previewUrl = shareHttpPreviewUrl(entry.path, 64)
   }

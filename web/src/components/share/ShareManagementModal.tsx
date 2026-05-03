@@ -35,7 +35,7 @@ interface ShareManagementModalProps {
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
 
 const operationsForPreset = (preset: SharePreset, isDirectory: boolean): ShareOperation[] => {
-  if (preset === 'upload') return ['metadata', 'list', 'preview', 'upload']
+  if (preset === 'upload') return ['metadata', 'list', 'upload']
   if (preset === 'download') return isDirectory ? ['metadata', 'list', 'preview', 'download'] : ['metadata', 'preview', 'download']
   return isDirectory ? ['metadata', 'list', 'preview', 'download'] : ['metadata', 'preview', 'download']
 }

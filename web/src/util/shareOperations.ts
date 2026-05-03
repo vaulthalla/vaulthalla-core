@@ -22,6 +22,12 @@ export const hasShareOperation = (allowedOps: ShareLink['allowed_ops'] | undefin
   return shareOperations(allowedOps).includes(operation)
 }
 
+export const canRequestSharePreview = (share: Pick<ShareLink, 'allowed_ops' | 'link_type'> | null | undefined) => {
+  if (!share) return false
+  if (share.link_type === 'upload') return false
+  return hasShareOperation(share.allowed_ops, 'preview')
+}
+
 export const shareOperationLabel = (allowedOps: ShareLink['allowed_ops'] | undefined) => {
   if (!allowedOps) return 'No operations'
   const ops = shareOperations(allowedOps)

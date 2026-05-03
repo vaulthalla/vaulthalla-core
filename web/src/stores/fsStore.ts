@@ -17,6 +17,13 @@ import { buildDownloadUrl } from '@/util/downloadUrl'
 
 type FsMode = 'authenticated' | 'share'
 type FsEntry = DBFile | Directory
+export interface UploadSuccessState {
+  message: string
+  filename: string | null
+  previewUrl: string | null
+  mimeType: string | null
+  listUnavailable: boolean
+}
 
 interface FsStore {
   mode: FsMode
@@ -25,7 +32,7 @@ interface FsStore {
   uploading: boolean
   uploadProgress: number
   uploadError: string | null
-  uploadSuccess: string | null
+  uploadSuccess: UploadSuccessState | null
   uploadLabel: string | null
   downloading: boolean
   downloadProgress: number
@@ -213,21 +220,50 @@ const uploadSuccessMessage = (files: FileWithRelativePath[]) => {
   return `${files.length} files uploaded.`
 }
 
-const clearTransferState = () => ({
-  copiedItem: null,
-  uploadProgress: 0,
-  uploading: false,
-  uploadError: null,
-  uploadSuccess: null,
-  uploadLabel: null,
-  downloadProgress: 0,
-  downloading: false,
-  downloadError: null,
-  downloadLabel: null,
-  previewing: false,
-  previewError: null,
-  sharePreview: null,
-})
+const revokeUploadPreview = (uploadSuccess?: UploadSuccessState | null) => {
+  if (typeof URL === 'undefined' || !uploadSuccess?.previewUrl?.startsWith('blob:')) return
+  URL.revokeObjectURL(uploadSuccess.previewUrl)
+}
+
+const createUploadSuccess = (files: FileWithRelativePath[], listUnavailable: boolean): UploadSuccessState => {
+  let previewFile: FileWithRelativePath | undefined
+  if (listUnavailable) {
+    for (let i = files.length - 1; i >= 0; i -= 1) {
+      if (files[i].type.startsWith('image/')) {
+        previewFile = files[i]
+        break
+      }
+    }
+  }
+  const previewUrl = previewFile && typeof URL !== 'undefined' ? URL.createObjectURL(previewFile) : null
+
+  return {
+    message: uploadSuccessMessage(files),
+    filename: files.length === 1 ? files[0].name : previewFile?.name ?? null,
+    previewUrl,
+    mimeType: previewFile?.type ?? null,
+    listUnavailable,
+  }
+}
+
+const clearTransferState = (uploadSuccess?: UploadSuccessState | null) => {
+  revokeUploadPreview(uploadSuccess)
+  return {
+    copiedItem: null,
+    uploadProgress: 0,
+    uploading: false,
+    uploadError: null,
+    uploadSuccess: null,
+    uploadLabel: null,
+    downloadProgress: 0,
+    downloading: false,
+    downloadError: null,
+    downloadLabel: null,
+    previewing: false,
+    previewError: null,
+    sharePreview: null,
+  }
+}
 
 const startBrowserDownload = (url: string) => {
   const anchor = document.createElement('a')
@@ -288,20 +324,8 @@ export const useFSStore = create<FsStore>()(
           currVault: null,
           path: '/',
           files: [],
-          copiedItem: null,
-          uploadProgress: 0,
-          uploading: false,
-          uploadError: null,
-          uploadSuccess: null,
-          uploadLabel: null,
-          downloadProgress: 0,
-          downloading: false,
-          downloadError: null,
-          downloadLabel: null,
-          previewing: false,
-          previewError: null,
-          sharePreview: null,
           currentDirectory: null,
+          ...clearTransferState(get().uploadSuccess),
         })
       },
 
@@ -310,20 +334,8 @@ export const useFSStore = create<FsStore>()(
           mode: 'authenticated',
           path: '',
           files: [],
-          copiedItem: null,
-          uploadProgress: 0,
-          uploading: false,
-          uploadError: null,
-          uploadSuccess: null,
-          uploadLabel: null,
-          downloadProgress: 0,
-          downloading: false,
-          downloadError: null,
-          downloadLabel: null,
-          previewing: false,
-          previewError: null,
-          sharePreview: null,
           currentDirectory: null,
+          ...clearTransferState(get().uploadSuccess),
         })
       },
 
@@ -407,7 +419,7 @@ export const useFSStore = create<FsStore>()(
 
           const normalizedPath = normalizeAuthPath(path)
           if (normalizedPath !== '/') {
-            set({ path: '', currentDirectory: null, files: [], ...clearTransferState() })
+            set({ path: '', currentDirectory: null, files: [], ...clearTransferState(get().uploadSuccess) })
             try {
               await loadAuthenticatedDirectory(currVault, '')
               return
@@ -421,7 +433,7 @@ export const useFSStore = create<FsStore>()(
             await vaultStore.fetchVaults()
             const localVault = await vaultStore.getLocalVault()
             if (localVault) {
-              set({ currVault: localVault, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+              set({ currVault: localVault, path: '', currentDirectory: null, files: [], ...clearTransferState(get().uploadSuccess) })
               await loadAuthenticatedDirectory(localVault, '')
               return
             }
@@ -429,7 +441,7 @@ export const useFSStore = create<FsStore>()(
             console.error('[FsStore] Vault recovery after list failure failed:', vaultError)
           }
 
-          set({ currentDirectory: null, files: [], ...clearTransferState() })
+          set({ currentDirectory: null, files: [], ...clearTransferState(get().uploadSuccess) })
           throw error
         }
       },
@@ -455,16 +467,22 @@ export const useFSStore = create<FsStore>()(
             })
           }
 
+          let listUnavailable = false
+
           if (get().mode === 'authenticated') {
             await useVaultStore.getState().syncVault({ id: get().currVault?.id || 0 })
             await fetchFiles()
           } else {
             const shareState = useVaultShareStore.getState()
-            if (hasShareOperation(shareState.share?.allowed_ops, 'list') || shareState.share?.target_type === 'file')
+            const canRelist = hasShareOperation(shareState.share?.allowed_ops, 'list') || shareState.share?.target_type === 'file'
+            listUnavailable = !canRelist
+            if (canRelist)
               await fetchFiles()
           }
 
-          set({ uploadProgress: 100, uploadError: null, uploadSuccess: uploadSuccessMessage(files) })
+          const uploadSuccess = createUploadSuccess(files, listUnavailable)
+          revokeUploadPreview(get().uploadSuccess)
+          set({ uploadProgress: 100, uploadError: null, uploadSuccess })
         } catch (err) {
           console.error('[FsStore] upload() batch failed:', err)
           set({ uploadError: uploadErrorMessage(err, 'Upload failed', get().mode) })
@@ -677,7 +695,7 @@ export const useFSStore = create<FsStore>()(
 
       async setCurrVault(vault) {
         requireAuthenticatedMode(get().mode, 'Vault selection')
-        set({ currVault: vault, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+        set({ currVault: vault, path: '', currentDirectory: null, files: [], ...clearTransferState(get().uploadSuccess) })
         await get().fetchFiles()
       },
 
@@ -730,7 +748,7 @@ export const useFSStore = create<FsStore>()(
               if (freshVault) {
                 await hydratedState.setCurrVault(freshVault)
               } else {
-                useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+                useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState(useFSStore.getState().uploadSuccess) })
                 const localVault = await vaultStore.getLocalVault()
                 if (localVault) await hydratedState.setCurrVault(localVault)
                 else console.warn('[FsStore] No local vault found during rehydration')
@@ -739,7 +757,7 @@ export const useFSStore = create<FsStore>()(
               if (!hydratedState.files || hydratedState.files.length === 0) await hydratedState.fetchFiles()
             } catch (err) {
               console.error('[FsStore] Rehydrate fetch failed:', err)
-              useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState() })
+              useFSStore.setState({ currVault: null, path: '', currentDirectory: null, files: [], ...clearTransferState(useFSStore.getState().uploadSuccess) })
             }
           })()
         }

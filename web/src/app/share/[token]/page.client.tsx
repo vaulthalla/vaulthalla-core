@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import React, { FormEvent, useEffect, useRef, useState } from 'react'
 import { Filesystem } from '@/components/fs/Filesystem'
 import { FileDropOverlay } from '@/components/fs/FileDropOverlay'
@@ -73,6 +74,28 @@ const SharePageClient = ({ token }: { token: string }) => {
   const canBrowseShare = canList || isFileShare
   const isUploadOnlyDirectoryShare = canUpload && isDirectoryShare && !canList
   const canShowFileSurface = canBrowseShare || isUploadOnlyDirectoryShare
+  const revalidateShareSurface = React.useCallback(async () => {
+    const shareState = useVaultShareStore.getState()
+    const shouldOpen =
+      shareState.publicToken !== token ||
+      shareState.status === 'idle' ||
+      shareState.status === 'opening' ||
+      shareState.status === 'ready'
+
+    if (!shouldOpen) return
+
+    await openSession(token)
+
+    const refreshedShareState = useVaultShareStore.getState()
+    const fsState = useFSStore.getState()
+    if (refreshedShareState.publicToken !== token || refreshedShareState.status !== 'ready' || fsState.mode !== 'share') return
+
+    const canBrowseRestoredShare =
+      hasShareOperation(refreshedShareState.share?.allowed_ops, 'list') ||
+      refreshedShareState.share?.target_type === 'file'
+
+    if (canBrowseRestoredShare) await fsState.fetchFiles()
+  }, [openSession, token])
 
   useEffect(() => {
     enterShareMode()
@@ -85,24 +108,12 @@ const SharePageClient = ({ token }: { token: string }) => {
   }, [clearShareSession, enterShareMode, exitShareMode, openSession, token])
 
   useEffect(() => {
-    const reopenIfStale = () => {
-      const shareState = useVaultShareStore.getState()
-      if (
-        shareState.publicToken !== token ||
-        shareState.status === 'idle' ||
-        shareState.status === 'opening' ||
-        shareState.status === 'ready'
-      ) {
-        openSession(token).catch(() => undefined)
-      }
-    }
-
     const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) reopenIfStale()
+      if (event.persisted) revalidateShareSurface().catch(() => undefined)
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') reopenIfStale()
+      if (document.visibilityState === 'visible') revalidateShareSurface().catch(() => undefined)
     }
 
     window.addEventListener('pageshow', handlePageShow)
@@ -112,7 +123,7 @@ const SharePageClient = ({ token }: { token: string }) => {
       window.removeEventListener('pageshow', handlePageShow)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [openSession, token])
+  }, [revalidateShareSurface])
 
   useEffect(() => {
     if (mode === 'share' && status === 'ready' && canBrowseShare) fetchFiles().catch(() => undefined)
@@ -229,6 +240,10 @@ const SharePageClient = ({ token }: { token: string }) => {
               </Alert>
             )}
 
+            {uploadSuccess && !uploading && !uploadError && !isUploadOnlyDirectoryShare && (
+              <Alert tone="success">{uploadSuccess.message}</Alert>
+            )}
+
             {isUploadOnlyDirectoryShare ? (
               <FileDropOverlay disabled={!canUpload || !isDirectoryShare} disabledMessage="Upload is not available for this share">
                 <UploadProgress />
@@ -236,8 +251,23 @@ const SharePageClient = ({ token }: { token: string }) => {
                   <h2 className="text-xl font-semibold text-white">Upload files to this share</h2>
                   <p className="mt-2 text-sm text-gray-400">Uploaded files may not be visible after upload.</p>
                   {uploadSuccess && (
-                    <div className="mt-5 rounded border border-emerald-500/40 bg-emerald-950/30 p-3 text-sm text-emerald-100">
-                      {uploadSuccess}
+                    <div className="mx-auto mt-5 max-w-lg rounded border border-emerald-500/40 bg-emerald-950/30 p-3 text-sm text-emerald-100">
+                      <p className="font-medium">{uploadSuccess.message}</p>
+                      {uploadSuccess.previewUrl && uploadSuccess.mimeType?.startsWith('image/') && (
+                        <div className="mt-3 overflow-hidden rounded border border-emerald-300/20 bg-black/30">
+                          <Image
+                            src={uploadSuccess.previewUrl}
+                            alt={uploadSuccess.filename ?? 'Uploaded image preview'}
+                            width={640}
+                            height={360}
+                            unoptimized
+                            className="mx-auto max-h-72 w-full object-contain"
+                          />
+                        </div>
+                      )}
+                      {uploadSuccess.listUnavailable && (
+                        <p className="mt-3 text-emerald-100/80">This share does not expose the directory listing, so the uploaded file may not appear here.</p>
+                      )}
                     </div>
                   )}
                   <div className="mt-5 flex flex-col items-center gap-3 text-sm text-cyan-200 sm:flex-row sm:justify-center">

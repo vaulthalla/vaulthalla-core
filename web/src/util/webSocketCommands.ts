@@ -8,6 +8,7 @@ import { Group } from '@/models/group'
 import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { SystemHealth } from '@/models/stats/systemHealth'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
 import {
   ShareDownloadCancelResponse,
@@ -268,6 +269,8 @@ export interface WebSocketCommandMap {
 
   // stats
   'stats.vault': { payload: { vault_id: number }; response: { stats: VaultStats } }
+
+  'stats.system.health': { payload: null; response: { stats: SystemHealth } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

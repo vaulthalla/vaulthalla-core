@@ -3,6 +3,7 @@ import { WSCommandPayload } from '@/util/webSocketCommands'
 import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { SystemHealth } from '@/models/stats/systemHealth'
 import { getErrorMessage } from '@/util/handleErrors'
 
 /**
@@ -23,9 +24,20 @@ export interface StatsWrapper<T> {
 }
 
 export type CacheStatsWrapper = StatsWrapper<CacheStats>
+export type SystemHealthWrapper = StatsWrapper<SystemHealth>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
+const makeSystemHealthWrapper = (initial?: Partial<SystemHealthWrapper>): SystemHealthWrapper => ({
+  data: new SystemHealth(),
   lastUpdated: null,
   loading: false,
   error: null,
@@ -38,23 +50,29 @@ interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
   httpCacheStats: CacheStatsWrapper
+  systemHealth: SystemHealthWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
+  getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
   // Refresh helpers
+  refreshSystemHealth: () => Promise<SystemHealth>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
   // Polling (separate pollers)
+  startSystemHealthPolling: (intervalMs?: number) => void
+  stopSystemHealthPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
   stopHttpCacheStatsPolling: () => void
 
   // internal
+  _systemHealthPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -62,7 +80,9 @@ interface StatsStore {
 export const useStatsStore = create<StatsStore>((set, get) => ({
   fsCacheStats: makeCacheWrapper(),
   httpCacheStats: makeCacheWrapper(),
+  systemHealth: makeSystemHealthWrapper(),
 
+  _systemHealthPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -71,6 +91,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.vault', vault_id)
     return response.stats
+  },
+
+  async getSystemHealth() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.health', null)
+    return SystemHealth.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -85,6 +112,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.http.cache', null)
     return response.stats
+  },
+
+  async refreshSystemHealth() {
+    const current = get().systemHealth
+    if (current.loading) return current.data
+
+    set({ systemHealth: { ...current, loading: true, error: null } })
+
+    try {
+      const health = await get().getSystemHealth()
+      const nextData = SystemHealth.from(health ?? {})
+      const now = Date.now()
+
+      set({
+        systemHealth: {
+          ...get().systemHealth,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch system health'
+      const now = Date.now()
+
+      set({ systemHealth: { ...get().systemHealth, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().systemHealth.data
+    }
   },
 
   async refreshFsCacheStats() {
@@ -150,6 +210,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       set({ httpCacheStats: { ...get().httpCacheStats, loading: false, error: msg, lastErrorAt: now } })
 
       return get().httpCacheStats.data
+    }
+  },
+
+  startSystemHealthPolling(intervalMs = 7500) {
+    if (get()._systemHealthPoller) return
+
+    void get().refreshSystemHealth()
+
+    const id = window.setInterval(() => {
+      void get().refreshSystemHealth()
+    }, intervalMs)
+
+    set({ _systemHealthPoller: id })
+  },
+
+  stopSystemHealthPolling() {
+    const id = get()._systemHealthPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _systemHealthPoller: null })
     }
   },
 

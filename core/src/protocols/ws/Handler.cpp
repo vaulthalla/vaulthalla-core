@@ -133,6 +133,7 @@ void Handler::registerGroupHandlers(const std::shared_ptr<Router>& r) {
 
 void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("stats.vault", &handler::Stats::vault);
+    r->registerSessionOnlyHandler("stats.system.health", &handler::Stats::systemHealth);
     r->registerSessionOnlyHandler("stats.fs.cache", &handler::Stats::fsCache);
     r->registerSessionOnlyHandler("stats.http.cache", &handler::Stats::httpCache);
 }

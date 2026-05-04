@@ -11,6 +11,7 @@ using json = nlohmann::json;
 
 struct Stats {
     static json vault(const json& payload, const std::shared_ptr<Session>& session);
+    static json systemHealth(const std::shared_ptr<Session>& session);
     static json fsCache(const std::shared_ptr<Session>& session);
     static json httpCache(const std::shared_ptr<Session>& session);
 };

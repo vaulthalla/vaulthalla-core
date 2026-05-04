@@ -9,6 +9,7 @@ import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
+import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
 import {
   ShareDownloadCancelResponse,
@@ -271,6 +272,8 @@ export interface WebSocketCommandMap {
   'stats.vault': { payload: { vault_id: number }; response: { stats: VaultStats } }
 
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
+
+  'stats.system.threadpools': { payload: null; response: { stats: ThreadPoolManagerStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

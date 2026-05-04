@@ -4,6 +4,7 @@ import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
+import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { getErrorMessage } from '@/util/handleErrors'
 
 /**
@@ -25,6 +26,7 @@ export interface StatsWrapper<T> {
 
 export type CacheStatsWrapper = StatsWrapper<CacheStats>
 export type SystemHealthWrapper = StatsWrapper<SystemHealth>
+export type ThreadPoolStatsWrapper = StatsWrapper<ThreadPoolManagerStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -46,26 +48,41 @@ const makeSystemHealthWrapper = (initial?: Partial<SystemHealthWrapper>): System
   ...initial,
 })
 
+const makeThreadPoolStatsWrapper = (initial?: Partial<ThreadPoolStatsWrapper>): ThreadPoolStatsWrapper => ({
+  data: new ThreadPoolManagerStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
   httpCacheStats: CacheStatsWrapper
   systemHealth: SystemHealthWrapper
+  threadPoolStats: ThreadPoolStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
+  getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
   // Refresh helpers
   refreshSystemHealth: () => Promise<SystemHealth>
+  refreshThreadPoolStats: () => Promise<ThreadPoolManagerStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
   // Polling (separate pollers)
   startSystemHealthPolling: (intervalMs?: number) => void
   stopSystemHealthPolling: () => void
+  startThreadPoolStatsPolling: (intervalMs?: number) => void
+  stopThreadPoolStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -73,6 +90,7 @@ interface StatsStore {
 
   // internal
   _systemHealthPoller: number | null
+  _threadPoolStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -81,8 +99,10 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   fsCacheStats: makeCacheWrapper(),
   httpCacheStats: makeCacheWrapper(),
   systemHealth: makeSystemHealthWrapper(),
+  threadPoolStats: makeThreadPoolStatsWrapper(),
 
   _systemHealthPoller: null,
+  _threadPoolStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -98,6 +118,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.health', null)
     return SystemHealth.from(response.stats)
+  },
+
+  async getThreadPoolStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.threadpools', null)
+    return ThreadPoolManagerStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -144,6 +171,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       set({ systemHealth: { ...get().systemHealth, loading: false, error: msg, lastErrorAt: now } })
 
       return get().systemHealth.data
+    }
+  },
+
+  async refreshThreadPoolStats() {
+    const current = get().threadPoolStats
+    if (current.loading) return current.data
+
+    set({ threadPoolStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getThreadPoolStats()
+      const nextData = ThreadPoolManagerStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        threadPoolStats: {
+          ...get().threadPoolStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch thread pool stats'
+      const now = Date.now()
+
+      set({ threadPoolStats: { ...get().threadPoolStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().threadPoolStats.data
     }
   },
 
@@ -230,6 +290,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _systemHealthPoller: null })
+    }
+  },
+
+  startThreadPoolStatsPolling(intervalMs = 7500) {
+    if (get()._threadPoolStatsPoller) return
+
+    void get().refreshThreadPoolStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshThreadPoolStats()
+    }, intervalMs)
+
+    set({ _threadPoolStatsPoller: id })
+  },
+
+  stopThreadPoolStatsPolling() {
+    const id = get()._threadPoolStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _threadPoolStatsPoller: null })
     }
   },
 

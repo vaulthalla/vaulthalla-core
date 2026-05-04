@@ -9,6 +9,7 @@
 #include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
 #include "stats/model/SystemHealth.hpp"
+#include "stats/model/ThreadPoolStats.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
 #include "rbac/resolver/admin/all.hpp"
@@ -46,6 +47,11 @@ json Stats::vault(const json& payload, const std::shared_ptr<Session>& session) 
 json Stats::systemHealth(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view system health.");
     return {{"stats", vh::stats::model::SystemHealth::snapshot()}};
+}
+
+json Stats::systemThreadPools(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view thread pool stats.");
+    return {{"stats", vh::stats::model::ThreadPoolManagerSnapshot::snapshot()}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

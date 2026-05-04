@@ -2,14 +2,17 @@
 
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
+#include "db/query/sync/Stats.hpp"
 #include "nlohmann/json.hpp"
 #include "protocols/ws/Session.hpp"
 #include "vault/task/Stats.hpp"
 #include "vault/model/Stat.hpp"
 #include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
+#include "stats/model/FuseStats.hpp"
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
+#include "stats/model/VaultSyncHealth.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
 #include "rbac/resolver/admin/all.hpp"
@@ -44,6 +47,21 @@ json Stats::vault(const json& payload, const std::shared_ptr<Session>& session) 
     throw std::runtime_error("Unable to load vault stats");
 }
 
+json Stats::vaultSync(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view sync stats for this vault.");
+
+    const auto stats = vh::db::query::sync::Stats::getVaultSyncHealth(vaultId);
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
 json Stats::systemHealth(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view system health.");
     return {{"stats", vh::stats::model::SystemHealth::snapshot()}};
@@ -52,6 +70,13 @@ json Stats::systemHealth(const std::shared_ptr<Session>& session) {
 json Stats::systemThreadPools(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view thread pool stats.");
     return {{"stats", vh::stats::model::ThreadPoolManagerSnapshot::snapshot()}};
+}
+
+json Stats::systemFuse(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view FUSE stats.");
+    const auto& stats = runtime::Deps::get().fuseStats;
+    if (!stats) throw std::runtime_error("No FUSE stats available.");
+    return {{"stats", stats->snapshot()}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

@@ -2,7 +2,7 @@ import { useStatsStore } from '@/stores/statsStore'
 import CapacityStats from '@/components/vault/VaultStatsDashboard/CapacityStats/Component'
 import { useEffect, useState } from 'react'
 import { VaultStats } from '@/models/stats/vaultStats'
-import LatestSyncHealth from '@/components/vault/VaultStatsDashboard/LatestSyncHealth/Component'
+import SyncHealth from '@/components/vault/VaultStatsDashboard/SyncHealth/Component'
 
 const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
   const [stats, setStats] = useState<VaultStats | undefined>(undefined)
@@ -16,7 +16,7 @@ const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
     stats && (
       <div className="VaultStatsDashboard">
         <CapacityStats capacityStats={stats.capacity} />
-        <LatestSyncHealth event={stats.latest_sync_event} />
+        <SyncHealth vaultId={vault_id} initialLatestEvent={stats.latest_sync_event} />
       </div>
     )
   )

@@ -44,6 +44,7 @@ class Connection {
     // Sync
     void initPreparedSync() const;
     void initPreparedSyncEvents() const;
+    void initPreparedSyncStats() const;
     void initPreparedSyncThroughput() const;
     void initPreparedSyncConflicts() const;
     void initPreparedSyncConflictArtifacts() const;

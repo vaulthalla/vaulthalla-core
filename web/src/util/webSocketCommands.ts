@@ -1,5 +1,6 @@
 import { LocalDiskVault, S3Vault, Vault } from '@/models/vaults'
 import { VaultStats } from '@/models/stats/vaultStats'
+import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { APIKey, S3APIKey } from '@/models/apiKey'
 import { User } from '@/models/user'
 import { AdminRolePayload, VaultRolePayload, Permission } from '@/models/role'
@@ -8,6 +9,7 @@ import { Group } from '@/models/group'
 import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { FuseStats } from '@/models/stats/fuseStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
@@ -271,9 +273,13 @@ export interface WebSocketCommandMap {
   // stats
   'stats.vault': { payload: { vault_id: number }; response: { stats: VaultStats } }
 
+  'stats.vault.sync': { payload: { vault_id: number }; response: { stats: VaultSyncHealth } }
+
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
 
   'stats.system.threadpools': { payload: null; response: { stats: ThreadPoolManagerStats } }
+
+  'stats.system.fuse': { payload: null; response: { stats: FuseStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

@@ -2,7 +2,9 @@ import { create } from 'zustand'
 import { WSCommandPayload } from '@/util/webSocketCommands'
 import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
+import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { FuseStats } from '@/models/stats/fuseStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { getErrorMessage } from '@/util/handleErrors'
@@ -27,6 +29,7 @@ export interface StatsWrapper<T> {
 export type CacheStatsWrapper = StatsWrapper<CacheStats>
 export type SystemHealthWrapper = StatsWrapper<SystemHealth>
 export type ThreadPoolStatsWrapper = StatsWrapper<ThreadPoolManagerStats>
+export type FuseStatsWrapper = StatsWrapper<FuseStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -58,23 +61,37 @@ const makeThreadPoolStatsWrapper = (initial?: Partial<ThreadPoolStatsWrapper>): 
   ...initial,
 })
 
+const makeFuseStatsWrapper = (initial?: Partial<FuseStatsWrapper>): FuseStatsWrapper => ({
+  data: new FuseStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
   httpCacheStats: CacheStatsWrapper
   systemHealth: SystemHealthWrapper
   threadPoolStats: ThreadPoolStatsWrapper
+  fuseStats: FuseStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
+  getVaultSyncHealth: (payload: WSCommandPayload<'stats.vault.sync'>) => Promise<VaultSyncHealth>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
+  getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
   // Refresh helpers
   refreshSystemHealth: () => Promise<SystemHealth>
   refreshThreadPoolStats: () => Promise<ThreadPoolManagerStats>
+  refreshFuseStats: () => Promise<FuseStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -83,6 +100,8 @@ interface StatsStore {
   stopSystemHealthPolling: () => void
   startThreadPoolStatsPolling: (intervalMs?: number) => void
   stopThreadPoolStatsPolling: () => void
+  startFuseStatsPolling: (intervalMs?: number) => void
+  stopFuseStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -91,6 +110,7 @@ interface StatsStore {
   // internal
   _systemHealthPoller: number | null
   _threadPoolStatsPoller: number | null
+  _fuseStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -100,9 +120,11 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   httpCacheStats: makeCacheWrapper(),
   systemHealth: makeSystemHealthWrapper(),
   threadPoolStats: makeThreadPoolStatsWrapper(),
+  fuseStats: makeFuseStatsWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
+  _fuseStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -111,6 +133,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.vault', vault_id)
     return response.stats
+  },
+
+  async getVaultSyncHealth(vault_id) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.vault.sync', vault_id)
+    return VaultSyncHealth.from(response.stats)
   },
 
   async getSystemHealth() {
@@ -125,6 +154,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.threadpools', null)
     return ThreadPoolManagerStats.from(response.stats)
+  },
+
+  async getFuseStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.fuse', null)
+    return FuseStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -204,6 +240,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       set({ threadPoolStats: { ...get().threadPoolStats, loading: false, error: msg, lastErrorAt: now } })
 
       return get().threadPoolStats.data
+    }
+  },
+
+  async refreshFuseStats() {
+    const current = get().fuseStats
+    if (current.loading) return current.data
+
+    set({ fuseStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getFuseStats()
+      const nextData = FuseStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        fuseStats: {
+          ...get().fuseStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch FUSE stats'
+      const now = Date.now()
+
+      set({ fuseStats: { ...get().fuseStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().fuseStats.data
     }
   },
 
@@ -310,6 +379,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _threadPoolStatsPoller: null })
+    }
+  },
+
+  startFuseStatsPolling(intervalMs = 7500) {
+    if (get()._fuseStatsPoller) return
+
+    void get().refreshFuseStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshFuseStats()
+    }, intervalMs)
+
+    set({ _fuseStatsPoller: id })
+  },
+
+  stopFuseStatsPolling() {
+    const id = get()._fuseStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _fuseStatsPoller: null })
     }
   },
 

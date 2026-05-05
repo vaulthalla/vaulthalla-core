@@ -65,6 +65,7 @@ class Connection {
     void initPreparedShareUploads() const;
     void initPreparedShareAuditEvents() const;
     void initPreparedShareVaultRoles() const;
+    void initPreparedShareStats() const;
 
     // Admin
     void initPreparedSecrets() const;

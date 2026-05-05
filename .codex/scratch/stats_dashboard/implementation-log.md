@@ -61,3 +61,59 @@
 - Avoid duplicate rows before adding FUSE rename/move operation records.
 - Add focused unit/integration coverage for activity recording.
 - Keep share observability as Phase 6 rather than overloading the activity card.
+
+## Phase 6 - Share Observatory Lite
+
+### Backend Files Added
+
+- `core/include/stats/model/VaultShareStats.hpp`
+- `core/src/stats/model/VaultShareStats.cpp`
+- `core/include/db/query/share/Stats.hpp`
+- `core/src/db/query/share/Stats.cpp`
+- `core/src/db/preparedStatements/share/stats.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+- `core/src/protocols/shell/commands/vault/listinfo.cpp`
+- `core/src/protocols/shell/commands/vault/role.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/vaultShareStats.ts`
+- `web/src/components/vault/VaultStatsDashboard/ShareStats/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.vault.shares`
+
+### Dashboard Integration
+
+- Vault dashboard order now includes:
+  - Capacity
+  - Sync Health
+  - Activity
+  - Share Observatory
+
+### Architectural Decisions
+
+- Share stats are read-only and query existing `share_link`, `share_upload`, and `share_access_event` tables.
+- The payload intentionally excludes full IP/user-agent fields; this card surfaces operator posture without leaking unnecessary sensitive detail.
+- Download counts use successful `share_access_event` rows whose event type starts with `share.download`.
+- Upload counts use completed `share_upload` rows joined through `share_link` to the vault.
+- Reconfigured unity builds exposed existing unqualified `Vault` ambiguity in shell vault commands, so the affected shell references now use `::vh::vault::model::Vault`.
+
+### Deferred TODOs
+
+- Add seeded DB tests for share rollup queries.
+- Add an optional global share activity card later if the admin dashboard needs cross-vault share posture.

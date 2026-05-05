@@ -17,3 +17,33 @@ Validation:
 Known failures:
 
 - None currently.
+
+Checkpoint:
+
+- Commit SHA: `e236717c`
+- Push target: `origin/stats-dashboards`
+- Push result: succeeded
+
+## Phase 6 - Share Observatory Lite
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending.
+- Push target: `origin/stats-dashboards`
+- Push result: pending

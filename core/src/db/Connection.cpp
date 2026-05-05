@@ -197,6 +197,7 @@ void Connection::initPrepared() const {
     initPreparedShareUploads();
     initPreparedShareAuditEvents();
     initPreparedShareVaultRoles();
+    initPreparedShareStats();
 
     // Admin
     initPreparedSecrets();

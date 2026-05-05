@@ -2,6 +2,7 @@
 
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
+#include "db/query/share/Stats.hpp"
 #include "db/query/sync/Stats.hpp"
 #include "db/query/vault/Activity.hpp"
 #include "nlohmann/json.hpp"
@@ -14,6 +15,7 @@
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
 #include "stats/model/VaultActivity.hpp"
+#include "stats/model/VaultShareStats.hpp"
 #include "stats/model/VaultSyncHealth.hpp"
 #include "runtime/Deps.hpp"
 #include "fs/cache/Registry.hpp"
@@ -76,6 +78,21 @@ json Stats::vaultActivity(const json& payload, const std::shared_ptr<Session>& s
     })) throw std::runtime_error("You do not have permission to view activity stats for this vault.");
 
     const auto stats = vh::db::query::vault::Activity::getVaultActivity(vaultId);
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
+json Stats::vaultShares(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view share stats for this vault.");
+
+    const auto stats = vh::db::query::share::Stats::getVaultShareStats(vaultId);
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 

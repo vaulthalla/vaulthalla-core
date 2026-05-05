@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 5 - Vault Activity and Mutation Stats
-- Status: implemented locally, validation passed, pending checkpoint commit/push.
+- Phase 6 - Share Observatory Lite
+- Status: implemented and validated locally; commit pending.
 
 ## Completed Phases
 
@@ -11,18 +11,19 @@
 - Phase 2: ThreadPool snapshots, `stats.system.threadpools`, admin dashboard card.
 - Phase 3: FuseStats, `stats.system.fuse`, admin dashboard card.
 - Phase 4: VaultSyncHealth, `stats.vault.sync`, vault dashboard card.
+- Phase 5: VaultActivity, `stats.vault.activity`, vault dashboard card.
 
 ## Latest Phase Summary
 
-Phase 5 adds `stats.vault.activity` backed by real mutation state:
+Phase 6 adds `stats.vault.shares` backed by real share state:
 
-- `file_activity` for file creates/modifies.
-- `files_trashed` for delete counts and removed bytes.
-- `operations` for move/rename/copy status and recent operation activity.
+- `share_link` for active/expired/revoked link posture and public/email-validated exposure.
+- `share_upload` for completed upload counts.
+- `share_access_event` for downloads, denied/rate-limited/failed attempts, top access signals, and recent share events.
 
-The vault dashboard now renders Activity below Sync Health.
+The vault dashboard now renders Share Observatory below Activity.
 
 ## Checkpoint
 
-- Commit SHA: pending checkpoint commit.
+- Commit SHA: pending.
 - Push target: `origin/stats-dashboards`.

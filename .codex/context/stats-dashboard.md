@@ -30,7 +30,9 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 5 - Vault Activity and Mutation Stats
 
-- Status: implemented locally, validation passed, pending commit/push.
+- Status: committed and pushed.
+- Commit: `e236717c`
+- Push target: `origin/stats-dashboards`
 - Websocket command: `stats.vault.activity`.
 - Backend surfaces:
   - `stats/model/VaultActivity`
@@ -64,3 +66,39 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - Add richer FUSE rename/move operation attribution only if it can avoid duplicate web operation rows.
   - Add explicit activity tests around mutation recording.
   - Operation status history for sync-processed pending operations remains existing behavior.
+
+## Phase 6 - Share Observatory Lite
+
+- Status: implemented and validated locally; commit pending.
+- Websocket command: `stats.vault.shares`.
+- Backend surfaces:
+  - `stats/model/VaultShareStats`
+  - `db/query/share/Stats`
+  - prepared share rollup queries
+  - vault View/ViewStats permission check through the existing stats handler pattern
+- Frontend surfaces:
+  - `web/src/models/stats/vaultShareStats.ts`
+  - `web/src/components/vault/VaultStatsDashboard/ShareStats/Component.tsx`
+  - `statsStore.getVaultShareStats`
+  - `WebSocketCommandMap['stats.vault.shares']`
+- Dashboard integration: vault dashboard renders Share Observatory after Activity.
+- Architectural decisions:
+  - Link posture metrics come from `share_link`.
+  - Completed upload count comes from `share_upload` joined to `share_link`.
+  - Download/denied/rate-limited/failed attempts and recent events come from `share_access_event`.
+  - Stats payload omits IP addresses and user agents to avoid exposing unnecessary sensitive detail in this rollup.
+  - Reconfigure exposed a pre-existing unity-build ambiguity in shell vault commands; unqualified `Vault` references were made explicit.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add dedicated share stats tests with seeded links/uploads/audit events.
+  - Add optional global admin share activity card in a later dashboard layout pass if desired.

@@ -344,7 +344,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8E - Retention and Cleanup Pressure
 
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 - Commit: `c4338666`
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.retention`, `stats.vault.retention`.
@@ -380,7 +380,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
 - Known failures: none currently.
-- Push result: pending.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add seeded DB tests for system/vault retention rollups.
   - Add share-access-event retention configuration if share event cleanup needs an independent policy.

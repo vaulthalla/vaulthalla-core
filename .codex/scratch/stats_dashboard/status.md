@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8E - Retention and Cleanup Pressure
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 

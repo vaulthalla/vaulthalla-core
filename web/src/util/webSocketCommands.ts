@@ -13,6 +13,7 @@ import { Group } from '@/models/group'
 import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { ConnectionStats } from '@/models/stats/connectionStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
@@ -300,6 +301,8 @@ export interface WebSocketCommandMap {
   'stats.system.db': { payload: null; response: { stats: DbStats } }
 
   'stats.system.operations': { payload: null; response: { stats: OperationStats } }
+
+  'stats.system.connections': { payload: null; response: { stats: ConnectionStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

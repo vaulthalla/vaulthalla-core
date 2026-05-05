@@ -15,6 +15,7 @@
 #include "vault/model/Stat.hpp"
 #include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
+#include "stats/model/ConnectionStats.hpp"
 #include "stats/model/DbStats.hpp"
 #include "stats/model/FuseStats.hpp"
 #include "stats/model/OperationStats.hpp"
@@ -176,6 +177,11 @@ json Stats::systemOperations(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view operation queue stats.");
     const auto stats = vh::db::query::stats::OperationStats::snapshot();
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
+json Stats::systemConnections(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view connection stats.");
+    return {{"stats", vh::stats::model::ConnectionStats::snapshot()}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

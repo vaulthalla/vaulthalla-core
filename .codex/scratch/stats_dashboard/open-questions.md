@@ -30,3 +30,8 @@
 
 - Should upload progress writes gain a lightweight `updated_at`/heartbeat timestamp so stalled uploads can be detected by lack of byte advancement instead of age alone?
 - Should operation queue retention prune old success rows, or should historical snapshot phases own long-term operation trend storage?
+
+## Phase 8C
+
+- Should websocket lifecycle add atomics for 24h opened/closed/swept/error counters, or should those wait for historical snapshot/event work?
+- Should admin dashboards ever expose redacted/top-limited IP/user-agent summaries, and what privacy policy should govern that?

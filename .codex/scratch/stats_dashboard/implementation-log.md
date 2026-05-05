@@ -342,3 +342,53 @@
 
 - Add seeded DB tests for system/vault operation queue rollups.
 - Add progress-stalled upload detection if upload progress instrumentation is introduced later.
+
+## Phase 8C - Connection Health
+
+### Backend Files Added
+
+- `core/include/stats/model/ConnectionStats.hpp`
+- `core/src/stats/model/ConnectionStats.cpp`
+
+### Backend Files Changed
+
+- `core/include/protocols/ws/ConnectionLifecycleManager.hpp`
+- `core/src/protocols/ws/ConnectionLifecycleManager.cpp`
+- `core/include/runtime/Manager.hpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+- `core/tests/unit/test_share_queries.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/connectionStats.ts`
+- `web/src/components/stats/ConnectionStats.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+
+### Websocket Commands Added
+
+- `stats.system.connections`
+
+### Dashboard Integration
+
+- Admin dashboard order now includes Connection Health after FUSE Operations and before Operation Queue.
+
+### Architectural Decisions
+
+- Connection stats are read-only and derive from `auth::session::Manager::getActive()`.
+- The payload separates human, share pending, share, and unauthenticated sessions.
+- Timeout settings are read from `ConnectionLifecycleManager` through small accessors.
+- IP and user-agent top lists are explicitly unavailable/empty in this phase to avoid unnecessary sensitive detail.
+- 24h opened/closed/swept/error counters remain null because no lifecycle counters exist yet.
+- Reconfigure exposed an incomplete-type unit-test dependency; `test_share_queries.cpp` now includes `share/Principal.hpp` directly.
+
+### Deferred TODOs
+
+- Add lifecycle counters for opened/closed/swept/error windows if needed.
+- Add redacted/top-limited IP/user-agent summaries only after an explicit privacy choice.

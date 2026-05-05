@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 8B - Operation Queue Health
-- Status: committed and pushed.
+- Phase 8C - Connection Health
+- Status: implemented and validated; checkpoint commit pending.
 
 ## Completed Phases
 
@@ -16,20 +16,21 @@
 - Phase 7: DbStats, `stats.system.db`, admin dashboard card.
 - Phase 8: VaultSecurity, `stats.vault.security`, vault dashboard card.
 - Phase 8A: VaultRecovery, `stats.vault.recovery`, vault dashboard card.
+- Phase 8B: OperationStats, `stats.system.operations` and `stats.vault.operations`, admin and vault dashboard cards.
 
 ## Latest Phase Summary
 
-Phase 8B adds operation/share-upload queue health:
+Phase 8C adds websocket/session health:
 
-- `stats.system.operations` for global admin queue pressure.
-- `stats.vault.operations` for vault-scoped queue pressure.
-- filesystem operation rollups from `operations`.
-- share upload active/stalled/failed rollups from `share_upload`.
-- recent queue error rows from failed/cancelled operations and uploads.
+- `stats.system.connections` for admin-only live session telemetry.
+- active session counts from `auth::session::Manager::getActive()`.
+- mode split for human, share, share-pending, and unauthenticated sessions.
+- lifecycle timeout settings from `ConnectionLifecycleManager`.
+- sensitive IP/user-agent top lists intentionally unavailable for now.
 
-The admin dashboard now renders Operation Queue after FUSE. The vault dashboard renders Operation Queue after Activity.
+The admin dashboard now renders Connection Health after FUSE and before Operation Queue.
 
 ## Checkpoint
 
-- Commit SHA: `f6ea80df`
+- Commit SHA: pending
 - Push target: `origin/stats-dashboards`.

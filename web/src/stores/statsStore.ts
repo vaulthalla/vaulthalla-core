@@ -8,6 +8,7 @@ import { VaultSecurity } from '@/models/stats/vaultSecurity'
 import { VaultShareStats } from '@/models/stats/vaultShareStats'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { ConnectionStats } from '@/models/stats/connectionStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
@@ -38,6 +39,7 @@ export type ThreadPoolStatsWrapper = StatsWrapper<ThreadPoolManagerStats>
 export type FuseStatsWrapper = StatsWrapper<FuseStats>
 export type DbStatsWrapper = StatsWrapper<DbStats>
 export type OperationStatsWrapper = StatsWrapper<OperationStats>
+export type ConnectionStatsWrapper = StatsWrapper<ConnectionStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -99,6 +101,16 @@ const makeOperationStatsWrapper = (initial?: Partial<OperationStatsWrapper>): Op
   ...initial,
 })
 
+const makeConnectionStatsWrapper = (initial?: Partial<ConnectionStatsWrapper>): ConnectionStatsWrapper => ({
+  data: new ConnectionStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
@@ -108,6 +120,7 @@ interface StatsStore {
   fuseStats: FuseStatsWrapper
   dbStats: DbStatsWrapper
   operationStats: OperationStatsWrapper
+  connectionStats: ConnectionStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
@@ -122,6 +135,7 @@ interface StatsStore {
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
   getDbStats: (payload?: WSCommandPayload<'stats.system.db'>) => Promise<DbStats>
   getOperationStats: (payload?: WSCommandPayload<'stats.system.operations'>) => Promise<OperationStats>
+  getConnectionStats: (payload?: WSCommandPayload<'stats.system.connections'>) => Promise<ConnectionStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
@@ -131,6 +145,7 @@ interface StatsStore {
   refreshFuseStats: () => Promise<FuseStats>
   refreshDbStats: () => Promise<DbStats>
   refreshOperationStats: () => Promise<OperationStats>
+  refreshConnectionStats: () => Promise<ConnectionStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -145,6 +160,8 @@ interface StatsStore {
   stopDbStatsPolling: () => void
   startOperationStatsPolling: (intervalMs?: number) => void
   stopOperationStatsPolling: () => void
+  startConnectionStatsPolling: (intervalMs?: number) => void
+  stopConnectionStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -156,6 +173,7 @@ interface StatsStore {
   _fuseStatsPoller: number | null
   _dbStatsPoller: number | null
   _operationStatsPoller: number | null
+  _connectionStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -168,12 +186,14 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   fuseStats: makeFuseStatsWrapper(),
   dbStats: makeDbStatsWrapper(),
   operationStats: makeOperationStatsWrapper(),
+  connectionStats: makeConnectionStatsWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
   _fuseStatsPoller: null,
   _dbStatsPoller: null,
   _operationStatsPoller: null,
+  _connectionStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -259,6 +279,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.operations', null)
     return OperationStats.from(response.stats)
+  },
+
+  async getConnectionStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.connections', null)
+    return ConnectionStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -440,6 +467,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
+  async refreshConnectionStats() {
+    const current = get().connectionStats
+    if (current.loading) return current.data
+
+    set({ connectionStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getConnectionStats()
+      const nextData = ConnectionStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        connectionStats: {
+          ...get().connectionStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch connection stats'
+      const now = Date.now()
+
+      set({ connectionStats: { ...get().connectionStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().connectionStats.data
+    }
+  },
+
   async refreshFsCacheStats() {
     const current = get().fsCacheStats
     if (current.loading) return current.data // dogpile protection
@@ -603,6 +663,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _operationStatsPoller: null })
+    }
+  },
+
+  startConnectionStatsPolling(intervalMs = 7500) {
+    if (get()._connectionStatsPoller) return
+
+    void get().refreshConnectionStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshConnectionStats()
+    }, intervalMs)
+
+    set({ _connectionStatsPoller: id })
+  },
+
+  stopConnectionStatsPolling() {
+    const id = get()._connectionStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _connectionStatsPoller: null })
     }
   },
 

@@ -144,6 +144,7 @@ void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerSessionOnlyHandler("stats.system.fuse", &handler::Stats::systemFuse);
     r->registerSessionOnlyHandler("stats.system.db", &handler::Stats::systemDb);
     r->registerSessionOnlyHandler("stats.system.operations", &handler::Stats::systemOperations);
+    r->registerSessionOnlyHandler("stats.system.connections", &handler::Stats::systemConnections);
     r->registerSessionOnlyHandler("stats.fs.cache", &handler::Stats::fsCache);
     r->registerSessionOnlyHandler("stats.http.cache", &handler::Stats::httpCache);
 }

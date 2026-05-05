@@ -260,3 +260,42 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add seeded operation/share-upload stats tests.
   - Add progress-staleness detection only if upload progress timestamps or instrumentation are added.
+
+## Phase 8C - Connection Health
+
+- Status: implemented and validated; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket command: `stats.system.connections`.
+- Backend surfaces:
+  - `stats/model/ConnectionStats`
+  - timeout accessors on `ConnectionLifecycleManager`
+  - `runtime::Manager::getConnectionLifecycleManager()`
+  - admin-only websocket handler for live connection stats
+- Frontend surfaces:
+  - `web/src/models/stats/connectionStats.ts`
+  - `web/src/components/stats/ConnectionStats.tsx`
+  - `statsStore` connection stats wrapper, fetch, refresh, and polling helpers
+  - `WebSocketCommandMap['stats.system.connections']`
+- Dashboard integration: admin dashboard renders Connection Health after FUSE Operations and before Operation Queue.
+- Architectural decisions:
+  - Active session counts come from the existing `auth::session::Manager::getActive()` registry.
+  - Session modes are split into unauthenticated, human, share pending, and ready share sessions.
+  - Timeout settings come from the runtime `ConnectionLifecycleManager`.
+  - Raw IP and user-agent top lists are intentionally returned as unavailable/empty to avoid leaking unnecessary sensitive detail.
+  - 24h open/close/error counters are returned as null because no lifecycle event counter exists yet.
+  - Reconfigure exposed a unit-test include dependency; `test_share_queries.cpp` now includes `share/Principal.hpp` explicitly.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after adding explicit test include
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add lightweight lifecycle counters if 24h opened/closed/swept/error metrics become necessary.
+  - Add redacted/top-limited user-agent/IP summaries only with an explicit privacy decision.

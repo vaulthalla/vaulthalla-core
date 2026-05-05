@@ -51,6 +51,7 @@ public:
     [[nodiscard]] std::shared_ptr<sync::Controller> getSyncController() const { return syncController; }
     [[nodiscard]] std::shared_ptr<protocols::ProtocolService> getProtocolService() const { return protocolService; }
     [[nodiscard]] std::shared_ptr<protocols::shell::Server> getShellServer() const { return shellServer; }
+    [[nodiscard]] std::shared_ptr<protocols::ws::ConnectionLifecycleManager> getConnectionLifecycleManager() const { return connectionLifecycleManager; }
 
     Manager(const Manager&) = delete;
     Manager& operator=(const Manager&) = delete;

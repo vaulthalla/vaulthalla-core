@@ -708,6 +708,6 @@ Architectural decisions:
 
 Checkpoint:
 
-- Commit SHA: pending.
+- Commit SHA: `9fd1fbbe`.
 - Push target: `origin/stats-dashboards`.
-- Push result: pending.
+- Push result: succeeded, with GitHub remote moved warning.

@@ -519,9 +519,10 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 12 - Customizable Dashboard Home Layout
 
-- Status: validation complete; commit pending.
-- Commit: pending.
+- Status: committed and pushed.
+- Commit: `9fd1fbbe`.
 - Push target: `origin/stats-dashboards`
+- Push result: succeeded, with GitHub remote moved warning.
 - Websocket commands: none added; Phase 12 reuses `stats.dashboard.overview`.
 - Backend surfaces:
   - No backend code changes.

@@ -69,7 +69,9 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 6 - Share Observatory Lite
 
-- Status: implemented and validated locally; commit pending.
+- Status: committed and pushed.
+- Commit: `36f35f23`
+- Push target: `origin/stats-dashboards`
 - Websocket command: `stats.vault.shares`.
 - Backend surfaces:
   - `stats/model/VaultShareStats`

@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 6 - Share Observatory Lite
-- Status: implemented and validated locally; commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -25,5 +25,5 @@ The vault dashboard now renders Share Observatory below Activity.
 
 ## Checkpoint
 
-- Commit SHA: pending.
+- Commit SHA: `36f35f23`
 - Push target: `origin/stats-dashboards`.

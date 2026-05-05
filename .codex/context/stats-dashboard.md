@@ -140,3 +140,41 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add focused DB stats query tests.
   - Add richer bloat/index-health estimates only if backed by safe PostgreSQL metadata.
+
+## Phase 8 - Vault Security / Integrity
+
+- Status: implemented and validated; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket command: `stats.vault.security`.
+- Backend surfaces:
+  - `stats/model/VaultSecurity`
+  - `db/query/vault/Security`
+  - prepared vault security rollup query for key version posture, file key coverage, denied share access, and policy-change timestamps
+  - vault View/ViewStats permission check through the existing per-vault stats handler pattern
+- Frontend surfaces:
+  - `web/src/models/stats/vaultSecurity.ts`
+  - `web/src/components/vault/VaultStatsDashboard/VaultSecurity/Component.tsx`
+  - `statsStore.getVaultSecurity`
+  - `WebSocketCommandMap['stats.vault.security']`
+- Dashboard integration: vault dashboard renders Security / Integrity after Share Observatory.
+- Architectural decisions:
+  - Encryption posture is based on `vault_keys`, `vault_keys_trashed`, and `files.encrypted_with_key_version`.
+  - Denied/rate-limited access signals come from `share_access_event` without exposing full IP or user-agent values.
+  - Last permission and share policy change timestamps come from vault role assignment/override and share role/link metadata.
+  - Integrity verification is reported honestly as `not_available`; no checksum pass/fail claim is made without a verifier.
+  - Unity-build helper names are security-specific to avoid collisions with other vault query helper functions.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after fixing security query unity helper-name collisions
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2 after rerunning sequentially behind `make test`; an earlier concurrent run raced the test DB setup and hit the known password-auth initialization failure
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add seeded DB tests for vault security rollups.
+  - Add a real integrity verifier before reporting checksum health as passed/failed.

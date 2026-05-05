@@ -15,3 +15,8 @@
 
 - Should slow-query thresholds stay fixed at mean execution time >= 1s, or become configurable from admin settings?
 - Should index bloat be estimated in a later phase, or deferred until historical DB snapshots exist?
+
+## Phase 8
+
+- Should vault security eventually expose redacted/top-limited denied access source summaries, or keep those out of dashboard telemetry unless explicitly requested?
+- What process should own checksum verification so `integrity_check_status` can move from `not_available` to a real pass/fail signal?

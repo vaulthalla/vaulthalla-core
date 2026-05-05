@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 7 - DB Health
-- Status: committed and pushed.
+- Phase 8 - Vault Security / Integrity
+- Status: implemented and validated; checkpoint commit pending.
 
 ## Completed Phases
 
@@ -13,18 +13,20 @@
 - Phase 4: VaultSyncHealth, `stats.vault.sync`, vault dashboard card.
 - Phase 5: VaultActivity, `stats.vault.activity`, vault dashboard card.
 - Phase 6: VaultShareStats, `stats.vault.shares`, vault dashboard card.
+- Phase 7: DbStats, `stats.system.db`, admin dashboard card.
 
 ## Latest Phase Summary
 
-Phase 7 adds `stats.system.db` backed by safe PostgreSQL metadata:
+Phase 8 adds `stats.vault.security` backed by existing security and share metadata:
 
-- `pg_database_size`, `pg_stat_database`, and `pg_stat_activity` for live DB health signals.
-- `pg_stat_user_tables` for largest table rollups.
-- `pg_extension` detection for `pg_stat_statements` without requiring the extension.
+- `vault_keys`, `vault_keys_trashed`, and `files.encrypted_with_key_version` for key coverage.
+- `share_access_event` denied/rate-limited rows for recent unauthorized access pressure.
+- vault/share role assignment and override timestamps for last policy changes.
+- explicit `integrity_check_status: not_available` until a real verifier exists.
 
-The admin dashboard now renders Database Health below FUSE Operations.
+The vault dashboard now renders Security / Integrity after Share Observatory.
 
 ## Checkpoint
 
-- Commit SHA: `b681356c`
+- Commit SHA: pending
 - Push target: `origin/stats-dashboards`.

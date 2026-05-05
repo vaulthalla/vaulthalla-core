@@ -3,6 +3,7 @@ import { WSCommandPayload } from '@/util/webSocketCommands'
 import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { VaultActivity } from '@/models/stats/vaultActivity'
+import { VaultSecurity } from '@/models/stats/vaultSecurity'
 import { VaultShareStats } from '@/models/stats/vaultShareStats'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
@@ -99,6 +100,7 @@ interface StatsStore {
   getVaultSyncHealth: (payload: WSCommandPayload<'stats.vault.sync'>) => Promise<VaultSyncHealth>
   getVaultActivity: (payload: WSCommandPayload<'stats.vault.activity'>) => Promise<VaultActivity>
   getVaultShareStats: (payload: WSCommandPayload<'stats.vault.shares'>) => Promise<VaultShareStats>
+  getVaultSecurity: (payload: WSCommandPayload<'stats.vault.security'>) => Promise<VaultSecurity>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
@@ -178,6 +180,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.vault.shares', vault_id)
     return VaultShareStats.from(response.stats)
+  },
+
+  async getVaultSecurity(vault_id) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.vault.security', vault_id)
+    return VaultSecurity.from(response.stats)
   },
 
   async getSystemHealth() {

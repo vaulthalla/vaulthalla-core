@@ -5,6 +5,7 @@ import { VaultStats } from '@/models/stats/vaultStats'
 import SyncHealth from '@/components/vault/VaultStatsDashboard/SyncHealth/Component'
 import VaultActivity from '@/components/vault/VaultStatsDashboard/VaultActivity/Component'
 import ShareStats from '@/components/vault/VaultStatsDashboard/ShareStats/Component'
+import VaultSecurity from '@/components/vault/VaultStatsDashboard/VaultSecurity/Component'
 
 const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
   const [stats, setStats] = useState<VaultStats | undefined>(undefined)
@@ -21,6 +22,7 @@ const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
         <SyncHealth vaultId={vault_id} initialLatestEvent={stats.latest_sync_event} />
         <VaultActivity vaultId={vault_id} />
         <ShareStats vaultId={vault_id} />
+        <VaultSecurity vaultId={vault_id} />
       </div>
     )
   )

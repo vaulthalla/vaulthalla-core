@@ -176,3 +176,58 @@
 
 - Add focused DB stats query tests.
 - Add safe index bloat estimates later if the formula is backed by PostgreSQL metadata available in stock installs.
+
+## Phase 8 - Vault Security / Integrity
+
+### Backend Files Added
+
+- `core/include/stats/model/VaultSecurity.hpp`
+- `core/src/stats/model/VaultSecurity.cpp`
+- `core/include/db/query/vault/Security.hpp`
+- `core/src/db/query/vault/Security.cpp`
+- `core/src/db/preparedStatements/vault/security.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/vaultSecurity.ts`
+- `web/src/components/vault/VaultStatsDashboard/VaultSecurity/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.vault.security`
+
+### Dashboard Integration
+
+- Vault dashboard order now includes:
+  - Capacity
+  - Sync Health
+  - Activity
+  - Share Observatory
+  - Security / Integrity
+
+### Architectural Decisions
+
+- Security posture is read-only and derives from existing key, file, share audit, and role policy tables.
+- `encryption_status` is `unknown` when no current vault key exists, `mixed` when legacy/unknown file key versions remain, and `encrypted` only when current key coverage is complete.
+- Share access pressure uses denied/failed/rate-limited `share_access_event` rows and keeps sensitive IP/user-agent data out of this payload.
+- Permission-change timestamps are rollups from vault role assignments/overrides and share policy metadata.
+- Integrity verifier state is exposed as `not_available`; the dashboard does not manufacture a checksum health claim.
+
+### Deferred TODOs
+
+- Add seeded DB coverage for vault security rollup edge cases.
+- Add real checksum/integrity verification before reporting pass/fail integrity health.

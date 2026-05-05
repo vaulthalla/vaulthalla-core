@@ -173,6 +173,7 @@ void Connection::initPrepared() const {
     initPreparedVaultKeys();
     initPreparedAPIKeys();
     initPreparedVaultActivity();
+    initPreparedVaultSecurity();
 
     // Sync
     initPreparedSync();

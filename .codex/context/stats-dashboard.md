@@ -1,0 +1,66 @@
+# Stats Dashboard Buildout Context
+
+This file mirrors the ignored scratch roadmap/status notes for durable checkpoint context.
+
+## Current Branch
+
+- Branch: `stats-dashboards`
+- Upstream: `origin/stats-dashboards`
+
+## Completed Checkpoints
+
+### Phase 1 - System Health Center MVP
+
+- Commit: `587d5b16`
+- Backend: shared `SystemHealth` model, `vh status` reuse, `stats.system.health`.
+- Frontend: `SystemHealth` model/store/component on admin dashboard.
+
+### Phase 2 - Thread Pool Pressure
+
+- Commit: `0e5400fe`
+- Backend: `ThreadPool`/`ThreadPoolManager` snapshots, `stats.system.threadpools`.
+- Frontend: `ThreadPoolStats` model/store/component on admin dashboard.
+
+### Phase 3 / Phase 4 - FUSE Telemetry and Vault Sync Health
+
+- Commit: `3d3432dd`
+- Backend: `FuseStats`, FUSE operation instrumentation, `stats.system.fuse`, `VaultSyncHealth`, sync rollup queries, `stats.vault.sync`.
+- Frontend: `FuseStats` admin card, `VaultSyncHealth` vault dashboard card.
+- Environment hardening in same checkpoint: dev/test PostgreSQL lifecycle fixes and direct integration test isolation.
+
+## Phase 5 - Vault Activity and Mutation Stats
+
+- Status: implemented locally, validation passed, pending commit/push.
+- Websocket command: `stats.vault.activity`.
+- Backend surfaces:
+  - `stats/model/VaultActivity`
+  - `db/query/vault/Activity`
+  - prepared vault activity rollup queries
+  - file activity insert seam for file create/modify
+  - operation status recording seam for web move/rename/copy
+- Frontend surfaces:
+  - `web/src/models/stats/vaultActivity.ts`
+  - `web/src/components/vault/VaultStatsDashboard/VaultActivity/Component.tsx`
+  - `statsStore.getVaultActivity`
+  - `WebSocketCommandMap['stats.vault.activity']`
+- Dashboard integration: vault dashboard renders Activity after Sync Health.
+- Architectural decisions:
+  - Activity metrics come from `file_activity`, `files_trashed`, and `operations`.
+  - Delete counts/bytes come from `files_trashed` because `file_activity` rows cascade when the file row is deleted.
+  - Move/rename/copy operation rows are written as short-lived `in_progress` records and marked `success`/`error` after the filesystem call.
+  - FUSE create/update flows contribute through `File::upsertFile`/`File::updateFile`; FUSE move/rename is not double-recorded in `operations` in this phase.
+  - `sync::model::Operation::Status::Failed` now serializes to `error` to match the schema check constraint; parser still accepts legacy `failed`.
+- Validation:
+  - `git diff --check`: passed
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after fixing websocket Router unity namespace ambiguity
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add richer FUSE rename/move operation attribution only if it can avoid duplicate web operation rows.
+  - Add explicit activity tests around mutation recording.
+  - Operation status history for sync-processed pending operations remains existing behavior.

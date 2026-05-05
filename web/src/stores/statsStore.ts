@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { WSCommandPayload } from '@/util/webSocketCommands'
 import { useWebSocketStore } from '@/stores/useWebSocket'
 import { VaultStats } from '@/models/stats/vaultStats'
+import { VaultActivity } from '@/models/stats/vaultActivity'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { FuseStats } from '@/models/stats/fuseStats'
@@ -82,6 +83,7 @@ interface StatsStore {
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
   getVaultSyncHealth: (payload: WSCommandPayload<'stats.vault.sync'>) => Promise<VaultSyncHealth>
+  getVaultActivity: (payload: WSCommandPayload<'stats.vault.activity'>) => Promise<VaultActivity>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
@@ -140,6 +142,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.vault.sync', vault_id)
     return VaultSyncHealth.from(response.stats)
+  },
+
+  async getVaultActivity(vault_id) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.vault.activity', vault_id)
+    return VaultActivity.from(response.stats)
   },
 
   async getSystemHealth() {

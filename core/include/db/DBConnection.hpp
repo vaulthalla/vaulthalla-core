@@ -40,6 +40,7 @@ class Connection {
     void initPreparedVaults() const;
     void initPreparedVaultKeys() const;
     void initPreparedAPIKeys() const;
+    void initPreparedVaultActivity() const;
 
     // Sync
     void initPreparedSync() const;

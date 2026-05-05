@@ -12,6 +12,7 @@ using json = nlohmann::json;
 struct Stats {
     static json vault(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultSync(const json& payload, const std::shared_ptr<Session>& session);
+    static json vaultActivity(const json& payload, const std::shared_ptr<Session>& session);
     static json systemHealth(const std::shared_ptr<Session>& session);
     static json systemThreadPools(const std::shared_ptr<Session>& session);
     static json systemFuse(const std::shared_ptr<Session>& session);

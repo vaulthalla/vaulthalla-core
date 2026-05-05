@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -38,6 +38,7 @@ Live severity badges in the sidebar are deferred; static child routes are in pla
 
 - Commit SHA: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`.
+- Push result: succeeded, with GitHub remote moved warning.
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
 

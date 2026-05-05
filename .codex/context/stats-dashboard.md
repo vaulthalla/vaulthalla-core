@@ -432,9 +432,10 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
 
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 - Commit: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`
+- Push result: succeeded, with GitHub remote moved warning.
 - Websocket commands: `stats.dashboard.overview`.
 - Backend surfaces:
   - `stats/model/DashboardOverview` serializes overview, section, card, metric, issue, and attention summaries.

@@ -341,3 +341,46 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add provider operation counters and latency/error instrumentation when storage engine boundaries are instrumented.
   - Add focused backend tests for storage backend status classification.
+
+## Phase 8E - Retention and Cleanup Pressure
+
+- Status: validated locally; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket commands: `stats.system.retention`, `stats.vault.retention`.
+- Backend surfaces:
+  - `stats/model/RetentionStats`
+  - `db/query/stats/RetentionStats`
+  - prepared retention rollup queries for system and vault scopes
+  - admin-only system command and View/ViewStats vault-scoped command
+- Frontend surfaces:
+  - `web/src/models/stats/retentionStats.ts`
+  - `web/src/components/stats/RetentionPressure.tsx`
+  - `web/src/components/vault/VaultStatsDashboard/RetentionPressure/Component.tsx`
+  - `statsStore` system retention wrapper, polling helpers, and vault fetch helper
+  - `WebSocketCommandMap['stats.system.retention']` and `['stats.vault.retention']`
+- Dashboard integration:
+  - Admin dashboard renders Retention / Cleanup after Database Health.
+  - Vault dashboard renders Retention / Cleanup after Security / Integrity.
+- Architectural decisions:
+  - Retention stats are read-only and use existing metadata tables only.
+  - System rollups query `files_trashed`, `sync_event`, `audit_log`, `share_access_event`, and `cache_index`.
+  - Vault rollups scope audit logs by `audit_log.target_file_id -> fs_entry.vault_id`.
+  - Config supplies trash retention, sync event retention/max entries, audit log retention, cache expiry days, and cache max size.
+  - Cache eviction candidates are expired entries unless indexed cache bytes exceed the configured max, in which case all indexed entries are candidates.
+  - Cleanup status is `healthy`, `warning`, `overdue`, or `unknown`.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after making helpers unity-build safe and including `stats/model/RetentionStats.hpp` in the websocket handler
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Push result: pending.
+- Deferred TODOs:
+  - Add seeded DB tests for system/vault retention rollups.
+  - Add share-access-event retention configuration if share event cleanup needs an independent policy.

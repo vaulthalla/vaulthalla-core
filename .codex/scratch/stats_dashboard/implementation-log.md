@@ -443,3 +443,58 @@
 
 - Add provider operation counters and latency/error instrumentation only when storage engine boundaries are instrumented.
 - Add focused backend unit tests for storage backend status classification.
+
+## Phase 8E - Retention and Cleanup Pressure
+
+### Backend Files Added
+
+- `core/include/stats/model/RetentionStats.hpp`
+- `core/src/stats/model/RetentionStats.cpp`
+- `core/include/db/query/stats/RetentionStats.hpp`
+- `core/src/db/query/stats/RetentionStats.cpp`
+- `core/src/db/preparedStatements/stats/retentionStats.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/retentionStats.ts`
+- `web/src/components/stats/RetentionPressure.tsx`
+- `web/src/components/vault/VaultStatsDashboard/RetentionPressure/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.system.retention`
+- `stats.vault.retention`
+
+### Dashboard Integration
+
+- Admin dashboard order now includes Retention / Cleanup after Database Health.
+- Vault dashboard order now includes Retention / Cleanup after Security / Integrity.
+
+### Architectural Decisions
+
+- Retention stats are read-only and derive from existing metadata tables; no cleanup or mutation is performed.
+- System rollups query `files_trashed`, `sync_event`, `audit_log`, `share_access_event`, and `cache_index` globally.
+- Vault rollups scope trash, sync events, share events, and cache directly by `vault_id`; audit logs are scoped through `audit_log.target_file_id -> fs_entry.vault_id`.
+- Retention windows come from config: trash retention, sync event audit retention/max entries, audit log retention, thumbnail/cache expiry, and cache max size.
+- Cache eviction candidates are expired entries unless total indexed cache bytes exceed configured max, in which case all indexed entries are candidates.
+- Status is `healthy`, `warning`, `overdue`, or `unknown` based on past-retention backlog size and very-old item ages.
+
+### Deferred TODOs
+
+- Add seeded DB tests for system/vault retention rollups.
+- Add share-access-event retention configuration if share event cleanup becomes independently configurable.

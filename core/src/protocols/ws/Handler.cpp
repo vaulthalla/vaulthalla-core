@@ -139,6 +139,7 @@ void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("stats.vault.recovery", &handler::Stats::vaultRecovery);
     r->registerPayload("stats.vault.operations", &handler::Stats::vaultOperations);
     r->registerPayload("stats.vault.storage", &handler::Stats::vaultStorage);
+    r->registerPayload("stats.vault.retention", &handler::Stats::vaultRetention);
     r->registerPayload("stats.vault.security", &handler::Stats::vaultSecurity);
     r->registerSessionOnlyHandler("stats.system.health", &handler::Stats::systemHealth);
     r->registerSessionOnlyHandler("stats.system.threadpools", &handler::Stats::systemThreadPools);
@@ -147,6 +148,7 @@ void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerSessionOnlyHandler("stats.system.operations", &handler::Stats::systemOperations);
     r->registerSessionOnlyHandler("stats.system.connections", &handler::Stats::systemConnections);
     r->registerSessionOnlyHandler("stats.system.storage", &handler::Stats::systemStorage);
+    r->registerSessionOnlyHandler("stats.system.retention", &handler::Stats::systemRetention);
     r->registerSessionOnlyHandler("stats.fs.cache", &handler::Stats::fsCache);
     r->registerSessionOnlyHandler("stats.http.cache", &handler::Stats::httpCache);
 }

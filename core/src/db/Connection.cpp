@@ -204,6 +204,7 @@ void Connection::initPrepared() const {
     // Stats
     initPreparedDbStats();
     initPreparedOperationStats();
+    initPreparedRetentionStats();
 
     // Admin
     initPreparedSecrets();

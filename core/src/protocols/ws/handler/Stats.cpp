@@ -4,6 +4,7 @@
 #include "concurrency/ThreadPool.hpp"
 #include "db/query/stats/DbStats.hpp"
 #include "db/query/stats/OperationStats.hpp"
+#include "db/query/stats/RetentionStats.hpp"
 #include "db/query/share/Stats.hpp"
 #include "db/query/sync/Stats.hpp"
 #include "db/query/vault/Activity.hpp"
@@ -19,6 +20,7 @@
 #include "stats/model/DbStats.hpp"
 #include "stats/model/FuseStats.hpp"
 #include "stats/model/OperationStats.hpp"
+#include "stats/model/RetentionStats.hpp"
 #include "stats/model/StorageBackendStats.hpp"
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
@@ -150,6 +152,21 @@ json Stats::vaultStorage(const json& payload, const std::shared_ptr<Session>& se
     return {{"stats", vh::stats::model::StorageBackendStats::snapshotForVault(vaultId)}};
 }
 
+json Stats::vaultRetention(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view retention stats for this vault.");
+
+    const auto stats = vh::db::query::stats::RetentionStats::snapshotForVault(vaultId);
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
 json Stats::vaultSecurity(const json& payload, const std::shared_ptr<Session>& session) {
     const auto& vaultId = payload.at("vault_id").get<uint32_t>();
 
@@ -202,6 +219,12 @@ json Stats::systemConnections(const std::shared_ptr<Session>& session) {
 json Stats::systemStorage(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view storage backend stats.");
     return {{"stats", vh::stats::model::StorageBackendStats::snapshot()}};
+}
+
+json Stats::systemRetention(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view retention stats.");
+    const auto stats = vh::db::query::stats::RetentionStats::snapshot();
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

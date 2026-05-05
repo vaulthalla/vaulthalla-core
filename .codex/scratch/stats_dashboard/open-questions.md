@@ -40,3 +40,8 @@
 
 - Should provider operation/error/latency counters be added around local and S3 engine boundaries, or deferred until historical snapshots need provider trend data?
 - Should `allow_fs_write` become editable in the vault admin UI now that the runtime model carries the schema field?
+
+## Phase 8E
+
+- Should share access events get an independent retention policy, or continue sharing broader audit/log cleanup policy until historical snapshots exist?
+- Should cache cleanup pressure distinguish thumbnail cache from file cache once both have separate retention/eviction policies?

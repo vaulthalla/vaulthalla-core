@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 8D - Storage Backend Health
-- Status: committed and pushed.
+- Phase 8E - Retention and Cleanup Pressure
+- Status: validated locally; checkpoint commit pending.
 
 ## Completed Phases
 
@@ -18,21 +18,22 @@
 - Phase 8A: VaultRecovery, `stats.vault.recovery`, vault dashboard card.
 - Phase 8B: OperationStats, `stats.system.operations` and `stats.vault.operations`, admin and vault dashboard cards.
 - Phase 8C: ConnectionStats, `stats.system.connections`, admin dashboard card.
+- Phase 8D: StorageBackendStats, `stats.system.storage` and `stats.vault.storage`, admin and vault dashboard cards.
 
 ## Latest Phase Summary
 
-Phase 8D adds storage backend health:
+Phase 8E adds retention and cleanup pressure:
 
-- `stats.system.storage` for admin-only local/S3 vault backend rollups.
-- `stats.vault.storage` for View/ViewStats-authorized per-vault backend status.
-- runtime snapshots from active `storage::Manager` engines.
-- local/S3 counts, active/inactive counts, vault size/cache/free-space signals, S3 bucket and upstream encryption configuration.
-- provider operation/latency/error counters are explicitly unavailable until provider-level instrumentation exists.
+- `stats.system.retention` for admin-only system-wide cleanup pressure.
+- `stats.vault.retention` for View/ViewStats-authorized per-vault cleanup pressure.
+- rollups from `files_trashed`, `sync_event`, `audit_log`, `share_access_event`, and `cache_index`.
+- config-backed retention windows for trash, sync events, audit logs, and cache expiry/size.
+- no destructive cleanup is performed by stats commands.
 
-The admin dashboard now renders Storage Backend after Operation Queue and before Database Health.
-The vault dashboard now renders Storage Backend after Capacity and before Sync Health.
+The admin dashboard now renders Retention / Cleanup after Database Health.
+The vault dashboard now renders Retention / Cleanup after Security / Integrity.
 
 ## Checkpoint
 
-- Commit SHA: `b2d1dcb0`
+- Commit SHA: pending
 - Push target: `origin/stats-dashboards`.

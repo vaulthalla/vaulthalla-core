@@ -6,6 +6,7 @@ import SyncHealth from '@/components/vault/VaultStatsDashboard/SyncHealth/Compon
 import VaultActivity from '@/components/vault/VaultStatsDashboard/VaultActivity/Component'
 import OperationQueue from '@/components/vault/VaultStatsDashboard/OperationQueue/Component'
 import RecoveryReadiness from '@/components/vault/VaultStatsDashboard/RecoveryReadiness/Component'
+import RetentionPressure from '@/components/vault/VaultStatsDashboard/RetentionPressure/Component'
 import ShareStats from '@/components/vault/VaultStatsDashboard/ShareStats/Component'
 import StorageBackend from '@/components/vault/VaultStatsDashboard/StorageBackend/Component'
 import VaultSecurity from '@/components/vault/VaultStatsDashboard/VaultSecurity/Component'
@@ -29,6 +30,7 @@ const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
         <OperationQueue vaultId={vault_id} />
         <ShareStats vaultId={vault_id} />
         <VaultSecurity vaultId={vault_id} />
+        <RetentionPressure vaultId={vault_id} />
       </div>
     )
   )

@@ -72,6 +72,7 @@ class Connection {
     // Stats
     void initPreparedDbStats() const;
     void initPreparedOperationStats() const;
+    void initPreparedRetentionStats() const;
 
     // Admin
     void initPreparedSecrets() const;

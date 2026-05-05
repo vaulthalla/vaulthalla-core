@@ -136,6 +136,7 @@ void Handler::registerStatHandlers(const std::shared_ptr<Router>& r) {
     r->registerPayload("stats.vault.sync", &handler::Stats::vaultSync);
     r->registerPayload("stats.vault.activity", &handler::Stats::vaultActivity);
     r->registerPayload("stats.vault.shares", &handler::Stats::vaultShares);
+    r->registerPayload("stats.vault.recovery", &handler::Stats::vaultRecovery);
     r->registerPayload("stats.vault.security", &handler::Stats::vaultSecurity);
     r->registerSessionOnlyHandler("stats.system.health", &handler::Stats::systemHealth);
     r->registerSessionOnlyHandler("stats.system.threadpools", &handler::Stats::systemThreadPools);

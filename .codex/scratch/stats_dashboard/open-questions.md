@@ -20,3 +20,8 @@
 
 - Should vault security eventually expose redacted/top-limited denied access source summaries, or keep those out of dashboard telemetry unless explicitly requested?
 - What process should own checksum verification so `integrity_check_status` can move from `not_available` to a real pass/fail signal?
+
+## Phase 8A
+
+- Should `backup_policy` be constrained to one row per vault, or is latest-row-by-id the intended policy selection rule?
+- What future process should write a distinct backup verification timestamp so "verified good state" can mean more than last successful backup completion?

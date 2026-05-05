@@ -179,3 +179,41 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add seeded DB tests for vault security rollups.
   - Add a real integrity verifier before reporting checksum health as passed/failed.
+
+## Phase 8A - Recovery Readiness
+
+- Status: implemented and validated; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket command: `stats.vault.recovery`.
+- Backend surfaces:
+  - `stats/model/VaultRecovery`
+  - `db/query/vault/Recovery`
+  - prepared backup policy query reading `backup_policy`
+  - vault View/ViewStats permission check through the existing per-vault stats handler pattern
+- Frontend surfaces:
+  - `web/src/models/stats/vaultRecovery.ts`
+  - `web/src/components/vault/VaultStatsDashboard/RecoveryReadiness/Component.tsx`
+  - `statsStore.getVaultRecovery`
+  - `WebSocketCommandMap['stats.vault.recovery']`
+- Dashboard integration: vault dashboard renders Recovery Readiness immediately after Sync Health and before Activity.
+- Architectural decisions:
+  - Readiness is based only on `backup_policy` state; the command does not trigger backup work.
+  - Missing policy returns `unknown`, disabled policy returns `disabled`, stale success windows return `stale`, and error state/unresolved latest error returns `failing`.
+  - `backup_stale` and missed backup estimates are nullable/unknown when there is no policy row rather than pretending the vault is recoverable.
+  - If multiple `backup_policy` rows exist for a vault, the query uses the latest row by id because the schema does not enforce uniqueness.
+  - Reconfigure exposed another existing shell unity-build ambiguity; `vault/create.cpp` RBAC references were fully qualified.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after qualifying shell vault create RBAC references
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add seeded DB tests for recovery readiness status rules.
+  - Add backup verification signals only when a real backup verification process exists.

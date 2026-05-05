@@ -95,3 +95,27 @@ Checkpoint:
 - Commit SHA: `f5ff4219`
 - Push target: `origin/stats-dashboards`
 - Push result: succeeded, with GitHub remote moved warning
+
+## Phase 8A - Recovery Readiness
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed after qualifying shell vault create RBAC references
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending
+- Push target: `origin/stats-dashboards`
+- Push result: pending

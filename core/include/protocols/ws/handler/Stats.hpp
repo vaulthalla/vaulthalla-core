@@ -14,6 +14,7 @@ struct Stats {
     static json vaultSync(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultActivity(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultShares(const json& payload, const std::shared_ptr<Session>& session);
+    static json vaultRecovery(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultSecurity(const json& payload, const std::shared_ptr<Session>& session);
     static json systemHealth(const std::shared_ptr<Session>& session);
     static json systemThreadPools(const std::shared_ptr<Session>& session);

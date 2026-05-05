@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 8 - Vault Security / Integrity
-- Status: committed and pushed.
+- Phase 8A - Recovery Readiness
+- Status: implemented and validated; checkpoint commit pending.
 
 ## Completed Phases
 
@@ -14,19 +14,20 @@
 - Phase 5: VaultActivity, `stats.vault.activity`, vault dashboard card.
 - Phase 6: VaultShareStats, `stats.vault.shares`, vault dashboard card.
 - Phase 7: DbStats, `stats.system.db`, admin dashboard card.
+- Phase 8: VaultSecurity, `stats.vault.security`, vault dashboard card.
 
 ## Latest Phase Summary
 
-Phase 8 adds `stats.vault.security` backed by existing security and share metadata:
+Phase 8A adds `stats.vault.recovery` backed by existing backup policy state:
 
-- `vault_keys`, `vault_keys_trashed`, and `files.encrypted_with_key_version` for key coverage.
-- `share_access_event` denied/rate-limited rows for recent unauthorized access pressure.
-- vault/share role assignment and override timestamps for last policy changes.
-- explicit `integrity_check_status: not_available` until a real verifier exists.
+- `backup_policy.enabled/status/interval` for backup mode.
+- `last_backup_at` and `last_success_at` for freshness.
+- `retention`, retry count, and last error for operator context.
+- nullable stale/missed-backup fields when no real policy row exists.
 
-The vault dashboard now renders Security / Integrity after Share Observatory.
+The vault dashboard now renders Recovery Readiness after Sync Health.
 
 ## Checkpoint
 
-- Commit SHA: `f5ff4219`
+- Commit SHA: pending
 - Push target: `origin/stats-dashboards`.

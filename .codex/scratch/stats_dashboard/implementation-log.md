@@ -231,3 +231,60 @@
 
 - Add seeded DB coverage for vault security rollup edge cases.
 - Add real checksum/integrity verification before reporting pass/fail integrity health.
+
+## Phase 8A - Recovery Readiness
+
+### Backend Files Added
+
+- `core/include/stats/model/VaultRecovery.hpp`
+- `core/src/stats/model/VaultRecovery.cpp`
+- `core/include/db/query/vault/Recovery.hpp`
+- `core/src/db/query/vault/Recovery.cpp`
+- `core/src/db/preparedStatements/vault/recovery.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+- `core/src/protocols/shell/commands/vault/create.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/vaultRecovery.ts`
+- `web/src/components/vault/VaultStatsDashboard/RecoveryReadiness/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.vault.recovery`
+
+### Dashboard Integration
+
+- Vault dashboard order now includes:
+  - Capacity
+  - Sync Health
+  - Recovery Readiness
+  - Activity
+  - Share Observatory
+  - Security / Integrity
+
+### Architectural Decisions
+
+- Recovery readiness is read-only telemetry from `backup_policy`; no backup job is started by the stats command.
+- `recovery_readiness` is `unknown` with no policy row, `disabled` when the policy is disabled, `failing` for policy error or unresolved latest error, `stale` for missing/old success, and `ready` only with recent `last_success_at` evidence.
+- Nullable `backup_stale` and missed-backup estimates keep no-policy state honest rather than presenting a false recoverability badge.
+- The schema does not enforce one `backup_policy` row per vault, so the query uses the latest row by id.
+- Reconfigure exposed a shell unity-build namespace ambiguity in `vault/create.cpp`; RBAC references now use fully qualified `::vh::rbac`.
+
+### Deferred TODOs
+
+- Add seeded DB tests for recovery status edge cases.
+- Add verified-good backup checks only after a real backup verification process exists.

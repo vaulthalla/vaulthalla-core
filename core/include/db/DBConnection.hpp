@@ -41,6 +41,7 @@ class Connection {
     void initPreparedVaultKeys() const;
     void initPreparedAPIKeys() const;
     void initPreparedVaultActivity() const;
+    void initPreparedVaultRecovery() const;
     void initPreparedVaultSecurity() const;
 
     // Sync

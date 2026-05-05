@@ -6,6 +6,7 @@
 #include "db/query/share/Stats.hpp"
 #include "db/query/sync/Stats.hpp"
 #include "db/query/vault/Activity.hpp"
+#include "db/query/vault/Recovery.hpp"
 #include "db/query/vault/Security.hpp"
 #include "nlohmann/json.hpp"
 #include "protocols/ws/Session.hpp"
@@ -18,6 +19,7 @@
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
 #include "stats/model/VaultActivity.hpp"
+#include "stats/model/VaultRecovery.hpp"
 #include "stats/model/VaultSecurity.hpp"
 #include "stats/model/VaultShareStats.hpp"
 #include "stats/model/VaultSyncHealth.hpp"
@@ -97,6 +99,21 @@ json Stats::vaultShares(const json& payload, const std::shared_ptr<Session>& ses
     })) throw std::runtime_error("You do not have permission to view share stats for this vault.");
 
     const auto stats = vh::db::query::share::Stats::getVaultShareStats(vaultId);
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
+json Stats::vaultRecovery(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view recovery stats for this vault.");
+
+    const auto stats = vh::db::query::vault::Recovery::getVaultRecovery(vaultId);
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 

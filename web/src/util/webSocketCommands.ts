@@ -1,6 +1,7 @@
 import { LocalDiskVault, S3Vault, Vault } from '@/models/vaults'
 import { VaultStats } from '@/models/stats/vaultStats'
 import { VaultActivity } from '@/models/stats/vaultActivity'
+import { VaultRecovery } from '@/models/stats/vaultRecovery'
 import { VaultSecurity } from '@/models/stats/vaultSecurity'
 import { VaultShareStats } from '@/models/stats/vaultShareStats'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
@@ -282,6 +283,8 @@ export interface WebSocketCommandMap {
   'stats.vault.activity': { payload: { vault_id: number }; response: { stats: VaultActivity } }
 
   'stats.vault.shares': { payload: { vault_id: number }; response: { stats: VaultShareStats } }
+
+  'stats.vault.recovery': { payload: { vault_id: number }; response: { stats: VaultRecovery } }
 
   'stats.vault.security': { payload: { vault_id: number }; response: { stats: VaultSecurity } }
 

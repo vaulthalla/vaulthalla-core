@@ -5,6 +5,7 @@
 #include "db/query/stats/DbStats.hpp"
 #include "db/query/stats/OperationStats.hpp"
 #include "db/query/stats/RetentionStats.hpp"
+#include "db/query/stats/Snapshot.hpp"
 #include "db/query/share/Stats.hpp"
 #include "db/query/sync/Stats.hpp"
 #include "db/query/vault/Activity.hpp"
@@ -22,6 +23,7 @@
 #include "stats/model/OperationStats.hpp"
 #include "stats/model/RetentionStats.hpp"
 #include "stats/model/StorageBackendStats.hpp"
+#include "stats/model/StatsTrends.hpp"
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
 #include "stats/model/VaultActivity.hpp"
@@ -36,11 +38,22 @@
 #include <future>
 #include <utility>
 #include <array>
+#include <algorithm>
 
 using namespace vh::stats;
 using namespace vh::rbac;
 
 namespace vh::protocols::ws::handler {
+
+namespace {
+
+std::uint32_t statsTrendWindowHours(const json& payload) {
+    if (!payload.is_object()) return 168;
+    const auto raw = payload.value("window_hours", 168u);
+    return std::clamp<std::uint32_t>(raw == 0 ? 168 : raw, 1, 24 * 30);
+}
+
+}
 
 json Stats::vault(const json& payload, const std::shared_ptr<Session>& session) {
     const auto& vaultId = payload.at("vault_id").get<uint32_t>();
@@ -167,6 +180,21 @@ json Stats::vaultRetention(const json& payload, const std::shared_ptr<Session>& 
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 
+json Stats::vaultTrends(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view trend stats for this vault.");
+
+    const auto stats = vh::db::query::stats::Snapshot::vaultTrends(vaultId, statsTrendWindowHours(payload));
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
 json Stats::vaultSecurity(const json& payload, const std::shared_ptr<Session>& session) {
     const auto& vaultId = payload.at("vault_id").get<uint32_t>();
 
@@ -224,6 +252,12 @@ json Stats::systemStorage(const std::shared_ptr<Session>& session) {
 json Stats::systemRetention(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view retention stats.");
     const auto stats = vh::db::query::stats::RetentionStats::snapshot();
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
+json Stats::systemTrends(const json& payload, const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view trend stats.");
+    const auto stats = vh::db::query::stats::Snapshot::systemTrends(statsTrendWindowHours(payload));
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 

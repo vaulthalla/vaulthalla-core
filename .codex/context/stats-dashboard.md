@@ -384,3 +384,47 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add seeded DB tests for system/vault retention rollups.
   - Add share-access-event retention configuration if share event cleanup needs an independent policy.
+
+## Phase 9 - Historical Snapshots and Trends
+
+- Status: implemented and validated; checkpoint commit pending.
+- Commit: pending checkpoint commit.
+- Push target: `origin/stats-dashboards`
+- Websocket commands: `stats.system.trends`, `stats.vault.trends`.
+- Backend surfaces:
+  - `deploy/psql/080_stats.sql` creates `stats_snapshot` with system/vault scope checks and indexes.
+  - `stats/model/StatsTrends` serializes trend payloads.
+  - `db/query/stats/Snapshot` inserts system/vault snapshots, purges old snapshots, and returns trend series from snapshot JSONB.
+  - `StatsSnapshotService` runs as a runtime `AsyncService`.
+  - `stats_snapshots` config controls enablement, runtime cadence, vault cadence, and retention days.
+- Frontend surfaces:
+  - `web/src/models/stats/statsTrends.ts`
+  - `web/src/components/stats/StatsTrends.tsx`
+  - `web/src/components/vault/VaultStatsDashboard/Trends/Component.tsx`
+  - `statsStore` system trends wrapper/fetch/refresh/polling and vault trend fetch helper.
+  - `WebSocketCommandMap['stats.system.trends']` and `['stats.vault.trends']`.
+- Dashboard integration:
+  - Admin dashboard renders Trends after Retention / Cleanup.
+  - Vault dashboard renders Trends after Retention / Cleanup.
+- Architectural decisions:
+  - Snapshot writes are background-only and never part of FUSE/request hot paths.
+  - Runtime snapshots default to 300 seconds and include thread pools, FUSE, cache, and DB live stats.
+  - Vault snapshots default to 3600 seconds and include capacity, sync health, and activity rollups.
+  - Snapshot retention defaults to 30 days and is configurable.
+  - Trend commands read only `stats_snapshot`, not raw operational tables.
+  - UI renders no-data honestly until snapshots exist and shows 24h/7d deltas when data is present.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Push result: pending checkpoint push.
+- Deferred TODOs:
+  - Add daily compaction/downsampling if longer raw snapshot retention becomes expensive.
+  - Add seeded DB tests for trend extraction once snapshot fixtures exist.

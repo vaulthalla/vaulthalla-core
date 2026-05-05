@@ -9,6 +9,7 @@ import RecoveryReadiness from '@/components/vault/VaultStatsDashboard/RecoveryRe
 import RetentionPressure from '@/components/vault/VaultStatsDashboard/RetentionPressure/Component'
 import ShareStats from '@/components/vault/VaultStatsDashboard/ShareStats/Component'
 import StorageBackend from '@/components/vault/VaultStatsDashboard/StorageBackend/Component'
+import Trends from '@/components/vault/VaultStatsDashboard/Trends/Component'
 import VaultSecurity from '@/components/vault/VaultStatsDashboard/VaultSecurity/Component'
 
 const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
@@ -31,6 +32,7 @@ const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
         <ShareStats vaultId={vault_id} />
         <VaultSecurity vaultId={vault_id} />
         <RetentionPressure vaultId={vault_id} />
+        <Trends vaultId={vault_id} />
       </div>
     )
   )

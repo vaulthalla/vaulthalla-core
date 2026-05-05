@@ -266,6 +266,27 @@ struct convert<ConnectionLifecycleManagerConfig> {
 };
 
 template<>
+struct convert<StatsSnapshotsConfig> {
+    static Node encode(const StatsSnapshotsConfig& rhs) {
+        Node node;
+        node["enabled"] = rhs.enabled;
+        node["runtime_interval_seconds"] = rhs.runtime_interval_seconds;
+        node["vault_interval_seconds"] = rhs.vault_interval_seconds;
+        node["retention_days"] = rhs.retention_days;
+        return node;
+    }
+
+    static bool decode(const Node& node, StatsSnapshotsConfig& rhs) {
+        if (!node.IsMap()) return false;
+        rhs.enabled = node["enabled"].as<bool>(true);
+        rhs.runtime_interval_seconds = std::max(static_cast<uint32_t>(60), node["runtime_interval_seconds"].as<uint32_t>(300));
+        rhs.vault_interval_seconds = std::max(static_cast<uint32_t>(300), node["vault_interval_seconds"].as<uint32_t>(3600));
+        rhs.retention_days = std::max(static_cast<uint32_t>(1), node["retention_days"].as<uint32_t>(30));
+        return true;
+    }
+};
+
+template<>
 struct convert<ServicesConfig> {
     static Node encode(const ServicesConfig& rhs) {
         Node node;

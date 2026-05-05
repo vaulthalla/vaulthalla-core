@@ -18,6 +18,7 @@ import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
 import { RetentionStats } from '@/models/stats/retentionStats'
+import { StatsTrends } from '@/models/stats/statsTrends'
 import { StorageBackendStats } from '@/models/stats/storageBackendStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
@@ -298,6 +299,8 @@ export interface WebSocketCommandMap {
 
   'stats.vault.retention': { payload: { vault_id: number }; response: { stats: RetentionStats } }
 
+  'stats.vault.trends': { payload: { vault_id: number; window_hours?: number }; response: { stats: StatsTrends } }
+
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
 
   'stats.system.threadpools': { payload: null; response: { stats: ThreadPoolManagerStats } }
@@ -313,6 +316,8 @@ export interface WebSocketCommandMap {
   'stats.system.storage': { payload: null; response: { stats: StorageBackendStats } }
 
   'stats.system.retention': { payload: null; response: { stats: RetentionStats } }
+
+  'stats.system.trends': { payload: { window_hours?: number }; response: { stats: StatsTrends } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

@@ -498,3 +498,46 @@
 
 - Add seeded DB tests for system/vault retention rollups.
 - Add share-access-event retention configuration if share event cleanup becomes independently configurable.
+
+## Phase 9 - Historical Snapshots and Trends
+
+Summary:
+
+- Added `stats_snapshot` JSONB table with system/vault scope checks and indexes for scoped trend reads.
+- Added configurable `stats_snapshots` config section:
+  - `enabled`
+  - `runtime_interval_seconds`
+  - `vault_interval_seconds`
+  - `retention_days`
+- Added `StatsSnapshotService` as a runtime background `AsyncService`.
+- The service collects runtime snapshots for:
+  - `system.threadpools`
+  - `system.fuse`
+  - `system.cache`
+  - `system.db`
+- The service collects vault snapshots for:
+  - `vault.capacity`
+  - `vault.sync`
+  - `vault.activity`
+- Added snapshot insert, purge, and trend query layer under `db/query/stats/Snapshot`.
+- Added trend model serialization under `stats/model/StatsTrends`.
+- Added websocket commands:
+  - `stats.system.trends`
+  - `stats.vault.trends`
+- Added frontend defensive trend parser and reusable trend card body.
+- Admin dashboard renders Trends after Retention / Cleanup.
+- Vault dashboard renders Trends after Retention / Cleanup.
+
+Architectural decisions:
+
+- Snapshot writes are intentionally done by a background service and are not part of FUSE/request hot paths.
+- Trend commands read only `stats_snapshot`, not raw operational tables.
+- System trends extract DB size/cache hit ratio/connections, FUSE total/error rate, thread-pool queue/pressure, and cache hit rates.
+- Vault trends extract capacity growth, file count, sync errors/failed ops/bytes, and activity mutation/bytes-added counts.
+- Frontend cards show no-data states until the collector has written snapshots instead of manufacturing fake trends.
+- Daily compaction is deferred; retention is configurable and currently purges raw snapshots older than the configured window.
+
+Checkpoint:
+
+- Commit SHA: pending checkpoint commit.
+- Push target: `origin/stats-dashboards`.

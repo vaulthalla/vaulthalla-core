@@ -215,3 +215,27 @@ Checkpoint:
 - Commit SHA: `c4338666`
 - Push target: `origin/stats-dashboards`
 - Push result: succeeded, with GitHub remote moved warning
+
+## Phase 9 - Historical Snapshots and Trends
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending checkpoint commit.
+- Push target: `origin/stats-dashboards`
+- Push result: pending checkpoint push

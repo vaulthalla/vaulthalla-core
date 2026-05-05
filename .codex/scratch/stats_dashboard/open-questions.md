@@ -45,3 +45,9 @@
 
 - Should share access events get an independent retention policy, or continue sharing broader audit/log cleanup policy until historical snapshots exist?
 - Should cache cleanup pressure distinguish thumbnail cache from file cache once both have separate retention/eviction policies?
+
+## Phase 9
+
+- Should raw snapshots be compacted into daily rollups after 30 days if operators increase retention beyond the MVP default?
+- Should trend extraction expand to include storage backend/recovery/security once those cards have stable live fields worth trending?
+- Should snapshot cadence be editable through the admin settings UI, or remain file-configured for now?

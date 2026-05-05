@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8C - Connection Health
-- Status: implemented and validated; checkpoint commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -32,5 +32,5 @@ The admin dashboard now renders Connection Health after FUSE and before Operatio
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `60b02079`
 - Push target: `origin/stats-dashboards`.

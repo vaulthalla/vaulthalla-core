@@ -164,6 +164,6 @@ Known failures:
 
 Checkpoint:
 
-- Commit SHA: pending
+- Commit SHA: `60b02079`
 - Push target: `origin/stats-dashboards`
-- Push result: pending
+- Push result: succeeded, with GitHub remote moved warning

@@ -107,7 +107,9 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 7 - DB Health
 
-- Status: implemented and validated locally; commit pending.
+- Status: committed and pushed.
+- Commit: `b681356c`
+- Push target: `origin/stats-dashboards`
 - Websocket command: `stats.system.db`.
 - Backend surfaces:
   - `stats/model/DbStats`

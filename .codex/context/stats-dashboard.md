@@ -478,9 +478,10 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 11 - Live Dashboard Severity Badges and Overview Polish
 
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 - Commit: `284729c8`.
 - Push target: `origin/stats-dashboards`
+- Push result: succeeded, with GitHub remote moved warning.
 - Websocket commands: none added; Phase 11 reuses `stats.dashboard.overview`.
 - Backend surfaces:
   - No backend contract changes.

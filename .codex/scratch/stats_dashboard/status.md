@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 11 - Live Dashboard Severity Badges and Overview Polish
-- Status: committed and pushed.
+- Phase 12 - Customizable Dashboard Home Layout
+- Status: validation complete; commit pending.
 
 ## Completed Phases
 
@@ -22,23 +22,58 @@
 - Phase 8E: RetentionStats, `stats.system.retention` and `stats.vault.retention`, admin and vault dashboard cards.
 - Phase 9: Historical snapshots, `stats.system.trends` and `stats.vault.trends`, admin and vault dashboard cards.
 - Phase 10: Dashboard overview command, compact overview, drilldown routes, and dashboard nav child routes.
+- Phase 11: Live dashboard severity badges and overview polish.
 
 ## Latest Phase Summary
 
-Phase 11 makes Phase 10's overview/drilldown architecture visibly communicate live severity:
+Phase 12 makes only the `/dashboard` home board configurable:
 
-- Reusable dashboard severity helpers render stable tones, ranks, icons, and issue count labels.
-- `/dashboard` overview cards show fa-duotone severity icons, warning/error counts, first issue messages, and detail links.
-- Attention queue renders backend-provided warning/error items with severity icons and links.
-- Dashboard parent and child nav items show live severity/count badges from `stats.dashboard.overview`.
+- Added a browser-local card layout model and frontend catalog for overview card IDs, finite sizes, and variants.
+- `/dashboard` renders selected summary cards in a responsive 12-column grid.
+- Customize mode supports add, remove, Up/Down reorder, finite size/variant selection, reset, and immediate preview refresh.
+- Dashboard overview polling now uses the current visible card specs when requesting `stats.dashboard.overview`.
+- Fixed drilldown pages remain unchanged and full-size.
 
-No backend contract changes were needed.
+No backend contract changes were needed. Server persistence and drag/drop are deferred to Phase 13.
 
 ## Checkpoint
 
-- Commit SHA: `284729c8`.
+- Commit SHA: pending.
 - Push target: `origin/stats-dashboards`.
-- Push result: succeeded, with GitHub remote moved warning.
+- Push result: pending.
+
+## Phase 12 - Customizable Dashboard Home Layout
+
+Backend files changed:
+
+- None.
+
+Frontend files added:
+
+- `web/src/models/dashboard/dashboardLayout.ts`
+- `web/src/components/dashboard/dashboardCardCatalog.ts`
+
+Frontend files changed:
+
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/stores/statsStore.ts`
+
+Dashboard integration:
+
+- `/dashboard` home uses a configurable browser-local summary-card grid.
+- `/dashboard/runtime`, `/dashboard/filesystem`, `/dashboard/storage`, `/dashboard/operations`, and `/dashboard/trends` remain fixed detail pages.
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
 

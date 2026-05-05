@@ -296,3 +296,32 @@ Checkpoint:
 - Commit SHA: `284729c8`.
 - Push target: `origin/stats-dashboards`.
 - Push result: succeeded, with GitHub remote moved warning.
+
+## Phase 12 - Customizable Dashboard Home Layout
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Known failures:
+
+- None currently.
+
+Notes:
+
+- Phase 12 is frontend-only. Backend validation was still run to preserve the normal phase cadence.
+- `make test` completed after the expected test environment teardown/reinstall path.
+
+Checkpoint:
+
+- Commit SHA: pending.
+- Push target: `origin/stats-dashboards`.
+- Push result: pending.

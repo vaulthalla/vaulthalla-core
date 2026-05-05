@@ -664,3 +664,50 @@ Checkpoint:
 - Commit SHA: `284729c8`.
 - Push target: `origin/stats-dashboards`.
 - Push result: succeeded, with GitHub remote moved warning.
+
+## Phase 12 - Customizable Dashboard Home Layout
+
+Summary:
+
+- Added a browser-local dashboard layout model with finite card sizes and variants.
+- Added a frontend card catalog for Phase 12 home-board customization.
+- Reworked `/dashboard` overview cards into a responsive 12-column grid driven by the selected layout.
+- Added customization controls for add/remove, Up/Down reorder, size changes, variant changes, and default reset.
+- Extended dashboard overview store refresh/polling to carry the selected visible card specs to `stats.dashboard.overview`.
+
+Backend files changed:
+
+- None.
+
+Frontend files added:
+
+- `web/src/models/dashboard/dashboardLayout.ts`
+- `web/src/components/dashboard/dashboardCardCatalog.ts`
+
+Frontend files changed:
+
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/stores/statsStore.ts`
+
+Websocket commands added:
+
+- None. Reuses `stats.dashboard.overview`.
+
+Dashboard integration:
+
+- Only `/dashboard` is customizable.
+- Fixed detail routes remain unchanged and continue to render full rich cards.
+- Attention queue now reflects currently visible home cards.
+
+Architectural decisions:
+
+- Layout is stored in browser-local `localStorage` as `vaulthalla.dashboard.layout.v1`.
+- Invalid or all-hidden local layouts fall back to the default visible home board.
+- Frontend selects only card IDs, variants, and sizes; backend remains authoritative for card summaries, metrics, severity, warnings, and errors.
+- Server-side preference persistence and drag/drop are deferred to Phase 13.
+
+Checkpoint:
+
+- Commit SHA: pending.
+- Push target: `origin/stats-dashboards`.
+- Push result: pending.

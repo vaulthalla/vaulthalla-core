@@ -210,7 +210,7 @@ interface StatsStore {
   refreshStorageBackendStats: () => Promise<StorageBackendStats>
   refreshRetentionStats: () => Promise<RetentionStats>
   refreshSystemTrends: () => Promise<StatsTrends>
-  refreshDashboardOverview: () => Promise<DashboardOverview>
+  refreshDashboardOverview: (payload?: WSCommandPayload<'stats.dashboard.overview'>) => Promise<DashboardOverview>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -233,7 +233,7 @@ interface StatsStore {
   stopRetentionStatsPolling: () => void
   startSystemTrendsPolling: (intervalMs?: number) => void
   stopSystemTrendsPolling: () => void
-  startDashboardOverviewPolling: (intervalMs?: number) => void
+  startDashboardOverviewPolling: (intervalMs?: number, payload?: WSCommandPayload<'stats.dashboard.overview'>) => void
   stopDashboardOverviewPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
@@ -251,6 +251,7 @@ interface StatsStore {
   _retentionStatsPoller: number | null
   _systemTrendsPoller: number | null
   _dashboardOverviewPoller: number | null
+  _dashboardOverviewPayload: WSCommandPayload<'stats.dashboard.overview'> | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -279,6 +280,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   _retentionStatsPoller: null,
   _systemTrendsPoller: null,
   _dashboardOverviewPoller: null,
+  _dashboardOverviewPayload: { scope: 'system', mode: 'dashboard_home' },
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -733,14 +735,17 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
-  async refreshDashboardOverview() {
+  async refreshDashboardOverview(payload) {
+    const request = payload ?? get()._dashboardOverviewPayload ?? { scope: 'system' as const, mode: 'dashboard_home' }
+    if (payload) set({ _dashboardOverviewPayload: request })
+
     const current = get().dashboardOverview
     if (current.loading) return current.data
 
     set({ dashboardOverview: { ...current, loading: true, error: null } })
 
     try {
-      const stats = await get().getDashboardOverview({ scope: 'system', mode: 'dashboard_home' })
+      const stats = await get().getDashboardOverview(request)
       const nextData = DashboardOverview.from(stats ?? {})
       const now = Date.now()
 
@@ -1012,10 +1017,15 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
-  startDashboardOverviewPolling(intervalMs = 7500) {
-    if (get()._dashboardOverviewPoller) return
+  startDashboardOverviewPolling(intervalMs = 7500, payload) {
+    if (payload) set({ _dashboardOverviewPayload: payload })
 
-    void get().refreshDashboardOverview()
+    if (get()._dashboardOverviewPoller) {
+      void get().refreshDashboardOverview(payload)
+      return
+    }
+
+    void get().refreshDashboardOverview(payload)
 
     const id = window.setInterval(() => {
       void get().refreshDashboardOverview()

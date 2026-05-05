@@ -516,3 +516,44 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add focused dashboard severity helper tests if/when a frontend test runner is configured.
   - Consider route-level nav badge preloading on first admin layout paint if operators want badges before the first websocket refresh completes.
+
+## Phase 12 - Customizable Dashboard Home Layout
+
+- Status: validation complete; commit pending.
+- Commit: pending.
+- Push target: `origin/stats-dashboards`
+- Websocket commands: none added; Phase 12 reuses `stats.dashboard.overview`.
+- Backend surfaces:
+  - No backend code changes.
+  - Confirmed `stats.dashboard.overview` already accepts card ID/variant/size requests, preserves request order, echoes requested size/variant, and returns honest unavailable summaries for unknown card IDs.
+- Frontend surfaces:
+  - `web/src/models/dashboard/dashboardLayout.ts` defines local layout card types, finite size/variant values, storage key, and layout normalization.
+  - `web/src/components/dashboard/dashboardCardCatalog.ts` defines the frontend Phase 12 card catalog and default browser-local home layout.
+  - `web/src/components/dashboard/DashboardOverview.tsx` now renders a 12-column responsive summary-card grid from the selected layout.
+  - `statsStore.refreshDashboardOverview` and `startDashboardOverviewPolling` accept the current overview request payload so polling follows the visible layout.
+- Dashboard integration:
+  - Only `/dashboard` is customizable.
+  - Fixed drilldown routes remain unchanged and continue rendering full-size rich cards.
+  - Users can enter customization mode, add hidden cards, remove visible cards, reorder with Up/Down controls, change finite size/variant selections, and reset the layout.
+  - Summary cards adapt density by selected size/variant without mounting full rich cards.
+  - Attention queue is filtered to currently visible home cards.
+- Architectural decisions:
+  - Card layout is stored in browser-local `localStorage` under `vaulthalla.dashboard.layout.v1`.
+  - Server persistence, drag/drop, and custom named dashboard pages are deferred to Phase 13.
+  - The frontend catalog controls card IDs/variants/sizes only; backend still owns summaries, metrics, severity, warnings, and errors.
+  - If local storage is stale, invalid, or hides every card, layout normalization falls back to the default visible home board.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Persist dashboard home layout preferences server-side in Phase 13.
+  - Add drag/drop reordering in Phase 13.
+  - Move the card catalog backend-side if Phase 13 persistence needs authoritative supported-size metadata.

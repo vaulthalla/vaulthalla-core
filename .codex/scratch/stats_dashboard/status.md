@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8A - Recovery Readiness
-- Status: implemented and validated; checkpoint commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -29,5 +29,5 @@ The vault dashboard now renders Recovery Readiness after Sync Health.
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `e0d97240`
 - Push target: `origin/stats-dashboards`.

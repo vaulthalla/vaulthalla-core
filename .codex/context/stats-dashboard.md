@@ -182,8 +182,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8A - Recovery Readiness
 
-- Status: implemented and validated; checkpoint commit pending.
-- Commit: pending
+- Status: committed and pushed.
+- Commit: `e0d97240`
 - Push target: `origin/stats-dashboards`
 - Websocket command: `stats.vault.recovery`.
 - Backend surfaces:
@@ -214,6 +214,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
 - Known failures: none currently.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add seeded DB tests for recovery readiness status rules.
   - Add backup verification signals only when a real backup verification process exists.

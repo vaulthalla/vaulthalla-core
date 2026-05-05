@@ -218,3 +218,44 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add seeded DB tests for recovery readiness status rules.
   - Add backup verification signals only when a real backup verification process exists.
+
+## Phase 8B - Operation Queue Health
+
+- Status: implemented and validated; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket commands: `stats.system.operations`, `stats.vault.operations`.
+- Backend surfaces:
+  - `stats/model/OperationStats`
+  - `db/query/stats/OperationStats`
+  - prepared operation/share-upload rollup queries for system and vault scopes
+  - admin-only system command and View/ViewStats vault-scoped command
+- Frontend surfaces:
+  - `web/src/models/stats/operationStats.ts`
+  - `web/src/components/stats/OperationQueueStats.tsx`
+  - `web/src/components/vault/VaultStatsDashboard/OperationQueue/Component.tsx`
+  - `statsStore` system operation wrapper, polling helpers, and vault fetch helper
+  - `WebSocketCommandMap['stats.system.operations']` and `['stats.vault.operations']`
+- Dashboard integration:
+  - Admin dashboard renders Operation Queue after FUSE Operations and before Database Health.
+  - Vault dashboard renders Operation Queue after Activity and before Share Observatory.
+- Architectural decisions:
+  - Filesystem work comes from the existing `operations` table.
+  - Share upload work comes from `share_upload`; vault filtering joins through `share_link`.
+  - Stalled work uses an honest age-only threshold of 15 minutes because progress-change instrumentation is not present.
+  - Recent errors combine failed/cancelled filesystem operations and failed/cancelled share uploads without mutating queue state.
+  - Overall status is `critical` for stalled work, `warning` for active/recent failed work, and `healthy` when queues are clear.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add seeded operation/share-upload stats tests.
+  - Add progress-staleness detection only if upload progress timestamps or instrumentation are added.

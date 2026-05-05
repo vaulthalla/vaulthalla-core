@@ -10,6 +10,7 @@ import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
+import { OperationStats } from '@/models/stats/operationStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { getErrorMessage } from '@/util/handleErrors'
@@ -36,6 +37,7 @@ export type SystemHealthWrapper = StatsWrapper<SystemHealth>
 export type ThreadPoolStatsWrapper = StatsWrapper<ThreadPoolManagerStats>
 export type FuseStatsWrapper = StatsWrapper<FuseStats>
 export type DbStatsWrapper = StatsWrapper<DbStats>
+export type OperationStatsWrapper = StatsWrapper<OperationStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -87,6 +89,16 @@ const makeDbStatsWrapper = (initial?: Partial<DbStatsWrapper>): DbStatsWrapper =
   ...initial,
 })
 
+const makeOperationStatsWrapper = (initial?: Partial<OperationStatsWrapper>): OperationStatsWrapper => ({
+  data: new OperationStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
@@ -95,6 +107,7 @@ interface StatsStore {
   threadPoolStats: ThreadPoolStatsWrapper
   fuseStats: FuseStatsWrapper
   dbStats: DbStatsWrapper
+  operationStats: OperationStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
@@ -102,11 +115,13 @@ interface StatsStore {
   getVaultActivity: (payload: WSCommandPayload<'stats.vault.activity'>) => Promise<VaultActivity>
   getVaultShareStats: (payload: WSCommandPayload<'stats.vault.shares'>) => Promise<VaultShareStats>
   getVaultRecovery: (payload: WSCommandPayload<'stats.vault.recovery'>) => Promise<VaultRecovery>
+  getVaultOperationStats: (payload: WSCommandPayload<'stats.vault.operations'>) => Promise<OperationStats>
   getVaultSecurity: (payload: WSCommandPayload<'stats.vault.security'>) => Promise<VaultSecurity>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
   getDbStats: (payload?: WSCommandPayload<'stats.system.db'>) => Promise<DbStats>
+  getOperationStats: (payload?: WSCommandPayload<'stats.system.operations'>) => Promise<OperationStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
@@ -115,6 +130,7 @@ interface StatsStore {
   refreshThreadPoolStats: () => Promise<ThreadPoolManagerStats>
   refreshFuseStats: () => Promise<FuseStats>
   refreshDbStats: () => Promise<DbStats>
+  refreshOperationStats: () => Promise<OperationStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -127,6 +143,8 @@ interface StatsStore {
   stopFuseStatsPolling: () => void
   startDbStatsPolling: (intervalMs?: number) => void
   stopDbStatsPolling: () => void
+  startOperationStatsPolling: (intervalMs?: number) => void
+  stopOperationStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -137,6 +155,7 @@ interface StatsStore {
   _threadPoolStatsPoller: number | null
   _fuseStatsPoller: number | null
   _dbStatsPoller: number | null
+  _operationStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -148,11 +167,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   threadPoolStats: makeThreadPoolStatsWrapper(),
   fuseStats: makeFuseStatsWrapper(),
   dbStats: makeDbStatsWrapper(),
+  operationStats: makeOperationStatsWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
   _fuseStatsPoller: null,
   _dbStatsPoller: null,
+  _operationStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -191,6 +212,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     return VaultRecovery.from(response.stats)
   },
 
+  async getVaultOperationStats(vault_id) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.vault.operations', vault_id)
+    return OperationStats.from(response.stats)
+  },
+
   async getVaultSecurity(vault_id) {
     const ws = useWebSocketStore.getState()
     await ws.waitForConnection()
@@ -224,6 +252,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.db', null)
     return DbStats.from(response.stats)
+  },
+
+  async getOperationStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.operations', null)
+    return OperationStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -372,6 +407,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
+  async refreshOperationStats() {
+    const current = get().operationStats
+    if (current.loading) return current.data
+
+    set({ operationStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getOperationStats()
+      const nextData = OperationStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        operationStats: {
+          ...get().operationStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch operation queue stats'
+      const now = Date.now()
+
+      set({ operationStats: { ...get().operationStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().operationStats.data
+    }
+  },
+
   async refreshFsCacheStats() {
     const current = get().fsCacheStats
     if (current.loading) return current.data // dogpile protection
@@ -515,6 +583,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _dbStatsPoller: null })
+    }
+  },
+
+  startOperationStatsPolling(intervalMs = 7500) {
+    if (get()._operationStatsPoller) return
+
+    void get().refreshOperationStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshOperationStats()
+    }, intervalMs)
+
+    set({ _operationStatsPoller: id })
+  },
+
+  stopOperationStatsPolling() {
+    const id = get()._operationStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _operationStatsPoller: null })
     }
   },
 

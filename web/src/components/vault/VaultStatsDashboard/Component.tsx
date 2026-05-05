@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { VaultStats } from '@/models/stats/vaultStats'
 import SyncHealth from '@/components/vault/VaultStatsDashboard/SyncHealth/Component'
 import VaultActivity from '@/components/vault/VaultStatsDashboard/VaultActivity/Component'
+import OperationQueue from '@/components/vault/VaultStatsDashboard/OperationQueue/Component'
 import RecoveryReadiness from '@/components/vault/VaultStatsDashboard/RecoveryReadiness/Component'
 import ShareStats from '@/components/vault/VaultStatsDashboard/ShareStats/Component'
 import VaultSecurity from '@/components/vault/VaultStatsDashboard/VaultSecurity/Component'
@@ -23,6 +24,7 @@ const VaultStatsDashboard = ({ vault_id }: { vault_id: number }) => {
         <SyncHealth vaultId={vault_id} initialLatestEvent={stats.latest_sync_event} />
         <RecoveryReadiness vaultId={vault_id} />
         <VaultActivity vaultId={vault_id} />
+        <OperationQueue vaultId={vault_id} />
         <ShareStats vaultId={vault_id} />
         <VaultSecurity vaultId={vault_id} />
       </div>

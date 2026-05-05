@@ -15,11 +15,13 @@ struct Stats {
     static json vaultActivity(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultShares(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultRecovery(const json& payload, const std::shared_ptr<Session>& session);
+    static json vaultOperations(const json& payload, const std::shared_ptr<Session>& session);
     static json vaultSecurity(const json& payload, const std::shared_ptr<Session>& session);
     static json systemHealth(const std::shared_ptr<Session>& session);
     static json systemThreadPools(const std::shared_ptr<Session>& session);
     static json systemFuse(const std::shared_ptr<Session>& session);
     static json systemDb(const std::shared_ptr<Session>& session);
+    static json systemOperations(const std::shared_ptr<Session>& session);
     static json fsCache(const std::shared_ptr<Session>& session);
     static json httpCache(const std::shared_ptr<Session>& session);
 };

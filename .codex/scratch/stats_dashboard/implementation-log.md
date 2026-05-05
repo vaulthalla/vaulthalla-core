@@ -288,3 +288,57 @@
 
 - Add seeded DB tests for recovery status edge cases.
 - Add verified-good backup checks only after a real backup verification process exists.
+
+## Phase 8B - Operation Queue Health
+
+### Backend Files Added
+
+- `core/include/stats/model/OperationStats.hpp`
+- `core/src/stats/model/OperationStats.cpp`
+- `core/include/db/query/stats/OperationStats.hpp`
+- `core/src/db/query/stats/OperationStats.cpp`
+- `core/src/db/preparedStatements/stats/operationStats.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/operationStats.ts`
+- `web/src/components/stats/OperationQueueStats.tsx`
+- `web/src/components/vault/VaultStatsDashboard/OperationQueue/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.system.operations`
+- `stats.vault.operations`
+
+### Dashboard Integration
+
+- Admin dashboard order now includes Operation Queue after FUSE Operations and before Database Health.
+- Vault dashboard order now includes Operation Queue after Activity and before Share Observatory.
+
+### Architectural Decisions
+
+- System and vault operation stats share one `OperationStats` payload shape; `vault_id` is null for system scope.
+- Filesystem queue metrics come from the `operations` table.
+- Share upload queue metrics come from `share_upload`; vault scope joins through `share_link`.
+- Stalled heuristics use a 15-minute age-only threshold because there is no upload progress timestamp instrumentation yet.
+- Recent errors combine failed/cancelled operations and failed/cancelled uploads, limited to the latest rows.
+
+### Deferred TODOs
+
+- Add seeded DB tests for system/vault operation queue rollups.
+- Add progress-stalled upload detection if upload progress instrumentation is introduced later.

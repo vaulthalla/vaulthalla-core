@@ -25,3 +25,8 @@
 
 - Should `backup_policy` be constrained to one row per vault, or is latest-row-by-id the intended policy selection rule?
 - What future process should write a distinct backup verification timestamp so "verified good state" can mean more than last successful backup completion?
+
+## Phase 8B
+
+- Should upload progress writes gain a lightweight `updated_at`/heartbeat timestamp so stalled uploads can be detected by lack of byte advancement instead of age alone?
+- Should operation queue retention prune old success rows, or should historical snapshot phases own long-term operation trend storage?

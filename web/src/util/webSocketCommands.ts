@@ -15,6 +15,7 @@ import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
+import { OperationStats } from '@/models/stats/operationStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
@@ -286,6 +287,8 @@ export interface WebSocketCommandMap {
 
   'stats.vault.recovery': { payload: { vault_id: number }; response: { stats: VaultRecovery } }
 
+  'stats.vault.operations': { payload: { vault_id: number }; response: { stats: OperationStats } }
+
   'stats.vault.security': { payload: { vault_id: number }; response: { stats: VaultSecurity } }
 
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
@@ -295,6 +298,8 @@ export interface WebSocketCommandMap {
   'stats.system.fuse': { payload: null; response: { stats: FuseStats } }
 
   'stats.system.db': { payload: null; response: { stats: DbStats } }
+
+  'stats.system.operations': { payload: null; response: { stats: OperationStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

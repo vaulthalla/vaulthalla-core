@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 8A - Recovery Readiness
-- Status: committed and pushed.
+- Phase 8B - Operation Queue Health
+- Status: implemented and validated; checkpoint commit pending.
 
 ## Completed Phases
 
@@ -15,19 +15,21 @@
 - Phase 6: VaultShareStats, `stats.vault.shares`, vault dashboard card.
 - Phase 7: DbStats, `stats.system.db`, admin dashboard card.
 - Phase 8: VaultSecurity, `stats.vault.security`, vault dashboard card.
+- Phase 8A: VaultRecovery, `stats.vault.recovery`, vault dashboard card.
 
 ## Latest Phase Summary
 
-Phase 8A adds `stats.vault.recovery` backed by existing backup policy state:
+Phase 8B adds operation/share-upload queue health:
 
-- `backup_policy.enabled/status/interval` for backup mode.
-- `last_backup_at` and `last_success_at` for freshness.
-- `retention`, retry count, and last error for operator context.
-- nullable stale/missed-backup fields when no real policy row exists.
+- `stats.system.operations` for global admin queue pressure.
+- `stats.vault.operations` for vault-scoped queue pressure.
+- filesystem operation rollups from `operations`.
+- share upload active/stalled/failed rollups from `share_upload`.
+- recent queue error rows from failed/cancelled operations and uploads.
 
-The vault dashboard now renders Recovery Readiness after Sync Health.
+The admin dashboard now renders Operation Queue after FUSE. The vault dashboard renders Operation Queue after Activity.
 
 ## Checkpoint
 
-- Commit SHA: `e0d97240`
+- Commit SHA: pending
 - Push target: `origin/stats-dashboards`.

@@ -203,6 +203,7 @@ void Connection::initPrepared() const {
 
     // Stats
     initPreparedDbStats();
+    initPreparedOperationStats();
 
     // Admin
     initPreparedSecrets();

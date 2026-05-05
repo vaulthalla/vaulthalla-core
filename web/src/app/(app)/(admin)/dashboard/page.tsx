@@ -3,6 +3,7 @@ import ConnectionStatsComponent from '@/components/stats/ConnectionStats'
 import DbHealthComponent from '@/components/stats/DbHealth'
 import FuseStatsComponent from '@/components/stats/FuseStats'
 import OperationQueueStatsComponent from '@/components/stats/OperationQueueStats'
+import StorageBackendStatsComponent from '@/components/stats/StorageBackendStats'
 import SystemHealthComponent from '@/components/stats/SystemHealth'
 import ThreadPoolStatsComponent from '@/components/stats/ThreadPoolStats'
 
@@ -15,6 +16,7 @@ const DashboardPage = () => {
         <FuseStatsComponent />
         <ConnectionStatsComponent />
         <OperationQueueStatsComponent />
+        <StorageBackendStatsComponent />
         <DbHealthComponent />
         <CacheStatsComponent source="fs" />
         <CacheStatsComponent source="http" />

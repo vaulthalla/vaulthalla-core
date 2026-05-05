@@ -300,3 +300,44 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add lightweight lifecycle counters if 24h opened/closed/swept/error metrics become necessary.
   - Add redacted/top-limited user-agent/IP summaries only with an explicit privacy decision.
+
+## Phase 8D - Storage Backend Health
+
+- Status: validated locally; checkpoint commit pending.
+- Commit: pending
+- Push target: `origin/stats-dashboards`
+- Websocket commands: `stats.system.storage`, `stats.vault.storage`.
+- Backend surfaces:
+  - `stats/model/StorageBackendStats`
+  - admin-only system storage stats command
+  - View/ViewStats vault-scoped storage stats command
+  - `vault::model::Vault` now carries the schema-backed `allow_fs_write` field
+- Frontend surfaces:
+  - `web/src/models/stats/storageBackendStats.ts`
+  - `web/src/components/stats/StorageBackendStats.tsx`
+  - `web/src/components/vault/VaultStatsDashboard/StorageBackend/Component.tsx`
+  - `statsStore` system storage wrapper, polling helpers, and vault fetch helper
+  - `WebSocketCommandMap['stats.system.storage']` and `['stats.vault.storage']`
+- Dashboard integration:
+  - Admin dashboard renders Storage Backend after Operation Queue and before Database Health.
+  - Vault dashboard renders Storage Backend after Capacity and before Sync Health.
+- Architectural decisions:
+  - Storage backend health is a read-only live snapshot from `storage::Manager` engines.
+  - Per-vault status includes type, active state, `allow_fs_write`, quota, vault/cache/free-space signals, backend status, and S3 bucket/encryption config.
+  - Provider operation/error/latency fields are intentionally null until provider operation boundaries are instrumented.
+  - Backend status is `error` for missing/exceptional engines, `degraded` for inactive vaults, low free-space signals, or incomplete S3 config, and `healthy` otherwise.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after adding `allow_fs_write` to `vault::model::Vault`
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Push result: pending.
+- Deferred TODOs:
+  - Add provider operation counters and latency/error instrumentation when storage engine boundaries are instrumented.
+  - Add focused backend tests for storage backend status classification.

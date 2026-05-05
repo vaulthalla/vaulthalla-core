@@ -392,3 +392,54 @@
 
 - Add lifecycle counters for opened/closed/swept/error windows if needed.
 - Add redacted/top-limited IP/user-agent summaries only after an explicit privacy choice.
+
+## Phase 8D - Storage Backend Health
+
+### Backend Files Added
+
+- `core/include/stats/model/StorageBackendStats.hpp`
+- `core/src/stats/model/StorageBackendStats.cpp`
+
+### Backend Files Changed
+
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+- `core/include/vault/model/Vault.hpp`
+- `core/src/vault/model/Vault.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/storageBackendStats.ts`
+- `web/src/components/stats/StorageBackendStats.tsx`
+- `web/src/components/vault/VaultStatsDashboard/StorageBackend/Component.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+- `web/src/components/vault/VaultStatsDashboard/Component.tsx`
+
+### Websocket Commands Added
+
+- `stats.system.storage`
+- `stats.vault.storage`
+
+### Dashboard Integration
+
+- Admin dashboard order now includes Storage Backend after Operation Queue and before Database Health.
+- Vault dashboard order now includes Storage Backend after Capacity and before Sync Health.
+
+### Architectural Decisions
+
+- Storage backend stats derive from live `storage::Manager` engines rather than new database tables.
+- Per-vault snapshots include vault type, active state, `allow_fs_write`, quota, vault size, cache size, computed free-space signal, backend status, and S3 bucket/encryption config.
+- `allow_fs_write` already existed in the schema but was not present in the runtime `Vault` model; the model now carries and serializes it.
+- Provider operation/error/latency fields are returned as null because local/S3 provider operations are not instrumented yet.
+- Backend status is `error` for missing/exceptional engines, `degraded` for inactive vaults, low free space, or incomplete S3 config, and `healthy` otherwise.
+
+### Deferred TODOs
+
+- Add provider operation counters and latency/error instrumentation only when storage engine boundaries are instrumented.
+- Add focused backend unit tests for storage backend status classification.

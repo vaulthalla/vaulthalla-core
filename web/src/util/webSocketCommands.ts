@@ -17,6 +17,7 @@ import { ConnectionStats } from '@/models/stats/connectionStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
+import { StorageBackendStats } from '@/models/stats/storageBackendStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { AdminRoleDTO, VaultRoleDTO } from '@/models/permission'
@@ -292,6 +293,8 @@ export interface WebSocketCommandMap {
 
   'stats.vault.security': { payload: { vault_id: number }; response: { stats: VaultSecurity } }
 
+  'stats.vault.storage': { payload: { vault_id: number }; response: { stats: StorageBackendStats } }
+
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
 
   'stats.system.threadpools': { payload: null; response: { stats: ThreadPoolManagerStats } }
@@ -303,6 +306,8 @@ export interface WebSocketCommandMap {
   'stats.system.operations': { payload: null; response: { stats: OperationStats } }
 
   'stats.system.connections': { payload: null; response: { stats: ConnectionStats } }
+
+  'stats.system.storage': { payload: null; response: { stats: StorageBackendStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

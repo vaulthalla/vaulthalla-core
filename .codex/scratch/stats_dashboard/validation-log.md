@@ -167,3 +167,27 @@ Checkpoint:
 - Commit SHA: `60b02079`
 - Push target: `origin/stats-dashboards`
 - Push result: succeeded, with GitHub remote moved warning
+
+## Phase 8D - Storage Backend Health
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed after adding the schema-backed `allow_fs_write` field to `vault::model::Vault`
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending
+- Push target: `origin/stats-dashboards`
+- Push result: pending

@@ -19,6 +19,7 @@
 #include "stats/model/DbStats.hpp"
 #include "stats/model/FuseStats.hpp"
 #include "stats/model/OperationStats.hpp"
+#include "stats/model/StorageBackendStats.hpp"
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
 #include "stats/model/VaultActivity.hpp"
@@ -135,6 +136,20 @@ json Stats::vaultOperations(const json& payload, const std::shared_ptr<Session>&
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 
+json Stats::vaultStorage(const json& payload, const std::shared_ptr<Session>& session) {
+    const auto& vaultId = payload.at("vault_id").get<uint32_t>();
+
+    using Perm = permission::admin::VaultPermissions;
+
+    if (!resolver::Admin::has<Perm>({
+        .user = session->user,
+        .permissions = { Perm::View, Perm::ViewStats },
+        .vault_id = vaultId
+    })) throw std::runtime_error("You do not have permission to view storage backend stats for this vault.");
+
+    return {{"stats", vh::stats::model::StorageBackendStats::snapshotForVault(vaultId)}};
+}
+
 json Stats::vaultSecurity(const json& payload, const std::shared_ptr<Session>& session) {
     const auto& vaultId = payload.at("vault_id").get<uint32_t>();
 
@@ -182,6 +197,11 @@ json Stats::systemOperations(const std::shared_ptr<Session>& session) {
 json Stats::systemConnections(const std::shared_ptr<Session>& session) {
     if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view connection stats.");
     return {{"stats", vh::stats::model::ConnectionStats::snapshot()}};
+}
+
+json Stats::systemStorage(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view storage backend stats.");
+    return {{"stats", vh::stats::model::StorageBackendStats::snapshot()}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

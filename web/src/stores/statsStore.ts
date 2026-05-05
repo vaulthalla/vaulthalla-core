@@ -12,6 +12,7 @@ import { ConnectionStats } from '@/models/stats/connectionStats'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
+import { StorageBackendStats } from '@/models/stats/storageBackendStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
 import { getErrorMessage } from '@/util/handleErrors'
@@ -40,6 +41,7 @@ export type FuseStatsWrapper = StatsWrapper<FuseStats>
 export type DbStatsWrapper = StatsWrapper<DbStats>
 export type OperationStatsWrapper = StatsWrapper<OperationStats>
 export type ConnectionStatsWrapper = StatsWrapper<ConnectionStats>
+export type StorageBackendStatsWrapper = StatsWrapper<StorageBackendStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -111,6 +113,18 @@ const makeConnectionStatsWrapper = (initial?: Partial<ConnectionStatsWrapper>): 
   ...initial,
 })
 
+const makeStorageBackendStatsWrapper = (
+  initial?: Partial<StorageBackendStatsWrapper>,
+): StorageBackendStatsWrapper => ({
+  data: new StorageBackendStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
@@ -121,6 +135,7 @@ interface StatsStore {
   dbStats: DbStatsWrapper
   operationStats: OperationStatsWrapper
   connectionStats: ConnectionStatsWrapper
+  storageBackendStats: StorageBackendStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
@@ -130,12 +145,14 @@ interface StatsStore {
   getVaultRecovery: (payload: WSCommandPayload<'stats.vault.recovery'>) => Promise<VaultRecovery>
   getVaultOperationStats: (payload: WSCommandPayload<'stats.vault.operations'>) => Promise<OperationStats>
   getVaultSecurity: (payload: WSCommandPayload<'stats.vault.security'>) => Promise<VaultSecurity>
+  getVaultStorageBackendStats: (payload: WSCommandPayload<'stats.vault.storage'>) => Promise<StorageBackendStats>
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
   getDbStats: (payload?: WSCommandPayload<'stats.system.db'>) => Promise<DbStats>
   getOperationStats: (payload?: WSCommandPayload<'stats.system.operations'>) => Promise<OperationStats>
   getConnectionStats: (payload?: WSCommandPayload<'stats.system.connections'>) => Promise<ConnectionStats>
+  getStorageBackendStats: (payload?: WSCommandPayload<'stats.system.storage'>) => Promise<StorageBackendStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
@@ -146,6 +163,7 @@ interface StatsStore {
   refreshDbStats: () => Promise<DbStats>
   refreshOperationStats: () => Promise<OperationStats>
   refreshConnectionStats: () => Promise<ConnectionStats>
+  refreshStorageBackendStats: () => Promise<StorageBackendStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -162,6 +180,8 @@ interface StatsStore {
   stopOperationStatsPolling: () => void
   startConnectionStatsPolling: (intervalMs?: number) => void
   stopConnectionStatsPolling: () => void
+  startStorageBackendStatsPolling: (intervalMs?: number) => void
+  stopStorageBackendStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -174,6 +194,7 @@ interface StatsStore {
   _dbStatsPoller: number | null
   _operationStatsPoller: number | null
   _connectionStatsPoller: number | null
+  _storageBackendStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -187,6 +208,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   dbStats: makeDbStatsWrapper(),
   operationStats: makeOperationStatsWrapper(),
   connectionStats: makeConnectionStatsWrapper(),
+  storageBackendStats: makeStorageBackendStatsWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
@@ -194,6 +216,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   _dbStatsPoller: null,
   _operationStatsPoller: null,
   _connectionStatsPoller: null,
+  _storageBackendStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -246,6 +269,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     return VaultSecurity.from(response.stats)
   },
 
+  async getVaultStorageBackendStats(vault_id) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.vault.storage', vault_id)
+    return StorageBackendStats.from(response.stats)
+  },
+
   async getSystemHealth() {
     const ws = useWebSocketStore.getState()
     await ws.waitForConnection()
@@ -286,6 +316,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.connections', null)
     return ConnectionStats.from(response.stats)
+  },
+
+  async getStorageBackendStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.storage', null)
+    return StorageBackendStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -500,6 +537,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
+  async refreshStorageBackendStats() {
+    const current = get().storageBackendStats
+    if (current.loading) return current.data
+
+    set({ storageBackendStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getStorageBackendStats()
+      const nextData = StorageBackendStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        storageBackendStats: {
+          ...get().storageBackendStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch storage backend stats'
+      const now = Date.now()
+
+      set({ storageBackendStats: { ...get().storageBackendStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().storageBackendStats.data
+    }
+  },
+
   async refreshFsCacheStats() {
     const current = get().fsCacheStats
     if (current.loading) return current.data // dogpile protection
@@ -683,6 +753,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _connectionStatsPoller: null })
+    }
+  },
+
+  startStorageBackendStatsPolling(intervalMs = 7500) {
+    if (get()._storageBackendStatsPoller) return
+
+    void get().refreshStorageBackendStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshStorageBackendStats()
+    }, intervalMs)
+
+    set({ _storageBackendStatsPoller: id })
+  },
+
+  stopStorageBackendStatsPolling() {
+    const id = get()._storageBackendStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _storageBackendStatsPoller: null })
     }
   },
 

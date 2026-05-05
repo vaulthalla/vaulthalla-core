@@ -35,3 +35,8 @@
 
 - Should websocket lifecycle add atomics for 24h opened/closed/swept/error counters, or should those wait for historical snapshot/event work?
 - Should admin dashboards ever expose redacted/top-limited IP/user-agent summaries, and what privacy policy should govern that?
+
+## Phase 8D
+
+- Should provider operation/error/latency counters be added around local and S3 engine boundaries, or deferred until historical snapshots need provider trend data?
+- Should `allow_fs_write` become editable in the vault admin UI now that the runtime model carries the schema field?

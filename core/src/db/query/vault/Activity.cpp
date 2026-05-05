@@ -125,7 +125,7 @@ std::vector<VaultActivityEvent> recentFromResult(const pqxx::result& res) {
 
 }
 
-std::shared_ptr<stats::model::VaultActivity> Activity::getVaultActivity(const std::uint32_t vaultId) {
+std::shared_ptr<::vh::stats::model::VaultActivity> Activity::getVaultActivity(const std::uint32_t vaultId) {
     return Transactions::exec("VaultActivity::getVaultActivity", [&](pqxx::work& txn) {
         auto activity = std::make_shared<VaultActivity>();
         activity->vaultId = vaultId;

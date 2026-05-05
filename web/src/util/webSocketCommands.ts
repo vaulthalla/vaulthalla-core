@@ -11,6 +11,7 @@ import { Group } from '@/models/group'
 import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
@@ -286,6 +287,8 @@ export interface WebSocketCommandMap {
   'stats.system.threadpools': { payload: null; response: { stats: ThreadPoolManagerStats } }
 
   'stats.system.fuse': { payload: null; response: { stats: FuseStats } }
+
+  'stats.system.db': { payload: null; response: { stats: DbStats } }
 
   'stats.fs.cache': { payload: null; response: { stats: CacheStats } }
 

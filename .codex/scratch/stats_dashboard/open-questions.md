@@ -10,3 +10,8 @@
 
 - Should public share observability get a global admin card in addition to the per-vault Share Observatory card?
 - Should top share events eventually expose redacted/top-limited remote IP or user-agent summaries, or keep those details out of dashboard stats unless explicitly requested?
+
+## Phase 7
+
+- Should slow-query thresholds stay fixed at mean execution time >= 1s, or become configurable from admin settings?
+- Should index bloat be estimated in a later phase, or deferred until historical DB snapshots exist?

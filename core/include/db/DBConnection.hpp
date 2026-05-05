@@ -67,6 +67,9 @@ class Connection {
     void initPreparedShareVaultRoles() const;
     void initPreparedShareStats() const;
 
+    // Stats
+    void initPreparedDbStats() const;
+
     // Admin
     void initPreparedSecrets() const;
     void initPreparedWaivers() const;

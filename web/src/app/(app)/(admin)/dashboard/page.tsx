@@ -1,4 +1,5 @@
 import CacheStatsComponent from '@/components/stats/CacheStats'
+import DbHealthComponent from '@/components/stats/DbHealth'
 import FuseStatsComponent from '@/components/stats/FuseStats'
 import SystemHealthComponent from '@/components/stats/SystemHealth'
 import ThreadPoolStatsComponent from '@/components/stats/ThreadPoolStats'
@@ -10,6 +11,7 @@ const DashboardPage = () => {
         <SystemHealthComponent />
         <ThreadPoolStatsComponent />
         <FuseStatsComponent />
+        <DbHealthComponent />
         <CacheStatsComponent source="fs" />
         <CacheStatsComponent source="http" />
       </div>

@@ -117,3 +117,62 @@
 
 - Add seeded DB tests for share rollup queries.
 - Add an optional global share activity card later if the admin dashboard needs cross-vault share posture.
+
+## Phase 7 - DB Health
+
+### Backend Files Added
+
+- `core/include/stats/model/DbStats.hpp`
+- `core/src/stats/model/DbStats.cpp`
+- `core/include/db/query/stats/DbStats.hpp`
+- `core/src/db/query/stats/DbStats.cpp`
+- `core/src/db/preparedStatements/stats/dbStats.cpp`
+
+### Backend Files Changed
+
+- `core/include/db/DBConnection.hpp`
+- `core/src/db/Connection.cpp`
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+- `core/include/db/query/share/Stats.hpp`
+- `core/src/db/query/share/Stats.cpp`
+- `core/include/db/query/vault/Activity.hpp`
+- `core/src/db/query/vault/Activity.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/dbStats.ts`
+- `web/src/components/stats/DbHealth.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+
+### Websocket Commands Added
+
+- `stats.system.db`
+
+### Dashboard Integration
+
+- Admin dashboard order now includes:
+  - System Health
+  - Thread Pools
+  - FUSE Operations
+  - Database Health
+  - FS Cache
+  - HTTP Cache
+
+### Architectural Decisions
+
+- DB health uses stock PostgreSQL catalog/stat views and does not require extensions.
+- `pg_stat_statements` is detected, not assumed; slow-query count stays unavailable when the extension is not enabled.
+- Failed DB collection returns a critical disconnected payload with an error instead of throwing away the entire health surface.
+- The new `vh::db::query::stats` namespace required fully qualified `::vh::stats::model` references in older DB query headers to avoid shadowing.
+
+### Deferred TODOs
+
+- Add focused DB stats query tests.
+- Add safe index bloat estimates later if the formula is backed by PostgreSQL metadata available in stock installs.

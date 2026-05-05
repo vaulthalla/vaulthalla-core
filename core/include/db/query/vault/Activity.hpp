@@ -9,7 +9,7 @@ namespace vh::db::query::vault {
 
 class Activity {
 public:
-    static std::shared_ptr<stats::model::VaultActivity> getVaultActivity(std::uint32_t vaultId);
+    static std::shared_ptr<::vh::stats::model::VaultActivity> getVaultActivity(std::uint32_t vaultId);
 };
 
 }

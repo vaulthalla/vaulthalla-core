@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 6 - Share Observatory Lite
-- Status: committed and pushed.
+- Phase 7 - DB Health
+- Status: implemented and validated locally; commit pending.
 
 ## Completed Phases
 
@@ -12,18 +12,19 @@
 - Phase 3: FuseStats, `stats.system.fuse`, admin dashboard card.
 - Phase 4: VaultSyncHealth, `stats.vault.sync`, vault dashboard card.
 - Phase 5: VaultActivity, `stats.vault.activity`, vault dashboard card.
+- Phase 6: VaultShareStats, `stats.vault.shares`, vault dashboard card.
 
 ## Latest Phase Summary
 
-Phase 6 adds `stats.vault.shares` backed by real share state:
+Phase 7 adds `stats.system.db` backed by safe PostgreSQL metadata:
 
-- `share_link` for active/expired/revoked link posture and public/email-validated exposure.
-- `share_upload` for completed upload counts.
-- `share_access_event` for downloads, denied/rate-limited/failed attempts, top access signals, and recent share events.
+- `pg_database_size`, `pg_stat_database`, and `pg_stat_activity` for live DB health signals.
+- `pg_stat_user_tables` for largest table rollups.
+- `pg_extension` detection for `pg_stat_statements` without requiring the extension.
 
-The vault dashboard now renders Share Observatory below Activity.
+The admin dashboard now renders Database Health below FUSE Operations.
 
 ## Checkpoint
 
-- Commit SHA: `36f35f23`
+- Commit SHA: pending.
 - Push target: `origin/stats-dashboards`.

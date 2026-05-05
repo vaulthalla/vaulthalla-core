@@ -199,6 +199,9 @@ void Connection::initPrepared() const {
     initPreparedShareVaultRoles();
     initPreparedShareStats();
 
+    // Stats
+    initPreparedDbStats();
+
     // Admin
     initPreparedSecrets();
     initPreparedWaivers();

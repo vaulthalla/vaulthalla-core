@@ -2,6 +2,7 @@
 
 #include "concurrency/ThreadPoolManager.hpp"
 #include "concurrency/ThreadPool.hpp"
+#include "db/query/stats/DbStats.hpp"
 #include "db/query/share/Stats.hpp"
 #include "db/query/sync/Stats.hpp"
 #include "db/query/vault/Activity.hpp"
@@ -11,6 +12,7 @@
 #include "vault/model/Stat.hpp"
 #include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
+#include "stats/model/DbStats.hpp"
 #include "stats/model/FuseStats.hpp"
 #include "stats/model/SystemHealth.hpp"
 #include "stats/model/ThreadPoolStats.hpp"
@@ -111,6 +113,12 @@ json Stats::systemFuse(const std::shared_ptr<Session>& session) {
     const auto& stats = runtime::Deps::get().fuseStats;
     if (!stats) throw std::runtime_error("No FUSE stats available.");
     return {{"stats", stats->snapshot()}};
+}
+
+json Stats::systemDb(const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view database health.");
+    const auto stats = vh::db::query::stats::DbStats::snapshot();
+    return {{"stats", stats ? json(*stats) : json(nullptr)}};
 }
 
 json Stats::fsCache(const std::shared_ptr<Session>& session) {

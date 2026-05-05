@@ -106,7 +106,7 @@ std::vector<VaultShareRecentEvent> recentEventsFromResult(const pqxx::result& re
 
 }
 
-std::shared_ptr<stats::model::VaultShareStats> Stats::getVaultShareStats(const std::uint32_t vaultId) {
+std::shared_ptr<::vh::stats::model::VaultShareStats> Stats::getVaultShareStats(const std::uint32_t vaultId) {
     return Transactions::exec("ShareStats::getVaultShareStats", [&](pqxx::work& txn) {
         auto stats = std::make_shared<VaultShareStats>();
         stats->vaultId = vaultId;

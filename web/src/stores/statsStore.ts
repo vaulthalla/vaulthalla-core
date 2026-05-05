@@ -6,6 +6,7 @@ import { VaultActivity } from '@/models/stats/vaultActivity'
 import { VaultShareStats } from '@/models/stats/vaultShareStats'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
+import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { SystemHealth } from '@/models/stats/systemHealth'
 import { ThreadPoolManagerStats } from '@/models/stats/threadPoolStats'
@@ -32,6 +33,7 @@ export type CacheStatsWrapper = StatsWrapper<CacheStats>
 export type SystemHealthWrapper = StatsWrapper<SystemHealth>
 export type ThreadPoolStatsWrapper = StatsWrapper<ThreadPoolManagerStats>
 export type FuseStatsWrapper = StatsWrapper<FuseStats>
+export type DbStatsWrapper = StatsWrapper<DbStats>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -73,6 +75,16 @@ const makeFuseStatsWrapper = (initial?: Partial<FuseStatsWrapper>): FuseStatsWra
   ...initial,
 })
 
+const makeDbStatsWrapper = (initial?: Partial<DbStatsWrapper>): DbStatsWrapper => ({
+  data: new DbStats(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
@@ -80,6 +92,7 @@ interface StatsStore {
   systemHealth: SystemHealthWrapper
   threadPoolStats: ThreadPoolStatsWrapper
   fuseStats: FuseStatsWrapper
+  dbStats: DbStatsWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
@@ -89,6 +102,7 @@ interface StatsStore {
   getSystemHealth: (payload?: WSCommandPayload<'stats.system.health'>) => Promise<SystemHealth>
   getThreadPoolStats: (payload?: WSCommandPayload<'stats.system.threadpools'>) => Promise<ThreadPoolManagerStats>
   getFuseStats: (payload?: WSCommandPayload<'stats.system.fuse'>) => Promise<FuseStats>
+  getDbStats: (payload?: WSCommandPayload<'stats.system.db'>) => Promise<DbStats>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
@@ -96,6 +110,7 @@ interface StatsStore {
   refreshSystemHealth: () => Promise<SystemHealth>
   refreshThreadPoolStats: () => Promise<ThreadPoolManagerStats>
   refreshFuseStats: () => Promise<FuseStats>
+  refreshDbStats: () => Promise<DbStats>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -106,6 +121,8 @@ interface StatsStore {
   stopThreadPoolStatsPolling: () => void
   startFuseStatsPolling: (intervalMs?: number) => void
   stopFuseStatsPolling: () => void
+  startDbStatsPolling: (intervalMs?: number) => void
+  stopDbStatsPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -115,6 +132,7 @@ interface StatsStore {
   _systemHealthPoller: number | null
   _threadPoolStatsPoller: number | null
   _fuseStatsPoller: number | null
+  _dbStatsPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -125,10 +143,12 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   systemHealth: makeSystemHealthWrapper(),
   threadPoolStats: makeThreadPoolStatsWrapper(),
   fuseStats: makeFuseStatsWrapper(),
+  dbStats: makeDbStatsWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
   _fuseStatsPoller: null,
+  _dbStatsPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -179,6 +199,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.fuse', null)
     return FuseStats.from(response.stats)
+  },
+
+  async getDbStats() {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.system.db', null)
+    return DbStats.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -291,6 +318,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       set({ fuseStats: { ...get().fuseStats, loading: false, error: msg, lastErrorAt: now } })
 
       return get().fuseStats.data
+    }
+  },
+
+  async refreshDbStats() {
+    const current = get().dbStats
+    if (current.loading) return current.data
+
+    set({ dbStats: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getDbStats()
+      const nextData = DbStats.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        dbStats: {
+          ...get().dbStats,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch database health'
+      const now = Date.now()
+
+      set({ dbStats: { ...get().dbStats, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().dbStats.data
     }
   },
 
@@ -417,6 +477,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _fuseStatsPoller: null })
+    }
+  },
+
+  startDbStatsPolling(intervalMs = 7500) {
+    if (get()._dbStatsPoller) return
+
+    void get().refreshDbStats()
+
+    const id = window.setInterval(() => {
+      void get().refreshDbStats()
+    }, intervalMs)
+
+    set({ _dbStatsPoller: id })
+  },
+
+  stopDbStatsPolling() {
+    const id = get()._dbStatsPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _dbStatsPoller: null })
     }
   },
 

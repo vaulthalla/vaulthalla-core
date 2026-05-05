@@ -104,3 +104,37 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add dedicated share stats tests with seeded links/uploads/audit events.
   - Add optional global admin share activity card in a later dashboard layout pass if desired.
+
+## Phase 7 - DB Health
+
+- Status: implemented and validated locally; commit pending.
+- Websocket command: `stats.system.db`.
+- Backend surfaces:
+  - `stats/model/DbStats`
+  - `db/query/stats/DbStats`
+  - prepared DB health queries for size, connection state, cache hit ratio, deadlocks, temp bytes, oldest transaction age, largest tables, and extension detection
+- Frontend surfaces:
+  - `web/src/models/stats/dbStats.ts`
+  - `web/src/components/stats/DbHealth.tsx`
+  - `statsStore` DB stats wrapper, refresh, and polling helpers
+  - `WebSocketCommandMap['stats.system.db']`
+- Dashboard integration: admin dashboard renders Database Health after FUSE Operations and before cache cards.
+- Architectural decisions:
+  - DB health works on stock PostgreSQL and does not require `pg_stat_statements`.
+  - `pg_stat_statements` is detected through `pg_extension`; slow-query count is `null`/not enabled when the extension is unavailable.
+  - If DB stat collection throws, the stats payload returns `connected=false`, `status=critical`, and an error string instead of inventing healthy data.
+  - Creating `vh::db::query::stats` exposed older relative `stats::model` lookup in DB query headers, so those references were made fully qualified.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed after qualifying shadowed stats model namespaces
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add focused DB stats query tests.
+  - Add richer bloat/index-health estimates only if backed by safe PostgreSQL metadata.

@@ -17,6 +17,7 @@ struct Stats {
     static json systemHealth(const std::shared_ptr<Session>& session);
     static json systemThreadPools(const std::shared_ptr<Session>& session);
     static json systemFuse(const std::shared_ptr<Session>& session);
+    static json systemDb(const std::shared_ptr<Session>& session);
     static json fsCache(const std::shared_ptr<Session>& session);
     static json httpCache(const std::shared_ptr<Session>& session);
 };

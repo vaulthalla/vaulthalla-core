@@ -13,6 +13,7 @@ Validation:
 - `pnpm --dir web lint`: passed
 - `pnpm --dir web test`: passed
 - `meson test -C build`: passed, 2/2
+- Extra environment validation: `make dev` passed after dropping/recreating the existing dev PostgreSQL role/database and reseeding `/run/vaulthalla/db_password`.
 
 Known failures:
 

@@ -61,6 +61,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web lint`: passed
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
+  - Extra environment validation: `make dev` passed after dropping/recreating the existing dev PostgreSQL role/database and reseeding `/run/vaulthalla/db_password`.
 - Known failures: none currently.
 - Deferred TODOs:
   - Add richer FUSE rename/move operation attribution only if it can avoid duplicate web operation rows.

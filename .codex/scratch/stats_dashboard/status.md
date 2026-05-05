@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 11 - Live Dashboard Severity Badges and Overview Polish
-- Status: implementation complete; checkpoint commit/push pending.
+- Status: committed locally; push pending.
 
 ## Completed Phases
 
@@ -36,7 +36,7 @@ No backend contract changes were needed.
 
 ## Checkpoint
 
-- Commit SHA: pending commit creation.
+- Commit SHA: `284729c8`.
 - Push target: `origin/stats-dashboards`.
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes

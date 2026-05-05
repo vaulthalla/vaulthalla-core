@@ -344,8 +344,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8E - Retention and Cleanup Pressure
 
-- Status: validated locally; checkpoint commit pending.
-- Commit: pending
+- Status: committed locally; push pending.
+- Commit: `c4338666`
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.retention`, `stats.vault.retention`.
 - Backend surfaces:

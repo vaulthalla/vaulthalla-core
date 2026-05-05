@@ -212,6 +212,6 @@ Known failures:
 
 Checkpoint:
 
-- Commit SHA: pending
+- Commit SHA: `c4338666`
 - Push target: `origin/stats-dashboards`
 - Push result: pending

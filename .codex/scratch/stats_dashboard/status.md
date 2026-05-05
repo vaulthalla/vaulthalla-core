@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8E - Retention and Cleanup Pressure
-- Status: validated locally; checkpoint commit pending.
+- Status: committed locally; push pending.
 
 ## Completed Phases
 
@@ -35,5 +35,5 @@ The vault dashboard now renders Retention / Cleanup after Security / Integrity.
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `c4338666`
 - Push target: `origin/stats-dashboards`.

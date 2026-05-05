@@ -475,3 +475,43 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add live nav severity badges driven by `stats.dashboard.overview`.
   - Add focused tests for overview severity mapping and issue generation.
+
+## Phase 11 - Live Dashboard Severity Badges and Overview Polish
+
+- Status: implementation complete; checkpoint commit/push pending.
+- Commit: pending commit creation.
+- Push target: `origin/stats-dashboards`
+- Websocket commands: none added; Phase 11 reuses `stats.dashboard.overview`.
+- Backend surfaces:
+  - No backend contract changes.
+  - Frontend continues to consume backend-owned `severity`, `warning_count`, `error_count`, `warnings`, `errors`, `attention`, and section/card summaries only.
+- Frontend surfaces:
+  - `web/src/components/dashboard/dashboardSeverity.ts` centralizes dashboard severity tone/rank/count helpers.
+  - `web/src/components/dashboard/DashboardSeverityBadge.tsx` renders fa-duotone severity icons and count badges.
+  - `web/src/components/dashboard/DashboardIssueList.tsx` renders warning/error issue rows from backend-provided issue arrays.
+  - `web/src/components/nav/DashboardNavSeverityBadge.tsx` subscribes to dashboard overview state and starts lightweight nav polling.
+  - `DashboardOverview` mini-cards and attention queue now use severity icons, count badges, and sharper warning/error presentation.
+  - `NavList` and admin nav config support dashboard overview/section severity sources.
+- Dashboard integration:
+  - Dashboard parent nav item shows live worst overview severity and issue count when overview data is available.
+  - Dashboard child routes show live section severity/count badges for Runtime, Filesystem, Storage, Operations, and Trends.
+  - Compact nav mode shows a small severity/count indicator for dashboard items.
+  - `/dashboard` remains overview-only and does not mount full detail cards.
+- Architectural decisions:
+  - No raw metric business rules were added to the frontend.
+  - The nav badge component uses the existing stats store and polling dogpile protection rather than opening independent websocket command paths.
+  - Focused tests for helper ranking/count logic are deferred because the current web `test` script is typecheck+lint only and there is no frontend unit test runner configured.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2 after rerun
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add focused dashboard severity helper tests if/when a frontend test runner is configured.
+  - Consider route-level nav badge preloading on first admin layout paint if operators want badges before the first websocket refresh completes.

@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
-- Status: committed and pushed.
+- Phase 11 - Live Dashboard Severity Badges and Overview Polish
+- Status: implementation complete; checkpoint commit/push pending.
 
 ## Completed Phases
 
@@ -21,24 +21,23 @@
 - Phase 8D: StorageBackendStats, `stats.system.storage` and `stats.vault.storage`, admin and vault dashboard cards.
 - Phase 8E: RetentionStats, `stats.system.retention` and `stats.vault.retention`, admin and vault dashboard cards.
 - Phase 9: Historical snapshots, `stats.system.trends` and `stats.vault.trends`, admin and vault dashboard cards.
+- Phase 10: Dashboard overview command, compact overview, drilldown routes, and dashboard nav child routes.
 
 ## Latest Phase Summary
 
-Phase 10 splits the admin dashboard into a compact command center plus drilldown pages:
+Phase 11 makes Phase 10's overview/drilldown architecture visibly communicate live severity:
 
-- `stats.dashboard.overview` returns backend-owned section/card summaries.
-- Summary cards include severity, warnings, errors, primary metrics, hrefs, and availability state.
-- `/dashboard` now renders the compact overview and attention queue.
-- Full-size admin cards moved to `/dashboard/runtime`, `/dashboard/filesystem`, `/dashboard/storage`, `/dashboard/operations`, and `/dashboard/trends`.
-- Dashboard sidebar now exposes the fixed child routes.
+- Reusable dashboard severity helpers render stable tones, ranks, icons, and issue count labels.
+- `/dashboard` overview cards show fa-duotone severity icons, warning/error counts, first issue messages, and detail links.
+- Attention queue renders backend-provided warning/error items with severity icons and links.
+- Dashboard parent and child nav items show live severity/count badges from `stats.dashboard.overview`.
 
-Live severity badges in the sidebar are deferred; static child routes are in place.
+No backend contract changes were needed.
 
 ## Checkpoint
 
-- Commit SHA: `1b78ce7b`.
+- Commit SHA: pending commit creation.
 - Push target: `origin/stats-dashboards`.
-- Push result: succeeded, with GitHub remote moved warning.
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
 
@@ -167,3 +166,57 @@ Live severity badges in the sidebar are deferred; static child routes are in pla
 
 - Add downsampled daily compaction if raw snapshots become too large for long retention windows.
 - Add seeded DB tests for trend extraction once snapshot fixtures exist.
+
+## Phase 11 - Live Dashboard Severity Badges and Overview Polish
+
+### Backend Files Changed
+
+- None.
+
+### Frontend Files Added
+
+- `web/src/components/dashboard/dashboardSeverity.ts`
+- `web/src/components/dashboard/DashboardSeverityBadge.tsx`
+- `web/src/components/dashboard/DashboardIssueList.tsx`
+- `web/src/components/nav/DashboardNavSeverityBadge.tsx`
+
+### Frontend Files Changed
+
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/components/nav/NavList.tsx`
+- `web/src/components/nav/types.d.ts`
+- `web/src/config/nav/admin.ts`
+
+### Websocket Commands Added
+
+- None. Reuses `stats.dashboard.overview`.
+
+### Dashboard Integration
+
+- `/dashboard` summary cards and section cards now show fa-duotone severity icons and warning/error counts.
+- Attention queue renders issue rows with severity icons and links.
+- Dashboard nav parent and child routes render live severity badges from overview state.
+
+### Architectural Decisions
+
+- Frontend uses only backend-provided overview severity/count/issue fields.
+- No raw metric thresholds or business rules were added to frontend code.
+- Nav badge polling uses the shared stats store dogpile protection.
+- Focused helper tests are deferred until a frontend unit test runner exists.
+
+### Deferred TODOs
+
+- Add focused helper tests once frontend unit testing is configured.
+- Consider configurable nav severity polling cadence.
+
+### Validation
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2 after rerun

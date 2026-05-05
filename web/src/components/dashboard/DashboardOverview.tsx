@@ -4,85 +4,17 @@ import Link from 'next/link'
 import React, { useEffect } from 'react'
 
 import type {
-  DashboardAttentionItem,
   DashboardCardSummary,
-  DashboardIssueSummary,
   DashboardMetricSummary,
   DashboardSectionSummary,
-  DashboardSeverity,
 } from '@/models/stats/dashboardOverview'
+import { DashboardIssueList, DashboardIssueSummaryLine } from '@/components/dashboard/DashboardIssueList'
+import { DashboardSeverityBadge, DashboardSeverityIcon } from '@/components/dashboard/DashboardSeverityBadge'
+import {
+  dashboardSeverityTone,
+  sortDashboardIssues,
+} from '@/components/dashboard/dashboardSeverity'
 import { useStatsStore } from '@/stores/statsStore'
-
-type Tone = {
-  label: string
-  border: string
-  bg: string
-  text: string
-  dot: string
-  soft: string
-  ring: string
-}
-
-const tones: Record<DashboardSeverity, Tone> = {
-  healthy: {
-    label: 'healthy',
-    border: 'border-emerald-300/30',
-    bg: 'bg-emerald-400/10',
-    text: 'text-emerald-100',
-    dot: 'bg-emerald-300',
-    soft: 'text-emerald-200/80',
-    ring: 'shadow-[0_0_0_1px_rgba(110,231,183,0.12),0_18px_45px_-30px_rgba(52,211,153,0.65)]',
-  },
-  info: {
-    label: 'info',
-    border: 'border-cyan-300/30',
-    bg: 'bg-cyan-400/10',
-    text: 'text-cyan-100',
-    dot: 'bg-cyan-300',
-    soft: 'text-cyan-200/80',
-    ring: 'shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_45px_-30px_rgba(34,211,238,0.65)]',
-  },
-  warning: {
-    label: 'warning',
-    border: 'border-amber-300/35',
-    bg: 'bg-amber-400/10',
-    text: 'text-amber-100',
-    dot: 'bg-amber-300',
-    soft: 'text-amber-200/80',
-    ring: 'shadow-[0_0_0_1px_rgba(252,211,77,0.12),0_18px_45px_-30px_rgba(251,191,36,0.65)]',
-  },
-  error: {
-    label: 'error',
-    border: 'border-rose-300/35',
-    bg: 'bg-rose-400/10',
-    text: 'text-rose-100',
-    dot: 'bg-rose-300',
-    soft: 'text-rose-200/80',
-    ring: 'shadow-[0_0_0_1px_rgba(253,164,175,0.12),0_18px_45px_-30px_rgba(244,63,94,0.65)]',
-  },
-  unknown: {
-    label: 'unknown',
-    border: 'border-white/10',
-    bg: 'bg-white/5',
-    text: 'text-white/70',
-    dot: 'bg-white/35',
-    soft: 'text-white/55',
-    ring: 'shadow-[0_18px_45px_-35px_rgba(255,255,255,0.2)]',
-  },
-  unavailable: {
-    label: 'unavailable',
-    border: 'border-white/10',
-    bg: 'bg-white/5',
-    text: 'text-white/55',
-    dot: 'bg-white/25',
-    soft: 'text-white/45',
-    ring: 'shadow-[0_18px_45px_-35px_rgba(255,255,255,0.18)]',
-  },
-}
-
-function toneFor(severity: DashboardSeverity): Tone {
-  return tones[severity] ?? tones.unknown
-}
 
 function formatCheckedAt(value: number | string | null, fallback: number | null): string {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
@@ -96,12 +28,6 @@ function formatCheckedAt(value: number | string | null, fallback: number | null)
   }
 
   return fallback ? new Date(fallback).toLocaleTimeString() : 'pending'
-}
-
-function issueGlyph(severity: DashboardSeverity): string {
-  if (severity === 'error') return '!'
-  if (severity === 'warning') return '!'
-  return 'i'
 }
 
 const LiveBadge = ({
@@ -136,46 +62,8 @@ const LiveBadge = ({
   </div>
 )
 
-function SeverityBadge({ severity }: { severity: DashboardSeverity }) {
-  const tone = toneFor(severity)
-  return (
-    <span className={['inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs', tone.border, tone.bg, tone.text].join(' ')}>
-      <span className={['h-1.5 w-1.5 rounded-full', tone.dot].join(' ')} />
-      {tone.label}
-    </span>
-  )
-}
-
-function IssueRow({ issue, link = true }: { issue: DashboardIssueSummary | DashboardAttentionItem; link?: boolean }) {
-  const tone = toneFor(issue.severity)
-  const content = (
-    <div className={['flex items-start gap-3 rounded-2xl border px-3 py-2', tone.border, tone.bg].join(' ')}>
-      <span
-        className={[
-          'mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-          tone.bg,
-          tone.text,
-        ].join(' ')}>
-        {issueGlyph(issue.severity)}
-      </span>
-      <div className="min-w-0">
-        {'title' in issue ?
-          <div className="mb-0.5 text-xs font-semibold text-white/70">{issue.title}</div>
-        : null}
-        <div className="text-sm text-white/80">{issue.message}</div>
-      </div>
-    </div>
-  )
-
-  return link && issue.href ?
-      <Link href={issue.href} className="block transition hover:brightness-125">
-        {content}
-      </Link>
-    : content
-}
-
 function MetricPill({ metric, link = true }: { metric: DashboardMetricSummary; link?: boolean }) {
-  const tone = toneFor(metric.tone)
+  const tone = dashboardSeverityTone(metric.tone)
   const body = (
     <div className={['rounded-2xl border px-3 py-2', tone.border, tone.bg].join(' ')}>
       <div className="text-[11px] text-white/45 uppercase">{metric.label}</div>
@@ -210,16 +98,41 @@ function OverviewShell({
 }
 
 function SectionCard({ section }: { section: DashboardSectionSummary }) {
-  const tone = toneFor(section.severity)
+  const tone = dashboardSeverityTone(section.severity)
+  const firstIssue = sortDashboardIssues([...section.errors, ...section.warnings])[0]
+
   return (
     <Link href={section.href} className="block h-full transition hover:-translate-y-0.5 hover:brightness-110">
-      <div className={['h-full rounded-3xl border bg-zinc-950/45 p-4 backdrop-blur', tone.border, tone.ring].join(' ')}>
+      <div
+        className={[
+          'h-full rounded-3xl border bg-zinc-950/45 p-4 backdrop-blur',
+          tone.border,
+          tone.ring,
+          section.error_count > 0 || section.warning_count > 0 ? 'ring-1 ring-inset' : '',
+          section.error_count > 0 ? 'ring-rose-300/15'
+          : section.warning_count > 0 ? 'ring-amber-300/15'
+          : 'ring-white/0',
+        ].join(' ')}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-white/90">{section.title}</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
+              <DashboardSeverityIcon severity={section.severity} className={['h-4 w-4', tone.text].join(' ')} />
+              {section.title}
+            </div>
             <div className="mt-1 text-xs text-white/50">{section.description}</div>
+            <DashboardIssueSummaryLine
+              severity={section.error_count > 0 ? 'error' : section.warning_count > 0 ? 'warning' : section.severity}
+              errorCount={section.error_count}
+              warningCount={section.warning_count}
+              firstIssue={firstIssue}
+            />
           </div>
-          <SeverityBadge severity={section.severity} />
+          <DashboardSeverityBadge
+            severity={section.severity}
+            errorCount={section.error_count}
+            warningCount={section.warning_count}
+            showCount
+          />
         </div>
         <p className="mt-4 min-h-10 text-sm text-white/70">{section.summary}</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -233,16 +146,38 @@ function SectionCard({ section }: { section: DashboardSectionSummary }) {
 }
 
 function SummaryCard({ card }: { card: DashboardCardSummary }) {
-  const tone = toneFor(card.severity)
+  const tone = dashboardSeverityTone(card.severity)
+  const errors = card.errors.length
+  const warnings = card.warnings.length
+  const firstIssue = sortDashboardIssues([...card.errors, ...card.warnings])[0]
+
   return (
     <Link href={card.href} className="block h-full transition hover:-translate-y-0.5 hover:brightness-110">
-      <article className={['h-full rounded-3xl border bg-zinc-950/45 p-4 backdrop-blur', tone.border, tone.ring].join(' ')}>
+      <article
+        className={[
+          'h-full rounded-3xl border bg-zinc-950/45 p-4 backdrop-blur',
+          tone.border,
+          tone.ring,
+          errors > 0 || warnings > 0 ? 'ring-1 ring-inset' : '',
+          errors > 0 ? 'ring-rose-300/15'
+          : warnings > 0 ? 'ring-amber-300/15'
+          : 'ring-white/0',
+        ].join(' ')}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-white/90">{card.title}</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
+              <DashboardSeverityIcon severity={card.severity} className={['h-4 w-4', tone.text].join(' ')} />
+              {card.title}
+            </div>
             <div className="mt-1 line-clamp-2 text-xs text-white/50">{card.description}</div>
+            <DashboardIssueSummaryLine
+              severity={errors > 0 ? 'error' : warnings > 0 ? 'warning' : card.severity}
+              errorCount={errors}
+              warningCount={warnings}
+              firstIssue={firstIssue}
+            />
           </div>
-          <SeverityBadge severity={card.severity} />
+          <DashboardSeverityBadge severity={card.severity} errorCount={errors} warningCount={warnings} showCount />
         </div>
         <p className="mt-4 min-h-10 text-sm text-white/70">{card.available ? card.summary : card.unavailable_reason}</p>
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -251,12 +186,11 @@ function SummaryCard({ card }: { card: DashboardCardSummary }) {
           ))}
         </div>
         {card.errors.length || card.warnings.length ?
-          <div className="mt-4 space-y-2">
-            {[...card.errors, ...card.warnings].slice(0, 2).map(issue => (
-              <IssueRow key={`${card.id}-${issue.code}`} issue={issue} link={false} />
-            ))}
+          <div className="mt-4">
+            <DashboardIssueList issues={[...card.errors, ...card.warnings]} max={2} link={false} compact />
           </div>
         : null}
+        <div className="mt-4 text-xs font-medium text-cyan-100/80">View details {'>'}</div>
       </article>
     </Link>
   )
@@ -273,7 +207,7 @@ export default function DashboardOverviewComponent({ intervalMs = 7500 }: { inte
   }, [startPolling, stopPolling, intervalMs])
 
   const overview = wrapper.data
-  const tone = toneFor(overview.overall_status)
+  const tone = dashboardSeverityTone(overview.overall_status)
   const checkedAt = formatCheckedAt(overview.checked_at, wrapper.lastUpdated)
 
   return (
@@ -284,7 +218,12 @@ export default function DashboardOverviewComponent({ intervalMs = 7500 }: { inte
             <div className="text-xs font-semibold tracking-[0.18em] text-cyan-200/65 uppercase">Admin Dashboard</div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold text-white">Health Command Center</h1>
-              <SeverityBadge severity={overview.overall_status} />
+              <DashboardSeverityBadge
+                severity={overview.overall_status}
+                errorCount={overview.error_count}
+                warningCount={overview.warning_count}
+                showCount
+              />
             </div>
             <p className="mt-2 max-w-3xl text-sm text-white/60">
               Runtime, filesystem, storage, operations, and trend posture at a glance.
@@ -324,11 +263,11 @@ export default function DashboardOverviewComponent({ intervalMs = 7500 }: { inte
             {overview.attention.length} items
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-2">
+        <div className="mt-4">
           {overview.attention.length ?
-            overview.attention.slice(0, 6).map(item => <IssueRow key={`${item.card_id}-${item.code}`} issue={item} />)
+            <DashboardIssueList issues={overview.attention} max={6} className="grid grid-cols-1 gap-2 lg:grid-cols-2" />
           : <div className="rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-3 py-3 text-sm text-emerald-100">
-              No active warnings or errors.
+              All monitored systems nominal.
             </div>
           }
         </div>

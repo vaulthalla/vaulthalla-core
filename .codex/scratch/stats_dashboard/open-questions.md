@@ -57,3 +57,8 @@
 - Should the server-rendered admin sidebar get a small client-side dashboard severity badge component in Phase 11, or should nav severity stay inside the `/dashboard` overview surface until customizable layouts land?
 - Should overview severity thresholds become configurable, or remain conservative backend constants until operators have real production feedback?
 - Should global share observability be promoted to a system dashboard card, or stay per-vault only unless a clear global operator question emerges?
+
+## Phase 11
+
+- Should the nav severity poll interval stay at 15 seconds, or should it become configurable with the rest of dashboard polling?
+- Should dashboard overview severity helper tests wait for a frontend unit test runner, or should a tiny local script under `.codex/scripts` cover pure helper checks until then?

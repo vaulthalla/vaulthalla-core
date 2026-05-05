@@ -268,3 +268,30 @@ Checkpoint:
 - Commit SHA: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`.
 - Push result: succeeded, with GitHub remote moved warning.
+
+## Phase 11 - Live Dashboard Severity Badges and Overview Polish
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2 after rerun
+
+Notes:
+
+- Initial `meson test -C build` reported a single `S3ProviderIntegrationTest.test_S3MultipartUploadRoundtrip` `NoSuchKey` failure. Immediate serial rerun passed 2/2; treated as transient S3 fixture/provider behavior unrelated to Phase 11 frontend changes.
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending commit creation.
+- Push target: `origin/stats-dashboards`.

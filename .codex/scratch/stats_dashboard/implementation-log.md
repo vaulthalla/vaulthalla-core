@@ -621,3 +621,45 @@ Checkpoint:
 - Commit SHA: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`.
 - Push result: succeeded, with GitHub remote moved warning.
+
+## Phase 11 - Live Dashboard Severity Badges and Overview Polish
+
+Summary:
+
+- Added reusable dashboard severity helpers and fa-duotone severity icon components.
+- Added reusable dashboard issue list rows for backend-provided warnings/errors/attention items.
+- Polished `/dashboard` overview cards with severity icons, warning/error counts, first issue messages, and clearer detail links.
+- Polished the attention queue with severity icons and backend-provided issue ordering/rendering.
+- Added live dashboard nav severity badges driven by `stats.dashboard.overview` state.
+- Added nav item metadata for Dashboard overall and section-level severity sources.
+
+Frontend files added:
+
+- `web/src/components/dashboard/dashboardSeverity.ts`
+- `web/src/components/dashboard/DashboardSeverityBadge.tsx`
+- `web/src/components/dashboard/DashboardIssueList.tsx`
+- `web/src/components/nav/DashboardNavSeverityBadge.tsx`
+
+Frontend files changed:
+
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/components/nav/NavList.tsx`
+- `web/src/components/nav/types.d.ts`
+- `web/src/config/nav/admin.ts`
+
+Websocket commands added:
+
+- None. Phase 11 reuses `stats.dashboard.overview`.
+
+Architectural decisions:
+
+- Dashboard severity badge rendering uses only overview-provided severity/count/issue fields.
+- No frontend thresholds or raw-stat business rules were added.
+- `DashboardNavSeverityBadge` starts lightweight overview polling at 15 seconds while nav is mounted and relies on store dogpile protection.
+- Compact nav mode renders a small count/dot indicator for dashboard severity.
+- Focused helper tests are deferred because the web package does not currently have a unit test runner beyond typecheck/lint.
+
+Checkpoint:
+
+- Commit SHA: pending commit creation.
+- Push target: `origin/stats-dashboards`.

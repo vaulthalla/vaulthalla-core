@@ -303,7 +303,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8D - Storage Backend Health
 
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 - Commit: `b2d1dcb0`
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.storage`, `stats.vault.storage`.
@@ -337,7 +337,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
 - Known failures: none currently.
-- Push result: pending.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add provider operation counters and latency/error instrumentation when storage engine boundaries are instrumented.
   - Add focused backend tests for storage backend status classification.

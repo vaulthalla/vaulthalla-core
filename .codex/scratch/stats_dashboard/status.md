@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8D - Storage Backend Health
-- Status: committed locally; push pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 

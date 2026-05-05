@@ -303,8 +303,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8D - Storage Backend Health
 
-- Status: validated locally; checkpoint commit pending.
-- Commit: pending
+- Status: committed locally; push pending.
+- Commit: `b2d1dcb0`
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.storage`, `stats.vault.storage`.
 - Backend surfaces:

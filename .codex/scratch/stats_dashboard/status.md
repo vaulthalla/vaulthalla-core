@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8D - Storage Backend Health
-- Status: validated locally; checkpoint commit pending.
+- Status: committed locally; push pending.
 
 ## Completed Phases
 
@@ -34,5 +34,5 @@ The vault dashboard now renders Storage Backend after Capacity and before Sync H
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `b2d1dcb0`
 - Push target: `origin/stats-dashboards`.

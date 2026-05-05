@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8B - Operation Queue Health
-- Status: implemented and validated; checkpoint commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -31,5 +31,5 @@ The admin dashboard now renders Operation Queue after FUSE. The vault dashboard 
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `f6ea80df`
 - Push target: `origin/stats-dashboards`.

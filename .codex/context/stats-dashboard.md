@@ -221,8 +221,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8B - Operation Queue Health
 
-- Status: implemented and validated; checkpoint commit pending.
-- Commit: pending
+- Status: committed and pushed.
+- Commit: `f6ea80df`
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.operations`, `stats.vault.operations`.
 - Backend surfaces:
@@ -256,6 +256,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
 - Known failures: none currently.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add seeded operation/share-upload stats tests.
   - Add progress-staleness detection only if upload progress timestamps or instrumentation are added.

@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
-- Status: implementation complete; checkpoint commit/push pending.
+- Status: committed locally; push pending.
 
 ## Completed Phases
 
@@ -36,7 +36,7 @@ Live severity badges in the sidebar are deferred; static child routes are in pla
 
 ## Checkpoint
 
-- Commit SHA: pending commit creation.
+- Commit SHA: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`.
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes

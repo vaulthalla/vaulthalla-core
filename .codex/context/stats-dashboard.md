@@ -432,8 +432,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
 
-- Status: implementation complete; checkpoint commit/push pending.
-- Commit: pending commit creation.
+- Status: committed locally; push pending.
+- Commit: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.dashboard.overview`.
 - Backend surfaces:

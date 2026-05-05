@@ -265,5 +265,5 @@ Known failures:
 
 Checkpoint:
 
-- Commit SHA: pending commit creation.
+- Commit SHA: `1b78ce7b`.
 - Push target: `origin/stats-dashboards`.

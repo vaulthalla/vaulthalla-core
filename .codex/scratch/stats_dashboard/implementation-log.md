@@ -541,3 +541,82 @@ Checkpoint:
 
 - Commit SHA: `aa4cf329`.
 - Push target: `origin/stats-dashboards`.
+
+## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
+
+Summary:
+
+- Added `stats.dashboard.overview` as an admin-only compact dashboard overview command.
+- Added `DashboardOverview` backend model with section/card summaries, primary metrics, severity, warnings, errors, hrefs, availability, and attention queue entries.
+- Added backend summary builders for:
+  - `system.health`
+  - `system.threadpools`
+  - `system.connections`
+  - `system.fuse`
+  - `system.fs_cache`
+  - `system.http_cache`
+  - `system.storage`
+  - `system.db`
+  - `system.retention`
+  - `system.operations`
+  - `system.trends`
+- Added frontend defensive dashboard overview parser and stats store wrapper/polling helpers.
+- Replaced the giant `/dashboard` full-card list with compact overview cards and an attention queue.
+- Added fixed drilldown routes:
+  - `/dashboard/runtime`
+  - `/dashboard/filesystem`
+  - `/dashboard/storage`
+  - `/dashboard/operations`
+  - `/dashboard/trends`
+- Moved existing full admin stats cards onto the drilldown routes without shrinking the existing components.
+- Added static Dashboard child routes to the admin nav and exact matching for the overview sub-route.
+
+Backend files added:
+
+- `core/include/stats/model/DashboardOverview.hpp`
+- `core/src/stats/model/DashboardOverview.cpp`
+
+Backend files changed:
+
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+
+Frontend files added:
+
+- `web/src/models/stats/dashboardOverview.ts`
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/components/dashboard/DashboardDetailPage.tsx`
+- `web/src/app/(app)/(admin)/dashboard/runtime/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/filesystem/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/storage/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/operations/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/trends/page.tsx`
+
+Frontend files changed:
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+- `web/src/components/nav/NavList.tsx`
+- `web/src/components/nav/types.d.ts`
+- `web/src/config/nav/admin.ts`
+
+Websocket commands added:
+
+- `stats.dashboard.overview`
+
+Architectural decisions:
+
+- Summary severity/warning/error rules live in the backend overview builders.
+- Frontend overview cards render only backend-provided summaries, metrics, warnings, errors, and hrefs.
+- Overview request shape allows card ID/variant/size only and intentionally avoids arbitrary field selection.
+- Summary builders reuse existing live stats collectors for buildout speed while returning compact payloads.
+- Unavailable cards are honest `available=false` summaries and do not count as operational warnings/errors unless the underlying card builder marks them so.
+- Global share stats remain omitted from the system operations drilldown because the roadmap has only landed per-vault share observability.
+- Sidebar live severity badges are deferred; static child routes are in place.
+
+Checkpoint:
+
+- Commit SHA: pending commit creation.
+- Push target: `origin/stats-dashboards`.

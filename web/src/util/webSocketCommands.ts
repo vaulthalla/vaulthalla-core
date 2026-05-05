@@ -14,6 +14,7 @@ import { File, IFileUpload } from '@/models/file'
 import { Directory } from '@/models/directory'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { ConnectionStats } from '@/models/stats/connectionStats'
+import { DashboardOverview, DashboardOverviewRequest } from '@/models/stats/dashboardOverview'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
@@ -300,6 +301,8 @@ export interface WebSocketCommandMap {
   'stats.vault.retention': { payload: { vault_id: number }; response: { stats: RetentionStats } }
 
   'stats.vault.trends': { payload: { vault_id: number; window_hours?: number }; response: { stats: StatsTrends } }
+
+  'stats.dashboard.overview': { payload: DashboardOverviewRequest | null; response: { stats: DashboardOverview } }
 
   'stats.system.health': { payload: null; response: { stats: SystemHealth } }
 

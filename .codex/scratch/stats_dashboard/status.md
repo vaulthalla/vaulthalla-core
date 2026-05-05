@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-- Phase 9 - Historical Snapshots and Trends
-- Status: committed and pushed.
+- Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
+- Status: implementation complete; checkpoint commit/push pending.
 
 ## Completed Phases
 
@@ -20,25 +20,86 @@
 - Phase 8C: ConnectionStats, `stats.system.connections`, admin dashboard card.
 - Phase 8D: StorageBackendStats, `stats.system.storage` and `stats.vault.storage`, admin and vault dashboard cards.
 - Phase 8E: RetentionStats, `stats.system.retention` and `stats.vault.retention`, admin and vault dashboard cards.
+- Phase 9: Historical snapshots, `stats.system.trends` and `stats.vault.trends`, admin and vault dashboard cards.
 
 ## Latest Phase Summary
 
-Phase 9 adds historical dashboard snapshots and trend cards:
+Phase 10 splits the admin dashboard into a compact command center plus drilldown pages:
 
-- `stats_snapshot` JSONB table for persisted dashboard snapshots.
-- Configurable background `StatsSnapshotService` for runtime and vault snapshot cadence/retention.
-- `stats.system.trends` for admin-only system trend lines.
-- `stats.vault.trends` for View/ViewStats-authorized vault trend lines.
-- System trends cover DB size/cache, FUSE ops/errors, thread pool pressure, and cache hit rates.
-- Vault trends cover capacity growth, sync errors/failed ops/traffic, and activity mutation/byte trends.
+- `stats.dashboard.overview` returns backend-owned section/card summaries.
+- Summary cards include severity, warnings, errors, primary metrics, hrefs, and availability state.
+- `/dashboard` now renders the compact overview and attention queue.
+- Full-size admin cards moved to `/dashboard/runtime`, `/dashboard/filesystem`, `/dashboard/storage`, `/dashboard/operations`, and `/dashboard/trends`.
+- Dashboard sidebar now exposes the fixed child routes.
 
-The admin dashboard now renders Trends after Retention / Cleanup.
-The vault dashboard now renders Trends after Retention / Cleanup.
+Live severity badges in the sidebar are deferred; static child routes are in place.
 
 ## Checkpoint
 
-- Commit SHA: `aa4cf329`.
+- Commit SHA: pending commit creation.
 - Push target: `origin/stats-dashboards`.
+
+## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
+
+### Backend Files Added
+
+- `core/include/stats/model/DashboardOverview.hpp`
+- `core/src/stats/model/DashboardOverview.cpp`
+
+### Backend Files Changed
+
+- `core/include/protocols/ws/handler/Stats.hpp`
+- `core/src/protocols/ws/handler/Stats.cpp`
+- `core/src/protocols/ws/Handler.cpp`
+
+### Frontend Files Added
+
+- `web/src/models/stats/dashboardOverview.ts`
+- `web/src/components/dashboard/DashboardOverview.tsx`
+- `web/src/components/dashboard/DashboardDetailPage.tsx`
+- `web/src/app/(app)/(admin)/dashboard/runtime/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/filesystem/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/storage/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/operations/page.tsx`
+- `web/src/app/(app)/(admin)/dashboard/trends/page.tsx`
+
+### Frontend Files Changed
+
+- `web/src/util/webSocketCommands.ts`
+- `web/src/stores/statsStore.ts`
+- `web/src/app/(app)/(admin)/dashboard/page.tsx`
+- `web/src/components/nav/NavList.tsx`
+- `web/src/components/nav/types.d.ts`
+- `web/src/config/nav/admin.ts`
+
+### Websocket Commands Added
+
+- `stats.dashboard.overview`
+
+### Dashboard Integration
+
+- `/dashboard` renders `DashboardOverviewComponent` instead of the full scroll-heavy card list.
+- `/dashboard/runtime` renders System Health, Thread Pools, and Connection Health.
+- `/dashboard/filesystem` renders FUSE, FS Cache, and HTTP Preview Cache.
+- `/dashboard/storage` renders Storage Backend, Database Health, and Retention / Cleanup.
+- `/dashboard/operations` renders Operation Queue.
+- `/dashboard/trends` renders Trends.
+- Admin nav exposes Dashboard child routes for Overview, Runtime, Filesystem, Storage, Operations, and Trends.
+
+### Architectural Decisions
+
+- `stats.dashboard.overview` is admin-only.
+- The backend owns severity, warning, and error rules for overview cards.
+- The overview request accepts card IDs/variant/size only; it does not support arbitrary metric field selection.
+- Summary builders reuse existing live stats collectors and return compact summaries.
+- Unavailable cards are returned honestly with `available=false` and do not contribute to warning/error counts.
+- Global share stats are omitted from Phase 10 operations because no global share card exists yet.
+- Live severity badges in the server-rendered sidebar are deferred until the nav can consume live overview state without DOM scraping.
+
+### Deferred TODOs
+
+- Add live dashboard nav severity badges driven by `stats.dashboard.overview`.
+- Add focused tests for dashboard overview summary severity mapping once a lightweight stats fixture seam exists.
 
 ## Phase 9 - Historical Snapshots and Trends
 

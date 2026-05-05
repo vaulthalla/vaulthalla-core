@@ -11,7 +11,7 @@ export const NavList = ({ items, compact = false }: { items: NavItem[]; compact?
       <div key={item.href} className={clsx(depth === 0 && 'border-b border-cyan-900/30 pb-1')}>
         <ActiveLink
           href={item.href}
-          partial
+          partial={!item.exact}
           className={clsx(
             'flex items-center justify-between rounded-md px-2 py-2 transition-colors',
             compact && 'justify-center',

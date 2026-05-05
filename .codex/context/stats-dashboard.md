@@ -429,3 +429,48 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 - Deferred TODOs:
   - Add daily compaction/downsampling if longer raw snapshot retention becomes expensive.
   - Add seeded DB tests for trend extraction once snapshot fixtures exist.
+
+## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
+
+- Status: implementation complete; checkpoint commit/push pending.
+- Commit: pending commit creation.
+- Push target: `origin/stats-dashboards`
+- Websocket commands: `stats.dashboard.overview`.
+- Backend surfaces:
+  - `stats/model/DashboardOverview` serializes overview, section, card, metric, issue, and attention summaries.
+  - `stats.dashboard.overview` is admin-only and accepts card ID/variant/size requests without arbitrary field selection.
+  - Summary builders map existing live stats surfaces into compact backend-owned severities, warnings, errors, and primary metrics.
+- Frontend surfaces:
+  - `web/src/models/stats/dashboardOverview.ts`
+  - `web/src/components/dashboard/DashboardOverview.tsx`
+  - `web/src/components/dashboard/DashboardDetailPage.tsx`
+  - `statsStore` dashboard overview wrapper, fetch, refresh, and polling helpers
+  - `WebSocketCommandMap['stats.dashboard.overview']`
+- Dashboard integration:
+  - `/dashboard` now renders the compact dashboard overview and attention queue.
+  - `/dashboard/runtime` renders System Health, Thread Pools, and Connection Health.
+  - `/dashboard/filesystem` renders FUSE, FS Cache, and HTTP Preview Cache.
+  - `/dashboard/storage` renders Storage Backend, Database Health, and Retention / Cleanup.
+  - `/dashboard/operations` renders Operation Queue.
+  - `/dashboard/trends` renders Trends.
+  - Admin nav now exposes fixed Dashboard child routes.
+- Architectural decisions:
+  - Backend owns overview business rules for warnings/errors/severity.
+  - Unavailable cards are returned honestly and do not contribute to operational warning/error counts by default.
+  - Summary builders reuse existing live collectors in Phase 10 to keep the vertical slice complete.
+  - Global share stats are omitted because only per-vault share observability exists today.
+  - Sidebar live severity badges are deferred until nav can consume live overview state cleanly.
+- Validation:
+  - `git diff --check`: passed
+  - `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+  - `meson setup --reconfigure build`: passed
+  - `meson compile -C build`: passed
+  - `make test`: passed
+  - `pnpm --dir web typecheck`: passed
+  - `pnpm --dir web lint`: passed
+  - `pnpm --dir web test`: passed
+  - `meson test -C build`: passed, 2/2
+- Known failures: none currently.
+- Deferred TODOs:
+  - Add live nav severity badges driven by `stats.dashboard.overview`.
+  - Add focused tests for overview severity mapping and issue generation.

@@ -9,6 +9,7 @@ import { VaultShareStats } from '@/models/stats/vaultShareStats'
 import { VaultSyncHealth } from '@/models/stats/vaultSyncHealth'
 import { CacheStats } from '@/models/stats/cacheStats'
 import { ConnectionStats } from '@/models/stats/connectionStats'
+import { DashboardOverview } from '@/models/stats/dashboardOverview'
 import { DbStats } from '@/models/stats/dbStats'
 import { FuseStats } from '@/models/stats/fuseStats'
 import { OperationStats } from '@/models/stats/operationStats'
@@ -46,6 +47,7 @@ export type ConnectionStatsWrapper = StatsWrapper<ConnectionStats>
 export type StorageBackendStatsWrapper = StatsWrapper<StorageBackendStats>
 export type RetentionStatsWrapper = StatsWrapper<RetentionStats>
 export type StatsTrendsWrapper = StatsWrapper<StatsTrends>
+export type DashboardOverviewWrapper = StatsWrapper<DashboardOverview>
 
 const makeCacheWrapper = (initial?: Partial<CacheStatsWrapper>): CacheStatsWrapper => ({
   data: new CacheStats({}),
@@ -149,6 +151,16 @@ const makeStatsTrendsWrapper = (initial?: Partial<StatsTrendsWrapper>): StatsTre
   ...initial,
 })
 
+const makeDashboardOverviewWrapper = (initial?: Partial<DashboardOverviewWrapper>): DashboardOverviewWrapper => ({
+  data: new DashboardOverview(),
+  lastUpdated: null,
+  loading: false,
+  error: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  ...initial,
+})
+
 interface StatsStore {
   // Two independent caches, same type
   fsCacheStats: CacheStatsWrapper
@@ -162,6 +174,7 @@ interface StatsStore {
   storageBackendStats: StorageBackendStatsWrapper
   retentionStats: RetentionStatsWrapper
   systemTrends: StatsTrendsWrapper
+  dashboardOverview: DashboardOverviewWrapper
 
   // Fetchers (raw RPC)
   getVaultStats: (payload: WSCommandPayload<'stats.vault'>) => Promise<VaultStats>
@@ -183,6 +196,7 @@ interface StatsStore {
   getStorageBackendStats: (payload?: WSCommandPayload<'stats.system.storage'>) => Promise<StorageBackendStats>
   getRetentionStats: (payload?: WSCommandPayload<'stats.system.retention'>) => Promise<RetentionStats>
   getSystemTrends: (payload?: WSCommandPayload<'stats.system.trends'>) => Promise<StatsTrends>
+  getDashboardOverview: (payload?: WSCommandPayload<'stats.dashboard.overview'>) => Promise<DashboardOverview>
   getFsCacheStats: (payload?: WSCommandPayload<'stats.fs.cache'>) => Promise<CacheStats>
   getHttpCacheStats: (payload?: WSCommandPayload<'stats.http.cache'>) => Promise<CacheStats>
 
@@ -196,6 +210,7 @@ interface StatsStore {
   refreshStorageBackendStats: () => Promise<StorageBackendStats>
   refreshRetentionStats: () => Promise<RetentionStats>
   refreshSystemTrends: () => Promise<StatsTrends>
+  refreshDashboardOverview: () => Promise<DashboardOverview>
   refreshFsCacheStats: () => Promise<CacheStats>
   refreshHttpCacheStats: () => Promise<CacheStats>
 
@@ -218,6 +233,8 @@ interface StatsStore {
   stopRetentionStatsPolling: () => void
   startSystemTrendsPolling: (intervalMs?: number) => void
   stopSystemTrendsPolling: () => void
+  startDashboardOverviewPolling: (intervalMs?: number) => void
+  stopDashboardOverviewPolling: () => void
   startFsCacheStatsPolling: (intervalMs?: number) => void
   stopFsCacheStatsPolling: () => void
   startHttpCacheStatsPolling: (intervalMs?: number) => void
@@ -233,6 +250,7 @@ interface StatsStore {
   _storageBackendStatsPoller: number | null
   _retentionStatsPoller: number | null
   _systemTrendsPoller: number | null
+  _dashboardOverviewPoller: number | null
   _fsCachePoller: number | null
   _httpCachePoller: number | null
 }
@@ -249,6 +267,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   storageBackendStats: makeStorageBackendStatsWrapper(),
   retentionStats: makeRetentionStatsWrapper(),
   systemTrends: makeStatsTrendsWrapper(),
+  dashboardOverview: makeDashboardOverviewWrapper(),
 
   _systemHealthPoller: null,
   _threadPoolStatsPoller: null,
@@ -259,6 +278,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   _storageBackendStatsPoller: null,
   _retentionStatsPoller: null,
   _systemTrendsPoller: null,
+  _dashboardOverviewPoller: null,
   _fsCachePoller: null,
   _httpCachePoller: null,
 
@@ -393,6 +413,13 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     await ws.waitForConnection()
     const response = await ws.sendCommand('stats.system.trends', payload)
     return StatsTrends.from(response.stats)
+  },
+
+  async getDashboardOverview(payload = { scope: 'system' as const, mode: 'dashboard_home' }) {
+    const ws = useWebSocketStore.getState()
+    await ws.waitForConnection()
+    const response = await ws.sendCommand('stats.dashboard.overview', payload)
+    return DashboardOverview.from(response.stats)
   },
 
   async getFsCacheStats() {
@@ -706,6 +733,39 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     }
   },
 
+  async refreshDashboardOverview() {
+    const current = get().dashboardOverview
+    if (current.loading) return current.data
+
+    set({ dashboardOverview: { ...current, loading: true, error: null } })
+
+    try {
+      const stats = await get().getDashboardOverview({ scope: 'system', mode: 'dashboard_home' })
+      const nextData = DashboardOverview.from(stats ?? {})
+      const now = Date.now()
+
+      set({
+        dashboardOverview: {
+          ...get().dashboardOverview,
+          data: nextData,
+          lastUpdated: now,
+          lastSuccessAt: now,
+          loading: false,
+          error: null,
+        },
+      })
+
+      return nextData
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error) || 'Failed to fetch dashboard overview'
+      const now = Date.now()
+
+      set({ dashboardOverview: { ...get().dashboardOverview, loading: false, error: msg, lastErrorAt: now } })
+
+      return get().dashboardOverview.data
+    }
+  },
+
   async refreshFsCacheStats() {
     const current = get().fsCacheStats
     if (current.loading) return current.data // dogpile protection
@@ -949,6 +1009,26 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     if (id) {
       window.clearInterval(id)
       set({ _systemTrendsPoller: null })
+    }
+  },
+
+  startDashboardOverviewPolling(intervalMs = 7500) {
+    if (get()._dashboardOverviewPoller) return
+
+    void get().refreshDashboardOverview()
+
+    const id = window.setInterval(() => {
+      void get().refreshDashboardOverview()
+    }, intervalMs)
+
+    set({ _dashboardOverviewPoller: id })
+  },
+
+  stopDashboardOverviewPolling() {
+    const id = get()._dashboardOverviewPoller
+    if (id) {
+      window.clearInterval(id)
+      set({ _dashboardOverviewPoller: null })
     }
   },
 

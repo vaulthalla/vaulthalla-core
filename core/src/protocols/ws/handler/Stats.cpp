@@ -18,6 +18,7 @@
 #include "identities/User.hpp"
 #include "stats/model/CacheStats.hpp"
 #include "stats/model/ConnectionStats.hpp"
+#include "stats/model/DashboardOverview.hpp"
 #include "stats/model/DbStats.hpp"
 #include "stats/model/FuseStats.hpp"
 #include "stats/model/OperationStats.hpp"
@@ -208,6 +209,11 @@ json Stats::vaultSecurity(const json& payload, const std::shared_ptr<Session>& s
 
     const auto stats = vh::db::query::vault::Security::getVaultSecurity(vaultId);
     return {{"stats", stats ? json(*stats) : json(nullptr)}};
+}
+
+json Stats::dashboardOverview(const json& payload, const std::shared_ptr<Session>& session) {
+    if (!session->user->isAdmin()) throw std::runtime_error("Must be an admin to view dashboard overview stats.");
+    return {{"stats", vh::stats::model::DashboardOverview::snapshot(vh::stats::model::dashboardOverviewRequestFromJson(payload))}};
 }
 
 json Stats::systemHealth(const std::shared_ptr<Session>& session) {

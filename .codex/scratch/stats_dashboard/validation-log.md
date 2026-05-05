@@ -240,3 +240,30 @@ Checkpoint:
 - Commit SHA: `aa4cf329`.
 - Push target: `origin/stats-dashboards`
 - Push result: succeeded, with GitHub remote moved warning
+
+## Phase 10 - Dashboard Registry, Overview Command, and Drilldown Routes
+
+Validation:
+
+- `git diff --check`: passed
+- `git -c core.filemode=true diff --summary`: passed, no filemode-only noise
+- `meson setup --reconfigure build`: passed
+- `meson compile -C build`: passed
+- `make test`: passed
+- `pnpm --dir web typecheck`: passed
+- `pnpm --dir web lint`: passed
+- `pnpm --dir web test`: passed
+- `meson test -C build`: passed, 2/2
+
+Notes:
+
+- An initial `meson test -C build` was started in parallel with `make test` while the test DB install was still running; it failed because `vh_cli_test` did not exist yet. Re-running serially after `make test` passed 2/2. This was a validation-order artifact, not a feature regression.
+
+Known failures:
+
+- None currently.
+
+Checkpoint:
+
+- Commit SHA: pending commit creation.
+- Push target: `origin/stats-dashboards`.

@@ -10,7 +10,19 @@ import VaultShield from '@/fa-duotone/file-shield.svg'
 import ShareNodes from '@/fa-duotone/share-nodes.svg'
 
 export const adminNavItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: Vault },
+  {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: Vault,
+    subItems: [
+      { label: 'Overview', href: '/dashboard', icon: Vault, exact: true },
+      { label: 'Runtime', href: '/dashboard/runtime', icon: Sliders },
+      { label: 'Filesystem', href: '/dashboard/filesystem', icon: VaultShield },
+      { label: 'Storage', href: '/dashboard/storage', icon: Vault },
+      { label: 'Operations', href: '/dashboard/operations', icon: ShareNodes },
+      { label: 'Trends', href: '/dashboard/trends', icon: UserShield },
+    ],
+  },
   { label: 'Vaults', href: '/vaults', icon: Vault },
   { label: 'Shares', href: '/shares', icon: ShareNodes },
   { label: 'API Keys', href: '/api-keys', icon: KeySkeleton },

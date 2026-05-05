@@ -387,8 +387,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 9 - Historical Snapshots and Trends
 
-- Status: implemented and validated; checkpoint commit pending.
-- Commit: pending checkpoint commit.
+- Status: committed and pushed.
+- Commit: `aa4cf329`.
 - Push target: `origin/stats-dashboards`
 - Websocket commands: `stats.system.trends`, `stats.vault.trends`.
 - Backend surfaces:
@@ -424,7 +424,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2
 - Known failures: none currently.
-- Push result: pending checkpoint push.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add daily compaction/downsampling if longer raw snapshot retention becomes expensive.
   - Add seeded DB tests for trend extraction once snapshot fixtures exist.

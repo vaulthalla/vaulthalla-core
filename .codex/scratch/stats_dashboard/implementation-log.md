@@ -539,5 +539,5 @@ Architectural decisions:
 
 Checkpoint:
 
-- Commit SHA: pending checkpoint commit.
+- Commit SHA: `aa4cf329`.
 - Push target: `origin/stats-dashboards`.

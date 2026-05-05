@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 9 - Historical Snapshots and Trends
-- Status: implemented and validated; checkpoint commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -37,7 +37,7 @@ The vault dashboard now renders Trends after Retention / Cleanup.
 
 ## Checkpoint
 
-- Commit SHA: pending checkpoint commit.
+- Commit SHA: `aa4cf329`.
 - Push target: `origin/stats-dashboards`.
 
 ## Phase 9 - Historical Snapshots and Trends

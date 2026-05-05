@@ -143,8 +143,8 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
 
 ## Phase 8 - Vault Security / Integrity
 
-- Status: implemented and validated; checkpoint commit pending.
-- Commit: pending
+- Status: committed and pushed.
+- Commit: `f5ff4219`
 - Push target: `origin/stats-dashboards`
 - Websocket command: `stats.vault.security`.
 - Backend surfaces:
@@ -175,6 +175,7 @@ This file mirrors the ignored scratch roadmap/status notes for durable checkpoin
   - `pnpm --dir web test`: passed
   - `meson test -C build`: passed, 2/2 after rerunning sequentially behind `make test`; an earlier concurrent run raced the test DB setup and hit the known password-auth initialization failure
 - Known failures: none currently.
+- Push result: succeeded, with GitHub remote moved warning.
 - Deferred TODOs:
   - Add seeded DB tests for vault security rollups.
   - Add a real integrity verifier before reporting checksum health as passed/failed.

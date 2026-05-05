@@ -3,7 +3,7 @@
 ## Current Phase
 
 - Phase 8 - Vault Security / Integrity
-- Status: implemented and validated; checkpoint commit pending.
+- Status: committed and pushed.
 
 ## Completed Phases
 
@@ -28,5 +28,5 @@ The vault dashboard now renders Security / Integrity after Share Observatory.
 
 ## Checkpoint
 
-- Commit SHA: pending
+- Commit SHA: `f5ff4219`
 - Push target: `origin/stats-dashboards`.
